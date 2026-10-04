@@ -224,23 +224,23 @@ ax.set_title("this one is left open, so the page shows it")'''),
     ],
     '''
 title: Figure and Axes
-intro: The two objects everything hangs off, and the two APIs that confuse every example.
+intro: The two objects all hangs off, and the two APIs that confuse each example.
 
 ## Two objects
 
-A **Figure** is the whole image: the canvas, its size, its background, and the file it is eventually saved to.
+A **Figure** is the whole image: the canvas, its size, its background. The file it's eventually saved to.
 
-An **Axes** is one plotting area inside it &mdash; the box with the ticks, the data, and the labels.
+An **Axes** is one plotting area inside it. The box with the ticks, the data, and the labels.
 
-The name is unfortunate. "Axes" is singular here, and it does not mean "the x and y axes". Those are `ax.xaxis` and `ax.yaxis`, which are objects on the Axes. One figure can hold many Axes, which is what a grid of subplots is.
+The name is unfortunate. "Axes" is singular here. It doesn't mean "the x and y axes". Those are `ax.xaxis` and `ax.yaxis`. This Are objects on the Axes. One figure can hold many Axes. This Is what a grid of subplots is.
 
-Nearly everything you want to do belongs to the Axes. Plotting, labelling, limits, ticks, legends and annotation are all `ax.` methods. The Figure handles size, the overall title, layout between subplots, and saving.
+Nearly all you want to do belongs to the Axes. Plotting, labelling, limits, ticks, legends and annotation are all `ax.` methods. The Figure handles size, the total title, layout between subplots, and saving.
 
-`fig, ax = plt.subplots()` creates one of each and returns both. It is the standard first line of almost every matplotlib program, and it is worth using even for a single plot, because it puts you in the API that keeps working when the plot grows.
+`fig, ax = plt.subplots()` creates one of each and returns both. It's the standard first line of almost each matplotlib program. It's worth using even for a single plot. It puts you in the API that keeps working when the plot grows.
 
 ## Two APIs
 
-Every matplotlib example you find online is written in one of two styles, and mixing them is why so many of them are hard to follow.
+each matplotlib example you find online is written in one of two styles. Mixing them is why so many of them are hard to follow.
 
 **Stateful (pyplot)**: `plt.plot(...)`, `plt.title(...)`, `plt.xlabel(...)`. These act on "the current figure and current axes", which matplotlib tracks internally. It is compact and reads well for a single quick plot.
 
@@ -248,25 +248,25 @@ Every matplotlib example you find online is written in one of two styles, and mi
 
 The stateful API is a convenience layer over the object-oriented one. `plt.title` finds the current axes and calls `set_title` on it.
 
-The translation is mechanical: most `plt.foo()` calls become `ax.set_foo()`. The exceptions are the drawing methods &mdash; `plot`, `scatter`, `bar` &mdash; which keep their names because they are actions rather than properties.
+The translation is rote: most `plt.foo()` calls become `ax.set_foo()`. The exceptions are the drawing methods. `plot`, `scatter`, `bar`. Which keep their names because they're actions rather than properties.
 
 ## Why the object-oriented form
 
-The current figure is a global variable, with the problems globals always have.
+The current figure is a global var, with the problems globals always have.
 
-In a script that draws one plot, nothing goes wrong. In a script that draws several, `plt.plot` after creating a second figure lands on the second, whether or not that was the intent. In a notebook, where cells run repeatedly and out of order, "the current figure" is whatever ran last &mdash; which is why plots sometimes appear on the wrong chart or an earlier figure gains a line nobody added.
+In a script that draws one plot, nothing goes wrong. In a script that draws a few, `plt.plot` after creating a second figure lands on the second, whether or not that was the intent. In a notebook. Here Cells run again and again and out of order, "the current figure" is what ran last. Which is why plots at times appear on the wrong chart or an earlier figure gains a line no one added.
 
 The object-oriented form has no such ambiguity: `ax1.plot` draws on `ax1`.
 
-It is also the only form that works comfortably with subplots, where there are several axes and no sensible notion of a current one.
+It's also the only form that works comfortably with subplots. Here There are a few axes and no sensible notion of a current one.
 
-This track uses `fig, ax = plt.subplots()` throughout, and mentions the `plt` equivalent where you are likely to meet it in other people's code.
+This track uses `fig, ax = plt.subplots()` throughout. Mentions the `plt` equal where you're likely to meet it in other people's code.
 
 ## Artists
 
-Everything drawn is an **Artist**: lines, text, patches, the axes themselves.
+all drawn is an **Artist**: lines, text, patches, the axes themselves.
 
-Draw calls return the artists they create. `ax.plot` returns a **list** of `Line2D` objects &mdash; a list, because one call can draw several lines &mdash; which is why the idiom is:
+Draw calls return the artists they create. `ax.plot` returns a **list** of `Line2D` objects. A list. One call can draw a few lines. Which is why the idiom is:
 
 ```python
 line, = ax.plot(x, y)
@@ -274,29 +274,29 @@ line, = ax.plot(x, y)
 
 The trailing comma unpacks the single element. Without it, `line` is a list and `line.set_color` fails.
 
-Keeping the artist matters when you want to change it later: `line.set_color("crimson")`, `line.set_label("...")`. For a static plot you can ignore the return value entirely, which is what most code does.
+Keeping the artist matters when you want to change it later: `line.set_color("crimson")`, `line.set_label("...")`. For a static plot you can skip the return value fully. This Is what most code does.
 
 ## Closing figures
 
-matplotlib keeps an internal reference to every figure created through pyplot, so they are never garbage collected while that reference exists.
+matplotlib keeps an inner link to each figure created through pyplot. They're never garbage collected while that link exists.
 
-For one plot that does not matter. In a loop &mdash; generating a chart per group, per file, per day &mdash; the figures accumulate, and matplotlib warns after twenty that "more than 20 figures have been opened".
+For one plot that doesn't matter. In a loop. Making a chart per group, per file, per day. The figures build up. Matplotlib warns after twenty that "more than 20 figures have been opened".
 
-`plt.close(fig)` closes one; `plt.close("all")` closes everything. Any loop that draws should close.
+`plt.close(fig)` closes one. `plt.close("all")` closes all. Any loop that draws should close.
 
-On these pages the runner collects open figures after each run and closes them, which is why an editor that draws shows its plot. That is also why a `plt.close()` at the end of an editor would leave you with no image &mdash; the figure has to still be open when the program finishes.
+On these pages the runner collects open figures after each run and closes them. This Is why an editor that draws shows its plot. That is also why a `plt.close()` at the end of an editor would leave you with no image. The figure has to still be open when the program finishes.
 
 ## Where matplotlib sits
 
-matplotlib is the oldest and most widely used plotting library in Python, and nearly everything else is built on it or interoperates with it. pandas' `.plot`, seaborn, and the plotting in scikit-learn and statsmodels all produce matplotlib objects you can adjust afterwards.
+matplotlib is the oldest and most widely used plotting library in Python. Nearly all else is built on it or interoperates with it. pandas' `.plot`, seaborn. The plotting in scikit-learn and statsmodels all give matplotlib objects you can adjust later.
 
-That is the practical argument for learning it even if you mostly use something higher-level: when the convenience wrapper does not do quite what you need, the escape hatch is matplotlib, and it is always available.
+That is the hands-on arg for learning it even if you mostly use a thing higher-level. When the convenience wrapper doesn't do quite what you need, the escape hatch is matplotlib, and it's always on hand.
 
-Its age also explains its awkward parts. The pyplot interface was designed to feel like MATLAB, the object-oriented API came later, and both are supported forever. Most confusing examples online are simply mixing the two.
+Its age also shows its awkward parts. The pyplot interface was designed to feel like MATLAB, the object-oriented API came later. Both are supported forever. Most confusing examples online are simply mixing the two.
 
 ## The parts of a figure
 
-Worth naming, because the documentation uses these terms constantly:
+Worth naming, because the docs uses these terms constantly:
 
 **Figure** &mdash; the whole canvas.
 
@@ -310,23 +310,23 @@ Worth naming, because the documentation uses these terms constantly:
 
 **Ticks** &mdash; the marks on an axis, with major and minor variants.
 
-The hierarchy is Figure &rarr; Axes &rarr; Axis &rarr; ticks and labels, and almost every method lives on the Axes.
+The tree is Figure &rarr; Axes &rarr; Axis &rarr; ticks and labels. Almost each method lives on the Axes.
 
 ## Showing a figure
 
-In a **notebook**, figures display automatically when a cell finishes. `%matplotlib inline` is the default in Jupyter and rarely needs stating.
+In a **notebook**, figures display on its own when a cell finishes. `%matplotlib inline` is the default in Jupyter and rarely needs stating.
 
-In a **script**, nothing is displayed unless you ask. `plt.show()` opens a window and blocks; `fig.savefig(path)` writes a file. A script that draws and does neither produces nothing, which is a common first surprise.
+In a **script**, nothing is displayed unless you ask. `plt.show()` opens a window and blocks. `fig.savefig(path)` writes a file. A script that draws and does neither makes nothing. This Is a common first surprise.
 
-On **these pages**, the runner collects any figure still open when your program finishes, renders it to a PNG, and shows it under the printed output. That is why the editors here never call `show` or `savefig` &mdash; and why calling `plt.close()` at the end of an editor would leave you with no picture.
+On **these pages**, the runner collects any figure still open when your program finishes, renders it to a PNG. Shows it under the printed output. That is why the editors here never call `show` or `savefig`. And why calling `plt.close()` at the end of an editor would leave you with no picture.
 
 ## Backends
 
-A **backend** is what matplotlib draws with. Interactive ones open windows; non-interactive ones write files.
+A **backend** is what matplotlib draws with. Interactive ones open windows. Non-interactive ones write files.
 
-`AGG` is the non-interactive raster backend, and it is what these pages use, because a Web Worker has no window to draw into. `matplotlib.use("AGG")` selects it, and that call must come before pyplot is imported &mdash; which is why it is in the page setup rather than in the examples.
+`AGG` is the non-interactive raster backend. It's what these pages use. A Web Worker has no window to draw into. `matplotlib.use("AGG")` selects it, and that call must come before pyplot is imported. Which is why it's in the page setup rather than in the examples.
 
-You will meet this in two places: on a server with no display, where `AGG` is required, and in a script that hangs on `plt.show()` because it picked an interactive backend it cannot actually use.
+You'll meet this in two places: on a server with no display. Here `AGG` is needed. In a script that hangs on `plt.show()` because it picked an interactive backend it can't really use.
 
 ## What this track covers
 
@@ -336,27 +336,27 @@ Then the parts that make a chart readable: labels, legends, limits, ticks, scale
 
 Then layout: subplots, spacing, twin axes, saving.
 
-Then judgement: choosing a chart, common mistakes, and performance when the data is large.
+Then judgement: choosing a chart, common mistakes, and speed when the data is large.
 
-Every module is six short programs, and each one draws. Changing a number and re-running is the fastest way to find out what an argument actually does &mdash; which is worth more here than in most libraries, because matplotlib's argument names are not always guessable.
+each module is six short programs. Each one draws. Changing a number and re-running is the fastest way to find out what an arg really does. Which is worth more here than in most libraries. Matplotlib's arg names aren't always guessable.
 
 ## Questions people ask first
 
-**Why are there two ways to do everything?**
+**Why are there two ways to do all?**
 
-History. pyplot was written to feel like MATLAB, where there is one implicit figure and commands act on it. The object-oriented API came later and is what pyplot calls underneath. Both are supported permanently, so examples mix them, and that is the main reason matplotlib feels harder than it is.
+History. pyplot was written to feel like MATLAB. Here There's one silent figure and commands act on it. The object-oriented API came later and is what pyplot calls underneath. Both are supported permanently. Examples mix them. That is the main reason matplotlib feels harder than it's.
 
 **Do I need `plt.show()`?**
 
-In a script, yes, unless you are saving to a file. In a notebook, no. On these pages, no &mdash; the runner collects whatever is open.
+In a script, yes, unless you're saving to a file. In a notebook, no. On these pages, no. The runner collects what is open.
 
-**Why does my figure look different on someone else's machine?**
+**Why does my figure look other on someone else's machine?**
 
-A different style, a different `matplotlibrc`, a missing font, or a different backend. The first two are the usual causes and both are silent.
+A other style, a other `matplotlibrc`, a missing font, or a other backend. The first two are the usual causes and both are silent.
 
 **Should I use seaborn instead?**
 
-For statistical charts, often yes &mdash; it produces matplotlib objects, so nothing is lost. Knowing matplotlib is what lets you adjust what seaborn gives you.
+For statistical charts, often yes. It makes matplotlib objects. Nothing is lost. Knowing matplotlib is what lets you adjust what seaborn gives you.
 
 **Why is my chart slow?**
 
@@ -364,45 +364,45 @@ Almost always too many artists, or too many points to be visible. Both have thei
 
 ## How to read the documentation
 
-matplotlib's documentation is large and organised around the object model, which makes it hard to search until you know the vocabulary.
+matplotlib's docs is large and organised around the object model. This Makes it hard to search until you know the vocab.
 
 Three habits help.
 
-Search for the **Axes method**, not the pyplot function &mdash; `Axes.set_xlabel` rather than `plt.xlabel` &mdash; because that page lists the full signature and every keyword.
+Search for the **Axes method**, not the pyplot function. `Axes.set_xlabel` rather than `plt.xlabel`. Because that page lists the full signature and each keyword.
 
-Read the **Artist** page for the thing you are styling. Most keyword arguments to a drawing call are properties of the artist it creates, so `Line2D` documents everything `plot` accepts beyond its own arguments.
+Read the **Artist** page for the thing you're styling. Most keyword args to a drawing call are properties of the artist it creates. `Line2D` docs all `plot` accepts beyond its own args.
 
-Use the **examples gallery** as a search index. Finding a picture that resembles what you want and reading its source is usually faster than working out what the operation is called.
+Use the **examples gallery** as a search index. Finding a picture that resembles what you want and reading its source is often faster than working out what the step is called.
 
-The API is wide but shallow: a few hundred methods, most of which take the same handful of styling arguments. Once the vocabulary is familiar the documentation becomes navigable.
+The API is wide but shallow: a few hundred methods, most of which take the same handful of styling args. Once the vocab is familiar the docs turns navigable.
 
 ## In summary
 
-Two objects: a Figure holding one or more Axes. Almost every method you want belongs to the Axes.
+Two objects: a Figure holding one or more Axes. Almost each method you want belongs to the Axes.
 
-Two APIs: the stateful `plt.*` one that draws into a hidden current figure, and the object-oriented one that names the axes. The second is what this track uses, because the first goes wrong the moment there is more than one figure &mdash; which in a notebook is immediately.
+Two APIs: the stateful `plt.*` one that draws into a hidden current figure. The object-oriented one that names the axes. The second is what this track uses. The first goes wrong the moment there's more than one figure. Which in a notebook is at once.
 
-`fig, ax = plt.subplots()` is the standard opening line, and the translation from any pyplot example is mechanical: `plt.title` becomes `ax.set_title`, and the drawing methods keep their names.
+`fig, ax = plt.subplots()` is the standard opening line. The translation from any pyplot example is rote: `plt.title` turns `ax.set_title`. The drawing methods keep their names.
 
-Draw calls return the artists they create, which you keep when something needs changing later and ignore otherwise.
+Draw calls return the artists they create. This You keep when a thing needs changing later and skip else.
 
-And figures must be closed, because matplotlib holds a reference to every one until you do.
+And figures must be closed. Matplotlib holds a link to each one until you do.
 
-Everything after this module is either a kind of drawing or a way of making the result readable, and all of it hangs off those two objects.
+all after this module is either a kind of drawing or a way of making the result readable. All of it hangs off those two objects.
 
 ## A closing note
 
-matplotlib has a reputation for being hard, and most of that comes from two things this module addresses.
+matplotlib has a reputation for being hard. Most of that comes from two things this module handles.
 
-The first is the two APIs, and examples that mix them without saying so. Once you know that `plt.title` and `ax.set_title` are the same operation reached differently, most confusing code becomes readable.
+The first is the two APIs. Examples that mix them without saying so. Once you know that `plt.title` and `ax.set_title` are the same step reached differently, most confusing code turns readable.
 
-The second is that it is a **drawing** library rather than a charting one. It has no opinion about what a good chart is, so it will not stop you, and everything is possible at the cost of nothing being automatic.
+The second is that it's a **drawing** library rather than a charting one. It has no view about what a good chart is. It won't stop you. All is possible at the cost of nothing being auto.
 
-That is the right trade for a foundation library, and it is why every higher-level tool in Python either sits on matplotlib or has to reimplement it. Learning it well means the ceiling is never the library.
+That is the right trade for a foundation library. It's why each higher-level tool in Python either sits on matplotlib or has to reimplement it. Learning it well means the ceiling is never the library.
 
 ## Reading the code back
 
-Every chart in this track starts the same way and ends the same way: create a figure and axes, draw with ax methods, label, adjust, and let the runner show it. What changes in the middle is the drawing call and the handful of arguments it takes. Recognising that shape makes the rest of the library a matter of looking up which method and which argument, rather than learning a new pattern each time.
+each chart in this track starts the same way and ends the same way. Create a figure and axes, draw with ax methods, label, adjust. Let the runner show it. What changes in the middle is the drawing call and the handful of args it takes. Recognising that shape makes the rest of the library a matter of looking up which method and which arg, rather than learning a new pattern each time.
 ''',
     [
         {"q": "What does 'Axes' refer to in matplotlib?",
@@ -569,29 +569,29 @@ print("   is drawn after it, as on the right.")'''),
     ],
     '''
 title: Line Plots
-intro: plot() and the arguments that do most of the work.
+intro: plot() and the args that do most of the work.
 
 ## The signature
 
 `ax.plot(y)` draws `y` against its index. `ax.plot(x, y)` draws one against the other.
 
-That one-argument form is convenient and occasionally misleading &mdash; a plot whose x axis reads 0 to 99 when the data is dated is usually a forgotten x argument rather than a deliberate choice.
+That one-arg form is convenient and at times misleading. A plot whose x axis reads 0 to 99 when the data is dated is often a forgotten x arg rather than a deliberate choice.
 
-`plot` accepts lists, NumPy arrays and pandas Series. With a Series it uses the index as x, which is why plotting a time-indexed Series gives a dated axis for free.
+`plot` accepts lists, NumPy arrays and pandas Series. With a Series it uses the index as x. This Is why plotting a time-indexed Series gives a dated axis for free.
 
 ## The colour cycle
 
 Each call to `plot` on the same axes takes the next colour from the **property cycle**, a list of ten colours defined by the current style.
 
-This is why several lines drawn in a loop come out in different colours with no work, and why the eleventh line repeats the first.
+This is why a few lines drawn in a loop come out in other colours with no work. Why the eleventh line repeats the first.
 
-`plt.rcParams["axes.prop_cycle"]` holds it. `ax.set_prop_cycle(...)` replaces it for one axes, which is how you enforce a house palette.
+`plt.rcParams["axes.prop_cycle"]` holds it. `ax.set_prop_cycle(...)` replaces it for one axes. This Is how you enforce a house palette.
 
-Passing an explicit `color` bypasses the cycle without advancing it.
+Passing an clear `color` bypasses the cycle without advancing it.
 
 ## Styling
 
-Three keywords cover nearly everything:
+Three keywords cover nearly all:
 
 `color` &mdash; a name (`"crimson"`), a hex string (`"#4c72b0"`), a single letter (`"r"`), a grey level as a string (`"0.4"`), or an RGBA tuple.
 
@@ -599,96 +599,96 @@ Three keywords cover nearly everything:
 
 `linewidth` &mdash; in points.
 
-Add `alpha` for transparency, which is how you keep many overlapping lines readable, and `marker` to show where the actual data points are.
+Add `alpha` for transparency. This Is how you keep many shared lines readable. `marker` to show where the actual data points are.
 
-That last one matters more than it looks: a smooth line through four points implies a lot of data that does not exist. Markers say where the measurements are and let the line be what it is &mdash; a visual aid rather than a claim.
+That last one matters more than it looks. A smooth line through four points implies a lot of data that doesn't exist. Markers say where the readings are and let the line be what it's. A visual aid rather than a claim.
 
 ## The format string
 
 `ax.plot(x, y, "r--o")` sets colour, linestyle and marker in one string.
 
-It is worth learning to read because it appears constantly in examples and documentation. It is not worth preferring: it supports only eight colours, cannot set width or alpha, and is opaque to anyone who has not memorised it.
+It's worth learning to read because it appears constantly in examples and docs. It isn't worth preferring. It supports only eight colours, can't set width or alpha. Is opaque to anyone who hasn't stored it.
 
-The order within the string does not matter, and any part can be omitted &mdash; `"o"` alone draws markers with no connecting line, which is a scatter plot by another route.
+The order within the string doesn't matter. Any part can be omitted. `"o"` alone draws markers with no connecting line. This Is a scatter plot by another route.
 
 ## Missing data
 
 `NaN` values are skipped, and the line is broken where they occur.
 
-This is the right default. A line drawn straight through a gap asserts that the value moved smoothly across it, which is exactly the thing you do not know.
+This is the right default. A line drawn straight through a gap asserts that the value moved smoothly across it. This Is just the thing you don't know.
 
-If you want the line joined, dropping the missing points is explicit about it:
+If you want the line joined, dropping the missing points is clear about it:
 
 ```python
 ok = ~np.isnan(y)
 ax.plot(x[ok], y[ok])
 ```
 
-Note that `None` behaves like `NaN` here, and a masked array's masked values are also skipped.
+Note that `None` behaves like `NaN` here. A masked array's masked values are also skipped.
 
-For a long series with occasional gaps, the broken line can look noisy; drawing markers as well makes the pattern of missingness visible rather than merely untidy.
+For a long series with occasional gaps, the broken line can look noisy. Drawing markers as well makes the pattern of missingness visible rather than merely untidy.
 
 ## Drawing order
 
-Artists are drawn in the order the calls are made, so later calls sit on top.
+Artists are drawn in the order the calls are made. Later calls sit on top.
 
-`zorder` overrides it. Higher values draw later. The defaults are set so that the usual expectations hold &mdash; patches at 1, lines at 2, text at 3 &mdash; which is why a line normally appears above a filled region even when the fill was drawn second.
+`zorder` replaces it. Higher values draw later. The defaults are set so that the usual expectations hold. Patches at 1, lines at 2, text at 3. Which is why a line most times appears above a filled region even when the fill was drawn second.
 
-Where it matters most is grid lines. `ax.grid()` draws below the data by default, and `ax.set_axisbelow(False)` puts it on top, which is almost never what you want but is occasionally what you get from a style sheet.
+Where it matters most is grid lines. `ax.grid()` draws below the data by default. `ax.set_axisbelow(False)` puts it on top. This Is almost never what you want but is at times what you get from a style sheet.
 
 ## Markers
 
 `marker="o"` draws a symbol at each data point. The common ones are `o` circle, `s` square, `^` triangle, `D` diamond, `.` point, `+` and `x`.
 
-Markers matter more than they look. A smooth line through five points implies a continuous relationship measured densely; markers say where the measurements actually are and let the line be the visual aid it is.
+Markers matter more than they look. A smooth line through five points implies a smooth link measured densely. Markers say where the readings really are and let the line be the visual aid it's.
 
-`markevery=10` draws one marker in ten, which keeps the "here are the observations" signal on a dense series without a solid band of symbols.
+`markevery=10` draws one marker in ten. This Keeps the "here are the findings" signal on a dense series without a solid band of symbols.
 
-`markersize`, `markerfacecolor` and `markeredgecolor` style them separately from the line, so a hollow marker is `markerfacecolor="none"`.
+`markersize`, `markerfacecolor` and `markeredgecolor` style them apart from the line. A hollow marker is `markerfacecolor="none"`.
 
 ## Steps and stems
 
-Not every sequence is a line.
+Not each sequence is a line.
 
-`ax.step(x, y, where="post")` draws a step function, which is correct for anything that holds a value until it changes: a price, a setting, a state. A straight line between the points would claim a gradual transition that did not happen.
+`ax.step(x, y, where="post")` draws a step function. This Is correct for anything that holds a value until it changes. A price, a setting, a state. A straight line between the points would claim a gradual transition that didn't happen.
 
-`where` takes `"pre"`, `"post"` or `"mid"`, deciding whether the step happens at the start or the end of each interval. Getting it wrong shifts every value by one position, and the chart looks plausible either way.
+`where` takes `"pre"`, `"post"` or `"mid"`, deciding whether the step happens at the start or the end of each interval. Getting it wrong shifts each value by one spot. The chart looks plausible either way.
 
-`ax.stem` draws a vertical line to each point, which suits sparse discrete data.
+`ax.stem` draws a vertical line to each point. This Suits sparse discrete data.
 
-`ax.fill_between` under a line turns it into an area chart, appropriate when the quantity accumulates to something meaningful and misleading when it does not.
+`ax.fill_between` under a line turns it into an area chart, right when the quantity builds up to a thing real and misleading when it doesn't.
 
 ## Multiple lines and readability
 
-Four or five lines on one axes is usually the limit before the chart becomes a tracing exercise.
+Four or five lines on one axes is often the limit before the chart turns a tracing exercise.
 
-Beyond that, the options in order of preference are: highlight one and grey the rest, split into small multiples, or reduce to the two lines the chart is actually about.
+Beyond that, the options in order of preference are. Highlight one and grey the rest, split into small multiples, or reduce to the two lines the chart is really about.
 
-Where several lines must stay, three things help.
+Where a few lines must stay, three things help.
 
 **Direct labels** at the line ends, instead of a legend.
 
-**Ordering the legend** to match the vertical order of the lines at their right-hand end, so the eye can map them without hunting. `ax.legend(handles=...)` in the order you want.
+**Sorting the legend** to match the vertical order of the lines at their right-hand end. The eye can map them without hunting. `ax.legend(handles=...)` in the order you want.
 
-**Varying linestyle** as well as colour, so the chart survives greyscale.
+**Varying linestyle** and colour, so the chart lives greyscale.
 
 ## Interpolation is a claim
 
 A line between two points asserts that the quantity passed through the values in between.
 
-For a temperature sampled hourly, that is reasonable. For monthly sales, the line between January and February is decorative &mdash; nothing happened at "January the 15th" in the data.
+For a temp sampled hourly, that is fair. For monthly sales, the line between January and February is decorative. Nothing happened at "January the 15th" in the data.
 
-That does not make the line wrong; connecting points is how the eye reads a trend, and a scatter of twelve unconnected points is harder to follow. But it is worth knowing that the line is an aid rather than data, which is another argument for markers.
+That doesn't make the line wrong. Connecting points is how the eye reads a trend. A scatter of twelve unconnected points is harder to follow. But it's worth knowing that the line is an aid rather than data. This Is another arg for markers.
 
-Where the gaps are genuinely large, breaking the line is more honest than spanning them, and that is what leaving the NaN in does for you automatically.
+Where the gaps are truly large, breaking the line is more honest than spanning them. That is what leaving the NaN in does for you on its own.
 
 ## Performance note
 
-One `plot` call with a large array is fast. Many `plot` calls are slow, because the cost is per artist rather than per point.
+One `plot` call with a large array is fast. Many `plot` calls are slow. The cost is per artist rather than per point.
 
-Drawing fifty lines in a loop creates fifty artists; where they can be combined, `LineCollection` draws them as one.
+Drawing fifty lines in a loop creates fifty artists. Where they can be mixed, `LineCollection` draws them as one.
 
-That matters at hundreds of lines rather than dozens, and it is covered properly in the performance module.
+That matters at hundreds of lines rather than dozens. It's covered properly in the speed module.
 
 ## A worked example
 
@@ -710,53 +710,53 @@ for side in ("top", "right"):
     ax.spines[side].set_visible(False)
 ```
 
-Aspect, colour, weight, markers, a title that says something, labelled units, a faint grid on one axis, two spines removed.
+Aspect, colour, weight, markers, a title that says a thing, labelled units, a faint grid on one axis, two spines removed.
 
-Ten lines, none of them clever, and the result looks deliberate. Every one is covered somewhere in this track, and together they are most of what separates a default matplotlib chart from a published one.
+Ten lines, none of them clever. The result looks deliberate. each one is covered one spot in this track, and together they're most of what splits a default matplotlib chart from a published one.
 
 ## Reading a line chart critically
 
 Three questions worth asking of any line chart, including your own.
 
-**Does the y axis start at zero, and should it?** A line encodes position, so truncation is legitimate &mdash; and it changes the apparent size of every change. If a 2% movement fills the chart, the reader should be able to tell.
+**Does the y axis start at zero. Should it?** A line codes spot. Truncation is legitimate. And it changes the apparent size of each change. If a 2% movement fills the chart, the reader should be able to tell.
 
-**Are the x values evenly spaced?** If the axis is categorical or the points are irregular in time, the slope between points is not a rate, and the eye reads it as one.
+**Are the x values evenly spaced?** If the axis is cat or the points are irregular in time, the slope between points isn't a rate. The eye reads it as one.
 
-**What is between the points?** Twelve monthly observations joined by lines look like a continuous series. The line is an aid; the data is twelve points.
+**What is between the points?** Twelve monthly findings joined by lines look like a smooth series. The line is an aid. The data is twelve points.
 
-None of these makes a line chart wrong. They are the things a careful reader checks, and knowing them is what lets you draw one that survives the checking.
+None of these makes a line chart wrong. They're the things a careful reader checks. Knowing them is what lets you draw one that lives the checking.
 
 ## In summary
 
 `ax.plot(x, y)` with `color`, `linewidth`, `linestyle` and `marker` covers the great majority of line charts.
 
-The colour cycle supplies distinct colours automatically and wraps after ten, which is well past the point where a line chart has stopped being readable.
+The colour cycle supplies distinct colours on its own and wraps after ten. This Is well past the point where a line chart has stopped being readable.
 
-NaN breaks the line, which is the honest treatment of a gap.
+NaN breaks the line. This Is the honest treatment of a gap.
 
-Markers say where the data actually is, and matter most when the points are few &mdash; a smooth line through five observations claims a lot.
+Markers say where the data really is. Matter most when the points are few. A smooth line through five findings claims a lot.
 
-Later calls draw on top, and `zorder` overrides it.
+Later calls draw on top, and `zorder` replaces it.
 
-And the finishing sequence is the same every time: an aspect ratio suited to the data, a title that says something, labelled units, a faint grid on one axis, and the top and right spines removed.
+And the finishing sequence is the same each time. An aspect ratio suited to the data, a title that says a thing, labelled units, a faint grid on one axis. The top and right spines removed.
 
 ## Smoothing
 
-A noisy series is often plotted with a smoothed version over it, and the pairing is more honest than either alone.
+A noisy series is often plotted with a smoothed version over it. The pairing is more honest than either alone.
 
-The raw series in a pale colour and the rolling mean in a strong one shows both the variation and the trend, and makes clear that the smooth line is derived rather than measured.
+The raw series in a pale colour and the rolling mean in a strong one shows both the variation and the trend. Makes clear that the smooth line is derived rather than measured.
 
 Two cautions worth stating on the chart.
 
-**The window is a choice**, and a longer one produces a smoother, more convincing line that is further from the data. Naming it &mdash; "7-day mean" &mdash; is the minimum.
+**The window is a choice**, and a longer one makes a smoother, more lifelike line that is further from the data. Naming it. "7-day mean" &mdash; is the min.
 
-**A centred window uses future values**, which is fine for describing history and wrong for anything presented as a signal available at the time. A trailing window is the honest choice for that case, at the cost of lagging the turns.
+**A centred window uses future values**. This Is fine for showing history and wrong for anything presented as a signal on hand at the time. A trailing window is the honest choice for that case, at the cost of lagging the turns.
 
-Plotting only the smoothed line, without the raw data, is where this becomes misleading, because the reader has no way to judge how much was smoothed away.
+Plotting only the smoothed line, without the raw data, is where this turns misleading. The reader has no way to judge how much was smoothed away.
 
 ## Highlighting within a line chart
 
-A line chart with one important series and several for context is the most common real case, and the treatment is consistent:
+A line chart with one key series and a few for context is the most common real case, and the treatment is steady:
 
 ```python
 for name, y in others.items():
@@ -765,27 +765,27 @@ ax.plot(x, focus_y, color="#264653", linewidth=2.5, zorder=2)
 ax.text(x[-1], focus_y[-1], "  " + focus_name, va="center", color="#264653")
 ```
 
-The grey lines give the range and the shape of the group, so nothing is lost. The dark line is unmistakably the subject. The label at the end removes the legend.
+The grey lines give the range and the shape of the group. Nothing is lost. The dark line is unmistakably the subject. The label at the end drops the legend.
 
-`zorder` ensures the highlighted line is on top regardless of drawing order, which matters when the context lines are drawn in a loop after it.
+`zorder` ensures the highlighted line is on top even so of drawing order. This Matters when the context lines are drawn in a loop after it.
 
-This pattern is worth having to hand, because it converts the hardest kind of line chart &mdash; many series, one message &mdash; into one of the easiest to read.
+This pattern is worth having to hand. It converts the hardest kind of line chart. Many series, one message. Into one of the easiest to read.
 
 ## One more thing
 
-`ax.plot` accepts several x/y pairs in one call &mdash; `ax.plot(x, y1, x, y2)` &mdash; which draws both with separate colours from the cycle.
+`ax.plot` accepts a few x/y pairs in one call. `ax.plot(x, y1, x, y2)`. Which draws both with split colours from the cycle.
 
-It is compact and gives no way to label the lines individually, so a loop with `label=` is usually better. Worth recognising in existing code, where it appears often.
+It's compact and gives no way to label the lines on their own. A loop with `label=` is often better. Worth recognising in existing code. Here It appears often.
 
 ## The short version
 
-A line chart is the most common chart there is, and the finishing sequence is the same every time: aspect, colour, weight, title, units, a faint grid, two spines removed.
+A line chart is the most common chart there's. The finishing sequence is the same each time. Aspect, colour, weight, title, units, a faint grid, two spines removed.
 
-The line itself is an aid rather than data, which is worth remembering when the points are few and the line is doing a lot of implying.
+The line itself is an aid rather than data. This Is worth remembering when the points are few and the line is doing a lot of implying.
 
 ## Reading the code back
 
-A finished line chart is about a dozen calls, and it is worth being able to name what each one is for: the figure size sets the aspect, the plot call sets colour and weight, the title carries the message, the labels carry the units, the margins control the breathing space, the grid supports value reading, and the spine removal takes away what carries nothing. Nothing in that list is optional in the sense of being decorative; each answers a question a reader would otherwise have to ask. Writing them in the same order every time makes the chart quick to produce and quick to review, which is most of why a house function is worth having.
+A finished line chart is about a dozen calls. It's worth being able to name what each one is for. The figure size sets the aspect, the plot call sets colour and weight, the title carries the message, the labels carry the units, the margins control the breathing space, the grid supports value reading. The spine removal takes away what carries nothing. Nothing in that list is optional in the sense of being decorative. Each answers a question a reader would else have to ask. Writing them in the same order each time makes the chart quick to give and quick to review. This Is most of why a house function is worth having.
 ''',
     [
         {"q": "What does `ax.plot(y)` use for the x values?",
@@ -964,71 +964,71 @@ print("it holds outside the data.")'''),
     ],
     '''
 title: Scatter Plots
-intro: scatter() versus plot(), and the two extra dimensions you get for free.
+intro: scatter() versus plot(), and the two extra dims you get for free.
 
 ## Two ways to draw dots
 
-`ax.plot(x, y, "o")` draws markers with no connecting line. `ax.scatter(x, y)` draws a collection of points.
+`ax.plot(x, y, "o")` draws markers with no connecting line. `ax.scatter(x, y)` draws a set of points.
 
-They look identical for a simple case, and they differ in what can vary.
+They look same for a simple case, and they differ in what can vary.
 
-`plot` draws one line object: every marker is the same size and the same colour. That uniformity makes it **faster**, sometimes substantially, for large numbers of identical points.
+`plot` draws one line object: each marker is the same size and the same colour. That uniformity makes it **faster**, at times much, for large numbers of same points.
 
 `scatter` draws a `PathCollection` where size and colour can be arrays, one value per point. That is what makes it a four-dimensional display: x, y, size and colour.
 
-The rule of thumb: `plot` when the points are all alike, `scatter` when they are not.
+The rule of thumb: `plot` when the points are all alike, `scatter` when they aren't.
 
 ## Size
 
 `s` is the marker area in **points squared**.
 
-That trips people, because doubling `s` does not double the visual width &mdash; it takes four times `s` to double the width. The default is around 36, meaning six points across.
+That trips people, because doubling `s` doesn't double the visual width. It takes four times `s` to double the width. The default is around 36, meaning six points across.
 
-Area is the right thing to scale, because the eye compares areas rather than radii. A common mistake is passing a raw value as `s` and getting circles that differ far more than the underlying numbers do; scaling into a sensible range first is usually needed.
+Area is the right thing to scale. The eye checks areas rather than radii. A common mistake is passing a raw value as `s` and getting circles that differ far more than the underlying numbers do. Scaling into a sensible range first is often needed.
 
-Very small values disappear and very large ones overlap into a mass, so the useful range is narrow &mdash; roughly 10 to 400 for most plots.
+Very small values disappear and very large ones share into a mass. The handy range is narrow. Roughly 10 to 400 for most plots.
 
 ## Colour
 
-`c=` takes an **array** of values, which are mapped through a colormap and can be explained with a colorbar.
+`c=` takes an **array** of values. This Are mapped through a colormap and can be shown with a colorbar.
 
-`color=` takes a **single** colour applied to every point.
+`color=` takes a **single** colour applied to each point.
 
-The names are one letter apart and the failure is silent: passing an array to `color` either errors or produces something unintended, and passing a single colour to `c` works but wastes the mechanism. "Why is my whole plot one colour" is nearly always this.
+The names are one letter apart and the failure is silent. Passing an array to `color` either errors or makes a thing unintended. Passing a single colour to `c` works but wastes the method. "Why is my whole plot one colour" is nearly always this.
 
-`fig.colorbar(sc, ax=ax)` needs the object `scatter` returned, which is why the return value is captured here where it is ignored elsewhere.
+`fig.colorbar(sc, ax=ax)` needs the object `scatter` returned. This Is why the return value is captured here where it's skipped elsewhere.
 
 ## Overplotting
 
-A scatter with a few hundred points shows the data. With a few thousand it shows the outline of the data, and every point in the middle is hidden behind another.
+A scatter with a few hundred points shows the data. With a few thousand it shows the outline of the data. Each point in the middle is hidden behind another.
 
 Three responses, in order of how much they preserve:
 
-`alpha` below 1 makes density visible as darkness. It is the cheapest fix and works up to tens of thousands of points.
+`alpha` below 1 makes density visible as darkness. It's the cheapest fix and works up to tens of thousands of points.
 
 Smaller markers help, and combine with alpha.
 
-`hexbin` or `hist2d` bins the points and shows counts, which turns density from something implied into something measured. Past roughly fifty thousand points this is the only honest option, and it is also far faster to draw.
+`hexbin` or `hist2d` bins the points and shows counts. This Turns density from a thing implied into a thing measured. Past roughly fifty thousand points this is the only honest option. It's also far faster to draw.
 
-Sampling is a fourth option, and a reasonable one when the shape matters more than the completeness.
+Sampling is a fourth option, and a fair one when the shape matters more than the completeness.
 
 ## Making it readable
 
-`edgecolor="black"` with a thin `linewidth` outlines each marker, which separates points that overlap. It is the single most effective small improvement to a moderately dense scatter.
+`edgecolor="black"` with a thin `linewidth` outlines each marker. This Splits points that share. It's the single most good small gain to a moderately dense scatter.
 
-Marker shape distinguishes categories, and does so weakly &mdash; readers reliably tell apart about three shapes, not six. Colour and position are much stronger encodings; if you need six categories, small multiples usually beat six shapes on one plot.
+Marker shape sets apart groups, and does so weakly. Readers well tell apart about three shapes, not six. Colour and spot are much stronger encodings. If you need six groups, small multiples often beat six shapes on one plot.
 
 ## Trend lines
 
-`np.polyfit(x, y, 1)` returns slope and intercept, and the fit is then drawn with an ordinary `plot`.
+`np.polyfit(x, y, 1)` returns slope and intercept. The fit is then drawn with an plain `plot`.
 
-Two details worth getting right. Draw the line only over the range of the observed x values, so it does not imply the relationship holds beyond the data. And put the coefficients in the legend label, so the chart carries the number rather than requiring the reader to estimate it.
+Two details worth getting right. Draw the line only over the range of the seen x values. It doesn't imply the link holds beyond the data. And put the coeffs in the legend label. So The chart carries the number rather than needing the reader to guess it.
 
-For anything beyond a straight line, `numpy.polynomial` is the modern interface and SciPy or statsmodels give confidence intervals &mdash; at which point the fit is a statistical claim and deserves the surrounding machinery.
+For anything beyond a straight line, `numpy.polynomial` is the modern interface and SciPy or statsmodels give trust intervals. At which point the fit is a statistical claim and deserves the nearby machinery.
 
 ## Colour by category
 
-For a categorical variable, plotting one scatter per group is clearer than mapping colours by hand:
+For a cat var, plotting one scatter per group is clearer than mapping colours by hand:
 
 ```python
 for name, sub in groups.items():
@@ -1036,71 +1036,71 @@ for name, sub in groups.items():
 ax.legend()
 ```
 
-Each call takes the next colour from the cycle and the legend is built from the labels, so nothing has to be assembled manually.
+Each call takes the next colour from the cycle and the legend is built from the labels. Nothing has to be assembled manually.
 
-Passing a list of category codes to `c=` works and gives you a continuous colormap applied to arbitrary integers, which implies an ordering the categories do not have &mdash; the same mistake as using a sequential colormap for categories.
+Passing a list of group codes to `c=` works and gives you a smooth colormap applied to any ints. This Implies an sorting the groups don't have. The same mistake as using a sequential colormap for groups.
 
 ## Bubble charts
 
-Encoding a third variable in the marker area produces a bubble chart, and it has a specific weakness: area is read poorly, so the third variable is the least accurately perceived thing on the chart.
+Encoding a third var in the marker area makes a bubble chart. It has a exact weakness. Area is read poorly. The third var is the least accurately seen thing on the chart.
 
-Two rules make them work when they are used.
+Two rules make them work when they're used.
 
-Scale by **area**, not by radius. Passing the raw value as `s` scales by area already, since `s` is area &mdash; but computing a radius and squaring it is a common way to exaggerate differences fourfold.
+Scale by **area**, not by radius. Passing the raw value as `s` scales by area already. `s` is area. But finding a radius and squaring it's a common way to exaggerate differences fourfold.
 
-Provide a **size legend**, since nobody can read an area off a chart without a reference. `ax.legend` can be built from proxy artists at a few representative sizes.
+Provide a **size legend**, since no one can read an area off a chart without a link. `ax.legend` can be built from proxy artists at a few representative sizes.
 
-If the third variable is the point of the chart, position or colour will carry it better than size.
+If the third var is the point of the chart, spot or colour will carry it better than size.
 
 ## Jitter for discrete values
 
-When one axis is discrete &mdash; a rating from one to five, a day of the week &mdash; points land exactly on top of each other and the density is invisible.
+When one axis is discrete. A rating from one to five, a day of the week &mdash; points land just on top of each other and the density is invisible.
 
-Adding a small random offset separates them:
+Adding a small random offset splits them:
 
 ```python
 xj = x + rng.uniform(-0.15, 0.15, len(x))
 ```
 
-The jitter must be small enough not to blur the categories, and it should be mentioned if the chart is published, because it is a deliberate distortion of position.
+The jitter must be small enough not to blur the groups. It should be mentioned if the chart is published. It's a deliberate distortion of spot.
 
-`alpha` and marker size do part of the same job and do not move anything.
+`alpha` and marker size do part of the same job and don't move anything.
 
 ## Connecting scatter points
 
-`ax.plot(x, y, "-o")` connects points in the order they appear in the array, which for a scatter is usually meaningless and occasionally exactly right.
+`ax.plot(x, y, "-o")` connects points in the order they appear in the array. This For a scatter is often meaningless and at times just right.
 
-The case where it is right is a **connected scatter**: two variables measured over time, with the line showing the path through the space. Unemployment against inflation year by year, for instance. Adding an arrow or labelling the first and last point makes the direction readable.
+The case where it's right is a **connected scatter**. Two vars measured over time, with the line showing the path through the space. Unemployment against inflation year by year, say. Adding an arrow or labelling the first and last point makes the direction readable.
 
-For anything without a natural order, sorting by x before connecting is what turns it into a line chart, and doing it accidentally &mdash; because the data happened to arrive sorted &mdash; produces a chart that implies a sequence that does not exist.
+For anything without a natural order, sorting by x before connecting is what turns it into a line chart. Doing it accidentally. Because the data happened to arrive sorted. Makes a chart that implies a sequence that doesn't exist.
 
 ## Density alternatives, in order
 
-As n grows, the sequence of reasonable displays is fairly fixed:
+As n grows, the sequence of fair displays is fairly fixed:
 
-**Under 1,000** &mdash; a plain scatter, with `edgecolor` for separation.
+**Under 1,000** &mdash; a plain scatter, with `edgecolor` for split.
 
 **1,000 to 20,000** &mdash; `alpha` around 0.1&ndash;0.3, smaller markers.
 
-**20,000 to 500,000** &mdash; `hexbin` or `hist2d`, which measure density rather than implying it.
+**20,000 to 500,000** &mdash; `hexbin` or `hist2d`. This Measure density rather than implying it.
 
 **Above that** &mdash; datashader, or aggregate before plotting.
 
-At every stage the question is the same: can the reader see the middle of the distribution, or only its outline? If only the outline, the display has stopped working regardless of how many points are technically drawn.
+At each stage the question is the same. Can the reader see the middle of the spread, or only its outline? If only the outline, the display has stopped working even so of how many points are strictly drawn.
 
 ## Correlation and what a scatter shows
 
-A scatter is the display for a relationship, and it shows more than a correlation coefficient does.
+A scatter is the display for a link. It shows more than a link coeff does.
 
-It shows the **shape** &mdash; linear, curved, stepped &mdash; where a coefficient assumes linearity.
+It shows the **shape** &mdash; linear, curved, stepped &mdash; where a coeff assumes linearity.
 
-It shows **outliers**, which can create or destroy a correlation on their own.
+It shows **outliers**, which can create or destroy a link on their own.
 
-It shows **clusters**, which a single coefficient averages away, and which usually mean an unmodelled group variable.
+It shows **clusters**, which a single coeff means away. Which often mean an unmodelled group var.
 
-It shows **heteroscedasticity** &mdash; spread that changes with x &mdash; which invalidates several standard tests.
+It shows **heteroscedasticity** &mdash; spread that changes with x &mdash; which invalidates a few standard tests.
 
-Anscombe's quartet is the canonical demonstration: four datasets with identical means, variances and correlation, and four completely different scatters. Plotting first is not a formality.
+Anscombe's quartet is the canonical demo: four datasets with same means, variances and link. Four fully other scatters. Plotting first isn't a formality.
 
 ## Practical defaults
 
@@ -1110,78 +1110,78 @@ A scatter that works most of the time:
 ax.scatter(x, y, s=25, alpha=0.6, edgecolor="white", linewidth=0.4)
 ```
 
-Moderate size, some transparency, and a thin light edge that separates overlapping points without adding visual weight.
+Moderate size, some transparency, and a thin light edge that splits shared points without adding visual weight.
 
-From there the adjustments follow the data: lower alpha and smaller markers as n grows, `hexbin` when the middle stops being visible, colour when there is a third variable worth showing.
+From there the adjustments follow the data: lower alpha and smaller markers as n grows, `hexbin` when the middle stops being visible, colour when there's a third var worth showing.
 
-For a relationship that will be discussed, adding the fit and putting its slope in the legend saves the reader estimating it &mdash; and forces you to look at whether a straight line is the right model, which the scatter will have already told you.
+For a link that will be discussed, adding the fit and putting its slope in the legend saves the reader guessing it. And forces you to look at whether a straight line is the right model. This The scatter will have already told you.
 
 ## In summary
 
-`scatter` when size or colour varies per point, `plot` with a marker when they do not &mdash; the second is faster and there is nothing to gain from the machinery you are not using.
+`scatter` when size or colour varies per point, `plot` with a marker when they don't. The second is faster and there's nothing to gain from the machinery you aren't using.
 
 `s` is area, so it scales as the square of the visual width.
 
-`c=` takes an array through a colormap; `color=` takes one colour. The distinction is one letter and produces very different charts.
+`c=` takes an array through a colormap. `color=` takes one colour. The gap is one letter and makes very other charts.
 
 Overplotting is the recurring problem, and the sequence of answers is alpha, then smaller markers, then hexbin, then aggregation before plotting.
 
-`edgecolor` separates overlapping points and is the cheapest readability fix available.
+`edgecolor` splits shared points and is the cheapest readability fix on hand.
 
-And a scatter shows things a correlation coefficient cannot: shape, clusters, outliers and changing spread. That is the reason to draw one before computing anything.
+And a scatter shows things a link coeff can't. Shape, clusters, outliers and changing spread. That is the reason to draw one before finding anything.
 
 ## Adding a third dimension well
 
-When a scatter needs to carry a third variable, the options are not equally good.
+When a scatter needs to carry a third var, the options aren't equally good.
 
-**Colour, sequential** &mdash; for a continuous third variable. Read reasonably well, and needs a colorbar.
+**Colour, sequential** &mdash; for a smooth third var. Read fairly well, and needs a colorbar.
 
-**Colour, categorical** &mdash; for a few discrete levels. Works up to about five before the colours stop separating.
+**Colour, cat** &mdash; for a few discrete levels. Works up to about five before the colours stop separating.
 
-**Small multiples** &mdash; one panel per level of a categorical variable. Better than colour for anything above three levels, because comparing panels is easier than separating overlapping colours.
+**Small multiples** &mdash; one panel per level of a cat var. Better than colour for anything above three levels. Checking panels is easier than separating shared colours.
 
-**Size** &mdash; read poorly, and best reserved for a variable that is context rather than the subject.
+**Size** &mdash; read poorly, and best reserved for a var that is context rather than the subject.
 
 **Shape** &mdash; read poorly beyond about three levels.
 
-The pattern is that the two strong channels &mdash; position and panel &mdash; are already used or available, and the weak ones should carry the least important variable. Encoding the most important third variable as size is a common inversion of that.
+The pattern is that the two strong channels. Spot and panel. Are already used or on hand. The weak ones should carry the least key var. Encoding the most key third var as size is a common inversion of that.
 
 ## Labelling points
 
-A scatter of named entities &mdash; countries, products, customers &mdash; frequently wants some of the points labelled.
+A scatter of named entities. Countries, products, customers &mdash; often wants some of the points labelled.
 
-Labelling all of them produces an unreadable mass. The useful approaches:
+Labelling all of them makes an unreadable mass. The handy approaches:
 
 **Label the extremes**, which are what the reader will ask about: the highest, the lowest, the furthest from the fit.
 
-**Label a chosen few** that the accompanying text discusses.
+**Label a chosen few** that the pairing text discusses.
 
-**Label on hover**, which matplotlib does not do well and is a reason to use an interactive library when it matters.
+**Label on hover**, which matplotlib doesn't do well and is a reason to use an interactive library when it matters.
 
-For the first two, offsetting the text so it does not sit on the marker is necessary:
+For the first two, offsetting the text so it doesn't sit on the marker is needed:
 
 ```python
 ax.annotate(name, (x[i], y[i]), textcoords="offset points",
             xytext=(5, 4), fontsize=9)
 ```
 
-With more than about eight labels, overlaps become the problem, and `adjustText` is the usual third-party answer &mdash; or, more simply, labelling fewer points.
+With more than about eight labels, shares become the problem. `adjustText` is the usual third-party answer. Or, more simply, labelling fewer points.
 
 ## One more thing
 
-`ax.scatter` returns a `PathCollection`, and `set_offsets` updates the point positions without redrawing everything.
+`ax.scatter` returns a `PathCollection`, and `set_offsets` updates the point spots without redrawing all.
 
-That is what makes an animated or interactive scatter efficient, and it is the same reuse principle as `set_ydata` on a line: create the artist once, change its data.
+That is what makes an animated or interactive scatter fast. It's the same reuse principle as `set_ydata` on a line: create the artist once, change its data.
 
 ## The short version
 
-A scatter is the display that shows what a summary statistic cannot: shape, clusters, outliers and changing spread.
+A scatter is the display that shows what a summary statistic can't: shape, clusters, outliers and changing spread.
 
-Its failure mode is density, and the sequence of fixes is fixed &mdash; alpha, smaller markers, hexbin, aggregation. The question at every stage is whether the middle of the distribution is still visible.
+Its failure mode is density, and the sequence of fixes is fixed. Alpha, smaller markers, hexbin, aggregation. The question at each stage is whether the middle of the spread is still visible.
 
 ## Reading the code back
 
-A working scatter is usually four decisions: marker size, transparency, whether an edge is needed, and whether a third variable is being encoded. Everything else follows from the data. The size and alpha are chosen from the number of points rather than from taste, which is why the same two lines that work for two hundred points fail for twenty thousand, and why the sequence of density fixes in this module is worth having in mind before drawing rather than after.
+A working scatter is often four choices: marker size, transparency, whether an edge is needed. Whether a third var is being coded. all else follows from the data. The size and alpha are chosen from the number of points rather than from taste. This Is why the same two lines that work for two hundred points fail for twenty thousand. Why the sequence of density fixes in this module is worth having in mind before drawing rather than after.
 ''',
     [
         {"q": "When does `scatter` do something `plot(x, y, 'o')` cannot?",
@@ -1362,81 +1362,81 @@ print("may not. If the differences are small, use a line or a dot plot.")'''),
     ],
     '''
 title: Bar Charts
-intro: Vertical, horizontal, grouped and stacked, and why the baseline has to be zero.
+intro: Vertical, flat, grouped and stacked, and why the baseline has to be zero.
 
 ## bar and barh
 
-`ax.bar(categories, values)` draws vertical bars; `ax.barh` draws horizontal ones.
+`ax.bar(groups, values)` draws vertical bars. `ax.barh` draws flat ones.
 
-For categorical data, **horizontal is usually better**, and the reason is typography: category labels are words, words are wide, and a vertical chart has only a bar's width in which to put each one. The usual workarounds &mdash; rotating labels 45 degrees, truncating them, shrinking the font &mdash; all make the chart harder to read.
+For cat data, **flat is often better**. The reason is typography. Group labels are words, words are wide, and a vertical chart has only a bar's width in which to put each one. The usual workarounds. Rotating labels 45 degrees, truncating them, shrinking the font. All make the chart harder to read.
 
-`barh` gives every label a full line of horizontal space, reading left to right like text.
+`barh` gives each label a full line of flat space, reading left to right like text.
 
-Vertical bars remain right when the x axis is ordered and quantitative-ish: months, years, bins of a distribution. There the order carries meaning and the labels are short.
+Vertical bars remain right when the x axis is sorted and quantitative-ish. Months, years, bins of a spread. There the order carries meaning and the labels are short.
 
 ## Sorting
 
-Bar charts are read by comparing lengths, and comparison is much easier when the bars are ordered.
+Bar charts are read by checking lengths. Compare is much easier when the bars are sorted.
 
-Unless the category order means something &mdash; months, sizes, a fixed scale &mdash; sort by value. It costs one line with `np.argsort` and changes the chart from something to be studied into something to be glanced at.
+Unless the group order means a thing. Months, sizes, a fixed scale. Sort by value. It costs one line with `np.argsort` and changes the chart from a thing to be studied into a thing to be glanced at.
 
-With `barh`, note that bars are drawn from the bottom up, so sorting **ascending** puts the largest bar at the top, which is where the eye starts.
+With `barh`, note that bars are drawn from the bottom up. Sorting **ascending** puts the largest bar at the top. This Is where the eye starts.
 
 ## Labelling
 
-`ax.bar_label(bars)` writes each bar's value at its end. It takes the container returned by `bar` or `barh`, which is why that return value is worth keeping here.
+`ax.bar_label(bars)` writes each bar's value at its end. It takes the holder returned by `bar` or `barh`. This Is why that return value is worth keeping here.
 
-`fmt="%.1f"` controls the format; `labels=[...]` replaces the text entirely, which is how you show percentages or add units.
+`fmt="%.1f"` controls the format. `labels=[...]` replaces the text fully. This Is how you show percentages or add units.
 
-Once the values are on the bars, the value axis is usually redundant. Removing it &mdash; `ax.set_xticks([])` and hiding the spines &mdash; leaves a chart that is quieter and easier to read. This is one of the few cases where deleting a standard chart element is almost always an improvement.
+Once the values are on the bars, the value axis is often redundant. Dropping it. `ax.set_xticks([])` and hiding the spines. Leaves a chart that is quieter and easier to read. This is one of the few cases where deleting a standard chart element is almost always an gain.
 
 ## Grouped bars
 
-There is no grouped-bar function. You compute the positions.
+There's no grouped-bar function. You find the spots.
 
-The pattern is: take `x = np.arange(n_groups)`, choose a bar width `w`, and offset each series by a fraction of it. For two series, `x - w/2` and `x + w/2`. For three, `x - w`, `x`, `x + w`.
+The pattern is: take `x = np.arange(n_groups)`, choose a bar width `w`. Offset each series by a fraction of it. For two series, `x - w/2` and `x + w/2`. For three, `x - w`, `x`, `x + w`.
 
-Then `ax.set_xticks(x)` and `ax.set_xticklabels(groups)` put one label in the middle of each cluster, because the default ticks would otherwise fall on the individual bars.
+Then `ax.set_xticks(x)` and `ax.set_xticklabels(groups)` put one label in the middle of each cluster. The default ticks would else fall on the single bars.
 
-Keep the total width of a group below 1 so there is a gap between clusters &mdash; a group of three bars of width 0.25 leaves 0.25 of space, which reads well.
+Keep the total width of a group below 1 so there's a gap between clusters. A group of three bars of width 0.25 leaves 0.25 of space, which reads well.
 
-Beyond three or four series per group, the chart stops working, and small multiples are the better answer.
+Beyond three or four series per group, the chart stops working. Small multiples are the better answer.
 
 ## Stacked bars
 
-`bottom=` gives the starting height of each segment, so each call passes the cumulative sum of everything below it.
+`bottom=` gives the starting height of each segment. Each call passes the cumulative sum of all below it.
 
-Stacking answers one question well &mdash; what is the total &mdash; and another badly. Only the **bottom** segment sits on a common baseline, so only it can be compared across bars by eye. Segments higher up float at different heights, and comparing them is genuinely hard.
+Stacking answers one question well. What is the total &mdash; and another badly. Only the **bottom** segment sits on a common baseline. Only it can be checked across bars by eye. Segments higher up float at other heights. Checking them is truly hard.
 
-So: stack when the total is the message and the breakdown is context. Group when the components are the message. And if the question is really about proportions, a 100% stacked bar &mdash; each column normalised to 1 &mdash; answers it better than either.
+So: stack when the total is the message and the breakdown is context. Group when the parts are the message. And if the question is really about proportions, a 100% stacked bar. Each column normed to 1. Answers it better than either.
 
 ## The zero baseline
 
-This is the one rule about bar charts that is not a matter of taste.
+This is the one rule about bar charts that isn't a matter of taste.
 
-A bar represents its value by **length**. If the axis starts at 97, a bar of value 98 has one unit of length and a bar of value 102 has five, so the chart shows a five-fold difference where the data has a 4% one.
+A bar shows its value by **length**. If the axis starts at 97, a bar of value 98 has one unit of length and a bar of value 102 has five. The chart shows a five-fold gap where the data has a 4% one.
 
-Line charts do not have this problem, because a line encodes value by **position**, and position is read against the axis labels. That is why truncating a line chart's y axis is acceptable and truncating a bar chart's is not.
+Line charts don't have this problem. A line codes value by **spot**. Spot is read against the axis labels. That is why truncating a line chart's y axis is acceptable and truncating a bar chart's isn't.
 
-matplotlib will happily let you do it, and it happens by accident whenever `set_ylim` is applied to a bar chart to "zoom in".
+matplotlib will happily let you do it. It happens by accident when `set_ylim` is applied to a bar chart to "zoom in".
 
-If the differences are genuinely small and genuinely interesting, the answer is a different chart &mdash; a line, a dot plot, or a chart of the differences themselves &mdash; not a truncated bar.
+If the differences are truly small and truly notable, the answer is a other chart. A line, a dot plot, or a chart of the differences themselves. Not a truncated bar.
 
 ## Width and spacing
 
 `width` is in data units, and the default of 0.8 leaves a fifth of the spacing as a gap.
 
-Setting it to 1.0 removes the gaps entirely, which turns a bar chart into something that reads like a histogram &mdash; and that is exactly the distinction the gap communicates. Bars with gaps say "these are separate categories"; bars without say "these are adjacent intervals of a continuous variable".
+Setting it to 1.0 drops the gaps fully. This Turns a bar chart into a thing that reads like a histogram. And that is just the gap the gap sends. Bars with gaps say "these are split groups". Bars without say "these are adjacent intervals of a smooth var".
 
-That is why a histogram has no gaps and a category chart does, and why removing the gap from a category chart is a small lie.
+That is why a histogram has no gaps and a group chart does. Why dropping the gap from a group chart is a small lie.
 
-For grouped bars, the arithmetic is: total group width below 1, divided by the number of series. Three series of width 0.27 occupy 0.81 and leave a fifth of a unit between clusters.
+For grouped bars, the math is: total group width below 1, cut by the number of series. Three series of width 0.27 occupy 0.81 and leave a fifth of a unit between clusters.
 
 ## Colour on bars
 
-A bar chart usually needs **one** colour. The categories are already distinguished by position and label, so colouring each bar differently adds nothing and implies a grouping that is not there.
+A bar chart often needs **one** colour. The groups are already distinguished by spot and label. Colouring each bar differently adds nothing and implies a grouping that isn't there.
 
-The exception is highlighting: one bar in a strong colour and the rest in grey says which category the chart is about, and is far more effective than an annotation.
+The exception is highlighting: one bar in a strong colour and the rest in grey says which group the chart is about. Is far more good than an annotation.
 
 ```python
 colors = ["0.75"] * len(names)
@@ -1444,11 +1444,11 @@ colors[focus] = "crimson"
 ax.barh(names, values, color=colors)
 ```
 
-Colour becomes meaningful again when it encodes a second variable &mdash; above or below target, positive or negative &mdash; and then two colours, not seven.
+Colour turns real again when it codes a second var. Above or below target, plus or minus. And then two colours, not seven.
 
 ## Negative values
 
-Bars extending below zero are drawn automatically, and the baseline should be made visible:
+Bars extending below zero are drawn on its own. The baseline should be made visible:
 
 ```python
 ax.axhline(0, color="black", linewidth=0.8)
@@ -1456,114 +1456,114 @@ ax.axhline(0, color="black", linewidth=0.8)
 
 Without it, the zero line is implied by the axis and easy to lose.
 
-Colouring by sign is the standard treatment, and it is one of the few cases where two colours on one series is right:
+Colouring by sign is the standard treatment. It's one of the few cases where two colours on one series is right:
 
 ```python
 colors = ["#2a9d8f" if v >= 0 else "#e76f51" for v in values]
 ```
 
-For a diverging bar chart &mdash; change from a baseline &mdash; sorting by value puts the largest increases and decreases at the two ends, which is usually the most readable arrangement.
+For a diverging bar chart. Change from a baseline &mdash; sorting by value puts the largest grows and falls at the two ends. This Is often the most readable setup.
 
 ## Bars for parts of a whole
 
-A stacked bar normalised so each column sums to 100% answers "what is the composition" better than either a pie or an ordinary stack.
+A stacked bar normed so each column sums to 100% answers "what is the composition" better than either a pie or an plain stack.
 
 ```python
 shares = counts / counts.sum(axis=0)
 ```
 
-Each segment is then a proportion, the columns are directly comparable, and the total &mdash; which is no longer shown &mdash; can go in the axis label or an annotation if it matters.
+Each segment is then a proportion, the columns are right close. The total. Which is no longer shown. Can go in the axis label or an annotation if it matters.
 
-The remaining weakness is the same as any stack: only the bottom and top segments have a fixed baseline, so middle categories are hard to compare across columns. Ordering the categories so the ones being compared are at the bottom mitigates it.
+The left weakness is the same as any stack. Only the bottom and top segments have a fixed baseline. Middle groups are hard to compare across columns. Sorting the groups so the ones being checked are at the bottom mitigates it.
 
 ## Bars are not always right
 
 Two cases where the default choice is wrong.
 
-**Small differences.** A bar's message is its length, and length must be read from zero. If the interesting differences are 2% of the value, a bar chart cannot show them honestly &mdash; a dot plot, or a chart of the differences, can.
+**Small differences.** A bar's message is its length. Length must be read from zero. If the notable differences are 2% of the value, a bar chart can't show them honestly. A dot plot, or a chart of the differences, can.
 
-**Many categories.** Forty bars is a wall. Sorting helps, and beyond about twenty a dot plot or a lollipop chart uses far less ink per category and stays readable.
+**Many groups.** Forty bars is a wall. Sorting helps. Beyond about twenty a dot plot or a lollipop chart uses far less ink per group and stays readable.
 
-`ax.hlines` plus `ax.scatter` builds a lollipop in two lines, and it is often the better display for a long ranked list.
+`ax.hlines` plus `ax.scatter` builds a lollipop in two lines. It's often the better display for a long ranked list.
 
 ## Labels on and around bars
 
-`ax.bar_label` handles the common case, and its arguments cover most of the rest.
+`ax.bar_label` handles the common case, and its args cover most of the rest.
 
-`padding=3` sets the gap in points. `fmt="%.1f%%"` formats. `label_type="center"` puts the value inside the bar rather than beyond its end, which suits stacked segments where there is no free space at the tip.
+`padding=3` sets the gap in points. `fmt="%.1f%%"` formats. `label_type="center"` puts the value inside the bar rather than beyond its end. This Suits stacked segments where there's no free space at the tip.
 
-For stacked bars, calling it once per container labels each segment:
+For stacked bars, calling it once per holder labels each segment:
 
 ```python
 for container in ax.containers:
     ax.bar_label(container, label_type="center", fmt="%.0f")
 ```
 
-Small segments produce overlapping labels, so filtering to the ones with room is usually necessary &mdash; `labels=[v if v > threshold else "" for v in values]`.
+Small segments give shared labels. So Filtering to the ones with room is often needed. `labels=[v if v > threshold else "" for v in values]`.
 
-Once values are on the bars, removing the value axis entirely makes the chart quieter and loses nothing.
+Once values are on the bars, dropping the value axis fully makes the chart quieter and loses nothing.
 
 ## The bar chart checklist
 
 Before a bar chart is finished:
 
-**Is it sorted?** Unless the order means something.
+**Is it sorted?** Unless the order means a thing.
 
-**Is it horizontal?** Unless the labels are short or the axis is ordered.
+**Is it flat?** Unless the labels are short or the axis is sorted.
 
 **Does it start at zero?** Always, for bars.
 
-**Is there one colour?** Unless colour encodes something, or one bar is highlighted.
+**Is there one colour?** Unless colour codes a thing, or one bar is highlighted.
 
 **Are the values labelled?** If so, is the axis now redundant?
 
 **Are there too many bars?** Past about twenty, a dot plot reads better.
 
-**Is the gap between bars visible?** It is what says these are categories rather than intervals.
+**Is the gap between bars visible?** It's what says these are groups rather than intervals.
 
 Seven questions, and a chart that answers all of them well is close to as good as a bar chart gets.
 
 ## In summary
 
-Horizontal, sorted, one colour, from zero.
+Flat, sorted, one colour, from zero.
 
-That covers most bar charts, and each part has a reason: horizontal because category labels are words, sorted because the reader should not have to rank them, one colour because position already distinguishes the categories, and from zero because a bar encodes value as length.
+That covers most bar charts, and each part has a reason. Flat because group labels are words, sorted because the reader shouldn't have to rank them, one colour because spot already sets apart the groups, and from zero because a bar codes value as length.
 
-`bar_label` puts the numbers on the bars, which often makes the value axis redundant.
+`bar_label` puts the numbers on the bars. This Often makes the value axis redundant.
 
-Grouped bars need the offsets computed by hand; stacked bars need `bottom` and hide everything above the first segment.
+Grouped bars need the offsets found by hand. Stacked bars need `bottom` and hide all above the first segment.
 
-And past about twenty categories, a dot plot or lollipop chart uses far less ink and stays readable, which is worth reaching for rather than shrinking the bars further.
+And past about twenty groups, a dot plot or lollipop chart uses far less ink and stays readable. This Is worth reaching for rather than shrinking the bars further.
 
 ## Bars over time
 
-Bars and lines both show a quantity over time, and the choice says something.
+Bars and lines both show a quantity over time, and the choice says a thing.
 
-A **line** implies continuity: the quantity existed between the observations and moved smoothly. Right for a measurement sampled repeatedly &mdash; a temperature, a price, a running total.
+A **line** implies continuity: the quantity existed between the findings and moved smoothly. Right for a reading sampled again and again. A temp, a price, a running total.
 
-**Bars** imply discreteness: each period is a separate quantity, and there is nothing between them. Right for a total per period &mdash; monthly revenue, daily counts, quarterly headcount.
+**Bars** imply discreteness: each period is a split quantity. There's nothing between them. Right for a total per period. Monthly revenue, daily counts, quarterly headcount.
 
-Most business time series are period totals and are drawn as lines out of habit. The bar version is frequently more honest and reads no worse.
+Most business time series are period totals and are drawn as lines out of habit. The bar version is often more honest and reads no worse.
 
-Two practical points. Bars need the zero baseline, which limits how much detail can be shown when the variation is small relative to the level. And with many periods bars become too thin to read, at which point a line or a step is the practical choice regardless of the semantics.
+Two hands-on points. Bars need the zero baseline. This Limits how much detail can be shown when the variation is small scaled to the level. And with many periods bars become too thin to read, at which point a line or a step is the hands-on choice even so of the semantics.
 
 A step plot is the compromise: discrete like bars, compact like a line.
 
 ## One more thing
 
-`ax.barh` draws from the bottom up, so a list passed in ascending order appears with the largest at the top.
+`ax.barh` draws from the bottom up. A list passed in ascending order appears with the largest at the top.
 
-That is usually what you want and is the opposite of the intuition from `bar`, where ascending order puts the largest on the right. Sorting ascending and letting `barh` reverse it visually is the idiom.
+That is often what you want and is the opposite of the intuition from `bar`. Here Ascending order puts the largest on the right. Sorting ascending and letting `barh` reverse it visually is the idiom.
 
 ## The short version
 
-Horizontal, sorted, one colour, from zero &mdash; four defaults that fix most bar charts before anything else is considered.
+Flat, sorted, one colour, from zero. Four defaults that fix most bar charts before anything else is seen as.
 
-The zero baseline is the only rule here that is not a matter of taste, because a bar encodes value as length and a truncated axis misstates every ratio on the chart.
+The zero baseline is the only rule here that isn't a matter of taste. A bar codes value as length and a truncated axis misstates each ratio on the chart.
 
 ## Reading the code back
 
-A bar chart is one call and a handful of decisions made before it: which orientation, what order, one colour or two, whether the values go on the bars, and whether the axis is then needed at all. Those decisions are all made in the data preparation and the argument list rather than in anything clever, which is why bar charts are quick to produce well once the defaults are settled and quick to produce badly when they are not.
+A bar chart is one call and a handful of choices made before it. Which orientation, what order, one colour or two, whether the values go on the bars. Whether the axis is then needed at all. Those choices are all made in the data preparation and the arg list rather than in anything clever. This Is why bar charts are quick to give well once the defaults are settled and quick to give badly when they aren't.
 ''',
     [
         {"q": "Why is `barh` usually better for categorical data?",
@@ -1755,21 +1755,21 @@ intro: hist() and the bin count that changes what the data appears to say.
 
 `ax.hist(data, bins=20)` returns `counts, edges, patches`.
 
-`counts` has one entry per bin. `edges` has **one more**, because n bins are defined by n+1 boundaries. That off-by-one is the usual confusion when using the return values, and it is the same convention `np.histogram` follows.
+`counts` has one entry per bin. `edges` has **one more**. N bins are defined by n+1 boundaries. That off-by-one is the usual confusion when using the return values. It's the same rule `np.histogram` follows.
 
-`patches` is the collection of rectangles, kept if you want to recolour particular bars &mdash; highlighting a threshold, for instance.
+`patches` is the set of rectangles, kept if you want to recolour given bars. Highlighting a threshold, say.
 
 `edgecolor="white"` is worth adding almost always: without it, adjacent bars merge into a single shape and the bin structure disappears.
 
 ## Bins decide the story
 
-This is the thing to understand about histograms, and it is not a detail.
+This is the thing to understand about histograms, and it isn't a detail.
 
-The same data with three bins and with three hundred looks like two different datasets. Too few bins smooths away real structure &mdash; a bimodal distribution becomes one lump. Too many turns sampling noise into apparent spikes.
+The same data with three bins and with three hundred looks like two other datasets. Too few bins smooths away real structure. A bimodal spread turns one lump. Too many turns sampling noise into apparent spikes.
 
-There is no correct number. It depends on the sample size, the underlying shape, and what you are trying to see.
+There's no correct number. It depends on the sample size, the underlying shape. What you're trying to see.
 
-The honest practice is to **look at more than one**. If a feature survives at several bin counts, it is probably real; if it appears only at one, it is probably not.
+The honest practice is to **look at more than one**. If a feature lives at a few bin counts, it's probably real. If it appears only at one, it's probably not.
 
 ## The automatic rules
 
@@ -1777,13 +1777,13 @@ The honest practice is to **look at more than one**. If a feature survives at se
 
 **Sturges** assumes roughly normal data and scales with `log2(n)`.
 
-**Freedman&ndash;Diaconis** uses the interquartile range and scales with `n^(1/3)`, which handles skew and outliers better.
+**Freedman&ndash;Diaconis** uses the interquartile range and scales with `n^(1/3)`. This Handles skew and outliers better.
 
-`"scott"`, `"sqrt"` and `"rice"` are also available. They disagree with each other, sometimes by a factor of several, which is a fair summary of how well-defined the problem is.
+`"scott"`, `"sqrt"` and `"rice"` are also on hand. They disagree with each other, at times by a factor of a few. This Is a fair summary of how well-defined the problem is.
 
-`"auto"` is a reasonable default and a starting point rather than an answer.
+`"auto"` is a fair default and a starting point rather than an answer.
 
-You can also pass explicit edges: `bins=np.arange(0, 101, 5)` gives fixed 5-unit bins, which is what you want when the boundaries have meaning or when two charts must be comparable.
+You can also pass clear edges: `bins=np.arange(0, 101, 5)` gives fixed 5-unit bins. This Is what you want when the boundaries have meaning or when two charts must be close.
 
 ## density
 
@@ -1791,41 +1791,41 @@ You can also pass explicit edges: `bins=np.arange(0, 101, 5)` gives fixed 5-unit
 
 Two situations need it.
 
-**Comparing samples of different sizes.** With counts, a sample ten times larger has bars ten times taller everywhere, and the shapes cannot be compared. With density they overlay.
+**Checking samples of other sizes.** With counts, a sample ten times larger has bars ten times taller all over. The shapes can't be checked. With density they overlay.
 
-**Overlaying a theoretical curve.** A normal PDF is a density, and it only lines up with a histogram that is also a density.
+**Overlaying a theoretical curve.** A normal PDF is a density. It only lines up with a histogram that is also a density.
 
-Note the y axis then reads as density, not proportion, and the values can exceed 1 when the bins are narrow. The area is 1; the height is not a probability.
+Note the y axis then reads as density, not proportion. The values can exceed 1 when the bins are narrow. The area is 1. The height isn't a chance.
 
 ## Comparing groups
 
-`ax.hist([a, b], bins=20)` &mdash; a list of arrays &mdash; draws them side by side within each bin. Both stay readable, at the cost of halving the effective bin width.
+`ax.hist([a, b], bins=20)` &mdash; a list of arrays &mdash; draws them side by side within each bin. Both stay readable, at the cost of halving the good bin width.
 
-Separate `hist` calls with `alpha` around 0.5 overlay them. The bins keep their width, and the overlap region becomes a blended colour that belongs to neither series.
+split `hist` calls with `alpha` around 0.5 overlay them. The bins keep their width. The share region turns a blended colour that belongs to neither series.
 
-`histtype="step"` draws outlines only, which overlays cleanly for three or four groups where filled bars would not.
+`histtype="step"` draws outlines only. This Overlays cleanly for three or four groups where filled bars wouldn't.
 
-Beyond three groups, none of these work well, and the answer is small multiples: one histogram per group, sharing axes, side by side.
+Beyond three groups, none of these work well. The answer is small multiples. One histogram per group, sharing axes, side by side.
 
 ## The cumulative view
 
-`cumulative=True` with `histtype="step"` draws an empirical cumulative distribution.
+`cumulative=True` with `histtype="step"` draws an empirical cumulative spread.
 
-It answers "what fraction is below x" directly, which is often the actual question &mdash; and quantiles read straight off it, where they must be estimated by eye from a histogram.
+It answers "what fraction is below x" right. This Is often the actual question. And quantiles read straight off it. Here They must be guessed by eye from a histogram.
 
-It has a further practical advantage: it barely depends on the bin count. Using two hundred bins gives a smooth curve rather than noise, because each bin adds to a running total rather than standing alone. That makes it the more honest display when the bin choice is doing too much work.
+It has a further hands-on edge: it barely depends on the bin count. Using two hundred bins gives a smooth curve rather than noise. Each bin adds to a running total rather than standing alone. That makes it the more honest display when the bin choice is doing too much work.
 
 ## Related displays
 
-`ax.boxplot` summarises a distribution as five numbers, which compares many groups compactly and hides the shape entirely &mdash; a bimodal distribution and a uniform one can produce the same box.
+`ax.boxplot` summarises a spread as five numbers. This Checks many groups compactly and hides the shape fully. A bimodal spread and a uniform one can give the same box.
 
-`ax.violinplot` shows an estimated density, which restores the shape at the cost of a smoothing parameter that has the same arbitrariness as the bin count.
+`ax.violinplot` shows an guessed density. This Restores the shape at the cost of a smoothing param that has the same arbitrariness as the bin count.
 
-`ax.hexbin` and `ax.hist2d` are the two-dimensional versions, for when the question is about the joint distribution rather than a single variable.
+`ax.hexbin` and `ax.hist2d` are the two-dimensional versions, for when the question is about the joint spread rather than a single var.
 
 ## Bin edges you choose
 
-Passing a count lets matplotlib pick the edges, which land on unmemorable numbers like 3.17 to 7.42.
+Passing a count lets matplotlib pick the edges. This Land on unmemorable numbers like 3.17 to 7.42.
 
 Passing an array puts them where you want:
 
@@ -1833,121 +1833,121 @@ Passing an array puts them where you want:
 ax.hist(ages, bins=np.arange(0, 101, 10))
 ```
 
-Ten-year bands, starting at zero, with boundaries a reader can name. That is almost always better for communication, and it has a second benefit: two histograms drawn with the same explicit edges are directly comparable, where two drawn with `bins=20` are not.
+Ten-year bands, starting at zero, with boundaries a reader can name. That is almost always better for exchange. It has a second gain. Two histograms drawn with the same clear edges are right close. Here Two drawn with `bins=20` aren't.
 
-`range=(lo, hi)` limits the extent without fixing the count, which is how you exclude a long tail without dropping the data.
+`range=(lo, hi)` limits the extent without fixing the count. This Is how you exclude a long tail without dropping the data.
 
-Values exactly on a boundary go into the **right-hand** bin, except at the last edge where the final bin includes both ends.
+Values just on a boundary go into the **right-hand** bin, except at the last edge where the final bin includes both ends.
 
 ## Weights
 
-`weights=` gives each observation a multiplier, which covers two common needs.
+`weights=` gives each finding a multiplier. This Covers two common needs.
 
-**Frequency data** &mdash; when the input is already counts per value rather than raw observations.
+**rate data** &mdash; when the input is already counts per value rather than raw findings.
 
-**Percentages** &mdash; `weights=np.ones(n) / n * 100` makes the y axis read as a percentage of the sample, which is often more useful than either counts or density and is easier to explain than density.
+**Percentages** &mdash; `weights=np.ones(n) / n * 100` makes the y axis read as a percentage of the sample. This Is often more handy than either counts or density and is easier to explain than density.
 
-Density has the awkward property that its values depend on the bin width and can exceed 1; a percentage does not.
+Density has the awkward property that its values depend on the bin width and can exceed 1. A percentage doesn't.
 
 ## Two-dimensional histograms
 
-`ax.hist2d(x, y, bins=50)` bins in both directions and colours the cells by count. `ax.hexbin` does the same with hexagonal bins, which tile more evenly and avoid the visual artefacts of a square grid.
+`ax.hist2d(x, y, bins=50)` bins in both directions and colours the cells by count. `ax.hexbin` does the same with hexagonal bins. This Tile more evenly and avoid the visual artefacts of a square grid.
 
-Both replace an overplotted scatter with something that measures density instead of implying it, and both need a colorbar to be readable.
+Both replace an overplotted scatter with a thing that measures density instead of implying it. Both need a colorbar to be readable.
 
-`bins="log"` on hexbin, or `norm=LogNorm()`, handles the usual situation where a few cells hold most of the points and everything else is faint.
+`bins="log"` on hexbin, or `norm=LogNorm()`, handles the usual situation where a few cells hold most of the points and all else is faint.
 
 ## Step histograms for comparison
 
 `histtype="step"` draws the outline only. `histtype="stepfilled"` fills it with transparency.
 
-For comparing three or four distributions, outlines overlay far more cleanly than filled bars: nothing is hidden, and the colours do not blend into a fourth colour that belongs to no series.
+For checking three or four spreads, outlines overlay far more cleanly than filled bars. Nothing is hidden. The colours don't blend into a fourth colour that belongs to no series.
 
-Combined with `density=True` it is the standard way to compare distributions of different sizes on one axes.
+Mixed with `density=True` it's the standard way to compare spreads of other sizes on one axes.
 
 Beyond four, small multiples remain the answer.
 
 ## What a histogram cannot show
 
-A histogram shows a marginal distribution and nothing else.
+A histogram shows a marginal spread and nothing else.
 
-It cannot show a relationship between two variables, a change over time, or an ordering within the data. Two datasets with identical histograms can be completely different, in the same way that two datasets with identical means can be.
+It can't show a link between two vars, a change over time, or an sorting within the data. Two datasets with same histograms can be fully other, in the same way that two datasets with same means can be.
 
-The specific thing it hides is **sequence**: a series that drifts upward over time and one that is stationary produce the same histogram. If the data has an order, a line chart of the values and a histogram of them answer different questions, and the histogram alone can conceal a trend entirely.
+The exact thing it hides is **sequence**: a series that drifts upward over time and one that is stationary give the same histogram. If the data has an order, a line chart of the values and a histogram of them answer other questions. The histogram alone can conceal a trend fully.
 
 ## Choosing the bins in practice
 
-A workable procedure, rather than a rule.
+A workable method, rather than a rule.
 
 Start with `bins="auto"` and look at it. Then try roughly half and roughly double that number and look at those.
 
-If the three agree about the shape, the shape is real and any of them will do; pick round-numbered edges for the final version.
+If the three agree about the shape, the shape is real and any of them will do. Pick round-numbered edges for the final version.
 
-If they disagree, the disagreement is the finding &mdash; there is structure at one scale and not another &mdash; and the chart should show the bin count that corresponds to the question being asked.
+If they disagree, the disagreement is the finding. There's structure at one scale and not another. And the chart should show the bin count that matches to the question being asked.
 
-For a chart that will be compared with another, fix the edges explicitly with an array. Two histograms with automatically chosen bins are not comparable even when they look it, because the bin widths differ.
+For a chart that will be checked with another, fix the edges by name with an array. Two histograms with on its own chosen bins aren't close even when they look it. The bin widths differ.
 
-And for anything above a few thousand points, a cumulative plot or a density estimate sidesteps the choice entirely, which is often the honest move.
+And for anything above a few thousand points, a cumulative plot or a density guess sidesteps the choice fully. This Is often the honest move.
 
 ## Related displays, and when to switch
 
-A histogram is one of a family, and it is not always the strongest member.
+A histogram is one of a family, and it isn't always the strongest member.
 
-**Cumulative** &mdash; when the question is about quantiles or thresholds, and to escape the bin-count problem.
+**Cumulative** &mdash; when the question is about quantiles or thresholds. To escape the bin-count problem.
 
-**Box plots** &mdash; when comparing more than three groups.
+**Box plots** &mdash; when checking more than three groups.
 
 **Violin or KDE** &mdash; when the shape matters and the sample is large.
 
-**Strip plot** &mdash; when the sample is small enough that the observations are the honest display.
+**Strip plot** &mdash; when the sample is small enough that the findings are the honest display.
 
-**Rug plot** &mdash; tick marks along the axis, added under any of the above, which shows exactly where the data is without a binning choice.
+**Rug plot** &mdash; tick marks along the axis, added under any of the above. This Shows just where the data is without a binning choice.
 
-`ax.plot(x, np.zeros_like(x), "|", markersize=12, alpha=0.3)` draws a rug in one line, and combining it with a histogram gives both the shape and the raw positions.
+`ax.plot(x, np.zeros_like(x), "|", markersize=12, alpha=0.3)` draws a rug in one line. Mixing it with a histogram gives both the shape and the raw spots.
 
 ## In summary
 
-The bin count is the whole story: it decides what shape the data appears to have, there is no correct value, and looking at two or three is the only honest approach.
+The bin count is the whole story: it decides what shape the data appears to have, there's no correct value. Looking at two or three is the only honest approach.
 
-`bins="auto"` is a reasonable start and an argument between two rules rather than an answer.
+`bins="auto"` is a fair start and an arg between two rules rather than an answer.
 
-Explicit edges make two histograms comparable, which automatically chosen bins never are.
+clear edges make two histograms close. This On its own chosen bins never are.
 
-`density=True` is what lets samples of different sizes be compared, and its y axis is a density rather than a proportion.
+`density=True` is what lets samples of other sizes be checked. Its y axis is a density rather than a proportion.
 
-For several groups, side-by-side or step outlines up to three or four, and small multiples beyond that.
+For a few groups, side-by-side or step outlines up to three or four, and small multiples beyond that.
 
-And the cumulative view answers quantile questions directly while barely depending on the binning &mdash; often the more honest display when the bin choice is doing too much work.
+And the cumulative view answers quantile questions right while barely based on the binning. Often the more honest display when the bin choice is doing too much work.
 
 ## What to check on a histogram
 
 Four things, none of which the chart tells you.
 
-**How many observations?** A histogram of thirty looks much like one of thirty thousand, and means far less. Putting `n` in the title or a corner is a one-line fix.
+**How many findings?** A histogram of thirty looks much like one of thirty thousand. Means far less. Putting `n` in the title or a corner is a one-line fix.
 
-**How many bins, and does the shape survive changing it?** The single most important check.
+**How many bins, and does the shape live changing it?** The single most key check.
 
 **Is anything outside the range?** If `range=` was set, or the axis limits were, the excluded values are simply gone.
 
-**Are the bins equal width?** With explicit edges they may not be, and unequal bins with a count axis are misleading &mdash; the area should represent the count, which is what `density=True` handles correctly and a raw count does not.
+**Are the bins equal width?** With clear edges they may not be. Unequal bins with a count axis are misleading. The area should represent the count. This Is what `density=True` handles right and a raw count doesn't.
 
 The last is a genuine trap: a histogram with wide bins at the tail and narrow ones in the middle, plotted as counts, exaggerates the tail. If the bins are unequal, density is the only honest y axis.
 
 ## One more thing
 
-`np.histogram` computes the counts without drawing anything, which is useful when the numbers are wanted alongside the chart or when the binning needs checking before it is plotted.
+`np.histogram` finds the counts without drawing anything. This Is handy when the numbers are wanted alongside the chart or when the binning needs checking before it's plotted.
 
-It takes the same `bins` argument and returns counts and edges, so the values behind a histogram can be printed, tested, or written to a file without a second pass over the data.
+It takes the same `bins` arg and returns counts and edges. The values behind a histogram can be printed, tested, or written to a file without a second pass over the data.
 
 ## The short version
 
-The bin count is a parameter that changes the answer, and it is chosen by default when nobody chooses it deliberately.
+The bin count is a param that changes the answer. It's chosen by default when no one chooses it on purpose.
 
-Looking at more than one binning, and stating which one the chart uses, is the whole of good practice here &mdash; along with knowing that a cumulative view sidesteps the problem when the question is about quantiles.
+Looking at more than one binning. Stating which one the chart uses, is the whole of good practice here. Along with knowing that a cumulative view sidesteps the problem when the question is about quantiles.
 
 ## Reading the code back
 
-A histogram is one call whose most important argument is the one people leave out. Passing explicit edges rather than a count makes the chart comparable with another, gives boundaries the reader can name, and forces the binning to be a decision rather than a default. Adding the sample size to the title and an edge colour to the bars costs two more arguments and answers most of what a reader would ask.
+A histogram is one call whose most key arg is the one people leave out. Passing clear edges rather than a count makes the chart close with another, gives boundaries the reader can name. Forces the binning to be a choice rather than a default. Adding the sample size to the title and an edge colour to the bars costs two more args and answers most of what a reader would ask.
 ''',
     [
         {"q": "Why does `hist` return one more edge than count?",
@@ -2134,31 +2134,31 @@ print("is noise - one label for the grid says the same thing.")'''),
     ],
     '''
 title: Labels, Titles and Legends
-intro: The text that turns a plot into something someone else can read.
+intro: The text that turns a plot into a thing someone else can read.
 
 ## The minimum
 
-Every chart that leaves your screen needs a title, an x label and a y label, and a legend if there is more than one series.
+each chart that leaves your screen needs a title, an x label and a y label. A legend if there's more than one series.
 
-The axis labels carry the part people most often omit: **units**. "Sales" could be rupees, units, thousands or a percentage change, and a reader who has to guess cannot act on the chart. "Sales (&#8377; thousands)" takes four extra characters and removes the question.
+The axis labels carry the part people most often omit: **units**. "Sales" could be rupees, units, thousands or a percentage change. A reader who has to guess can't act on the chart. "Sales (&#8377. Thousands)" takes four extra characters and drops the question.
 
-`ax.set(title=..., xlabel=..., ylabel=...)` does all three in one call, which is convenient in a chain.
+`ax.set(title=..., xlabel=..., ylabel=...)` does all three in one call. This Is convenient in a chain.
 
 ## legend
 
 `ax.legend()` collects the artists on the axes that have a `label` and draws a key.
 
-Artists without a label are skipped, and if nothing has one, matplotlib warns and draws nothing. That warning &mdash; "No artists with labels found" &mdash; is one of the most common in matplotlib and always means the same thing.
+Artists without a label are skipped. If nothing has one, matplotlib warns and draws nothing. That warning. "No artists with labels found". Is one of the most common in matplotlib and always means the same thing.
 
-A label beginning with an underscore is **deliberately excluded**. That is the mechanism for keeping a helper artist &mdash; a threshold line, a shaded band &mdash; out of the key without giving up labelling it in code.
+A label beginning with an underscore is **on purpose excluded**. That is the method for keeping a helper artist. A threshold line, a shaded band. Out of the key without giving up labelling it in code.
 
-You can also pass the handles and labels explicitly, `ax.legend(handles, labels)`, which is how you control the order or combine artists from different axes.
+You can also pass the handles and labels by name, `ax.legend(handles, labels)`. This Is how you control the order or combine artists from other axes.
 
 ## Placement
 
-`loc` names a position: `"upper right"`, `"lower left"`, `"center"`, and the rest.
+`loc` names a spot: `"upper right"`, `"lower left"`, `"center"`, and the rest.
 
-The default is `"best"`, which searches for the position overlapping the least data. That is convenient and has two costs: it is slow on a plot with many points, and it can put the legend somewhere different when the data changes, which is unwelcome in a figure you are iterating on.
+The default is `"best"`. This Searches for the spot shared the least data. That is convenient and has two costs. It's slow on a plot with many points. It can put the legend one spot other when the data changes, which is unwelcome in a figure you're iterating on.
 
 For a legend outside the axes:
 
@@ -2166,91 +2166,91 @@ For a legend outside the axes:
 ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0)
 ```
 
-`bbox_to_anchor` gives a point in axes coordinates &mdash; `(1.02, 1)` is just past the right edge, at the top &mdash; and `loc` says which corner of the legend goes there. Remember to leave room, with `fig.tight_layout()` or a smaller axes, or the legend will be cut off when saved.
+`bbox_to_anchor` gives a point in axes coords. `(1.02, 1)` is just past the right edge, at the top. And `loc` says which corner of the legend goes there. note to leave room, with `fig.tight_layout()` or a smaller axes, or the legend will be cut off when saved.
 
-`ncol=3` spreads a legend horizontally, which suits one placed above or below the axes.
+`ncol=3` spreads a legend flatly. This Suits one placed above or below the axes.
 
-`frameon=False` removes the box, which usually looks cleaner over a plot with white space.
+`frameon=False` drops the box. This Often looks cleaner over a plot with white space.
 
 ## Direct labelling
 
-A legend asks the reader to match a colour to a name, hold it in memory, and find the corresponding line. That is real cognitive work, repeated for every series.
+A legend asks the reader to match a colour to a name, hold it in memory. Find the matching line. That is real cognitive work, repeated for each series.
 
-Labelling each line at its end removes the step:
+Labelling each line at its end drops the step:
 
 ```python
 ax.text(x[-1] + 0.2, y[-1], name, va="center")
 ```
 
-It works well when the lines end at different heights, which is common in time series. It fails when they converge, and then a legend is the honest choice.
+It works well when the lines end at other heights. This Is common in time series. It fails when they settle. Then a legend is the honest choice.
 
-This is one of the highest-value small improvements available to a line chart, and matplotlib has no built-in for it &mdash; two lines of `text` is the whole implementation.
+This is one of the highest-value small gains on hand to a line chart. Matplotlib has no built-in for it. Two lines of `text` is the whole setup.
 
 ## Titles that say something
 
-The default habit is a title that names the variables: "Sales by month". The chart already shows that; the axis labels already say it.
+The default habit is a title that names the vars: "Sales by month". The chart already shows that. The axis labels already say it.
 
-A more useful title states the **finding**: "Sales peaked in August, then fell 22%". The reader then knows what they are looking for, and the chart supports the claim rather than posing a question.
+A more handy title states the **finding**: "Sales peaked in August, then fell 22%". The reader then knows what they're looking for. The chart supports the claim rather than posing a question.
 
-`loc="left"` left-aligns the title, which makes it read like a headline rather than a caption. Combined with a slightly larger font and a subtitle in smaller grey text, it is the layout most publications use, and it is a few lines of matplotlib.
+`loc="left"` left-aligns the title. This Makes it read like a headline rather than a caption. Mixed with a slightly larger font and a subtitle in smaller grey text, it's the layout most publications use. It's a few lines of matplotlib.
 
-Annotating the thing the title mentions &mdash; a vertical line at the peak, a highlighted point &mdash; closes the loop between the words and the picture.
+Annotating the thing the title mentions. A vertical line at the peak, a highlighted point. Closes the loop between the words and the picture.
 
 ## Figure-level text
 
-With a grid of subplots sharing axes, repeating the same axis label on every panel is noise.
+With a grid of subplots sharing axes, repeating the same axis label on each panel is noise.
 
-`fig.supxlabel`, `fig.supylabel` and `fig.suptitle` attach text to the figure instead, so one label serves the whole grid.
+`fig.supxlabel`, `fig.supylabel` and `fig.suptitle` attach text to the figure instead. One label serves the whole grid.
 
-`fig.tight_layout()` afterwards makes room for them; without it, a suptitle frequently overlaps the top row of panels.
+`fig.tight_layout()` later makes room for them. Without it, a suptitle often shares the top row of panels.
 
 ## Text properties
 
-Every text-producing method takes the same styling arguments: `fontsize`, `fontweight`, `color`, `family`, `style`, `alpha`, `rotation`.
+each text-making method takes the same styling args: `fontsize`, `fontweight`, `color`, `family`, `style`, `alpha`, `rotation`.
 
-A small set of conventions covers most charts:
+A small set of rules covers most charts:
 
-**Title** &mdash; larger, bold, left-aligned. It is a headline.
+**Title** &mdash; larger, bold, left-aligned. It's a headline.
 
 **Axis labels** &mdash; default size, sentence case, with units.
 
-**Tick labels** &mdash; smaller and lighter than the data, because they are reference rather than content.
+**Tick labels** &mdash; smaller and lighter than the data. They're link rather than content.
 
-**Annotations** &mdash; the colour of the thing they annotate, which ties them together without an arrow.
+**Annotations** &mdash; the colour of the thing they annotate. This Ties them together without an arrow.
 
-`plt.rcParams` holds defaults for all of these &mdash; `axes.titlesize`, `axes.labelsize`, `xtick.labelsize` &mdash; so a house style sets them once rather than per chart.
+`plt.rcParams` holds defaults for all of these. `axes.titlesize`, `axes.labelsize`, `xtick.labelsize`. So a house style sets them once rather than per chart.
 
 ## Legend contents
 
-`ax.legend()` takes arguments that solve most legend problems.
+`ax.legend()` takes args that solve most legend problems.
 
-`ncol=3` spreads it horizontally, which suits a legend above or below the axes and wastes far less vertical space than a single column.
+`ncol=3` spreads it flatly. This Suits a legend above or below the axes and wastes far less vertical space than a single column.
 
-`title="Region"` labels the legend itself, which removes the need to explain the categories elsewhere.
+`title="Region"` labels the legend itself. This Drops the need to explain the groups elsewhere.
 
 `frameon=False` drops the box. `framealpha=0.8` keeps it but lets the data show through.
 
-`fontsize="small"` shrinks it, appropriate because a legend is reference material rather than content.
+`fontsize="small"` shrinks it, right because a legend is link material rather than content.
 
-`handles` and `labels` given explicitly control both the order and the contents &mdash; how you put the series in the same vertical order they appear on the chart, which makes the mapping obvious.
+`handles` and `labels` given by name control both the order and the contents. How you put the series in the same vertical order they appear on the chart. This Makes the mapping obvious.
 
 ## Mathematical text
 
-Any text argument accepts mathtext between dollar signs:
+Any text arg accepts mathtext between dollar signs:
 
 ```python
 ax.set_ylabel(r"Energy ($\mathrm{J\,m^{-2}}$)")
 ```
 
-The `r` prefix matters, because backslashes are otherwise interpreted by Python before matplotlib sees them.
+The `r` prefix matters, because backslashes are else read by Python before matplotlib sees them.
 
-This is a built-in subset of LaTeX and needs no LaTeX installation. `rcParams["text.usetex"] = True` switches to a real LaTeX renderer for full support, at the cost of requiring LaTeX to be present and slowing rendering considerably.
+This is a built-in subset of LaTeX and needs no LaTeX installation. `rcParams["text.usetex"] = True` switches to a real LaTeX renderer for full support, at the cost of needing LaTeX to be present and slowing rendering a lot.
 
-For units, superscripts and Greek letters &mdash; which is most scientific labelling &mdash; mathtext is enough.
+For units, superscripts and Greek letters. Which is most scientific labelling &mdash; mathtext is enough.
 
 ## Multi-line and wrapped text
 
-A long title can be broken with a newline, and the alignment applies to the block:
+A long title can be broken with a newline. The alignment applies to the block:
 
 ```python
 ax.set_title("A longer headline that\nruns to two lines", loc="left")
@@ -2266,34 +2266,34 @@ ax.text(0, 1.02, "Monthly, 2024, thousands", transform=ax.transAxes,
         fontsize=9, color="0.4")
 ```
 
-Two lines, and the chart reads like something published rather than something exported.
+Two lines, and the chart reads like a thing published rather than a thing exported.
 
 ## Labels that fix themselves
 
-The most robust label is one computed from the data rather than typed:
+The most robust label is one found from the data rather than typed:
 
 ```python
 ax.set_title("Peak %s: %.0f" % (months[i], y[i]))
 ax.legend(title="n = %d" % len(df))
 ```
 
-A hard-coded number in a title is wrong the first time the data changes, and nothing will tell you. Deriving it means the chart cannot disagree with itself &mdash; which matters most for exactly the charts that get regenerated regularly.
+A hard-coded number in a title is wrong the first time the data changes. Nothing will tell you. Deriving it means the chart can't disagree with itself. Which matters most for just the charts that get regenerated regularly.
 
 ## Where the reader looks
 
-Text placement is not only about fitting; it is about the order things are read.
+Text placement isn't only about fitting. It's about the order things are read.
 
 The **title** is read first, so it should carry the message.
 
-The **direct labels** on the data are read next, if they exist, which is why they beat a legend.
+The **direct labels** on the data are read next, if they exist. This Is why they beat a legend.
 
-The **axis labels** are consulted when a value needs interpreting.
+The **axis labels** are consulted when a value needs reading.
 
-The **legend** is consulted repeatedly, which is the cost that direct labels remove.
+The **legend** is consulted again and again. This Is the cost that direct labels drop.
 
-A **caption or source note** is read last, if at all, and belongs in small grey text at the bottom.
+A **caption or source note** is read last, if at all. Belongs in small grey text at the bottom.
 
-Designing in that order &mdash; message, then data labels, then reference material &mdash; produces a chart that can be understood at a glance and interrogated afterwards, which is what a good chart does.
+Designing in that order &mdash; message, then data labels, then link material &mdash; makes a chart that can be understood at a glance and interrogated later. This Is what a good chart does.
 
 ## Common labelling errors
 
@@ -2301,53 +2301,53 @@ Designing in that order &mdash; message, then data labels, then reference materi
 
 **A title that repeats the axes.** "Sales by month" over a chart with "Month" and "Sales" on the axes says nothing new.
 
-**A legend with no title**, where the categories need explaining.
+**A legend with no title**. Here The groups need showing.
 
-**Labels rotated 45 degrees** when `barh` would have avoided rotation entirely.
+**Labels rotated 45 degrees** when `barh` would have avoided rotation fully.
 
-**Text that overlaps the data**, with no background box.
+**Text that shares the data**, with no background box.
 
 **A hard-coded number in the title** that no longer matches the data.
 
 **A legend in `loc="best"`** that moves between runs, making two versions of a figure hard to compare.
 
-All are cheap to fix and all survive into published charts regularly.
+All are cheap to fix and all live into published charts regularly.
 
 ## In summary
 
-Title, both axis labels with units, and a legend when there is more than one series &mdash; that is the minimum, and units are the part most often missing.
+Title, both axis labels with units. A legend when there's more than one series. That is the min, and units are the part most often missing.
 
-`legend()` reads labels from the artists, warns when there are none, and skips anything whose label starts with an underscore.
+`legend()` reads labels from the artists, warns when there are none. Skips anything whose label starts with an underscore.
 
-Direct labels on the lines remove the colour-matching a legend imposes, and are worth the two lines of `text` they cost.
+Direct labels on the lines drop the colour-matching a legend imposes. Are worth the two lines of `text` they cost.
 
-A title that states the finding is more useful than one naming the variables, and `loc="left"` makes it read as a headline.
+A title that states the finding is more handy than one naming the vars. `loc="left"` makes it read as a headline.
 
-For a grid, `fig.suptitle` and `supxlabel` replace repeating the same label on every panel.
+For a grid, `fig.suptitle` and `supxlabel` replace repeating the same label on each panel.
 
-And any number in a label should be computed from the data, because a hard-coded one is wrong the first time the data changes and nothing will say so.
+And any number in a label should be found from the data. A hard-coded one is wrong the first time the data changes and nothing will say so.
 
 ## Writing the title
 
 The title is the most valuable text on a chart and the most often wasted.
 
-Three levels, in increasing usefulness:
+Three levels, in growing usefulness:
 
-**Descriptive** &mdash; "Sales by month". Names the variables the axes already name. Adds nothing.
+**Descriptive** &mdash; "Sales by month". Names the vars the axes already name. Adds nothing.
 
-**Specific** &mdash; "Monthly sales, 2024, all regions". Adds scope, which the reader needs, and belongs in a subtitle rather than the headline.
+**exact** &mdash; "Monthly sales, 2024, all regions". Adds scope. This The reader needs. Belongs in a subtitle rather than the headline.
 
-**Assertive** &mdash; "Sales peaked in August, then fell 22%". States what the chart shows, so the reader knows what to look for and can check the claim against the picture.
+**Assertive** &mdash; "Sales peaked in August, then fell 22%". States what the chart shows. The reader knows what to look for and can check the claim against the picture.
 
-The assertive form has a discipline attached: having written it, you have to make sure the chart supports it. That is a useful constraint, and it frequently changes the chart &mdash; highlighting August, annotating the fall, removing series that are not part of the claim.
+The assertive form has a discipline attached: having written it, you've to make sure the chart supports it. That is a handy constraint. It often changes the chart. Highlighting August, annotating the fall, dropping series that aren't part of the claim.
 
-Where a chart genuinely has no single finding &mdash; an exploratory panel, a reference figure &mdash; the specific form is right, and the absence of a claim is itself informative.
+Where a chart truly has no single finding. An exploratory panel, a link figure. The exact form is right. The lack of a claim is itself helpful.
 
 ## Subtitles and source notes
 
 Two pieces of text that most charts want and matplotlib has no method for.
 
-A **subtitle** carries the scope that the headline title leaves out &mdash; the period, the units, the population. Placed just under the title in axes coordinates, smaller and grey:
+A **subtitle** carries the scope that the headline title leaves out. The period, the units, the group. Placed just under the title in axes coords, smaller and grey:
 
 ```python
 ax.text(0, 1.02, "Monthly, 2024, all regions", transform=ax.transAxes,
@@ -2361,23 +2361,23 @@ fig.text(0, 0, "Source: internal sales data, extracted 2024-09-01",
          fontsize=8, color="0.5", va="bottom")
 ```
 
-Both are two lines and both are what makes a chart usable by someone who did not make it. The source note in particular is the difference between a chart that can be checked and one that has to be taken on trust.
+Both are two lines and both are what makes a chart usable by someone who didn't make it. The source note in given is the gap between a chart that can be checked and one that has to be taken on trust.
 
 ## One more thing
 
-`ax.legend(labelcolor="linecolor")` colours each legend label to match its line, which removes the need for the swatch entirely and reads well with `handlelength=0`.
+`ax.legend(labelcolor="linecolor")` colours each legend label to match its line. This Drops the need for the swatch fully and reads well with `handlelength=0`.
 
-It is a compact treatment that sits between a full legend and direct labelling, and works when the lines converge so that end labels would overlap.
+It's a compact treatment that sits between a full legend and direct labelling. Works when the lines settle so that end labels would share.
 
 ## The short version
 
-Text is what turns a picture of numbers into something someone else can act on, and units are the part most often left out.
+Text is what turns a picture of numbers into a thing someone else can act on. Units are the part most often left out.
 
-A legend is reference material that the reader consults repeatedly; a direct label is read once. Where the lines end apart, the direct label wins, and it costs two lines of `text`.
+A legend is link material that the reader consults again and again. A direct label is read once. Where the lines end apart, the direct label wins. It costs two lines of `text`.
 
 ## Reading the code back
 
-The text on a chart is written in a fixed order: the title says what was found, the axis labels say what the numbers are, and the legend or the direct labels say which series is which. Written in that order, the chart is complete; written in any other, something is usually missing. The most common omission is units, and the most common redundancy is a title that repeats the axis names.
+The text on a chart is written in a fixed order. The title says what was found, the axis labels say what the numbers are. The legend or the direct labels say which series is which. Written in that order, the chart is full. Written in any other, a thing is often missing. The most common omission is units. The most common redundancy is a title that repeats the axis names.
 ''',
     [
         {"q": "What does `ax.legend()` do when no artist has a label?",
@@ -2579,97 +2579,97 @@ print("matplotlib offers.")'''),
     ],
     '''
 title: Limits, Ticks and Scales
-intro: Controlling what the axis shows and how it is written.
+intro: Controlling what the axis shows and how it's written.
 
 ## Limits
 
 `ax.set_xlim(a, b)` and `ax.set_ylim(a, b)` set the visible range.
 
-By default matplotlib picks limits slightly **wider** than the data, so points do not sit on the frame. `ax.margins(0)` removes that padding, and `ax.margins(x=0.1, y=0.2)` sets it per axis as a fraction.
+By default matplotlib picks limits slightly **wider** than the data. Points don't sit on the frame. `ax.margins(0)` drops that padding. `ax.margins(x=0.1, y=0.2)` sets it per axis as a fraction.
 
 Passing the limits in reverse order reverses the axis: `ax.set_ylim(100, 0)` puts 100 at the bottom. That is how you draw a rank chart where 1 is best, or a depth profile where zero is the surface.
 
-Two cautions. Setting limits **hides** data rather than removing it &mdash; points outside the range are still there, still counted by anything that reads the data, just not visible. And on a bar chart, changing the y limit away from zero misstates the values, which is the subject of its own module.
+Two cautions. Setting limits **hides** data rather than dropping it. Points outside the range are still there, still counted by anything that reads the data, just not visible. And on a bar chart, changing the y limit away from zero misstates the values. This Is the subject of its own module.
 
-`ax.autoscale()` returns to automatic, and `ax.set_xlim(left=0)` sets one end and leaves the other automatic.
+`ax.autoscale()` returns to auto, and `ax.set_xlim(left=0)` sets one end and leaves the other auto.
 
 ## Ticks
 
-`ax.set_xticks(positions)` decides where the ticks go. `ax.set_xticklabels(labels)` decides what they say.
+`ax.set_xticks(spots)` decides where the ticks go. `ax.set_xticklabels(labels)` decides what they say.
 
-**Setting labels without setting positions is the classic bug.** matplotlib chooses its own positions based on the current view, and `set_xticklabels` simply renames whatever ticks happen to exist. Change the data and the labels stay put, now attached to different values. The symptom is a chart where the labels are subtly wrong and nothing errored.
+**Setting labels without setting spots is the classic bug.** matplotlib chooses its own spots based on the current view. `set_xticklabels` simply renames what ticks happen to exist. Change the data and the labels stay put, now attached to other values. The symptom is a chart where the labels are subtly wrong and nothing errored.
 
-Always set positions first, or pass both together: `ax.set_xticks(pos, labels)`.
+Always set spots first, or pass both together: `ax.set_xticks(pos, labels)`.
 
-For automatic but controlled ticks, `matplotlib.ticker` has locators: `MaxNLocator(5)` for at most five ticks, `MultipleLocator(0.25)` for every quarter, `LogLocator` for log axes.
+For auto but controlled ticks, `matplotlib.ticker` has locators: `MaxNLocator(5)` for at most five ticks, `MultipleLocator(0.25)` for each quarter, `LogLocator` for log axes.
 
-`ax.tick_params(axis="x", rotation=45, labelsize=9)` handles rotation and size, which is the usual fix for crowded category labels &mdash; though `barh` is usually the better fix.
+`ax.tick_params(axis="x", rotation=45, labelsize=9)` handles rotation and size. This Is the usual fix for crowded group labels. Though `barh` is often the better fix.
 
 ## Formatters
 
 A formatter changes how a tick value is **written** without changing the value.
 
-The default for large numbers uses a shared offset &mdash; a small `1e6` in the corner &mdash; which readers routinely miss, so a chart of millions gets read as a chart of single digits.
+The default for large numbers uses a shared offset. A small `1e6` in the corner. Which readers routinely miss. A chart of millions gets read as a chart of single digits.
 
-`FuncFormatter(lambda v, pos: "%.1fM" % (v / 1e6))` puts the unit on every label. The function receives the value and the tick position and returns a string.
+`FuncFormatter(lambda v, pos: "%.1fM" % (v / 1e6))` puts the unit on each label. The function receives the value and the tick spot and returns a string.
 
 The ready-made ones cover most needs: `PercentFormatter`, `StrMethodFormatter("{x:,.0f}")` for thousands separators, `EngFormatter` for SI prefixes, `FormatStrFormatter("%.2f")`.
 
-`ax.ticklabel_format(style="plain")` is the quick way to switch off scientific notation entirely.
+`ax.ticklabel_format(style="plain")` is the quick way to switch off scientific form fully.
 
 ## Scales
 
 `ax.set_yscale("log")` is the one that changes what a chart can show.
 
-Data spanning orders of magnitude &mdash; populations, prices, counts, anything growing exponentially &mdash; is unreadable on a linear axis: the small values are pressed against zero and only the largest is visible. On a log axis they separate, and exponential growth becomes a straight line, which is diagnostic in itself.
+Data spanning orders of magnitude. Groups, prices, counts, anything growing fast &mdash; is unreadable on a linear axis. The small values are pressed against zero and only the largest is visible. On a log axis they split. Steep growth turns a straight line. This Is diagnostic in itself.
 
-Two things to know. Log requires **positive** values; zeros and negatives are dropped without an error, so a series that touches zero loses those points silently. And a log axis must be labelled as such, because a reader who assumes linear will misread every distance on it.
+Two things to know. Log needs **plus** values. Zeros and negatives are dropped without an error. A series that touches zero loses those points silently. And a log axis must be labelled as such. A reader who assumes linear will misread each distance on it.
 
-`"symlog"` is logarithmic away from zero and linear within a band around it, set by `linthresh`. It handles data that crosses zero, at the cost of a scale that changes character partway along &mdash; which needs explaining to the reader.
+`"symlog"` is logarithmic away from zero and linear within a band around it, set by `linthresh`. It handles data that crosses zero, at the cost of a scale that changes character partway along. Which needs showing to the reader.
 
 `"logit"` suits proportions, stretching the ends near 0 and 1.
 
 ## Grids and spines
 
-A grid helps when someone will read values off the chart, and is decoration when they will not.
+A grid helps when someone will read values off the chart. Is decoration when they won't.
 
-When it does help, a faint grid on one axis is usually enough: `ax.grid(True, axis="y", alpha=0.4)`. A full dark grid competes with the data for attention.
+When it does help, a faint grid on one axis is often enough: `ax.grid(True, axis="y", alpha=0.4)`. A full dark grid competes with the data for focus.
 
-`ax.set_axisbelow(True)` draws it behind the data, which is normally what you want and is not always the default in a given style.
+`ax.set_axisbelow(True)` draws it behind the data. This Is most times what you want and isn't always the default in a given style.
 
-The **spines** are the four lines around the plot. The top and right ones enclose the area and carry no information:
+The **spines** are the four lines around the plot. The top and right ones enclose the area and carry no data:
 
 ```python
 ax.spines["top"].set_visible(False)
 ax.spines["right"].set_visible(False)
 ```
 
-Two lines, and the chart immediately looks less like a default. It is the highest ratio of visual improvement to effort in matplotlib, which is why nearly every published-looking style does it.
+Two lines, and the chart at once looks less like a default. It's the highest ratio of visual gain to effort in matplotlib. This Is why nearly each published-looking style does it.
 
-`ax.spines["left"].set_position(("outward", 10))` detaches the remaining spines slightly, which is a further small refinement.
+`ax.spines["left"].set_position(("outward", 10))` detaches the left spines slightly. This Is a further small refinement.
 
 ## Minor ticks
 
-`ax.minorticks_on()` adds unlabelled ticks between the major ones, and `AutoMinorLocator(5)` sets how many.
+`ax.minorticks_on()` adds untagged ticks between the major ones, and `AutoMinorLocator(5)` sets how many.
 
-They give a sense of scale without adding labels, which is useful on a log axis where the spacing between decades is not linear, and on any chart where the reader will estimate intermediate values.
+They give a sense of scale without adding labels. This Is handy on a log axis where the spacing between decades isn't linear. On any chart where the reader will guess mid values.
 
-`ax.grid(which="minor", alpha=0.15)` draws a fainter grid at the minor ticks, giving two levels of reference. That is common on engineering charts and usually too much for a presentation.
+`ax.grid(which="minor", alpha=0.15)` draws a fainter grid at the minor ticks, giving two levels of link. That is common on engineering charts and often too much for a presentation.
 
 ## Tick direction and appearance
 
-`ax.tick_params` controls everything about ticks in one call:
+`ax.tick_params` controls all about ticks in one call:
 
 ```python
 ax.tick_params(axis="both", direction="in", length=4,
                labelsize=9, colors="0.3")
 ```
 
-`direction="in"` points the marks inward, which many publication styles prefer because it keeps the outer margin clean.
+`direction="in"` points the marks inward. This Many publication styles prefer because it keeps the outer margin clean.
 
 `which="both"` applies to major and minor together.
 
-`top=False, right=False` removes ticks from the spines you have hidden &mdash; worth doing, since hiding a spine does not remove its ticks and leaving them produces marks floating in space.
+`top=False, right=False` drops ticks from the spines you've hidden. Worth doing. Hiding a spine doesn't drop its ticks and leaving them makes marks floating in space.
 
 ## Formatting money, percentages and dates
 
@@ -2683,122 +2683,122 @@ ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
 ax.yaxis.set_major_formatter(FuncFormatter(lambda v, p: f"£{v/1000:.0f}k"))
 ```
 
-`PercentFormatter(xmax=1)` treats the data as fractions; `xmax=100` treats it as already-percentages. Getting that backwards multiplies everything by a hundred, and the chart still looks plausible.
+`PercentFormatter(xmax=1)` treats the data as fractions. `xmax=100` treats it as already-percentages. Getting that backwards times all by a hundred. The chart still looks plausible.
 
 The thousands separator from `StrMethodFormatter("{x:,.0f}")` is a small change that makes large numbers much faster to read.
 
 ## Symmetric limits
 
-For diverging data, limits should usually be symmetric so zero sits in the middle:
+For diverging data, limits should often be even so zero sits in the middle:
 
 ```python
 lim = max(abs(y.min()), abs(y.max()))
 ax.set_ylim(-lim, lim)
 ```
 
-Without it, a series ranging from &minus;2 to +8 puts zero a fifth of the way up, and the visual centre of the chart is +3 &mdash; which reads as the neutral point even though it is not.
+Without it, a series ranging from &minus;2 to +8 puts zero a fifth of the way up. The visual centre of the chart is +3. Which reads as the neutral point though it isn't.
 
-The same reasoning applies to diverging colormaps, and for the same reason.
+The same thinking applies to diverging colormaps, and for the same reason.
 
 ## Shared limits across charts
 
-Two charts compared side by side must share their limits, whether or not they are subplots of one figure.
+Two charts checked side by side must share their limits, whether or not they're subplots of one figure.
 
-Within a figure, `sharey=True` does it. Across figures, compute the range once and apply it to both:
+Within a figure, `sharey=True` does it. Across figures, find the range once and apply it to both:
 
 ```python
 lim = (0, max(a.max(), b.max()) * 1.05)
 ```
 
-This is the same class of error as unshared subplots and unshared colour scales: the layout invites a comparison the axes do not support. It is easy to miss because each chart is individually correct.
+This is the same class of error as unshared subplots and unshared colour scales. The layout invites a compare the axes don't support. It's easy to miss because each chart is on their own correct.
 
 ## Tick density
 
-The right number of ticks is fewer than the default in most cases.
+The right number of ticks is fewer than the default often.
 
-Five to eight labelled ticks on an axis is comfortable. Twelve is crowded, and the reader is not using them all.
+Five to eight labelled ticks on an axis is comfortable. Twelve is crowded. The reader isn't using them all.
 
-`MaxNLocator(6)` caps the count while keeping the positions on round numbers, which is usually better than choosing positions by hand because it adapts when the data changes.
+`MaxNLocator(6)` caps the count while keeping the spots on round numbers. This Is often better than choosing spots by hand because it adapts when the data changes.
 
-`MultipleLocator(25)` forces a fixed interval, which is right when the interval has meaning &mdash; quarters, decades, standard bin widths.
+`MultipleLocator(25)` forces a fixed interval. This Is right when the interval has meaning. Quarters, decades, standard bin widths.
 
-For a categorical axis, every category needs a tick, and if there are too many for the labels to fit, the answer is a different chart rather than smaller text.
+For a cat axis, each group needs a tick. If there are too many for the labels to fit, the answer is a other chart rather than smaller text.
 
 ## Scales and honesty
 
-A log axis changes what every distance on the chart means, and a reader who does not notice will misread every comparison on it.
+A log axis changes what each distance on the chart means. A reader who doesn't notice will misread each compare on it.
 
 Three things make it safe:
 
-**Say so in the axis label** &mdash; "Population (log scale)".
+**Say so in the axis label** &mdash; "Group (log scale)".
 
 **Use round decade ticks**, so the labels themselves announce the scale: 1, 10, 100, 1000.
 
-**Consider whether the linear version answers the question.** A log scale is right when the data spans orders of magnitude or when relative change is the subject; it is wrong when absolute differences are what matter.
+**Consider whether the linear version answers the question.** A log scale is right when the data spans orders of magnitude or when scaled change is the subject. It's wrong when abs differences are what matter.
 
-The same applies to any non-linear scale. The chart is not dishonest, but it depends on the reader noticing, and the labelling is what makes them notice.
+The same applies to any non-linear scale. The chart isn't dishonest. It depends on the reader noticing. The labelling is what makes them notice.
 
 ## Ticks that carry meaning
 
-Tick positions are an editorial choice, not a formatting detail.
+Tick spots are an editorial choice, not a formatting detail.
 
-Ticks at 0, 25, 50, 75, 100 say the scale is a percentage of something. Ticks at 0, 20, 40, 60, 80, 100 say the same range is being read in twenties. Ticks at the actual data boundaries &mdash; the minimum, the median, the maximum &mdash; say something else again.
+Ticks at 0, 25, 50, 75, 100 say the scale is a percentage of a thing. Ticks at 0, 20, 40, 60, 80, 100 say the same range is being read in twenties. Ticks at the actual data boundaries. The min, the median, the max. Say a thing else again.
 
 Three patterns are worth knowing.
 
-**Round numbers**, which is the default behaviour and right for most continuous scales.
+**Round numbers**, which is the default action and right for most smooth scales.
 
-**Meaningful values** &mdash; a target, a threshold, a previous year's figure &mdash; placed explicitly so the reader can see where the data sits relative to them. `ax.set_yticks(list(ax.get_yticks()) + [target])` adds one without losing the rest.
+**Real values** &mdash; a target, a threshold, a previous year's figure &mdash; placed by name so the reader can see where the data sits scaled to them. `ax.set_yticks(list(ax.get_yticks()) + [target])` adds one without losing the rest.
 
-**Only the endpoints**, which is a minimalist treatment that works when the shape matters and precise values do not: `ax.set_yticks([y.min(), y.max()])`.
+**Only the endpoints**, which is a minimalist treatment that works when the shape matters and precise values don't: `ax.set_yticks([y.min(), y.max()])`.
 
-The last one is worth trying on a chart that feels cluttered. Most charts have more ticks than anyone uses, and each one is a small piece of visual noise competing with the data.
+The last one is worth trying on a chart that feels cluttered. Most charts have more ticks than anyone uses. Each one is a small piece of visual noise competing with the data.
 
 ## In summary
 
-Limits control what is visible and hide what is not, silently.
+Limits control what is visible and hide what isn't, silently.
 
-matplotlib adds a 5% margin by default, which is right until the data should reach the edge.
+matplotlib adds a 5% margin by default. This Is right until the data should reach the edge.
 
-`set_xticks` decides positions and `set_xticklabels` the text, and setting labels without positions attaches them to whatever ticks happen to exist &mdash; a bug that produces a plausible, wrong chart.
+`set_xticks` decides spots and `set_xticklabels` the text. Setting labels without spots attaches them to what ticks happen to exist. A bug that makes a plausible, wrong chart.
 
-Formatters change how numbers read, which matters most for large values that otherwise get a `1e6` offset nobody notices.
+Formatters change how numbers read. This Matters most for large values that else get a `1e6` offset no one notices.
 
-A log scale makes exponential growth a straight line and drops zeros without a word, and it must be labelled as logarithmic or every distance on it is misread.
+A log scale makes steep growth a straight line and drops zeros without a word. It must be labelled as logarithmic or each distance on it's misread.
 
-And the top and right spines carry no information; removing them is the cheapest improvement matplotlib offers.
+And the top and right spines carry no data. Dropping them is the cheapest gain matplotlib offers.
 
 ## Limits that adapt
 
-Hard-coded limits are correct until the data changes, which for any chart regenerated regularly is a matter of time.
+Hard-coded limits are correct until the data changes. This For any chart regenerated regularly is a matter of time.
 
 Three patterns that adapt.
 
-**Anchor one end.** `ax.set_ylim(bottom=0)` fixes zero and lets the top follow the data &mdash; right for anything where zero is meaningful.
+**Anchor one end.** `ax.set_ylim(bottom=0)` fixes zero and lets the top follow the data. Right for anything where zero is real.
 
-**Pad proportionally.** `ax.margins(y=0.15)` leaves headroom as a fraction rather than a fixed amount, so annotations near the top still fit when the values grow.
+**Pad proportionally.** `ax.margins(y=0.15)` leaves headroom as a fraction rather than a fixed amount. Annotations near the top still fit when the values grow.
 
-**Compute from the data.** `lim = max(abs(y.min()), abs(y.max()))` for a symmetric range around zero.
+**Find from the data.** `lim = max(abs(y.min()), abs(y.max()))` for a even range around zero.
 
-The one to avoid is `set_ylim(0, 100)` on a chart whose data will change, because when a value exceeds 100 the bar is silently clipped and nothing indicates it.
+The one to avoid is `set_ylim(0, 100)` on a chart whose data will change. When a value exceeds 100 the bar is silently clipped and nothing shows it.
 
-Where a fixed range is genuinely wanted &mdash; comparability across a series of charts &mdash; an assertion that the data fits inside it is worth the line.
+Where a fixed range is truly wanted. Comparability across a series of charts. An assertion that the data fits inside it's worth the line.
 
 ## One more thing
 
-`ax.invert_yaxis()` reverses an axis after the fact, which is more readable than passing the limits backwards when the limits are otherwise automatic.
+`ax.invert_yaxis()` reverses an axis after the fact. This Is more readable than passing the limits backwards when the limits are else auto.
 
-It is the usual way to draw a ranked list with position 1 at the top, and a depth or pressure profile where the surface is at the top &mdash; both cases where the convention of the domain runs opposite to the axis default.
+It's the usual way to draw a ranked list with spot 1 at the top. A depth or pressure profile where the surface is at the top. Both cases where the rule of the domain runs opposite to the axis default.
 
 ## The short version
 
 Ticks and limits are where a chart quietly decides what the reader can see and how they read it.
 
-Most charts have more ticks than anyone uses, a margin they did not choose, and a top and right spine carrying no information. Removing the excess is not decoration &mdash; it is what leaves the data as the most prominent thing on the chart.
+Most charts have more ticks than anyone uses, a margin they didn't choose. A top and right spine carrying no data. Dropping the excess isn't decoration. It's what leaves the data as the most prominent thing on the chart.
 
 ## Reading the code back
 
-Limits, ticks and scale are three separate decisions that are usually left to defaults together. Each has a case for being set: limits when the data should reach the edge or a baseline matters, ticks when the default count is more than anyone will read, and scale when the data spans orders of magnitude. Setting all three deliberately on a chart that matters takes four lines and changes how much work the reader has to do.
+Limits, ticks and scale are three split choices that are often left to defaults together. Each has a case for being set. Limits when the data should reach the edge or a baseline matters, ticks when the default count is more than anyone will read. Scale when the data spans orders of magnitude. Setting all three on purpose on a chart that matters takes four lines and changes how much work the reader has to do.
 ''',
     [
         {"q": "Why do automatic limits extend beyond the data?",
@@ -2993,42 +2993,42 @@ print("and cropped when saved is almost always missing one of them.")'''),
     ],
     '''
 title: Subplots
-intro: Several axes on one figure.
+intro: a few axes on one figure.
 
 ## The grid
 
 `fig, axes = plt.subplots(2, 3)` creates a figure with six axes and returns them as a NumPy array.
 
-`axes[0, 2]` is the top-right panel. `axes.flat` iterates in reading order, which is what you want when the panels correspond to a flat list of categories:
+`axes[0, 2]` is the top-right panel. `axes.flat` iterates in reading order. This Is what you want when the panels match to a flat list of groups:
 
 ```python
 for ax, name in zip(axes.flat, names):
     ...
 ```
 
-`zip` stops at the shorter of the two, so a grid with more cells than data leaves the extras blank &mdash; visible, and usually worth removing with `ax.remove()` or hiding with `ax.axis("off")`.
+`zip` stops at the shorter of the two. A grid with more cells than data leaves the extras blank. Visible. Often worth dropping with `ax.drop()` or hiding with `ax.axis("off")`.
 
 ## The shape surprise
 
-The returned array's shape is not always what code expects.
+The returned array's shape isn't always what code expects.
 
-`subplots(2, 3)` gives a `(2, 3)` array. `subplots(1, 3)` gives a **1-D** array of three. `subplots(1, 1)` gives a single `Axes`, not an array at all &mdash; which is what makes `fig, ax = plt.subplots()` work.
+`subplots(2, 3)` gives a `(2, 3)` array. `subplots(1, 3)` gives a **1-D** array of three. `subplots(1, 1)` gives a single `Axes`, not an array at all. Which is what makes `fig, ax = plt.subplots()` work.
 
-That is convenient interactively and awkward in a function that takes the grid size as a parameter, because `axes[0, 1]` fails on the 1-D case.
+That is convenient interactively and awkward in a function that takes the grid size as a param. `axes[0, 1]` fails on the 1-D case.
 
-`squeeze=False` forces a 2-D array always. In reusable code it is the right default, and it costs one argument.
+`squeeze=False` forces a 2-D array always. In reusable code it's the right default, and it costs one arg.
 
 ## Sharing
 
 `sharex=True` and `sharey=True` make the panels use the same limits.
 
-This is not a cosmetic setting. Without it, every panel autoscales to its own data, so a bar that reaches the top of one panel may represent a smaller number than a shorter bar in the panel beside it. The grid looks like a comparison and is not one.
+This isn't a cosmetic setting. Without it, each panel autoscales to its own data. A bar that reaches the top of one panel may represent a smaller number than a shorter bar in the panel beside it. The grid looks like a compare and isn't one.
 
-Sharing also hides the inner tick labels, which removes a great deal of repetition from a grid.
+Sharing also hides the inner tick labels. This Drops a great deal of repetition from a grid.
 
-`sharex="col"` and `sharey="row"` share within columns or rows, which suits a matrix where each row is a different quantity.
+`sharex="col"` and `sharey="row"` share within columns or rows. This Suits a mat where each row is a other quantity.
 
-The trade-off: with shared axes, a panel whose data occupies a small part of the shared range is compressed. When the panels genuinely have different scales, small multiples with independent axes and clearly labelled ranges are more honest &mdash; but then the reader must be told not to compare heights directly.
+The trade-off: with shared axes, a panel whose data occupies a small part of the shared range is compressed. When the panels truly have other scales, small multiples with split axes and clearly labelled ranges are more honest. But then the reader must be told not to compare heights right.
 
 ## Uneven grids
 
@@ -3040,7 +3040,7 @@ big = fig.add_subplot(gs[0, :])     # whole top row
 small = fig.add_subplot(gs[1, 0])   # bottom left
 ```
 
-`height_ratios` and `width_ratios` make rows and columns different sizes, which is how you give a main chart more space than the supporting ones.
+`height_ratios` and `width_ratios` make rows and columns other sizes. This Is how you give a main chart more space than the supporting ones.
 
 ## subplot_mosaic
 
@@ -3053,46 +3053,46 @@ fig, axd = plt.subplot_mosaic("""
 """)
 ```
 
-Repeated letters span cells, and the result is a dict keyed by the letters. `axd["A"]` is far easier to follow than `gs[0, :2]`, and the layout is visible in the source rather than encoded in slice arithmetic.
+Repeated letters span cells, and the result is a dict keyed by the letters. `axd["A"]` is far easier to follow than `gs[0, :2]`, and the layout is visible in the source rather than coded in slice math.
 
 A `.` in the string leaves a cell empty.
 
-It is the most readable way to build an uneven layout, and worth preferring wherever it fits.
+It's the most readable way to build an uneven layout. Worth preferring wherever it fits.
 
 ## Layout
 
-Labels, titles and tick text are drawn outside the axes, and matplotlib does not account for them when placing panels. The result is overlapping labels, or a title running off the top.
+Labels, titles and tick text are drawn outside the axes. Matplotlib doesn't account for them when placing panels. The result is shared labels, or a title running off the top.
 
-Two mechanisms fix it.
+Two methods fix it.
 
-`fig.tight_layout()` is called after everything is drawn and adjusts spacing once. It is simple and works for most cases; it can be confused by artists added afterwards, and it does not handle colorbars especially well.
+`fig.tight_layout()` is called after all is drawn and adjusts spacing once. It's simple and works for most cases. It can be confused by artists added later. It doesn't handle colorbars above all well.
 
-`constrained_layout=True` is set when the figure is created and keeps adjusting as things are added. It handles colorbars, suptitles and legends outside the axes better, and it is the one to reach for on a complex figure.
+`constrained_layout=True` is set when the figure is created and keeps adjusting as things are added. It handles colorbars, suptitles and legends outside the axes better. It's the one to reach for on a complex figure.
 
 Neither is on by default. `fig.subplots_adjust(hspace=..., wspace=...)` sets spacing manually when you want precise control.
 
-The symptom of missing layout management is a figure that looks acceptable on screen and comes out cropped when saved &mdash; because `savefig` uses the figure's declared size, not whatever the screen happened to show. `bbox_inches="tight"` on `savefig` is the other half of that fix.
+The symptom of missing layout management is a figure that looks acceptable on screen and comes out cropped when saved. Because `savefig` uses the figure's declared size, not what the screen happened to show. `bbox_inches="tight"` on `savefig` is the other half of that fix.
 
 ## Removing unused panels
 
-A 3&times;4 grid holding ten charts leaves two empty boxes with ticks and spines, which look like a mistake.
+A 3&times;4 grid holding ten charts leaves two empty boxes with ticks and spines. This Look like a mistake.
 
-`ax.remove()` deletes the axes entirely. `ax.axis("off")` keeps it but hides everything, which preserves the spacing &mdash; useful when the grid should stay rectangular.
+`ax.drop()` deletes the axes fully. `ax.axis("off")` keeps it but hides all. This Preserves the spacing. handy when the grid should stay rectangular.
 
 ```python
 for ax in axes.flat[len(items):]:
     ax.remove()
 ```
 
-The empty cell is also a reasonable place for a legend or a note, using `ax.axis("off")` and `ax.legend(...)` with handles gathered from the other panels.
+The empty cell is also a fair place for a legend or a note, using `ax.axis("off")` and `ax.legend(...)` with handles gathered from the other panels.
 
 ## Titles and labels across a grid
 
 With shared axes, per-panel axis labels are repetition. `fig.supxlabel` and `fig.supylabel` label the grid once.
 
-Panel titles remain useful and should be small &mdash; they are identifying the panel, not heading a chart. `fontsize=9` and `loc="left"` reads well.
+Panel titles remain handy and should be small. They're finding the panel, not heading a chart. `fontsize=9` and `loc="left"` reads well.
 
-For a formal figure, lettering the panels is conventional:
+For a formal figure, lettering the panels is standard:
 
 ```python
 for letter, ax in zip("abcdef", axes.flat):
@@ -3100,73 +3100,73 @@ for letter, ax in zip("abcdef", axes.flat):
             fontweight="bold", va="top")
 ```
 
-Axes coordinates, so the letter stays in the corner regardless of the data.
+Axes coords, so the letter stays in the corner even so of the data.
 
 ## Iterating in the right order
 
-`axes.flat` iterates row by row, which matches how the panels will be read.
+`axes.flat` iterates row by row. This Matches how the panels will be read.
 
-`zip(axes.flat, items)` pairs them and stops at the shorter, which is convenient and silently drops items if the grid is too small. Asserting the sizes match is one line and prevents a chart quietly missing a category:
+`zip(axes.flat, items)` pairs them and stops at the shorter. This Is convenient and silently drops items if the grid is too small. Asserting the sizes match is one line and blocks a chart quietly missing a group:
 
 ```python
 assert len(items) <= axes.size
 ```
 
-For a grid indexed by two variables, `axes[i, j]` with explicit loops is clearer than flattening, because the position then carries meaning.
+For a grid indexed by two vars, `axes[i, j]` with clear loops is clearer than flattening. The spot then carries meaning.
 
 ## When not to use subplots
 
-Small multiples are excellent for comparing the **same** measurement across groups.
+Small multiples are great for checking the **same** reading across groups.
 
-They are poor when the panels show different quantities on different scales, because the shared layout implies a comparability that the axes do not support. Four panels showing revenue, headcount, latency and satisfaction are four charts that happen to be adjacent, and separating them &mdash; or at least not sharing axes and labelling each scale clearly &mdash; is more honest.
+They're poor when the panels show other quantities on other scales. The shared layout implies a comparability that the axes don't support. Four panels showing revenue, headcount, delay and satisfaction are four charts that happen to be adjacent. Separating them. Or at least not sharing axes and labelling each scale clearly &mdash; is more honest.
 
-They are also poor past about twelve panels, where each becomes too small to read. At that point the answer is usually to reduce what is being shown, not to shrink the panels further.
+They're also poor past about twelve panels. Here Each turns too small to read. At that point the answer is often to reduce what is being shown, not to shrink the panels further.
 
 ## Figure size for a grid
 
-The figure size should scale with the grid. A 2&times;3 grid in the same six inches as a single chart gives panels a third the size, and text that was comfortable becomes proportionally huge.
+The figure size should scale with the grid. A 2&times;3 grid in the same six inches as a single chart gives panels a third the size. Text that was comfortable turns proportionally huge.
 
-A reasonable rule is to keep the per-panel size roughly constant:
+A fair rule is to keep the per-panel size roughly constant:
 
 ```python
 fig, axes = plt.subplots(nrows, ncols, figsize=(3.2 * ncols, 2.4 * nrows))
 ```
 
-Then adding a row makes the figure taller rather than making everything smaller.
+Then adding a row makes the figure taller rather than making all smaller.
 
 ## Shared axes in detail
 
-`sharex=True` links the axes objects, so changing the limits on one changes all of them &mdash; which is convenient interactively and occasionally surprising in a script, where an autoscale on one panel silently rescales the rest.
+`sharex=True` links the axes objects. So Changing the limits on one changes all of them. Which is convenient interactively and at times surprising in a script. Here An autoscale on one panel silently rescales the rest.
 
-`ax.label_outer()` hides the tick labels on inner panels, which `sharex`/`sharey` do automatically but which is needed when you build the grid by hand.
+`ax.label_outer()` hides the tick labels on inner panels. This `sharex`/`sharey` do on its own but which is needed when you build the grid by hand.
 
-`sharex="col"` links within columns only, which suits a grid where columns are different quantities and rows are groups.
+`sharex="col"` links within columns only. This Suits a grid where columns are other quantities and rows are groups.
 
-To share afterwards rather than at creation, `ax2.sharex(ax1)` exists, and the older `ax2.get_shared_x_axes().join(ax1, ax2)` appears in existing code.
+To share later rather than at creation, `ax2.sharex(ax1)` exists. The older `ax2.get_shared_x_axes().join(ax1, ax2)` appears in existing code.
 
 ## A grid that reads
 
-The details that make a grid of panels look considered:
+The details that make a grid of panels look seen as:
 
-**Consistent panel titles**, small and left-aligned.
+**steady panel titles**, small and left-aligned.
 
 **One axis label per grid**, via `supxlabel`/`supylabel`.
 
-**Shared limits**, so the comparison is valid.
+**Shared limits**, so the compare is valid.
 
-**A consistent colour** across panels for the same series, or a single colour if each panel is one thing.
+**A steady colour** across panels for the same series, or a single colour if each panel is one thing.
 
 **Empty cells removed**, not left as empty boxes.
 
-**A common annotation style** &mdash; if one panel has a reference line, they all should.
+**A common annotation style** &mdash; if one panel has a link line, they all should.
 
-Individually trivial; together they are the difference between a grid that reads as one figure and one that reads as several charts stuck together.
+On their own trivial. Together they're the gap between a grid that reads as one figure and one that reads as a few charts stuck together.
 
 ## Building a grid programmatically
 
-Most real grids are generated from data rather than written out, and a few patterns make that robust.
+Most real grids are made from data rather than written out. A few patterns make that robust.
 
-Compute the grid size from the number of items:
+Find the grid size from the number of items:
 
 ```python
 n = len(items)
@@ -3176,7 +3176,7 @@ fig, axes = plt.subplots(nrows, ncols, figsize=(3.2 * ncols, 2.4 * nrows),
                          sharex=True, sharey=True, squeeze=False)
 ```
 
-`squeeze=False` guarantees a 2-D array whatever the numbers work out to, so `axes.flat` always behaves.
+`squeeze=False` promises a 2-D array what the numbers work out to, so `axes.flat` always behaves.
 
 Then pair, draw, and clean up the remainder:
 
@@ -3187,23 +3187,23 @@ for ax in axes.flat[n:]:
     ax.remove()
 ```
 
-The figure size scaling with the grid is what keeps the text a constant size relative to each panel, rather than shrinking as rows are added.
+The figure size scaling with the grid is what keeps the text a constant size scaled to each panel, rather than shrinking as rows are added.
 
-And because `zip` stops at the shorter argument, asserting `n <= axes.size` is worth the line &mdash; otherwise a grid that is too small silently drops categories.
+And because `zip` stops at the shorter arg, asserting `n <= axes.size` is worth the line. Else a grid that is too small silently drops groups.
 
 ## In summary
 
-`subplots(r, c)` returns an array; `axes.flat` iterates in reading order; `squeeze=False` makes the shape predictable.
+`subplots(r, c)` returns an array. `axes.flat` iterates in reading order. `squeeze=False` makes the shape predictable.
 
-`sharex` and `sharey` are what turn a grid into a comparison, and without them each panel scales to its own data and the heights mean different things.
+`sharex` and `sharey` are what turn a grid into a compare. Without them each panel scales to its own data and the heights mean other things.
 
-`gridspec` and `subplot_mosaic` handle uneven layouts, and the mosaic string is far easier to read than slice arithmetic.
+`gridspec` and `subplot_mosaic` handle uneven layouts. The mosaic string is far easier to read than slice math.
 
-`tight_layout` or `constrained_layout` stop labels colliding, and a figure that saves cropped is usually missing one.
+`tight_layout` or `constrained_layout` stop labels colliding. A figure that saves cropped is often missing one.
 
-Label the grid once with `supxlabel` rather than every panel, remove unused cells, and scale the figure size with the number of panels.
+Label the grid once with `supxlabel` rather than each panel, drop unused cells. Scale the figure size with the number of panels.
 
-And small multiples are the right answer far more often than one crowded chart &mdash; they are the display that makes many comparisons possible at once.
+And small multiples are the right answer far more often than one crowded chart. They're the display that makes many checks possible at once.
 
 ## Grids in practice
 
@@ -3211,17 +3211,17 @@ Three layouts cover nearly all real grids.
 
 **A row of two or three**, for a before-and-after or a small set of related views. Wide, shared y, one shared axis label.
 
-**A square-ish grid**, for small multiples over a categorical variable. Shared both ways, panel titles small, figure size scaled by the grid.
+**A square-ish grid**, for small multiples over a cat var. Shared both ways, panel titles small, figure size scaled by the grid.
 
 **A main chart plus supporting ones**, built with `subplot_mosaic` or `gridspec` and unequal ratios. The main panel gets two-thirds of the height and the supporting row the rest.
 
-The fourth layout &mdash; a grid of unrelated charts &mdash; is common and usually a mistake. Panels in a grid are read as comparable, and four charts of different quantities on different scales are four figures that happen to be adjacent. Either give them separate figures, or make the difference explicit with clearly labelled independent scales and no shared axes.
+The fourth layout &mdash; a grid of unrelated charts &mdash; is common and often a mistake. Panels in a grid are read as close. Four charts of other quantities on other scales are four figures that happen to be adjacent. Either give them split figures, or make the gap clear with clearly labelled split scales and no shared axes.
 
-The question that decides it: would a reader be right to compare the panels to each other? If yes, share the axes. If no, they probably should not be in a grid.
+The question that decides it: would a reader be right to compare the panels to each other? If yes, share the axes. If no, they probably shouldn't be in a grid.
 
 ## Sharing a legend
 
-A grid where every panel repeats the same legend wastes space and attention.
+A grid where each panel repeats the same legend wastes space and focus.
 
 One figure-level legend is the fix:
 
@@ -3231,27 +3231,27 @@ fig.legend(handles, labels, loc="lower center", ncol=len(labels))
 fig.subplots_adjust(bottom=0.15)
 ```
 
-Handles are taken from any one panel, because they are all the same series, and `fig.legend` places it relative to the figure rather than an axes.
+Handles are taken from any one panel. They're all the same series. `fig.legend` places it scaled to the figure rather than an axes.
 
-Room has to be made for it, which `constrained_layout` does automatically and `subplots_adjust` does explicitly.
+Room has to be made for it. This `constrained_layout` does on its own and `subplots_adjust` does by name.
 
-The same applies to a colorbar: one bar serving the whole grid, which also enforces the shared scale the panels need to be comparable.
+The same applies to a colorbar: one bar serving the whole grid. This Also enforces the shared scale the panels need to be close.
 
 ## One more thing
 
-`fig.align_ylabels()` lines up the y-axis labels across a column of panels, which otherwise sit at different distances from the axes depending on how wide each panel's tick labels are.
+`fig.align_ylabels()` lines up the y-axis labels across a column of panels. This Else sit at other distances from the axes based on how wide each panel's tick labels are.
 
-It is a small alignment that is very visible once noticed, and `align_xlabels` does the same horizontally. On a grid where the panels have different value ranges, it is the difference between a column of labels that reads as one and one that looks ragged.
+It's a small alignment that is very visible once noticed. `align_xlabels` does the same flatly. On a grid where the panels have other value ranges, it's the gap between a column of labels that reads as one and one that looks ragged.
 
 ## The short version
 
-A grid is a claim that the panels belong together. Sharing the axes is what makes the claim true, and labelling the grid once rather than every panel is what makes it read as one figure.
+A grid is a claim that the panels belong together. Sharing the axes is what makes the claim true. Labelling the grid once rather than each panel is what makes it read as one figure.
 
-The three things that most often go wrong are an unshared y axis making incomparable panels look comparable, a figure size that did not grow with the grid so everything is cramped, and empty cells left as bare boxes. All three are one line each.
+The three things that most often go wrong are an unshared y axis making incomparable panels look close, a figure size that didn't grow with the grid so all is cramped. Empty cells left as bare boxes. All three are one line each.
 
 ## Reading the code back
 
-A grid is created in one call and finished in three: share the axes, label the grid once, and remove what is unused. The figure size should be computed from the grid rather than fixed, so adding a row makes the figure taller instead of making every panel smaller. Those four decisions are what separate a grid that reads as one figure from several charts that happen to be adjacent.
+A grid is created in one call and finished in three. Share the axes, label the grid once. Drop what is unused. The figure size should be found from the grid rather than fixed. Adding a row makes the figure taller instead of making each panel smaller. Those four choices are what split a grid that reads as one figure from a few charts that happen to be adjacent.
 ''',
     [
         {"q": "What does `plt.subplots(1, 3)` return for the axes?",
@@ -3449,29 +3449,29 @@ print("greyscale, in a photocopy, and on a projector.")'''),
     ],
     '''
 title: Colour and Colormaps
-intro: Naming colours, the cycle, and picking a colormap that does not invent structure.
+intro: Naming colours, the cycle, and picking a colormap that doesn't invent structure.
 
 ## Naming a colour
 
-matplotlib accepts several notations wherever a colour is wanted:
+matplotlib accepts a few notations wherever a colour is wanted:
 
 A **CSS name**: `"crimson"`, `"steelblue"`, `"rebeccapurple"`.
 
 **Hex**: `"#4c72b0"`, with an optional alpha suffix.
 
-A **cycle reference**: `"C0"` through `"C9"`, meaning the nth colour of the current property cycle. Using these keeps a figure consistent when the style changes.
+A **cycle link**: `"C0"` through `"C9"`, meaning the nth colour of the current property cycle. Using these keeps a figure steady when the style changes.
 
-A **grey level as a string**: `"0.55"`. The quotes matter &mdash; the bare number `0.55` is not a colour.
+A **grey level as a string**: `"0.55"`. The quotes matter. The bare number `0.55` isn't a colour.
 
 An **RGB or RGBA tuple** of floats from 0 to 1.
 
-Single letters `"r"`, `"g"`, `"b"`, `"k"` also work, and are the ones the format-string shorthand uses.
+Single letters `"r"`, `"g"`, `"b"`, `"k"` also work. Are the ones the format-string shorthand uses.
 
 ## The property cycle
 
 Each axes has a **property cycle** that supplies the colour for successive plots. The default has ten colours and then repeats.
 
-`ax.set_prop_cycle(cycler(color=[...]))` replaces it for one axes. `plt.rcParams["axes.prop_cycle"]` replaces it globally, which is how you apply a house palette to a whole script.
+`ax.set_prop_cycle(cycler(color=[...]))` replaces it for one axes. `plt.rcParams["axes.prop_cycle"]` replaces it globally. This Is how you apply a house palette to a whole script.
 
 A `cycler` can carry more than colour:
 
@@ -3479,108 +3479,108 @@ A `cycler` can carry more than colour:
 cycler(color=palette) + cycler(linestyle=["-", "--", ":", "-."])
 ```
 
-`+` pairs them elementwise, so the first series is the first colour and the first linestyle. That single change makes every chart in a script survive being printed in greyscale, which is worth more than it costs.
+`+` pairs them elementwise, so the first series is the first colour and the first linestyle. That single change makes each chart in a script live being printed in greyscale. This Is worth more than it costs.
 
-`*` gives the outer product instead, cycling every combination.
+`*` gives the outer product instead, cycling each mix.
 
 ## Three kinds of colormap
 
-The choice of colormap is a statement about the data, and the wrong one asserts something false.
+The choice of colormap is a statement about the data. The wrong one asserts a thing false.
 
 **Sequential** &mdash; `viridis`, `plasma`, `Blues` &mdash; runs from low to high in one direction. Use for magnitudes: counts, temperatures, concentrations.
 
-**Diverging** &mdash; `coolwarm`, `RdBu`, `BrBG` &mdash; has two directions from a neutral centre. Use when there is a **meaningful midpoint**: zero, an average, a baseline. Applying one to data with no natural centre invents a boundary in the middle of the range.
+**Diverging** &mdash; `coolwarm`, `RdBu`, `BrBG` &mdash; has two directions from a neutral centre. Use when there's a **real midpoint**. Zero, an mean, a baseline. Applying one to data with no natural centre invents a boundary in the middle of the range.
 
-**Qualitative** &mdash; `tab10`, `Set2` &mdash; is a set of distinct hues with no ordering. Use for categories. Using a sequential map for categories implies an order that does not exist.
+**Qualitative** &mdash; `tab10`, `Set2` &mdash; is a set of distinct hues with no sorting. Use for groups. Using a sequential map for groups implies an order that doesn't exist.
 
 **Cyclic** &mdash; `twilight`, `hsv` &mdash; wraps around, for angles and phases.
 
 ## Why jet is a problem
 
-`jet` was the default in older tools and still appears everywhere. It is a bad choice, for a reason that is measurable rather than aesthetic.
+`jet` was the default in older tools and still appears all over. It's a bad choice, for a reason that is measurable rather than aesthetic.
 
-A good colormap is **perceptually uniform**: equal steps in the data look like equal steps in colour. `viridis` was designed for this, and its brightness increases steadily from one end to the other.
+A good colormap is **perceptually uniform**: equal steps in the data look like equal steps in colour. `viridis` was designed for this. Its brightness grows steadily from one end to the other.
 
-`jet` does not. Its brightness rises, falls and rises again, with a bright band in the middle. The eye reads a sharp brightness change as a boundary, so `jet` shows edges and structure where the data is perfectly smooth &mdash; and hides real gradients in the flat regions.
+`jet` doesn't. Its brightness rises, falls and rises again, with a bright band in the middle. The eye reads a sharp brightness change as a boundary. `jet` shows edges and structure where the data is just right smooth. And hides real grads in the flat regions.
 
-It also collapses when converted to greyscale, because different values map to the same brightness.
+It also merges when converted to greyscale. Other values map to the same brightness.
 
-The fourth editor plots the brightness of both, which makes the difference visible rather than assertable.
+The fourth editor plots the brightness of both. This Makes the gap visible rather than assertable.
 
 ## Colorbars
 
 A colour-mapped plot without a colorbar is decoration: the reader can see that values differ and not by how much.
 
-`fig.colorbar(mappable, ax=ax)` needs the object returned by the drawing call &mdash; `imshow`, `scatter`, `pcolormesh`, `contourf`. That is why those return values are captured here.
+`fig.colorbar(mappable, ax=ax)` needs the object returned by the drawing call. `imshow`, `scatter`, `pcolormesh`, `contourf`. That is why those return values are captured here.
 
-`label=` names the quantity, which is as important as it is on an axis. `shrink` and `pad` adjust size and spacing; `orientation="horizontal"` puts it below.
+`label=` names the quantity. This Is as key as it's on an axis. `shrink` and `pad` adjust size and spacing. `orientation="flat"` puts it below.
 
-For a grid of subplots, `fig.colorbar(im, ax=axes.ravel().tolist())` makes one bar serve all panels, which is right when they share a scale &mdash; and they should, or the panels are not comparable.
+For a grid of subplots, `fig.colorbar(im, ax=axes.ravel().tolist())` makes one bar serve all panels. This Is right when they share a scale. And they should, or the panels aren't close.
 
 ## Accessibility
 
-Around 8% of men and 0.5% of women have some form of colour vision deficiency, most commonly difficulty separating red from green.
+Around 8% of men and 0.5% of women have some form of colour vision deficiency, most often trouble separating red from green.
 
 Three habits cover most of it:
 
-**Avoid red against green** as the primary distinction. Blue against orange is distinguishable for almost everyone.
+**Avoid red against green** as the main gap. Blue against orange is distinguishable for almost all.
 
-**Vary a second channel** &mdash; linestyle, marker, or position &mdash; so colour is reinforcing rather than carrying the meaning alone.
+**Vary a second channel** &mdash; linestyle, marker, or spot &mdash; so colour is reinforcing rather than carrying the meaning alone.
 
-**Use `viridis` and friends** for continuous data. They were designed to remain monotonic in brightness under common deficiencies, which is why they work in greyscale too.
+**Use `viridis` and friends** for smooth data. They were designed to remain monotonic in brightness under common deficiencies. This Is why they work in greyscale too.
 
-The greyscale test is a good proxy for all of it: print the chart in black and white, and if it is still readable, it will survive most viewing conditions.
+The greyscale test is a good proxy for all of it. Print the chart in black and white. If it's still readable, it will live most viewing rules.
 
 ## Transparency
 
 `alpha` runs from 0 to 1 and can be set per artist or baked into a colour as a fourth channel.
 
-Three places it earns its keep: showing density in an overplotted scatter, letting a shaded band sit under a line without hiding it, and de-emphasising context series without changing their colour.
+Three places it earns its keep: showing density in an overplotted scatter, letting a shaded band sit under a line without hiding it. De-emphasising context series without changing their colour.
 
-Two cautions. Alpha compounds &mdash; ten overlapping shapes at 0.1 are opaque where they all coincide, which is exactly the density signal you want in a scatter and an unwanted colour shift elsewhere. And transparency is lost when a figure is flattened onto a background, so a chart designed with alpha over white looks different over grey.
+Two cautions. Alpha compounds &mdash; ten shared shapes at 0.1 are opaque where they all coincide. This Is just the density signal you want in a scatter and an unwanted colour shift elsewhere. And transparency is lost when a figure is flattened onto a background. A chart designed with alpha over white looks other over grey.
 
 ## Named palettes
 
-matplotlib ships the `tab10` and `tab20` qualitative sets, and `plt.get_cmap("tab10").colors` gives the list for use in a cycler.
+matplotlib ships the `tab10` and `tab20` qualitative sets. `plt.get_cmap("tab10").colors` gives the list for use in a cycler.
 
-For categorical work, palettes designed for colour-vision deficiency are worth preferring &mdash; the Okabe&ndash;Ito set is eight colours chosen to remain distinguishable under the common deficiencies, and it is a plain list of hex codes you can paste into a cycler.
+For cat work, palettes designed for colour-vision deficiency are worth preferring. The Okabe&ndash;Ito set is eight colours chosen to remain distinguishable under the common deficiencies. It's a plain list of hex codes you can paste into a cycler.
 
-For sequential data, the perceptually uniform family is `viridis`, `plasma`, `inferno`, `magma` and `cividis`. `cividis` is designed specifically to look the same to viewers with and without colour-vision deficiency.
+For sequential data, the perceptually uniform family is `viridis`, `plasma`, `inferno`, `magma` and `cividis`. `cividis` is designed namely to look the same to viewers with and without colour-vision deficiency.
 
 Appending `_r` to any colormap name reverses it: `viridis_r`.
 
 ## Discrete colour from a continuous map
 
-Sampling a continuous colormap gives a graded set for ordered categories:
+Sampling a smooth colormap gives a graded set for sorted groups:
 
 ```python
 cmap = plt.get_cmap("viridis")
 colors = [cmap(i / (n - 1)) for i in range(n)]
 ```
 
-That is right when the categories have an **order** &mdash; age bands, quartiles, years &mdash; because the colour then carries the ordering.
+That is right when the groups have an **order**. Age bands, quartiles, years. Because the colour then carries the sorting.
 
-It is wrong for unordered categories, where a qualitative palette should be used instead, and it is a common way to imply a sequence that does not exist.
+It's wrong for unordered groups. Here A qualitative palette should be used instead. It's a common way to imply a sequence that doesn't exist.
 
-`BoundaryNorm` does the same thing for a mapped plot, banding a continuous scale into discrete steps with a colorbar that shows the boundaries.
+`BoundaryNorm` does the same thing for a mapped plot, banding a smooth scale into discrete steps with a colorbar that shows the boundaries.
 
 ## Colorbar placement
 
-The default steals space from the axes it is attached to, which shrinks that panel and misaligns it with its neighbours.
+The default steals space from the axes it's attached to. This Shrinks that panel and misaligns it with its neighbours.
 
-`fig.colorbar(im, ax=axes.ravel().tolist())` spans several panels with one bar, which is right when they share a scale.
+`fig.colorbar(im, ax=axes.ravel().tolist())` spans a few panels with one bar. This Is right when they share a scale.
 
-`shrink=0.8` and `aspect=30` adjust its proportions; `pad` sets the gap; `location="bottom"` moves it.
+`shrink=0.8` and `aspect=30` adjust its proportions. `pad` sets the gap. `location="bottom"` moves it.
 
-For precise control, `fig.add_axes([left, bottom, width, height])` creates a dedicated axes for it in figure coordinates, which is how you get a colorbar that lines up exactly with a grid.
+For precise control, `fig.add_axes([left, bottom, width, height])` creates a dedicated axes for it in figure coords. This Is how you get a colorbar that lines up just with a grid.
 
 ## Backgrounds
 
-`fig.patch` is the figure background and `ax.patch` the axes background, and they are separate.
+`fig.patch` is the figure background and `ax.patch` the axes background, and they're split.
 
-`ax.set_facecolor("#f7f7f7")` gives the plotting area a light tint, which some styles use to make a white grid readable.
+`ax.set_facecolor("#f7f7f7")` gives the plotting area a light tint. This Some styles use to make a white grid readable.
 
-For a dark theme, both need setting along with the text, tick and spine colours &mdash; which is exactly what the `dark_background` style does, and a reason to use a style rather than setting six things by hand.
+For a dark theme, both need setting along with the text, tick and spine colours. Which is just what the `dark_background` style does. A reason to use a style rather than setting six things by hand.
 
 ## Building a palette
 
@@ -3588,63 +3588,63 @@ A palette for a project needs fewer colours than people expect.
 
 **One** colour, for charts with a single series. Most charts.
 
-**Two**, for a comparison or a before-and-after.
+**Two**, for a compare or a before-and-after.
 
 **A greyscale plus one accent**, for highlighting one series among many. This covers more cases than any multi-colour palette.
 
-**Five or six**, for genuinely categorical work, drawn from a set designed for the purpose.
+**Five or six**, for truly cat work, drawn from a set designed for the purpose.
 
-Beyond about six, colour stops distinguishing reliably, and the answer is small multiples rather than more hues.
+Beyond about six, colour stops distinguishing well. The answer is small multiples rather than more hues.
 
-Add a grey for context elements, a light grey for gridlines, and a dark grey rather than black for text, and that is a complete house palette.
+Add a grey for context elements, a light grey for gridlines. A dark grey rather than black for text. That is a full house palette.
 
 ## Testing a colour scheme
 
 Three checks, none of which needs a tool.
 
-**Greyscale.** Convert the figure to greyscale and see whether the series are still distinguishable. If they are not, luminance is not varying and the chart depends entirely on hue.
+**Greyscale.** Convert the figure to greyscale and see whether the series are still distinguishable. If they aren't, luminance isn't varying and the chart depends fully on hue.
 
-**Small size.** View the figure at the size it will actually be seen. Colours that separate at full screen frequently do not at thumbnail size.
+**Small size.** View the figure at the size it will really be seen. Colours that split at full screen often don't at thumbnail size.
 
-**Print.** A projector and a printer both compress the range, and colours that differ on a monitor often do not survive either.
+**Print.** A projector and a printer both compress the range. Colours that differ on a monitor often don't live either.
 
-Passing all three usually means the encoding is robust, and failing any of them is fixed the same way: vary luminance, and vary a second channel.
+Passing all three often means the encoding is robust. Failing any of them is fixed the same way: vary luminance, and vary a second channel.
 
 ## Colour with meaning
 
-The strongest use of colour is when it encodes something the reader already understands.
+The strongest use of colour is when it codes a thing the reader already understands.
 
-**Semantic colours** &mdash; red for loss, green for gain, a brand colour for one product &mdash; are read without a legend because the meaning arrives with the hue. They are also culturally specific, and the red/green pairing is the worst possible choice for colour-blind readers, so the convention has to be weighed against accessibility.
+**Semantic colours** &mdash; red for loss, green for gain, a brand colour for one product &mdash; are read without a legend because the meaning arrives with the hue. They're also culturally exact. The red/green pairing is the worst possible choice for colour-blind readers. The rule has to be weighed against accessibility.
 
-**Sequential colour for an ordered variable** &mdash; darker for more &mdash; is read correctly with almost no instruction.
+**Sequential colour for an sorted var**. Darker for more. Is read right with almost no instruction.
 
-**One accent against grey** is the most reliable of all, because it says "this one" and nothing else.
+**One accent against grey** is the most solid of all. It says "this one" and nothing else.
 
-The weakest use is colour as decoration: seven categories in seven hues because the palette had seven. That asks the reader to learn an arbitrary mapping and consult it repeatedly, and it is usually a sign the chart should be small multiples.
+The weakest use is colour as decoration: seven groups in seven hues because the palette had seven. That asks the reader to learn an any mapping and consult it again and again. It's often a sign the chart should be small multiples.
 
-The test is whether removing the colour destroys the chart's meaning or only its appearance. If the former, the colour is doing work and should be chosen carefully. If the latter, it can be simplified away.
+The test is whether dropping the colour destroys the chart's meaning or only its appearance. If the former, the colour is doing work and should be chosen carefully. If the latter, it can be simplified away.
 
 ## In summary
 
-Colours accept names, hex, `C0`-style cycle references, greys as strings, and RGB tuples.
+Colours accept names, hex, `C0`-style cycle links, greys as strings, and RGB tuples.
 
-The property cycle supplies distinct colours automatically, and a cycler can vary linestyle alongside colour so the chart survives greyscale.
+The property cycle supplies distinct colours on its own. A cycler can vary linestyle alongside colour so the chart lives greyscale.
 
-Colormaps come in three kinds, and using the wrong kind asserts something false: sequential for magnitude, diverging around a real centre, qualitative for unordered categories.
+Colormaps come in three kinds, and using the wrong kind asserts a thing false. Sequential for magnitude, diverging around a real centre, qualitative for unordered groups.
 
-`jet` fails measurably rather than aesthetically &mdash; its brightness is not monotonic, so it shows edges the data does not have.
+`jet` fails measurably rather than aesthetically. Its brightness isn't monotonic. It shows edges the data doesn't have.
 
-A colour-mapped plot needs a colorbar, with a label, and two such plots need a shared scale.
+A colour-mapped plot needs a colorbar, with a label. Two such plots need a shared scale.
 
-And roughly one man in twelve cannot separate red from green, which is why a second channel is worth varying and why greyscale is a good proxy test for the whole question.
+And roughly one man in twelve can't split red from green. This Is why a second channel is worth varying and why greyscale is a good proxy test for the whole question.
 
 ## A closing note
 
 Colour is the most over-used channel in charting and the most rewarding to use sparingly.
 
-The strongest charts usually have one colour, or one colour against grey. Colour that encodes a variable earns its place; colour that distinguishes seven categories nobody needs to distinguish does not.
+The strongest charts often have one colour, or one colour against grey. Colour that codes a var earns its place. Colour that sets apart seven groups no one needs to set apart doesn't.
 
-The technical points matter too &mdash; perceptual uniformity, the right kind of colormap, a centred diverging scale, a colorbar that says what the colours mean &mdash; and they are all in service of the same thing: the reader should be able to work out what a colour means without being told twice.
+The technical points matter too. Visual uniformity, the right kind of colormap, a centred diverging scale, a colorbar that says what the colours mean &mdash; and they're all in service of the same thing. The reader should be able to work out what a colour means without being told twice.
 
 The greyscale test remains the quickest check on all of it.
 
@@ -3652,11 +3652,11 @@ The greyscale test remains the quickest check on all of it.
 
 Colour is the most over-used channel in charting and the most rewarding to use sparingly.
 
-One accent against grey outperforms a seven-hue palette in almost every case, and the greyscale test is the quickest check on whether the encoding survives contact with the real world.
+One accent against grey beats a seven-hue palette in almost each case. The greyscale test is the quickest check on whether the encoding lives contact with the real world.
 
 ## Reading the code back
 
-Colour decisions are made once for a project and applied through a cycler, not chosen per chart. A palette of five or six for categories, a sequential map for magnitudes, a diverging one for data with a real centre, and a grey for context is a complete set. Anything beyond that is usually a chart that should have been small multiples.
+Colour choices are made once for a project and applied through a cycler, not chosen per chart. A palette of five or six for groups, a sequential map for magnitudes, a diverging one for data with a real centre. A grey for context is a full set. Anything beyond that is often a chart that should have been small multiples.
 ''',
     [
         {"q": "What does the string `'0.55'` mean as a colour?",
@@ -3854,19 +3854,19 @@ print("whatever the axis limits are.")'''),
     ],
     '''
 title: Annotating a Plot
-intro: Text, arrows and reference lines - saying what the chart is for.
+intro: Text, arrows and link lines - saying what the chart is for.
 
 ## text
 
-`ax.text(x, y, "some words")` places text at a point in **data coordinates**.
+`ax.text(x, y, "some words")` places text at a point in **data coords**.
 
-`ha` (horizontal alignment) and `va` (vertical alignment) decide which part of the text sits at that point: `ha="center"` centres it, `va="bottom"` puts its bottom edge there. Without them, text starts at the point and runs to the right, which is rarely where you want it.
+`ha` (flat alignment) and `va` (vertical alignment) decide which part of the text sits at that point: `ha="center"` centres it, `va="bottom"` puts its bottom edge there. Without them, text starts at the point and runs to the right. This Is rarely where you want it.
 
-Because the coordinates are data units, the text moves when the axis limits change &mdash; correct for labelling a data point, wrong for a caption.
+Because the coords are data units, the text moves when the axis limits change. Correct for labelling a data point, wrong for a caption.
 
 ## annotate
 
-`ax.annotate` is `text` with two positions and an optional arrow:
+`ax.annotate` is `text` with two spots and an optional arrow:
 
 ```python
 ax.annotate("lowest point",
@@ -3875,59 +3875,59 @@ ax.annotate("lowest point",
             arrowprops=dict(arrowstyle="->"))
 ```
 
-Omit `arrowprops` and it is text with an offset. Include it and matplotlib draws a connector.
+Omit `arrowprops` and it's text with an offset. Include it and matplotlib draws a connector.
 
-`arrowstyle` takes `"->"`, `"-|>"`, `"fancy"`, `"wedge"` and others. `connectionstyle="arc3,rad=0.3"` curves the arrow, which is how you route it around the data rather than through it.
+`arrowstyle` takes `"->"`, `"-|>"`, `"fancy"`, `"wedge"` and others. `connectionstyle="arc3,rad=0.3"` curves the arrow. This Is how you route it around the data rather than through it.
 
-`textcoords="offset points"` with `xytext=(dx, dy)` positions the label a fixed number of **points** from the target, instead of at another data coordinate. That is usually what you want: the gap stays constant when the limits change, where a data-coordinate offset would grow or shrink.
+`textcoords="offset points"` with `xytext=(dx, dy)` spots the label a fixed number of **points** from the target, instead of at another data coord. That is often what you want. The gap stays constant when the limits change. Here A data-coord offset would grow or shrink.
 
 ## Reference lines
 
-`ax.axhline(value)` draws a horizontal line across the whole axes; `axvline` the vertical equivalent. They span the full width regardless of the current limits, and keep doing so if the limits change.
+`ax.axhline(value)` draws a flat line across the whole axes. `axvline` the vertical equal. They span the full width even so of the current limits. Keep doing so if the limits change.
 
 `axhspan(lo, hi)` and `axvspan` shade a band between two values.
 
-These are better than plotting the line yourself. `ax.plot([0, 40], [mean, mean])` hard-codes the x range, and stops spanning the axes as soon as the data grows.
+These are better than plotting the line yourself. `ax.plot([0, 40], [mean, mean])` hard-codes the x range. Stops spanning the axes as soon as the data grows.
 
-Typical uses: a target or threshold, a mean, a standard-deviation band, the date of a known event.
+Common uses: a target or threshold, a mean, a standard-deviation band, the date of a known event.
 
 Label them &mdash; either through `label=` and a legend, or with text at one end &mdash; because an unexplained line is a question rather than an answer.
 
 ## Coordinate systems
 
-Three systems, and choosing correctly is what makes annotations survive changes to the data.
+Three systems, and choosing right is what makes annotations live changes to the data.
 
-**Data coordinates** (the default) &mdash; for anything attached to a specific value.
+**Data coords** (the default) &mdash; for anything attached to a exact value.
 
-**Axes coordinates** &mdash; `transform=ax.transAxes`, running 0 to 1 across the axes. A label at `(0.02, 0.95)` sits just inside the top-left corner whatever the data is. This is right for a panel letter, a note, a sample size.
+**Axes coords** &mdash; `transform=ax.transAxes`, running 0 to 1 across the axes. A label at `(0.02, 0.95)` sits just inside the top-left corner what the data is. This is right for a panel letter, a note, a sample size.
 
-**Figure coordinates** &mdash; `fig.text(0.5, 0.01, ...)`, running 0 to 1 across the whole figure. Right for a source note or a caption under a grid of panels.
+**Figure coords** &mdash; `fig.text(0.5, 0.01, ...)`, running 0 to 1 across the whole figure. Right for a source note or a caption under a grid of panels.
 
-The mistake is putting a corner label in data coordinates: it looks correct until the data changes, then drifts into the middle of the plot or off the edge entirely.
+The mistake is putting a corner label in data coords. It looks correct until the data changes, then drifts into the middle of the plot or off the edge fully.
 
 ## Shading regions
 
 `fill_between(x, y1, y2)` fills between two curves, or between a curve and a constant.
 
-`where=condition` restricts it to the parts where a boolean array is true &mdash; shading only where a series is above its mean, or above a threshold.
+`where=rule` restricts it to the parts where a boolean array is true. Shading only where a series is above its mean, or above a threshold.
 
-Add `interpolate=True` and the shading stops exactly at the crossing point; without it, it stops at the nearest data point, leaving a small notch. On coarsely sampled data that notch is visible and looks like a mistake.
+Add `interpolate=True` and the shading stops just at the crossing point. Without it, it stops at the nearest data point, leaving a small notch. On coarsely sampled data that notch is visible and looks like a mistake.
 
-`fill_between` is also how you draw a confidence band, with the upper and lower bounds as the two curves and `alpha` around 0.2.
+`fill_between` is also how you draw a trust band, with the upper and lower bounds as the two curves and `alpha` around 0.2.
 
 ## Restraint
 
 This is the part that matters most and is hardest to apply.
 
-Every annotation competes with the data for attention. A chart with twelve labelled points has twelve things to read and no message. A chart with one highlighted point and one label has a message.
+each annotation competes with the data for focus. A chart with twelve labelled points has twelve things to read and no message. A chart with one highlighted point and one label has a message.
 
-The useful question is what the reader should take away, and then annotating **that** and nothing else. Greying the rest of the series and colouring the highlighted part is often more effective than adding an arrow, because it directs attention without adding ink.
+The handy question is what the reader should take away. Then annotating **that** and nothing else. Greying the rest of the series and colouring the highlighted part is often more good than adding an arrow. It directs focus without adding ink.
 
-If several things genuinely need pointing out, that is usually a sign the chart is trying to say more than one thing, and two charts would each say theirs more clearly.
+If a few things truly need pointing out, that is often a sign the chart is trying to say more than one thing. Two charts would each say theirs more clearly.
 
 ## Boxes behind text
 
-`bbox=` puts a patch behind a label, which is how you keep text readable over busy data:
+`bbox=` puts a patch behind a label. This Is how you keep text readable over busy data:
 
 ```python
 ax.text(x, y, "peak", bbox=dict(boxstyle="round,pad=0.3",
@@ -3940,29 +3940,29 @@ A white box at 80% alpha is the standard treatment for a label that must sit ove
 
 ## Annotating a specific series
 
-Text placed at the end of a line is the most useful annotation there is, and the position should come from the data:
+Text placed at the end of a line is the most handy annotation there's. The spot should come from the data:
 
 ```python
 ax.text(x[-1], y[-1], f"  {name}", va="center", color=line.get_color())
 ```
 
-Taking the colour from the artist ties the label to its line without repeating a colour constant, and it keeps working when the cycle changes.
+Taking the colour from the artist ties the label to its line without repeating a colour constant. It keeps working when the cycle changes.
 
-The leading spaces are a crude but effective offset; `annotate` with `textcoords="offset points"` is the tidier version.
+The leading spaces are a crude but good offset. `annotate` with `textcoords="offset points"` is the tidier version.
 
 Leave room for the labels with `ax.set_xlim(right=x.max() * 1.15)`, or they run off the edge.
 
 ## Arrows
 
-`arrowprops` is a dict, and the two useful spellings are:
+`arrowprops` is a dict, and the two handy spellings are:
 
 `dict(arrowstyle="->")` &mdash; the modern form, with styles like `"->"`, `"-|>"`, `"fancy"`.
 
-`dict(facecolor="black", shrink=0.05)` &mdash; the older form, which produces a filled arrow.
+`dict(facecolor="black", shrink=0.05)` &mdash; the older form. This Makes a filled arrow.
 
-`connectionstyle="arc3,rad=0.2"` curves the connector. A slight curve often reads better than a straight line, because it does not look like part of the data.
+`connectionstyle="arc3,rad=0.2"` curves the connector. A slight curve often reads better than a straight line. It doesn't look like part of the data.
 
-`shrinkA` and `shrinkB` pull the ends back from the text and the target, which stops the arrowhead touching the point it is identifying.
+`shrinkA` and `shrinkB` pull the ends back from the text and the target. This Stops the arrowhead touching the point it's finding.
 
 ## Guides and callouts
 
@@ -3974,99 +3974,99 @@ A few patterns recur often enough to be worth naming.
 
 **A value callout**: a single marker in a strong colour, plus text offset from it.
 
-`ax.get_yaxis_transform()` is the blended transform used above: x in axes fractions, y in data units. Its counterpart `get_xaxis_transform()` does the reverse, and between them they place edge labels that stay put when the data changes.
+`ax.get_yaxis_transform()` is the blended transform used above: x in axes fractions, y in data units. Its counterpart `get_xaxis_transform()` does the reverse. Between them they place edge labels that stay put when the data changes.
 
 ## Too much of it
 
-The failure mode of annotation is a chart where everything is emphasised, which is the same as nothing being emphasised.
+The failure mode of annotation is a chart where all is emphasised. This Is the same as nothing being emphasised.
 
-A useful discipline is to write the sentence the chart is meant to support, and then annotate only what that sentence refers to. If the sentence has two clauses about different things, that is two charts.
+A handy discipline is to write the sentence the chart is meant to support. Then annotate only what that sentence refers to. If the sentence has two clauses about other things, that is two charts.
 
 ## Annotation as editing
 
-The most useful way to think about annotation is as **editing** rather than addition.
+The most handy way to think about annotation is as **editing** rather than addition.
 
-A chart shows everything in the data equally. Annotation is where you say which part matters &mdash; and the strongest form of that is usually subtraction, not addition: greying the context, thinning the lines that are not the subject, removing the gridlines that are not being read.
+A chart shows all in the data equally. Annotation is where you say which part matters. And the strongest form of that is often subtraction, not addition. Greying the context, thinning the lines that aren't the subject, dropping the gridlines that aren't being read.
 
-A highlighted line with a label at its end and everything else in grey carries more meaning than the same chart with an arrow and a paragraph of text, because the emphasis is in the visual hierarchy rather than in something extra to read.
+A highlighted line with a label at its end and all else in grey carries more meaning than the same chart with an arrow and a paragraph of text. The emphasis is in the visual tree rather than in a thing extra to read.
 
-Add annotation when it names something the reader could not derive; remove weight from everything that is not it.
+Add annotation when it names a thing the reader couldn't derive. Drop weight from all that isn't it.
 
 ## Keeping annotations correct
 
-Annotations placed by hand go stale, because the data changes and the coordinates do not.
+Annotations placed by hand go stale. The data changes and the coords don't.
 
 Three habits keep them honest:
 
-**Compute the position from the data.** `ax.annotate(..., xy=(x[i], y[i]))` with `i = y.argmax()` follows the peak wherever it moves.
+**Find the spot from the data.** `ax.annotate(..., xy=(x[i], y[i]))` with `i = y.argmax()` follows the peak wherever it moves.
 
-**Compute the text from the data.** `f"peak {y.max():.1f}"` cannot disagree with the chart.
+**Find the text from the data.** `f"peak {y.max():.1f}"` can't disagree with the chart.
 
-**Use axes coordinates for anything not attached to a value.** A corner note in data coordinates drifts as soon as the limits change.
+**Use axes coords for anything not attached to a value.** A corner note in data coords drifts as soon as the limits change.
 
-A hard-coded annotation is correct exactly once, and there is nothing to warn you when it stops being.
+A hard-coded annotation is correct just once. There's nothing to warn you when it stops being.
 
 ## Annotating for different readers
 
-How much annotation a chart needs depends entirely on who reads it and how long they have.
+How much annotation a chart needs depends fully on who reads it and how long they've.
 
-**A chart in a presentation** gets one annotation, large, saying the thing the speaker is about to say. Everything else is removed, because the audience has seconds and cannot re-read.
+**A chart in a presentation** gets one annotation, large, saying the thing the speaker is about to say. all else is removed. The audience has seconds and can't re-read.
 
-**A chart in a report** can carry two or three, because the reader controls the pace and can look between the chart and the text.
+**A chart in a report** can carry two or three. The reader controls the pace and can look between the chart and the text.
 
-**A chart in an appendix** may carry none, because its job is to be available rather than to argue.
+**A chart in an appendix** may carry none. Its job is to be on hand rather than to argue.
 
 **A chart for yourself** needs none at all.
 
-The common error is annotating a presentation chart like a report chart: four callouts, a legend, a subtitle and a source line, none of which can be read from the back of a room.
+The common error is annotating a presentation chart like a report chart. Four callouts, a legend, a subtitle and a source line, none of which can be read from the back of a room.
 
-Writing the sentence the chart supports, and then annotating only the words in that sentence, resolves it in every case.
+Writing the sentence the chart supports. Then annotating only the words in that sentence, resolves it in each case.
 
 ## In summary
 
-`text` places a string at a data coordinate, with `ha` and `va` deciding which part of it sits there.
+`text` places a string at a data coord, with `ha` and `va` deciding which part of it sits there.
 
-`annotate` adds a second position and an optional arrow, and `textcoords="offset points"` keeps the gap constant when the limits change.
+`annotate` adds a second spot and an optional arrow. `textcoords="offset points"` keeps the gap constant when the limits change.
 
-`axhline`, `axvline` and the span functions cover thresholds and periods, and stay correct when the data grows.
+`axhline`, `axvline` and the span functions cover thresholds and periods. Stay correct when the data grows.
 
-`transform=ax.transAxes` is for anything not attached to a value, so a corner note stays in the corner.
+`transform=ax.transAxes` is for anything not attached to a value. A corner note stays in the corner.
 
-`fill_between(..., where=...)` shades a condition, with `interpolate=True` to stop at the crossing.
+`fill_between(..., where=...)` shades a rule, with `interpolate=True` to stop at the crossing.
 
-And the hardest part is restraint: every annotation competes with the data, and a chart with one highlighted point says more than one with twelve labels.
+And the hardest part is restraint: each annotation competes with the data. A chart with one highlighted point says more than one with twelve labels.
 
 ## Text that scales
 
-An annotation sized in points stays the same physical size when the figure changes, which means it occupies a different fraction of a small figure than a large one.
+An annotation sized in points stays the same physical size when the figure changes. This Means it occupies a other fraction of a small figure than a large one.
 
-For a figure that will be produced at several sizes, three options:
+For a figure that will be made at a few sizes, three options:
 
-**Set font sizes in the style** relative to a base `font.size`, so changing one value scales everything together.
+**Set font sizes in the style** scaled to a base `font.size`. Changing one value scales all together.
 
-**Compute sizes from the figure size**, which is what a house function can do: `fontsize = 4 + fig.get_size_inches()[0]`.
+**Find sizes from the figure size**. This Is what a house function can do: `fontsize = 4 + fig.get_size_inches()[0]`.
 
-**Draw at the final size** and avoid the problem, which is the recommendation everywhere else in this track.
+**Draw at the final size** and avoid the problem. This Is the recommendation all over else in this track.
 
-The failure to avoid is annotating a figure at screen size and then exporting it at a third of that for a document, where a comfortable label becomes unreadable and an arrow becomes a hairline.
+The failure to avoid is annotating a figure at screen size and then exporting it at a third of that for a doc. Here A comfortable label turns unreadable and an arrow turns a hairline.
 
 Looking at the exported file, at the size it will be seen, is the check that catches all of it.
 
 ## One more thing
 
-`ax.annotate` accepts `xycoords` as well as `textcoords`, so the point being annotated can itself be in axes or figure coordinates rather than data ones.
+`ax.annotate` accepts `xycoords` and `textcoords`. So The point being annotated can itself be in axes or figure coords rather than data ones.
 
-That is how you draw an arrow from a corner note to a data point &mdash; text anchored to the corner in axes coordinates, target in data coordinates &mdash; which stays correct as the data changes.
+That is how you draw an arrow from a corner note to a data point. Text anchored to the corner in axes coords, target in data coords. Which stays correct as the data changes.
 
 ## The short version
 
 Annotation is where a chart stops showing and starts saying.
 
-The technique is straightforward; the discipline is not. One thing pointed out clearly beats five things labelled, and greying the context is usually more effective than adding an arrow.
+The technique is straightforward. The discipline isn't. One thing pointed out clearly beats five things labelled. Greying the context is often more good than adding an arrow.
 
 ## Reading the code back
 
-An annotation has three parts: what is being pointed at, where the label sits, and which coordinate system each uses. Getting the third right is what makes the annotation survive a change in the data, and it is the part most often left to chance. Computing both the position and the text from the data means the chart cannot contradict itself.
+An annotation has three parts: what is being pointed at. Here The label sits. Which coord system each uses. Getting the third right is what makes the annotation live a change in the data. It's the part most often left to chance. finding both the spot and the text from the data means the chart can't contradict itself.
 ''',
     [
         {"q": "What do `ha` and `va` control in `ax.text`?",
@@ -4256,58 +4256,58 @@ ax.set_title("file sizes")'''),
     ],
     '''
 title: Saving Figures
-intro: savefig, dpi, and the arguments that decide whether the file looks like the screen.
+intro: savefig, dpi, and the args that decide whether the file looks like the screen.
 
 ## Size and resolution
 
-A figure has a size in **inches** (`figsize`) and a resolution in **dots per inch** (`dpi`). The saved image is their product in pixels.
+A figure has a size in **inches** (`figsize`) and a detail in **dots per inch** (`dpi`). The saved image is their product in pixels.
 
 `figsize=(6, 3)` at `dpi=100` gives 600&times;300. At `dpi=200` it gives 1200&times;600.
 
-That much is arithmetic. The part that catches people is that **these two are not interchangeable**:
+That much is math. The part that catches people is that **these two aren't the same**:
 
 `figsize=(4, 2), dpi=200` &rarr; 800&times;400
 `figsize=(8, 4), dpi=100` &rarr; 800&times;400
 
-Same pixels, different-looking charts. Text is sized in **points**, a physical unit, so 10-point text occupies a tenth of an inch either way. On the 4-inch figure that is a large fraction of the width; on the 8-inch one it is half as much.
+Same pixels, other-looking charts. Text is sized in **points**, a physical unit. 10-point text occupies a tenth of an inch either way. On the 4-inch figure that is a large fraction of the width. On the 8-inch one it's half as much.
 
-The rule that follows: choose `figsize` for the **layout** &mdash; how big the text should look relative to the plot &mdash; and `dpi` for the **resolution**. Then scaling up for a high-resolution export changes only sharpness, not proportions.
+The rule that follows: choose `figsize` for the **layout**. How big the text should look scaled to the plot. And `dpi` for the **detail**. Then scaling up for a high-detail export changes only sharpness, not proportions.
 
-A common mistake is making a figure bigger to get more detail and finding the text has shrunk relative to everything else.
+A common mistake is making a figure bigger to get more detail and finding the text has shrunk scaled to all else.
 
 ## bbox_inches
 
-By default `savefig` writes exactly the declared figure area. Labels, titles and legends drawn outside the axes may fall outside it and be cropped.
+By default `savefig` writes just the declared figure area. Labels, titles and legends drawn outside the axes may fall outside it and be cropped.
 
-`bbox_inches="tight"` recomputes the bounding box to include everything drawn. It is the fix for the very common "my y-axis label is missing from the saved file".
+`bbox_inches="tight"` recomputes the bounding box to include all drawn. It's the fix for the very common "my y-axis label is missing from the saved file".
 
-Two consequences: the output dimensions are no longer exactly `figsize &times; dpi`, and `pad_inches` controls the margin it leaves. If you need an exact pixel size, use layout management instead and leave the bbox alone.
+Two results: the output dims are no longer just `figsize &times; dpi`. `pad_inches` controls the margin it leaves. If you need an exact pixel size, use layout management instead and leave the bbox alone.
 
 ## Formats
 
-**PNG** is raster: a grid of pixels. Right for the web, for slides, and anywhere the display size is known. Small for simple charts.
+**PNG** is raster: a grid of pixels. Right for the web, for slides. Anywhere the display size is known. Small for simple charts.
 
-**PDF** is vector: shapes and text. Scales to any size without blurring, embeds fonts, and is what a journal or a print process wants.
+**PDF** is vector: shapes and text. Scales to any size without blurring, embeds fonts. Is what a journal or a print process wants.
 
-**SVG** is vector and text-based, so it can be edited afterwards in Inkscape or styled with CSS in a browser.
+**SVG** is vector and text-based. So It can be edited later in Inkscape or styled with CSS in a browser.
 
-**JPEG** should be avoided for charts: it is lossy in a way that puts artefacts around sharp edges and text, which is exactly what a chart is made of.
+**JPEG** should be avoided for charts: it's lossy in a way that puts artefacts around sharp edges and text. This Is just what a chart is made of.
 
-The trade-off with vector formats is that file size grows with the **number of elements**, not the image dimensions. A line chart is tiny; a scatter plot of 100,000 points is an enormous PDF that may take a viewer minutes to render.
+The trade-off with vector formats is that file size grows with the **number of elements**, not the image dims. A line chart is tiny. A scatter plot of 100,000 points is an huge PDF that may take a viewer minutes to render.
 
-`rasterized=True` on a specific artist stores just that layer as pixels while keeping text and axes as vectors, which gives a small file with sharp labels.
+`rasterized=True` on a exact artist stores just that layer as pixels while keeping text and axes as vectors. This Gives a small file with sharp labels.
 
 ## Background
 
 The default background is white for both the figure and the axes.
 
-`transparent=True` makes both transparent, so the chart sits on whatever is behind it. `facecolor="#222"` sets a specific colour.
+`transparent=True` makes both transparent, so the chart sits on what is behind it. `facecolor="#222"` sets a exact colour.
 
-The catch: transparency changes the background and **not the foreground**. Text, spines and tick labels stay their original dark colour, so a transparent figure dropped onto a dark slide has invisible labels. Making a chart for a dark background means changing the text and line colours too, which is what a dark style sheet does.
+The catch: transparency changes the background and **not the foreground**. Text, spines and tick labels stay their first dark colour. A transparent figure dropped onto a dark slide has invisible labels. Making a chart for a dark background means changing the text and line colours too. This Is what a dark style sheet does.
 
 ## Saving in a loop
 
-The pattern for generating many charts:
+The pattern for making many charts:
 
 ```python
 for group, data in groups:
@@ -4317,29 +4317,29 @@ for group, data in groups:
     plt.close(fig)
 ```
 
-`plt.close(fig)` is the line people omit. Without it every figure stays open, matplotlib warns after twenty, and a loop over a few thousand groups exhausts memory.
+`plt.close(fig)` is the line people omit. Without it each figure stays open, matplotlib warns after twenty. A loop over a few thousand groups exhausts memory.
 
-For output that goes into a document, saving as PDF and letting the document scale it usually beats guessing a dpi.
+For output that goes into a doc, saving as PDF and letting the doc scale it often beats guessing a dpi.
 
-And `savefig` accepts a file-like object as well as a path, which is how you write straight into a buffer for a web response or a test &mdash; as every editor on this page does, since there is no filesystem to write to.
+And `savefig` accepts a file-like object and a path. This Is how you write straight into a buffer for a web response or a test. As each editor on this page does. There's no filesystem to write to.
 
 ## dpi in three places
 
 `dpi` appears in the figure, in `savefig`, and in rcParams, and they interact.
 
-`plt.subplots(dpi=100)` sets the figure's own dpi, which affects on-screen size.
+`plt.subplots(dpi=100)` sets the figure's own dpi. This Affects on-screen size.
 
-`fig.savefig(path, dpi=200)` overrides it for that file.
+`fig.savefig(path, dpi=200)` replaces it for that file.
 
 `rcParams["savefig.dpi"]` sets the default for saving, and defaults to `"figure"`, meaning "use the figure's".
 
-The practical consequence is that a figure looking right on screen can save at a different resolution than expected, and passing `dpi` explicitly at save time removes the question.
+The hands-on result is that a figure looking right on screen can save at a other detail than expected. Passing `dpi` by name at save time drops the question.
 
 Common values: 100 for a quick look, 150&ndash;200 for slides and web, 300 for print, 600 for a journal that asks for it.
 
 ## Metadata and reproducibility
 
-`savefig` accepts a `metadata` dict, which for PNG and PDF is written into the file.
+`savefig` accepts a `metadata` dict. This For PNG and PDF is written into the file.
 
 Recording the script, the data version and the timestamp there means a chart found later can be traced back:
 
@@ -4347,15 +4347,15 @@ Recording the script, the data version and the timestamp there means a chart fou
 fig.savefig(path, metadata={"Software": "analysis.py", "Creation Date": stamp})
 ```
 
-A more visible version is a small caption in figure coordinates giving the source and date, which survives the chart being copied into a document where the file metadata does not follow.
+A more visible version is a small caption in figure coords giving the source and date. This Lives the chart being copied into a doc where the file metadata doesn't follow.
 
 ## Vector text and fonts
 
-By default, PDF and SVG output stores text as **text**, which keeps it selectable and searchable, and requires the reader to have the font.
+By default, PDF and SVG output stores text as **text**. This Keeps it selectable and searchable. Needs the reader to have the font.
 
-`rcParams["pdf.fonttype"] = 42` embeds the font as TrueType, making the file self-contained at the cost of size. Journals frequently require this, and it is the fix when a submitted figure renders in the wrong typeface.
+`rcParams["pdf.fonttype"] = 42` embeds the font as TrueType, making the file self-held at the cost of size. Journals often need this. It's the fix when a submitted figure renders in the wrong typeface.
 
-`rcParams["svg.fonttype"] = "none"` does the opposite for SVG, leaving text as text so it can be styled with CSS in a browser &mdash; useful for the web, wrong for a document.
+`rcParams["svg.fonttype"] = "none"` does the opposite for SVG, leaving text as text so it can be styled with CSS in a browser. handy for the web, wrong for a doc.
 
 ## Saving several formats
 
@@ -4366,7 +4366,7 @@ for ext in ("png", "pdf"):
     fig.savefig(f"{name}.{ext}", dpi=200, bbox_inches="tight")
 ```
 
-The figure can be saved any number of times; nothing is consumed. A PNG for the draft and a PDF for the final document, from one drawing pass.
+The figure can be saved any number of times. Nothing is consumed. A PNG for the draft and a PDF for the final doc, from one drawing pass.
 
 ## Buffers rather than files
 
@@ -4377,13 +4377,13 @@ buf = io.BytesIO()
 fig.savefig(buf, format="png")
 ```
 
-That is how a chart becomes a web response, an email attachment, or a test assertion &mdash; and how these pages work, since the browser has no filesystem to write into.
+That is how a chart turns a web response, an email attachment, or a test assertion. And how these pages work. The browser has no filesystem to write into.
 
-`format` is required when there is no filename to infer it from, which is the usual first error with this.
+`format` is needed when there's no filename to infer it from. This Is the usual first error with this.
 
 ## A saving function
 
-For a project producing many figures, a small wrapper enforces consistency:
+For a project making many figures, a small wrapper enforces agreement:
 
 ```python
 def save(fig, name, formats=("png", "pdf")):
@@ -4393,57 +4393,57 @@ def save(fig, name, formats=("png", "pdf")):
     plt.close(fig)
 ```
 
-One place to change the dpi, the formats, the background and the padding, and the `close` is not forgotten.
+One place to change the dpi, the formats, the background and the padding, and the `close` isn't forgotten.
 
-Adding the source script and a timestamp to the metadata, or as a small caption, makes a figure traceable months later &mdash; which is the difference between a chart that can be updated and one that has to be remade.
+Adding the source script and a timestamp to the metadata, or as a small caption, makes a figure traceable months later. Which is the gap between a chart that can be updated and one that has to be remade.
 
 ## Common saving problems
 
 **Labels cut off** &mdash; missing `bbox_inches="tight"` or layout management.
 
-**Blurry in a document** &mdash; a raster format at too low a dpi; use PDF, or 200&ndash;300 dpi.
+**Blurry in a doc** &mdash; a raster format at too low a dpi. Use PDF, or 200&ndash;300 dpi.
 
-**Enormous PDF** &mdash; a dense scatter stored as vector; rasterise that layer.
+**Huge PDF** &mdash; a dense scatter stored as vector. Rasterise that layer.
 
-**Wrong font on another machine** &mdash; the font was not embedded; `pdf.fonttype = 42`.
+**Wrong font on another machine**. The font wasn't embedded. `pdf.fonttype = 42`.
 
-**Invisible text on a dark background** &mdash; `transparent=True` changed the background and not the foreground.
+**Invisible text on a dark background**. `transparent=True` changed the background and not the foreground.
 
-**Different from the screen** &mdash; the screen was a different size; the file is authoritative.
+**other from the screen** &mdash; the screen was a other size. The file is authoritative.
 
 Each has a one-line fix, and all of them are easier to prevent in a saving function than to diagnose per figure.
 
 ## Figures in a pipeline
 
-When charts are generated automatically &mdash; a weekly report, a dashboard build, a model evaluation &mdash; a few properties matter more than they do for a one-off.
+When charts are made on its own. A weekly report, a dashboard build, a model check. A few properties matter more than they do for a one-off.
 
-**Determinism.** The same input should produce the same file. That means seeding any randomness, sorting anything whose order is not guaranteed, and pinning the style rather than inheriting whatever is configured.
+**Determinism.** The same input should give the same file. That means seeding any noise, sorting anything whose order isn't sure. Pinning the style rather than taking from what is configured.
 
-**Self-description.** The chart should carry its own date range and source, because it will be found later without its context.
+**Self-description.** The chart should carry its own date range and source. It will be found later without its context.
 
-**Failure behaviour.** A chart generated from empty data should produce something explicit rather than an empty axes; a check and a clear message beats a blank rectangle in a report.
+**Failure action.** A chart made from empty data should give a thing clear rather than an empty axes. A check and a clear message beats a blank rectangle in a report.
 
-**Size predictability.** Labels grow with the data, so `bbox_inches="tight"` and a figure size derived from the number of categories prevent a layout that worked in testing from cropping in production.
+**Size predictability.** Labels grow with the data. `bbox_inches="tight"` and a figure size derived from the number of groups prevent a layout that worked in testing from cropping in production.
 
-None of these is about matplotlib specifically. They are the difference between a chart that runs unattended and one that has to be looked at every week.
+None of these is about matplotlib namely. They're the gap between a chart that runs unattended and one that has to be looked at each week.
 
 ## In summary
 
-Pixel size is `figsize &times; dpi`, and `figsize` decides how large the text looks relative to the plot &mdash; so the two are not interchangeable ways of getting the same resolution.
+Pixel size is `figsize &times; dpi`. `figsize` decides how large the text looks scaled to the plot. So the two aren't the same ways of getting the same detail.
 
-`bbox_inches="tight"` is the fix for cropped labels, and changes the output dimensions as a side effect.
+`bbox_inches="tight"` is the fix for cropped labels. Changes the output dims as a side effect.
 
-PNG for the web, PDF or SVG for print and anything resized, and never JPEG for a chart.
+PNG for the web, PDF or SVG for print and anything resized. Never JPEG for a chart.
 
-Vector file size grows with the number of elements, so a dense scatter wants `rasterized=True` on that artist.
+Vector file size grows with the number of elements. A dense scatter wants `rasterized=True` on that artist.
 
-`transparent=True` changes the background and not the text, so a chart for a dark page needs its foreground recoloured too.
+`transparent=True` changes the background and not the text. A chart for a dark page needs its foreground recoloured too.
 
-And in any loop that saves, `plt.close(fig)` &mdash; the figures do not clean themselves up, and the warning arrives long after the memory has started growing.
+And in any loop that saves, `plt.close(fig)`. The figures don't clean themselves up. The warning arrives long after the memory has started growing.
 
 ## Choosing dpi and size together
 
-The two are usually chosen backwards: a default size, then a dpi high enough to look sharp.
+The two are often chosen backwards: a default size, then a dpi high enough to look sharp.
 
 The order that works is destination first.
 
@@ -4453,43 +4453,43 @@ The order that works is destination first.
 
 **A web page at 700 px wide** &rarr; `figsize=(7, 4)`, `dpi=200` for retina displays, then let CSS scale it down.
 
-**A quick look** &rarr; whatever the default is.
+**A quick look** &rarr; what the default is.
 
-Setting the size to the destination means the fonts can be chosen once and are right, and no scaling happens afterwards to disturb the proportions.
+Setting the size to the destination means the fonts can be chosen once and are right. No scaling happens later to disturb the proportions.
 
-The test is whether the figure needs resizing when it arrives where it is going. If it does, it was drawn at the wrong size.
+The test is whether the figure needs resizing when it arrives where it's going. If it does, it was drawn at the wrong size.
 
 ## Checking the output
 
-The saved file is what other people see, and it differs from the screen in ways worth checking once per project rather than per figure.
+The saved file is what other people see. It differs from the screen in ways worth checking once per project rather than per figure.
 
 **Open it at 100%.** Labels that are comfortable in a scaled preview may be too small.
 
 **Check the edges.** Anything drawn outside the axes is the first thing to be cropped.
 
-**Check the background.** A transparent figure over an unexpected background, or a white border around a dark chart.
+**Check the background.** A transparent figure over an surprise background, or a white border around a dark chart.
 
-**Check the file size.** A surprisingly large PDF means a dense artist that should be rasterised.
+**Check the file size.** A oddly large PDF means a dense artist that should be rasterised.
 
-**Open it in the destination** &mdash; the document, the slide, the page &mdash; because that is where the size and the background are decided.
+**Open it in the destination**. The doc, the slide, the page &mdash; because that is where the size and the background are decided.
 
-Doing this once when the saving function is written catches problems that would otherwise recur in every figure the project produces.
+Doing this once when the saving function is written catches problems that would else recur in each figure the project makes.
 
 ## One more thing
 
-`fig.savefig` accepts `pad_inches=0` alongside `bbox_inches="tight"`, which removes the border entirely.
+`fig.savefig` accepts `pad_inches=0` alongside `bbox_inches="tight"`. This Drops the border fully.
 
-That is what you want for a figure being embedded in a layout that provides its own spacing, and what you do not want for one being viewed on its own, where the border is what stops the labels touching the edge.
+That is what you want for a figure being embedded in a layout that gives its own spacing. What you don't want for one being viewed on its own. Here The border is what stops the labels touching the edge.
 
 ## The short version
 
-The saved file is the artefact; the screen is a preview.
+The saved file is the artefact. The screen is a preview.
 
-Size and dpi are one decision made for the destination, `bbox_inches="tight"` prevents the most common cropping, vector formats need rasterised layers for dense data, and every loop that saves needs to close.
+Size and dpi are one choice made for the destination, `bbox_inches="tight"` blocks the most common cropping, vector formats need rasterised layers for dense data. Each loop that saves needs to close.
 
 ## Reading the code back
 
-A save is one call with four arguments that matter: the format, the dpi, the bounding box and the background. Wrapping them in a project function means they are decided once, applied everywhere, and the close is not forgotten. The check that the output is right is to open the file at full size in the place it will be used.
+A save is one call with four args that matter. The format, the dpi, the bounding box and the background. Wrapping them in a project function means they're decided once, applied all over. The close isn't forgotten. The check that the output is right is to open the file at full size in the place it will be used.
 ''',
     [
         {"q": "`figsize=(4,2) dpi=200` and `figsize=(8,4) dpi=100` both give 800x400. How do they differ?",
@@ -4705,13 +4705,13 @@ intro: Time series plotting, and the locators and formatters that stop labels co
 
 ## The axis type follows the data
 
-Pass a list of `datetime.date` or `datetime.datetime` objects &mdash; or a pandas `DatetimeIndex`, or NumPy `datetime64` &mdash; and matplotlib recognises them and builds a date axis. Tick positions and labels are then chosen in date units rather than arbitrary numbers.
+Pass a list of `datetime.date` or `datetime.datetime` objects. Or a pandas `DatetimeIndex`, or NumPy `datetime64`. And matplotlib recognises them and builds a date axis. Tick spots and labels are then chosen in date units rather than any numbers.
 
-Pass **strings** and you get something quite different: matplotlib treats them as categories. Each distinct string gets a position, evenly spaced, in the order supplied.
+Pass **strings** and you get a thing quite other. Matplotlib treats them as groups. Each distinct string gets a spot, evenly spaced, in the order supplied.
 
-That difference matters more than it sounds. With categories, two readings a day apart and two readings two months apart are drawn the same distance apart. The gap in the data disappears, and the line implies a continuity that is not there.
+That gap matters more than it sounds. With groups, two readings a day apart and two readings two months apart are drawn the same distance apart. The gap in the data disappears. The line implies a continuity that isn't there.
 
-Since dates from a CSV arrive as strings, this is a common and quiet failure. `pd.to_datetime` before plotting is the fix, and checking the dtype is how you notice.
+Since dates from a CSV arrive as strings, this is a common and quiet failure. `pd.to_datetime` before plotting is the fix. Checking the dtype is how you notice.
 
 ## Locators
 
@@ -4719,7 +4719,7 @@ A **locator** decides where ticks go. The date locators think in calendar units:
 
 `YearLocator()`, `MonthLocator()`, `WeekdayLocator(byweekday=MO)`, `DayLocator()`, `HourLocator()`, `MinuteLocator()`.
 
-Each takes an `interval`, so `MonthLocator(interval=3)` gives quarterly ticks, and several take a `by...` argument &mdash; `DayLocator(bymonthday=1)` for the first of each month.
+Each takes an `interval`, so `MonthLocator(interval=3)` gives quarterly ticks. A few take a `by...` arg. `DayLocator(bymonthday=1)` for the first of each month.
 
 `AutoDateLocator()` chooses based on the visible range, and adapts if the axis is zoomed.
 
@@ -4731,88 +4731,88 @@ A **formatter** decides how a tick reads.
 
 `DateFormatter("%d %b")` uses `strftime` codes: `%Y` four-digit year, `%y` two-digit, `%m` month number, `%b` abbreviated month name, `%d` day, `%H:%M` time.
 
-`ConciseDateFormatter(locator)` is usually the better choice. It drops what is repeated &mdash; printing the year once at the left rather than on every label, and showing only the day number when the month is unchanged. That is what a person would do by hand, and it saves a great deal of horizontal space.
+`ConciseDateFormatter(locator)` is often the better choice. It drops what is repeated. Printing the year once at the left rather than on each label. Showing only the day number when the month is unchanged. That is what a person would do by hand. It saves a great deal of flat space.
 
-It needs the locator passed to it, because it decides what to omit based on the tick spacing.
+It needs the locator passed to it. It decides what to omit based on the tick spacing.
 
 ## Crowded labels
 
-Date labels collide more than any other kind, because they are long and there are many of them.
+Date labels collide more than any other kind. They're long and there are many of them.
 
 Three fixes, in order of preference:
 
-**Fewer ticks.** A coarser locator. Fifteen readable ticks beat forty overlapping ones, and the reader was never going to use all forty.
+**Fewer ticks.** A coarser locator. Fifteen readable ticks beat forty shared ones. The reader was never going to use all forty.
 
 **Shorter labels.** `"%d %b"` instead of `"%Y-%m-%d"`, or `ConciseDateFormatter`.
 
-**Rotation.** `fig.autofmt_xdate()` rotates the labels and right-aligns them, and also makes room. It works, and slanted text is genuinely harder to read than horizontal text, so it belongs after the other two rather than instead of them.
+**Rotation.** `fig.autofmt_xdate()` rotates the labels and right-aligns them. Also makes room. It works, and slanted text is truly harder to read than flat text. It belongs after the other two rather than instead of them.
 
-A wider figure is the fourth option and often the honest one: a year of daily data does not fit legibly in four inches.
+A wider figure is the fourth option and often the honest one. A year of daily data doesn't fit legibly in four inches.
 
 ## Marking events
 
-`axvline(date)` and `axvspan(start, end)` take dates directly.
+`axvline(date)` and `axvspan(start, end)` take dates right.
 
-That works because the date axis is numeric underneath &mdash; matplotlib converts dates to floating-point days since an epoch, plots the numbers, and formats the labels back into dates. `mdates.date2num` and `num2date` do the conversion explicitly when you need it.
+That works because the date axis is numeric underneath. Matplotlib converts dates to floating-point days since an epoch, plots the numbers. Formats the labels back into dates. `mdates.date2num` and `num2date` do the conversion by name when you need it.
 
-The same fact explains why `set_xlim` accepts either dates or raw numbers, and why arithmetic on the limits works.
+The same fact shows why `set_xlim` accepts either dates or raw numbers. Why math on the limits works.
 
 ## With pandas
 
-A pandas Series with a `DatetimeIndex` plots directly:
+A pandas Series with a `DatetimeIndex` plots right:
 
 ```python
 ax.plot(series.index, series.values)
 ```
 
-or `series.plot(ax=ax)`, which uses pandas' own date formatting. The two produce slightly different tick choices, and pandas' version is often good enough that no locator work is needed.
+or `series.plot(ax=ax)`, which uses pandas' own date formatting. The two give slightly other tick choices. Pandas' version is often good enough that no locator work is needed.
 
-For a DataFrame, `df.plot(ax=ax)` draws every column against the index, which is the fastest route from a time-indexed frame to a chart &mdash; and the subject of a later module.
+For a DataFrame, `df.plot(ax=ax)` draws each column against the index. This Is the fastest route from a time-indexed frame to a chart. And the subject of a later module.
 
 ## Time zones and the axis
 
-matplotlib converts datetimes to numbers using a fixed epoch, and time-zone-aware timestamps are converted to the axis's timezone before plotting.
+matplotlib converts datetimes to numbers using a fixed epoch. Time-zone-aware timestamps are converted to the axis's timezone before plotting.
 
-`rcParams["timezone"]` sets it. If it does not match the data's, the labels are correct times in a different zone, and the shift is a whole number of hours &mdash; large enough to matter and small enough to overlook.
+`rcParams["timezone"]` sets it. If it doesn't match the data's, the labels are correct times in a other zone. The shift is a whole number of hours. Large enough to matter and small enough to overlook.
 
-The reliable approach is the one from the pandas track: normalise to a single zone before plotting, and label the axis with which one.
+The solid approach is the one from the pandas track. Norm to a single zone before plotting. Label the axis with which one.
 
 ## Gaps and non-trading days
 
-A date axis draws real elapsed time, so a weekend appears as a gap.
+A date axis draws real elapsed time. So A weekend appears as a gap.
 
-For financial data that is usually unwanted: five trading days a week become a line with regular breaks, and a month of data has eight or nine of them.
+For money data that is often unwanted: five trading days a week become a line with regular breaks. A month of data has eight or nine of them.
 
-Two options. Plot against an integer index and label the ticks with the dates, which removes the gaps at the cost of a slightly dishonest axis. Or accept the gaps, which is more truthful about elapsed time.
+Two options. Plot against an int index and label the ticks with the dates. This Drops the gaps at the cost of a slightly dishonest axis. Or accept the gaps. This Is more truthful about elapsed time.
 
-Which is right depends on whether the chart is about the market's behaviour over trading sessions or about calendar time. Both are defensible; picking without noticing is not.
+Which is right depends on whether the chart is about the market's action over trading sessions or about calendar time. Both are defensible. Picking without noticing isn't.
 
 ## Resampling before plotting
 
-A year of per-minute data is half a million points, and a chart seven inches wide has seven hundred pixel columns.
+A year of per-minute data is half a million points. A chart seven inches wide has seven hundred pixel columns.
 
-Resampling to a sensible frequency before plotting is usually better than drawing everything:
+Resampling to a sensible rate before plotting is often better than drawing all:
 
 ```python
 daily = series.resample("D").mean()
 ax.plot(daily.index, daily.values)
 ```
 
-That is fewer artists, a smaller file, and a chart that looks identical &mdash; because the extra points were never distinguishable.
+That is fewer artists, a smaller file. A chart that looks same. Because the extra points were never distinguishable.
 
-Where extremes matter, resampling to min and max per period and shading between them keeps the envelope, which is the technique from the performance module.
+Where extremes matter, resampling to min and max per period and shading between them keeps the envelope. This Is the technique from the speed module.
 
 ## Multiple time series with different ranges
 
-Two series covering different date ranges plot happily on one axis, and the shorter one simply occupies part of the width.
+Two series covering other date ranges plot happily on one axis. The shorter one simply occupies part of the width.
 
-That is correct and can mislead, because a series that starts later looks like it began at zero rather than being unobserved. Making the difference explicit &mdash; a note, or a shaded region marking where data exists &mdash; prevents the reading that something changed at that date.
+That is correct and can mislead. A series that starts later looks like it began at zero rather than being unobserved. Making the gap clear. A note, or a shaded region marking where data exists. Blocks the reading that a thing changed at that date.
 
-The same applies to a series with a gap in the middle, where the broken line is the honest display and a joined one is not.
+The same applies to a series with a gap in the middle. Here The broken line is the honest display and a joined one isn't.
 
 ## Annotating dates
 
-Every annotation method takes dates directly, because the axis is numeric underneath.
+each annotation method takes dates right, because the axis is numeric underneath.
 
 The pattern for marking an event:
 
@@ -4822,103 +4822,103 @@ ax.text(event_date, 1.01, " launch", transform=ax.get_xaxis_transform(),
         rotation=0, fontsize=9, color="crimson")
 ```
 
-`get_xaxis_transform()` puts x in data units and y in axes fractions, so the label sits just above the plot regardless of the data's range &mdash; which is what you want for an event marker that should stay at the top.
+`get_xaxis_transform()` puts x in data units and y in axes fractions. The label sits just above the plot even so of the data's range. Which is what you want for an event marker that should stay at the top.
 
 ## Reading a time axis
 
-Three things a reader needs from a dated axis, and which are frequently missing.
+Three things a reader needs from a dated axis, and which are often missing.
 
 **The period covered**, which the first and last tick imply and a title states.
 
-**The granularity** &mdash; whether a point is a day, a week or a month &mdash; which markers make explicit and a smooth line hides.
+**The granularity** &mdash; whether a point is a day, a week or a month &mdash; which markers make clear and a smooth line hides.
 
-**Whether gaps are real.** A break in a line means missing data; a gap on the axis with the line continuing means the axis is categorical and the elapsed time is not being shown.
+**Whether gaps are real.** A break in a line means missing data. A gap on the axis with the line continuing means the axis is cat and the elapsed time isn't being shown.
 
-Stating the frequency in the title or the axis label &mdash; "Daily", "Monthly average" &mdash; costs a word and answers all three.
+Stating the rate in the title or the axis label. "Daily", "Monthly mean". Costs a word and answers all three.
 
 ## Common date problems
 
-**Labels overlapping** &mdash; too many ticks; use a coarser locator before rotating.
+**Labels shared** &mdash; too many ticks. Use a coarser locator before rotating.
 
-**Dates as categories** &mdash; strings not converted; gaps disappear and the spacing is wrong.
+**Dates as groups** &mdash; strings not converted. Gaps disappear and the spacing is wrong.
 
 **A shifted axis** &mdash; a time-zone mismatch between the data and `rcParams["timezone"]`.
 
-**Ticks in odd places** &mdash; an automatic locator on an unusual range; name the locator.
+**Ticks in odd places** &mdash; an auto locator on an unusual range. Name the locator.
 
-**A frequency string that no longer works** &mdash; pandas 2.2 renamed several of them.
+**A rate string that no longer works**. Pandas 2.2 renamed a few of them.
 
-**The line breaking at weekends** &mdash; real elapsed time, which is either correct or a reason to plot against an index.
+**The line breaking at weekends**. Real elapsed time. This Is either correct or a reason to plot against an index.
 
-The first two account for most of it, and both are visible immediately.
+The first two account for most of it, and both are visible at once.
 
 ## Aggregating before plotting
 
 Most time-series charts are better after aggregation than before it.
 
-Per-minute data over a year is half a million points and roughly seven hundred pixel columns. Resampling to daily gives 365 points, a chart that draws instantly, and a picture that is visually identical because the extra points were never separable.
+Per-minute data over a year is half a million points and roughly seven hundred pixel columns. Resampling to daily gives 365 points, a chart that draws instantly. A picture that is visually same because the extra points were never separable.
 
-The choice of aggregation is a decision about what the chart is for:
+The choice of aggregation is a choice about what the chart is for:
 
-**Mean** for a level &mdash; the typical value in each period.
+**Mean** for a level &mdash; the common value in each period.
 
 **Sum** for a quantity &mdash; total sales per week.
 
 **Min and max** shaded as a band, when the extremes are what matter and a mean would hide them.
 
-**Last** for a state or a price, where the value at the end of the period is the meaningful one.
+**Last** for a state or a price. Here The value at the end of the period is the real one.
 
-Plotting raw high-frequency data and letting the renderer overplot it is not more honest; it is the same information rendered less legibly, with whatever the overlapping happens to leave visible standing in for a summary you did not choose.
+Plotting raw high-rate data and letting the renderer overplot it isn't more honest. It's the same data rendered less legibly, with what the shared happens to leave visible standing in for a summary you didn't choose.
 
 ## In summary
 
-Pass real datetimes and matplotlib builds a date axis; pass strings and it builds a categorical one where gaps disappear.
+Pass real datetimes and matplotlib builds a date axis. Pass strings and it builds a cat one where gaps disappear.
 
-`pd.to_datetime` with an explicit `format` is faster and removes the day-first ambiguity.
+`pd.to_datetime` with an clear `format` is faster and drops the day-first ambiguity.
 
 Locators place the ticks in calendar units and formatters decide how they read, with `ConciseDateFormatter` dropping the repetition.
 
 For crowded labels, fewer ticks first, shorter labels second, rotation last.
 
-`axvline` and `axvspan` take dates directly, because the axis is numeric underneath.
+`axvline` and `axvspan` take dates right, because the axis is numeric underneath.
 
-And pandas 2.2 renamed the frequency aliases &mdash; `ME`, `h`, `min` &mdash; which is the usual reason a copied example stops working.
+And pandas 2.2 renamed the rate aliases. `ME`, `h`, `min`. Which is the usual reason a copied example stops working.
 
 ## Periods rather than instants
 
-Much time-series data is about **periods** rather than points: monthly totals, weekly averages, daily counts.
+Much time-series data is about **periods** rather than points: monthly totals, weekly means, daily counts.
 
-Plotting a period as a point at its start implies the value occurred at that instant, and a line between two such points implies a smooth transition through the month.
+Plotting a period as a point at its start implies the value occurred at that instant. A line between two such points implies a smooth transition through the month.
 
 Two displays are more honest for period data.
 
-**Bars**, one per period, which say "this is the total for this interval" and have no between-values.
+**Bars**, one per period. This Say "this is the total for this interval" and have no between-values.
 
-**A step line**, `ax.step(..., where="post")`, which holds the value across the period and changes at the boundary.
+**A step line**, `ax.step(..., where="post")`. This Holds the value across the period and changes at the boundary.
 
-A line is still reasonable when the periods are short relative to the trend and the shape is the point &mdash; but it is a choice, and for something like monthly revenue a bar chart is frequently the better display and rarely the one reached for.
+A line is still fair when the periods are short scaled to the trend and the shape is the point. But it's a choice. For something like monthly revenue a bar chart is often the better display and rarely the one reached for.
 
-Labelling the axis with the period &mdash; "Month starting" &mdash; removes the remaining ambiguity about which end a point represents.
+Labelling the axis with the period. "Month starting". Drops the left ambiguity about which end a point shows.
 
 ## A closing note
 
-Time axes carry more conventions than any other kind, and most of the work is in the setup rather than the drawing.
+Time axes carry more rules than any other kind. Most of the work is in the setup rather than the drawing.
 
-Parse the dates properly, check the dtype, decide on a time zone, sort, and choose a frequency that matches the question. After that, the plotting is the same as any other line chart.
+Parse the dates properly, check the dtype, decide on a time zone, sort. Choose a rate that matches the question. After that, the plotting is the same as any other line chart.
 
-The two failures that matter are plotting strings instead of dates, which silently removes the gaps and misrepresents elapsed time, and letting the locator produce more labels than can be read, which is fixed by asking for fewer rather than by rotating them.
+The two failures that matter are plotting strings instead of dates. This Silently drops the gaps and misrepresents elapsed time. Letting the locator give more labels than can be read. This Is fixed by asking for fewer rather than by rotating them.
 
-And frequency aliases changed in pandas 2.2, which accounts for a large share of examples that no longer run.
+And rate aliases changed in pandas 2.2. This Accounts for a large share of examples that no longer run.
 
 ## The short version
 
-A date axis is the difference between a chart of a time series and a chart of some values in order.
+A date axis is the gap between a chart of a time series and a chart of some values in order.
 
-Parse properly, sort, choose a frequency that matches the question, and use fewer ticks than the default. The rest follows from the line-chart material.
+Parse properly, sort, choose a rate that matches the question. Use fewer ticks than the default. The rest follows from the line-chart material.
 
 ## Reading the code back
 
-A time-series chart is a line chart with three extra decisions: how the dates were parsed, which locator places the ticks, and which formatter writes them. All three are made before any styling, and getting the first wrong makes the other two irrelevant because the axis is not a timeline at all.
+A time-series chart is a line chart with three extra choices. How the dates were parsed. This Locator places the ticks. Which formatter writes them. All three are made before any styling. Getting the first wrong makes the other two irrelevant because the axis isn't a timeline at all.
 ''',
     [
         {"q": "What happens if you plot date strings rather than date objects?",
@@ -5131,84 +5131,84 @@ print("get confused constantly.")'''),
     ],
     '''
 title: Error Bars and Bands
-intro: Showing uncertainty, and saying which kind you are showing.
+intro: Showing uncertainty, and saying which kind you're showing.
 
 ## errorbar
 
 `ax.errorbar(x, y, yerr=err)` plots points with vertical intervals.
 
-A single array or scalar gives **symmetric** bars &mdash; the same distance above and below. A `(2, n)` array or a list of two arrays gives **asymmetric** ones, with the first row the distance **below** and the second the distance **above**.
+A single array or scalar gives **even** bars. The same distance above and below. A `(2, n)` array or a list of two arrays gives **skewed** ones, with the first row the distance **below** and the second the distance **above**.
 
-Both are given as positive offsets from the point, not as absolute positions. Passing absolute upper and lower bounds is a common mistake and produces enormous bars.
+Both are given as plus offsets from the point, not as abs spots. Passing abs upper and lower bounds is a common mistake and makes huge bars.
 
-`xerr` does the same horizontally, and both can be used at once.
+`xerr` does the same flatly, and both can be used at once.
 
-`capsize` adds the end caps; without it the bars are bare lines, which is harder to read against a busy background. `fmt="o"` sets the marker, and `fmt="none"` draws the bars with no marker at all.
+`capsize` adds the end caps. Without it the bars are bare lines. This Is harder to read against a busy background. `fmt="o"` sets the marker. `fmt="none"` draws the bars with no marker at all.
 
 ## Bands
 
-Error bars work for a handful of discrete measurements. On a curve with two hundred points they overlap into a grey smear that conveys nothing.
+Error bars work for a handful of discrete readings. On a curve with two hundred points they share into a grey smear that conveys nothing.
 
-`fill_between(x, low, high)` is the continuous version:
+`fill_between(x, low, high)` is the smooth version:
 
 ```python
 ax.plot(x, y)
 ax.fill_between(x, y - sd, y + sd, alpha=0.25)
 ```
 
-`alpha` around 0.2 to 0.3 keeps the central line clearly on top. Using the same colour for line and band ties them together; using a different one implies they are different series.
+`alpha` around 0.2 to 0.3 keeps the central line clearly on top. Using the same colour for line and band ties them together. Using a other one implies they're other series.
 
-`fill_between` also takes `where=` to shade only part of the range, and `step="pre"` for step-like data where a smooth fill would be wrong.
+`fill_between` also takes `where=` to shade only part of the range. `step="pre"` for step-like data where a smooth fill would be wrong.
 
 ## Say which interval it is
 
 This is the part that matters and is most often skipped.
 
-**Standard deviation** describes the spread of the **data**. It does not shrink as you collect more.
+**Standard deviation** shows the spread of the **data**. It doesn't shrink as you collect more.
 
-**Standard error** describes the uncertainty of the **mean**. It is the standard deviation divided by the square root of n, so it does shrink.
+**Standard error** shows the uncertainty of the **mean**. It's the standard deviation cut by the square root of n, so it does shrink.
 
-**A confidence interval** is roughly 1.96 standard errors for a 95% interval on a mean, under assumptions.
+**A trust interval** is roughly 1.96 standard errors for a 95% interval on a mean, under assumptions.
 
-**A prediction interval** is where a new observation should fall, and is wider than a confidence interval for the fitted line.
+**A guess interval** is where a new finding should fall. Is wider than a trust interval for the fitted line.
 
-On a sample of forty with a standard deviation of fifteen, these differ by a factor of six. An error bar without a caption saying which one it is cannot be interpreted, and readers reliably assume whichever supports their prior.
+On a sample of forty with a standard deviation of fifteen, these differ by a factor of six. An error bar without a caption saying which one it's can't be read. Readers well assume whichever supports their prior.
 
 Put it in the axis label or the legend: `"mean (95% CI)"` costs nothing.
 
 ## Bars with error bars
 
-`ax.bar(x, heights, yerr=errs, capsize=5)` works directly, and `error_kw` passes styling through to the whiskers.
+`ax.bar(x, heights, yerr=errs, capsize=5)` works right, and `error_kw` passes styling through to the whiskers.
 
-Two cautions specific to bars.
+Two cautions exact to bars.
 
-The **zero baseline** rule still applies, and error bars make it more tempting to break, because a truncated axis makes the intervals look more separated.
+The **zero baseline** rule still applies. Error bars make it more tempting to break. A truncated axis makes the intervals look more split.
 
-And the **overlap heuristic** &mdash; "the error bars overlap, so the difference is not significant" &mdash; is wrong for confidence intervals of two means. Non-overlapping intervals do imply a significant difference; overlapping ones do **not** imply the absence of one, because the relevant quantity is the interval around the *difference*, which is narrower than either individual interval suggests. Two 95% intervals can overlap by a fair margin while the difference is still significant.
+And the **share heuristic** &mdash; "the error bars share. The gap isn't large" &mdash; is wrong for trust intervals of two means. Non-shared intervals do imply a large gap. shared ones do **not** imply the lack of one. The relevant quantity is the interval around the *gap*. This Is narrower than either single interval suggests. Two 95% intervals can share by a fair margin while the gap is still large.
 
 ## Show the data when you can
 
-With a dozen observations per group, a bar and an error bar throw away almost everything: the shape, the outliers, the sample size.
+With a dozen findings per group, a bar and an error bar throw away almost all: the shape, the outliers, the sample size.
 
-A strip plot &mdash; the individual points with a small random x offset, or "jitter", to stop them overlapping &mdash; shows all of it in the same space. Adding a horizontal line for the mean keeps the summary.
+A strip plot &mdash; the single points with a small random x offset, or "jitter", to stop them shared &mdash; shows all of it in the same space. Adding a flat line for the mean keeps the summary.
 
-The fifth editor shows a case where two groups have the same mean and very different spreads, one with a clear outlier. The bar chart reports a taller error bar; the points report what happened.
+The fifth editor shows a case where two groups have the same mean and very other spreads, one with a clear outlier. The bar chart reports a taller error bar. The points report what happened.
 
 The rule of thumb: under about fifty points per group, show the points. Above that, a box plot or a violin summarises without hiding as much as a bar does.
 
 ## Model intervals
 
-Drawing a fit with a band is the standard way to show a model and its uncertainty, and it requires being explicit about which band.
+Drawing a fit with a band is the standard way to show a model and its uncertainty. It needs being clear about which band.
 
-A **confidence band** for the fitted line is narrow in the middle and bow-shaped, widening at the ends where the fit is less constrained.
+A **trust band** for the fitted line is narrow in the middle and bow-shaped, widening at the ends where the fit is less constrained.
 
-A **prediction band** for new observations is much wider and roughly parallel to the line, because it includes the residual scatter as well as the uncertainty in the line.
+A **guess band** for new findings is much wider and roughly parallel to the line. It includes the residual scatter and the uncertainty in the line.
 
-The sixth editor draws the second, approximately. For anything that will be used to make a decision, statsmodels or SciPy compute these properly, and the arithmetic is worth doing rather than approximating.
+The sixth editor draws the second, about. For anything that will be used to make a choice, statsmodels or SciPy find these properly. The math is worth doing rather than approximating.
 
 ## Styling error bars
 
-`errorbar` takes separate styling for the line, the markers and the bars:
+`errorbar` takes split styling for the line, the markers and the bars:
 
 ```python
 ax.errorbar(x, y, yerr=e,
@@ -5216,15 +5216,15 @@ ax.errorbar(x, y, yerr=e,
             ecolor="0.4", elinewidth=1, capsize=4, capthick=1)
 ```
 
-`fmt="o"` draws markers with no connecting line, which is right when the x values are discrete categories rather than a sequence. `fmt="none"` draws bars only.
+`fmt="o"` draws markers with no connecting line. This Is right when the x values are discrete groups rather than a sequence. `fmt="none"` draws bars only.
 
-`ecolor` lighter than the marker keeps the point as the subject and the interval as context, which is usually the correct emphasis.
+`ecolor` lighter than the marker keeps the point as the subject and the interval as context. This Is often the correct emphasis.
 
-`errorevery=5` draws bars on every fifth point, for a dense series where every bar would be a smear but some indication of uncertainty is wanted.
+`errorevery=5` draws bars on each fifth point, for a dense series where each bar would be a smear but some indication of uncertainty is wanted.
 
 ## Asymmetric intervals from quantiles
 
-Real uncertainty is often asymmetric, and quantiles give it directly:
+Real uncertainty is often skewed, and quantiles give it right:
 
 ```python
 lo = np.percentile(samples, 5, axis=0)
@@ -5238,13 +5238,13 @@ For `errorbar` the same quantiles must be converted to **offsets** from the cent
 yerr = np.vstack([median - lo, hi - median])
 ```
 
-Forgetting that conversion &mdash; passing the quantiles themselves &mdash; is the most common error here, and produces intervals that are wrong by the magnitude of the data rather than subtly off.
+Losing that conversion &mdash; passing the quantiles themselves &mdash; is the most common error here. Makes intervals that are wrong by the magnitude of the data rather than subtly off.
 
 ## Several series with intervals
 
-Two series each with a band overlap into something unreadable if both bands are the same weight.
+Two series each with a band share into a thing unreadable if both bands are the same weight.
 
-Three things help: low alpha on the bands (0.15 rather than 0.3), matching each band to its line's colour, and drawing all the bands before all the lines so no line is buried.
+Three things help: low alpha on the bands (0.15 rather than 0.3), matching each band to its line's colour. Drawing all the bands before all the lines so no line is buried.
 
 ```python
 for name, (y, lo, hi) in series.items():
@@ -5257,107 +5257,107 @@ Beyond three series with bands, the bands stop being separable and small multipl
 
 ## Error bars on log axes
 
-An interval that is symmetric on a linear scale is asymmetric on a log one, and vice versa.
+An interval that is even on a linear scale is skewed on a log one, and vice versa.
 
-Passing symmetric `yerr` to a log-scaled axis produces a lower bar that is visually much longer than the upper one, which is correct arithmetic and usually not what was intended &mdash; multiplicative uncertainty is normally what you have on a log scale.
+Passing even `yerr` to a log-scaled axis makes a lower bar that is visually much longer than the upper one. This Is correct math and often not what was intended. Scaling uncertainty is most times what you've on a log scale.
 
-The fix is to compute the interval in the space you are plotting: bounds as multiplicative factors, converted to offsets at each point.
+The fix is to find the interval in the space you're plotting. Bounds as scaling factors, converted to offsets at each point.
 
-A bar reaching below zero on a log axis simply does not draw, which is the visible symptom.
+A bar reaching below zero on a log axis simply doesn't draw. This Is the visible symptom.
 
 ## What the interval is for
 
-An error bar is a claim about repeatability, and it is worth being clear which claim.
+An error bar is a claim about repeatability, and it's worth being clear which claim.
 
-"If I did this again, the mean would land in here" is a confidence interval.
+"If I did this again, the mean would land in here" is a trust interval.
 
-"A new observation would land in here" is a prediction interval, and is much wider.
+"A new finding would land in here" is a guess interval, and is much wider.
 
-"The data spread this much" is a standard deviation, and does not shrink with more data.
+"The data spread this much" is a standard deviation, and doesn't shrink with more data.
 
-Charts routinely show one and are read as another. The caption is the only thing that resolves it, which is why every editor here labels the interval rather than leaving it to the reader.
+Charts routinely show one and are read as another. The caption is the only thing that resolves it. This Is why each editor here labels the interval rather than leaving it to the reader.
 
 ## Uncertainty that is not statistical
 
-Not every band is a confidence interval, and saying which kind it is matters as much as the arithmetic.
+Not each band is a trust interval. Saying which kind it's matters as much as the math.
 
-**A measurement tolerance** &mdash; the instrument's stated accuracy, fixed and known.
+**A reading handling** &mdash; the instrument's stated score, fixed and known.
 
-**A range across scenarios** &mdash; best and worst case, which is not a probability statement at all.
+**A range across cases** &mdash; best and worst case. This Isn't a chance statement at all.
 
-**A forecast interval** &mdash; widening with horizon, and conditional on the model.
+**A forecast interval** &mdash; widening with horizon, and gated on the model.
 
-**Observed min and max** &mdash; the actual extremes, which say nothing about what a new observation would do.
+**Seen min and max** &mdash; the actual extremes. This Say nothing about what a new finding would do.
 
-Each is a different claim, and drawn identically. The caption is the only thing distinguishing them, which is why an unlabelled band is the most common way a chart overstates what is known.
+Each is a other claim, and drawn the same way. The caption is the only thing distinguishing them. This Is why an untagged band is the most common way a chart overstates what is known.
 
 ## Choosing what to show
 
-The decision is what the reader should conclude.
+The choice is what the reader should conclude.
 
-If the question is **"is this difference real?"**, show a confidence interval on the difference, not two intervals on the means &mdash; the eye cannot combine them correctly.
+If the question is **"is this gap real?"**, show a trust interval on the gap, not two intervals on the means. The eye can't combine them right.
 
-If the question is **"how variable is this?"**, show the spread: a standard deviation, a percentile band, or the points.
+If the question is **"how var is this?"**, show the spread: a standard deviation, a percentile band, or the points.
 
-If the question is **"what will happen next?"**, show a prediction interval, which is wider than either.
+If the question is **"what will happen next?"**, show a guess interval. This Is wider than either.
 
-If the sample is small, showing the observations answers all three better than any interval.
+If the sample is small, showing the findings answers all three better than any interval.
 
-The failure to avoid is showing a standard error because it is narrowest and letting it be read as spread, which understates variability by a factor of the square root of n.
+The failure to avoid is showing a standard error because it's narrowest and letting it be read as spread. This Understates spread by a factor of the square root of n.
 
 ## Intervals in a report
 
-An interval on a chart is a claim, and the surrounding text is part of it.
+An interval on a chart is a claim. The nearby text is part of it.
 
 Three things belong in the caption or the axis label, and are almost always omitted:
 
-**Which interval it is** &mdash; standard deviation, standard error, a confidence interval and at what level, or a prediction interval.
+**Which interval it's** &mdash; standard deviation, standard error, a trust interval and at what level, or a guess interval.
 
-**What it assumes** &mdash; normality, independence, a model.
+**What it assumes** &mdash; normality, freedom, a model.
 
-**The sample size**, because an interval from eight observations and one from eight hundred are different kinds of claim even when they are the same width.
+**The sample size**, because an interval from eight findings and one from eight hundred are other kinds of claim even when they're the same width.
 
-"Mean &plusmn; 95% CI, n = 42" in the y label costs nine words and makes the chart interpretable. Without it the reader either assumes the most favourable reading or discounts the interval entirely, and both are worse than being told.
+"Mean &plusmn; 95% CI, n = 42" in the y label costs nine words and makes the chart readable. Without it the reader either assumes the most favourable reading or discounts the interval fully. Both are worse than being told.
 
 ## In summary
 
-`errorbar` for discrete measurements, `fill_between` for a curve &mdash; hundreds of bars become a smear.
+`errorbar` for discrete readings, `fill_between` for a curve. Hundreds of bars become a smear.
 
-`yerr=[lo, hi]` takes positive offsets, not absolute bounds, and getting that wrong produces intervals wrong by the scale of the data.
+`yerr=[lo, hi]` takes plus offsets, not abs bounds. Getting that wrong makes intervals wrong by the scale of the data.
 
-Standard deviation, standard error and a confidence interval differ by large factors on the same data, and an unlabelled bar cannot be interpreted.
+Standard deviation, standard error and a trust interval differ by large factors on the same data. An untagged bar can't be read.
 
-Overlapping confidence intervals do not imply the absence of a significant difference, though non-overlapping ones do imply its presence.
+shared trust intervals don't imply the lack of a large gap, though non-shared ones do imply its presence.
 
-On a log axis, symmetric offsets are asymmetric on screen, and the interval should be computed in the space being plotted.
+On a log axis, even offsets are skewed on screen. The interval should be found in the space being plotted.
 
-And with few observations, showing the points beats any summary of them.
+And with few findings, showing the points beats any summary of them.
 
 ## Bands on a forecast
 
-A forecast chart has a specific convention worth following.
+A forecast chart has a exact rule worth following.
 
-The **historical** series is drawn solid; the **forecast** is drawn dashed or in a different shade, so the boundary between observed and predicted is visible without reading the caption.
+The **historical** series is drawn solid. The **forecast** is drawn dashed or in a other shade. The boundary between seen and predicted is visible without reading the caption.
 
 A **vertical line** at the forecast origin makes it unmissable.
 
-The **band widens** with horizon, because uncertainty grows &mdash; a constant-width band on a forecast is almost always wrong, and it understates the far end.
+The **band widens** with horizon. Uncertainty grows. A constant-width band on a forecast is almost always wrong. It understates the far end.
 
-**Two bands** at different levels &mdash; 50% and 90%, with the inner one darker &mdash; communicate the shape of the uncertainty better than one, and are standard in published forecasts.
+**Two bands** at other levels. 50% and 90%, with the inner one darker &mdash; send the shape of the uncertainty better than one. Are standard in published forecasts.
 
-And the caption states the model and the interval, because a forecast band is entirely conditional on a model the chart does not show.
+And the caption states the model and the interval. A forecast band is fully gated on a model the chart doesn't show.
 
-Without the vertical line and the style change, a reader takes the whole line as data, which is the most consequential misreading available on this kind of chart.
+Without the vertical line and the style change, a reader takes the whole line as data. This Is the most consequential misreading on hand on this kind of chart.
 
 ## The short version
 
 An interval is a claim, and the caption is part of the claim.
 
-Standard deviation, standard error, confidence and prediction intervals differ by large factors on the same data, and drawing them identically without saying which is the most common way a chart overstates what is known.
+Standard deviation, standard error, trust and guess intervals differ by large factors on the same data. Drawing them the same way without saying which is the most common way a chart overstates what is known.
 
 ## Reading the code back
 
-Drawing an interval is one argument. Deciding which interval, computing it correctly as offsets, and saying in the chart which one it is are three separate pieces of work, and only the first is about matplotlib. A band drawn without the other two is a decoration that readers will interpret as a claim.
+Drawing an interval is one arg. Deciding which interval, finding it right as offsets. Saying in the chart which one it's are three split pieces of work. Only the first is about matplotlib. A band drawn without the other two is a decoration that readers will read as a claim.
 ''',
     [
         {"q": "How is `yerr=[lo, hi]` interpreted?",
@@ -5561,7 +5561,7 @@ print("value that matters.")'''),
     ],
     '''
 title: Images and Heatmaps
-intro: imshow and pcolormesh, and the origin that catches everyone.
+intro: imshow and pcolormesh, and the origin that catches all.
 
 ## imshow
 
@@ -5569,19 +5569,19 @@ intro: imshow and pcolormesh, and the origin that catches everyone.
 
 Its defaults are chosen for **images**, and three of them are wrong for data.
 
-**Origin.** `z[0, 0]` is drawn at the top-left, because that is where the first pixel of an image goes. For a matrix whose rows are a quantity &mdash; a y axis &mdash; that puts the smallest value at the top, upside down. `origin="lower"` fixes it.
+**Origin.** `z[0, 0]` is drawn at the top-left. That is where the first pixel of an image goes. For a mat whose rows are a quantity. A y axis. That puts the smallest value at the top, upside down. `origin="lower"` fixes it.
 
-**Aspect.** The default `"equal"` makes every cell square, so a 6&times;30 array is drawn five times wider than tall no matter what figure size you asked for. `aspect="auto"` stretches it to fill the axes.
+**Aspect.** The default `"equal"` makes each cell square. A 6&times;30 array is drawn five times wider than tall no matter what figure size you asked for. `aspect="auto"` stretches it to fill the axes.
 
-**Interpolation.** The default smooths between cells. On a photograph that is desirable; on a matrix of values it draws colours that correspond to no data point, which is a small lie. `interpolation="nearest"` gives hard cell edges.
+**blending.** The default smooths between cells. On a photo that is wanted. On a mat of values it draws colours that match to no data point. This Is a small lie. `blending="nearest"` gives hard cell edges.
 
-For data, `imshow(z, origin="lower", aspect="auto", interpolation="nearest")` is the honest starting point.
+For data, `imshow(z, origin="lower", aspect="auto", blending="nearest")` is the honest starting point.
 
 ## Labelling cells
 
-A heatmap of a small matrix is a table that has been coloured. It should read like one.
+A heatmap of a small mat is a table that has been coloured. It should read like one.
 
-Set the ticks to the row and column names, and write the values into the cells:
+Set the ticks to the row and column names. Write the values into the cells:
 
 ```python
 for i in range(rows):
@@ -5589,190 +5589,190 @@ for i in range(rows):
         ax.text(j, i, z[i, j], ha="center", va="center")
 ```
 
-Note the index order: `ax.text(j, i, ...)`. The first argument is x, which is the **column**. Getting this backwards is the usual bug, and on a square matrix it produces a transposed result that looks plausible.
+Note the index order: `ax.text(j, i, ...)`. The first arg is x. This Is the **column**. Getting this backwards is the usual bug. On a square mat it makes a transposed result that looks plausible.
 
-Choosing the text colour by threshold &mdash; white on dark cells, black on light &mdash; keeps every label readable. Without it, half the numbers vanish into the background at one end of the colormap.
+Choosing the text colour by threshold. White on dark cells, black on light. Keeps each label readable. Without it, half the numbers vanish into the background at one end of the colormap.
 
 ## pcolormesh
 
-`imshow` assumes a regular grid and ignores any coordinates you have.
+`imshow` assumes a regular grid and skips any coords you've.
 
-`pcolormesh(x_edges, y_edges, z)` takes the **edges** of the cells, so they can be unevenly spaced &mdash; logarithmic bins, irregular time intervals, a non-uniform mesh.
+`pcolormesh(x_edges, y_edges, z)` takes the **edges** of the cells. They can be unevenly spaced. Logarithmic bins, irregular time intervals, a non-uniform mesh.
 
-The edges outnumber the cells by one in each direction, the same convention as histogram bins. Passing centres instead of edges is the common mistake; matplotlib will accept same-sized arrays and shift everything by half a cell.
+The edges outnumber the cells by one in each direction, the same rule as histogram bins. Passing centres instead of edges is the common mistake. Matplotlib will accept same-sized arrays and shift all by half a cell.
 
 `pcolormesh` is slower than `imshow` and much more flexible. For a regular grid, `imshow` is the right tool.
 
-`contourf` is the third option, drawing filled contour bands rather than cells &mdash; appropriate when the underlying field is genuinely continuous and misleading when it is not.
+`contourf` is the third option, drawing filled contour bands rather than cells. Right when the underlying field is truly smooth and misleading when it isn't.
 
 ## Shared colour scales
 
 `vmin` and `vmax` set the values at the ends of the colormap.
 
-Without them, each heatmap scales to its own data, exactly like unshared subplot axes. Two heatmaps drawn side by side then use the same colours for different values, and the comparison the layout invites is invalid.
+Without them, each heatmap scales to its own data, just like unshared subplot axes. Two heatmaps drawn side by side then use the same colours for other values. The compare the layout invites is invalid.
 
-The colorbar does say so, in numbers, and readers do not read them &mdash; they read the colours.
+The colorbar does say so, in numbers. Readers don't read them. They read the colours.
 
-So: whenever two colour-mapped plots will be compared, fix `vmin` and `vmax` across both, or use one shared colorbar.
+So: when two colour-mapped plots will be checked, fix `vmin` and `vmax` across both, or use one shared colorbar.
 
 `norm=` gives finer control &mdash; `LogNorm` for data spanning orders of magnitude, `BoundaryNorm` for discrete bands.
 
 ## Centring a diverging map
 
-A diverging colormap has a neutral colour in the middle and two directions away from it. It only means anything if that neutral point sits at the value that matters, usually zero.
+A diverging colormap has a neutral colour in the middle and two directions away from it. It only means anything if that neutral point sits at the value that matters, often zero.
 
-With automatic limits, the midpoint of the colormap lands at the midpoint of the **data**. On data ranging from &minus;4 to +10, white sits at +3, and every cell below +3 is coloured as though it were negative.
+With auto limits, the midpoint of the colormap lands at the midpoint of the **data**. On data ranging from &minus;4 to +10, white sits at +3. Each cell below +3 is coloured as though it were minus.
 
-The fix is symmetric limits:
+The fix is even limits:
 
 ```python
 lim = np.abs(z).max()
 ax.imshow(z, cmap="coolwarm", vmin=-lim, vmax=lim)
 ```
 
-or `TwoSlopeNorm(vcenter=0)` when the two sides genuinely need different ranges.
+or `TwoSlopeNorm(vcenter=0)` when the two sides truly need other ranges.
 
-This is one of the most common quiet errors in heatmaps, because the result looks like a normal chart and asserts something false about the sign of half the data.
+This is one of the most common quiet errors in heatmaps. The result looks like a normal chart and asserts a thing false about the sign of half the data.
 
 ## extent for real coordinates
 
-`imshow` numbers the cells from zero by default. `extent=(x0, x1, y0, y1)` maps the array onto real coordinates:
+`imshow` numbers the cells from zero by default. `extent=(x0, x1, y0, y1)` maps the array onto real coords:
 
 ```python
 ax.imshow(z, extent=(0, 100, 0, 50), origin="lower", aspect="auto")
 ```
 
-The four values are the outer edges of the image, not cell centres, which is the usual off-by-half confusion. With `origin="lower"`, `y0` is the bottom.
+The four values are the outer edges of the image, not cell centres. This Is the usual off-by-half confusion. With `origin="lower"`, `y0` is the bottom.
 
-This is what lets a heatmap be overlaid with a line or a scatter in the same units, and without it any overlay is a half-cell out.
+This is what lets a heatmap be overlaid with a line or a scatter in the same units. Without it any overlay is a half-cell out.
 
 ## Masked and missing values
 
-`np.nan` in the array is drawn as the colormap's "bad" colour, which defaults to fully transparent &mdash; so missing cells show whatever is behind them, usually the axes background.
+`np.nan` in the array is drawn as the colormap's "bad" colour. This Defaults to fully transparent. So missing cells show what is behind them, often the axes background.
 
-`cmap.set_bad("0.9")` makes them an explicit grey, which is better than transparent because a missing cell then reads as missing rather than as background.
+`cmap.set_bad("0.9")` makes them an clear grey. This Is better than transparent because a missing cell then reads as missing rather than as background.
 
-A masked array behaves the same way, and is the more explicit form when the mask is computed separately from the data.
+A masked array behaves the same way. Is the more clear form when the mask is found apart from the data.
 
 ## Aspect and reading order
 
-For a correlation matrix or any square array, `aspect="equal"` is right and is the default.
+For a link mat or any square array, `aspect="equal"` is right and is the default.
 
-For a wide array &mdash; time along one axis, a handful of categories along the other &mdash; `aspect="auto"` is necessary, or the figure is drawn at the array's proportions and ignores the size you asked for.
+For a wide array &mdash; time along one axis, a handful of groups along the other &mdash; `aspect="auto"` is needed, or the figure is drawn at the array's proportions and skips the size you asked for.
 
-Row order deserves thought. An unordered heatmap makes the reader scan for structure; sorting rows by their mean, or by a clustering, often reveals the pattern the chart is meant to show. That is a data decision made in the plotting code, and it should be stated in the caption if the order is not alphabetical.
+Row order deserves thought. An unordered heatmap makes the reader scan for structure. Sorting rows by their mean, or by a clustering, often reveals the pattern the chart is meant to show. That is a data choice made in the plotting code. It should be stated in the caption if the order isn't alphabetical.
 
 ## Contours
 
-`ax.contour(z)` draws lines of constant value; `ax.contourf(z)` fills between them.
+`ax.contour(z)` draws lines of constant value. `ax.contourf(z)` fills between them.
 
-They suit genuinely continuous fields &mdash; elevation, temperature, a fitted surface &mdash; and imply smoothness, so they are wrong for a matrix of independent measurements where `pcolormesh` is honest.
+They suit truly smooth fields. Elevation, temp, a fitted surface &mdash; and imply smoothness. They're wrong for a mat of split readings where `pcolormesh` is honest.
 
-`levels=` sets the number or the exact values, and `ax.clabel(cs, inline=True)` writes the values on the lines, which often removes the need for a colorbar.
+`levels=` sets the number or the exact values. `ax.clabel(cs, inline=True)` writes the values on the lines. This Often drops the need for a colorbar.
 
-Combining a filled contour with thin contour lines on top is a standard treatment for a field where both the bands and the exact levels matter.
+Mixing a filled contour with thin contour lines on top is a standard treatment for a field where both the bands and the exact levels matter.
 
 ## Annotating a heatmap
 
-For a small matrix, writing values into the cells makes it a table with colour as a visual aid rather than the only encoding.
+For a small mat, writing values into the cells makes it a table with colour as a visual aid rather than the only encoding.
 
-The threshold trick for text colour is worth restating because it is the difference between a readable and an unreadable heatmap:
+The threshold trick for text colour is worth restating because it's the gap between a readable and an unreadable heatmap:
 
 ```python
 color = "white" if z[i, j] > z.max() / 2 else "black"
 ```
 
-For a diverging map centred on zero, the threshold should be based on distance from the centre rather than from the maximum, or the labels invert on the wrong half.
+For a diverging map centred on zero, the threshold should be based on distance from the centre rather than from the max, or the labels invert on the wrong half.
 
 ## Reading a heatmap
 
-Heatmaps are read less accurately than people assume, because colour intensity is a weak encoding.
+Heatmaps are read less accurately than people assume. Colour intensity is a weak encoding.
 
-They are good at showing **patterns**: blocks, gradients, an outlier cell, structure along a diagonal.
+They're good at showing **patterns**: blocks, grads, an outlier cell, structure along a main-line.
 
-They are poor at **values**: nobody reads 0.62 off a colour.
+They're poor at **values**: no one reads 0.62 off a colour.
 
-So the rule is that a heatmap should either be about the pattern, or it should have the numbers written in the cells &mdash; at which point it is a table with colour as a guide, which is a genuinely good display for a small matrix.
+So the rule is that a heatmap should either be about the pattern, or it should have the numbers written in the cells. At which point it's a table with colour as a guide. This Is a truly good display for a small mat.
 
-For a large matrix, the pattern is the only thing available, and ordering the rows and columns &mdash; by cluster, by total, by a meaningful sequence &mdash; is what makes a pattern visible at all.
+For a large mat, the pattern is the only thing on hand. Sorting the rows and columns. By cluster, by total, by a real sequence. Is what makes a pattern visible at all.
 
 ## Common heatmap mistakes
 
 **Wrong origin** &mdash; row 0 at the top for data whose y axis is a quantity.
 
-**Interpolation on** &mdash; smoothing between cells that are independent measurements.
+**blending on** &mdash; smoothing between cells that are split readings.
 
-**Unshared scales** across panels that will be compared.
+**Unshared scales** across panels that will be checked.
 
-**An uncentred diverging map**, putting the neutral colour at an arbitrary value.
+**An uncentred diverging map**, putting the neutral colour at an any value.
 
 **No colorbar**, leaving the colours meaningless.
 
-**Text the same colour everywhere**, so half the labels disappear into the background.
+**Text the same colour all over**. So Half the labels disappear into the background.
 
-**Unordered rows**, hiding whatever structure exists.
+**Unordered rows**, hiding what structure exists.
 
-All seven are defaults or omissions rather than errors of arithmetic, which is why a heatmap can look professional and communicate nothing.
+All seven are defaults or omissions rather than errors of math. This Is why a heatmap can look professional and send nothing.
 
 ## Correlation matrices
 
-The most common heatmap in practice, and it has its own conventions.
+The most common heatmap and it has its own rules.
 
-**Centre the colormap on zero** with symmetric limits, because a correlation of &minus;0.4 and +0.4 should be equally strong in opposite directions. Without it, a matrix of mostly positive correlations puts the neutral colour somewhere arbitrary and the few negatives look far more extreme than they are.
+**Centre the colormap on zero** with even limits. A link of &minus;0.4 and +0.4 should be equally strong in opposite directions. Without it, a mat of mostly plus links puts the neutral colour one spot any and the few negatives look far more extreme than they're.
 
 **Use a diverging map** for the same reason.
 
-**Set `vmin=-1, vmax=1`**, so two matrices are comparable and so the colour scale means the same thing in every such chart.
+**Set `vmin=-1, vmax=1`**, so two mats are close and so the colour scale means the same thing in each such chart.
 
-**Mask the upper triangle**, since the matrix is symmetric and half of it is repetition. `np.triu` with `np.nan` and a `set_bad` colour does it.
+**Mask the upper triangle**, since the mat is even and half of it's repetition. `np.triu` with `np.nan` and a `set_bad` colour does it.
 
-**Write the numbers in**, if the matrix is small enough, because the exact values are usually what the reader wants.
+**Write the numbers in**, if the mat is small enough. The exact values are often what the reader wants.
 
-Those five turn the default output into something readable, and the first three are the ones that affect whether it is accurate.
+Those five turn the default output into a thing readable. The first three are the ones that affect whether it's accurate.
 
 ## In summary
 
-`imshow` has image defaults: row 0 at the top, square cells, and interpolation between them. For data, `origin="lower"`, `aspect="auto"` and `interpolation="nearest"` are the honest settings.
+`imshow` has image defaults: row 0 at the top, square cells. Blending between them. For data, `origin="lower"`, `aspect="auto"` and `blending="nearest"` are the honest settings.
 
-`pcolormesh` takes cell edges and handles uneven grids; edges outnumber cells by one per axis.
+`pcolormesh` takes cell edges and handles uneven grids. Edges outnumber cells by one per axis.
 
-`vmin`/`vmax` are what make two heatmaps comparable, and their absence is the same error as unshared subplot axes.
+`vmin`/`vmax` are what make two heatmaps close. Their lack is the same error as unshared subplot axes.
 
-A diverging colormap needs symmetric limits or its neutral point lands at the midpoint of the data rather than at zero.
+A diverging colormap needs even limits or its neutral point lands at the midpoint of the data rather than at zero.
 
-A colorbar is not optional, and a small matrix is better as a table with the numbers written in.
+A colorbar isn't optional, and a small mat is better as a table with the numbers written in.
 
-And row order is a choice: sorting by a meaningful quantity is frequently what makes a pattern visible at all.
+And row order is a choice: sorting by a real quantity is often what makes a pattern visible at all.
 
 ## Overlaying on an image
 
-A heatmap or image often needs something drawn on top &mdash; contours, a scatter, a boundary.
+A heatmap or image often needs a thing drawn on top. Contours, a scatter, a boundary.
 
-The key is that `imshow` sets up a coordinate system, and everything overlaid must use the same one.
+The key is that `imshow` sets up a coord system. All overlaid must use the same one.
 
-With default settings the cells are numbered from zero and a scatter must be in those units. With `extent=`, both use real coordinates and the overlay is straightforward.
+With default settings the cells are numbered from zero and a scatter must be in those units. With `extent=`, both use real coords and the overlay is straightforward.
 
-Two details catch people. `extent` gives the outer **edges**, so a cell centre is half a cell in from the boundary &mdash; a scatter of cell centres plotted against edge coordinates is offset by half a cell, which looks like a small registration error.
+Two details catch people. `extent` gives the outer **edges**. A cell centre is half a cell in from the boundary. A scatter of cell centres plotted against edge coords is offset by half a cell. This Looks like a small registration error.
 
-And `origin="lower"` must be consistent between the image and any y coordinates computed for the overlay, or the overlay is flipped relative to the image while both look individually correct.
+And `origin="lower"` must be steady between the image and any y coords found for the overlay, or the overlay is flipped scaled to the image while both look on their own correct.
 
-Drawing a few known points on top is the quickest way to confirm the coordinate system is what you think.
+Drawing a few known points on top is the quickest way to confirm the coord system is what you think.
 
 ## One more thing
 
-`ax.matshow` is `imshow` with the defaults already set for a matrix: origin at the top with the tick labels along the top edge, which is the convention for displaying a matrix in mathematical notation.
+`ax.matshow` is `imshow` with the defaults already set for a mat. Origin at the top with the tick labels along the top edge. This Is the rule for displaying a mat in math form.
 
-It is convenient for a correlation matrix and confusing for anything with a quantitative y axis, where `imshow(origin="lower")` remains the right call.
+It's convenient for a link mat and confusing for anything with a quantitative y axis. Here `imshow(origin="lower")` remains the right call.
 
 ## The short version
 
-A heatmap is read for its pattern, not its values, which is why ordering the rows and columns matters as much as the colormap.
+A heatmap is read for its pattern, not its values. This Is why sorting the rows and columns matters as much as the colormap.
 
-The defaults are built for photographs, and three of them &mdash; origin, aspect and interpolation &mdash; are wrong for data. Setting all three explicitly is the honest starting point.
+The defaults are built for photos. Three of them. Origin, aspect and blending. Are wrong for data. Setting all three by name is the honest starting point.
 
 ## Reading the code back
 
-A heatmap is one call and four corrections to its defaults: origin, aspect, interpolation and the colour limits. Add a colorbar with a label and, for a small matrix, the values in the cells. That is six lines, and it is the difference between a picture of colours and a readable display of a matrix.
+A heatmap is one call and four corrections to its defaults. Origin, aspect, blending and the colour limits. Add a colorbar with a label and, for a small mat, the values in the cells. That is six lines. It's the gap between a picture of colours and a readable display of a mat.
 ''',
     [
         {"q": "Why does `imshow` put row 0 at the top?",
@@ -5976,13 +5976,13 @@ ax.set_xticks([]); ax.set_yticks([])'''),
     ],
     '''
 title: Styles and rcParams
-intro: Changing every chart at once, instead of styling each one by hand.
+intro: Changing each chart at once, instead of styling each one by hand.
 
 ## rcParams
 
-`plt.rcParams` is a dictionary of every default matplotlib uses &mdash; several hundred settings covering figure size, fonts, colours, line widths, spines, grids, ticks and saving.
+`plt.rcParams` is a dict of each default matplotlib uses. A few hundred settings covering figure size, fonts, colours, line widths, spines, grids, ticks and saving.
 
-Changing one changes every figure created afterwards:
+Changing one changes each figure created later:
 
 ```python
 plt.rcParams["axes.spines.top"] = False
@@ -5990,25 +5990,25 @@ plt.rcParams["axes.spines.top"] = False
 
 The keys are dotted paths mirroring the object structure: `lines.linewidth`, `axes.titlesize`, `xtick.direction`, `savefig.dpi`.
 
-`plt.rcdefaults()` restores everything, which is worth knowing in a notebook where settings accumulate across cells.
+`plt.rcdefaults()` restores all, which is worth knowing in a notebook where settings build up across cells.
 
-The important property is that these are **defaults**, applied when an artist is created. Changing a setting does not affect figures already drawn.
+The key property is that these are **defaults**, applied when an artist is created. Changing a setting doesn't affect figures already drawn.
 
 ## Style sheets
 
 A style sheet is a named bundle of rcParams.
 
-`plt.style.available` lists them &mdash; `ggplot`, `bmh`, `fivethirtyeight`, `grayscale`, the `seaborn-v0_8-*` family, and several others.
+`plt.style.on hand` lists them &mdash; `ggplot`, `bmh`, `fivethirtyeight`, `grayscale`, the `seaborn-v0_8-*` family, and a few others.
 
-`plt.style.use("ggplot")` applies one from that point on. `with plt.style.context("ggplot"):` applies it to a block and restores the previous settings afterwards, which is what you want in a script that also produces charts in a different style.
+`plt.style.use("ggplot")` applies one from that point on. `with plt.style.context("ggplot"):` applies it to a block and restores the previous settings later. This Is what you want in a script that also makes charts in a other style.
 
-Writing your own is a plain text file of `key: value` lines with a `.mplstyle` extension, placed where matplotlib looks for it. For a project, a dict in a module is usually simpler.
+Writing your own is a plain text file of `key. Value` lines with a `.mplstyle` extension, placed where matplotlib looks for it. For a project, a dict in a module is often simpler.
 
 ## Combining
 
 `plt.style.use(["ggplot", {"lines.linewidth": 3}])` applies items left to right, so later ones win.
 
-A dict in the list is treated as rcParams. That is the practical form for real work: take a published style for its typography and colours, then override the two or three things it gets wrong for your case, without copying and maintaining a whole style file.
+A dict in the list is treated as rcParams. That is the hands-on form for real work. Take a published style for its typography and colours, then replace the two or three things it gets wrong for your case, without copying and keeping a whole style file.
 
 ## A house style
 
@@ -6030,53 +6030,53 @@ with plt.rc_context(HOUSE):
     ...
 ```
 
-`rc_context` takes a dict directly and restores the previous settings on exit.
+`rc_context` takes a dict right and restores the previous settings on exit.
 
-The settings worth putting in almost any house style are the ones that fix matplotlib's weakest defaults: the top and right spines, a left-aligned bold title, a faint grid drawn below the data, a legend without a frame, and a colour cycle you chose.
+The settings worth putting in almost any house style are the ones that fix matplotlib's weakest defaults. The top and right spines, a left-aligned bold title, a faint grid drawn below the data, a legend without a frame. A colour cycle you chose.
 
-That is six lines, and it is the difference between charts that look like matplotlib defaults and charts that look designed.
+That is six lines, and it's the gap between charts that look like matplotlib defaults and charts that look designed.
 
 ## What styles cannot do
 
-A style sets defaults. It cannot make decisions.
+A style sets defaults. It can't make choices.
 
-It will not choose between a bar chart and a line chart. It will not set an `alpha` appropriate to your number of points &mdash; the right value for 100 points is wrong for 100,000. It will not decide the axis should start at zero, or that the title should state a finding, or that three of the seven series should be greyed out.
+It won't choose between a bar chart and a line chart. It won't set an `alpha` right to your number of points. The right value for 100 points is wrong for 100,000. It won't decide the axis should start at zero, or that the title should state a finding, or that three of the seven series should be greyed out.
 
-The fifth editor shows a styled scatter that is still unreadable, because the problem was overplotting and no setting addresses that.
+The fifth editor shows a styled scatter that is still unreadable. The problem was overplotting and no setting handles that.
 
-Styling is the last 20% of a chart. The decisions are the rest, and they are the subject of most of this track.
+Styling is the last 20% of a chart. The choices are the rest. They're the subject of most of this track.
 
 ## Fonts
 
-`font.family` takes a generic name &mdash; `sans-serif`, `serif`, `monospace` &mdash; and `font.sans-serif` is the ordered list of actual fonts tried for it.
+`font.family` takes a plain name. `sans-serif`, `serif`, `monospace` &mdash; and `font.sans-serif` is the sorted list of actual fonts tried for it.
 
-A font that is not installed produces a **warning and a fallback**, not an error. The figure renders in whatever was available next, which means the same script can produce different-looking output on a different machine, and the only sign is a warning that is easy to miss in a log.
+A font that isn't installed makes a **warning and a fallback**, not an error. The figure renders in what was on hand next. This Means the same script can give other-looking output on a other machine. The only sign is a warning that is easy to miss in a log.
 
-For output that must look identical everywhere, either restrict yourself to fonts you know are present, or embed the font by saving as PDF or SVG with `pdf.fonttype = 42`, which stores the glyphs in the file.
+For output that must look same all over, either restrict yourself to fonts you know are present, or embed the font by saving as PDF or SVG with `pdf.fonttype = 42`. This Stores the glyphs in the file.
 
-`mathtext` handles LaTeX-style maths in labels without needing LaTeX installed: `r"$\\sigma^2$"` in any text argument.
+`mathtext` handles LaTeX-style maths in labels without needing LaTeX installed: `r"$\\sigma^2$"` in any text arg.
 
 ## Where settings come from
 
-matplotlib reads its defaults in a fixed order, each overriding the last:
+matplotlib reads its defaults in a fixed order, each replacing the last:
 
 The built-in defaults.
 
-A `matplotlibrc` file, found in the current directory, the user's config directory, or the installation.
+A `matplotlibrc` file, found in the current folder, the user's config folder, or the installation.
 
 `plt.style.use(...)`.
 
-Direct assignment to `plt.rcParams`.
+Direct set to `plt.rcParams`.
 
-Arguments passed to the plotting call itself.
+args passed to the plotting call itself.
 
-That ordering explains a common confusion: a setting applied in a style sheet is overridden by anything passed explicitly, and a `matplotlibrc` in the working directory silently changes every chart in that project. When a figure looks different on another machine, a `matplotlibrc` is a candidate.
+That sorting shows a common confusion: a setting applied in a style sheet is overridden by anything passed by name. A `matplotlibrc` in the working folder silently changes each chart in that project. When a figure looks other on another machine, a `matplotlibrc` is a pick.
 
 ## Settings worth knowing
 
 Beyond the obvious ones, a handful appear in most house styles:
 
-`figure.autolayout: True` &mdash; applies `tight_layout` to every figure automatically.
+`figure.autolayout: True` &mdash; applies `tight_layout` to each figure on its own.
 
 `axes.titlelocation: left` &mdash; headline-style titles.
 
@@ -6084,9 +6084,9 @@ Beyond the obvious ones, a handful appear in most house styles:
 
 `legend.frameon: False`.
 
-`savefig.bbox: tight` &mdash; makes every save behave as if `bbox_inches="tight"` had been passed, which removes a whole class of cropping bug.
+`savefig.bbox: tight` &mdash; makes each save behave as if `bbox_inches="tight"` had been passed. This Drops a whole class of cropping bug.
 
-`figure.constrained_layout.use: True` &mdash; the newer alternative to `autolayout`.
+`figure.constrained_layout.use: True` &mdash; the newer option to `autolayout`.
 
 `errorbar.capsize: 3` &mdash; caps by default, since the bare-line default is rarely what anyone wants.
 
@@ -6100,25 +6100,25 @@ axes.spines.top: False
 axes.prop_cycle: cycler('color', ['264653', 'e76f51', '2a9d8f'])
 ```
 
-Note the colours have no `#` prefix, because `#` starts a comment in this format &mdash; a small trap that produces a confusing parse error.
+Note the colours have no `#` prefix. `#` starts a comment in this format. A small trap that makes a confusing parse error.
 
 Placed in `~/.config/matplotlib/stylelib/`, it can be used by name from anywhere.
 
 ## Per-project versus per-figure
 
-A project-wide style is right for consistency and wrong when one figure needs to differ.
+A project-wide style is right for agreement and wrong when one figure needs to differ.
 
-`plt.rc_context(...)` as a context manager is the middle ground: a project default applied broadly, and a block that overrides it for one figure without leaking.
+`plt.rc_context(...)` as a context manager is the middle ground. A project default applied broadly. A block that replaces it for one figure without leaking.
 
-The failure mode of global settings in a notebook is that they accumulate invisibly across cells, so a figure depends on which cells have been run. `plt.rcdefaults()` at the top of a notebook, followed by the project style, makes it deterministic.
+The failure mode of global settings in a notebook is that they build up invisibly across cells. A figure depends on which cells have been run. `plt.rcdefaults()` at the top of a notebook, followed by the project style, makes it fixed.
 
 ## Style is not design
 
-A style sheet gets the typography, spacing and palette consistent, which is genuinely valuable and is roughly the last fifth of making a chart good.
+A style sheet gets the typography, spacing and palette steady. This Is truly valuable and is roughly the last fifth of making a chart good.
 
-The other four fifths &mdash; which chart, what to compare, what to leave out, what the title claims, whether the axis starts at zero &mdash; are decisions no setting can make.
+The other four fifths &mdash; which chart, what to compare, what to leave out, what the title claims, whether the axis starts at zero &mdash; are choices no setting can make.
 
-That is worth saying explicitly because a good style sheet makes a bad chart look professional, which is not an improvement.
+That is worth saying by name because a good style sheet makes a bad chart look professional. This Isn't an gain.
 
 ## A minimal house style
 
@@ -6143,87 +6143,87 @@ HOUSE = {
 }
 ```
 
-Nothing exotic, and every chart in a project drawn under it looks intentional. `savefig.bbox` alone removes the most common cropping complaint.
+Nothing exotic, and each chart in a project drawn under it looks intentional. `savefig.bbox` alone drops the most common cropping complaint.
 
 ## Styles and reproducibility
 
-A figure's appearance depends on settings that are not in the plotting code, which is a reproducibility problem.
+A figure's appearance depends on settings that aren't in the plotting code. This Is a reproducibility problem.
 
-Three sources of drift: a `matplotlibrc` in the working directory, accumulated `rcParams` changes in a long notebook session, and a style sheet that differs between machines.
+Three sources of drift: a `matplotlibrc` in the working folder, built up `rcParams` changes in a long notebook session. A style sheet that differs between machines.
 
 Two habits address it.
 
-**Reset explicitly** at the start: `plt.rcdefaults()` followed by the project style. The figure then does not depend on what ran before.
+**Reset by name** at the start: `plt.rcdefaults()` followed by the project style. The figure then doesn't depend on what ran before.
 
-**Apply the style in a context manager** rather than globally, so a figure carries its own appearance rather than inheriting whatever is current.
+**Apply the style in a context manager** rather than globally. A figure carries its own appearance rather than taking from what is current.
 
-For a figure that will be regenerated months later, the style belongs in the repository alongside the code, not in a user config directory.
+For a figure that will be regenerated months later, the style belongs in the store alongside the code, not in a user config folder.
 
 ## Style as a decision record
 
-A style sheet is a place to write down decisions once, and that is worth more than the consistency it produces.
+A style sheet is a place to write down choices once. That is worth more than the agreement it makes.
 
-Every setting in it encodes a judgement: that titles are left-aligned headlines, that grids are faint and behind the data, that legends have no frame, that this is the palette. Written in a style file, those decisions are visible, reviewable and changeable in one place.
+each setting in it codes a judgement: that titles are left-aligned headlines, that grids are faint and behind the data, that legends have no frame, that this is the palette. Written in a style file, those choices are visible, reviewable and changeable in one place.
 
-Written into each chart, they are re-decided every time, inconsistently, by whoever is writing that chart.
+Written into each chart, they're re-decided each time, inconsistently, by whoever is writing that chart.
 
-The practical benefit shows up when something has to change &mdash; a new brand colour, a journal's font requirement, a switch to dark backgrounds for a presentation. With a style, that is one edit. Without it, it is a search through every plotting call in the project.
+The hands-on gain shows up when a thing has to change. A new brand colour, a journal's font need, a switch to dark backgrounds for a presentation. With a style, that is one edit. Without it, it's a search through each plotting call in the project.
 
-That is the same argument as any other configuration, and it applies here more than people expect, because chart styling is exactly the kind of thing that gets copy-pasted.
+That is the same arg as any other config. It applies here more than people expect. Chart styling is just the kind of thing that gets copy-pasted.
 
 ## In summary
 
-`rcParams` holds every default, and changes affect figures created afterwards.
+`rcParams` holds each default, and changes affect figures created later.
 
-Style sheets bundle them; `plt.style.context` applies one to a block without leaking.
+Style sheets bundle them. `plt.style.context` applies one to a block without leaking.
 
-A list applies styles in order, and a dict in the list overrides individual settings &mdash; the practical way to take a published style and fix the two things it gets wrong.
+A list applies styles in order. A dict in the list replaces single settings. The hands-on way to take a published style and fix the two things it gets wrong.
 
-`rc_context` with a module-level dict is the whole mechanism for a project style.
+`rc_context` with a module-level dict is the whole method for a project style.
 
-A missing font warns and falls back silently, so figures can look different elsewhere.
+A missing font warns and falls back silently. So Figures can look other elsewhere.
 
-And a style is the last fifth of a good chart. It cannot choose the chart type, set an alpha suited to your sample size, or decide what the title should claim &mdash; and it will make a bad chart look professional, which is not the same as making it better.
+And a style is the last fifth of a good chart. It can't choose the chart type, set an alpha suited to your sample size, or decide what the title should claim. And it will make a bad chart look professional. This Isn't the same as making it better.
 
 ## Dark backgrounds
 
-A dark theme is not a colour inversion, and doing it by hand usually misses something.
+A dark theme isn't a colour inversion, and doing it by hand often misses a thing.
 
-The elements that need changing: the figure background, the axes background, the text colour, the tick colours, the tick label colours, the spine colours, the grid colour, and the property cycle &mdash; because a palette tuned for white is usually too dark on black.
+The elements that need changing: the figure background, the axes background, the text colour, the tick colours, the tick label colours, the spine colours, the grid colour. The property cycle. Because a palette tuned for white is often too dark on black.
 
-`plt.style.use("dark_background")` does all of it, which is the argument for using a style rather than setting six things.
+`plt.style.use("dark_background")` does all of it. This Is the arg for using a style rather than setting six things.
 
-Two further points. Saturated colours that look right on white are often too intense on black, and desaturating them slightly helps. And `savefig` still writes a white background unless told otherwise, so a dark figure saved with default settings comes out with a white border around a dark plot &mdash; `facecolor=fig.get_facecolor()` fixes it, or setting `savefig.facecolor` in the style.
+Two further points. Saturated colours that look right on white are often too intense on black. Desaturating them slightly helps. And `savefig` still writes a white background unless told else. A dark figure saved with default settings comes out with a white border around a dark plot. `facecolor=fig.get_facecolor()` fixes it, or setting `savefig.facecolor` in the style.
 
 ## Where to keep a style
 
-A project style needs to live somewhere both the code and the people can find.
+A project style needs to live one spot both the code and the people can find.
 
-**A module in the repository** &mdash; `style.py` exporting a dict &mdash; is version-controlled, reviewable, and importable. It is the option that behaves like the rest of the code.
+**A module in the store**. `style.py` exporting a dict &mdash; is version-controlled, reviewable. Importable. It's the option that behaves like the rest of the code.
 
-**A `.mplstyle` file in the repository**, applied with a relative path, is equivalent and uses matplotlib's own format.
+**A `.mplstyle` file in the store**, applied with a scaled path, is equal and uses matplotlib's own format.
 
-**A file in the user's config directory** is convenient and invisible to everyone else, which makes figures irreproducible on another machine. It is the wrong place for anything shared.
+**A file in the user's config folder** is convenient and invisible to all else. This Makes figures irreproducible on another machine. It's the wrong place for anything shared.
 
-The repository options also mean the style is part of the diff when it changes, so a figure that suddenly looks different has a commit explaining why.
+The store options also mean the style is part of the diff when it changes. A figure that suddenly looks other has a commit showing why.
 
-For a single analysis, a dict at the top of the notebook applied with `rc_context` is enough, and still better than settings scattered through the plotting calls.
+For a single analysis, a dict at the top of the notebook applied with `rc_context` is enough. Still better than settings scattered through the plotting calls.
 
 ## One more thing
 
-`plt.style.use` accepts a URL or a file path as well as a name, so a style can be shared without installing it.
+`plt.style.use` accepts a URL or a file path and a name. A style can be shared without installing it.
 
-For a team, a style file in a shared repository referenced by relative path gives everyone the same figures without anyone configuring their environment &mdash; and it appears in code review when it changes.
+For a team, a style file in a shared store referenced by scaled path gives all the same figures without anyone configuring their setting. And it appears in code review when it changes.
 
 ## The short version
 
-A style is a set of decisions written down once, which is worth more than the consistency it produces.
+A style is a set of choices written down once. This Is worth more than the agreement it makes.
 
-It handles typography, spacing and palette &mdash; roughly the last fifth of a good chart. The other four fifths are choices no setting can make, and a good style applied to a bad chart produces a professional-looking bad chart.
+It handles typography, spacing and palette. Roughly the last fifth of a good chart. The other four fifths are choices no setting can make. A good style applied to a bad chart makes a professional-looking bad chart.
 
 ## Reading the code back
 
-A style is a dict applied in a context manager, and its contents are decisions rather than settings. The ones that matter most are the ones fixing matplotlib's weakest defaults: spines, title alignment, grid weight, legend frame and the colour cycle. Six entries covers it, and every chart in the project then starts from a better place.
+A style is a dict applied in a context manager. Its contents are choices rather than settings. The ones that matter most are the ones fixing matplotlib's weakest defaults. Spines, title alignment, grid weight, legend frame and the colour cycle. Six entries covers it. Each chart in the project then starts from a better place.
 ''',
     [
         {"q": "What does changing `plt.rcParams` affect?",
@@ -6432,20 +6432,20 @@ intro: Two scales on one plot, and the reasons to think twice.
 
 `ax2 = ax.twinx()` creates a second axes occupying the same space, sharing the x axis and having its own y axis on the right. `twiny()` is the transpose.
 
-Everything drawn on `ax2` uses the right-hand scale. They are genuinely separate axes objects: separate limits, separate ticks, separate artists.
+all drawn on `ax2` uses the right-hand scale. They're truly split axes objects: split limits, split ticks, split artists.
 
-The one styling step that is not optional is **colour-coding**. Set each y label and its tick labels to match the colour of the series that uses it:
+The one styling step that isn't optional is **colour-coding**. Set each y label and its tick labels to match the colour of the series that uses it:
 
 ```python
 ax.set_ylabel("revenue", color=c1)
 ax.tick_params(axis="y", labelcolor=c1)
 ```
 
-Without it, the reader has two scales and no way to tell which belongs to which line, and the chart is simply unreadable.
+Without it, the reader has two scales and no way to tell which belongs to which line. The chart is simply unreadable.
 
 ## The legend problem
 
-`ax.legend()` collects labelled artists **on that axes only**. With a twin, that means each half of the chart gets its own legend, which looks like a mistake.
+`ax.legend()` collects labelled artists **on that axes only**. With a twin, that means each half of the chart gets its own legend. This Looks like a mistake.
 
 Collect the handles and pass them to one call:
 
@@ -6461,74 +6461,74 @@ Or gather them generically with `ax.get_legend_handles_labels()` on each axes an
 
 This is the part worth taking seriously.
 
-Two series on independent scales have **no defined relationship**. Where they cross, which is above which, whether they diverge &mdash; all of it depends on the limits you chose for the second axis. Change `ax2.set_ylim` and the crossing moves, or disappears.
+Two series on split scales have **no defined link**. Where they cross. This Is above which, whether they diverge. All of it depends on the limits you chose for the second axis. Change `ax2.set_ylim` and the crossing moves, or disappears.
 
-The third editor draws the same two series three times with different right-hand limits, and they cross in three different places.
+The third editor draws the same two series three times with other right-hand limits. They cross in three other places.
 
-Readers do not see it that way. A crossing looks like an event: "revenue overtook cost in June". It is an artefact of a choice you made, usually without thinking about it, because matplotlib picked the limits automatically.
+Readers don't see it that way. A crossing looks like an event: "revenue overtook cost in June". It's an artefact of a choice you made, often without thinking about it. Matplotlib picked the limits on its own.
 
-This is the mechanism behind a large share of misleading charts in the wild, and most of them are not deliberate.
+This is the method behind a large share of misleading charts in the wild. Most of them aren't deliberate.
 
 ## The alternatives
 
-**Stacked panels** with `sharex=True`. Two small charts, one above the other, sharing the time axis. The shapes can be compared, the levels cannot be confused, and no crossing is implied. This is the right answer most of the time.
+**Stacked panels** with `sharex=True`. Two small charts, one above the other, sharing the time axis. The shapes can be checked, the levels can't be confused. No crossing is implied. This is the right answer most of the time.
 
-**Index both to a common base.** Divide each series by its first value and multiply by 100. Both are then percentages of their own starting point, they share one axis honestly, and a crossing now means something real: relative growth diverged.
+**Index both to a common base.** Divide each series by its first value and times by 100. Both are then percentages of their own starting point, they share one axis honestly. A crossing now means a thing real: scaled growth diverged.
 
-**Percentage change** does the same job for series where the level is not meaningful.
+**Percentage change** does the same job for series where the level isn't real.
 
 **Two charts** side by side, when the series have nothing in common but the time axis.
 
 ## secondary_axis
 
-`ax.secondary_yaxis("right", functions=(forward, inverse))` is a different mechanism and does not share the drawbacks.
+`ax.secondary_yaxis("right", functions=(forward, inverse))` is a other method and doesn't share the drawbacks.
 
-It shows the **same data** in a second unit, with an explicit conversion. Celsius and Fahrenheit, millimetres and inches, a count and a percentage of a known total.
+It shows the **same data** in a second unit, with an clear conversion. Celsius and Fahrenheit, millimetres and inches, a count and a percentage of a known total.
 
-Because the two scales are related by a function rather than by an arbitrary choice, nothing about the chart can mislead: the line is in one place, and the two axes are two ways of reading the same position.
+Because the two scales are related by a function rather than by an any choice, nothing about the chart can mislead. The line is in one place. The two axes are two ways of reading the same spot.
 
-The functions must be inverses of each other, and matplotlib uses both &mdash; forward to place the ticks, inverse to keep them consistent when the view changes.
+The functions must be inverses of each other. Matplotlib uses both. Forward to place the ticks, inverse to keep them steady when the view changes.
 
-`secondary_xaxis` does the same horizontally, which is how you put dates on one side and elapsed days on the other.
+`secondary_xaxis` does the same flatly. This Is how you put dates on one side and elapsed days on the other.
 
 ## When a twin axis is fine
 
-There is a defensible case, and it is narrower than its popularity suggests.
+There's a defensible case, and it's narrower than its popularity suggests.
 
-It works when one series is clearly **background context** rather than a co-equal subject. The standard example is price and volume: volume as pale bars pushed to the bottom of the chart, price as a line in front. Nobody tries to compare a bar height with a line position, because the visual hierarchy makes clear which one is the subject.
+It works when one series is clearly **background context** rather than a co-equal subject. The standard example is price and volume. Volume as pale bars pushed to the bottom of the chart, price as a line in front. No one tries to compare a bar height with a line spot. The visual tree makes clear which one is the subject.
 
 Setting the bar axis limit to two or three times the data range pushes the bars down and reinforces that.
 
-The test: if a reader might compare the two series against each other, the twin axis is a hazard. If one is obviously scenery, it is a reasonable use of space.
+The test: if a reader might compare the two series against each other, the twin axis is a hazard. If one is obviously scenery, it's a fair use of space.
 
 ## Ordering and z-order
 
-The twin axes is created after the original, so its artists draw **on top** by default.
+The twin axes is created after the first. Its artists draw **on top** by default.
 
-That is usually wrong when the first series is the subject: a background bar series drawn on `ax` ends up behind, which is right, but a line drawn on `ax` is covered by anything on `ax2`.
+That is often wrong when the first series is the subject. A background bar series drawn on `ax` ends up behind. This Is right. A line drawn on `ax` is covered by anything on `ax2`.
 
-`ax.set_zorder(ax2.get_zorder() + 1)` moves the first axes in front, and `ax.patch.set_visible(False)` is then required, or its opaque background hides the second axes entirely.
+`ax.set_zorder(ax2.get_zorder() + 1)` moves the first axes in front. `ax.patch.set_visible(False)` is then needed, or its opaque background hides the second axes fully.
 
-That two-line incantation appears in a great deal of twin-axis code, and it exists because the axes are genuinely stacked rather than merged.
+That two-line incantation appears in a great deal of twin-axis code. It exists because the axes are truly stacked rather than merged.
 
 ## Grid lines on a twin
 
-Both axes can draw a grid, and two grids at different spacings is visual noise that makes both harder to read.
+Both axes can draw a grid. Two grids at other spacings is visual noise that makes both harder to read.
 
-The convention is to grid only the axes whose scale the reader should use for judging values &mdash; usually the primary one &mdash; and to turn the other off:
+The rule is to grid only the axes whose scale the reader should use for judging values. Often the main one. And to turn the other off:
 
 ```python
 ax.grid(True, axis="y", alpha=0.3)
 ax2.grid(False)
 ```
 
-Since `ax2` inherits grid settings from rcParams, turning it off explicitly is necessary when the style enables grids by default.
+Since `ax2` takes from grid settings from rcParams, turning it off by name is needed when the style enables grids by default.
 
 ## Aligning the two scales
 
-A frequent request is to make zero on both axes fall at the same height, so the two series are comparable around a baseline.
+A frequent request is to make zero on both axes fall at the same height. The two series are close around a baseline.
 
-There is no built-in for it; it is arithmetic on the limits:
+There's no built-in for it. It's math on the limits:
 
 ```python
 def align_zero(a1, a2):
@@ -6537,7 +6537,7 @@ def align_zero(a1, a2):
     a2.set_ylim(bottom=(f * h2) / (f - 1) if f != 1 else l2)
 ```
 
-Whether that is a good idea is another question. Aligning zero makes the chart look more comparable without making it more comparable &mdash; the scales are still unrelated, and the reader is now more likely to compare them.
+Whether that is a good idea is another question. Aligning zero makes the chart look more close without making it more close. The scales are still unrelated. The reader is now more likely to compare them.
 
 ## Three axes
 
@@ -6548,55 +6548,55 @@ ax3 = ax.twinx()
 ax3.spines["right"].set_position(("outward", 45))
 ```
 
-It works, and it is almost always a mistake. Three unrelated scales on one plot is three arbitrary choices, and no amount of colour coding makes the crossings meaningful.
+It works, and it's almost always a mistake. Three unrelated scales on one plot is three any choices, and no amount of colour coding makes the crossings real.
 
-If three series must be shown together, three stacked panels sharing an x axis is the display that does it honestly, and it is not much taller.
+If three series must be shown together, three stacked panels sharing an x axis is the display that does it honestly, and it isn't much taller.
 
 ## The honest summary
 
-Twin axes exist because people want them, and matplotlib provides them without editorialising.
+Twin axes exist because people want them, and matplotlib gives them without editorialising.
 
-They are appropriate when one series is context and the other is the subject, when the two quantities are related by something the reader knows, or when a convention in the field makes the pairing familiar.
+They're right when one series is context and the other is the subject, when the two quantities are related by a thing the reader knows, or when a rule in the field makes the pairing familiar.
 
-They are inappropriate when the chart invites a comparison of levels or a reading of the crossing point &mdash; which is most of the time, and is why the alternatives in this module are worth reaching for first.
+They're inappropriate when the chart invites a compare of levels or a reading of the crossing point. Which is most of the time. Is why the options in this module are worth reaching for first.
 
 ## How the misreading happens
 
-Worth spelling out, because it is not obvious that anything is wrong.
+Worth spelling out, because it isn't obvious that anything is wrong.
 
-A reader sees two lines. Lines on a chart normally share a scale, so distance between them means something. Here it does not: the vertical gap is the difference between two arbitrary rescalings.
+A reader sees two lines. Lines on a chart most times share a scale. Distance between them means a thing. Here it doesn't. The vertical gap is the gap between two any rescalings.
 
-The crossing is worse. A crossing is a visually salient event, and the reader interprets it as "the quantities became equal" &mdash; which is meaningless when the units differ. Move one axis's limits and the crossing moves, or vanishes.
+The crossing is worse. A crossing is a visually salient event. The reader reads it as "the quantities became equal". Which is meaningless when the units differ. Move one axis's limits and the crossing moves, or vanishes.
 
-None of that is signalled. The chart looks like every other two-line chart, and the two y axes are the only clue that the usual reading does not apply.
+None of that is signalled. The chart looks like every other two-line chart. The two y axes are the only clue that the usual reading doesn't apply.
 
 ## If you must
 
-When a twin axis is genuinely the right choice, four things make it as safe as it can be.
+When a twin axis is truly the right choice, four things make it as safe as it can be.
 
 **Colour-code both axes** to their series, including the tick labels.
 
-**Make the hierarchy obvious** &mdash; one series as background context, the other as the subject.
+**Make the tree obvious** &mdash; one series as background context, the other as the subject.
 
-**Do not let them cross**, if the limits can reasonably be set to avoid it.
+**Don't let them cross**, if the limits can fairly be set to avoid it.
 
-**Say in the caption** that the scales are independent.
+**Say in the caption** that the scales are split.
 
-And check the alternative honestly first. Most twin-axis charts exist because two series were to hand, not because the comparison needed one plot.
+And check the option honestly first. Most twin-axis charts exist because two series were to hand, not because the compare needed one plot.
 
 ## A decision procedure
 
 When a second scale is proposed, four questions settle it.
 
-**Are the units related by a known conversion?** If yes, `secondary_yaxis` with the conversion functions &mdash; safe, and not really a second series at all.
+**Are the units related by a known conversion?** If yes, `secondary_yaxis` with the conversion functions. Safe. Not really a second series at all.
 
 **Is one series clearly background?** If yes, a twin axis is defensible, with the background pushed down and drawn in a pale colour.
 
-**Would indexing both to a common base answer the question?** Usually yes, and it puts them on one honest axis where crossings mean something.
+**Would indexing both to a common base answer the question?** often yes. It puts them on one honest axis where crossings mean a thing.
 
 **Would two stacked panels do?** Almost always yes, and it costs nothing but vertical space.
 
-Only if the first two are no and the second two are genuinely unsuitable is a co-equal twin axis the right answer &mdash; and by that point the reasoning has been made explicit, which is the useful part of the exercise.
+Only if the first two are no and the second two are truly unsuitable is a co-equal twin axis the right answer. And by that point the thinking has been made clear. This Is the handy part of the exercise.
 
 ## In summary
 
@@ -6604,45 +6604,45 @@ Only if the first two are no and the second two are genuinely unsuitable is a co
 
 Colour-code both axes to their series, or the chart is unreadable.
 
-One legend requires collecting the handles from both axes.
+One legend needs collecting the handles from both axes.
 
-The crossing point is determined by the limits you chose, and readers treat it as a finding &mdash; which is the whole problem.
+The crossing point is found by the limits you chose. Readers treat it as a finding. Which is the whole problem.
 
-`secondary_yaxis` with a function pair is a different and safe mechanism, relabelling one series in another unit.
+`secondary_yaxis` with a function pair is a other and safe method, relabelling one series in another unit.
 
-The honest alternatives are stacked panels sharing an x axis, or indexing both series to a common base.
+The honest options are stacked panels sharing an x axis, or indexing both series to a common base.
 
-And a twin axis is reasonable when one series is obviously scenery &mdash; volume behind price &mdash; because then nobody is trying to compare them.
+And a twin axis is fair when one series is obviously scenery. Volume behind price. Because then no one is trying to compare them.
 
 ## A worked alternative
 
-Given revenue in thousands and conversion rate in percent over twelve months, the twin-axis version puts them on one plot and invites a comparison that is not defined.
+Given revenue in thousands and conversion rate in percent over twelve months, the twin-axis version puts them on one plot and invites a compare that isn't defined.
 
-Three alternatives, each answering a slightly different question.
+Three options, each answering a slightly other question.
 
-**Stacked panels**, sharing the x axis. Answers "how did each move?" and allows the shapes to be compared without implying anything about levels.
+**Stacked panels**, sharing the x axis. Answers "how did each move?" and allows the shapes to be checked without implying anything about levels.
 
-**Indexed to January = 100.** Answers "which grew faster?" and puts both on one honest axis, where a crossing genuinely means relative performance diverged.
+**Indexed to January = 100.** Answers "which grew faster?" and puts both on one honest axis. Here A crossing truly means scaled speed diverged.
 
-**A scatter of one against the other**, coloured or labelled by month. Answers "are they related?" directly, which is usually the underlying question when someone reaches for a twin axis.
+**A scatter of one against the other**, coloured or labelled by month. Answers "are they related?" right. This Is often the underlying question when someone reaches for a twin axis.
 
-That third one is worth considering more often. A twin-axis chart is frequently an attempt to show a relationship using a display designed for showing two time series, and a scatter shows the relationship.
+That third one is worth considering more often. A twin-axis chart is often an attempt to show a link using a display designed for showing two time series. A scatter shows the link.
 
 ## One more thing
 
-`ax2.set_ylim` should generally be set explicitly on a twin axis rather than left automatic.
+`ax2.set_ylim` should often be set by name on a twin axis rather than left auto.
 
-The reason is reproducibility rather than aesthetics: automatic limits depend on the data, so a chart regenerated next month has a different second scale and the two lines cross somewhere new. If a reader has seen the earlier version, that looks like a change in the data.
+The reason is reproducibility rather than aesthetics: auto limits depend on the data. A chart regenerated next month has a other second scale and the two lines cross one spot new. If a reader has seen the earlier version, that looks like a change in the data.
 
 ## The short version
 
 A second y axis is the only common chart feature whose main effect is on what the reader wrongly concludes.
 
-Everything else in this track can be done badly; a twin axis is difficult to do well even deliberately, because the ambiguity is in the display rather than in the execution. Reaching for stacked panels or a common index first is the habit worth having.
+all else in this track can be done badly. A twin axis is hard to do well even on purpose. The ambiguity is in the display rather than in the run. Reaching for stacked panels or a common index first is the habit worth having.
 
 ## Reading the code back
 
-A twin axis is one call and a series of mitigations: colour-code both scales, assemble one legend, fix the limits explicitly, establish a visual hierarchy, and say in the caption that the scales are independent. The length of that list is itself the argument for checking whether stacked panels would do instead.
+A twin axis is one call and a series of mitigations. Colour-code both scales, assemble one legend, fix the limits by name, establish a visual tree. Say in the caption that the scales are split. The length of that list is itself the arg for checking whether stacked panels would do instead.
 ''',
     [
         {"q": "Why must you colour-code the two y axes on a twin plot?",
@@ -6831,93 +6831,93 @@ print("boxes ask the reader to do the ranking themselves.")'''),
     ],
     '''
 title: Box and Violin Plots
-intro: Comparing many distributions at once, and what each summary throws away.
+intro: Checking many spreads at once, and what each summary throws away.
 
 ## What a box plot is
 
 Five numbers, drawn:
 
-The **box** spans the first to the third quartile, so it contains the middle half of the data. Its height is the interquartile range.
+The **box** spans the first to the third quartile. It holds the middle half of the data. Its height is the interquartile range.
 
 The **line** inside is the median &mdash; not the mean.
 
-The **whiskers** reach the furthest data point within 1.5&times;IQR of the box. They are not a fixed multiple of anything; they stop at real observations.
+The **whiskers** reach the furthest data point within 1.5&times;IQR of the box. They aren't a fixed multiple of anything. They stop at real findings.
 
-Points beyond that are drawn **individually** as outliers.
+Points beyond that are drawn **on their own** as outliers.
 
-That 1.5 is a convention, chosen so that roughly 0.7% of normally distributed data falls outside. It has no deeper justification, and matplotlib lets you change it with `whis=`.
+That 1.5 is a rule, chosen so that roughly 0.7% of most times spread data falls outside. It has no deeper justification. Matplotlib lets you change it with `whis=`.
 
 ## What they are for
 
-Comparing many groups.
+Checking many groups.
 
-Five histograms take five panels and require the reader to move between them. Five boxes sit side by side on one axis, sharing a scale, and the comparison is immediate.
+Five histograms take five panels and need the reader to move between them. Five boxes sit side by side on one axis, sharing a scale, and the compare is direct.
 
-That is the whole argument, and it is a strong one. For one distribution, a histogram is better. For eight, a box plot is much better. Somewhere around three the answer changes.
+That is the whole arg, and it's a strong one. For one spread, a histogram is better. For eight, a box plot is much better. one spot around three the answer changes.
 
-`patch_artist=True` makes the boxes filled rather than outlines, which is needed before `set_facecolor` does anything &mdash; a common small frustration.
+`patch_artist=True` makes the boxes filled rather than outlines. This Is needed before `set_facecolor` does anything. A common small frustration.
 
 ## What they hide
 
-A box plot is a summary, and every summary discards.
+A box plot is a summary, and each summary discards.
 
-Any distribution sharing those five numbers produces an identical box. That includes a **bimodal** distribution &mdash; two clusters with a gap in the middle &mdash; whose median sits in the empty space where no data is.
+Any spread sharing those five numbers makes an same box. That includes a **bimodal** spread. Two clusters with a gap in the middle. Whose median sits in the empty space where no data is.
 
-The third editor draws exactly that: two distributions with nearly identical boxes and completely different shapes.
+The third editor draws just that: two spreads with nearly same boxes and fully other shapes.
 
-This is not a hypothetical failure. Bimodality usually means two populations have been mixed, which is often the most important thing in the data, and the box plot conceals it perfectly.
+This isn't a hypothetical failure. Bimodality often means two groups have been mixed. This Is often the most key thing in the data. The box plot conceals it just right.
 
-The practical rule: look at a histogram of each group **once** before settling on box plots for the comparison.
+The hands-on rule: look at a histogram of each group **once** before settling on box plots for the compare.
 
 ## Violin plots
 
-A violin shows an estimated density, mirrored, so the width at any height is how much data is around that value. It shows the bimodality a box hides.
+A violin shows an guessed density, mirrored. The width at any height is how much data is around that value. It shows the bimodality a box hides.
 
 Two honest caveats.
 
-It is a **kernel density estimate**, with a bandwidth that smooths the data. That parameter has exactly the arbitrariness of a histogram's bin count, and matplotlib picks it for you. Too much smoothing merges peaks; too little invents them.
+It's a **kernel density guess**, with a bandwidth that smooths the data. That param has just the arbitrariness of a histogram's bin count. Matplotlib picks it for you. Too much smoothing merges peaks. Too little invents them.
 
-It **extends past the observed data** at both ends, because the kernel has tails. A violin of a strictly positive quantity will happily show density below zero, which is a claim the data does not support.
+It **extends past the seen data** at both ends. The kernel has tails. A violin of a strictly plus quantity will happily show density below zero. This Is a claim the data doesn't support.
 
-`showmedians=True` adds the median line; the defaults draw the extrema.
+`showmedians=True` adds the median line. The defaults draw the extrema.
 
 ## Showing the points
 
-For small samples, the best display is usually both: a box or violin for the summary, and the individual points with jitter on top.
+For small samples, the best display is often both. A box or violin for the summary. The single points with jitter on top.
 
-`showfliers=False` prevents the outliers being drawn twice, once by the box and once by the scatter.
+`showfliers=False` blocks the outliers being drawn twice, once by the box and once by the scatter.
 
 `zorder=3` on the scatter puts the points above the box.
 
-Below roughly fifty points per group this is strictly more informative than either element alone: you get the quartiles and the actual sample. Above a few hundred, the points overplot and the summary is doing the work.
+Below roughly fifty points per group this is strictly more helpful than either element alone. You get the quartiles and the actual sample. Above a few hundred, the points overplot and the summary is doing the work.
 
 ## Layout
 
-`vert=False` draws them horizontally, which lets long category names read normally &mdash; the same argument that makes `barh` preferable to `bar`.
+`vert=False` draws them flatly. This Lets long group names read most times. The same arg that makes `barh` preferable to `bar`.
 
-Sorting the groups by median makes the ranking immediate rather than something the reader assembles.
+Sorting the groups by median makes the ranking direct rather than a thing the reader assembles.
 
-And as with any grouped comparison, the y axis must be shared, which it is by construction here &mdash; that is part of why the display works.
+And as with any grouped compare, the y axis must be shared. This It's by build here. That is part of why the display works.
 
 ## Notches and confidence
 
-`notch=True` draws a waist around the median whose width approximates a 95% confidence interval for it.
+`notch=True` draws a waist around the median whose width approximates a 95% trust interval for it.
 
-The heuristic it enables is that if two notches do not overlap, the medians differ significantly. That is roughly true and depends on assumptions the plot does not state.
+The heuristic it enables is that if two notches don't share, the medians differ much. That is roughly true and depends on assumptions the plot doesn't state.
 
-Two practical problems. On small samples the notch can extend beyond the box, producing a folded shape that looks like a rendering error. And the heuristic is exactly the overlap reasoning that is unreliable for error bars, applied to a different statistic.
+Two hands-on problems. On small samples the notch can extend beyond the box, making a folded shape that looks like a rendering error. And the heuristic is just the share thinking that is unreliable for error bars, applied to a other statistic.
 
-Useful when comparing many groups quickly; not a substitute for a test.
+handy when checking many groups quickly. Not a substitute for a test.
 
 ## Ordering and orientation
 
-The same arguments as bar charts apply.
+The same args as bar charts apply.
 
-Sort by median unless the category order means something &mdash; time, size, an experimental sequence.
+Sort by median unless the group order means a thing. Time, size, an test sequence.
 
 Use `vert=False` when the labels are words.
 
-And keep the y axis shared, which happens automatically here because all groups share one axes, and is exactly why the display works for comparison.
+And keep the y axis shared. This Happens on its own here because all groups share one axes. Is just why the display works for compare.
 
 ## Styling the parts
 
@@ -6931,69 +6931,69 @@ for m in bp["medians"]:
     m.set(color="crimson", linewidth=2)
 ```
 
-`patch_artist=True` is required before boxes can be filled &mdash; without it they are unfillable outlines and `set_facecolor` does nothing, silently.
+`patch_artist=True` is needed before boxes can be filled. Without it they're unfillable outlines and `set_facecolor` does nothing, silently.
 
-The property dicts &mdash; `medianprops`, `boxprops`, `whiskerprops`, `flierprops` &mdash; do the same at call time and are usually tidier.
+The property dicts &mdash; `medianprops`, `boxprops`, `whiskerprops`, `flierprops` &mdash; do the same at call time and are often tidier.
 
 ## Violin internals
 
 `violinplot` returns a dict too, with `"bodies"` and optional `"cmedians"`, `"cmeans"`, `"cbars"`.
 
-By default it draws the extrema and no median, which is an odd choice; `showmedians=True` is nearly always wanted.
+By default it draws the extrema and no median. This Is an odd choice. `showmedians=True` is nearly always wanted.
 
-`widths` controls the maximum thickness, and `bw_method` the smoothing &mdash; a number, or `"scott"` / `"silverman"`. Halving the bandwidth roughly doubles the visible detail and the visible noise.
+`widths` controls the max thickness, and `bw_method` the smoothing. A number, or `"scott"` / `"silverman"`. Halving the bandwidth roughly doubles the visible detail and the visible noise.
 
-Because the two halves are mirror images, one half is redundant. A **half violin** paired with the raw points on the other side uses the space better, and is built by clipping the body path &mdash; more work than it sounds, and worth it for a figure that will be published.
+Because the two halves are mirror images, one half is redundant. A **half violin** paired with the raw points on the other side uses the space better. Is built by clipping the body path. More work than it sounds. Worth it for a figure that will be published.
 
 ## Choosing between them
 
-**Box** &mdash; many groups, when the quartiles are the summary you want and shape is not expected to be interesting.
+**Box** &mdash; many groups, when the quartiles are the summary you want and shape isn't expected to be notable.
 
-**Violin** &mdash; when shape matters and the samples are large enough for a density estimate to mean something, roughly a hundred per group.
+**Violin** &mdash; when shape matters and the samples are large enough for a density guess to mean a thing, roughly a hundred per group.
 
-**Strip or swarm** &mdash; small samples, where the individual values are the honest display.
+**Strip or swarm** &mdash; small samples. Here The single values are the honest display.
 
-**Box plus points** &mdash; the general-purpose answer under about fifty per group.
+**Box plus points** &mdash; the all-round answer under about fifty per group.
 
 **Histogram grid** &mdash; when the shapes are the subject and there are few enough groups to give each a panel.
 
-The mistake is treating the box plot as the default for all distribution comparison, which is how bimodality goes unnoticed.
+The mistake is treating the box plot as the default for all spread compare. This Is how bimodality goes unnoticed.
 
 ## Outliers
 
-The points beyond the whiskers are labelled outliers, and the label is doing more work than the statistics support.
+The points beyond the whiskers are labelled outliers. The label is doing more work than the statistics support.
 
-They are simply points more than 1.5&times;IQR from the box. On normally distributed data about 0.7% of observations qualify, so a sample of a thousand produces seven "outliers" that are nothing of the kind.
+They're simply points more than 1.5&times;IQR from the box. On most times spread data about 0.7% of findings qualify. A sample of a thousand makes seven "outliers" that are nothing of the kind.
 
-On skewed data the rule flags far more, all on one side, which is a property of the distribution rather than of the points.
+On skewed data the rule flags far more, all on one side. This Is a property of the spread rather than of the points.
 
-So: a point beyond a whisker is worth looking at and is not evidence of an error. `showfliers=False` hides them when they are distracting, and `whis=(5, 95)` changes the rule to percentiles, which is often more interpretable.
+So: a point beyond a whisker is worth looking at and isn't evidence of an error. `showfliers=False` hides them when they're distracting. `whis=(5, 95)` changes the rule to percentiles. This Is often more readable.
 
 ## Sample size
 
-A box plot looks the same for twelve observations and twelve thousand, which is a real weakness when groups differ in size.
+A box plot looks the same for twelve findings and twelve thousand. This Is a real weakness when groups differ in size.
 
 Three ways to show it:
 
-**Width proportional to n** &mdash; `widths=` accepts a list, and scaling by the square root of the count is conventional.
+**Width scaled to n** &mdash; `widths=` accepts a list. Scaling by the square root of the count is standard.
 
 **The count in the tick label** &mdash; `"group a\n(n=12)"`.
 
-**The points overlaid**, which shows the sample size directly.
+**The points overlaid**, which shows the sample size right.
 
-Without one of these, a group of eight and a group of eight hundred are presented as equally reliable, and the reader has no way to know.
+Without one of these, a group of eight and a group of eight hundred are presented as equally solid. The reader has no way to know.
 
 ## Ordering and grouping
 
-With more than a handful of groups, the arrangement is most of the chart.
+With more than a handful of groups, the setup is most of the chart.
 
-**Sort by median** unless the categories have a natural order. It turns a search into a reading.
+**Sort by median** unless the groups have a natural order. It turns a search into a reading.
 
-**Group related categories together** and separate the groups with space, which `positions=` allows: passing `[1, 2, 3, 5, 6, 7]` leaves a gap between two clusters.
+**Group related groups together** and split the groups with space. This `spots=` allows. Passing `[1, 2, 3, 5, 6, 7]` leaves a gap between two clusters.
 
-**Use colour for the grouping**, not for the individual boxes, so the colour carries the structure rather than repeating the labels.
+**Use colour for the grouping**, not for the single boxes. The colour carries the structure rather than repeating the labels.
 
-**Consider a reference line** &mdash; the overall median, a target &mdash; drawn across the whole axes, which turns each box from an isolated summary into a comparison.
+**Consider a link line** &mdash; the total median, a target &mdash; drawn across the whole axes. This Turns each box from an isolated summary into a compare.
 
 With those, twenty boxes on one chart remains readable. Without them, six is already hard.
 
@@ -7001,47 +7001,47 @@ With those, twenty boxes on one chart remains readable. Without them, six is alr
 
 A box is five numbers, and whiskers reach the furthest point within 1.5&times;IQR rather than a fixed multiple.
 
-The display exists to compare many groups at once, which is what it does better than anything else.
+The display exists to compare many groups at once. This Is what it does better than anything else.
 
-It hides shape, and specifically hides bimodality &mdash; two populations mixed together produce a box that looks unremarkable.
+It hides shape, and namely hides bimodality. Two groups mixed together give a box that looks plain.
 
-A violin restores the shape and introduces a bandwidth you did not choose, plus tails extending past the observed data.
+A violin restores the shape and adds a bandwidth you didn't choose, plus tails extending past the seen data.
 
-Under about fifty points per group, showing the points with jitter is more informative than either.
+Under about fifty points per group, showing the points with jitter is more helpful than either.
 
-And `patch_artist=True`, `showfliers=False` and `vert=False` are the three arguments that come up most: fillable boxes, no double-drawn outliers, and horizontal layout for wordy labels.
+And `patch_artist=True`, `showfliers=False` and `vert=False` are the three args that come up most. Fillable boxes, no double-drawn outliers. Flat layout for wordy labels.
 
 ## Beeswarm and the alternatives
 
-A strip plot with random jitter shows every point and lets some of them overlap by chance.
+A strip plot with random jitter shows each point and lets some of them share by chance.
 
-A **beeswarm** places the points deterministically so none overlap, which reads better and is not built into matplotlib &mdash; seaborn's `swarmplot` is the usual route, and it refuses to plot when there are too many points to place, which is a reasonable failure.
+A **beeswarm** places the points deterministically so none share. This Reads better and isn't built into matplotlib. Seaborn's `swarmplot` is the usual route. It refuses to plot when there are too many points to place. This Is a fair failure.
 
-A **rain cloud** combines three: a half violin for the shape, a box for the summary, and the points below. It is the most complete display of a distribution comparison and takes the most space, which is the trade.
+A **rain cloud** mixes three: a half violin for the shape, a box for the summary. The points below. It's the most full display of a spread compare and takes the most space. This Is the trade.
 
-For most work the ordering is: points if the sample is small, box if there are many groups, box plus points in between, and a violin when the shape is genuinely the question and the samples are large enough to estimate it.
+For most work the sorting is: points if the sample is small, box if there are many groups, box plus points in between. A violin when the shape is truly the question and the samples are large enough to guess it.
 
-What matters more than the choice is knowing what each one hides, which is the theme of this whole module.
+What matters more than the choice is knowing what each one hides. This Is the theme of this whole module.
 
 ## A closing note
 
-Every distribution display is a compromise between completeness and comparability.
+each spread display is a compromise between completeness and comparability.
 
-The points show everything and compare badly past a few groups. The box compares many groups and hides the shape. The violin restores the shape and adds a smoothing choice. The histogram shows one distribution well and several badly.
+The points show all and compare badly past a few groups. The box checks many groups and hides the shape. The violin restores the shape and adds a smoothing choice. The histogram shows one spread well and a few badly.
 
-There is no display that does all of it, which is why the useful skill is knowing what each one discards rather than having a favourite.
+There's no display that does all of it. This Is why the handy skill is knowing what each one discards rather than having a favourite.
 
-The specific thing worth remembering: a box plot cannot show bimodality, and bimodality usually means two populations have been mixed &mdash; which is frequently the most important fact about the data. Looking at a histogram of each group once, before settling on boxes for the comparison, costs a minute and prevents the failure this module is mostly about.
+The exact thing worth remembering: a box plot can't show bimodality. Bimodality often means two groups have been mixed. Which is often the most key fact about the data. Looking at a histogram of each group once, before settling on boxes for the compare, costs a minute and blocks the failure this module is mostly about.
 
 ## The short version
 
-Both displays trade completeness for comparability, and both hide something specific: the box hides shape, the violin hides its own smoothing choice.
+Both displays trade completeness for comparability. Both hide a thing exact. The box hides shape, the violin hides its own smoothing choice.
 
-Knowing what each discards is more useful than preferring one, and looking at a histogram of each group once before choosing is what prevents the bimodality failure this module exists to describe.
+Knowing what each discards is more handy than preferring one. Looking at a histogram of each group once before choosing is what blocks the bimodality failure this module exists to show.
 
 ## Reading the code back
 
-A box plot is one call with three arguments worth passing: patch_artist to make the boxes fillable, showfliers to control the outliers, and vert to choose the orientation. The decisions before it are which groups, in what order, and whether the points should be shown as well - and those are what determine whether the chart works.
+A box plot is one call with three args worth passing. Patch_artist to make the boxes fillable, showfliers to control the outliers. Vert to choose the orientation. The choices before it are which groups, in what order. Whether the points should be shown as well - and those are what find whether the chart works.
 ''',
     [
         {"q": "What do the whiskers on a matplotlib box plot reach?",
@@ -7241,17 +7241,17 @@ intro: df.plot as a shortcut, and when to drop back to matplotlib.
 
 ## What it does for you
 
-`df.plot()` draws every column as a line against the index, adds a legend labelled with the column names, and formats the x axis appropriately for the index type.
+`df.plot()` draws each column as a line against the index, adds a legend labelled with the column names. Formats the x axis rightly for the index type.
 
-For a time-indexed frame that is a dated axis, sensible tick spacing, one line per column and a legend &mdash; from one call. Doing the same in raw matplotlib is five or six lines.
+For a time-indexed frame that is a dated axis, sensible tick spacing, one line per column and a legend. From one call. Doing the same in raw matplotlib is five or six lines.
 
-That is the case for using it: for exploration, and for the common chart types, it is simply faster.
+That is the case for using it: for exploration. For the common chart types, it's simply faster.
 
 ## It is a thin wrapper
 
-The important thing to know is that `df.plot` **returns a matplotlib Axes**, and accepts one through `ax=`.
+The key thing to know is that `df.plot` **returns a matplotlib Axes**, and accepts one through `ax=`.
 
-That means it is not a separate system. Everything in this track applies to the result:
+That means it isn't a split system. all in this track applies to the result:
 
 ```python
 fig, ax = plt.subplots()
@@ -7260,27 +7260,27 @@ ax.set_title(...)
 ax.axhline(...)
 ```
 
-`ax=` also matters for a different reason: without it, pandas creates its **own** figure. A `df.plot` call inside a loop over subplots draws each chart in a new figure rather than the panel you intended, which is a common and confusing result.
+`ax=` also matters for a other reason: without it, pandas creates its **own** figure. A `df.plot` call inside a loop over subplots draws each chart in a new figure rather than the panel you intended. This Is a common and confusing result.
 
 ## kinds
 
 `kind=` selects the chart: `"line"` (the default), `"bar"`, `"barh"`, `"hist"`, `"box"`, `"kde"`, `"area"`, `"pie"`, `"scatter"`, `"hexbin"`.
 
-`df.plot.bar()` is equivalent and reads better, with the advantage that an editor can autocomplete the method names and their arguments.
+`df.plot.bar()` is equal and reads better, with the edge that an editor can autocomplete the method names and their args.
 
-`scatter` and `hexbin` need `x=` and `y=` naming columns, since they take two variables rather than plotting everything against the index.
+`scatter` and `hexbin` need `x=` and `y=` naming columns. They take two vars rather than plotting all against the index.
 
-Most keyword arguments are passed through to matplotlib, so `alpha`, `color`, `linewidth` and the rest work as expected.
+Most keyword args are passed through to matplotlib. `alpha`, `color`, `linewidth` and the rest work as expected.
 
 ## The frame's shape is the chart
 
-This is the part that determines whether the output is what you wanted.
+This is the part that finds whether the output is what you wanted.
 
-Each **column** becomes a series. Each **row** becomes a position on the x axis.
+Each **column** turns a series. Each **row** turns a spot on the x axis.
 
-So a frame with quarters as rows and products as columns gives grouped bars with one cluster per quarter. If you wanted one cluster per product, the frame needs transposing &mdash; `df.T.plot(kind="bar")` &mdash; not a different plotting argument.
+So a frame with quarters as rows and products as columns gives grouped bars with one cluster per quarter. If you wanted one cluster per product, the frame needs transposing. `df.T.plot(kind="bar")`. Not a other plotting arg.
 
-When a chart comes out grouped the wrong way, the fix is nearly always a `pivot`, a `groupby().unstack()`, or a transpose. That is the reshaping module doing its job: **getting the frame into the right shape is the plotting work**, and the plot call is then trivial.
+When a chart comes out grouped the wrong way, the fix is nearly always a `pivot`, a `groupby().unstack()`, or a transpose. That is the reshaping module doing its job: **getting the frame into the right shape is the plotting work**. The plot call is then trivial.
 
 `stacked=True` stacks bars or areas.
 
@@ -7288,7 +7288,7 @@ When a chart comes out grouped the wrong way, the fix is nearly always a `pivot`
 
 `df.plot(subplots=True)` gives one panel per column and returns an **array** of axes rather than one.
 
-It is the fastest route to small multiples, and it has a default worth knowing: the y axes are **independent**, so the panels are not comparable. `sharey=True` fixes it, and without it a panel showing a range of 0&ndash;2 sits beside one showing 0&ndash;2000 at the same visual height.
+It's the fastest route to small multiples. It has a default worth knowing. The y axes are **split**. The panels aren't close. `sharey=True` fixes it, and without it a panel showing a range of 0&ndash;2 sits beside one showing 0&ndash;2000 at the same visual height.
 
 `layout=(2, 3)` arranges them in a grid rather than a column.
 
@@ -7300,7 +7300,7 @@ Reach for matplotlib when you need:
 
 annotations, arrows or text;
 
-reference lines and shaded regions;
+link lines and shaded regions;
 
 a second y axis, or a secondary unit;
 
@@ -7308,23 +7308,23 @@ fine control of ticks, formatters or scales;
 
 anything drawn conditionally &mdash; highlighting one series, greying the rest.
 
-The good news is that this is not a switch. `df.plot(ax=ax)` for the data and `ax.` methods for everything else is the normal way to work, and it is why the wrapper is worth having.
+The good news is that this isn't a switch. `df.plot(ax=ax)` for the data and `ax.` methods for all else is the normal way to work. It's why the wrapper is worth having.
 
 ## And when to leave both
 
-For statistical charts &mdash; faceted grids, regression plots with confidence bands, categorical scatter with built-in jitter &mdash; seaborn sits on top of matplotlib and produces them in one call, returning matplotlib objects you can adjust afterwards.
+For statistical charts &mdash; faceted grids, regression plots with trust bands, cat scatter with built-in jitter &mdash; seaborn sits on top of matplotlib and makes them in one call, returning matplotlib objects you can adjust later.
 
 For interactive charts in a browser, Plotly or Altair. matplotlib's interactivity is limited and not its purpose.
 
-Knowing where matplotlib stops is part of using it well; it is a drawing library that happens to have statistical conveniences, not a statistical graphics system.
+Knowing where matplotlib stops is part of using it well. It's a drawing library that happens to have statistical conveniences, not a statistical graphics system.
 
 ## What pandas adds
 
-Beyond convenience, three things are genuinely easier through pandas.
+Beyond convenience, three things are truly easier through pandas.
 
-**The index becomes the x axis**, with date formatting handled. That alone removes several lines for any time series.
+**The index turns the x axis**, with date formatting handled. That alone drops a few lines for any time series.
 
-**Column names become labels**, so the legend is built from the data rather than from a list you maintain separately.
+**Column names become labels**, so the legend is built from the data rather than from a list you maintain apart.
 
 **Groupby output plots directly**: `df.groupby("k")["v"].sum().plot(kind="barh")` goes from raw rows to a chart in one line, because the aggregation produces exactly the index-and-values shape the plot wants.
 
@@ -7334,43 +7334,43 @@ That last point is the real workflow: reshape until the frame *is* the chart, th
 
 **A time-indexed frame, one column per series** &rarr; `df.plot()` gives a multi-line chart.
 
-**A frame indexed by category, one column per group** &rarr; `df.plot(kind="bar")` gives grouped bars.
+**A frame indexed by group, one column per group** &rarr; `df.plot(kind="bar")` gives grouped bars.
 
-**A long frame** &mdash; one row per observation with a category column &mdash; needs pivoting first: `df.pivot(index=..., columns=..., values=...)`.
+**A long frame** &mdash; one row per finding with a group column &mdash; needs pivoting first: `df.pivot(index=..., columns=..., values=...)`.
 
 **A group-by result with two keys** &rarr; `.unstack()` puts one key into columns, giving the wide shape the plot needs.
 
-Recognising which of these you have, and which the chart needs, is most of the work. The plot call is one line either way.
+Recognising which of these you've, and which the chart needs, is most of the work. The plot call is one line either way.
 
 ## Where pandas gets in the way
 
-`df.plot` has its own opinions that occasionally conflict with matplotlib's.
+`df.plot` has its own views that at times conflict with matplotlib's.
 
-It sets its own tick locators for date axes, which are usually good and are awkward to override afterwards &mdash; setting a matplotlib locator on an axes pandas has already formatted sometimes has no effect, and plotting with `ax.plot(df.index, df[col])` instead gives back full control.
+It sets its own tick locators for date axes. This Are often good and are awkward to replace later. Setting a matplotlib locator on an axes pandas has already formatted at times has no effect. Plotting with `ax.plot(df.index, df[col])` instead gives back full control.
 
-It creates a figure if not given one, which is the `ax=` issue.
+It creates a figure if not given one. This Is the `ax=` issue.
 
-And `secondary_y=True` exists and produces a twin axis with all the problems from that module, plus a legend that is harder to assemble.
+And `secondary_y=True` exists and makes a twin axis with all the problems from that module, plus a legend that is harder to assemble.
 
-For anything beyond the standard cases, dropping to `ax.plot(df.index, df["col"])` costs one line and removes the ambiguity about who owns the axes.
+For anything beyond the standard cases, dropping to `ax.plot(df.index, df["col"])` costs one line and drops the ambiguity about who owns the axes.
 
 ## Categorical bar charts
 
-`df.plot(kind="bar")` uses the index as the categories and draws them at integer positions, with the labels rotated 90 degrees by default.
+`df.plot(kind="bar")` uses the index as the groups and draws them at int spots, with the labels rotated 90 degrees by default.
 
-`rot=0` stops the rotation. `kind="barh"` is usually better still, for the reasons in the bar module.
+`rot=0` stops the rotation. `kind="barh"` is often better still, for the reasons in the bar module.
 
-Sorting is a pandas operation, not a plotting one: `df.sort_values("v").plot(kind="barh")`. That is a small example of the general pattern &mdash; the data manipulation belongs in pandas, and the plot call should be trivial.
+Sorting is a pandas step, not a plotting one: `df.sort_values("v").plot(kind="barh")`. That is a small example of the general pattern. The data handling belongs in pandas. The plot call should be trivial.
 
 ## Beyond pandas
 
-`df.plot` covers the standard charts. seaborn covers the statistical ones &mdash; faceted grids, regression with bands, categorical scatter with jitter built in &mdash; and returns matplotlib objects, so the same adjustment methods apply afterwards.
+`df.plot` covers the standard charts. seaborn covers the statistical ones. Faceted grids, regression with bands, cat scatter with jitter built in. And returns matplotlib objects. The same adjustment methods apply later.
 
-The three layers work together: pandas for the data, seaborn for the statistical display, matplotlib for the final control. Knowing which layer a problem belongs to is most of using them well, and the answer for "make this specific thing look right" is almost always the bottom one.
+The three layers work together: pandas for the data, seaborn for the statistical display, matplotlib for the final control. Knowing which layer a problem belongs to is most of using them well. The answer for "make this exact thing look right" is almost always the bottom one.
 
 ## A complete example
 
-The typical shape of real plotting code, where the data work dominates:
+The common shape of real plotting code. Here The data work dominates:
 
 ```python
 summary = (df
@@ -7388,79 +7388,79 @@ for side in ("top", "right"):
 
 Four lines of pandas to get the frame into the shape of the chart, one to draw it, and four to finish it.
 
-That ratio is normal, and it is why reshaping is a plotting skill.
+That ratio is normal, and it's why reshaping is a plotting skill.
 
 ## Pitfalls
 
-**Forgetting `ax=`**, so the plot lands in its own figure.
+**Losing `ax=`**, so the plot lands in its own figure.
 
-**The wrong frame shape**, giving bars grouped by the wrong variable.
+**The wrong frame shape**, giving bars grouped by the wrong var.
 
 **Rotated labels by default** on `kind="bar"`, fixed with `rot=0` or by using `barh`.
 
 **`secondary_y=True`**, which is a twin axis with all its problems.
 
-**Assuming shared axes** with `subplots=True`, where the default is independent.
+**given shared axes** with `subplots=True`. Here The default is split.
 
-**A datetime index that is really strings**, giving a categorical axis with no gaps.
+**A datetime index that is really strings**, giving a cat axis with no gaps.
 
 The last is worth checking with `df.index.dtype` before wondering why the spacing looks wrong.
 
 ## The three layers
 
-Real plotting code sits across three libraries, and knowing which one owns a problem saves a lot of searching.
+Real plotting code sits across three libraries. Knowing which one owns a problem saves a lot of searching.
 
-**pandas** owns the data: filtering, grouping, pivoting, resampling. If the chart is grouped by the wrong thing, or the bars are clustered incorrectly, or a date axis is behaving like a category, the fix is here &mdash; in the shape or the dtypes, not in the plot call.
+**pandas** owns the data: filtering, grouping, pivoting, resampling. If the chart is grouped by the wrong thing, or the bars are clustered incorrectly, or a date axis is behaving like a group, the fix is here. In the shape or the dtypes, not in the plot call.
 
-**seaborn** owns statistical display: faceting, regression with bands, categorical scatter with jitter, distribution comparisons. If you are writing twenty lines to build a grid of conditioned plots, this layer already has it.
+**seaborn** owns statistical display: faceting, regression with bands, cat scatter with jitter, spread checks. If you're writing twenty lines to build a grid of conditioned plots, this layer already has it.
 
-**matplotlib** owns the drawing: annotations, reference lines, exact ticks, colour control, layout, saving. Everything the other two produce is a matplotlib object, so this layer is always available underneath.
+**matplotlib** owns the drawing: annotations, link lines, exact ticks, colour control, layout, saving. all the other two give is a matplotlib object. This layer is always on hand underneath.
 
-The common mistake is trying to solve a data problem in the plotting call &mdash; adding arguments to `df.plot` to fix a grouping that should have been a `pivot`.
+The common mistake is trying to solve a data problem in the plotting call. Adding args to `df.plot` to fix a grouping that should have been a `pivot`.
 
 ## In summary
 
-`df.plot()` draws every column against the index and builds the legend from the column names.
+`df.plot()` draws each column against the index and builds the legend from the column names.
 
-It returns an Axes and takes one, which is what makes it a shortcut rather than a separate system &mdash; and `ax=` is required, or a plot inside a subplot loop creates its own figure.
+It returns an Axes and takes one. This Is what makes it a shortcut rather than a split system. And `ax=` is needed, or a plot inside a subplot loop creates its own figure.
 
-The frame's shape is the chart: columns are series, rows are groups, and a chart grouped the wrong way needs a transpose or a pivot.
+The frame's shape is the chart: columns are series, rows are groups. A chart grouped the wrong way needs a transpose or a pivot.
 
-`subplots=True` gives small multiples and independent y axes unless you say otherwise.
+`subplots=True` gives small multiples and split y axes unless you say else.
 
-Reach for matplotlib for annotations, thresholds, shading and exact control &mdash; and mix freely, because it is the same Axes object either way.
+Reach for matplotlib for annotations, thresholds, shading and exact control. And mix freely. It's the same Axes object either way.
 
 ## Reshaping is the plotting work
 
 The recurring lesson of this module is worth stating on its own.
 
-The plot call is usually one line. The work is getting the frame into a shape where that one line is correct.
+The plot call is often one line. The work is getting the frame into a shape where that one line is correct.
 
 **A wide frame** &mdash; one column per series, index as x &mdash; is what a multi-line chart or a grouped bar chart wants.
 
-**A long frame** &mdash; one row per observation &mdash; is what seaborn and most statistical tools want.
+**A long frame** &mdash; one row per finding &mdash; is what seaborn and most statistical tools want.
 
 **An aggregated frame** &mdash; one row per group &mdash; is what a bar chart of totals wants.
 
 Moving between them is `pivot`, `melt`, `groupby().agg()` and `unstack`, all covered in the pandas track.
 
-When a chart comes out grouped by the wrong variable, or with the series and categories swapped, or with one line where there should be five, the fix is almost never an argument to `plot` &mdash; it is the shape of the frame. Recognising that immediately saves a lot of time reading plotting documentation for something the data work should have solved.
+When a chart comes out grouped by the wrong var, or with the series and groups swapped, or with one line where there should be five, the fix is almost never an arg to `plot`. It's the shape of the frame. Recognising that at once saves a lot of time reading plotting docs for a thing the data work should have solved.
 
 ## A closing note
 
-`df.plot` is a shortcut, and its value is proportional to how standard the chart is.
+`df.plot` is a shortcut, and its value is scaled to how standard the chart is.
 
-For a quick line chart of a time-indexed frame it is unbeatable: one call, correct axis, legend included. For anything with an annotation, a threshold, a highlighted series or a specific tick format, it stops helping and matplotlib underneath does the work.
+For a quick line chart of a time-indexed frame it's unbeatable. One call, correct axis, legend included. For anything with an annotation, a threshold, a highlighted series or a exact tick format, it stops helping and matplotlib underneath does the work.
 
-The two together are the normal way to write plotting code, and the boundary is not a decision you make once &mdash; `df.plot(ax=ax)` followed by half a dozen `ax.` calls is a perfectly ordinary chart.
+The two together are the normal way to write plotting code. The boundary isn't a choice you make once. `df.plot(ax=ax)` followed by half a dozen `ax.` calls is a just right plain chart.
 
-What is worth internalising is that most plotting problems are data problems. When the chart is grouped wrongly, or has too many lines, or shows a category as a number, the fix is in the frame.
+What is worth internalising is that most plotting problems are data problems. When the chart is grouped wrongly, or has too many lines, or shows a group as a number, the fix is in the frame.
 
 ## The short version
 
-`df.plot` is a shortcut that returns a matplotlib Axes, which is what makes it a convenience rather than a separate system.
+`df.plot` is a shortcut that returns a matplotlib Axes. This Is what makes it a convenience rather than a split system.
 
-Its limits arrive quickly, and the boundary is not a decision made once: `df.plot(ax=ax)` followed by half a dozen `ax.` calls is ordinary code. And most plotting problems are data problems.
+Its limits arrive quickly, and the boundary isn't a choice made once: `df.plot(ax=ax)` followed by half a dozen `ax.` calls is plain code. And most plotting problems are data problems.
 ''',
     [
         {"q": "What does `df.plot()` use for the x axis?",
@@ -7692,109 +7692,109 @@ Most charts answer one of four questions, and each has a standard display:
 
 **How did this change over time?** A line chart. Time on the x axis, left to right.
 
-**How do these categories compare?** A bar chart &mdash; horizontal, so the labels read, and sorted, so the ranking is immediate.
+**How do these groups compare?** A bar chart. Flat. The labels read. Sorted. So The ranking is direct.
 
-**Is there a relationship between these two things?** A scatter plot.
+**Is there a link between these two things?** A scatter plot.
 
-**How is this distributed?** A histogram for one group, box plots or the points themselves for several.
+**How is this spread?** A histogram for one group, box plots or the points themselves for a few.
 
-That covers the large majority of real charts. When none of them fits, it is usually because the question has not been stated precisely, and stating it identifies the chart.
+That covers the large majority of real charts. When none of them fits, it's often because the question hasn't been stated just. Stating it finds the chart.
 
-The corollary: decide the question first. A chart made by plotting the data and then deciding what it shows is usually a chart of several things at once.
+The corollary: decide the question first. A chart made by plotting the data and then deciding what it shows is often a chart of a few things at once.
 
 ## Why encodings matter
 
 Some visual channels are read more accurately than others. Roughly, in order:
 
-**Position** along a common scale &mdash; the most accurate. This is what a line, a scatter and a dot plot use.
+**spot** along a common scale. The most accurate. This is what a line, a scatter and a dot plot use.
 
 **Length** from a common baseline &mdash; nearly as good. Bars.
 
 **Angle and area** &mdash; noticeably worse. Pies, bubbles.
 
-**Colour intensity** &mdash; worse again, and good only for ordering, not for reading values.
+**Colour intensity** &mdash; worse again, and good only for sorting, not for reading values.
 
-That ordering is why a bar chart beats a pie chart, why bubble size should never carry the main message, and why a heatmap needs its numbers written in when the values matter.
+That sorting is why a bar chart beats a pie chart, why bubble size should never carry the main message. Why a heatmap needs its numbers written in when the values matter.
 
 ## Pie charts
 
-A pie asks the reader to compare angles. With two or three slices of an obvious whole, that is fine, and the shape communicates "parts of a total" immediately.
+A pie asks the reader to compare angles. With two or three slices of an obvious whole, that is fine. The shape sends "parts of a total" at once.
 
-With five similar slices it fails: ranking them by eye is genuinely difficult, which is why almost every pie chart in the wild has its percentages printed on it &mdash; an admission that the picture is not doing the work.
+With five similar slices it fails: ranking them by eye is truly hard. This Is why almost each pie chart in the wild has its percentages printed on it. An admission that the picture isn't doing the work.
 
-The same numbers as a sorted horizontal bar chart are trivially readable, and the bar chart also shows the magnitudes rather than only the proportions.
+The same numbers as a sorted flat bar chart are trivially readable. The bar chart also shows the magnitudes rather than only the proportions.
 
-Donut charts are pies with the middle removed, which makes them slightly worse, because the angle is now inferred from an arc.
+Donut charts are pies with the middle removed. This Makes them slightly worse. The angle is now inferred from an arc.
 
 ## Dual axes
 
 The other display worth avoiding, covered fully in its own module.
 
-The short version: two series on independent scales have no defined relationship, so where they cross is determined by the limits you chose. Readers see the crossing as a finding.
+The short version: two series on split scales have no defined link. Where they cross is found by the limits you chose. Readers see the crossing as a finding.
 
 Stacked panels sharing an x axis, or indexing both series to a common base, say the same thing without inventing a fact.
 
 ## Small multiples
 
-Six series on one axes is a hairball with a legend. The reader traces each colour, loses it in a crossing, and consults the legend repeatedly.
+Six series on one axes is a hairball with a legend. The reader traces each colour, loses it in a crossing, and consults the legend again and again.
 
-Six small panels, sharing axes, let them see each shape directly and compare across panels. The shared scale is what makes the comparison valid, and the panel title replaces the legend.
+Six small panels, sharing axes, let them see each shape right and compare across panels. The shared scale is what makes the compare valid. The panel title replaces the legend.
 
-This is one of the most reliable improvements available, and matplotlib makes it one call: `plt.subplots(2, 3, sharex=True, sharey=True)`.
+This is one of the most solid gains on hand. Matplotlib makes it one call: `plt.subplots(2, 3, sharex=True, sharey=True)`.
 
-The trade-off is that comparing two specific series is harder when they are in different panels. If the chart is about one comparison, put those two on one axes; if it is about the set, use multiples.
+The trade-off is that checking two exact series is harder when they're in other panels. If the chart is about one compare, put those two on one axes. If it's about the set, use multiples.
 
 ## Highlighting
 
-When one series is the subject and the others are context, say so with colour: the subject in a strong colour and heavier line, the rest in light grey.
+When one series is the subject and the others are context, say so with colour. The subject in a strong colour and heavier line, the rest in light grey.
 
-The grey lines still give the range and the shape of the group, so nothing is lost. The reader's eye goes to the subject immediately, and no legend is needed if the highlighted line is labelled at its end.
+The grey lines still give the range and the shape of the group. Nothing is lost. The reader's eye goes to the subject at once. No legend is needed if the highlighted line is labelled at its end.
 
-This is more effective than an annotation, because it directs attention by contrast rather than by adding another thing to read.
+This is more good than an annotation. It directs focus by contrast rather than by adding another thing to read.
 
 ## The checklist
 
 Before a chart leaves your screen:
 
-Does the **title state the finding**, rather than naming the variables?
+Does the **title state the finding**, rather than naming the vars?
 
 Do the **axis labels carry units**?
 
-Is the **baseline** right &mdash; zero for bars, and does a truncated line axis need saying?
+Is the **baseline** right &mdash; zero for bars. Does a truncated line axis need saying?
 
-Is anything **hidden** &mdash; overplotted points, a series behind another, a category off the edge?
+Is anything **hidden** &mdash; overplotted points, a series behind another, a group off the edge?
 
-Is the **non-data ink** doing work &mdash; the grid, the frame, the legend, the tick marks?
+Is the **non-data ink** doing work. The grid, the frame, the legend, the tick marks?
 
-Would it **survive greyscale**, and colour-vision deficiency?
+Would it **live greyscale**, and colour-vision deficiency?
 
-Is there **one message**, or several competing? Two charts each saying one thing beat one saying both.
+Is there **one message**, or a few competing? Two charts each saying one thing beat one saying both.
 
-None of these is about matplotlib, which is the point. The library will draw whatever you ask; the choices are yours, and they are what makes a chart worth looking at.
+None of these is about matplotlib. This Is the point. The library will draw what you ask. The choices are yours. They're what makes a chart worth looking at.
 
 ## Ranking, not just comparing
 
-"Compare categories" splits into two questions that want different charts.
+"Compare groups" splits into two questions that want other charts.
 
-**Which is biggest?** A sorted horizontal bar chart, and nothing else comes close.
+**Which is biggest?** A sorted flat bar chart, and nothing else comes close.
 
-**How does each compare with a reference?** A dot plot against a line, or a bar of the difference from the reference, which puts the comparison on the axis instead of asking the reader to subtract.
+**How does each compare with a link?** A dot plot against a line, or a bar of the gap from the link. This Puts the compare on the axis instead of asking the reader to subtract.
 
-The second is under-used. A chart of "actual minus target" answers the question directly, where two bars per category makes the reader do the arithmetic.
+The second is under-used. A chart of "actual minus target" answers the question right. Here Two bars per group makes the reader do the math.
 
 ## Part-to-whole
 
-Four displays, in decreasing order of how well they work.
+Four displays, in falling order of how well they work.
 
-**Stacked bar normalised to 100%** &mdash; comparable across groups, and readable for four or five parts.
+**Stacked bar normed to 100%**. Close across groups. Readable for four or five parts.
 
 **A single stacked bar** &mdash; fine for one composition with few parts.
 
-**Small multiples of the parts** &mdash; better when the individual trends matter more than the composition.
+**Small multiples of the parts**. Better when the single trends matter more than the composition.
 
-**A pie** &mdash; two or three parts, and only when "these are shares of one thing" is the message rather than the values.
+**A pie** &mdash; two or three parts. Only when "these are shares of one thing" is the message rather than the values.
 
-Treemaps handle many parts and are hard to compare precisely; they suit hierarchy more than proportion.
+Treemaps handle many parts and are hard to compare just. They suit tree more than proportion.
 
 ## Distribution over time
 
@@ -7804,65 +7804,65 @@ A frequent question with no single good answer.
 
 **A box plot per period** works when the periods are few.
 
-**A heatmap of time against value bins** shows the full distribution and takes practice to read.
+**A heatmap of time against value bins** shows the full spread and takes practice to read.
 
-**Individual lines, greyed** &mdash; a spaghetti plot with a highlighted median &mdash; works when the number of entities is modest and their individual paths matter.
+**Single lines, greyed** &mdash; a spaghetti plot with a highlighted median &mdash; works when the number of entities is modest and their single paths matter.
 
-The wrong answer is a line of the mean alone, which hides everything that changed about the spread.
+The wrong answer is a line of the mean alone. This Hides all that changed about the spread.
 
 ## Two variables plus a third
 
-A scatter with colour is the first choice; a scatter with size is second and much weaker.
+A scatter with colour is the first choice. A scatter with size is second and much weaker.
 
-If the third variable is categorical with few levels, **small multiples** &mdash; one scatter per level, shared axes &mdash; beat colour, because comparing panels is easier than separating overlapping colours.
+If the third var is cat with few levels, **small multiples**. One scatter per level, shared axes. Beat colour. Checking panels is easier than separating shared colours.
 
-If it is continuous, colour with a sequential map and a colorbar.
+If it's smooth, colour with a sequential map and a colorbar.
 
-Encoding four variables on one chart is usually a mistake; the fourth becomes decoration, and the chart takes longer to read than two charts would.
+Encoding four vars on one chart is often a mistake. The fourth turns decoration. The chart takes longer to read than two charts would.
 
 ## The general rule
 
-Every chart makes the reader do some work, and the choice of chart decides how much.
+each chart makes the reader do some work. The choice of chart decides how much.
 
 A sorted bar chart asks them to read a ranking that is already visible. An unsorted one asks them to sort. A pie asks them to compare angles. A dual-axis chart asks them to hold two scales at once. A twelve-line chart asks them to trace colours through a legend.
 
-The best chart is usually the one that has already done the work &mdash; sorted, filtered, highlighted, labelled &mdash; leaving the reader only the conclusion.
+The best chart is often the one that has already done the work. Sorted, filtered, highlighted, labelled. Leaving the reader only the conclusion.
 
 ## Charts for a specific audience
 
-The same data justifies different charts depending on who is reading.
+The same data justifies other charts based on who is reading.
 
-**For yourself, exploring** &mdash; density, defaults, many panels. Nothing needs labelling because you know what it is, and speed matters more than polish.
+**For yourself, exploring** &mdash; density, defaults, many panels. Nothing needs labelling because you know what it's. Speed matters more than polish.
 
 **For a colleague** &mdash; labelled, titled, one message per chart, and the caveats visible.
 
-**For a presentation** &mdash; one chart, one message, large text, minimal reference material, and the conclusion in the title. The reader has seconds and cannot zoom.
+**For a presentation** &mdash; one chart, one message, large text, minimal link material. The conclusion in the title. The reader has seconds and can't zoom.
 
-**For a document** &mdash; sized for the column, with a caption carrying the detail that would clutter the chart.
+**For a doc** &mdash; sized for the column, with a caption carrying the detail that would clutter the chart.
 
-The mistake is showing an exploratory chart to an audience, which is how a chart with eleven series and no title ends up in a meeting.
+The mistake is showing an exploratory chart to an audience. This Is how a chart with eleven series and no title ends up in a meeting.
 
 ## The one-message rule
 
-The most useful constraint in charting is that a chart should say one thing.
+The most handy constraint in charting is that a chart should say one thing.
 
-It forces the choices: which variable is on which axis, what to highlight, what to leave out, what the title claims.
+It forces the choices: which var is on which axis, what to highlight, what to leave out, what the title claims.
 
-A chart trying to say three things usually says none, because the reader cannot tell which of the three to look at, and the elements supporting each compete with the others.
+A chart trying to say three things often says none. The reader can't tell which of the three to look at. The elements supporting each compete with the others.
 
-Two charts each saying one thing take the same space and communicate more. Splitting is nearly always the right answer when a chart feels crowded, and "what is this chart for?" is the question that resolves most design arguments about it.
+Two charts each saying one thing take the same space and send more. Splitting is nearly always the right answer when a chart feels crowded. "what is this chart for?" is the question that resolves most design args about it.
 
 ## Redesigning a chart
 
-A practical exercise: take a chart that is not working and improve it without changing the data.
+A hands-on exercise: take a chart that isn't working and improve it without changing the data.
 
-The sequence that usually helps, in order:
+The sequence that often helps, in order:
 
 **State the message in a sentence.** If that is hard, the chart is trying to do more than one thing.
 
-**Remove everything the sentence does not need.** Series, gridlines, the legend if direct labels would do, tick marks, the box around the plot.
+**Drop all the sentence doesn't need.** Series, gridlines, the legend if direct labels would do, tick marks, the box around the plot.
 
-**Sort, if the order is arbitrary.**
+**Sort, if the order is any.**
 
 **Highlight the subject** and grey the rest.
 
@@ -7870,33 +7870,33 @@ The sequence that usually helps, in order:
 
 **Label the thing the sentence refers to.**
 
-Six steps, none of which requires new data, and together they turn a chart that shows the numbers into one that makes the point. Most charts improve substantially and the code gets shorter, because most of the steps remove something.
+Six steps, none of which needs new data. Together they turn a chart that shows the numbers into one that makes the point. Most charts improve much and the code gets shorter. Most of the steps drop a thing.
 
 ## In summary
 
-Time is a line, categories are a sorted horizontal bar, relationships are a scatter, distributions are a histogram or a box.
+Time is a line, groups are a sorted flat bar, links are a scatter, spreads are a histogram or a box.
 
-Position is read most accurately, then length; angle and area much less well. That ordering is why bars beat pies and why bubble size should never carry the main message.
+spot is read most accurately, then length. Angle and area much less well. That sorting is why bars beat pies and why bubble size should never carry the main message.
 
 Dual axes put the crossing point under your control rather than the data's.
 
-Small multiples beat many series on one chart when the question is about the set; highlighting beats a legend when it is about one.
+Small multiples beat many series on one chart when the question is about the set. Highlighting beats a legend when it's about one.
 
-And the best chart is the one that has already done the reader's work: sorted, filtered, labelled, with the conclusion in the title and nothing else competing for attention.
+And the best chart is the one that has already done the reader's work. Sorted, filtered, labelled, with the conclusion in the title and nothing else competing for focus.
 
 ## A closing note
 
-Everything else in this track is mechanism; this module is the part that decides whether the mechanism was worth using.
+all else in this track is method. This module is the part that decides whether the method was worth using.
 
-The recurring theme is that a chart is a piece of communication, and the reader's effort is the cost. Sorting, filtering, highlighting and labelling all move work from the reader to the author, and the best charts have had the most work moved.
+The recurring theme is that a chart is a piece of exchange. The reader's effort is the cost. Sorting, filtering, highlighting and labelling all move work from the reader to the author. The best charts have had the most work moved.
 
-The chart types worth avoiding &mdash; pies with many slices, dual axes, truncated bars &mdash; are all cases where the display asks the reader to do something people do badly, or invites a conclusion the data does not support.
+The chart types worth avoiding. Pies with many slices, dual axes, truncated bars &mdash; are all cases where the display asks the reader to do a thing people do badly, or invites a conclusion the data doesn't support.
 
-And the most useful single constraint remains the simplest: one chart, one message. Almost every design question resolves once that is decided.
+And the most handy single constraint remains the simplest. One chart, one message. Almost each design question resolves once that is decided.
 
 ## Reading the code back
 
-Choosing is done before any code: what question, what encoding, what to leave out, what the title will claim. A chart written from those four answers is usually short, because most of the length in plotting code comes from adjusting a display that was not the right one to begin with.
+Choosing is done before any code: what question, what encoding, what to leave out, what the title will claim. A chart written from those four answers is often short. Most of the length in plotting code comes from adjusting a display that wasn't the right one to begin with.
 ''',
     [
         {"q": "Which visual encoding do people read most accurately?",
@@ -8154,56 +8154,56 @@ ax.set_title("seconds for 20 charts")'''),
     ],
     '''
 title: Performance and Large Data
-intro: What makes a figure slow, and what to do when there are more points than pixels.
+intro: What makes a figure slow. What to do when there are more points than pixels.
 
 ## Artists, not data
 
 matplotlib's cost is dominated by the number of **artists** it manages, not the number of data values.
 
-One `plot` call with a million points creates one `Line2D`. A loop making two thousand calls creates two thousand artists, each with its own properties, transform and draw pass &mdash; and that is far slower even with a fraction of the data.
+One `plot` call with a million points creates one `Line2D`. A loop making two thousand calls creates two thousand artists, each with its own properties, transform and draw pass. And that is far slower even with a fraction of the data.
 
-The rule that follows is the same one as NumPy and pandas: **pass arrays, do not loop**. Where a loop is unavoidable, `LineCollection` and its relatives draw many segments as a single artist.
+The rule that follows is the same one as NumPy and pandas: **pass arrays, don't loop**. Where a loop is unavoidable, `LineCollection` and its relatives draw many segments as a single artist.
 
 ## plot versus scatter
 
 For many points that all look alike, `ax.plot(x, y, "o")` is faster than `ax.scatter(x, y)`.
 
-`scatter` builds a collection that carries a size and colour per point, because that is what it is for. When those do not vary, the machinery is unused and paid for anyway.
+`scatter` builds a set that carries a size and colour per point. That is what it's for. When those don't vary, the machinery is unused and paid for anyway.
 
-So: `scatter` when size or colour encodes something, `plot` when it does not.
+So: `scatter` when size or colour codes a thing, `plot` when it doesn't.
 
 ## More points than pixels
 
-A seven-inch figure at 100 dpi is 700 pixels wide. Two hundred thousand points is roughly 285 per pixel column, and 284 of them are drawn exactly on top of others.
+A seven-inch figure at 100 dpi is 700 pixels wide. Two hundred thousand points is roughly 285 per pixel column. 284 of them are drawn just on top of others.
 
 They cost time and file size and contribute nothing visible.
 
-Reducing them is not a compromise; it is removing something the reader could never see. Two approaches, and the difference matters.
+Reducing them isn't a compromise. It's dropping a thing the reader could never see. Two approaches, and the gap matters.
 
-**Subsampling** &mdash; `x[::step]` &mdash; is trivial and drops whatever it does not land on. A single-sample spike disappears. For smooth, dense data that is fine; for anything where extremes matter it is not.
+**Subsampling** &mdash; `x[::step]` &mdash; is trivial and drops what it doesn't land on. A single-sample spike disappears. For smooth, dense data that is fine. For anything where extremes matter it isn't.
 
-**Aggregating** &mdash; binning by x and drawing the min and max in each bin as a filled band &mdash; keeps the envelope. The chart looks nearly identical to the full data because the envelope is what the eye was reading anyway, and genuine spikes survive.
+**Aggregating** &mdash; binning by x and drawing the min and max in each bin as a filled band &mdash; keeps the envelope. The chart looks nearly same to the full data because the envelope is what the eye was reading anyway, and genuine spikes live.
 
 The fourth editor puts one real spike in the data and shows subsampling losing it while binning keeps it.
 
-For scatter data, the equivalent is `hexbin` or `hist2d`, which replaces overplotted points with measured density.
+For scatter data, the equal is `hexbin` or `hist2d`. This Replaces overplotted points with measured density.
 
 ## File size
 
-Vector formats store every element, so a scatter of 30,000 points is 30,000 objects in the PDF. Such files are slow to open and large.
+Vector formats store each element. So A scatter of 30,000 points is 30,000 objects in the PDF. Such files are slow to open and large.
 
-`rasterized=True` on the artist stores **that layer** as pixels while everything else &mdash; axes, ticks, labels, title &mdash; stays vector:
+`rasterized=True` on the artist stores **that layer** as pixels while all else. Axes, ticks, labels, title &mdash; stays vector:
 
 ```python
 ax.scatter(x, y, s=2, rasterized=True)
 fig.savefig("out.pdf", dpi=200)
 ```
 
-The result is a small file with sharp text and a pixel-based data layer, which is exactly the right trade for a dense scatter in a document. The `dpi` at save time controls the resolution of the rasterised part.
+The result is a small file with sharp text and a pixel-based data layer. This Is just the right trade for a dense scatter in a doc. The `dpi` at save time controls the detail of the rasterised part.
 
 ## Drawing loops
 
-Generating many similar charts &mdash; one per group, per day, per file &mdash; spends most of its time creating figures, not drawing data.
+making many similar charts &mdash; one per group, per day, per file &mdash; spends most of its time creating figures, not drawing data.
 
 Two levels of fix.
 
@@ -8217,25 +8217,25 @@ ax.relim(); ax.autoscale_view()
 fig.savefig(path)
 ```
 
-`relim` and `autoscale_view` are needed because setting data does not rescale the axes.
+`relim` and `autoscale_view` are needed because setting data doesn't rescale the axes.
 
-This is meaningfully faster when the layout is identical between charts, and it is the same mechanism animations use.
+This is usefully faster when the layout is same between charts. It's the same method animations use.
 
 ## When matplotlib is the wrong tool
 
-matplotlib renders once and is not built for interactive exploration of large data.
+matplotlib renders once and isn't built for interactive exploration of large data.
 
-**Datashader** aggregates hundreds of millions of points into an image, and is the right answer above a few million.
+**Datashader** aggregates hundreds of millions of points into an image. Is the right answer above a few million.
 
-**Plotly, Bokeh, Altair** give pan-and-zoom in a browser, which matplotlib's interactive backends do only awkwardly.
+**Plotly, Bokeh, Altair** give pan-and-zoom in a browser. This Matplotlib's interactive backends do only awkwardly.
 
 **mpl-scatter-density** and similar handle the dense-scatter case within matplotlib.
 
-The signal is usually the size: if a figure takes more than a few seconds to draw, the answer is a different approach rather than a faster matplotlib.
+The signal is often the size: if a figure takes more than a few seconds to draw, the answer is a other approach rather than a faster matplotlib.
 
 ## Measuring draw time
 
-Timing a matplotlib figure needs care, because the drawing is lazy: creating artists is fast and nothing is rendered until the canvas is drawn.
+Timing a matplotlib figure needs care. The drawing is lazy. Creating artists is fast and nothing is rendered until the canvas is drawn.
 
 ```python
 t = time.perf_counter()
@@ -8243,75 +8243,75 @@ fig.canvas.draw()
 elapsed = time.perf_counter() - t
 ```
 
-Without the explicit `draw()`, the timing measures only object creation and reports numbers far too good.
+Without the clear `draw()`, the timing measures only object creation and reports numbers far too good.
 
-The first draw of a session also pays for font cache and backend initialisation, which can be a second or more. A warm-up figure before timing anything is the difference between a meaningful comparison and a misleading one &mdash; the editors in this module do exactly that.
+The first draw of a session also pays for font cache and backend init. This Can be a second or more. A warm-up figure before timing anything is the gap between a real compare and a misleading one. The editors in this module do just that.
 
 ## Where the time goes
 
-For a typical figure, in rough order:
+For a common figure, in rough order:
 
 **Artist creation** when there are many artists.
 
 **Rendering** the artists to pixels.
 
-**Text layout**, which is more expensive than it sounds &mdash; a chart with hundreds of tick labels or annotations spends real time measuring glyphs.
+**Text layout**, which is more costly than it sounds. A chart with hundreds of tick labels or annotations spends real time measuring glyphs.
 
-**Font cache building**, once per environment, and occasionally minutes on first run.
+**Font cache building**, once per setting, and at times minutes on first run.
 
-**Saving**, particularly to vector formats with many elements.
+**Saving**, above all to vector formats with many elements.
 
-The practical consequences: fewer artists, fewer text objects, and rasterised layers for dense data.
+The hands-on results: fewer artists, fewer text objects, and rasterised layers for dense data.
 
 ## Interactive versus file output
 
-An interactive backend redraws on every pan, zoom and resize, so a figure that takes two seconds to draw is unusable interactively while being perfectly fine as a file.
+An interactive backend redraws on each pan, zoom and resize. A figure that takes two seconds to draw is unusable interactively while being just right fine as a file.
 
-That changes the trade-off. For a saved figure, drawing a million points slowly once is acceptable. For something a person will manipulate, the point budget is far smaller, and downsampling is not an optimisation but a requirement.
+That changes the trade-off. For a saved figure, drawing a million points slowly once is acceptable. For a thing a person will change, the point budget is far smaller. Downsampling isn't an tuning but a need.
 
-`fig.canvas.draw_idle()` defers a redraw until the event loop is free, which is what interactive tools use to stay responsive.
+`fig.canvas.draw_idle()` defers a redraw until the event loop is free. This Is what interactive tools use to stay responsive.
 
 ## Animations
 
-`FuncAnimation` re-renders a figure per frame, so the per-frame cost is what matters.
+`FuncAnimation` re-renders a figure per frame. So The per-frame cost is what matters.
 
-`blit=True` redraws only the artists that changed, which is much faster and requires the update function to return them.
+`blit=True` redraws only the artists that changed. This Is much faster and needs the update function to return them.
 
-The same reuse principle as the drawing loop applies: create the artists once, update their data each frame with `set_data`, and never call `plot` inside the update.
+The same reuse principle as the drawing loop applies. Create the artists once, update their data each frame with `set_data`. Never call `plot` inside the update.
 
 ## The wider picture
 
-matplotlib is designed for correctness and control rather than throughput, and its limits are reached sooner than people expect &mdash; tens of thousands of artists, or a few million points.
+matplotlib is designed for correctness and control rather than throughput. Its limits are reached sooner than people expect. Tens of thousands of artists, or a few million points.
 
 The escape routes, roughly by problem:
 
 **Too many points** &mdash; aggregate, or use datashader.
 
-**Too many artists** &mdash; collections instead of loops.
+**Too many artists** &mdash; sets instead of loops.
 
 **Too slow interactively** &mdash; a browser-based library.
 
 **Too many figures** &mdash; reuse, and close.
 
-The one that matters most is the first. Most performance problems in matplotlib are really a display problem: drawing more than the reader can see, which costs time and communicates nothing.
+The one that matters most is the first. Most speed problems in matplotlib are really a display problem. Drawing more than the reader can see. This Costs time and sends nothing.
 
 ## Font cache and first-run cost
 
-A surprise on a fresh environment: the very first matplotlib figure can take a long time, occasionally minutes, while the font cache is built.
+A surprise on a fresh setting: the very first matplotlib figure can take a long time, at times minutes, while the font cache is built.
 
-It happens once per environment and is cached afterwards, and it is a common source of "matplotlib is incredibly slow" reports from people who ran it once in a new container.
+It happens once per setting and is cached later. It's a common source of "matplotlib is incredibly slow" reports from people who ran it once in a new holder.
 
-In a container or CI image, drawing one throwaway figure at build time moves the cost out of the first real run.
+In a holder or CI image, drawing one throwaway figure at build time moves the cost out of the first real run.
 
-`matplotlib.get_cachedir()` shows where it lives, and deleting it forces a rebuild &mdash; which is the fix when a newly installed font is not being found.
+`matplotlib.get_cachedir()` shows where it lives, and deleting it forces a rebuild. Which is the fix when a newly installed font isn't being found.
 
 ## A performance checklist
 
 When a figure is slow, in the order worth checking:
 
-**How many artists?** `len(ax.lines) + len(ax.collections) + len(ax.patches)`. Hundreds is fine; tens of thousands is the problem.
+**How many artists?** `len(ax.lines) + len(ax.sets) + len(ax.patches)`. Hundreds is fine. Tens of thousands is the problem.
 
-**How many points, against how many pixels?** If it is more than a few per pixel column, the extras are invisible.
+**How many points, against how many pixels?** If it's more than a few per pixel column, the extras are invisible.
 
 **Is it in a loop?** Are figures being closed?
 
@@ -8321,11 +8321,11 @@ When a figure is slow, in the order worth checking:
 
 **Is it the first run?** The font cache.
 
-Most slow figures are the first two, and both are fixed by drawing less rather than by drawing faster.
+Most slow figures are the first two. Both are fixed by drawing less rather than by drawing faster.
 
 ## Budgets
 
-Rough numbers, which are more useful than general advice.
+Rough numbers, which are more handy than general advice.
 
 **Artists**: up to a few thousand is comfortable. Tens of thousands is slow. Hundreds of thousands will not finish in a reasonable time.
 
@@ -8339,57 +8339,57 @@ Rough numbers, which are more useful than general advice.
 
 **Vector output**: above roughly 10,000 elements the file becomes slow to open.
 
-Those thresholds explain most of the practical advice: pass arrays rather than looping, aggregate before plotting, rasterise dense layers, and reuse figures in loops.
+Those thresholds explain most of the hands-on advice. Pass arrays rather than looping, aggregate before plotting, rasterise dense layers, and reuse figures in loops.
 
 ## In summary
 
-Cost is driven by artists, not data points, so one call with an array beats a loop of calls by a wide margin.
+Cost is driven by artists, not data points. One call with an array beats a loop of calls by a wide margin.
 
 `plot` beats `scatter` when the markers are uniform.
 
-Past a few thousand points there are more points than pixels, and the extras cost time while communicating nothing.
+Past a few thousand points there are more points than pixels. The extras cost time while communicating nothing.
 
-Subsampling drops genuine extremes; binning to a min/max envelope keeps them, and looks the same.
+Subsampling drops genuine extremes. Binning to a min/max envelope keeps them, and looks the same.
 
 `rasterized=True` keeps a vector file small while leaving the text sharp.
 
-Creating figures is the expensive part of a drawing loop, so reuse them &mdash; and close them regardless, because matplotlib will not.
+Creating figures is the costly part of a drawing loop. Reuse them. And close them even so, because matplotlib won't.
 
-And when a figure takes seconds to draw, the answer is usually a different approach rather than a faster matplotlib.
+And when a figure takes seconds to draw, the answer is often a other approach rather than a faster matplotlib.
 
 ## When to stop optimising
 
-A figure that takes two seconds to draw once, and is then saved, is fine. There is nothing to fix.
+A figure that takes two seconds to draw once. Is then saved, is fine. There's nothing to fix.
 
 The cases that justify effort are narrower than they look:
 
-**A figure regenerated frequently** &mdash; in a dashboard build, a CI job, a loop over thousands of groups. The cost multiplies.
+**A figure regenerated often** &mdash; in a dashboard build, a CI job, a loop over thousands of groups. The cost times.
 
-**An interactive figure**, where every pan and zoom pays it again.
+**An interactive figure**, where each pan and zoom pays it again.
 
-**A figure that does not finish**, or exhausts memory, which is a correctness problem rather than a speed one.
+**A figure that doesn't finish**, or exhausts memory. This Is a correctness problem rather than a speed one.
 
-**A file too large to open**, which is the vector-scatter case.
+**A file too large to open**. This Is the vector-scatter case.
 
-Outside those, drawing time is usually a rounding error next to the data work that preceded it, and the effort is better spent on whether the chart says the right thing.
+Outside those, drawing time is often a rounding error next to the data work that preceded it. The effort is better spent on whether the chart says the right thing.
 
-That is worth stating because performance is easy to optimise and easy to over-optimise, and a fast chart nobody can read is not an improvement.
+That is worth stating because speed is easy to optimise and easy to over-optimise. A fast chart no one can read isn't an gain.
 
 ## One more thing
 
-`fig.canvas.draw_idle()` requests a redraw at the next opportunity rather than immediately, which is what keeps an interactive figure responsive when several things change at once.
+`fig.canvas.draw_idle()` requests a redraw at the next opportunity rather than at once. This Is what keeps an interactive figure responsive when a few things change at once.
 
-For a script it makes no difference, since the draw happens at save time either way. It matters in a callback that updates several artists, where an immediate draw per change would render the figure several times for one logical update.
+For a script it makes no gap. The draw happens at save time either way. It matters in a callback that updates a few artists. Here An direct draw per change would render the figure a few times for one logical update.
 
 ## The short version
 
-Nearly every performance problem in matplotlib is a display problem in disguise: drawing more than the output can show.
+Nearly each speed problem in matplotlib is a display problem in disguise: drawing more than the output can show.
 
-Fixing it by drawing less &mdash; aggregating, subsampling with care, rasterising a dense layer &mdash; makes the chart faster and usually more readable at the same time, which is unusual among optimisations.
+Fixing it by drawing less. Aggregating, subsampling with care, rasterising a dense layer &mdash; makes the chart faster and often more readable also. This Is unusual among optimisations.
 
 ## Reading the code back
 
-Performance work here is a short list checked in order: is there a loop creating artists, are there more points than pixels, are figures being closed, is the output vector with a dense layer in it. Four questions, and the first two account for nearly everything. None of them requires knowing anything about how matplotlib renders.
+speed work here is a short list checked in order. Is there a loop creating artists, are there more points than pixels, are figures being closed, is the output vector with a dense layer in it. Four questions. The first two account for nearly all. None of them needs knowing anything about how matplotlib renders.
 ''',
     [
         {"q": "What dominates matplotlib's drawing cost?",
@@ -8593,35 +8593,35 @@ intro: Figure size, margins and the space between panels.
 
 `figsize=(w, h)` in inches does two things: it sets how large the figure is, and it sets the **shape**.
 
-The shape matters more than the size, because the size is usually adjusted at display time anyway.
+The shape matters more than the size. The size is often adjusted at display time anyway.
 
-**Time series want width.** A hundred and fifty points in three inches is 50 per inch, and the shape of the series is compressed into noise. The same data in nine inches is readable. Wide-and-short &mdash; something like 4:1 &mdash; is a good default for a single time series.
+**Time series want width.** A hundred and fifty points in three inches is 50 per inch. The shape of the series is compressed into noise. The same data in nine inches is readable. Wide-and-short. Something like 4:1. Is a good default for a single time series.
 
-**Two-variable scatters want to be square**, so neither axis is visually privileged and a correlation is not exaggerated by the aspect ratio.
+**Two-var scatters want to be square**. Neither axis is visually privileged and a link isn't exaggerated by the aspect ratio.
 
-**Ranked bar charts want height proportional to the number of bars.** Twenty categories in three inches gives bars a few pixels apart; the figure should grow with the data.
+**Ranked bar charts want height scaled to the number of bars.** Twenty groups in three inches gives bars a few pixels apart. The figure should grow with the data.
 
-`figsize` interacts with font size: text is a fixed physical size, so a small figure has proportionally larger text. That is why shrinking a figure to fit a slide makes the labels look enormous, and why the fix is to set both together.
+`figsize` interacts with font size: text is a fixed physical size. A small figure has proportionally larger text. That is why shrinking a figure to fit a slide makes the labels look huge. Why the fix is to set both together.
 
 ## Margins
 
 matplotlib leaves a 5% margin beyond the data at each end, controlled by `axes.xmargin` and `axes.ymargin`.
 
-It exists so points do not sit exactly on the frame, and it is usually right.
+It exists so points don't sit just on the frame, and it's often right.
 
-It is wrong when the data should reach the edge: a filled area, a time series ending at today's date, an image. `ax.margins(x=0)` removes it on one axis, and `ax.margins(0)` on both.
+It's wrong when the data should reach the edge. A filled area, a time series ending at today's date, an image. `ax.margins(x=0)` drops it on one axis, and `ax.margins(0)` on both.
 
-`ax.margins(y=0.15)` increases it, which is how you leave room for labels above the highest point without hard-coding limits that break when the data changes.
+`ax.margins(y=0.15)` grows it, which is how you leave room for labels above the highest point without hard-coding limits that break when the data changes.
 
 ## Space between panels
 
-`fig.subplots_adjust(hspace=..., wspace=...)` sets the gaps as **fractions of the average panel size**, so `0.4` means a gap of 40% of a panel's height.
+`fig.subplots_adjust(hspace=..., wspace=...)` sets the gaps as **fractions of the mean panel size**. `0.4` means a gap of 40% of a panel's height.
 
-It also takes `left`, `right`, `top` and `bottom` as figure fractions, which is how you reserve space at an edge.
+It also takes `left`, `right`, `top` and `bottom` as figure fractions. This Is how you reserve space at an edge.
 
-These are what `tight_layout` and `constrained_layout` compute for you. Setting them by hand is for when you want a specific look, or when the automatic layout is fighting something you placed manually.
+These are what `tight_layout` and `constrained_layout` find for you. Setting them by hand is for when you want a exact look, or when the auto layout is fighting a thing you placed manually.
 
-The two automatic options differ: `tight_layout()` runs once after drawing; `constrained_layout=True` is set at creation and keeps adjusting as artists are added, handling colorbars and suptitles better.
+The two auto options differ: `tight_layout()` runs once after drawing. `constrained_layout=True` is set at creation and keeps adjusting as artists are added, handling colorbars and suptitles better.
 
 ## Things outside the axes
 
@@ -8633,59 +8633,59 @@ Three fixes:
 
 `constrained_layout=True` works it out, including for colorbars.
 
-`bbox_inches="tight"` at save time expands the saved image to include everything. Note this makes the file larger than `figsize` implies, rather than shrinking the axes &mdash; a different result from the other two.
+`bbox_inches="tight"` at save time expands the saved image to include all. Note this makes the file larger than `figsize` implies, rather than shrinking the axes. A other result from the other two.
 
-The same applies to long tick labels and axis labels, which is why a rotated date axis so often looks cut off.
+The same applies to long tick labels and axis labels. This Is why a rotated date axis so often looks cut off.
 
 ## Data aspect ratio
 
 `ax.set_aspect("equal")` makes one unit of x occupy the same distance as one unit of y.
 
-Without it, a circle plotted as `cos`/`sin` comes out an ellipse, because the axes box is wider than it is tall while the limits are the same.
+Without it, a circle plotted as `cos`/`sin` comes out an ellipse. The axes box is wider than it's tall while the limits are the same.
 
-It is required for anything where shape carries meaning: maps, geometry, images, physical layouts. It is wrong for most statistical charts, where the two axes have unrelated units and forcing them equal wastes space.
+It's needed for anything where shape carries meaning. Maps, geometry, images, physical layouts. It's wrong for most statistical charts. Here The two axes have unrelated units and forcing them equal wastes space.
 
-`ax.set_aspect(2)` sets a specific ratio, and `adjustable="datalim"` changes the limits rather than the box to achieve it.
+`ax.set_aspect(2)` sets a exact ratio, and `adjustable="datalim"` changes the limits rather than the box to achieve it.
 
 ## Putting it together
 
-The last editor is a finished chart, and every line in it is one of the decisions from this track: an aspect ratio suited to the data, limits that leave room for end labels, margins for breathing space, ticks at meaningful positions, a faint grid below the data, two spines removed, direct labels instead of a legend, and a title that states the finding.
+The last editor is a finished chart. Each line in it's one of the choices from this track. An aspect ratio suited to the data, limits that leave room for end labels, margins for breathing space, ticks at real spots, a faint grid below the data, two spines removed, direct labels instead of a legend, and a title that states the finding.
 
-None of it is complicated. It is a dozen lines, applied deliberately, and it is the difference between a default chart and one that looks like someone made it.
+None of it's complicated. It's a dozen lines, applied on purpose. It's the gap between a default chart and one that looks like someone made it.
 
 ## Figure versus axes coordinates
 
-Two coordinate systems place things on a figure, and mixing them up is a common source of misplaced elements.
+Two coord systems place things on a figure. Mixing them up is a common source of misplaced elements.
 
-**Figure coordinates** run 0 to 1 across the whole figure. `fig.text`, `fig.add_axes`, `fig.legend` use them.
+**Figure coords** run 0 to 1 across the whole figure. `fig.text`, `fig.add_axes`, `fig.legend` use them.
 
-**Axes coordinates** run 0 to 1 across one axes. `ax.text(..., transform=ax.transAxes)` uses them.
+**Axes coords** run 0 to 1 across one axes. `ax.text(..., transform=ax.transAxes)` uses them.
 
-A note that belongs to the whole figure &mdash; a source line, a caption &mdash; goes in figure coordinates and stays put when panels change. A note about one panel goes in that panel's axes coordinates.
+A note that belongs to the whole figure. A source line, a caption. Goes in figure coords and stays put when panels change. A note about one panel goes in that panel's axes coords.
 
-`fig.subplots_adjust` also takes figure coordinates for `left`, `right`, `top` and `bottom`, which is how you reserve a strip at an edge.
+`fig.subplots_adjust` also takes figure coords for `left`, `right`, `top` and `bottom`. This Is how you reserve a strip at an edge.
 
 ## Adding an axes anywhere
 
-`fig.add_axes([left, bottom, width, height])` places an axes at an exact position in figure coordinates, outside the grid entirely.
+`fig.add_axes([left, bottom, width, height])` places an axes at an exact spot in figure coords, outside the grid fully.
 
-Two uses come up: an inset showing a zoomed region, and a colorbar positioned precisely rather than stolen from a panel.
+Two uses come up: an inset showing a zoomed region. A colorbar positioned just rather than stolen from a panel.
 
-`ax.inset_axes([x, y, w, h])` does the same in the parent's coordinates, which is easier for an inset because the position is relative to the panel it belongs to.
+`ax.inset_axes([x, y, w, h])` does the same in the parent's coords. This Is easier for an inset because the spot is scaled to the panel it belongs to.
 
-`ax.indicate_inset_zoom(inset_ax)` draws the connecting lines between the region and the inset, which is what makes the relationship readable.
+`ax.indicate_inset_zoom(inset_ax)` draws the connecting lines between the region and the inset. This Is what makes the link readable.
 
 ## Spacing that reads
 
-A few conventions produce figures that look considered rather than default.
+A few rules give figures that look seen as rather than default.
 
-Leave more space **between** groups than within them &mdash; a grid of panels with a `wspace` smaller than the margin around the grid reads as a unit.
+Leave more space **between** groups than within them. A grid of panels with a `wspace` smaller than the margin around the grid reads as a unit.
 
-Keep the **left margin** wide enough for the y label at its final font size, which is what `constrained_layout` does and hand-tuning frequently gets wrong when the font changes.
+Keep the **left margin** wide enough for the y label at its final font size. This Is what `constrained_layout` does and hand-tuning often gets wrong when the font changes.
 
-Give a **suptitle** room, or it collides with the top row's titles. `fig.suptitle(..., y=1.02)` with `tight_layout` is a common fix and is fragile; `constrained_layout` handles it properly.
+Give a **suptitle** room, or it collides with the top row's titles. `fig.suptitle(..., y=1.02)` with `tight_layout` is a common fix and is fragile. `constrained_layout` handles it properly.
 
-Do not centre a title over a grid that has a colorbar on one side, because the visual centre and the geometric centre differ.
+Don't centre a title over a grid that has a colorbar on one side. The visual centre and the geometric centre differ.
 
 ## Sizing for a destination
 
@@ -8693,11 +8693,11 @@ The figure should be sized for where it will be seen.
 
 **A slide** is wide and viewed from a distance: fewer elements, larger text, `figsize` around 10&times;5.6 for 16:9.
 
-**A document column** is narrow: around 3.5 inches wide for a two-column paper, and text sized so that the figure needs no scaling &mdash; scaling a figure in a document is what makes its labels the wrong size relative to the body text.
+**A doc column** is narrow: around 3.5 inches wide for a two-column paper. Text sized so that the figure needs no scaling. Scaling a figure in a doc is what makes its labels the wrong size scaled to the body text.
 
-**A web page** is variable, so a raster at 2&times; the display size and a `max-width` in CSS is the usual approach.
+**A web page** is var. So A raster at 2&times; the display size and a `max-width` in CSS is the usual approach.
 
-The mistake is drawing at a default size and scaling afterwards, which changes the text size relative to everything else. Sizing at the destination's dimensions and choosing the font accordingly is the fix.
+The mistake is drawing at a default size and scaling later. This Changes the text size scaled to all else. Sizing at the destination's dims and choosing the font so is the fix.
 
 ## The last pass
 
@@ -8705,11 +8705,11 @@ Before a figure is finished, three checks that are all layout:
 
 Is anything cut off at the edges? Save it and look at the file, not the screen.
 
-Is the text a sensible size relative to the figure at its final display size?
+Is the text a sensible size scaled to the figure at its final display size?
 
-Is there enough space that nothing touches anything else &mdash; labels to spines, title to panels, legend to data?
+Is there enough space that nothing touches anything else. Labels to spines, title to panels, legend to data?
 
-None of these change what the chart says, and all of them change whether it looks like someone finished it.
+None of these change what the chart says. All of them change whether it looks like someone finished it.
 
 ## Insets
 
@@ -8722,67 +8722,67 @@ inset.set_xlim(a, b)
 ax.indicate_inset_zoom(inset, edgecolor="0.5")
 ```
 
-The position is in the parent's axes coordinates, so it moves with the panel.
+The spot is in the parent's axes coords. So It moves with the panel.
 
-`indicate_inset_zoom` draws the rectangle on the main axes and the connecting lines, which is what makes the relationship legible &mdash; an inset without it is a floating chart the reader has to interpret.
+`indicate_inset_zoom` draws the rectangle on the main axes and the connecting lines. This Is what makes the link legible. An inset without it's a floating chart the reader has to read.
 
-Insets suit a long series with an interesting short window, and a scatter with a dense cluster worth magnifying. They do not suit anything the reader needs to compare precisely with the main axes, because the scales differ.
+Insets suit a long series with an notable short window. A scatter with a dense cluster worth magnifying. They don't suit anything the reader needs to compare just with the main axes, because the scales differ.
 
 ## Layout that survives regeneration
 
-Hand-tuned spacing breaks when the data changes: a longer label, an extra category, a bigger number needing more room.
+Hand-tuned spacing breaks when the data changes: a longer label, an extra group, a bigger number needing more room.
 
 Three habits keep a layout robust.
 
 **Prefer `constrained_layout`** over hand-set `subplots_adjust`, because it recomputes rather than remembering.
 
-**Size the figure from the data** &mdash; `figsize=(7, 0.35 * len(categories) + 1)` for a horizontal bar chart grows with the number of bars.
+**Size the figure from the data**. `figsize=(7, 0.35 * len(groups) + 1)` for a flat bar chart grows with the number of bars.
 
 **Use `bbox_inches="tight"` when saving**, so anything that grew is still included.
 
-A figure generated weekly will meet all three problems eventually, and the alternative is adjusting the numbers each time something changes.
+A figure made weekly will meet all three problems eventually. The option is adjusting the numbers each time a thing changes.
 
 ## Text size and the destination
 
 The most common layout error is a figure drawn at one size and displayed at another.
 
-Text in matplotlib is specified in **points**, a physical unit. A 10-point label on a 4-inch figure is a quarter of an inch, which is a substantial fraction of the width. The same label on a 10-inch figure is the same quarter inch, and now looks small.
+Text in matplotlib is given in **points**, a physical unit. A 10-point label on a 4-inch figure is a quarter of an inch. This Is a large fraction of the width. The same label on a 10-inch figure is the same quarter inch, and now looks small.
 
-So scaling a figure after the fact changes the relationship between the text and everything else &mdash; which is why a chart shrunk to fit a document column has labels that are suddenly too large, and one enlarged for a slide has labels that are too small.
+So scaling a figure after the fact changes the link between the text and all else. Which is why a chart shrunk to fit a doc column has labels that are suddenly too large. One enlarged for a slide has labels that are too small.
 
 The fix is to draw at the final size. For a two-column paper, that means a figure about 3.4 inches wide with fonts chosen to be readable at that size. For a slide, something like 10 by 5.6 with fonts around 14 points.
 
-`figsize` and `font.size` are one decision, not two.
+`figsize` and `font.size` are one choice, not two.
 
 ## In summary
 
-`figsize` is an aspect-ratio decision: width for time series, square for scatters, height proportional to the number of bars.
+`figsize` is an aspect-ratio choice: width for time series, square for scatters, height scaled to the number of bars.
 
 Margins default to 5% each side and should be removed when the data is meant to reach the edge.
 
-`hspace`/`wspace` are fractions of panel size, and are what the layout managers compute for you.
+`hspace`/`wspace` are fractions of panel size, and are what the layout managers find for you.
 
-Anything outside the axes &mdash; a legend, long labels &mdash; needs room reserved, or it is cut off in the saved file.
+Anything outside the axes &mdash; a legend, long labels &mdash; needs room reserved, or it's cut off in the saved file.
 
-`set_aspect("equal")` is required where shape carries meaning and wasteful elsewhere.
+`set_aspect("equal")` is needed where shape carries meaning and wasteful elsewhere.
 
-And a figure should be drawn at the size it will be displayed, because text is a physical size and scaling afterwards changes everything about the balance.
+And a figure should be drawn at the size it will be displayed. Text is a physical size and scaling later changes all about the balance.
 
 ## A closing note
 
-Layout is the part of charting that gets the least attention and is most visible in the result.
+Layout is the part of charting that gets the least focus and is most visible in the result.
 
-A chart with the right data, the right type and the wrong spacing looks unfinished, and readers register that before they read anything. Labels touching the frame, a title colliding with a panel, a legend crowding the data, text at the wrong size for the display &mdash; all are cheap to fix and all cost credibility.
+A chart with the right data, the right type and the wrong spacing looks unfinished. Readers register that before they read anything. Labels touching the frame, a title colliding with a panel, a legend crowding the data, text at the wrong size for the display. All are cheap to fix and all cost credibility.
 
-The mechanisms are few: pick a figure size for the destination, let `constrained_layout` handle the spacing, reserve room for anything outside the axes, and check the saved file rather than the screen.
+The methods are few: pick a figure size for the destination, let `constrained_layout` handle the spacing, reserve room for anything outside the axes. Check the saved file rather than the screen.
 
-Doing that consistently is most of the difference between charts that look produced and charts that look exported.
+Doing that always is most of the gap between charts that look made and charts that look exported.
 
 ## The short version
 
-Layout gets the least attention and is the most visible in the result.
+Layout gets the least focus and is the most visible in the result.
 
-Size for the destination, let a layout manager handle the spacing, reserve room for anything outside the axes, and look at the saved file. That is most of the difference between charts that look produced and charts that look exported.
+Size for the destination, let a layout manager handle the spacing, reserve room for anything outside the axes. Look at the saved file. That is most of the gap between charts that look made and charts that look exported.
 ''',
     [
         {"q": "What shape suits a single time series?",
@@ -8983,7 +8983,7 @@ ax.set_title("one deliberate figure")'''),
     ],
     '''
 title: Common Mistakes
-intro: The errors that produce a chart which looks fine and is not.
+intro: The errors that give a chart which looks fine and isn't.
 
 ## Nothing appears
 
@@ -8991,59 +8991,59 @@ Three causes, distinguishable in a few seconds.
 
 **No data.** `len(x)` and `len(y)`. An empty array plots without complaint.
 
-**All missing.** `np.isnan(y).all()`. NaN is skipped, so an all-NaN series draws an empty line object.
+**All missing.** `np.isnan(y).all()`. NaN is skipped. So An all-NaN series draws an empty line object.
 
 **The view is elsewhere.** `ax.get_xlim()` and `get_ylim()`. Limits set before the data was added, or set to the wrong range, put the data outside the visible box.
 
-`len(ax.lines)` distinguishes "the draw call never ran" from "it ran and there is nothing to see", which is usually the fastest thing to check.
+`len(ax.lines)` sets apart "the draw call never ran" from "it ran and there's nothing to see". This Is often the fastest thing to check.
 
-A fourth possibility in a script: you never showed or saved the figure. In a notebook figures display automatically; in a script they do not, and `plt.show()` or `savefig` is required.
+A fourth possibility in a script: you never showed or saved the figure. In a notebook figures display on its own. In a script they don't. `plt.show()` or `savefig` is needed.
 
 ## The plot lands somewhere else
 
-`plt.plot` draws on the **current** axes. After `plt.subplots(1, 2)`, the current axes is the last one created, so a stray `plt.plot` goes to the right-hand panel regardless of intent.
+`plt.plot` draws on the **current** axes. After `plt.subplots(1, 2)`, the current axes is the last one created. A stray `plt.plot` goes to the right-hand panel even so of intent.
 
-In a notebook it is worse, because the current figure is whatever the last executed cell created &mdash; which, with out-of-order execution, is not necessarily the one above.
+In a notebook it's worse. The current figure is what the last ran cell created. Which, with out-of-order run, isn't always the one above.
 
-`ax.plot(...)` removes the question. This is the practical reason the object-oriented API is worth the extra characters.
+`ax.plot(...)` drops the question. This is the hands-on reason the object-oriented API is worth the extra characters.
 
 ## Cropped output
 
-A figure is saved at the size `figsize` declares, at `dpi` resolution. The window you were looking at has nothing to do with it.
+A figure is saved at the size `figsize` declares, at `dpi` detail. The window you were looking at has nothing to do with it.
 
-So a chart whose labels fit on screen can be cropped in the file, and the first time this happens it looks like matplotlib lost the label.
+So a chart whose labels fit on screen can be cropped in the file. The first time this happens it looks like matplotlib lost the label.
 
-`tight_layout()` or `constrained_layout=True` reserve the space. `bbox_inches="tight"` at save time expands the output to include everything.
+`tight_layout()` or `constrained_layout=True` reserve the space. `bbox_inches="tight"` at save time expands the output to include all.
 
-Rotated tick labels and long y-axis labels are the usual casualties, and a chart type that does not need rotation &mdash; `barh` rather than `bar` &mdash; avoids the problem entirely.
+Rotated tick labels and long y-axis labels are the usual casualties. A chart type that doesn't need rotation. `barh` rather than `bar`. Avoids the problem fully.
 
 ## Colour that does not survive
 
-Colours chosen to be visually distinct are often not distinct in **luminance**, and luminance is what remains in greyscale and what colour-blind readers rely on most.
+Colours chosen to be visually distinct are often not distinct in **luminance**. Luminance is what remains in greyscale and what colour-blind readers lean on most.
 
-Red, green and dark red are three obviously different colours with nearly the same brightness. Printed in black and white, they are one colour.
+Red, green and dark red are three obviously other colours with nearly the same brightness. Printed in black and white, they're one colour.
 
-Two habits fix it: use a palette designed for the purpose &mdash; the viridis family, or Okabe&ndash;Ito for categories &mdash; and vary a second channel so colour is reinforcing rather than carrying the meaning.
+Two habits fix it: use a palette designed for the purpose. The viridis family, or Okabe&ndash;Ito for groups. And vary a second channel so colour is reinforcing rather than carrying the meaning.
 
 The greyscale test is quick and catches most of it.
 
 ## Silent clipping
 
-Setting limits that exclude data does not warn. The excluded points are simply not drawn, and a bar taller than the axis runs off the top looking like any other tall bar.
+Setting limits that exclude data doesn't warn. The excluded points are simply not drawn. A bar taller than the axis runs off the top looking like any other tall bar.
 
-That is a serious failure: the reader sees a chart where one category is four times the next largest, and has no way to know.
+That is a serious failure: the reader sees a chart where one group is four times the next largest. Has no way to know.
 
-matplotlib cannot warn about it, because clipping is often exactly what you want &mdash; zooming into a region is a legitimate operation.
+matplotlib can't warn about it. Clipping is often just what you want. Zooming into a region is a legitimate step.
 
-The check is one line: compare `max(data)` against `ax.get_ylim()[1]`. Where a value is genuinely off-scale and the chart must stay zoomed, say so with an annotation giving the real number.
+The check is one line: compare `max(data)` against `ax.get_ylim()[1]`. Where a value is truly off-scale and the chart must stay zoomed, say so with an annotation giving the real number.
 
-The related version is a category filtered out earlier in the pipeline and never noticed, which is why comparing the number of bars against the number of groups is worth doing.
+The related version is a group filtered out earlier in the pipeline and never noticed. This Is why checking the number of bars against the number of groups is worth doing.
 
 ## Figures left open
 
-matplotlib keeps a reference to every figure created through pyplot, so they are never collected while it holds them.
+matplotlib keeps a link to each figure created through pyplot. They're never collected while it holds them.
 
-After twenty, it warns: "More than 20 figures have been opened." That is a warning, not an error &mdash; the loop continues, and memory keeps growing until something else fails.
+After twenty, it warns: "More than 20 figures have been opened." That is a warning, not an error. The loop continues. Memory keeps growing until a thing else fails.
 
 `plt.close(fig)` in the loop. `plt.close("all")` between sections of a notebook.
 
@@ -9063,57 +9063,57 @@ Compare the data's range against the axis limits.
 
 Close figures in loops.
 
-And the one from the design module that outranks all of them: know what the chart is for before drawing it, because none of these checks help a chart that is answering the wrong question.
+And the one from the design module that outranks all of them. Know what the chart is for before drawing it. None of these checks help a chart that is answering the wrong question.
 
 ## Mistakes of interpretation
 
-Beyond the mechanical errors, a set of chart-level mistakes produce output that is technically correct and misleading.
+Beyond the rote errors, a set of chart-level mistakes give output that is strictly correct and misleading.
 
 **A truncated bar axis.** Length must be read from zero.
 
 **Dual axes.** The crossing point is a choice, not a finding.
 
-**Unshared axes across panels.** The layout invites a comparison the scales do not support.
+**Unshared axes across panels.** The layout invites a compare the scales don't support.
 
 **An uncentred diverging colormap.** Half the data is coloured as though it had the opposite sign.
 
-**A line through sparse points.** It asserts values between the observations.
+**A line through sparse points.** It asserts values between the findings.
 
-**A pie with many slices.** The reader cannot rank them.
+**A pie with many slices.** The reader can't rank them.
 
-**A mean without a spread.** Two very different distributions look identical.
+**A mean without a spread.** Two very other spreads look same.
 
-Each of these is a default that matplotlib will happily produce, which is why they are worth knowing as a list.
+Each of these is a default that matplotlib will happily give. This Is why they're worth knowing as a list.
 
 ## Mistakes of omission
 
-Things whose absence is the error:
+Things whose lack is the error:
 
 No units on the axis labels.
 
 No indication of sample size, when it varies between groups.
 
-No note that an axis is logarithmic, which changes how every distance on it should be read.
+No note that an axis is logarithmic. This Changes how each distance on it should be read.
 
-No statement of what an error bar represents.
+No statement of what an error bar shows.
 
 No caption saying when the data is from and what it covers.
 
-These cost a line each and are the difference between a chart that can be acted on and one that has to be asked about.
+These cost a line each and are the gap between a chart that can be acted on and one that has to be asked about.
 
 ## Debugging a figure
 
 A routine that resolves most problems quickly:
 
-**Print the data.** Shape, range, count of NaN. Most "the chart is wrong" is "the data is not what I thought".
+**Print the data.** Shape, range, count of NaN. Most "the chart is wrong" is "the data isn't what I thought".
 
-**Check the artists.** `len(ax.lines)`, `len(ax.patches)`, `len(ax.collections)` &mdash; did the draw call happen?
+**Check the artists.** `len(ax.lines)`, `len(ax.patches)`, `len(ax.sets)`. Did the draw call happen?
 
 **Check the view.** `ax.get_xlim()`, `get_ylim()` against the data's range.
 
-**Save it and look at the file**, which is what other people will see.
+**Save it and look at the file**. This Is what other people will see.
 
-**Look at it in greyscale**, which catches encoding problems that colour hides.
+**Look at it in greyscale**. This Catches encoding problems that colour hides.
 
 In that order, because each is cheaper than the next.
 
@@ -9125,9 +9125,9 @@ Does the title state the finding?
 
 Do the axes have units?
 
-Is the baseline appropriate?
+Is the baseline right?
 
-Are the panels comparable, if the layout implies they should be?
+Are the panels close, if the layout implies they should be?
 
 Is anything clipped, hidden or overplotted?
 
@@ -9137,35 +9137,35 @@ Is there one message?
 
 Is the source and date on it?
 
-Eight questions, most answered in seconds, and between them they catch nearly everything in this module.
+Eight questions, most answered in seconds. Between them they catch nearly all in this module.
 
 ## The general lesson
 
-matplotlib will draw whatever it is asked. It has no opinion about whether the chart is honest, readable or answering a question anyone asked.
+matplotlib will draw what it's asked. It has no view about whether the chart is honest, readable or answering a question anyone asked.
 
-That is the right design for a library and it means the responsibility sits with the person writing the call. The mechanical parts of this track &mdash; the arguments, the objects, the defaults &mdash; are the easy half. The decisions are the half that determines whether the chart was worth drawing.
+That is the right design for a library and it means the job sits with the person writing the call. The rote parts of this track. The args, the objects, the defaults. Are the easy half. The choices are the half that finds whether the chart was worth drawing.
 
 ## Mistakes that look like matplotlib bugs
 
-A few behaviours get reported as bugs and are working as designed.
+A few actions get reported as bugs and are working as designed.
 
-**A figure appears blank in a script** &mdash; nothing called `show` or `savefig`.
+**A figure appears blank in a script**. Nothing called `show` or `savefig`.
 
-**Colours ignored** &mdash; passing `c=` where `color=` was meant, or a colour list to a function taking a single colour.
+**Colours skipped** &mdash; passing `c=` where `color=` was meant, or a colour list to a function taking a single colour.
 
-**`set_facecolor` doing nothing on a box plot** &mdash; `patch_artist=True` was not passed.
+**`set_facecolor` doing nothing on a box plot** &mdash; `patch_artist=True` wasn't passed.
 
-**Ticks reappearing** after being set &mdash; a later autoscale replaced the locator.
+**Ticks reappearing** after being set. A later autoscale replaced the locator.
 
-**A legend showing one entry for many lines** &mdash; one `label` on a call that drew several.
+**A legend showing one entry for many lines**. One `label` on a call that drew a few.
 
 **Text invisible after `transparent=True`** &mdash; the foreground was never changed.
 
-Each has a one-line fix and none of them raises, which is what makes them frustrating rather than difficult.
+Each has a one-line fix and none of them raises. This Is what makes them frustrating rather than hard.
 
 ## Building the habit
 
-The checks in this module are worth turning into a routine rather than remembering individually.
+The checks in this module are worth turning into a routine rather than remembering on their own.
 
 A short function that draws and then asserts is one way:
 
@@ -9179,43 +9179,43 @@ def finish(ax, title, xlabel, ylabel):
     return ax
 ```
 
-It enforces the labels, applies the house treatment, and fails if something was skipped.
+It enforces the labels, applies the house treatment, and fails if a thing was skipped.
 
-More generally, the mistakes in this track fall into two groups: things matplotlib will not tell you (clipping, wrong axes, cropped output) and things nobody will tell you (a misleading baseline, an uninterpretable interval, a chart answering the wrong question). The first group is caught by checking; the second only by asking what the chart is for.
+More often, the mistakes in this track fall into two groups. Things matplotlib won't tell you (clipping, wrong axes, cropped output) and things no one will tell you (a misleading baseline, an uninterpretable interval, a chart answering the wrong question). The first group is caught by checking. The second only by asking what the chart is for.
 
 ## The two kinds of error
 
-It is worth separating them, because they are found in different ways.
+It's worth separating them, because they're found in other ways.
 
-**Errors matplotlib could tell you about but does not.** A plot on the wrong axes, a clipped bar, a cropped label, an empty series, a figure never closed. These are mechanical, they have definite answers, and the checks in this module find them in seconds. They are also the ones that produce a chart which is obviously odd once looked at.
+**Errors matplotlib could tell you about but doesn't.** A plot on the wrong axes, a clipped bar, a cropped label, an empty series, a figure never closed. These are rote, they've definite answers. The checks in this module find them in seconds. They're also the ones that give a chart which is obviously odd once looked at.
 
-**Errors nobody can tell you about.** A truncated baseline, an uncentred diverging scale, a dual axis, a mean without a spread, a chart answering a question nobody asked. These produce output that is technically correct and misleading, and no check catches them because nothing is wrong with the code.
+**Errors no one can tell you about.** A truncated baseline, an uncentred diverging scale, a dual axis, a mean without a spread, a chart answering a question no one asked. These give output that is strictly correct and misleading. No check catches them because nothing is wrong with the code.
 
-The first kind is fixed by looking at the chart. The second is fixed by asking what the chart claims and whether the data supports it &mdash; which is a different activity, and the one that matters more.
+The first kind is fixed by looking at the chart. The second is fixed by asking what the chart claims and whether the data supports it. Which is a other activity. The one that matters more.
 
 ## In summary
 
-An empty plot is empty data, all-NaN data, or limits pointing elsewhere; `len(ax.lines)` says whether the draw happened.
+An empty plot is empty data, all-NaN data, or limits pointing elsewhere. `len(ax.lines)` says whether the draw happened.
 
-`plt.plot` lands on the current axes, which is rarely the one you meant.
+`plt.plot` lands on the current axes. This Is rarely the one you meant.
 
-A figure saves at its declared size, so look at the file rather than the screen.
+A figure saves at its declared size. Look at the file rather than the screen.
 
-Limits that exclude data clip it silently, and a too-tall bar looks like any other tall bar.
+Limits that exclude data clip it silently. A too-tall bar looks like any other tall bar.
 
 Colours of similar luminance vanish in greyscale.
 
 Figures left open warn after twenty and keep consuming memory.
 
-And the checklist that catches most of it &mdash; title states the finding, units on the labels, correct baseline, nothing hidden, works without colour, one message, source and date &mdash; takes under a minute and is the difference between a chart that is finished and one that is merely drawn.
+And the checklist that catches most of it. Title states the finding, units on the labels, correct baseline, nothing hidden, works without colour, one message, source and date. Takes under a minute and is the gap between a chart that is finished and one that is merely drawn.
 
 ## A worked debug
 
 A concrete example of the routine, on the most common complaint: "the chart is wrong".
 
-**Look at the data going in.** `df.shape`, `df.head()`, `df.dtypes`, `df.isna().sum()`. About half of all wrong charts are correct renderings of wrong data, and this finds them before any plotting is examined.
+**Look at the data going in.** `df.shape`, `df.head()`, `df.dtypes`, `df.isna().sum()`. About half of all wrong charts are correct renderings of wrong data. This finds them before any plotting is checked.
 
-**Check the artists.** Did the draw call happen, and how many things did it create? A legend with one entry where five were expected means one call drew five lines with one label.
+**Check the artists.** Did the draw call happen. How many things did it create? A legend with one entry where five were expected means one call drew five lines with one label.
 
 **Check the view.** Limits against the data's range.
 
@@ -9225,13 +9225,13 @@ A concrete example of the routine, on the most common complaint: "the chart is w
 
 **Look at it in greyscale.**
 
-The order matters because each step is cheaper than the next, and the first one resolves the majority. The instinct to start by reading matplotlib documentation is usually the slowest available route.
+The order matters because each step is cheaper than the next. The first one resolves the majority. The instinct to start by reading matplotlib docs is often the slowest on hand route.
 
 ## The short version
 
-Two kinds of error: the ones matplotlib could report and does not, and the ones nobody can report because nothing is wrong with the code.
+Two kinds of error: the ones matplotlib could report and doesn't. The ones no one can report because nothing is wrong with the code.
 
-The first are found by looking &mdash; at the data, the artists, the limits, the saved file. The second are found by asking what the chart claims and whether the data supports it, which is the harder and more valuable habit.
+The first are found by looking. At the data, the artists, the limits, the saved file. The second are found by asking what the chart claims and whether the data supports it. This Is the harder and more valuable habit.
 ''',
     [
         {"q": "Your plot is empty. What distinguishes 'the draw never ran' from 'there is nothing to see'?",

@@ -228,7 +228,7 @@ print("only while you stay out of per-row Python.")'''),
     ],
     '''
 title: What pandas Is For
-intro: Columns with names, types and an index, and why that differs from a 2-D array.
+intro: Columns with names, types and an index. Why that differs from a 2-D array.
 
 ## Two structures
 
@@ -236,181 +236,181 @@ intro: Columns with names, types and an index, and why that differs from a 2-D a
 
 `DataFrame` is a set of Series sharing one index. Each column has its own dtype.
 
-That second point is the practical difference from NumPy. A NumPy array has one dtype for the whole block; a DataFrame has one per column. A table with a name, an age, a score and a flag is four dtypes, and that is exactly the shape real data arrives in.
+That second point is the hands-on gap from NumPy. A NumPy array has one dtype for the whole block. A DataFrame has one per column. A table with a name, an age, a score and a flag is four dtypes. That is just the shape real data arrives in.
 
-Convert such a DataFrame to a NumPy array and every column collapses to the one type that can hold all of them &mdash; usually `object`, which is a list of pointers with extra steps. That collapse is worth seeing once, because it explains why pandas exists rather than everyone using arrays.
+Convert such a DataFrame to a NumPy array and each column merges to the one type that can hold all of them. Often `object`. This Is a list of pointers with extra steps. That collapse is worth seeing once. It shows why pandas exists rather than all using arrays.
 
 ## The index does work you did not ask for
 
-The index looks like row numbers, because by default it is `0, 1, 2`. That default hides what it actually is: a labelled axis that participates in almost every operation.
+The index looks like row numbers. By default it's `0, 1, 2`. That default hides what it really is. A labelled axis that participates in almost each step.
 
-Two consequences arrive early and confuse people.
+Two results arrive early and confuse people.
 
-**It survives filtering.** Filter a Series down to two of five rows and the index reads `1, 4`, not `0, 1`. The labels came along. Code that then indexes positionally gets the wrong rows or a `KeyError`.
+**It lives filtering.** Filter a Series down to two of five rows and the index reads `1, 4`, not `0, 1`. The labels came along. Code that then indexes positionally gets the wrong rows or a `KeyError`.
 
-**Arithmetic aligns on it.** Adding two Series matches them up **by label**, not by position. If the labels are in different orders, pandas reorders for you. If one has a label the other lacks, the result is `NaN` there rather than an error.
+**Math aligns on it.** Adding two Series matches them up **by label**, not by spot. If the labels are in other orders, pandas reorders for you. If one has a label the other lacks, the result is `NaN` there rather than an error.
 
-That alignment is a genuine feature &mdash; it is what makes combining data from different sources safe, because mismatches surface as NaN rather than as a silent off-by-one. It is also the single most surprising behaviour for anyone arriving from NumPy, where `+` is strictly positional.
+That alignment is a genuine feature. It's what makes mixing data from other sources safe. Mismatches surface as NaN rather than as a silent off-by-one. It's also the single most surprising action for anyone arriving from NumPy. Here `+` is strictly spot-based.
 
-The index gets a module of its own next, because nearly every pandas confusion traces back to it.
+The index gets a module of its own next. Nearly each pandas confusion traces back to it.
 
 ## Names instead of positions
 
-`df["salary"]` says what it selects. `arr[:, 3]` requires you to remember what column 3 was, and breaks silently when a column is inserted.
+`df["salary"]` says what it selects. `arr[:, 3]` needs you to note what column 3 was. Breaks silently when a column is inserted.
 
-That is not a small ergonomic point. It is most of why pandas code survives contact with changing data, and why a group-by is one line rather than a dict, a loop and a decision about missing keys.
+That isn't a small ergonomic point. It's most of why pandas code lives contact with changing data. Why a group-by is one line rather than a dict, a loop and a choice about missing keys.
 
 ## When to use something else
 
-**Plain Python** for small, one-off, non-tabular work. A hundred records processed once does not justify the import, and a list of dicts is easier to read.
+**Plain Python** for small, one-off, non-tabular work. A hundred records processed once doesn't justify the import. A list of dicts is easier to read.
 
-**NumPy** when the data is genuinely homogeneous and numeric &mdash; a matrix, an image, a signal. pandas adds per-column bookkeeping you are not using, and costs both memory and speed for it.
+**NumPy** when the data is truly homogeneous and numeric. A mat, an image, a signal. pandas adds per-column bookkeeping you aren't using. Costs both memory and speed for it.
 
-**A database** when the data does not fit in memory, or when several processes need it at once. pandas assumes one process and one machine.
+**A DB** when the data doesn't fit in memory, or when a few processes need it at once. pandas assumes one process and one machine.
 
-**Polars or DuckDB** when the data is large and the work is analytical. Both are considerably faster than pandas on big joins and aggregations.
+**Polars or DuckDB** when the data is large and the work is analytical. Both are a lot faster than pandas on big joins and aggregations.
 
-pandas is the right tool for tabular, in-memory, mixed-type data where the questions are column-shaped &mdash; which describes an enormous amount of real work.
+pandas is the right tool for tabular, in-memory, mixed-type data where the questions are column-shaped. Which shows an huge amount of real work.
 
 ## The one performance rule
 
-pandas is a thin, convenient layer over compiled code. It is fast while the work happens inside that compiled layer, and slow the moment it has to call back into Python once per row.
+pandas is a thin, convenient layer over compiled code. It's fast while the work happens inside that compiled layer. Slow the moment it has to call back into Python once per row.
 
-`apply`, `iterrows` and a `for` loop over rows all do exactly that. The last editor measures it, and the gap is large enough that it is usually the whole performance story of a pandas script.
+`apply`, `iterrows` and a `for` loop over rows all do just that. The last editor measures it. The gap is large enough that it's often the whole speed story of a pandas script.
 
-The rule: express operations on **whole columns**. `df["a"] * 2` operates on the column; `df["a"].apply(lambda v: v * 2)` operates on each value from Python and is far slower for the identical result.
+The rule: express steps on **whole columns**. `df["a"] * 2` operates on the column. `df["a"].apply(lambda v: v * 2)` operates on each value from Python and is far slower for the same result.
 
-There are cases where `apply` is unavoidable, and a module later covers them. Most uses of it are not those cases.
+There are cases where `apply` is unavoidable. A module later covers them. Most uses of it aren't those cases.
 
 ## How this track is organised
 
-The index and selection come first, because they cause the most confusion and everything else depends on them &mdash; including the copy warning, which gets a module to itself because nothing else in pandas wastes as much of people's time.
+The index and pick come first. They cause the most confusion and all else depends on them. Including the copy warning. This Gets a module to itself because nothing else in pandas wastes as much of people's time.
 
-Then cleaning: missing values, duplicates, strings, types.
+Then cleaning: missing values, copies, strings, types.
 
 Then the aggregation work that is the reason to use pandas at all: group-by, joins, reshaping.
 
-Then time series, reading and writing files, and performance.
+Then time series, reading and writing files, and speed.
 
-Every module is short runnable programs rather than one long script, so you can change one line and see which rule produced which output.
+each module is short runnable programs rather than one long script. You can change one line and see which rule made which output.
 
 ## Where pandas sits
 
-pandas is built **on** NumPy. Underneath each numeric column is a NumPy array, and the arithmetic that runs on a column is the same compiled code.
+pandas is built **on** NumPy. Underneath each numeric column is a NumPy array. The math that runs on a column is the same compiled code.
 
-What pandas adds is bookkeeping: labels for the rows, names and separate types for the columns, and a large library of operations that assume your data is a table rather than a matrix.
+What pandas adds is bookkeeping: labels for the rows, names and split types for the columns. A large library of steps that assume your data is a table rather than a mat.
 
-That layering explains both its strengths and its costs. Column arithmetic is fast because NumPy is doing it. Anything that has to consult labels, reconcile dtypes, or fall back to Python objects is slower, and that is where pandas code goes wrong.
+That layering shows both its strengths and its costs. Column math is fast because NumPy is doing it. Anything that has to consult labels, merge dtypes, or fall back to Python objects is slower. That is where pandas code goes wrong.
 
-Above pandas sit the tools that consume it: scikit-learn takes DataFrames, matplotlib and seaborn plot them, and most data pipelines pass them around. Knowing the layer below and the layer above tells you when to drop down to NumPy for speed and when to hand off entirely.
+Above pandas sit the tools that consume it. Scikit-learn takes DataFrames, matplotlib and seaborn plot them. Most data pipelines pass them around. Knowing the layer below and the layer above tells you when to drop down to NumPy for speed and when to hand off fully.
 
 ## The vocabulary
 
-A few terms recur constantly, and being precise about them prevents confusion later.
+A few terms recur constantly, and being precise about them blocks confusion later.
 
 **Series** &mdash; one column: values plus an index, with a single dtype.
 
-**DataFrame** &mdash; several Series sharing one index.
+**DataFrame** &mdash; a few Series sharing one index.
 
 **Index** &mdash; the labels for the rows. The column names are also an Index.
 
-**dtype** &mdash; the type of one column. `object` usually means Python strings.
+**dtype** &mdash; the type of one column. `object` often means Python strings.
 
-**Axis** &mdash; `axis=0` is rows, `axis=1` is columns. As in NumPy, the axis you name is generally the one being collapsed or moved along, which is why `df.sum(axis=0)` gives a total per column.
+**Axis** &mdash; `axis=0` is rows, `axis=1` is columns. As in NumPy, the axis you name is often the one being merged or moved along. This Is why `df.sum(axis=0)` gives a total per column.
 
-**NaN / NaT / pd.NA** &mdash; missing markers for floats, datetimes and the nullable types.
+**NaN / NaT / pd.NA**. Missing markers for floats, datetimes and the nullable types.
 
 ## Reading pandas output
 
-Printed output carries more information than it appears to, and reading it saves a great many print statements.
+Printed output carries more data than it appears to. Reading it saves a great many print statements.
 
-The **dtype line** under a Series tells you what you are holding. `int64` and `float64` are numeric; `object` almost always means strings; `datetime64[ns]` means dates have been parsed.
+The **dtype line** under a Series tells you what you're holding. `int64` and `float64` are numeric. `object` almost always means strings. `datetime64[ns]` means dates have been parsed.
 
-The **index** is the left-hand column, and it is not row numbers. If it reads `0, 3, 7` rather than `0, 1, 2`, the frame has been filtered and the original labels came along.
+The **index** is the left-hand column. It isn't row numbers. If it reads `0, 3, 7` rather than `0, 1, 2`, the frame has been filtered and the first labels came along.
 
 `Name:` under a Series gives the column it came from.
 
-`[5 rows x 3 columns]` at the bottom of a truncated frame is the real shape, which matters when the display has elided the middle.
+`[5 rows x 3 columns]` at the bottom of a truncated frame is the real shape. This Matters when the display has elided the middle.
 
-Three things worth setting in a notebook: `pd.set_option("display.max_columns", None)` to stop columns being hidden, `display.width` to control wrapping, and `display.float_format` to stop long decimals dominating a table.
+Three things worth setting in a notebook: `pd.set_option("display.max_columns", None)` to stop columns being hidden, `display.width` to control wrapping. `display.float_format` to stop long decimals dominating a table.
 
 ## A first session
 
-The shape of almost every piece of pandas work is the same:
+The shape of almost each piece of pandas work is the same:
 
 **Load** with `read_csv`, saying what you know about types and dates.
 
-**Look** &mdash; `shape`, `dtypes`, `head`, `info`, `describe`, and `value_counts` on the categorical columns.
+**Look** &mdash; `shape`, `dtypes`, `head`, `info`, `show`, and `value_counts` on the cat columns.
 
-**Clean** &mdash; fix types, handle missing values, normalise text, remove or aggregate duplicates.
+**Clean** &mdash; fix types, handle missing values, norm text, drop or aggregate copies.
 
 **Reshape** &mdash; filter to what matters, join in what is missing, group and aggregate.
 
 **Output** &mdash; a table, a chart, or a file.
 
-Roughly half of real work is in the middle two steps, which is why this track spends most of its modules there rather than on the aggregation everyone thinks of as the interesting part.
+Roughly half of real work is in the middle two steps. This Is why this track spends most of its modules there rather than on the aggregation all thinks of as the notable part.
 
 ## Two habits worth starting with
 
-**Check after every step that changes the shape.** `len(df)` after a filter or a merge, `df.dtypes` after a load or a concat. Most pandas bugs are silent, and the ones that are not silent are usually caught by one of those two lines.
+**Check after each step that changes the shape.** `len(df)` after a filter or a merge, `df.dtypes` after a load or a concat. Most pandas bugs are silent. The ones that aren't silent are often caught by one of those two lines.
 
-**Prefer explicit over clever.** `df.loc[mask, "col"]` over `df[mask]["col"]`, named aggregation over positional, `.copy()` where you mean a copy. The explicit form is nearly always the one that keeps working when the data changes.
+**Prefer clear over clever.** `df.loc[mask, "col"]` over `df[mask]["col"]`, named aggregation over spot-based, `.copy()` where you mean a copy. The clear form is nearly always the one that keeps working when the data changes.
 
 ## Questions that come up first
 
 **Do I need to learn NumPy before pandas?**
 
-Not before, but alongside. pandas hides NumPy most of the time, and then leaks it at exactly the moments that matter &mdash; dtypes, NaN behaviour, broadcasting, views versus copies. Every one of those is a NumPy concept wearing a pandas name, and the modules that cause the most trouble here are the ones where the NumPy layer shows through.
+Not before, but alongside. pandas hides NumPy most of the time. Then leaks it at just the moments that matter. Dtypes, NaN action, broadcasting, views versus copies. each one of those is a NumPy concept wearing a pandas name. The modules that cause the most trouble here are the ones where the NumPy layer shows through.
 
 **Why is my column `object`?**
 
-Because it holds Python objects rather than a uniform numeric type &mdash; almost always strings, sometimes mixed types from a messy source. It is the single most common cause of both slow code and surprising results, and `df.dtypes` is how you find it.
+Because it holds Python objects rather than a uniform numeric type. Almost always strings, at times mixed types from a messy source. It's the single most common cause of both slow code and surprising results. `df.dtypes` is how you find it.
 
-**Why did my integers become floats?**
+**Why did my ints become floats?**
 
-A missing value. NumPy integer arrays cannot hold NaN, so pandas promotes the column. The nullable `Int64` type is the fix.
+A missing value. NumPy int arrays can't hold NaN. Pandas promotes the column. The nullable `Int64` type is the fix.
 
 **Why does my filter return an empty frame?**
 
-Usually a type mismatch &mdash; comparing a string column against a number &mdash; or whitespace and case differences in the values. `value_counts()` on the column shows both immediately.
+often a type mismatch &mdash; checking a string column against a number &mdash; or whitespace and case differences in the values. `value_counts()` on the column shows both at once.
 
 **Should I use pandas or SQL?**
 
-If the data lives in a database and the operation is a filter, join or aggregate, do it in SQL and bring back less data. pandas is for what happens after that, and for data that never was in a database.
+If the data lives in a DB and the step is a filter, join or aggregate, do it in SQL and bring back less data. pandas is for what happens after that. For data that never was in a DB.
 
 ## What this track assumes
 
-That you can read Python, and that you have met lists and dicts. No statistics, no NumPy, and no prior pandas.
+That you can read Python, and that you've met lists and dicts. No statistics, no NumPy, and no prior pandas.
 
-The modules are ordered by dependency rather than by glamour. The index, selection and the copy warning come first because everything later depends on them and because they cause the most confusion. Cleaning comes next, because that is where most real time goes. Group-by, joins and reshaping come after, because they are what people think pandas is for and they only work properly once the earlier material is in place.
+The modules are sorted by dependency rather than by glamour. The index, pick and the copy warning come first because all later depends on them and because they cause the most confusion. Cleaning comes next. That is where most real time goes. Group-by, joins and reshaping come after, because they're what people think pandas is for and they only work properly once the earlier material is in place.
 
-Each module is six short programs and an article. The programs are the point: changing a value and re-running is the fastest way to find out what a rule actually does, and several of them are written so the output contradicts the guess most people would make.
+Each module is six short programs and an article. The programs are the point. Changing a value and re-running is the fastest way to find out what a rule really does. A few of them are written so the output clashes with the guess most people would make.
 
 ## The shortest useful summary
 
 A DataFrame is columns with names and types, sharing an index.
 
-The index takes part in almost everything, including alignment, which is silent.
+The index takes part in almost all, including alignment, which is silent.
 
-Selection is `.loc` for labels and `.iloc` for positions.
+Pick is `.loc` for labels and `.iloc` for spots.
 
-Assignment goes in one `.loc` call, or through an explicit `.copy()`.
+set goes in one `.loc` call, or through an clear `.copy()`.
 
-Operations on whole columns are fast; anything per row is not.
+steps on whole columns are fast. Anything per row isn't.
 
 And when a result surprises you, the answer is nearly always in `df.dtypes`, `df.shape`, or the index &mdash; in that order.
 
 ## A closing note
 
-pandas is a large library, and the temptation is to learn it as a list of methods. That does not work well, because the methods are not the hard part.
+pandas is a large library, and the temptation is to learn it as a list of methods. That doesn't work well. The methods aren't the hard part.
 
-The hard part is a small number of behaviours that run through everything: the index takes part in operations you did not ask it to; a column has one dtype and that dtype decides what is possible; selection returns something whose relationship to the original is not always specified; and anything that runs Python once per row is slow enough to dominate.
+The hard part is a small number of actions that run through all. The index takes part in steps you didn't ask it to. A column has one dtype and that dtype decides what is possible. Pick returns a thing whose link to the first isn't always given. And anything that runs Python once per row is slow enough to dominate.
 
 Those four explain most of what surprises people, and each has a module here.
 
-The methods, by contrast, are searchable. Nobody remembers the argument order of `merge` or the exact spelling of every frequency alias, and nobody needs to.
+The methods, by contrast, are searchable. No one remembers the arg order of `merge` or the exact spelling of each rate alias, and no one needs to.
 
-So the useful thing to take from this track is not coverage but a set of instincts: check `dtypes` after loading, check row counts after joining, know whether you are holding a copy, and stay out of per-row Python.
+So the handy thing to take from this track isn't coverage but a set of instincts. Check `dtypes` after loading, check row counts after joining, know whether you're holding a copy. Stay out of per-row Python.
 ''',
     [
         {"q": "What is the main structural difference between a DataFrame and a 2-D NumPy array?",
@@ -577,203 +577,203 @@ print("sort_index() fixes it:", list(dup.sort_index().loc[1:4]))'''),
     ],
     '''
 title: The Index
-intro: The labelled axis that participates in almost every operation.
+intro: The labelled axis that participates in almost each step.
 
 ## What it is
 
-Every Series and every DataFrame carries an index: an ordered set of labels, one per row. A DataFrame also has an index for its columns.
+each Series and each DataFrame carries an index. An sorted set of labels, one per row. A DataFrame also has an index for its columns.
 
-If you do not supply one, pandas creates a `RangeIndex` of `0, 1, 2, ...`. That default is why the index is easy to overlook &mdash; it looks like row numbers, and for a freshly created frame it behaves like them.
+If you don't supply one, pandas creates a `RangeIndex` of `0, 1, 2, ...`. That default is why the index is easy to overlook. It looks like row numbers. For a freshly created frame it behaves like them.
 
-It is not row numbers. It is a labelled axis that takes part in selection, alignment, joining, grouping and reshaping. Nearly every pandas behaviour that surprises people is the index doing something they did not ask for.
+It isn't row numbers. It's a labelled axis that takes part in pick, alignment, joining, grouping and reshaping. Nearly each pandas action that surprises people is the index doing a thing they didn't ask for.
 
 ## Labels stick to rows
 
-Filter a Series of five values down to three and the surviving rows keep their original labels. The result's index might be `1, 3, 4`.
+Filter a Series of five values down to three and the surviving rows keep their first labels. The result's index might be `1, 3, 4`.
 
-This is correct &mdash; the label identifies the row, and the row did not change identity by being selected &mdash; but it breaks positional habits immediately.
+This is correct &mdash; the label finds the row. The row didn't change identity by being selected &mdash; but it breaks spot-based habits at once.
 
-`big[0]` raises `KeyError`, because there is no label `0` any more. `big.iloc[0]` gets the first row by position. `big.loc[1]` gets the row labelled 1.
+`big[0]` raises `KeyError`, because there's no label `0` any more. `big.iloc[0]` gets the first row by spot. `big.loc[1]` gets the row labelled 1.
 
-Two consequences worth internalising.
+Two results worth internalising.
 
-**After filtering, use `iloc` for position and `loc` for labels**, and know which you mean. The next module is entirely about that distinction.
+**After filtering, use `iloc` for spot and `loc` for labels**. Know which you mean. The next module is fully about that gap.
 
-**`reset_index(drop=True)` renumbers** when you genuinely want a fresh `0..n-1`. Without `drop=True`, the old index is kept as a new column, which is occasionally what you want and usually not.
+**`reset_index(drop=True)` renumbers** when you truly want a fresh `0..n-1`. Without `drop=True`, the old index is kept as a new column. This Is at times what you want and often not.
 
 ## set_index and reset_index
 
-`df.set_index("city")` makes the `city` column the index. Lookups by city then work with `.loc`, joins on city become index joins, and grouping by it is cheaper.
+`df.set_index("city")` makes the `city` column the index. Lookups by city then work with `.loc`, joins on city become index joins, and grouping by it's cheaper.
 
-`df.reset_index()` reverses it, putting the index back as an ordinary column and restoring a `RangeIndex`.
+`df.reset_index()` reverses it, putting the index back as an plain column and restoring a `RangeIndex`.
 
-Setting a meaningful index is worth doing when you will look rows up by that key repeatedly. It is not worth doing reflexively &mdash; an index carries rules, and a frame with a `RangeIndex` is simpler to reason about.
+Setting a real index is worth doing when you'll look rows up by that key again and again. It isn't worth doing reflexively. An index carries rules. A frame with a `RangeIndex` is simpler to reason about.
 
 ## Alignment
 
-This is the behaviour that most distinguishes pandas from NumPy, and it is silent.
+This is the action that most sets apart pandas from NumPy, and it's silent.
 
-When two Series are combined, pandas matches them **by label** before doing anything. Order does not matter. A label present in one and absent from the other produces `NaN` rather than an error.
+When two Series are mixed, pandas matches them **by label** before doing anything. Order doesn't matter. A label present in one and absent from the other makes `NaN` rather than an error.
 
-For addition of two quarterly figures indexed by city, that is exactly right: you want Pune added to Pune, whatever order the rows arrived in, and a city missing from one quarter should be visibly missing rather than silently paired with the wrong row.
+For addition of two quarterly figures indexed by city, that is just right. You want Pune added to Pune, what order the rows arrived in. A city missing from one quarter should be visibly missing rather than silently paired with the wrong row.
 
-It becomes a problem when you did not realise the indexes differed. A common version: you filter a frame, compute a column from it, and assign that column back to the original frame. Alignment matches on the filtered labels, so the rows you filtered out get `NaN` &mdash; which is arguably the right answer, and is rarely what the author expected.
+It turns a problem when you didn't realise the indexes differed. A common version. You filter a frame, find a column from it. Assign that column back to the first frame. Alignment matches on the filtered labels. The rows you filtered out get `NaN`. Which is arguably the right answer, and is rarely what the author expected.
 
-`.values` or `.to_numpy()` strips the index and forces positional behaviour. That is occasionally the right escape hatch, and it silences the safety feature, so it deserves a comment when used.
+`.values` or `.to_numpy()` strips the index and forces spot-based action. That is at times the right escape hatch. It silences the safety feature. It deserves a comment when used.
 
-The arithmetic methods take `fill_value`: `q1.add(q2, fill_value=0)` treats a missing label as zero rather than propagating NaN.
+The math methods take `fill_value`: `q1.add(q2, fill_value=0)` treats a missing label as zero rather than passing NaN.
 
 ## Duplicates
 
-An index may contain the same label more than once. pandas does not prevent it.
+An index may hold the same label more than once. pandas doesn't prevent it.
 
-The consequence is that `s["a"]` returns a **scalar** when `a` appears once and a **Series** when it appears twice. Downstream code written against the scalar case fails when a duplicate appears, and duplicates usually appear in production rather than in the sample used for development.
+The result is that `s["a"]` returns a **scalar** when `a` appears once and a **Series** when it appears twice. Downstream code written against the scalar case fails when a copy appears. Copies often appear in production rather than in the sample used for development.
 
-`s.index.is_unique` checks. `set_index(..., verify_integrity=True)` refuses to build a duplicated index, which is worth passing when uniqueness is part of what the data means.
+`s.index.is_unique` checks. `set_index(..., verify_integrity=True)` refuses to build a duplicated index. This Is worth passing when uniqueness is part of what the data means.
 
-`df.index.duplicated()` gives a mask of the repeats, so you can inspect them rather than guess.
+`df.index.duplicated()` gives a mask of the repeats. So You can inspect them rather than guess.
 
 ## Sorted indexes
 
 `is_monotonic_increasing` tells you whether the index is sorted.
 
-A sorted index allows binary-search lookups, which matters on large frames.
+A sorted index allows binary-search lookups. This Matters on large frames.
 
-It is often said that label-range slicing *requires* a sorted index. That is not quite the rule, and the editor above shows it: a **unique** index slices fine whatever order it is in, because pandas can find each bound unambiguously and take everything between them. What it cannot do is slice a **non-unique, unsorted** index &mdash; there is no single position for a repeated bound, so it raises rather than guessing.
+It's often said that label-range slicing *needs* a sorted index. That isn't quite the rule. The editor above shows it. A **unique** index slices fine what order it's in. Pandas can find each bound unambiguously and take all between them. What it can't do is slice a **non-unique, unsorted** index. There's no single spot for a repeated bound. It raises rather than guessing.
 
-Worth knowing what that slice returns on an unsorted index: everything between the two bounds *in the index's own order*, which is not numeric order. That is rarely what people intend, so `sort_index()` first is still good practice even where it is not required.
+Worth knowing what that slice returns on an unsorted index. All between the two bounds *in the index's own order*. This Isn't numeric order. That is rarely what people intend. `sort_index()` first is still good practice even where it isn't needed.
 
-Note that label slicing with `.loc` is **inclusive of the endpoint**, unlike every other slice in Python. `s.loc[100:200]` includes 200. That is deliberate &mdash; with labels there is no "one past the end" to point at &mdash; and it is a reliable source of off-by-one surprises.
+Note that label slicing with `.loc` is **inclusive of the endpoint**, unlike every other slice in Python. `s.loc[100:200]` includes 200. That is deliberate. With labels there's no "one past the end" to point at. And it's a solid source of off-by-one surprises.
 
-`sort_index()` sorts by the index; `sort_values()` sorts by the data. Both return new objects by default.
+`sort_index()` sorts by the index. `sort_values()` sorts by the data. Both return new objects by default.
 
 ## The habits worth forming
 
-Look at the index when a result surprises you. It is the first thing to check, ahead of the values.
+Look at the index when a result surprises you. It's the first thing to check, ahead of the values.
 
 Call `reset_index(drop=True)` after filtering when downstream code will think positionally.
 
-Prefer `.loc` and `.iloc` over bare `[]`, so that "label" or "position" is written down rather than inferred.
+Prefer `.loc` and `.iloc` over bare `[]`. That "label" or "spot" is written down rather than inferred.
 
-Use `fill_value` when combining objects whose labels may not match exactly.
+Use `fill_value` when mixing objects whose labels may not match just.
 
-And check `is_unique` before relying on a lookup returning one row.
+And check `is_unique` before leaning on a lookup returning one row.
 
 ## Kinds of index
 
-The default is a `RangeIndex` &mdash; a compact `0, 1, 2, ...` that stores only start, stop and step rather than the values.
+The default is a `RangeIndex`. A compact `0, 1, 2, ...` that stores only start, stop and step rather than the values.
 
-`Index` holds arbitrary labels: strings, integers, anything hashable.
+`Index` holds any labels: strings, ints, anything hashable.
 
-`DatetimeIndex` holds timestamps and unlocks partial string selection (`s["2024-02"]`) and `resample`.
+`DatetimeIndex` holds timestamps and unlocks partial string pick (`s["2024-02"]`) and `resample`.
 
-`CategoricalIndex` holds a fixed set of categories, and is memory-efficient for a repeated key.
+`CategoricalIndex` holds a fixed set of groups, and is memory-fast for a repeated key.
 
-`MultiIndex` holds several levels, and is what a group-by on more than one key returns.
+`MultiIndex` holds a few levels, and is what a group-by on more than one key returns.
 
-You rarely choose between these deliberately. They arrive from whatever produced the object, and knowing which you have explains what operations are available.
+You rarely choose between these on purpose. They arrive from what made the object. Knowing which you've shows what steps are on hand.
 
 ## The index is not free
 
-`RangeIndex` costs almost nothing. Any other index stores one label per row, and a string index over a million rows is a million Python strings &mdash; often larger than the numeric columns it labels.
+`RangeIndex` costs almost nothing. Any other index stores one label per row. A string index over a million rows is a million Python strings. Often larger than the numeric columns it labels.
 
-`df.index.dtype` and `df.memory_usage(deep=True)` show it. `reset_index(drop=True)` discards it and returns to a `RangeIndex`, which is worth doing when the labels carry no meaning.
+`df.index.dtype` and `df.memory_usage(deep=True)` show it. `reset_index(drop=True)` discards it and returns to a `RangeIndex`. This Is worth doing when the labels carry no meaning.
 
-That is the practical argument for not setting a meaningful index reflexively: it costs memory, and it only pays if you actually select or join on it.
+That is the hands-on arg for not setting a real index reflexively. It costs memory. It only pays if you really select or join on it.
 
 ## Selecting with an index that is not unique
 
-`is_unique` is worth checking before relying on lookups, because the return type of `s[label]` depends on it.
+`is_unique` is worth checking before leaning on lookups. The return type of `s[label]` depends on it.
 
-With a unique index, `s["a"]` is a scalar. With a duplicated one it is a Series. Code written against the first case &mdash; arithmetic, a comparison, passing the value to a function &mdash; breaks on the second, and the break happens wherever the value is used rather than at the lookup.
+With a unique index, `s["a"]` is a scalar. With a duplicated one it's a Series. Code written against the first case. Math, a compare, passing the value to a function. Breaks on the second. The break happens wherever the value is used rather than at the lookup.
 
-`df.index.duplicated()` gives a mask of the repeats, and `df[df.index.duplicated(keep=False)]` shows every conflicting group.
+`df.index.duplicated()` gives a mask of the repeats, and `df[df.index.duplicated(keep=False)]` shows each conflicting group.
 
-`verify_integrity=True` on `set_index` refuses to build a duplicated index, and is worth passing whenever uniqueness is part of what the data means.
+`verify_integrity=True` on `set_index` refuses to build a duplicated index. Is worth passing when uniqueness is part of what the data means.
 
 ## Aligning on purpose
 
-Alignment is usually helpful and occasionally in the way. Three ways to control it:
+Alignment is often helpful and at times in the way. Three ways to control it:
 
-**Match the indexes** &mdash; `reindex(other.index)` conforms one object to another's labels, filling missing ones with `NaN`. This is alignment made explicit rather than implicit.
+**Match the indexes** &mdash; `reindex(other.index)` conforms one object to another's labels, filling missing ones with `NaN`. This is alignment made clear rather than silent.
 
-**Drop the index** &mdash; `.values` or `.to_numpy()` gives a plain array with no labels, so operations become positional. Use it when you know the order is right and the labels are noise, and comment why.
+**Drop the index** &mdash; `.values` or `.to_numpy()` gives a plain array with no labels. Steps become spot-based. Use it when you know the order is right and the labels are noise, and comment why.
 
-**Reset both** &mdash; `reset_index(drop=True)` on both sides before combining, when they should correspond row-for-row.
+**Reset both** &mdash; `reset_index(drop=True)` on both sides before mixing, when they should match row-for-row.
 
-The failure this prevents is the one from the previous module: two objects that *should* line up, whose indexes have drifted apart because one was filtered, silently producing `NaN` or a much longer result.
+The failure this blocks is the one from the previous module. Two objects that *should* line up, whose indexes have drifted apart because one was filtered, silently making `NaN` or a much longer result.
 
 ## Index methods worth knowing
 
-An Index behaves like an immutable set, and the set operations are occasionally exactly what you need:
+An Index behaves like an immutable set. The set steps are at times just what you need:
 
-`a.index.difference(b.index)` &mdash; labels in one and not the other. The fastest way to find out which rows a join would drop.
+`a.index.gap(b.index)` &mdash; labels in one and not the other. The fastest way to find out which rows a join would drop.
 
 `a.index.intersection(b.index)` &mdash; the common labels.
 
-`idx.get_loc(label)` &mdash; the position of a label, for when you genuinely need to cross from labels to positions.
+`idx.get_loc(label)` &mdash; the spot of a label, for when you truly need to cross from labels to spots.
 
-`idx.str` &mdash; the string accessor works on an Index too, which is how you clean column names in one expression.
+`idx.str` &mdash; the string accessor works on an Index too. This Is how you clean column names in one formula.
 
-Indexes are immutable. You cannot assign into one; you build a new one and attach it. That is deliberate, because a mutable index would break the hash-based lookups that make label selection fast.
+Indexes are immutable. You can't assign into one. You build a new one and attach it. That is deliberate. A mutable index would break the hash-based lookups that make label pick fast.
 
 ## When to set a meaningful index
 
-**Set one** when you will look rows up by that key repeatedly, join on it more than once, or need time-based selection and `resample`.
+**Set one** when you'll look rows up by that key again and again, join on it more than once, or need time-based pick and `resample`.
 
-**Do not set one** when the key is not unique, when you only need it once, or when the result is heading to a file or a merge that expects columns.
+**Don't set one** when the key isn't unique, when you only need it once, or when the result is heading to a file or a merge that expects columns.
 
-`reset_index()` is cheap and always available, so the decision is not permanent &mdash; which is a good reason not to agonise over it.
+`reset_index()` is cheap and always on hand. The choice isn't permanent. Which is a good reason not to agonise over it.
 
 ## Common index mistakes
 
-**Assuming a filtered frame is renumbered.** It is not; `reset_index(drop=True)` renumbers.
+**given a filtered frame is renumbered.** It isn't. `reset_index(drop=True)` renumbers.
 
-**Using `[0]` after a filter.** There may be no label 0. `.iloc[0]` is the position.
+**Using `[0]` after a filter.** There may be no label 0. `.iloc[0]` is the spot.
 
-**Forgetting `drop=True`.** `reset_index()` keeps the old index as a new column, which then travels through every later operation as an unwanted `index` column.
+**Losing `drop=True`.** `reset_index()` keeps the old index as a new column. This Then travels through each later step as an unwanted `index` column.
 
-**Setting an index and then merging on the column.** After `set_index("id")`, there is no `id` column to merge on &mdash; use `left_index=True`, or reset first.
+**Setting an index and then merging on the column.** After `set_index("id")`, there's no `id` column to merge on. Use `left_index=True`, or reset first.
 
-**Assuming alignment is positional.** It is by label. Two Series with the same values in different label orders add to something neither of them looks like.
+**given alignment is spot-based.** It's by label. Two Series with the same values in other label orders add to a thing neither of them looks like.
 
-**Ignoring duplicates.** A lookup that returns a Series instead of a scalar breaks downstream code, and the break happens away from the lookup.
+**Skipping copies.** A lookup that returns a Series instead of a scalar breaks downstream code. The break happens away from the lookup.
 
 ## Reindexing
 
-`reindex` conforms an object to a given set of labels: present labels are kept, absent ones are filled with `NaN`, and labels not in the new set are dropped.
+`reindex` conforms an object to a given set of labels. Present labels are kept, absent ones are filled with `NaN`. Labels not in the new set are dropped.
 
 That makes it the tool for two jobs.
 
-**Making frames comparable.** `b.reindex(a.index)` puts `b` on `a`'s labels, so a subsequent operation aligns exactly and any mismatch is visible as `NaN` rather than silently reordering.
+**Making frames close.** `b.reindex(a.index)` puts `b` on `a`'s labels. A later step aligns just and any mismatch is visible as `NaN` rather than silently reordering.
 
-**Filling out a sparse axis.** Reindexing onto a complete date range turns missing days into explicit `NaN` rows, which is what you want before plotting or before a rolling window over rows.
+**Filling out a sparse axis.** Reindexing onto a full date range turns missing days into clear `NaN` rows. This Is what you want before plotting or before a rolling window over rows.
 
-`fill_value=` sets what the gaps become, and `method="ffill"` carries values forward, which requires a sorted index.
+`fill_value=` sets what the gaps become. `method="ffill"` carries values forward. This Needs a sorted index.
 
 `reindex_like(other)` is the shorthand for the first case.
 
 ## The index in output
 
-The index is written by `to_csv` unless you pass `index=False`, and read back as an unnamed column unless you pass `index_col=0`. That round-trip mismatch is the origin of the `Unnamed: 0` column that appears in so many datasets.
+The index is written by `to_csv` unless you pass `index=False`. Read back as an unnamed column unless you pass `index_col=0`. That round-trip mismatch is the origin of the `Unnamed: 0` column that appears in so many datasets.
 
-`to_dict()`, `to_json()` and `to_excel` all have their own opinions about the index, and all of them are worth checking once for any output that another system consumes.
+`to_dict()`, `to_json()` and `to_excel` all have their own views about the index. All of them are worth checking once for any output that another system consumes.
 
-The rule that avoids most of it: if the index is meaningful data, name it and write it deliberately. If it is not, `reset_index(drop=True)` before writing.
+The rule that avoids most of it: if the index is real data, name it and write it on purpose. If it isn't, `reset_index(drop=True)` before writing.
 
 ## A working summary
 
 The index is a labelled axis, not row numbers.
 
-It survives filtering, and alignment uses it silently.
+It lives filtering, and alignment uses it silently.
 
-`set_index` when you will select or join on the key repeatedly; `reset_index(drop=True)` when you will not.
+`set_index` when you'll select or join on the key again and again. `reset_index(drop=True)` when you won't.
 
-Check `is_unique` before relying on lookups.
+Check `is_unique` before leaning on lookups.
 
 `sort_index()` after building or reshaping anything with a non-trivial index.
 
-And when a result has the wrong number of rows or unexpected `NaN`, look at the indexes of the inputs first. That is the cause more often than anything in the operation itself.
+And when a result has the wrong number of rows or surprise `NaN`, look at the indexes of the inputs first. That is the cause more often than anything in the step itself.
 ''',
     [
         {"q": "After filtering a Series down to 3 of 5 rows, what is `result[0]` likely to do?",
@@ -948,61 +948,61 @@ intro: From dicts, records, arrays and files, and which orientation each assumes
 
 ## The two orientations
 
-Almost every confusion about constructing a DataFrame comes from one question: does this input describe **columns** or **rows**?
+Almost each confusion about making a DataFrame comes from one question: does this input show **columns** or **rows**?
 
-`pd.DataFrame({"a": [1,2,3], "b": [4,5,6]})` describes columns. Each key is a column name and each value is the entire column. This is the most common form and the one to reach for when you have parallel lists.
+`pd.DataFrame({"a": [1,2,3], "b": [4,5,6]})` shows columns. Each key is a column name and each value is the entire column. This is the most common form and the one to reach for when you've parallel lists.
 
-`pd.DataFrame([{"a":1,"b":4}, {"a":2,"b":5}])` describes rows. Each dict is one record. This is the shape data arrives in from an API or a database cursor, and pandas handles it directly.
+`pd.DataFrame([{"a":1,"b":4}, {"a":2,"b":5}])` shows rows. Each dict is one record. This is the shape data arrives in from an API or a DB cursor, and pandas handles it right.
 
-Both produce the same frame. Knowing which one you are writing prevents a transposed result.
+Both give the same frame. Knowing which one you're writing blocks a transposed result.
 
 ## What each form tolerates
 
-**Dict of columns** requires equal lengths and raises otherwise, which is a useful check. A **scalar** value is the exception: it broadcasts to every row, so `{"a": [1,2,3], "flag": True}` gives a flag column of three `True` values.
+**Dict of columns** needs equal lengths and raises else. This Is a handy check. A **scalar** value is the exception. It broadcasts to each row. `{"a": [1,2,3], "flag": True}` gives a flag column of three `True` values.
 
-**List of dicts** does not require the keys to match. Missing keys become `NaN`, and the column order follows first appearance across all records. That tolerance is convenient for messy input and worth watching: a typo in one record's key silently creates a new mostly-empty column rather than raising.
+**List of dicts** doesn't need the keys to match. Missing keys become `NaN`. The column order follows first appearance across all records. That handling is convenient for messy input and worth watching. A typo in one record's key silently creates a new mostly-empty column rather than raising.
 
-**List of lists** works but names the columns `0, 1, 2`. Pass `columns=` unless you genuinely want integer names. Integer column names are legal and lead to real confusion later, because `df[0]` then means a column and looks like positional indexing.
+**List of lists** works but names the columns `0, 1, 2`. Pass `columns=` unless you truly want int names. int column names are legal and lead to real confusion later. `df[0]` then means a column and looks like spot-based indexing.
 
-**Dict of scalars** raises, because pandas cannot tell whether you meant one row or one column. `pd.DataFrame([d])` means one row; `pd.DataFrame.from_dict(d, orient="index")` means one column. The error is good &mdash; guessing here would be worse.
+**Dict of scalars** raises, because pandas can't tell whether you meant one row or one column. `pd.DataFrame([d])` means one row. `pd.DataFrame.from_dict(d, orient="index")` means one column. The error is good. Guessing here would be worse.
 
 ## read_csv
 
-For real data this is the usual entry point, and it does a lot by default: infers a dtype per column, treats the first line as a header, and parses common missing-value markers.
+For real data this is the usual entry point. It does a lot by default. Infers a dtype per column, treats the first line as a header, and parses common missing-value markers.
 
-The arguments worth knowing early:
+The args worth knowing early:
 
-`index_col` sets a column as the index during the read rather than afterwards.
+`index_col` sets a column as the index during the read rather than later.
 
-`usecols` reads only the columns you name, which matters on wide files &mdash; it saves both time and memory.
+`usecols` reads only the columns you name. This Matters on wide files. It saves both time and memory.
 
-`dtype` overrides inference. This is how you stop an identifier column being read as an integer and losing its leading zeros, and how you read a low-cardinality column straight into `category`.
+`dtype` replaces inference. This is how you stop an identifier column being read as an int and losing its leading zeros. How you read a low-cardinality column straight into `group`.
 
-`parse_dates` converts date columns during the read, which is faster than converting afterwards.
+`parse_dates` converts date columns during the read. This Is faster than converting later.
 
-`nrows` reads a sample, which is the right way to inspect a large file before committing to it.
+`nrows` reads a sample. This Is the right way to inspect a large file before committing to it.
 
-It accepts any file-like object, so `io.StringIO` works for testing and for data that is already in memory.
+It accepts any file-like object. So `io.StringIO` works for testing and for data that is already in memory.
 
 ## Type inference and its costs
 
-`read_csv` and the constructors infer types per column. That is usually helpful and occasionally wrong in expensive ways.
+`read_csv` and the constructors infer types per column. That is often helpful and at times wrong in costly ways.
 
-A column of integers with one missing value becomes `float64`, because integer arrays cannot hold NaN. Identifiers then print as `1001.0`.
+A column of ints with one missing value turns `float64`. Int arrays can't hold NaN. Identifiers then print as `1001.0`.
 
-A column that is mostly numbers with one stray non-numeric value becomes `object`, and every subsequent numeric operation on it either fails or silently operates on strings.
+A column that is mostly numbers with one stray non-numeric value turns `object`. Each later numeric step on it either fails or silently operates on strings.
 
-Both are worth checking with `df.dtypes` immediately after loading. It takes one line and catches a category of bug that otherwise surfaces much later.
+Both are worth checking with `df.dtypes` at once after loading. It takes one line and catches a group of bug that else surfaces much later.
 
 ## Never grow a frame
 
-`acc.loc[len(acc)] = row` inside a loop reallocates the entire frame on every iteration. So did `df.append`, which is why it was **removed in pandas 2.0** rather than merely deprecated.
+`acc.loc[len(acc)] = row` inside a loop reallocates the entire frame on each loop. So did `df.append`. This Is why it was **removed in pandas 2.0** rather than merely deprecated.
 
-The correct pattern is the same as NumPy's: collect into a Python list and construct once at the end. Lists append cheaply; DataFrames do not append at all.
+The correct pattern is the same as NumPy's. Collect into a Python list and make once at the end. Lists append cheaply. DataFrames don't append at all.
 
-If the pieces are already frames, `pd.concat(list_of_frames)` once at the end is the right call &mdash; and `pd.concat` inside a loop is exactly the same mistake in a different costume.
+If the pieces are already frames, `pd.concat(list_of_frames)` once at the end is the right call. And `pd.concat` inside a loop is just the same mistake in a other costume.
 
-The last editor measures it. The gap grows with the number of rows, so a pattern that seems acceptable on a hundred records becomes unusable on a hundred thousand.
+The last editor measures it. The gap grows with the number of rows. A pattern that seems acceptable on a hundred records turns unusable on a hundred thousand.
 
 ## Choosing
 
@@ -1016,47 +1016,47 @@ The last editor measures it. The gap grows with the number of rows, so a pattern
 
 **One row from a dict**: `pd.DataFrame([d])`.
 
-And in every case, print `df.dtypes` and `df.shape` immediately afterwards. Those two lines catch most of what goes wrong at the boundary between raw data and pandas.
+And in each case, print `df.dtypes` and `df.shape` at once later. Those two lines catch most of what goes wrong at the boundary between raw data and pandas.
 
 ## From a NumPy array
 
-`pd.DataFrame(arr, columns=[...])` wraps an array. The array has **one** dtype, so every column starts with that dtype until you convert.
+`pd.DataFrame(arr, columns=[...])` wraps an array. The array has **one** dtype. Each column starts with that dtype until you convert.
 
-That matters when the array came from something that widened it. An array of mixed data is `object`, and a DataFrame built from it has every column as `object` &mdash; numeric-looking columns that do not behave numerically.
+That matters when the array came from a thing that widened it. An array of mixed data is `object`. A DataFrame built from it has each column as `object`. Numeric-looking columns that don't behave by number.
 
-`index=` sets the labels at the same time.
+`index=` sets the labels also.
 
-For the reverse direction, `df.to_numpy()` collapses back to a single dtype, and `df.values` is the older spelling of the same thing.
+For the reverse direction, `df.to_numpy()` merges back to a single dtype. `df.values` is the older spelling of the same thing.
 
 ## From a database or an API
 
-`pd.read_sql(query, connection)` runs a query and returns a frame, with column names taken from the result. It accepts a SQLAlchemy connection or a raw DBAPI one.
+`pd.read_sql(query, link)` runs a query and returns a frame, with column names taken from the result. It accepts a SQLAlchemy link or a raw DBAPI one.
 
-`pd.read_json` handles JSON, and `pd.json_normalize` is the one worth knowing: it flattens **nested** JSON into columns, turning `{"user": {"name": "ana"}}` into a `user.name` column. Most API responses need it, and building the frame by hand from nested dicts is the long way round.
+`pd.read_json` handles JSON, and `pd.json_normalize` is the one worth knowing. It flattens **nested** JSON into columns, turning `{"user": {"name": "ana"}}` into a `user.name` column. Most API responses need it, and building the frame by hand from nested dicts is the long way round.
 
-`pd.read_html(url_or_html)` scrapes every table on a page into a list of frames. It is startlingly effective for simple pages and needs `lxml` or `bs4` installed.
+`pd.read_html(url_or_html)` scrapes each table on a page into a list of frames. It's startlingly good for simple pages and needs `lxml` or `bs4` installed.
 
 ## Setting the index at creation
 
 Any of the constructors accept `index=`, and `read_csv` accepts `index_col=`.
 
-Doing it at creation is slightly cheaper than `set_index` afterwards, and more importantly it documents that the column is a key rather than data.
+Doing it at creation is slightly cheaper than `set_index` later. More importantly it docs that the column is a key rather than data.
 
 If the index should be a `DatetimeIndex`, parse the dates in the same call: `read_csv(path, parse_dates=["date"], index_col="date")` gives a time-indexed frame in one step.
 
 ## Empty frames, and why they cause trouble
 
-`pd.DataFrame()` is legal and occasionally useful as a placeholder.
+`pd.DataFrame()` is legal and at times handy as a placeholder.
 
-It is a poor starting point for accumulation, for two reasons. Growing it row by row is quadratic, as the last editor shows. And its columns have no meaningful dtype, so the first `concat` into it can widen everything to `object` &mdash; at which point the frame is slow and the numeric columns are no longer numeric.
+It's a poor starting point for build-up, for two reasons. Growing it row by row is quadratic, as the last editor shows. And its columns have no real dtype. The first `concat` into it can widen all to `object`. At which point the frame is slow and the numeric columns are no longer numeric.
 
 `pd.DataFrame(columns=["a", "b"])` has the same problem with more ceremony.
 
-The pattern to use instead is always the same: build a **list** of rows or of frames, and construct once at the end.
+The pattern to use instead is always the same. Build a **list** of rows or of frames. Make once at the end.
 
 ## Checking what you built
 
-Four lines, immediately after construction, catch most problems at the boundary:
+Four lines, at once after build, catch most problems at the boundary:
 
 ```python
 df.shape        # is this the number of rows I expected?
@@ -1065,65 +1065,65 @@ df.head()       # does the data look like the data?
 df.isna().sum() # where are the gaps?
 ```
 
-The second is the one that earns its keep. Type inference is where most silent damage happens, and it happens exactly once, at construction.
+The second is the one that earns its keep. Type inference is where most silent damage happens. It happens just once, at build.
 
 ## Choosing a constructor
 
 **Parallel lists you already have** &mdash; a dict of columns.
 
-**Records from an API or a cursor** &mdash; a list of dicts, or `json_normalize` if they are nested.
+**Records from an API or a cursor**. A list of dicts, or `json_normalize` if they're nested.
 
-**A file** &mdash; `read_csv`, with `dtype`, `usecols` and `parse_dates` set deliberately.
+**A file** &mdash; `read_csv`, with `dtype`, `usecols` and `parse_dates` set on purpose.
 
-**A query** &mdash; `read_sql`, which names the columns for you.
+**A query** &mdash; `read_sql`. This Names the columns for you.
 
 **A NumPy array** &mdash; the constructor with `columns=`, remembering the single dtype.
 
 **One row from a dict** &mdash; `pd.DataFrame([d])`.
 
-**Accumulated pieces** &mdash; a list, then `pd.DataFrame(rows)` or `pd.concat(frames)` once.
+**built up pieces** &mdash; a list, then `pd.DataFrame(rows)` or `pd.concat(frames)` once.
 
-In every branch, set the dtype at creation rather than converting afterwards. `astype` allocates a second full frame, and getting it right the first time avoids both the copy and the class of bugs where a column silently is not the type you assumed.
+In each branch, set the dtype at creation rather than converting later. `astype` allocates a second full frame. Getting it right the first time avoids both the copy and the class of bugs where a column silently isn't the type you assumed.
 
 ## Reproducible test frames
 
-Small frames written by hand are how you check that an operation does what you think, and it is worth having a habit for them.
+Small frames written by hand are how you check that an step does what you think. It's worth having a habit for them.
 
 A dict of columns is the most readable form for a handful of rows. `pd.DataFrame({"a": [1,2,3], "b": list("xyz")})` fits on one line and shows the columns clearly.
 
-For a frame with a specific index, pass `index=` rather than setting it afterwards.
+For a frame with a exact index, pass `index=` rather than setting it later.
 
-For random test data, seed it: `np.random.default_rng(0)`. Unseeded random test data makes a failing check unreproducible, which is the opposite of what a test is for.
+For random test data, seed it: `np.random.default_rng(0)`. Unseeded random test data makes a failing check unreproducible. This Is the opposite of what a test is for.
 
-`pd.util.testing` used to provide frame generators; the supported route now is `pd.testing.assert_frame_equal` for comparisons, and building the frames yourself.
+`pd.util.testing` used to provide frame gens. The supported route now is `pd.testing.assert_frame_equal` for checks, and building the frames yourself.
 
 ## Checking two frames match
 
-`pd.testing.assert_frame_equal(a, b)` is the precise comparison: values, dtypes, index and column order all have to agree, and the error message says which differed.
+`pd.testing.assert_frame_equal(a, b)` is the precise compare: values, dtypes, index and column order all have to agree. The error message says which differed.
 
-`check_dtype=False` relaxes the type comparison, which is often necessary when one side came through a CSV.
+`check_dtype=False` relaxes the type compare. This Is often needed when one side came through a CSV.
 
-`check_like=True` ignores row and column order.
+`check_like=True` skips row and column order.
 
-This is what belongs in a test, rather than `a.equals(b)`, because when it fails it tells you *what* failed.
+This is what belongs in a test, rather than `a.equals(b)`. When it fails it tells you *what* failed.
 
 ## Copy semantics at construction
 
-`pd.DataFrame(some_array)` does **not** always copy. If the array's dtype and layout are usable directly, pandas may wrap it, and writing to the frame then writes to the array.
+`pd.DataFrame(some_array)` does **not** always copy. If the array's dtype and layout are usable right, pandas may wrap it. Writing to the frame then writes to the array.
 
-`copy=True` forces a copy. Under copy-on-write this stops mattering, which is another reason that change is welcome.
+`copy=True` forces a copy. Under copy-on-write this stops mattering. This Is another reason that change is welcome.
 
-`pd.DataFrame(dict_of_series)` aligns the Series on their indexes, which is easy to forget: three Series with different labels produce a frame with the union of them and `NaN` in the gaps, not three columns side by side.
+`pd.DataFrame(dict_of_series)` aligns the Series on their indexes. This Is easy to forget. Three Series with other labels give a frame with the union of them and `NaN` in the gaps, not three columns side by side.
 
 If you meant "these are parallel columns", reset the indexes first or pass plain lists.
 
 ## The construction checklist
 
-Decide whether the input describes rows or columns.
+Decide whether the input shows rows or columns.
 
 Pass `columns=` if the source has no names.
 
-Set `dtype` at construction, especially for identifiers and for integers that may have gaps.
+Set `dtype` at build, above all for identifiers and for ints that may have gaps.
 
 Set `index=` if a column is really a key.
 
@@ -1135,25 +1135,25 @@ That is six lines of discipline that prevent most of what the cleaning modules e
 
 ## A closing note
 
-Construction is where a frame's types are decided, and types decided badly here cause problems everywhere afterwards.
+build is where a frame's types are decided. Types decided badly here cause problems all over later.
 
-The two questions worth answering deliberately are whether the input describes rows or columns, and what the dtypes should be. Getting the first wrong gives a transposed frame that is immediately obvious. Getting the second wrong gives a frame that looks correct and behaves oddly much later.
+The two questions worth answering on purpose are whether the input shows rows or columns. What the dtypes should be. Getting the first wrong gives a transposed frame that is at once obvious. Getting the second wrong gives a frame that looks correct and behaves oddly much later.
 
-`dtype=` at construction costs nothing. `astype` afterwards allocates a second copy of every column it touches, and by then the leading zeros may already be gone.
+`dtype=` at build costs nothing. `astype` later allocates a second copy of each column it touches. By then the leading zeros may already be gone.
 
-The other rule is the one shared with NumPy: never grow a frame in a loop. Collect into a list and construct once. `df.loc[len(df)] = row` and `pd.concat` inside a loop are the same quadratic mistake wearing different syntax, and `df.append` was removed rather than merely deprecated because of it.
+The other rule is the one shared with NumPy. Never grow a frame in a loop. Collect into a list and make once. `df.loc[len(df)] = row` and `pd.concat` inside a loop are the same quadratic mistake wearing other syntax. `df.append` was removed rather than merely deprecated because of it.
 
 ## One more thing
 
-`pd.DataFrame.from_records` handles an iterable of tuples with a `columns` argument, and accepts an `index` naming one of the fields. It is the constructor that fits a database cursor most directly, since cursors yield tuples rather than dicts.
+`pd.DataFrame.from_records` handles an iterable of tuples with a `columns` arg. Accepts an `index` naming one of the fields. It's the constructor that fits a DB cursor most right. Cursors yield tuples rather than dicts.
 
-And `pd.concat` of many small frames is usually faster than building one large list of dicts when the pieces are already frames &mdash; the rule is to avoid the loop, not to prefer one container over the other.
+And `pd.concat` of many small frames is often faster than building one large list of dicts when the pieces are already frames. The rule is to avoid the loop, not to prefer one holder over the other.
 
 ## In summary
 
-Decide whether the input describes rows or columns, set the dtypes at construction, and check `shape`, `dtypes` and `head` immediately afterwards.
+Decide whether the input shows rows or columns, set the dtypes at build. Check `shape`, `dtypes` and `head` at once later.
 
-Never grow a frame in a loop &mdash; collect into a list and build once. `df.append` was removed rather than deprecated because of exactly that pattern.
+Never grow a frame in a loop. Collect into a list and build once. `df.append` was removed rather than deprecated because of just that pattern.
 ''',
     [
         {"q": "What does `pd.DataFrame({'a': [1,2,3], 'flag': True})` produce?",
@@ -1311,25 +1311,25 @@ intro: The six calls to make before writing any analysis.
 
 ## Why this comes before anything else
 
-Most pandas bugs are not bugs in pandas. They are assumptions about the data that were never checked: a column that is text where you expected numbers, an identifier that lost its leading zeros, a category with four spellings, a date column that is still strings.
+Most pandas bugs aren't bugs in pandas. They're assumptions about the data that were never checked. A column that is text where you expected numbers, an identifier that lost its leading zeros, a group with four spellings, a date column that is still strings.
 
-None of these raise. They produce plausible output that is wrong, and the error surfaces much later, somewhere unrelated.
+None of these raise. They give plausible output that is wrong. The error surfaces much later, one spot unrelated.
 
 Six calls catch nearly all of it, and together they take under a minute.
 
 ## shape and dtypes
 
-`df.shape` gives `(rows, columns)`. It confirms the file loaded as expected, and catches the case where a delimiter was misread and everything landed in one column.
+`df.shape` gives `(rows, columns)`. It confirms the file loaded as expected. Catches the case where a delimiter was misread and all landed in one column.
 
-`df.dtypes` is the important one. Three failures show up here and nowhere else:
+`df.dtypes` is the key one. Three failures show up here and nowhere else:
 
-**An identifier read as an integer.** `001` becomes `1`, and the leading zeros are gone permanently. Fix at read time with `dtype={"id": str}`.
+**An identifier read as an int.** `001` turns `1`. The leading zeros are gone permanently. Fix at read time with `dtype={"id": str}`.
 
-**An integer column turned float** because one value is missing. NumPy integers cannot hold NaN, so pandas promotes. The symptom downstream is ids printing as `1001.0`.
+**An int column turned float** because one value is missing. NumPy ints can't hold NaN. Pandas promotes. The symptom downstream is ids printing as `1001.0`.
 
-**A numeric column read as `object`** because one row contains a stray non-numeric value. Every later numeric operation then either fails or silently operates on strings.
+**A numeric column read as `object`** because one row holds a stray non-numeric value. each later numeric step then either fails or silently operates on strings.
 
-Running these two lines immediately after loading is the highest-value habit in this module.
+Running these two lines at once after loading is the highest-value habit in this module.
 
 ## head, tail, sample
 
@@ -1339,45 +1339,45 @@ Look at the data. Not the summary &mdash; the actual rows.
 
 `tail()` catches trailing junk: summary rows, blank lines, a footer the exporter added.
 
-`sample(n, random_state=0)` shows the middle, which is where the surprises usually live. Passing `random_state` makes it reproducible, which matters if you are going to discuss what you saw.
+`sample(n, random_state=0)` shows the middle. This Is where the surprises often live. Passing `random_state` makes it reproducible. This Matters if you're going to discuss what you saw.
 
 ## info
 
 `df.info()` prints dtypes, non-null counts and memory usage together.
 
-The non-null count is the part to read carefully. Compare it against the row count for each column: a column with 400 non-null out of 10,000 rows is effectively empty and any analysis using it is built on 4% of the data.
+The non-null count is the part to read carefully. Compare it against the row count for each column. A column with 400 non-null out of 10,000 rows is in effect empty and any analysis using it's built on 4% of the data.
 
-`memory_usage="deep"` gives the true cost of object columns, which the default underestimates badly because it counts the pointers rather than the strings they point at.
+`memory_usage="deep"` gives the true cost of object columns. This The default underestimates badly because it counts the pointers rather than the strings they point at.
 
 ## describe
 
-`df.describe()` gives count, mean, standard deviation, min, max and quartiles for **numeric columns only**.
+`df.show()` gives count, mean, standard deviation, min, max and quartiles for **numeric columns only**.
 
-`include="all"` adds text columns, reporting count, unique, top and frequency for them instead.
+`include="all"` adds text columns, reporting count, unique, top and rate for them instead.
 
-The most useful reading of it is the **mean against the median** (the 50% row). When they are far apart, the distribution is skewed or contains outliers, and every mean-based summary you were about to compute will mislead. A `mean` of 220 with a `50%` of 30 is telling you something important before you have written any analysis.
+The most handy reading of it's the **mean against the median** (the 50% row). When they're far apart, the spread is skewed or holds outliers. Each mean-based summary you were about to find will mislead. A `mean` of 220 with a `50%` of 30 is telling you a thing key before you've written any analysis.
 
-`min` and `max` are also worth a glance for impossible values: a negative age, a date in 1900, a price of zero.
+`min` and `max` are also worth a glance for hopeless values. A minus age, a date in 1900, a price of zero.
 
 ## Missing values
 
-`df.isna().sum()` counts them per column. `df.isna().mean()` gives the proportion, which is easier to judge than a raw count.
+`df.isna().sum()` counts them per column. `df.isna().mean()` gives the proportion. This Is easier to judge than a raw count.
 
-`df.isna().any(axis=1).sum()` counts rows affected by any missing value &mdash; the number you would lose to `dropna()`, and often much larger than any single column's count.
+`df.isna().any(axis=1).sum()` counts rows affected by any missing value. The number you'd lose to `dropna()`. Often much larger than any single column's count.
 
-Doing this before deciding how to handle missing data means the decision is informed rather than reflexive. Dropping 2% of rows is different from dropping 60%.
+Doing this before deciding how to handle missing data means the choice is informed rather than reflexive. Dropping 2% of rows is other from dropping 60%.
 
 ## value_counts
 
-For every text or categorical column, run `value_counts()`.
+For each text or cat column, run `value_counts()`.
 
-It finds, in one line: typos, inconsistent capitalisation, trailing whitespace, unexpected categories, and cardinality far higher than expected (often a sign the column is really an identifier).
+It finds, in one line: typos, inconsistent capitalisation, trailing whitespace, surprise groups. Cardinality far higher than expected (often a sign the column is really an identifier).
 
-The last editor shows two cities appearing as four values &mdash; `pune`, `Pune`, and `pune ` with a trailing space. A group-by on that column would produce four groups, and nothing would warn you.
+The last editor shows two cities appearing as four values. `pune`, `Pune`. `pune ` with a trailing space. A group-by on that column would give four groups, and nothing would warn you.
 
-`dropna=False` includes missing values in the count, which is otherwise invisible here.
+`dropna=False` includes missing values in the count. This Is else invisible here.
 
-`normalize=True` gives shares rather than counts, which is the right form when comparing distributions between datasets.
+`norm=True` gives shares rather than counts. This Is the right form when checking spreads between datasets.
 
 ## A starting routine
 
@@ -1393,21 +1393,21 @@ df.isna().mean()
 
 Then `value_counts()` on each text column.
 
-It is not glamorous and it is not optional. Every one of these calls has a specific failure it catches, and the alternative is finding that failure later, in a result you have already shown someone.
+It isn't glamorous and it isn't optional. each one of these calls has a exact failure it catches. The option is finding that failure later, in a result you've already shown someone.
 
 ## Making the display readable
 
-Default display settings hide things, and hidden data is data you will not check.
+Default display settings hide things, and hidden data is data you won't check.
 
-`pd.set_option("display.max_columns", None)` stops columns being elided into `...`, which is the single most useful setting on a wide frame.
+`pd.set_option("display.max_columns", None)` stops columns being elided into `...`. This Is the single most handy setting on a wide frame.
 
 `pd.set_option("display.width", 200)` controls wrapping.
 
 `pd.set_option("display.max_rows", 100)` shows more before truncating.
 
-`pd.set_option("display.float_format", "{:.2f}".format)` stops fifteen decimal places dominating every table.
+`pd.set_option("display.float_format", "{:.2f}".format)` stops fifteen decimal places dominating each table.
 
-These affect display only, never the data. In a notebook they are worth putting in the first cell.
+These affect display only, never the data. In a notebook they're worth putting in the first cell.
 
 ## Reading info carefully
 
@@ -1417,29 +1417,29 @@ These affect display only, never the data. In a notebook they are worth putting 
 
 **Non-Null Count** per column, against that row count. This is the fastest way to find a column that is mostly empty.
 
-**Dtype** per column. `object` on something that should be numeric is a problem; `float64` on something that should be integer usually means a missing value.
+**Dtype** per column. `object` on a thing that should be numeric is a problem. `float64` on a thing that should be int often means a missing value.
 
 **Memory usage**, which needs `memory_usage="deep"` to be truthful about text columns.
 
-A column with, say, 400 non-null out of 200,000 rows is effectively empty. Any analysis using it is built on 0.2% of the data, and it is better to know that before building the analysis than after presenting it.
+A column with, say, 400 non-null out of 200,000 rows is in effect empty. Any analysis using it's built on 0.2% of the data. It's better to know that before building the analysis than after presenting it.
 
 ## describe, beyond the defaults
 
-`percentiles=[0.01, 0.5, 0.99]` changes which quantiles are shown. The 1st and 99th are often more informative than the quartiles for spotting outliers.
+`percentiles=[0.01, 0.5, 0.99]` changes which quantiles are shown. The 1st and 99th are often more helpful than the quartiles for spotting outliers.
 
 `include="all"` adds non-numeric columns, reporting `count`, `unique`, `top` and `freq` for them.
 
 `include=["object"]` or `exclude=["number"]` restrict it.
 
-`df.describe().T` transposes the result, which is much easier to read when there are many columns &mdash; one row per column instead of one column per column.
+`df.show().T` transposes the result. This Is much easier to read when there are many columns. One row per column instead of one column per column.
 
 Three readings worth making a habit:
 
 **mean against 50%** &mdash; far apart means skew or outliers.
 
-**min and max** &mdash; look for impossible values: a negative age, a zero price, a date in 1900.
+**min and max** &mdash; look for hopeless values: a minus age, a zero price, a date in 1900.
 
-**std of zero** &mdash; a constant column, which carries no information and is often a sign something upstream went wrong.
+**std of zero** &mdash; a constant column. This Carries no data and is often a sign a thing upstream went wrong.
 
 ## Looking at the missing rows, not just counting them
 
@@ -1449,19 +1449,19 @@ Counting missing values tells you how much. Looking at *which* rows are missing 
 df[df["income"].isna()].head()
 ```
 
-If those rows share something &mdash; the same source, the same date range, the same category &mdash; then the data is not missing at random, and both dropping and imputing will bias the result.
+If those rows share a thing. The same source, the same date range, the same group &mdash; then the data isn't missing at random. Both dropping and imputing will bias the result.
 
-`df.isna().sum(axis=1).value_counts()` shows how many rows have 0, 1, 2... missing values. A long tail means a few badly broken rows; a big spike at one value often means an entire column is absent for a subset of the data.
+`df.isna().sum(axis=1).value_counts()` shows how many rows have 0, 1, 2... missing values. A long tail means a few badly broken rows. A big spike at one value often means an entire column is absent for a subset of the data.
 
 ## Comparing two frames
 
-When something changes and you want to know what, three tools:
+When a thing changes and you want to know what, three tools:
 
 `df.equals(other)` &mdash; exact, including dtypes.
 
-`df.compare(other)` &mdash; shows only the cells that differ, side by side. It requires identical shape and labels, which makes it right for before-and-after checks on the same data.
+`df.compare(other)` &mdash; shows only the cells that differ, side by side. It needs same shape and labels. This Makes it right for before-and-after checks on the same data.
 
-`set(a.columns) ^ set(b.columns)` &mdash; the symmetric difference of column names, which is usually where the discrepancy is.
+`set(a.columns) ^ set(b.columns)` &mdash; the even gap of column names. This Is often where the discrepancy is.
 
 ## The routine, as a block
 
@@ -1480,11 +1480,11 @@ for c in df.select_dtypes("object"):
     print(df[c].value_counts(dropna=False).head())
 ```
 
-That is a minute of work and it answers most of the questions you would otherwise discover the hard way: what types things are, where the gaps are, which categories are messy, and whether the file is what you were told it was.
+That is a minute of work and it answers most of the questions you'd else discover the hard way. What types things are. Here The gaps are. This Groups are messy. Whether the file is what you were told it was.
 
 ## Profiling a frame quickly
 
-For a fast overall picture beyond `describe`, three one-liners cover most of it:
+For a fast total picture beyond `show`, three one-liners cover most of it:
 
 ```python
 df.nunique().sort_values()                      # cardinality per column
@@ -1492,11 +1492,11 @@ df.isna().mean().sort_values(ascending=False)   # missingness per column
 df.memory_usage(deep=True).sort_values(ascending=False)
 ```
 
-Cardinality is the most under-used of the three. A column with one distinct value carries no information. A column with as many distinct values as rows is an identifier, not a feature. Everything interesting is in between, and the ranking tells you which columns are which without opening any of them.
+Cardinality is the most under-used of the three. A column with one distinct value carries no data. A column with as many distinct values as rows is an identifier, not a feature. all notable is in between. The ranking tells you which columns are which without opening any of them.
 
 ## Checking assumptions explicitly
 
-Looking at data is better than not looking, and asserting is better than looking, because an assertion keeps checking after you stop paying attention.
+Looking at data is better than not looking. Asserting is better than looking. An assertion keeps checking after you stop paying focus.
 
 ```python
 assert df["id"].is_unique
@@ -1505,59 +1505,59 @@ assert set(df["status"]) <= {"open", "closed"}
 assert df["date"].notna().all()
 ```
 
-Each of these encodes something you believe about the data. When the belief stops being true &mdash; a new export, a changed upstream system &mdash; the script stops rather than producing a quietly wrong answer.
+Each of these codes a thing you believe about the data. When the belief stops being true. A new export, a changed upstream system. The script stops rather than making a quietly wrong answer.
 
-That is worth more than any amount of exploratory looking, because the looking happens once and the assertions happen every run.
+That is worth more than any amount of exploratory looking. The looking happens once and the assertions happen each run.
 
 ## The shape of a first pass
 
 The order matters, because each step informs the next.
 
-**Shape and dtypes** &mdash; is this the file I think it is?
+**Shape and dtypes** &mdash; is this the file I think it's?
 
 **head, tail, sample** &mdash; does the data look like data?
 
 **info** &mdash; where are the gaps and how big is this?
 
-**describe** &mdash; are there impossible or extreme values?
+**show** &mdash; are there hopeless or extreme values?
 
-**value_counts on categoricals** &mdash; are the categories what I expect, and how many are there?
+**value_counts on cats** &mdash; are the groups what I expect, and how many are there?
 
 **Missingness pattern** &mdash; are the gaps random or structured?
 
-Only then is it worth writing any analysis. Every one of these steps has caught, for someone, a problem that would otherwise have surfaced in a result presented to someone else.
+Only then is it worth writing any analysis. each one of these steps has caught, for someone, a problem that would else have surfaced in a result presented to someone else.
 
 ## Two habits that pay repeatedly
 
-**Look at the rows you are about to drop.** Before `dropna`, before a filter, before deduplication &mdash; `df[mask].head()`. If the rows you are discarding share a pattern, you are not removing noise, you are removing a category.
+**Look at the rows you're about to drop.** Before `dropna`, before a filter, before deduplication. `df[mask].head()`. If the rows you're discarding share a pattern, you aren't dropping noise, you're dropping a group.
 
-**Compare counts before and after every step that can change them.** A filter, a merge, a group-by, a concat. One number, checked, catches silent row multiplication and silent row loss, which between them account for a large share of wrong answers in data work.
+**Compare counts before and after each step that can change them.** A filter, a merge, a group-by, a concat. One number, checked, catches silent row product and silent row loss. This Between them account for a large share of wrong answers in data work.
 
 ## A closing note
 
-Every one of these calls exists because someone shipped a wrong answer that one of them would have caught.
+each one of these calls exists because someone shipped a wrong answer that one of them would have caught.
 
-The routine is short enough to run without thinking about it, and the discipline is to run it **before** writing any analysis rather than after a result looks odd. By the time a number looks wrong, the cheap explanations have been ruled out and the expensive debugging has started.
+The routine is short enough to run without thinking about it. The discipline is to run it **before** writing any analysis rather than after a result looks odd. By the time a number looks wrong, the cheap reasons have been ruled out and the costly debugging has started.
 
-The single highest-value line is `df.dtypes`. It catches the identifier read as an integer, the date left as text, and the numeric column turned into strings by one stray value &mdash; three failures that produce plausible output and no error.
+The single highest-value line is `df.dtypes`. It catches the identifier read as an int, the date left as text. The numeric column turned into strings by one stray value. Three failures that give plausible output and no error.
 
-The second is `value_counts` on the categorical columns, which finds the variants that would silently split a group-by.
+The second is `value_counts` on the cat columns. This Finds the variants that would silently split a group-by.
 
-Neither takes more than a few seconds, and together they answer most of what you need to know about a file you have not seen before.
+Neither takes more than a few seconds. Together they answer most of what you need to know about a file you haven't seen before.
 
 ## One more thing
 
-`df.head()` and `df.tail()` can be combined into one view with `pd.concat([df.head(3), df.tail(3)])`, which shows both ends of a sorted frame at once &mdash; useful when the interesting rows are the extremes.
+`df.head()` and `df.tail()` can be mixed into one view with `pd.concat([df.head(3), df.tail(3)])`. This Shows both ends of a sorted frame at once. handy when the notable rows are the extremes.
 
-And `df.sample(frac=1)` shuffles the whole frame, which is occasionally the honest way to look at data that arrived in a meaningful order, since the first rows of a sorted file are not representative of anything.
+And `df.sample(frac=1)` shuffles the whole frame. This Is at times the honest way to look at data that arrived in a real order. The first rows of a sorted file aren't representative of anything.
 
 ## In summary
 
-Six calls, run before any analysis, catch most of what goes wrong: `shape`, `dtypes`, `head`/`sample`, `info`, `describe`, and `value_counts` on the categorical columns.
+Six calls, run before any analysis, catch most of what goes wrong: `shape`, `dtypes`, `head`/`sample`, `info`, `show`. `value_counts` on the cat columns.
 
-`dtypes` is the one that earns its place. It reveals the identifier read as a number, the date still stored as text, and the numeric column turned into strings by a single stray value &mdash; three failures that produce plausible output and no error at all.
+`dtypes` is the one that earns its place. It reveals the identifier read as a number, the date still stored as text. The numeric column turned into strings by a single stray value. Three failures that give plausible output and no error at all.
 
-And an assertion is worth more than a look, because the look happens once and the assertion happens every run.
+And an assertion is worth more than a look. The look happens once and the assertion happens each run.
 ''',
     [
         {"q": "Why check `df.dtypes` immediately after loading?",
@@ -1723,33 +1723,33 @@ print("loc call. Two sets of brackets is where trouble starts.")'''),
     ],
     '''
 title: loc and iloc
-intro: Label or position, and the endpoint rule that differs between them.
+intro: Label or spot, and the endpoint rule that differs between them.
 
 ## The distinction
 
 `.loc` selects by **label** &mdash; the values in the index.
 
-`.iloc` selects by **position** &mdash; where the row sits, from 0.
+`.iloc` selects by **spot** &mdash; where the row sits, from 0.
 
-On a freshly created frame the index is `0, 1, 2, ...`, so label and position are the same number and the two behave identically. That coincidence is why the difference goes unnoticed until something breaks it: a filter, a sort, a join, a `set_index`.
+On a freshly created frame the index is `0, 1, 2, ...`. Label and spot are the same number and the two behave the same way. That coincidence is why the gap goes unnoticed until a thing breaks it. A filter, a sort, a join, a `set_index`.
 
-After any of those, `df.loc[0]` and `df.iloc[0]` can refer to different rows &mdash; or `.loc[0]` can raise `KeyError` because no row is labelled 0 any more.
+After any of those, `df.loc[0]` and `df.iloc[0]` can refer to other rows. Or `.loc[0]` can raise `KeyError` because no row is labelled 0 any more.
 
-Writing `.loc` or `.iloc` explicitly, rather than bare `df[...]`, makes the choice visible. Bare brackets guess, and the guess changes with the argument type: `df["age"]` is a column, `df[0:2]` is rows by position, `df[mask]` is rows by condition. Three meanings for one syntax is a lot to hold, and the explicit accessors cost four characters.
+Writing `.loc` or `.iloc` by name, rather than bare `df[...]`, makes the choice visible. Bare brackets guess. The guess changes with the arg type: `df["age"]` is a column, `df[0:2]` is rows by spot, `df[mask]` is rows by rule. Three meanings for one syntax is a lot to hold. The clear accessors cost four characters.
 
 ## The endpoint rule
 
-This is the one that catches everyone.
+This is the one that catches all.
 
-`df.iloc[1:4]` gives positions 1, 2, 3 &mdash; the end is **excluded**, exactly like a list slice.
+`df.iloc[1:4]` gives spots 1, 2, 3. The end is **excluded**, just like a list slice.
 
-`df.loc["b":"d"]` gives labels b, c **and d** &mdash; the end is **included**.
+`df.loc["b":"d"]` gives labels b, c **and d**. The end is **included**.
 
-The reason is that labels have no natural "one past the end". With positions you can point at index 4 to mean "stop before here". With arbitrary labels &mdash; strings, dates, non-contiguous integers &mdash; there is no such thing as the label after `d`, so pandas includes it.
+labels have no natural "one past the end". With spots you can point at index 4 to mean "stop before here". With any labels. Strings, dates, non-contiguous ints. There's no such thing as the label after `d`, so pandas includes it.
 
-The practical consequence: on a default index, `df.loc[1:3]` returns **three** rows and `df.iloc[1:3]` returns **two**. Both look correct in isolation.
+The hands-on result: on a default index, `df.loc[1:3]` returns **three** rows and `df.iloc[1:3]` returns **two**. Both look correct in alone.
 
-Label slicing also requires a sorted index when the labels are not unique or not monotonic; otherwise it raises rather than guessing.
+Label slicing also needs a sorted index when the labels aren't unique or not monotonic. Else it raises rather than guessing.
 
 ## Two axes
 
@@ -1761,85 +1761,85 @@ Each part can be a single value, a list, a slice or (for `.loc`) a boolean mask.
 
 `df.loc[:, "age"]` is a whole column. `df.loc["r2"]` is a whole row, returned as a Series whose index is the column names.
 
-This two-axis form is the one to prefer, and not only for brevity. `df.loc[mask, "col"]` is a single indexing operation on a single object, which is what makes assignment through it reliable. `df[mask]["col"]` is two operations, the first of which may have produced a copy &mdash; and that is the subject of the next module.
+This two-axis form is the one to prefer. Not only for brevity. `df.loc[mask, "col"]` is a single indexing step on a single object. This Is what makes set through it solid. `df[mask]["col"]` is two steps, the first of which may have made a copy. And that is the subject of the next module.
 
 ## Boolean masks
 
-Masks go in `.loc`. `df.loc[df["age"] >= 25]` selects matching rows, and `df.loc[df["age"] >= 25, ["name", "city"]]` selects matching rows and named columns in one call.
+Masks go in `.loc`. `df.loc[df["age"] >= 25]` selects matching rows. `df.loc[df["age"] >= 25, ["name", "city"]]` selects matching rows and named columns in one call.
 
-`.iloc` does not accept a labelled boolean Series. It will take a plain list or array of booleans, but not a Series, because a Series carries an index and `.iloc` is defined to ignore labels &mdash; accepting one would be ambiguous. The error is deliberate.
+`.iloc` doesn't accept a labelled boolean Series. It will take a plain list or array of booleans. Not a Series. A Series carries an index and `.iloc` is defined to skip labels. Accepting one would be ambiguous. The error is deliberate.
 
 If you need to use a mask positionally, `.to_numpy()` on it strips the index.
 
 ## at and iat
 
-For a single cell, `.at` (label) and `.iat` (position) are faster than `.loc` and `.iloc`, because they skip the machinery that handles slices, lists and masks.
+For a single cell, `.at` (label) and `.iat` (spot) are faster than `.loc` and `.iloc`. They skip the machinery that handles slices, lists and masks.
 
-The difference is small for one call and substantial in a loop, as the fifth editor measures.
+The gap is small for one call and large in a loop, as the fifth editor measures.
 
-They also raise if you ask for more than one cell, which makes them self-documenting: seeing `.at` in code tells you the author meant exactly one value.
+They also raise if you ask for more than one cell. This Makes them self-documenting. Seeing `.at` in code tells you the author meant just one value.
 
-That said, a loop over cells is usually the wrong shape for the problem. `.at` makes a loop faster; removing the loop makes it unnecessary.
+That said, a loop over cells is often the wrong shape for the problem. `.at` makes a loop faster. Dropping the loop makes it not needed.
 
 ## Assignment
 
-The rule is short: **one `.loc` call, with both the row and column selection inside it**.
+The rule is short: **one `.loc` call, with both the row and column pick inside it**.
 
 ```python
 df.loc[df["age"] < 30, "age"] = 30
 ```
 
-pandas can see this is a single indexing operation on `df` itself, so it writes to `df`.
+pandas can see this is a single indexing step on `df` itself. It writes to `df`.
 
 ```python
 df[df["age"] < 30]["age"] = 30
 ```
 
-does not reliably work. The first bracket produces a new object, and the assignment may write to that temporary rather than to `df`. Historically this raised `SettingWithCopyWarning`; in current pandas it may silently do nothing.
+doesn't well work. The first bracket makes a new object. The set may write to that temporary rather than to `df`. Once this raised `SettingWithCopyWarning`. In current pandas it may silently do nothing.
 
-Assigning a column for a subset of rows fills the unselected rows with `NaN`, which is usually what you want and is worth expecting rather than discovering.
+Assigning a column for a subset of rows fills the unselected rows with `NaN`. This Is often what you want and is worth expecting rather than discovering.
 
 ## A working summary
 
-Use `.loc` when you mean labels, `.iloc` when you mean positions, and write one of them rather than bare brackets.
+Use `.loc` when you mean labels, `.iloc` when you mean spots. Write one of them rather than bare brackets.
 
-Remember that `.loc` slices include the endpoint.
+note that `.loc` slices include the endpoint.
 
-Put row and column selection in the same call.
+Put row and column pick in the same call.
 
-Use `.at`/`.iat` for a single cell if you are in a loop, and consider whether the loop should exist.
+Use `.at`/`.iat` for a single cell if you're in a loop. Consider whether the loop should exist.
 
-And after any filter or sort, be aware that positions and labels have parted company &mdash; which is the source of most of the confusion these two accessors exist to prevent.
+And after any filter or sort, be aware that spots and labels have parted company. Which is the source of most of the confusion these two accessors exist to prevent.
 
 ## What bare brackets do
 
-`df[...]` guesses from the argument, and the guess changes with the type:
+`df[...]` guesses from the arg, and the guess changes with the type:
 
 `df["age"]` &mdash; a **column**, returned as a Series.
 
-`df[["age", "city"]]` &mdash; several **columns**, returned as a DataFrame.
+`df[["age", "city"]]` &mdash; a few **columns**, returned as a DataFrame.
 
-`df[0:2]` &mdash; **rows** by position.
+`df[0:2]` &mdash; **rows** by spot.
 
 `df["a":"c"]` &mdash; **rows** by label.
 
-`df[mask]` &mdash; **rows** by condition.
+`df[mask]` &mdash; **rows** by rule.
 
-Five behaviours, two axes, one syntax. It reads well for the common case &mdash; selecting a column &mdash; and is a genuine source of confusion for everything else, because the same brackets sometimes mean rows and sometimes columns.
+Five actions, two axes, one syntax. It reads well for the common case. Selecting a column. And is a genuine source of confusion for all else. The same brackets at times mean rows and at times columns.
 
-`.loc` and `.iloc` remove the guessing. That is the argument for using them even where bare brackets would work.
+`.loc` and `.iloc` drop the guessing. That is the arg for using them even where bare brackets would work.
 
-One consequence worth knowing: on a Series, `s[0]` is ambiguous when the index is integers. Is `0` a label or a position? pandas treats it as a **label**, which raises if there is no label 0 even when there are plenty of rows. This ambiguity is why the positional-only accessor exists.
+One result worth knowing: on a Series, `s[0]` is ambiguous when the index is ints. Is `0` a label or a spot? pandas treats it as a **label**. This Raises if there's no label 0 even when there are plenty of rows. This ambiguity is why the spot-based-only accessor exists.
 
 ## Callable selection
 
-Both accessors accept a **function** that receives the object and returns a selection:
+Both accessors accept a **function** that receives the object and returns a pick:
 
 ```python
 df.loc[lambda d: d["age"] > 30]
 ```
 
-That looks like extra syntax for the same thing, and it earns its place in a chain, where `df` may not be the object being selected from:
+That looks like extra syntax for the same thing. It earns its place in a chain. Here `df` may not be the object being selected from:
 
 ```python
 (df.query("year == 2024")
@@ -1847,25 +1847,25 @@ That looks like extra syntax for the same thing, and it earns its place in a cha
    .loc[lambda d: d["total"] > 100])
 ```
 
-Without the lambda, the final `loc` would have to reference an intermediate that does not have a name.
+Without the lambda, the final `loc` would have to link an mid that doesn't have a name.
 
 ## Selecting columns by type or name pattern
 
-`df.select_dtypes(include="number")` picks columns by dtype, and `exclude=` is the inverse. This is how you apply an operation to every numeric column without listing them.
+`df.select_dtypes(include="number")` picks columns by dtype, and `exclude=` is the inverse. This is how you apply an step to each numeric column without listing them.
 
-`df.filter(like="date")` selects columns whose name contains a substring; `regex=` takes a pattern; `items=` takes an explicit list.
+`df.filter(like="date")` selects columns whose name holds a substring. `regex=` takes a pattern. `items=` takes an clear list.
 
-Both return a frame, so they compose with everything else. They are considerably more robust than a hard-coded column list when the source data gains or loses columns.
+Both return a frame, so they compose with all else. They're a lot more robust than a hard-coded column list when the source data gains or loses columns.
 
 ## Setting values
 
-The rules for assignment through `.loc` are worth stating explicitly, because each has a failure mode.
+The rules for set through `.loc` are worth stating by name. Each has a failure mode.
 
 **A scalar broadcasts**: `df.loc[mask, "col"] = 0` fills every selected row.
 
-**A list or array must match the selection length exactly**, and goes in positionally.
+**A list or array must match the pick length just**, and goes in positionally.
 
-**A Series aligns on the index**, so labels that are not in the selection are ignored and labels missing from it become `NaN`.
+**A Series aligns on the index**. Labels that aren't in the pick are skipped and labels missing from it become `NaN`.
 
 **A new column created for a subset** leaves `NaN` in the unselected rows.
 
@@ -1873,91 +1873,91 @@ The rules for assignment through `.loc` are worth stating explicitly, because ea
 
 ## Enlargement
 
-`.loc` can create rows and columns that do not exist:
+`.loc` can create rows and columns that don't exist:
 
 `df.loc["new_row"] = [...]` adds a row. `df.loc[:, "new_col"] = ...` adds a column.
 
-`.iloc` **cannot** &mdash; a position that does not exist is an error, since there is no sensible position to create.
+`.iloc` **can't** &mdash; a spot that doesn't exist is an error. There's no sensible spot to create.
 
-Enlargement is convenient for one addition and is the quadratic anti-pattern in a loop. It is the mechanism behind `df.loc[len(df)] = row`, which is the slow way to build a frame.
+Enlargement is convenient for one addition and is the quadratic anti-pattern in a loop. It's the method behind `df.loc[len(df)] = row`. This Is the slow way to build a frame.
 
 ## A summary
 
-Use `.loc` for labels and `.iloc` for positions, and write one of them rather than relying on bare brackets to guess.
+Use `.loc` for labels and `.iloc` for spots. Write one of them rather than leaning on bare brackets to guess.
 
-Remember `.loc` slices include the endpoint and `.iloc` slices do not.
+note `.loc` slices include the endpoint and `.iloc` slices don't.
 
-Put both selections in one call, especially when assigning.
+Put both picks in one call, above all when assigning.
 
-Use `.at`/`.iat` for a single cell in a loop, and consider whether the loop is necessary.
+Use `.at`/`.iat` for a single cell in a loop. Consider whether the loop is needed.
 
 Use `select_dtypes` and `filter` instead of hard-coded column lists when the schema may change.
 
-And after any filter or sort, remember that labels and positions have parted company &mdash; which is the confusion these accessors exist to prevent.
+And after any filter or sort, note that labels and spots have parted company. Which is the confusion these accessors exist to prevent.
 
 ## Copy or view, briefly
 
-Whether `.loc` returns a view or a copy is deliberately unspecified, and depends on the internal block layout.
+Whether `.loc` returns a view or a copy is on purpose unspecified. Depends on the inner block layout.
 
-That is the whole reason the copy warning exists, and it is why the guidance in this module is phrased as "put both selections in one call" rather than "select and then assign".
+That is the whole reason the copy warning exists. It's why the guidance in this module is phrased as "put both picks in one call" rather than "select and then assign".
 
-Under copy-on-write, selections always behave as copies and the ambiguity disappears &mdash; but the one-call rule remains correct, because it is also clearer.
+Under copy-on-write, picks always behave as copies and the ambiguity disappears. But the one-call rule remains correct, because it's also clearer.
 
 ## Selecting a single row or column
 
-`df.loc["r2"]` returns a **Series** whose index is the column names. That means the row's values are forced into one dtype: a row containing an integer and a string comes back as `object`, and the integer is now an object.
+`df.loc["r2"]` returns a **Series** whose index is the column names. That means the row's values are forced into one dtype. A row holding an int and a string comes back as `object`. The int is now an object.
 
-That is a real hazard when iterating rows or passing a row to a function. It is the same problem `iterrows` has, for the same reason.
+That is a real hazard when iterating rows or passing a row to a function. It's the same problem `iterrows` has, for the same reason.
 
 `df.loc[["r2"]]` &mdash; a list rather than a scalar &mdash; returns a one-row **DataFrame** instead, preserving each column's dtype. When the dtypes matter, that is the form to use.
 
-The same distinction applies to columns: `df["a"]` is a Series, `df[["a"]]` is a one-column frame.
+The same gap applies to columns: `df["a"]` is a Series, `df[["a"]]` is a one-column frame.
 
 ## Common errors and what they mean
 
-**`KeyError`** on `.loc` &mdash; the label does not exist. Often because the frame was filtered and the labels changed, or because the key is a string where you passed an integer.
+**`KeyError`** on `.loc` &mdash; the label doesn't exist. Often because the frame was filtered and the labels changed, or because the key is a string where you passed an int.
 
-**`IndexError`** on `.iloc` &mdash; the position is out of range.
+**`IndexError`** on `.iloc` &mdash; the spot is out of range.
 
-**"Cannot mask with non-boolean array containing NA / NaN values"** &mdash; a `.str` predicate without `na=False`.
+**"Can't mask with non-boolean array holding NA / NaN values"**. A `.str` predicate without `na=False`.
 
-**"The truth value of a Series is ambiguous"** &mdash; `and`/`or` where `&`/`|` was needed, or a missing pair of parentheses.
+**"The truth value of a Series is ambiguous"**. `and`/`or` where `&`/`|` was needed, or a missing pair of parentheses.
 
-**"cannot reindex on an axis with duplicate labels"** &mdash; the index has repeats and the operation needs uniqueness.
+**"can't reindex on an axis with copy labels"**. The index has repeats and the step needs uniqueness.
 
-**`SettingWithCopyWarning`** &mdash; two indexing operations on the left of an assignment.
+**`SettingWithCopyWarning`** &mdash; two indexing steps on the left of an set.
 
-Each of these has one usual cause, and recognising them saves more time than any amount of general debugging.
+Each of these has one usual cause. Recognising them saves more time than any amount of general debugging.
 
 ## A short reference
 
 `df["col"]` &mdash; one column, as a Series.
 
-`df[["a", "b"]]` &mdash; several columns, as a frame.
+`df[["a", "b"]]` &mdash; a few columns, as a frame.
 
 `df.loc[rows, cols]` &mdash; by label, endpoint inclusive.
 
-`df.iloc[rows, cols]` &mdash; by position, endpoint exclusive.
+`df.iloc[rows, cols]` &mdash; by spot, endpoint exclusive.
 
 `df.at[row, col]` / `df.iat[i, j]` &mdash; one cell, fast.
 
-`df.loc[mask]` &mdash; rows by condition.
+`df.loc[mask]` &mdash; rows by rule.
 
-`df.loc[mask, "col"] = value` &mdash; the only assignment form worth using.
+`df.loc[mask, "col"] = value` &mdash; the only set form worth using.
 
 `df.select_dtypes(...)` / `df.filter(...)` &mdash; columns by type or name pattern.
 
 ## A closing note
 
-The distinction is small to state and causes a disproportionate amount of confusion, because on a freshly loaded frame label and position are the same number.
+The gap is small to state and causes a disproportionate amount of confusion. On a freshly loaded frame label and spot are the same number.
 
-They part company the first time anything filters, sorts, joins or reindexes &mdash; and from then on `df.loc[0]` and `df.iloc[0]` may be different rows, or `.loc[0]` may raise because no row is labelled 0 any more.
+They part company the first time anything filters, sorts, joins or reindexes. And from then on `df.loc[0]` and `df.iloc[0]` may be other rows, or `.loc[0]` may raise because no row is labelled 0 any more.
 
-Writing `.loc` or `.iloc` rather than bare brackets makes the choice explicit, which matters because bare brackets guess differently depending on what you hand them: a column for a string, rows for a slice, rows for a mask.
+Writing `.loc` or `.iloc` rather than bare brackets makes the choice clear. This Matters because bare brackets guess differently based on what you hand them. A column for a string, rows for a slice, rows for a mask.
 
-The endpoint rule is the other thing to carry: `.loc` slices include the last label, `.iloc` slices do not. On a default index the two forms differ by exactly one row, and both look correct.
+The endpoint rule is the other thing to carry: `.loc` slices include the last label, `.iloc` slices don't. On a default index the two forms differ by just one row, and both look correct.
 
-And for assignment there is only one form worth using &mdash; a single `.loc` with the rows and the column both inside it.
+And for set there's only one form worth using. A single `.loc` with the rows and the column both inside it.
 ''',
     [
         {"q": "On a default index, how many rows does `df.loc[1:3]` return?",
@@ -2123,16 +2123,16 @@ print("   original still has", len(df), "rows")'''),
     ],
     '''
 title: Filtering Rows
-intro: Masks, isin, between and query, and the parenthesis rule that catches everyone.
+intro: Masks, isin, between and query, and the parenthesis rule that catches all.
 ## A mask is a Series
 
-`df["age"] >= 25` does not return rows. It returns a boolean Series, one value per row, carrying the same index as the frame.
+`df["age"] >= 25` doesn't return rows. It returns a boolean Series, one value per row, carrying the same index as the frame.
 
-You then hand that mask to `.loc`, and pandas keeps the rows where it is `True`.
+You then hand that mask to `.loc`, and pandas keeps the rows where it's `True`.
 
-Because the mask is an ordinary Series, everything you know applies to it. `mask.sum()` counts matches, since `True` is 1. `mask.mean()` gives the proportion. `~mask` inverts it. It can be stored in a variable, named, and reused.
+Because the mask is an plain Series, all you know applies to it. `mask.sum()` counts matches. `True` is 1. `mask.mean()` gives the proportion. `~mask` inverts it. It can be stored in a var, named, and reused.
 
-Naming masks is worth doing when a filter has several parts:
+Naming masks is worth doing when a filter has a few parts:
 
 ```python
 adult = df["age"] >= 18
@@ -2141,96 +2141,96 @@ recent = df["days"] < 30
 df.loc[adult & local & recent]
 ```
 
-Each name documents a condition, and each can be counted separately when the result is unexpectedly empty &mdash; which is how you find out which clause is doing the damage.
+Each name docs a rule, and each can be counted apart when the result is unexpectedly empty. Which is how you find out which clause is doing the damage.
 
 ## The parenthesis rule
 
 This is the single most common syntax error in pandas.
 
-`df["age"] > 20 & df["age"] < 35` does not mean what it looks like. In Python, `&` binds **tighter** than `>`, so this parses as `df["age"] > (20 & df["age"]) < 35`. The result is an error or, worse, something plausible.
+`df["age"] > 20 & df["age"] < 35` doesn't mean what it looks like. In Python, `&` binds **tighter** than `>`. This parses as `df["age"] > (20 & df["age"]) < 35`. The result is an error or, worse, a thing plausible.
 
-Every condition needs its own parentheses: `(df["age"] > 20) & (df["age"] < 35)`.
+each rule needs its own parentheses: `(df["age"] > 20) & (df["age"] < 35)`.
 
-The related mistake is `and` instead of `&`. Python's `and` needs a single truth value and a Series has many, so it raises "The truth value of a Series is ambiguous". That message always means the same thing: use `&`, and add parentheses.
+The related mistake is `and` instead of `&`. Python's `and` needs a single truth value and a Series has many. It raises "The truth value of a Series is ambiguous". That message always means the same thing: use `&`, and add parentheses.
 
-The three operators are `&` (and), `|` (or), `~` (not). There is no way to make Python's precedence rules cooperate here, so parenthesising becomes a reflex.
+The three ops are `&` (and), `|` (or), `~` (not). There's no way to make Python's precedence rules cooperate here. Parenthesising turns a reflex.
 
 ## isin and between
 
-`df["city"].isin(["pune", "goa"])` is clearer and faster than `(df["city"] == "pune") | (df["city"] == "goa")`, and it scales to a list of any length &mdash; including one computed at runtime.
+`df["city"].isin(["pune", "goa"])` is clearer and faster than `(df["city"] == "pune") | (df["city"] == "goa")`. It scales to a list of any length. Including one found at runtime.
 
-`df["age"].between(25, 31)` is inclusive of both ends by default. The `inclusive` argument takes `"both"`, `"left"`, `"right"` or `"neither"`, which is worth passing explicitly whenever the boundary matters, because the default is not what everyone assumes.
+`df["age"].between(25, 31)` is inclusive of both ends by default. The `inclusive` arg takes `"both"`, `"left"`, `"right"` or `"neither"`. This Is worth passing by name when the boundary matters. The default isn't what all assumes.
 
 `~` negates either of them.
 
 ## Missing values fail everything
 
-Every comparison involving `NaN` is `False`. That includes `>`, `<`, `==` and `!=`.
+each compare involving `NaN` is `False`. That includes `>`, `<`, `==` and `!=`.
 
-The consequence is specific and easy to miss: `df[df["x"] > 2]` and `df[df["x"] <= 2]` do **not** partition the frame. Rows where `x` is missing are absent from both, and the two counts do not add up to the row count.
+The result is exact and easy to miss: `df[df["x"] > 2]` and `df[df["x"] <= 2]` do **not** split the frame. Rows where `x` is missing are absent from both. The two counts don't add up to the row count.
 
-This is usually the right default &mdash; an unknown value genuinely does not satisfy a condition &mdash; but it means "everything else" is not the same as "the negation of this condition" whenever missing data is possible.
+This is often the right default. An unknown value truly doesn't meet a rule. But it means "all else" isn't the same as "the negation of this rule" when missing data is possible.
 
-When missing rows should be handled rather than dropped, say so explicitly with `isna()`, or fill before filtering.
+When missing rows should be handled rather than dropped, say so by name with `isna()`, or fill before filtering.
 
 ## query
 
-`df.query("age > 20 and score > 7")` takes the condition as a string.
+`df.query("age > 20 and score > 7")` takes the rule as a string.
 
-Inside the string, column names are bare identifiers, `and`/`or`/`not` work normally, and no parentheses are needed for precedence. That makes long conditions much easier to read than the operator form.
+Inside the string, column names are bare identifiers, `and`/`or`/`not` work most times. No parentheses are needed for precedence. That makes long rules much easier to read than the op form.
 
-`@name` references a Python variable: `df.query("age > @cutoff")`.
+`@name` links a Python var: `df.query("age > @cutoff")`.
 
 `in` and `not in` work against lists.
 
-The costs: column names with spaces need backticks, there is no editor autocompletion or type checking inside a string, and a typo becomes a runtime error rather than something a linter catches. `query` also has a small parsing overhead per call, which is irrelevant once and noticeable in a loop.
+The costs: column names with spaces need backticks, there's no editor autocompletion or type checking inside a string. A typo turns a runtime error rather than a thing a linter catches. `query` also has a small parsing cost per call. This Is irrelevant once and noticeable in a loop.
 
-Use it when a condition is long enough that the operator form is hard to read. Use operators otherwise.
+Use it when a rule is long enough that the op form is hard to read. Use ops else.
 
 ## Filtering copies
 
-`df.loc[mask]` returns a **new** frame. The original is untouched, and the result keeps the original index labels rather than renumbering.
+`df.loc[mask]` returns a **new** frame. The first is untouched. The result keeps the first index labels rather than renumbering.
 
-Both facts matter downstream. The surviving labels mean positional code breaks, and `reset_index(drop=True)` is the fix when you want a clean `0..n-1`.
+Both facts matter downstream. The surviving labels mean spot-based code breaks. `reset_index(drop=True)` is the fix when you want a clean `0..n-1`.
 
-That the result is new &mdash; and specifically that it may be a copy rather than a view of the original &mdash; is what makes assigning into a filtered frame unreliable. That is the subject of the next module, and it is the single largest source of confusion in pandas.
+That the result is new. And namely that it may be a copy rather than a view of the first &mdash; is what makes assigning into a filtered frame unreliable. That is the subject of the next module. It's the single largest source of confusion in pandas.
 
 ## A summary
 
-Build masks with comparisons, combine with `& | ~`, and parenthesise everything.
+Build masks with checks, combine with `& | ~`, and parenthesise all.
 
-Prefer `isin` and `between` where they fit; they say what you mean.
+Prefer `isin` and `between` where they fit. They say what you mean.
 
-Remember NaN fails every test, so a condition and its negation are not a partition.
+note NaN fails each test. So A rule and its negation aren't a split.
 
-Reach for `query` when the expression is long, and for operators when it is short.
+Reach for `query` when the formula is long, and for ops when it's short.
 
 And know that the result is a new object whose index came along for the ride.
 
 ## Filtering on more than one column
 
-Conditions on different columns combine exactly like conditions on one:
+Rules on other columns combine just like rules on one:
 
 ```python
 df.loc[(df["age"] >= 18) & (df["city"] == "pune")]
 ```
 
-For a variable number of conditions &mdash; built from user input, or a config &mdash; combine them programmatically:
+For a var number of rules. Built from user input, or a config &mdash; combine them programmatically:
 
 ```python
 from functools import reduce
 mask = reduce(lambda a, b: a & b, conditions)
 ```
 
-`np.logical_and.reduce(conditions)` does the same thing. Either is better than building a query string, which loses type checking and invites injection if any part comes from outside.
+`np.logical_and.reduce(rules)` does the same thing. Either is better than building a query string. This Loses type checking and invites injection if any part comes from outside.
 
 ## Filtering by index rather than data
 
 `df.loc[["a", "c"]]` selects by label and **raises** if a label is missing.
 
-`df.reindex(["a", "c", "zz"])` selects by label and fills missing ones with `NaN` instead. The difference matters when you are conforming one frame to another's labels and absence is expected.
+`df.reindex(["a", "c", "zz"])` selects by label and fills missing ones with `NaN` instead. The gap matters when you're conforming one frame to another's labels and lack is expected.
 
-`df[df.index.isin(wanted)]` filters by membership without requiring every label to exist.
+`df[df.index.isin(wanted)]` filters by membership without needing each label to exist.
 
 `df.index.str.startswith("2024")` works when the labels are strings, since an Index has the `.str` accessor too.
 
@@ -2238,37 +2238,37 @@ mask = reduce(lambda a, b: a & b, conditions)
 
 The common task of "keep rows whose key appears in this other table" has two forms.
 
-`df[df["id"].isin(other["id"])]` is the direct one, and it is usually what you want. It cannot change the row count upward and needs no thought about join semantics.
+`df[df["id"].isin(other["id"])]` is the direct one, and it's often what you want. It can't change the row count upward and needs no thought about join semantics.
 
-`df.merge(other[["id"]], on="id")` does the same thing as an inner join, and **can** multiply rows if `other` has duplicate ids. `isin` cannot.
+`df.merge(other[["id"]], on="id")` does the same thing as an inner join. **can** times rows if `other` has copy ids. `isin` can't.
 
-For "keep rows whose key does **not** appear", `~isin` is the whole answer, where the join equivalent needs an outer join with an indicator and a filter. This is one of the places `isin` is clearly better than a merge.
+For "keep rows whose key does **not** appear", `~isin` is the whole answer. Here The join equal needs an outer join with an indicator and a filter. This is one of the places `isin` is clearly better than a merge.
 
 ## nlargest, sample and head as filters
 
-Not every subset comes from a condition.
+Not each subset comes from a rule.
 
-`df.nlargest(10, "sales")` &mdash; the top ten by a column, without sorting everything.
+`df.nlargest(10, "sales")` &mdash; the top ten by a column, without sorting all.
 
 `df.sample(n=100, random_state=0)` &mdash; a random subset, reproducible with the seed. `frac=0.1` takes a proportion.
 
-`df.head(1000)` &mdash; the first thousand, which is only meaningful if the order means something.
+`df.head(1000)` &mdash; the first thousand. This Is only real if the order means a thing.
 
 `df.drop_duplicates(subset=["id"])` &mdash; one row per key.
 
 ## Performance
 
-Filtering builds a boolean mask the length of the frame, then copies the matching rows. Both cost time proportional to the data.
+Filtering builds a boolean mask the length of the frame, then copies the matching rows. Both cost time scaled to the data.
 
 Three things that help on large frames:
 
-**Combine conditions before selecting.** `df[(a) & (b)]` allocates one result; `df[a][b]` allocates two.
+**Combine rules before selecting.** `df[(a) & (b)]` allocates one result. `df[a][b]` allocates two.
 
-**Filter before computing**, not after. Every operation downstream then touches fewer rows &mdash; usually the largest structural win available.
+**Filter before finding**, not after. each step downstream then touches fewer rows. Often the largest structural win on hand.
 
-**Use a category dtype** for the columns you filter on repeatedly. Comparison then runs on integer codes rather than strings.
+**Use a group dtype** for the columns you filter on again and again. compare then runs on int codes rather than strings.
 
-`query` has a small parsing overhead per call, which is irrelevant once and measurable in a loop. It can also use `numexpr` for very large frames, which occasionally makes it faster than the operator form rather than slower.
+`query` has a small parsing cost per call. This Is irrelevant once and measurable in a loop. It can also use `numexpr` for very large frames. This At times makes it faster than the op form rather than slower.
 
 ## The mistakes, collected
 
@@ -2276,17 +2276,17 @@ Three things that help on large frames:
 
 **`and` instead of `&`.** The "truth value is ambiguous" error always means this.
 
-**Forgetting `na=False`** on a `.str` predicate, which raises as soon as the data has a gap.
+**Losing `na=False`** on a `.str` predicate. This Raises as soon as the data has a gap.
 
-**Assuming a condition and its negation partition the frame.** They do not, when values can be missing.
+**given a rule and its negation split the frame.** They don't, when values can be missing.
 
-**Chained assignment on a filtered frame.** `df[mask]["col"] = x` &mdash; the subject of its own module, and the most expensive mistake here.
+**Chained set on a filtered frame.** `df[mask]["col"] = x`. The subject of its own module. The most costly mistake here.
 
-**Forgetting the index came along.** `reset_index(drop=True)` when downstream code thinks positionally.
+**Losing the index came along.** `reset_index(drop=True)` when downstream code thinks positionally.
 
 ## Filters that read well
 
-A filter is a statement about the data, and it is worth writing it as one.
+A filter is a statement about the data, and it's worth writing it as one.
 
 Naming masks does most of the work:
 
@@ -2298,66 +2298,66 @@ recent   = df["date"] >= cutoff
 df.loc[is_adult & in_scope & recent]
 ```
 
-Three benefits beyond readability: each mask can be counted separately when the result is unexpectedly empty; the masks can be reused for a complementary selection; and the combining line reads as the sentence it represents.
+Three gains beyond readability: each mask can be counted apart when the result is unexpectedly empty. The masks can be reused for a complementary pick. And the mixing line reads as the sentence it shows.
 
-For a filter that appears in several places, a small function returning the mask keeps the definition in one place:
+For a filter that appears in a few places, a small function returning the mask keeps the meaning in one place:
 
 ```python
 def active(d):
     return (d["status"] == "open") & d["closed_at"].isna()
 ```
 
-`df.loc[active(df)]` then means the same thing everywhere, and changing the definition changes it everywhere.
+`df.loc[active(df)]` then means the same thing all over. Changing the meaning changes it all over.
 
 ## Debugging an empty result
 
-When a filter returns nothing, the cause is nearly always one of five things, and they can be checked in about a minute.
+When a filter returns nothing, the cause is nearly always one of five things. They can be checked in about a minute.
 
 **A type mismatch.** `df["id"] == 1` against a string column matches nothing. Check `df["id"].dtype`.
 
 **Whitespace or case.** `df["city"] == "Pune"` against `"pune "`. Check `df["city"].value_counts().head(20)`.
 
-**Missing values.** They fail every comparison, so a condition can exclude more than you think.
+**Missing values.** They fail each compare. So A rule can exclude more than you think.
 
-**An `&` that should be `|`.** Conditions that cannot be true simultaneously.
+**An `&` that should be `|`.** Rules that can't be true at once.
 
-**A stale variable.** In a notebook, `df` is not what the cell above assumed.
+**A stale var.** In a notebook, `df` isn't what the cell above assumed.
 
-Counting each condition separately &mdash; `is_adult.sum()`, `in_scope.sum()` &mdash; identifies which clause is responsible in one step, which is far quicker than reasoning about the combination.
+Counting each rule apart &mdash; `is_adult.sum()`, `in_scope.sum()` &mdash; finds which clause is in charge in one step. This Is far quicker than thinking about the mix.
 
 ## Filtering and the copy warning
 
-`sub = df[mask]` produces a new frame whose relationship to `df` is deliberately unspecified.
+`sub = df[mask]` makes a new frame whose link to `df` is on purpose unspecified.
 
-Anything you then assign into `sub` may or may not affect `df`. This is the single most common route into the copy warning, and it is worth deciding at the point of filtering rather than at the point of assignment:
+Anything you then assign into `sub` may or may not affect `df`. This is the single most common route into the copy warning. It's worth deciding at the point of filtering rather than at the point of set:
 
-`sub = df[mask].copy()` if `sub` is a separate dataset.
+`sub = df[mask].copy()` if `sub` is a split dataset.
 
 `df.loc[mask, "col"] = ...` if you meant to change `df`.
 
-Adding `.copy()` to a filter you intend to modify costs seven characters and removes the question entirely.
+Adding `.copy()` to a filter you intend to modify costs seven characters and drops the question fully.
 
 ## A closing note
 
-Filtering is the most-used operation in pandas and has two persistent gotchas, both syntactic and both cheap to avoid.
+Filtering is the most-used step in pandas and has two persistent gotchas, both syntactic and both cheap to avoid.
 
-Parenthesise every condition, because `&` binds tighter than the comparison operators and the unparenthesised version parses into something else entirely. And use `&`, `|`, `~` rather than `and`, `or`, `not`, which need a single truth value that a Series cannot provide.
+Parenthesise each rule, because `&` binds tighter than the compare ops and the unparenthesised version parses into a thing else fully. And use `&`, `|`, `~` rather than `and`, `or`, `not`. This Need a single truth value that a Series can't provide.
 
-The semantic gotcha is missing values. They fail every comparison, so a condition and its negation do not partition the frame, and rows quietly appear in neither half.
+The semantic gotcha is missing values. They fail each compare. A rule and its negation don't split the frame. Rows quietly appear in neither half.
 
-Beyond that, the advice is about readability: name your masks when there is more than one, so each can be counted separately when the result is unexpectedly empty. Debugging a filter that returns nothing is nearly always a matter of finding which clause is responsible, and named masks turn that into one line rather than a process of elimination.
+Beyond that, the advice is about readability: name your masks when there's more than one. Each can be counted apart when the result is unexpectedly empty. Debugging a filter that returns nothing is nearly always a matter of finding which clause is in charge. Named masks turn that into one line rather than a process of elimination.
 
 ## One more thing
 
-`df.query` accepts `engine="python"` for expressions the default parser cannot handle, and `inplace=True` which, as elsewhere, is best avoided.
+`df.query` accepts `engine="python"` for expressions the default parser can't handle. `inplace=True` which, as elsewhere, is best avoided.
 
 ## In summary
 
-Comparisons give boolean Series; combine them with `&`, `|` and `~`, and parenthesise every one.
+checks give boolean Series. Combine them with `&`, `|` and `~`, and parenthesise each one.
 
-`isin` and `between` read as the question being asked, and `query` earns its place when the expression is long.
+`isin` and `between` read as the question being asked. `query` earns its place when the formula is long.
 
-Missing values fail every test, so a condition and its negation do not partition the frame. And `.copy()` the result if you intend to modify it, which decides the copy question at the point it arises rather than at the point it bites.
+Missing values fail each test. So A rule and its negation don't split the frame. And `.copy()` the result if you intend to modify it. This Decides the copy question at the point it arises rather than at the point it bites.
 ''',
     [
         {"q": "Why does `df[df['age'] > 20 & df['age'] < 35]` fail?",
@@ -2524,7 +2524,7 @@ print("means nothing changes when you upgrade.")'''),
     ],
     '''
 title: The Copy Warning
-intro: Why an assignment that looks right silently does nothing.
+intro: Why an set that looks right silently does nothing.
 
 ## The problem
 
@@ -2534,218 +2534,218 @@ df[df["age"] < 30]["age"] = 99
 
 This looks like it sets `age` to 99 for the young rows. Often it does nothing at all, and the frame is unchanged.
 
-The reason is that there are **two** operations here, not one.
+there are **two** steps here, not one.
 
-`df[df["age"] < 30]` runs first and produces a new object. Then `["age"] = 99` assigns into *that* object. Whether the new object shares memory with `df` decides whether `df` sees the change &mdash; and if it does not, the write lands on a temporary that is discarded on the next line.
+`df[df["age"] < 30]` runs first and makes a new object. Then `["age"] = 99` assigns into *that* object. Whether the new object shares memory with `df` decides whether `df` sees the change. And if it doesn't, the write lands on a temporary that is discarded on the next line.
 
-Historically pandas noticed this pattern and raised `SettingWithCopyWarning`. The warning is famous for being confusing: it appears where the code looks fine, it sometimes appears when nothing is wrong, and it sometimes fails to appear when something is. In current versions the assignment may simply do nothing, silently.
+Once pandas noticed this pattern and raised `SettingWithCopyWarning`. The warning is famous for being confusing. It appears where the code looks fine, it at times appears when nothing is wrong. It at times fails to appear when a thing is. In current versions the set may simply do nothing, silently.
 
 ## Why pandas cannot just fix it
 
-The obvious question is why pandas does not make chained assignment work.
+The obvious question is why pandas doesn't make chained set work.
 
-It cannot know, at the time the first bracket runs, that an assignment is coming. `df[mask]` is an ordinary expression that returns an object. Python then calls `__setitem__` on that object. By then the information that this was one statement is gone.
+It can't know, at the time the first bracket runs, that an set is coming. `df[mask]` is an plain formula that returns an object. Python then calls `__setitem__` on that object. By then the data that this was one statement is gone.
 
-Whether the intermediate is a view or a copy depends on the internal layout, which depends on the dtypes.
+Whether the mid is a view or a copy depends on the inner layout. This Depends on the dtypes.
 
-pandas stores columns in **blocks** of like dtype. Selecting a column that happens to be a block of its own can hand back a view; selecting one column out of a larger same-dtype block has to build a new object.
+pandas stores columns in **blocks** of like dtype. Selecting a column that happens to be a block of its own can hand back a view. Selecting one column out of a larger same-dtype block has to build a new object.
 
-The editor above shows this, and the direction surprises most people: the **mixed-dtype** frame gives the view, because there the integer column sits in a block by itself. The all-integer frame gives a copy, because its columns share one block.
+The editor above shows this, and the direction surprises most people. The **mixed-dtype** frame gives the view. There the int column sits in a block by itself. The all-int frame gives a copy, because its columns share one block.
 
 So the same line of code can work on one frame and not another, or work in development and fail in production when a column's type changes. That unpredictability, not the warning, is the actual problem.
 
 ## The rule
 
-**One indexing operation, with both selections inside it.**
+**One indexing step, with both picks inside it.**
 
 ```python
 df.loc[df["age"] < 30, "age"] = 99
 ```
 
-Here pandas sees a single `__setitem__` on `df` itself, with the rows and column both specified. There is no intermediate object and no ambiguity.
+Here pandas sees a single `__setitem__` on `df` itself, with the rows and column both given. There's no mid object and no ambiguity.
 
 Anything with two sets of brackets to the left of `=` deserves a second look. That includes the variants people reach for:
 
-`df["age"][mask] = 99` &mdash; same problem, different order.
+`df["age"][mask] = 99` &mdash; same problem, other order.
 
 `df[mask]["age"] = 99` &mdash; the classic.
 
-`sub = df[mask]` then later `sub["age"] = 99` &mdash; the same thing spread across two statements, which is how it usually appears in real code and why it is harder to spot.
+`sub = df[mask]` then later `sub["age"] = 99`. The same thing spread across two statements. This Is how it often appears in real code and why it's harder to spot.
 
 ## The subset case
 
-The most common real-world version is not a one-liner. It is:
+The most common real-world version isn't a one-liner. It's:
 
 ```python
 sub = df[df["city"] == "pune"]
 sub["sales"] = 0
 ```
 
-Here the intent is genuinely ambiguous. Did you want a separate frame to work on, or did you want to change those rows of `df`?
+Here the intent is truly ambiguous. Did you want a split frame to work on, or did you want to change those rows of `df`?
 
-Both are reasonable, and the fix is to say which:
+Both are fair, and the fix is to say which:
 
 ```python
 sub = df[df["city"] == "pune"].copy()   # a separate frame
 df.loc[df["city"] == "pune", "sales"] = 0   # change the original
 ```
 
-`.copy()` costs seven characters and removes the entire question. It is worth adding by default whenever you take a subset you intend to modify, even if you are fairly sure it would work without.
+`.copy()` costs seven characters and drops the entire question. It's worth adding by default when you take a subset you intend to modify, even if you're fairly sure it would work without.
 
 ## Copy-on-write
 
-pandas is fixing this properly. Under **copy-on-write**, every selection behaves as though it were a copy: modifying a subset never affects the parent, in any circumstances, with no warning and no dtype-dependent surprises.
+pandas is fixing this properly. Under **copy-on-write**, each pick behaves as though it were a copy. Modifying a subset never affects the parent, in any circumstances, with no warning and no dtype-dependent surprises.
 
-To change the original you must say so with `.loc`.
+To change the first you must say so with `.loc`.
 
-It is the default in pandas 3.0. In 2.x you can switch it on:
+It's the default in pandas 3.0. In 2.x you can switch it on:
 
 ```python
 pd.options.mode.copy_on_write = True
 ```
 
-The name refers to the implementation, not the behaviour: pandas still avoids copying data until something is actually written, so it is not slower in general and is often faster, because it can drop the defensive copies it used to make.
+The name refers to the setup, not the action. Pandas still avoids copying data until a thing is really written. It isn't slower and is often faster. It can drop the defensive copies it used to make.
 
-Writing code that assumes copy-on-write today means nothing changes when you upgrade. In practice that means the two habits above &mdash; explicit `.copy()`, and `.loc` for assignment &mdash; which are worth having regardless.
+Writing code that assumes copy-on-write today means nothing changes when you upgrade. that means the two habits above. Clear `.copy()`. `.loc` for set. Which are worth having even so.
 
 ## If you see the warning
 
-Do not silence it. `pd.options.mode.chained_assignment = None` turns off the message and leaves the bug.
+Don't silence it. `pd.options.mode.chained_assignment = None` turns off the message and leaves the bug.
 
-Instead, find the line, and ask which of the two things you meant. The answer is always one of them, and writing it down fixes the code and documents the intent at the same time.
+Instead, find the line, and ask which of the two things you meant. The answer is always one of them, and writing it down fixes the code and docs the intent also.
 
 ## How to read the warning
 
-The message is famously unhelpful, but it has a structure worth knowing.
+The message is famously unhelpful. But It has a structure worth knowing.
 
-*"A value is trying to be set on a copy of a slice from a DataFrame"* &mdash; pandas noticed that the object being written to was produced by indexing another object, and it cannot tell whether the write will propagate.
+*"A value is trying to be set on a copy of a slice from a DataFrame"*. Pandas noticed that the object being written to was made by indexing another object. It can't tell whether the write will pass.
 
-*"Try using .loc[row_indexer, col_indexer] = value instead"* &mdash; the fix, stated generically.
+*"Try using .loc[row_indexer, col_indexer] = value instead"*. The fix, stated generically.
 
 Two properties make it frustrating.
 
-It points at the **assignment**, which may be far from the line that created the intermediate. `sub = df[mask]` on line 10 and `sub["x"] = 1` on line 40 produce a warning on line 40, and line 10 is the cause.
+It points at the **set**. This May be far from the line that created the mid. `sub = df[mask]` on line 10 and `sub["x"] = 1` on line 40 give a warning on line 40. Line 10 is the cause.
 
-It is a **heuristic**. It can fire when nothing is wrong, and it can stay silent when something is. That is why "make the warning go away" is the wrong goal &mdash; the goal is to know which object you are writing to.
+It's a **heuristic**. It can fire when nothing is wrong. It can stay silent when a thing is. That is why "make the warning go away" is the wrong goal. The goal is to know which object you're writing to.
 
 ## Why silencing it is worse than the warning
 
 `pd.options.mode.chained_assignment = None` turns off the message.
 
-It does not change the behaviour. The write still may or may not reach the original frame; you have simply removed the only signal that there was a question.
+It doesn't change the action. The write still may or may not reach the first frame. You've simply removed the only signal that there was a question.
 
-You will see this suggested. It is the wrong fix in every case, and it is worth recognising in an existing codebase as a sign that someone met this problem and did not resolve it.
+You'll see this suggested. It's the wrong fix in each case. It's worth recognising in an existing code as a sign that someone met this problem and didn't resolve it.
 
 ## The two-statement version
 
-Most real occurrences are not one-liners. They look like this:
+Most real cases aren't one-liners. They look like this:
 
 ```python
 recent = df[df["year"] == 2024]
 recent["flag"] = recent["sales"] > 100
 ```
 
-This is harder to spot than the chained form, because each line looks entirely reasonable, and it is the shape that appears in real analysis code.
+This is harder to spot than the chained form. Each line looks fully fair. It's the shape that appears in real analysis code.
 
-The question to ask is: **is `recent` a separate dataset, or a window onto `df`?**
+The question to ask is: **is `recent` a split dataset, or a window onto `df`?**
 
-If separate: `recent = df[df["year"] == 2024].copy()`.
+If split: `recent = df[df["year"] == 2024].copy()`.
 
-If a window: do not create it; write `df.loc[df["year"] == 2024, "flag"] = ...`.
+If a window: don't create it. Write `df.loc[df["year"] == 2024, "flag"] = ...`.
 
-Adding `.copy()` when taking a subset you intend to modify is a cheap default. On a small frame the cost is nothing; on a large one it is a deliberate decision you have now made explicitly rather than by accident.
+Adding `.copy()` when taking a subset you intend to modify is a cheap default. On a small frame the cost is nothing. On a large one it's a deliberate choice you've now made by name rather than by accident.
 
 ## Copy-on-write in more detail
 
-Under CoW, every object behaves as though it owns its data. Modifying a subset never affects its parent, and modifying a parent never affects a subset taken earlier.
+Under CoW, each object behaves as though it owns its data. Modifying a subset never affects its parent. Modifying a parent never affects a subset taken earlier.
 
-The name describes the implementation: pandas still shares the underlying arrays, and only copies when something is actually written. So the guarantee is about **behaviour**, not about memory, and in practice CoW often uses *less* memory than the current default, because pandas can drop the defensive copies it makes today.
+The name shows the setup: pandas still shares the underlying arrays. Only copies when a thing is really written. So the promise is about **action**, not about memory. CoW often uses *less* memory than the current default. Pandas can drop the defensive copies it makes today.
 
 Three things change when you enable it:
 
-Chained assignment **never** works, and pandas raises a `ChainedAssignmentError` rather than warning.
+Chained set **never** works, and pandas raises a `ChainedAssignmentError` rather than warning.
 
 `SettingWithCopyWarning` disappears, because the ambiguity it warned about is gone.
 
-Some code that relied on a view propagating a write will stop working &mdash; which is the migration cost, and the reason it is opt-in until pandas 3.0.
+Some code that leaned on a view passing a write will stop working. Which is the migration cost. The reason it's opt-in until pandas 3.0.
 
-Turning it on in a project today is a good way to find out whether your code depends on behaviour that is about to change.
+Turning it on in a project today is a good way to find out whether your code depends on action that is about to change.
 
 ## A checklist
 
-**Two sets of brackets left of `=`** &mdash; rewrite as one `.loc`.
+**Two sets of brackets left of `=`**. Rewrite as one `.loc`.
 
-**A subset you will modify** &mdash; add `.copy()`.
+**A subset you'll modify** &mdash; add `.copy()`.
 
-**A warning you do not understand** &mdash; find where the object was created, not where it was written.
+**A warning you don't understand**. Find where the object was created, not where it was written.
 
-**A tempting `chained_assignment = None`** &mdash; do not.
+**A tempting `chained_assignment = None`** &mdash; don't.
 
-**New code** &mdash; write it as though copy-on-write is on, because soon it will be.
+**New code** &mdash; write it as though copy-on-write is on. Soon it will be.
 
 ## Why this module exists
 
-No other pandas behaviour wastes as much time. The warning is famous, the explanations are usually wrong, and the standard advice on forums &mdash; silence it &mdash; leaves the bug in place.
+No other pandas action wastes as much time. The warning is famous, the reasons are often wrong. The standard advice on forums. Silence it. Leaves the bug in place.
 
-The underlying issue is genuinely hard: Python evaluates `df[mask]["col"] = x` as two separate operations, and by the time the assignment happens the information that this was one statement is gone. pandas is warning about something it cannot fix from where it stands.
+The underlying issue is truly hard: Python tests `df[mask]["col"] = x` as two split steps. By the time the set happens the data that this was one statement is gone. pandas is warning about a thing it can't fix from where it stands.
 
-Understanding that makes the fix obvious rather than arbitrary. One indexing operation cannot be ambiguous, so put both selections in one call.
+Understanding that makes the fix obvious rather than any. One indexing step can't be ambiguous. Put both picks in one call.
 
 ## The rules, in one place
 
-**One `.loc` for assignment.** `df.loc[mask, "col"] = value`.
+**One `.loc` for set.** `df.loc[mask, "col"] = value`.
 
-**`.copy()` for a subset you will modify.** `sub = df[mask].copy()`.
+**`.copy()` for a subset you'll modify.** `sub = df[mask].copy()`.
 
-**Never silence the warning.** It removes the signal, not the problem.
+**Never silence the warning.** It drops the signal, not the problem.
 
 **Write as though copy-on-write is on.** It will be, by default, in pandas 3.0.
 
-Those four cover every case. There is no fifth situation requiring judgement.
+Those four cover each case. There's no fifth situation needing judgement.
 
 ## Recognising it in existing code
 
-Patterns worth searching for in a codebase you have inherited:
+Patterns worth searching for in a code you've from parent:
 
-`][` on the same line as `=` &mdash; the classic chained assignment.
+`][` on the same line as `=`. The classic chained set.
 
-`pd.options.mode.chained_assignment = None` &mdash; someone met this and did not fix it. Everything downstream of that line is suspect.
+`pd.options.mode.chained_assignment = None` &mdash; someone met this and didn't fix it. all downstream of that line is suspect.
 
-`inplace=True` on a subset &mdash; the same problem with different syntax.
+`inplace=True` on a subset &mdash; the same problem with other syntax.
 
-A variable assigned from a filter and modified later &mdash; the two-statement form, which no search finds reliably and which is the most common version in real code.
+A var assigned from a filter and modified later. The two-statement form. This No search finds well and which is the most common version in real code.
 
 ## What changes under copy-on-write
 
-Worth being concrete, because "it will be fixed" is not a plan.
+Worth being concrete, because "it will be fixed" isn't a plan.
 
-Chained assignment raises `ChainedAssignmentError` instead of warning, so the failure is loud.
+Chained set raises `ChainedAssignmentError` instead of warning. So The failure is loud.
 
 `SettingWithCopyWarning` no longer exists.
 
-Code that relied on a view propagating a write &mdash; deliberately or accidentally &mdash; stops working. That is the migration cost, and it is why the change is opt-in for a version.
+Code that leaned on a view passing a write. on purpose or accidentally. Stops working. That is the migration cost. It's why the change is opt-in for a version.
 
-Memory usage generally goes **down**, because pandas can stop making defensive copies.
+Memory usage often goes **down**, because pandas can stop making defensive copies.
 
-Enabling `pd.options.mode.copy_on_write = True` in a project today is the cheapest way to find out whether any of your code depends on the old behaviour.
+Enabling `pd.options.mode.copy_on_write = True` in a project today is the cheapest way to find out whether any of your code depends on the old action.
 
 ## The one-line version
 
-If you remember nothing else from this module: **two sets of brackets to the left of an equals sign is a bug**, and `.loc` with both selections inside it is the fix.
+If you note nothing else from this module: **two sets of brackets to the left of an equals sign is a bug**. `.loc` with both picks inside it's the fix.
 
 ## A closing note
 
-This is the only module in the track devoted to a warning message, and it earns the space by how much time it wastes.
+This is the only module in the track devoted to a warning message. It earns the space by how much time it wastes.
 
-The underlying situation is genuinely awkward. `df[mask]["col"] = x` is two operations, and by the time the assignment runs, the fact that it was one statement is gone. pandas cannot fix it from where it stands, so it warns instead &mdash; imperfectly, sometimes when nothing is wrong and sometimes not when something is.
+The underlying situation is truly awkward. `df[mask]["col"] = x` is two steps. By the time the set runs, that it was one statement is gone. pandas can't fix it from where it stands. It warns instead. Imperfectly, at times when nothing is wrong and at times not when a thing is.
 
-That imperfection is why "make the warning stop" is the wrong goal. The right goal is to know which object you are writing to, and there are only two answers: a separate frame you made with `.copy()`, or the original, addressed through a single `.loc`.
+That imperfection is why "make the warning stop" is the wrong goal. The right goal is to know which object you're writing to. There are only two answers. A split frame you made with `.copy()`, or the first, handled through a single `.loc`.
 
-Copy-on-write removes the ambiguity entirely and becomes the default in pandas 3.0. Writing code today as though it is already on costs nothing and means the upgrade changes nothing.
+Copy-on-write drops the ambiguity fully and turns the default in pandas 3.0. Writing code today as though it's already on costs nothing and means the upgrade changes nothing.
 
 ## One more thing
 
-`df._is_copy` holds the internal flag that drives the warning. It is private, it should not be relied on, and knowing it exists occasionally helps when reasoning about why a warning appeared where it did.
+`df._is_copy` holds the inner flag that drives the warning. It's private, it shouldn't be leaned on. Knowing it exists at times helps when thinking about why a warning appeared where it did.
 ''',
     [
         {"q": "Why can `df[mask]['col'] = x` fail to change `df`?",
@@ -2912,19 +2912,19 @@ print(list(df[["b", "middle", "a"]].columns))'''),
     ],
     '''
 title: Adding and Removing Columns
-intro: assign, drop, rename, and the alignment that decides what a new column contains.
+intro: assign, drop, rename, and the alignment that decides what a new column holds.
 
 ## Bracket assignment
 
 `df["total"] = df["qty"] * df["price"]` adds a column at the end.
 
-Two behaviours are worth stating because neither warns.
+Two actions are worth stating because neither warns.
 
-A **scalar broadcasts**: `df["currency"] = "INR"` fills every row.
+A **scalar broadcasts**: `df["currency"] = "INR"` fills each row.
 
-An **existing name is replaced**, silently. There is no protection against overwriting a column by reusing its name, which is a real hazard in a long script where the column list is not in front of you.
+An **existing name is replaced**, silently. There's no protection against overwriting a column by reusing its name. This Is a real hazard in a long script where the column list isn't in front of you.
 
-Column order is insertion order. `insert` is the only way to place one somewhere specific.
+Column order is insertion order. `insert` is the only way to place one one spot exact.
 
 ## assign
 
@@ -2938,21 +2938,21 @@ out = (df
        .assign(cheap=lambda d: d["total"] < 100))
 ```
 
-The lambda receives the frame **as it is at that point in the chain**, so the second `assign` can use the column the first one created. Passing a value directly rather than a lambda works too, but then it is computed against the original frame, which breaks in a chain.
+The lambda receives the frame **as it's at that point in the chain**. The second `assign` can use the column the first one created. Passing a value right rather than a lambda works too. But Then it's found against the first frame. This Breaks in a chain.
 
-`assign` also keeps the original untouched, which is worth something in a notebook where cells get re-run out of order.
+`assign` also keeps the first untouched. This Is worth a thing in a notebook where cells get re-run out of order.
 
-The cost is a copy per call. In a hot loop that matters; in ordinary analysis code it does not, and the readability of a chain usually wins.
+The cost is a copy per call. In a hot loop that matters. In plain analysis code it doesn't. The readability of a chain often wins.
 
 ## Alignment decides the contents
 
-This is the part that surprises people, and it is the index rule again.
+This is the part that surprises people, and it's the index rule again.
 
-Assigning a **Series** aligns on the index. If the Series has the same labels in a different order, pandas reorders it to match &mdash; which is correct and is not what positional intuition expects. If the Series is missing some labels, those rows get `NaN`. If it has extra labels, they are dropped.
+Assigning a **Series** aligns on the index. If the Series has the same labels in a other order, pandas reorders it to match. Which is correct and isn't what spot-based intuition expects. If the Series is missing some labels, those rows get `NaN`. If it has extra labels, they're dropped.
 
-Assigning a **list** or a NumPy array has no index to align on, so it goes in by position, and the length must match exactly or it raises.
+Assigning a **list** or a NumPy array has no index to align on. It goes in by spot. The length must match just or it raises.
 
-That difference means `df["x"] = some_series` and `df["x"] = some_series.values` can produce different columns from the same data. The first is usually what you want; the second is the escape hatch when you know the order is right and the labels are not.
+That gap means `df["x"] = some_series` and `df["x"] = some_series.values` can give other columns from the same data. The first is often what you want. The second is the escape hatch when you know the order is right and the labels aren't.
 
 ## The filtered-assignment trap
 
@@ -2963,47 +2963,47 @@ sub = df[df["city"] == "pune"]
 df["doubled"] = sub["sales"] * 2
 ```
 
-`sub` has only the Pune rows, so the computed Series has only those labels. Alignment fills every other row with `NaN`.
+`sub` has only the Pune rows. The found Series has only those labels. Alignment fills every other row with `NaN`.
 
-pandas did exactly what it promises. The author expected "compute for these rows and leave the others alone", which is a different operation:
+pandas did just what it promises. The author expected "find for these rows and leave the others alone". This Is a other step:
 
 ```python
 df.loc[df["city"] == "pune", "doubled"] = df["sales"] * 2
 ```
 
-The difference is visible whenever the column **already exists**. Whole-column assignment replaces the entire column, so rows absent from the subset are overwritten with `NaN` &mdash; even if they held a perfectly good value a moment ago. The `.loc` form touches only the selected rows and leaves the rest alone.
+The gap is visible when the column **already exists**. Whole-column set replaces the entire column. Rows absent from the subset are overwritten with `NaN`. Even if they held a just right good value a moment ago. The `.loc` form touches only the selected rows and leaves the rest alone.
 
-When the column does *not* already exist, both forms leave `NaN` in the unselected rows, because creating a column has to put something in every row. If you want a default there, create the column first and then overwrite the subset &mdash; which is exactly what the editor above does.
+When the column does *not* already exist, both forms leave `NaN` in the unselected rows. Creating a column has to put a thing in each row. If you want a default there, create the column first and then overwrite the subset. Which is just what the editor above does.
 
 ## Dropping
 
 `df.drop(columns=["b"])` and `df.drop(index=[0])` both return a new frame.
 
-The `axis=` form works and is older; `columns=`/`index=` say what they mean and are worth preferring.
+The `axis=` form works and is older. `columns=`/`index=` say what they mean and are worth preferring.
 
-A name that does not exist raises `KeyError`. That is usually helpful &mdash; it catches typos and stale column lists &mdash; and `errors="ignore"` turns it off when dropping optional columns.
+A name that doesn't exist raises `KeyError`. That is often helpful. It catches typos and stale column lists. And `errors="skip"` turns it off when dropping optional columns.
 
-To drop in place, reassign: `df = df.drop(columns=["b"])`. The `inplace=True` argument exists, and is discouraged: it does not reliably avoid a copy, it breaks chaining, and it returns `None`, which makes `df = df.drop(..., inplace=True)` a silent way to destroy your frame.
+To drop in place, reassign: `df = df.drop(columns=["b"])`. The `inplace=True` arg exists. Is discouraged: it doesn't well avoid a copy, it breaks chaining. It returns `None`. This Makes `df = df.drop(..., inplace=True)` a silent way to destroy your frame.
 
 ## Renaming
 
-`df.rename(columns={"a": "alpha"})` takes a mapping, and `columns=str.upper` takes a function applied to every name.
+`df.rename(columns={"a": "alpha"})` takes a mapping, and `columns=str.upper` takes a function applied to each name.
 
-The important quirk: **keys that do not match anything are ignored silently**. A typo in the old name does nothing at all and gives no indication. When a rename appears not to have worked, a misspelled key is the first thing to check.
+The key quirk: **keys that don't match anything are skipped silently**. A typo in the old name does nothing at all and gives no indication. When a rename appears not to have worked, a misspelled key is the first thing to check.
 
-`df.columns = [...]` replaces every name at once and requires the right length. It is blunter and, for a full rename, clearer.
+`df.columns = [...]` replaces each name at once and needs the right length. It's blunter and, for a full rename, clearer.
 
-For cleaning up messy headers, a function is usually better than a mapping:
+For cleaning up messy headers, a function is often better than a mapping:
 
 ```python
 df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
 ```
 
-That handles the whole frame without listing every column, and is worth running on anything that came from a spreadsheet.
+That handles the whole frame without listing each column. Is worth running on anything that came from a spreadsheet.
 
 ## Adding several columns at once
 
-`assign` takes any number of keyword arguments, and they are applied in order, so later ones can use earlier ones:
+`assign` takes any number of keyword args. They're applied in order. Later ones can use earlier ones:
 
 ```python
 df.assign(
@@ -3012,9 +3012,9 @@ df.assign(
 )
 ```
 
-For column names that are not valid identifiers &mdash; a space, a leading digit &mdash; keyword arguments will not work, and bracket assignment is the only option. That is a reasonable argument for normalising column names early.
+For column names that aren't valid identifiers. A space, a leading digit. Keyword args won't work. Bracket set is the only option. That is a fair arg for norming column names early.
 
-Assigning several columns from one operation is the case `assign` handles less well. When a function returns several values per row, a common pattern is:
+Assigning a few columns from one step is the case `assign` handles less well. When a function returns a few values per row, a common pattern is:
 
 ```python
 df[["a", "b"]] = df["text"].str.split("-", expand=True)
@@ -3024,13 +3024,13 @@ The right-hand side must have the same number of columns as the left, and the in
 
 ## Reordering
 
-Column order is insertion order, and there is no `reorder` method.
+Column order is insertion order, and there's no `reorder` method.
 
-Three ways, in increasing robustness:
+Three ways, in growing robustness:
 
-`df[["b", "a", "c"]]` &mdash; select in the order you want. Fails loudly if a name is wrong, which is usually a feature.
+`df[["b", "a", "c"]]` &mdash; select in the order you want. Fails loudly if a name is wrong. This Is often a feature.
 
-`df.insert(pos, name, values)` &mdash; place one column at a position, in place.
+`df.insert(pos, name, values)` &mdash; place one column at a spot, in place.
 
 Building the order from what exists:
 
@@ -3043,27 +3043,27 @@ That pins the columns you care about to the front and keeps the rest, without br
 
 ## Removing columns safely
 
-`drop(columns=[...])` raises on a name that does not exist, which catches typos and stale lists.
+`drop(columns=[...])` raises on a name that doesn't exist. This Catches typos and stale lists.
 
-`errors="ignore"` suppresses that, and is right when the columns are genuinely optional &mdash; dropping debug fields that may or may not be present.
+`errors="skip"` suppresses that, and is right when the columns are truly optional. Dropping debug fields that may or may not be present.
 
-`df.drop(columns=df.filter(like="tmp_").columns)` drops by pattern, which survives changes in the exact names.
+`df.drop(columns=df.filter(like="tmp_").columns)` drops by pattern. This Lives changes in the exact names.
 
-For keeping rather than dropping, selecting is clearer: `df[["a", "b"]]` states what you want rather than what you do not, and does not need updating when new unwanted columns appear.
+For keeping rather than dropping, selecting is clearer: `df[["a", "b"]]` states what you want rather than what you don't. Doesn't need updating when new unwanted columns appear.
 
 ## A note on inplace
 
-Most of these methods take `inplace=True`. It is worth being clear about why it is discouraged.
+Most of these methods take `inplace=True`. It's worth being clear about why it's discouraged.
 
-It does **not** reliably avoid a copy, so the performance argument for it is largely false.
+It does **not** well avoid a copy. The speed arg for it's largely false.
 
-It returns `None`, so `df = df.drop(columns=["a"], inplace=True)` silently sets `df` to `None` &mdash; a mistake that is easy to make and confusing to debug.
+It returns `None`, so `df = df.drop(columns=["a"], inplace=True)` silently sets `df` to `None`. A mistake that is easy to make and confusing to debug.
 
 It breaks method chaining.
 
-And it is on the way out: the pandas team has discussed removing it, and copy-on-write makes its remaining rationale weaker.
+And it's on the way out: the pandas team has discussed dropping it. Copy-on-write makes its left rationale weaker.
 
-Reassignment &mdash; `df = df.drop(columns=["a"])` &mdash; is clearer and no slower in practice.
+Reassignment &mdash; `df = df.drop(columns=["a"])` &mdash; is clearer and no slower .
 
 ## Renaming, at scale
 
@@ -3079,11 +3079,11 @@ df.columns = (df.columns
               .str.strip("_"))
 ```
 
-This handles trailing spaces, capitals, punctuation and units-in-parentheses in one pass, and does not need to know what the columns are called.
+This handles trailing spaces, capitals, punctuation and units-in-parentheses in one pass. Doesn't need to know what the columns are called.
 
-Doing it immediately after loading means every later reference uses predictable names, and it removes the class of bug where a column name has an invisible trailing space.
+Doing it at once after loading means each later link uses predictable names. It drops the class of bug where a column name has an invisible trailing space.
 
-`df.rename(columns=..., errors="raise")` makes a mapping strict, so a key that matches nothing raises instead of doing nothing silently. That is worth using when the rename is important.
+`df.rename(columns=..., errors="raise")` makes a mapping strict. A key that matches nothing raises instead of doing nothing silently. That is worth using when the rename is key.
 
 ## Creating columns conditionally
 
@@ -3091,7 +3091,7 @@ The three standard shapes, none of which needs `apply`:
 
 **Two branches** &mdash; `np.where(cond, a, b)`.
 
-**Several branches** &mdash; `np.select([c1, c2], [v1, v2], default=v3)`, evaluated in order.
+**a few branches** &mdash; `np.select([c1, c2], [v1, v2], default=v3)`, checked in order.
 
 **Numeric bands** &mdash; `pd.cut`.
 
@@ -3104,69 +3104,69 @@ df["band"] = "unknown"
 df.loc[df["score"] >= 80, "band"] = "high"
 ```
 
-That avoids the `NaN` that appears when a column is created directly for a subset, and it makes the default explicit rather than implied.
+That avoids the `NaN` that appears when a column is created right for a subset. It makes the default clear rather than implied.
 
 ## Types when adding a column
 
 A new column takes its dtype from what you assign. Two cases are worth watching.
 
-Assigning a Python list of integers gives `int64`; assigning one with a `None` in it gives `object` or `float64`. If the column is meant to be a nullable integer, say so: `pd.array([1, None], dtype="Int64")`.
+Assigning a Python list of ints gives `int64`. Assigning one with a `None` in it gives `object` or `float64`. If the column is meant to be a nullable int, say so: `pd.array([1, None], dtype="Int64")`.
 
-Assigning a string to a subset of a numeric column upcasts the **whole** column to `object`, silently, which makes every later numeric operation on it slow or wrong. If a column may hold either, that is usually a sign it should be two columns.
+Assigning a string to a subset of a numeric column upcasts the **whole** column to `object`, silently. This Makes each later numeric step on it slow or wrong. If a column may hold either, that is often a sign it should be two columns.
 
 ## Dropping rows
 
-`drop(index=[...])` removes by label, which is fine for a handful of known labels and awkward otherwise.
+`drop(index=[...])` drops by label. This Is fine for a handful of known labels and awkward else.
 
-For a condition, filtering is clearer: `df[~mask]` says "everything except", and does not require knowing the labels.
+For a rule, filtering is clearer: `df[~mask]` says "all except". Doesn't need knowing the labels.
 
 `df.drop(df[mask].index)` works and is a longer way of writing the same thing.
 
-`dropna`, `drop_duplicates` and `query` cover the common cases directly, and each says what it does in its name.
+`dropna`, `drop_duplicates` and `query` cover the common cases right. Each says what it does in its name.
 
 ## A summary
 
 `df["new"] = ...` adds or silently replaces.
 
-`assign` returns a new frame and chains; use a lambda inside a chain.
+`assign` returns a new frame and chains. Use a lambda inside a chain.
 
-Assigning a **Series** aligns on the index; a **list** goes in by position.
+Assigning a **Series** aligns on the index. A **list** goes in by spot.
 
-Whole-column assignment from a subset overwrites the unmatched rows with `NaN`; `.loc` touches only the selection.
+Whole-column set from a subset overwrites the unmatched rows with `NaN`. `.loc` touches only the pick.
 
-`drop(columns=...)` raises on a missing name unless `errors="ignore"`.
+`drop(columns=...)` raises on a missing name unless `errors="skip"`.
 
-`rename` ignores keys that match nothing, so a typo does nothing at all.
+`rename` skips keys that match nothing. So A typo does nothing at all.
 
-Normalise column names once, at load, with a function over `df.columns`.
+Norm column names once, at load, with a function over `df.columns`.
 
-And prefer reassignment to `inplace=True`, which does not do what its name suggests.
+And prefer reassignment to `inplace=True`. This Doesn't do what its name suggests.
 
 ## A closing note
 
 Adding a column looks like the simplest thing in pandas and carries two traps.
 
-The first is silence: assigning to an existing name replaces it without a word, and a rename with a misspelled key does nothing without a word. Neither raises, and both are easy to miss in a long script.
+The first is silence: assigning to an existing name replaces it without a word. A rename with a misspelled key does nothing without a word. Neither raises. Both are easy to miss in a long script.
 
-The second is alignment. A Series assigned to a column is matched by label, not position, so a value computed from a filtered subset fills the unmatched rows with `NaN` &mdash; and if the column already existed, it overwrites what was there. A plain list, having no index, goes in positionally instead. Two lines that look equivalent behave differently.
+The second is alignment. A Series assigned to a column is matched by label, not spot. A value found from a filtered subset fills the unmatched rows with `NaN`. And if the column already existed, it overwrites what was there. A plain list, having no index, goes in positionally instead. Two lines that look equal behave differently.
 
-The defences are small: use `.loc` when you mean "these rows only", check the column list after a rename, and normalise column names once at load so that later references are predictable.
+The defences are small: use `.loc` when you mean "these rows only", check the column list after a rename. Norm column names once at load so that later links are predictable.
 
 ## One more thing
 
-`df.pop("col")` removes a column and returns it, which is occasionally the clearest way to move a column out of a frame and into a variable in one step.
+`df.pop("col")` drops a column and returns it. This Is at times the clearest way to move a column out of a frame and into a var in one step.
 
-And `df.drop` accepts `level=` for a MultiIndexed frame, so a whole outer group can be removed by label without building a mask. Both are small conveniences, and both read better than the two-step alternatives when the intent is exactly what they describe.
+And `df.drop` accepts `level=` for a MultiIndexed frame. A whole outer group can be removed by label without building a mask. Both are small conveniences. Both read better than the two-step options when the intent is just what they show.
 
 ## In summary
 
-Adding and removing columns is mechanically simple, and the two things that bite are both about silence.
+Adding and dropping columns is mechanically simple. The two things that bite are both about silence.
 
-Nothing warns when you overwrite a column by reusing its name, and nothing warns when a rename key matches nothing. Both leave the frame in a state that looks correct.
+Nothing warns when you overwrite a column by reusing its name. Nothing warns when a rename key matches nothing. Both leave the frame in a state that looks correct.
 
-And assignment is governed by alignment: a Series matches on labels, a list matches on position, and a whole-column assignment computed from a subset overwrites every unmatched row with `NaN` &mdash; including rows that held a perfectly good value a moment before.
+And set is governed by alignment: a Series matches on labels, a list matches on spot. A whole-column set found from a subset overwrites each unmatched row with `NaN`. Including rows that held a just right good value a moment before.
 
-Using `.loc` when you mean "these rows only", normalising column names once at load, and checking the column list after a rename cover all of it.
+Using `.loc` when you mean "these rows only", norming column names once at load. Checking the column list after a rename cover all of it.
 ''',
     [
         {"q": "What happens when you assign to an existing column name?",
@@ -3328,21 +3328,21 @@ print("dtype after coercion:", coerced.dtype)'''),
     ],
     '''
 title: Dtypes and Memory
-intro: object, category and the nullable types.
+intro: object, group and the nullable types.
 
 ## Why this matters early
 
-A frame that does not fit in memory cannot be analysed at all, and the usual reason a frame is larger than expected is not the number of rows. It is one or two columns stored in the widest possible type.
+A frame that doesn't fit in memory can't be analysed at all. The usual reason a frame is larger than expected isn't the number of rows. It's one or two columns stored in the widest possible type.
 
-Fixing dtypes is often the difference between a dataset that loads and one that does not, and it takes one line per column.
+Fixing dtypes is often the gap between a dataset that loads and one that doesn't. It takes one line per column.
 
 ## object is the expensive one
 
-A column of strings has dtype `object`. That means an array of **pointers**, each leading to a separate Python string somewhere else in memory.
+A column of strings has dtype `object`. That means an array of **pointers**, each leading to a split Python string one spot else in memory.
 
-Two costs follow. The obvious one is memory: a pointer plus a Python string object plus the characters, against a few bytes for a number. The less obvious one is speed &mdash; operations on object columns fall back to per-element Python, which is the same reason `apply` is slow.
+Two costs follow. The obvious one is memory. A pointer plus a Python string object plus the characters, against a few bytes for a number. The less obvious one is speed. Steps on object columns fall back to per-element Python. This Is the same reason `apply` is slow.
 
-`df.memory_usage()` reports **8 bytes per pointer** and stops there. For a text column that is a wild underestimate. `df.memory_usage(deep=True)` follows the pointers and reports the truth, and the gap between the two numbers is often a factor of ten.
+`df.memory_usage()` reports **8 bytes per pointer** and stops there. For a text column that is a wild underestimate. `df.memory_usage(deep=True)` follows the pointers and reports the truth. The gap between the two numbers is often a factor of ten.
 
 `df.info(memory_usage="deep")` gives the same accounting alongside the dtypes.
 
@@ -3350,52 +3350,52 @@ Always use `deep=True` when looking at a frame with text in it. The shallow numb
 
 ## category
 
-When a text column has few distinct values relative to its length &mdash; a city, a status, a product code &mdash; `category` is the fix.
+When a text column has few distinct values scaled to its length. A city, a status, a product code. `group` is the fix.
 
-It stores the distinct values once in a lookup, and one small integer code per row. A column of 30,000 rows drawn from four cities goes from storing 30,000 strings to storing four strings and 30,000 one-byte codes.
+It stores the distinct values once in a lookup. One small int code per row. A column of 30,000 rows drawn from four cities goes from storing 30,000 strings to storing four strings and 30,000 one-byte codes.
 
-The savings are large, and they compound: group-by and comparison on a category are faster too, because they operate on the codes.
+The savings are large, and they compound: group-by and compare on a group are faster too. They operate on the codes.
 
-The condition is repetition. A column where every value is distinct &mdash; an email address, a UUID &mdash; costs **more** as a category, because you store the codes in addition to all the original values. The rule of thumb is that it pays when the number of distinct values is well under half the row count, and it pays enormously when it is a tiny fraction.
+The rule is repetition. A column where each value is distinct. An email address, a UUID. Costs **more** as a group. You store the codes plus all the first values. The rule of thumb is that it pays when the number of distinct values is well under half the row count. It pays enormously when it's a tiny fraction.
 
-Two behaviours to know. Categories carry an order if you give them one, which is what makes sorting by a grade or a size work properly. And operations that produce a value outside the category set give `NaN` rather than extending the set, which is occasionally surprising and generally the safer default.
+Two actions to know. groups carry an order if you give them one. This Is what makes sorting by a grade or a size work properly. And steps that give a value outside the group set give `NaN` rather than extending the set. This Is at times surprising and often the safer default.
 
 ## Downcasting numbers
 
-`int64` holds numbers up to about 9.2 quintillion. A column of ages does not need that.
+`int64` holds numbers up to about 9.2 quintillion. A column of ages doesn't need that.
 
-`pd.to_numeric(s, downcast="integer")` picks the narrowest signed type that fits; `downcast="unsigned"` does the same for non-negative data, and `downcast="float"` gives `float32`.
+`pd.to_numeric(s, downcast="int")` picks the narrowest signed type that fits. `downcast="unsigned"` does the same for non-minus data, and `downcast="float"` gives `float32`.
 
-The saving is up to 8x for integers and 2x for floats.
+The saving is up to 8x for ints and 2x for floats.
 
-The caution is the same as NumPy's: narrow integer types **wrap silently** on overflow. Downcast when the range is genuinely bounded &mdash; ages, day-of-month, a small enum &mdash; and leave counters and identifiers alone. An `int8` column that later receives 200 does not give you 200.
+The caution is the same as NumPy's: narrow int types **wrap silently** on overflow. Downcast when the range is truly bounded. Ages, day-of-month, a small enum. And leave counters and identifiers alone. An `int8` column that later receives 200 doesn't give you 200.
 
 ## Nullable dtypes
 
-The oldest wart in pandas is that a NumPy integer array cannot represent a missing value, so an integer column with one gap becomes `float64` and identifiers start printing as `1001.0`.
+The oldest wart in pandas is that a NumPy int array can't represent a missing value. An int column with one gap turns `float64` and identifiers start printing as `1001.0`.
 
-The nullable extension types fix this. `Int64` with a **capital I** is a different dtype from `int64`, and it holds integers and missing values together. The missing marker is `pd.NA` rather than `np.nan`.
+The nullable extension types fix this. `Int64` with a **capital I** is a other dtype from `int64`. It holds ints and missing values together. The missing marker is `pd.NA` rather than `np.nan`.
 
-`Float64`, `boolean` and `string` are the equivalents for the other kinds. The nullable `boolean` is genuinely useful, because plain `bool` columns also collapse to `object` when they gain a missing value.
+`Float64`, `boolean` and `string` are the equivalents for the other kinds. The nullable `boolean` is truly handy. Plain `bool` columns also collapse to `object` when they gain a missing value.
 
-They are not the default, and there are corners where a library downstream expects NumPy types and does not handle them. But for identifiers and counts that must not become floats, they are the right answer.
+They aren't the default, and there are corners where a library downstream expects NumPy types and doesn't handle them. But for identifiers and counts that must not become floats, they're the right answer.
 
-`pd.NA` propagates through arithmetic like NaN, and comparisons with it return `pd.NA` rather than `False` &mdash; a difference from NaN that matters if you are filtering on such a column.
+`pd.NA` passes through math like NaN. Checks with it return `pd.NA` rather than `False`. A gap from NaN that matters if you're filtering on such a column.
 
 ## Converting safely
 
-`astype(int)` raises on the first value it cannot convert, and the message does not tell you which row.
+`astype(int)` raises on the first value it can't convert. The message doesn't tell you which row.
 
-`pd.to_numeric(s, errors="coerce")` converts what it can and turns the rest into `NaN`. That is usually the better tool for real data, because it lets you find the offenders:
+`pd.to_numeric(s, errors="coerce")` converts what it can and turns the rest into `NaN`. That is often the better tool for real data. It lets you find the offenders:
 
 ```python
 converted = pd.to_numeric(s, errors="coerce")
 bad = s[converted.isna() & s.notna()]
 ```
 
-Those are the rows that were present and unconvertible &mdash; the stray `"N/A"`, the number with a thousands separator, the value with a trailing space.
+Those are the rows that were present and unconvertible. The stray `"N/A"`, the number with a thousands separator, the value with a trailing space.
 
-`errors="raise"` is the default and is right when the data is supposed to be clean and you want to know immediately if it is not.
+`errors="raise"` is the default and is right when the data is supposed to be clean and you want to know at once if it isn't.
 
 ## A practical routine
 
@@ -3405,53 +3405,53 @@ After loading anything:
 df.info(memory_usage="deep")
 ```
 
-Then, for each `object` column, `nunique()` against `len(df)`. Anything with heavy repetition becomes a `category`. Anything numeric-looking gets `to_numeric`. Anything that is an identifier gets `str` at read time so its leading zeros survive.
+Then, for each `object` column, `nunique()` against `len(df)`. Anything with heavy repetition turns a `group`. Anything numeric-looking gets `to_numeric`. Anything that is an identifier gets `str` at read time so its leading zeros live.
 
-That is usually a handful of lines, and on a large frame it routinely cuts memory by more than half.
+That is often a handful of lines. On a large frame it routinely cuts memory by more than half.
 
 ## Seeing where the memory goes
 
-`df.memory_usage(deep=True).sort_values(ascending=False)` ranks the columns. On most real frames one or two text columns dominate, and everything else is noise.
+`df.memory_usage(deep=True).sort_values(ascending=False)` ranks the columns. On most real frames one or two text columns dominate, and all else is noise.
 
-That ranking tells you where to spend effort. Converting a column that holds 2% of the memory is not worth the risk of changing a dtype.
+That ranking tells you where to spend effort. Converting a column that holds 2% of the memory isn't worth the risk of changing a dtype.
 
-`df.info(memory_usage="deep")` gives the same information alongside dtypes and null counts, which is usually the more convenient single call.
+`df.info(memory_usage="deep")` gives the same data alongside dtypes and null counts. This Is often the more convenient single call.
 
 ## Categories in more detail
 
-`astype("category")` builds the category set from the values present.
+`astype("group")` builds the group set from the values present.
 
-Two consequences follow from the set being fixed.
+Two results follow from the set being fixed.
 
-**Assigning a value outside the set fails** or produces `NaN`, depending on the operation. Adding a new city to a categorical column requires `cat.add_categories` first.
+**Assigning a value outside the set fails** or makes `NaN`, based on the step. Adding a new city to a cat column needs `cat.add_categories` first.
 
-**Combining two categoricals with different sets** gives `object` unless the sets match. This bites when concatenating frames from different files, each of which saw a different subset of the categories. `pd.api.types.union_categoricals` handles it, or convert after concatenating rather than before.
+**Mixing two cats with other sets** gives `object` unless the sets match. This bites when concatenating frames from other files, each of which saw a other subset of the groups. `pd.api.types.union_categoricals` handles it, or convert after concatenating rather than before.
 
-`cat.set_categories([...], ordered=True)` gives an order, which is what makes sorting by size or grade work correctly rather than alphabetically. `cat.as_ordered()` and comparison operators then behave as you would expect.
+`cat.set_categories([...], sorted=True)` gives an order. This Is what makes sorting by size or grade work right rather than alphabetically. `cat.as_ordered()` and compare ops then behave as you'd expect.
 
-`cat.remove_unused_categories()` shrinks the set after filtering, which otherwise keeps every original category and can leave empty groups in a group-by.
+`cat.remove_unused_categories()` shrinks the set after filtering. This Else keeps each first group and can leave empty groups in a group-by.
 
-Group-by on a categorical includes **every** category by default, even absent ones, producing rows of zeros. `observed=True` restricts it to categories actually present, and it is worth passing deliberately since the default has changed across versions.
+Group-by on a cat includes **each** group by default, even absent ones, making rows of zeros. `seen=True` restricts it to groups really present. It's worth passing on purpose since the default has changed across versions.
 
 ## What float32 costs
 
-`float32` halves memory and keeps about seven significant digits.
+`float32` halves memory and keeps about seven large digits.
 
-For data that came from a sensor with three, that is ample. For accumulating a long sum it is not, and the fix is to accumulate in a wider type: `s.sum(dtype="float64")` reads a narrow column and adds in a wide accumulator.
+For data that came from a sensor with three, that is ample. For building up a long sum it isn't. The fix is to build up in a wider type: `s.sum(dtype="float64")` reads a narrow column and adds in a wide accumulator.
 
-`float16` exists and is rarely a good idea outside deep learning &mdash; three significant digits is not much, and most operations upcast it anyway.
+`float16` exists and is rarely a good idea outside deep learning. Three large digits isn't much. Most steps upcast it anyway.
 
 ## Nullable types in practice
 
 The extension types &mdash; `Int64`, `Float64`, `boolean`, `string` &mdash; fix the missing-value gaps in the NumPy-backed dtypes.
 
-Three practical notes.
+Three hands-on notes.
 
-`pd.NA` propagates through comparisons as `pd.NA` rather than `False`. Filtering a nullable column therefore needs care: `df[df["x"] > 1]` drops the missing rows either way, but a mask containing `pd.NA` cannot always be used directly, and `.fillna(False)` on the mask is the fix.
+`pd.NA` passes through checks as `pd.NA` rather than `False`. Filtering a nullable column so needs care: `df[df["x"] > 1]` drops the missing rows either way. A mask holding `pd.NA` can't always be used right. `.fillna(False)` on the mask is the fix.
 
-Some libraries downstream expect NumPy dtypes and do not handle extension types. Converting back with `astype("float64")` at the boundary is sometimes necessary.
+Some libraries downstream expect NumPy dtypes and don't handle extension types. Converting back with `astype("float64")` at the boundary is at times needed.
 
-`convert_dtypes()` converts a whole frame to the best available nullable types in one call, which is a quick way to see what it would look like.
+`convert_dtypes()` converts a whole frame to the best on hand nullable types in one call. This Is a quick way to see what it would look like.
 
 ## A conversion routine
 
@@ -3468,9 +3468,9 @@ for c in df.select_dtypes("integer"):
 
 Two loops, run once, that routinely halve the memory of a real frame.
 
-The threshold is a judgement rather than a rule. Well under half distinct is a clear win; near half is marginal; mostly distinct is a loss.
+The threshold is a judgement rather than a rule. Well under half distinct is a clear win. Near half is marginal. Mostly distinct is a loss.
 
-And the general principle from the numpy track applies here too: set the dtype as early as possible, ideally at read time, because every conversion afterwards allocates a second copy of the column.
+And the general principle from the numpy track applies here too. Set the dtype as early as possible, ideally at read time. Each conversion later allocates a second copy of the column.
 
 ## A diagnosis routine
 
@@ -3483,57 +3483,57 @@ df.select_dtypes("object").nunique()
 df.select_dtypes("object").apply(lambda s: s.str.len().mean())
 ```
 
-The first two find which columns dominate. The third says whether they are candidates for `category` &mdash; low cardinality &mdash; or identifiers that will not benefit. The fourth shows average string length, which explains a column that is large despite having few rows.
+The first two find which columns dominate. The third says whether they're picks for `group`. Low cardinality. Or identifiers that won't gain. The fourth shows mean string length. This Shows a column that is large despite having few rows.
 
-Almost always the answer is one or two `object` columns, and almost always one of them should be a category.
+Almost always the answer is one or two `object` columns. Almost always one of them should be a group.
 
 ## dtype mistakes that cause wrong answers
 
 Memory is the visible cost. These are the ones that change results.
 
-**An identifier read as an integer** loses leading zeros, and two different ids can collide once the zeros are gone.
+**An identifier read as an int** loses leading zeros. Two other ids can collide once the zeros are gone.
 
-**A numeric column stored as `object`** compares as strings: `"100" < "20"` is True. Sorting, comparison and `max` all silently give the wrong answer, and nothing raises.
+**A numeric column stored as `object`** checks as strings: `"100" < "20"` is True. Sorting, compare and `max` all silently give the wrong answer, and nothing raises.
 
-**A narrow integer that overflows** wraps. `int8` holding 200 does not hold 200.
+**A narrow int that overflows** wraps. `int8` holding 200 doesn't hold 200.
 
-**Mixed types in one column** make it `object`, and any aggregation either fails or produces something meaningless.
+**Mixed types in one column** make it `object`. Any aggregation either fails or makes a thing meaningless.
 
-**A float used as a key** in a merge or a group-by. Floating-point equality is unreliable, and two values that print identically may not match.
+**A float used as a key** in a merge or a group-by. Floating-point equality is unreliable. Two values that print the same way may not match.
 
-Each of these is caught by looking at `dtypes` immediately after loading, which is why that habit appears in three separate modules.
+Each of these is caught by looking at `dtypes` at once after loading. This Is why that habit appears in three split modules.
 
 ## When to convert
 
-**At read time** if you can &mdash; `dtype=` in `read_csv`. No extra copy, no window where the column is wrong.
+**At read time** if you can. `dtype=` in `read_csv`. No extra copy, no window where the column is wrong.
 
-**Immediately after loading** otherwise, before any analysis, so every later operation sees the right types.
+**at once after loading** else, before any analysis. Each later step sees the right types.
 
-**Not repeatedly.** Each `astype` allocates a full copy of the column. Converting inside a function that runs per group or per file is a common and invisible cost.
+**Not again and again.** Each `astype` allocates a full copy of the column. Converting inside a function that runs per group or per file is a common and invisible cost.
 
 ## A summary
 
-Text columns hold pointers; use `deep=True` to see their real size.
+Text columns hold pointers. Use `deep=True` to see their real size.
 
-`category` for repeated values, and only for repeated values.
+`group` for repeated values, and only for repeated values.
 
-Downcast numerics when the range is genuinely bounded.
+Downcast numerics when the range is truly bounded.
 
 `Int64`, `boolean` and `string` hold missing values without changing type.
 
-`to_numeric(errors="coerce")` converts what it can and shows you what it could not.
+`to_numeric(errors="coerce")` converts what it can and shows you what it couldn't.
 
-Set types as early as possible, and check `dtypes` right after loading &mdash; it is one line and it prevents a category of silent wrongness.
+Set types as early as possible. Check `dtypes` right after loading. It's one line and it blocks a group of silent wrongness.
 
 ## A closing note
 
-Dtypes are the quiet determinant of whether a pandas script is fast, correct, and able to load its data at all.
+Dtypes are the quiet determinant of whether a pandas script is fast, correct. Able to load its data at all.
 
-The memory story is simple: text columns hold pointers to Python strings and dominate most real frames, `category` collapses them when values repeat, and narrow numeric types halve or quarter the rest. Two loops run once after loading routinely cut a frame's footprint in half.
+The memory story is simple: text columns hold pointers to Python strings and dominate most real frames, `group` merges them when values repeat. Narrow numeric types halve or quarter the rest. Two loops run once after loading routinely cut a frame's footprint in half.
 
-The correctness story matters more. A numeric column stored as `object` compares as strings, so `"100" < "20"` is true and every sort and maximum is silently wrong. An identifier read as an integer loses its leading zeros permanently. An integer column with one gap becomes float, and ids start printing with a decimal point.
+The correctness story matters more. A numeric column stored as `object` checks as strings. `"100" < "20"` is true and each sort and max is silently wrong. An identifier read as an int loses its leading zeros permanently. An int column with one gap turns float. Ids start printing with a decimal point.
 
-None of those raise. All of them are visible in one line of `df.dtypes`, run immediately after loading &mdash; which is why that habit appears in several modules and is worth more than any other single check in this track.
+None of those raise. All of them are visible in one line of `df.dtypes`, run at once after loading. Which is why that habit appears in a few modules and is worth more than any other single check in this track.
 ''',
     [
         {"q": "Why does `memory_usage()` undercount a text column?",
@@ -3706,131 +3706,131 @@ intro: Finding it, counting it, and the choice that matters more than the code.
 
 ## Three markers
 
-pandas has more than one representation of "missing", for historical reasons.
+pandas has more than one form of "missing", for historical reasons.
 
-`np.nan` is a float. It is what you get in numeric columns, and it is why an integer column with a gap becomes `float64`.
+`np.nan` is a float. It's what you get in numeric columns. It's why an int column with a gap turns `float64`.
 
-`None` is Python's null. In an `object` column it stays `None`; in a float column it is converted to `NaN` on the way in.
+`None` is Python's null. In an `object` column it stays `None`. In a float column it's converted to `NaN` on the way in.
 
 `pd.NA` is the newer, dtype-agnostic marker used by the nullable extension types (`Int64`, `boolean`, `string`).
 
-You rarely need to care which one you have, because `isna()` and `notna()` handle all three. Use them rather than `== None` or `== np.nan`, neither of which works &mdash; `NaN` is not equal to anything, including itself.
+You rarely need to care which one you've. `isna()` and `notna()` handle all three. Use them rather than `== None` or `== np.nan`, neither of which works. `NaN` isn't equal to anything, including itself.
 
-The one place the difference bites: comparisons with `pd.NA` return `pd.NA` rather than `False`, so filtering a nullable column can behave differently from filtering a float one.
+The one place the gap bites: checks with `pd.NA` return `pd.NA` rather than `False`. Filtering a nullable column can behave differently from filtering a float one.
 
 ## Count first
 
-Before choosing a strategy, get three numbers:
+Before choosing a plan, get three numbers:
 
 `df.isna().sum()` &mdash; how many are missing in each column.
 
-`df.isna().mean()` &mdash; the same as a proportion, which is far easier to judge.
+`df.isna().mean()` &mdash; the same as a proportion. This Is far easier to judge.
 
-`df.isna().any(axis=1).sum()` &mdash; how many rows would be lost to `dropna()`. This is usually much larger than any single column's count, because different rows are missing different things.
+`df.isna().any(axis=1).sum()` &mdash; how many rows would be lost to `dropna()`. This is often much larger than any single column's count. Other rows are missing other things.
 
-Those three numbers make the decision. Dropping 2% of rows is a rounding error; dropping 40% changes what the dataset is. A column that is 60% empty probably should not be used at all, and no amount of imputation fixes that.
+Those three numbers make the choice. Dropping 2% of rows is a rounding error. Dropping 40% changes what the dataset is. A column that is 60% empty probably shouldn't be used at all. No amount of imputation fixes that.
 
 ## dropna
 
-The default is stricter than most people expect: `df.dropna()` drops a row if **any** value in it is missing.
+The default is stricter than most people expect: `df.dropna()` drops a row if **any** value in it's missing.
 
-`how="all"` only drops rows that are entirely empty, which is the right tool for trailing junk from a spreadsheet export.
+`how="all"` only drops rows that are fully empty. This Is the right tool for trailing junk from a spreadsheet export.
 
 `thresh=n` keeps rows with at least `n` non-missing values.
 
-`subset=["a", "b"]` only considers those columns, which is usually what you actually want &mdash; you care that the key fields are present, not that every optional field is.
+`subset=["a", "b"]` only considers those columns. This Is often what you really want. You care that the key fields are present, not that each optional field is.
 
-`axis=1` drops columns rather than rows, which is the blunt way to remove mostly-empty fields.
+`axis=1` drops columns rather than rows. This Is the blunt way to drop mostly-empty fields.
 
 ## fillna
 
-The code is easy. The choice is a statistical decision, and it is not neutral.
+The code is easy. The choice is a statistical choice, and it isn't neutral.
 
-**Zero** shifts the mean toward zero. For a count where missing genuinely means none, it is correct. For a measurement where missing means unknown, it invents data and biases every summary.
+**Zero** shifts the mean toward zero. For a count where missing truly means none, it's correct. For a reading where missing means unknown, it invents data and biases each summary.
 
-**The mean** preserves the mean by construction and **shrinks the variance**, because you are adding points with no spread. Anything downstream that cares about dispersion &mdash; a standard deviation, a confidence interval, a model that weights by variance &mdash; is then quietly wrong. The fourth editor measures this.
+**The mean** preserves the mean by build and **shrinks the variance**. You're adding points with no spread. Anything downstream that cares about dispersion. A standard deviation, a trust interval, a model that weights by variance. Is then quietly wrong. The fourth editor measures this.
 
 **The median** is more robust to outliers and has the same variance problem.
 
-**A sentinel** like `-1` is honest for categorical codes but must be documented, or someone will average it.
+**A sentinel** like `-1` is honest for cat codes but must be documented, or someone will mean it.
 
-**Group-wise fills** &mdash; filling with the mean of the same city, or the same product &mdash; are usually better than a global fill, because they use information you actually have.
+**Group-wise fills** &mdash; filling with the mean of the same city, or the same product &mdash; are often better than a global fill. They use data you really have.
 
 ## Filling from neighbours
 
-For ordered data, adjacency carries meaning and the neighbouring value is often the best guess.
+For sorted data, adjacency carries meaning and the neighbouring value is often the best guess.
 
 `ffill()` carries the last known value forward. This is the standard treatment for a sensor reading or a price that is only recorded when it changes.
 
 `bfill()` carries the next value backward.
 
-Both leave an edge unfilled &mdash; `ffill` cannot fill a leading gap, `bfill` cannot fill a trailing one &mdash; which is worth checking rather than assuming the column is now complete.
+Both leave an edge unfilled. `ffill` can't fill a leading gap, `bfill` can't fill a trailing one &mdash; which is worth checking rather than given the column is now full.
 
-`limit=n` caps how far a value travels. Without it, a single reading can propagate across a gap of any length, which turns one measurement into a hundred fabricated ones.
+`limit=n` caps how far a value travels. Without it, a single reading can pass across a gap of any length. This Turns one reading into a hundred fabricated ones.
 
-`interpolate()` fits between the surrounding values rather than repeating one, and takes a `method` for the shape of the fit. It needs a meaningful order, so it belongs on time series and not on arbitrary rows.
+`interpolate()` fits between the nearby values rather than repeating one. Takes a `method` for the shape of the fit. It needs a real order. It belongs on time series and not on any rows.
 
-Note that `fillna(method="ffill")` is deprecated; `ffill()` is the current spelling.
+Note that `fillna(method="ffill")` is deprecated. `ffill()` is the current spelling.
 
 ## Missingness as information
 
-The most commonly missed point: **why** a value is absent often matters more than what you replace it with.
+The most often missed point: **why** a value is absent often matters more than what you replace it with.
 
-If a value is missing at random, dropping or imputing is defensible. If it is missing *because of what it would have been* &mdash; a sensor that fails at extremes, an income question people skip when the answer is embarrassing, a test not run because the patient was too ill &mdash; then both dropping and imputing bias the result, in opposite directions.
+If a value is missing at random, dropping or imputing is defensible. If it's missing *because of what it would have been*. A sensor that fails at extremes, an income question people skip when the answer is embarrassing, a test not run because the patient was too ill. Then both dropping and imputing bias the result, in opposite directions.
 
-The last editor shows the extreme case: a column that is missing exactly when another column takes a particular value. Filling it with the mean would erase the most informative thing in the data.
+The last editor shows the extreme case: a column that is missing just when another column takes a given value. Filling it with the mean would erase the most helpful thing in the data.
 
-Adding an indicator column &mdash; `df["x_missing"] = df["x"].isna().astype(int)` &mdash; keeps that information while still allowing a fill. It costs one column and is frequently the single most useful feature in a model built on messy data.
+Adding an indicator column &mdash; `df["x_missing"] = df["x"].isna().astype(int)` &mdash; keeps that data while still allowing a fill. It costs one column and is often the single most handy feature in a model built on messy data.
 
 ## A working order
 
-Count. Look at *which* rows are missing, not just how many. Ask whether the missingness looks random. Add an indicator if it does not. Then choose a fill, and write down which one you used &mdash; because by the time someone asks, the code will have moved on.
+Count. Look at *which* rows are missing, not just how many. Ask whether the missingness looks random. Add an indicator if it doesn't. Then choose a fill. Write down which one you used. Because by the time someone asks, the code will have moved on.
 
 ## Where missing values come from
 
-Knowing the source usually tells you what to do.
+Knowing the source often tells you what to do.
 
-**Not collected** &mdash; the question was not asked, the sensor was not installed. Often missing at random; dropping is defensible.
+**Not collected** &mdash; the question wasn't asked, the sensor wasn't installed. Often missing at random. Dropping is defensible.
 
-**Not applicable** &mdash; a spouse's name for an unmarried person. Not missing at all; a sentinel or a separate flag is more honest than `NaN`.
+**Not applicable** &mdash; a spouse's name for an unmarried person. Not missing at all. A sentinel or a split flag is more honest than `NaN`.
 
-**Failed** &mdash; a sensor error, a timeout. Frequently correlated with the value, and therefore not missing at random.
+**Failed** &mdash; a sensor error, a timeout. often linked with the value. So not missing at random.
 
-**Created by an operation** &mdash; a join that did not match, an alignment mismatch, a `shift`, a `pct_change` on the first row, a value outside a `cut` range. These are the ones people mistake for data problems when they are really code problems.
+**Created by an step** &mdash; a join that didn't match, an alignment mismatch, a `shift`, a `pct_change` on the first row, a value outside a `cut` range. These are the ones people mistake for data problems when they're really code problems.
 
-That last category is worth checking first. If a column gained missing values partway through a pipeline, the cause is upstream in the code, not in the source data.
+That last group is worth checking first. If a column gained missing values partway through a pipeline, the cause is upstream in the code, not in the source data.
 
 ## Missing values in operations
 
 Most aggregations **skip** missing values by default: `sum`, `mean`, `max` all use `skipna=True`.
 
-That is different from NumPy, where a single `NaN` poisons the whole reduction, and it is worth knowing because it changes the denominator. `df["x"].mean()` divides by the number of **present** values, not the row count.
+That is other from NumPy. Here A single `NaN` poisons the whole reduction. It's worth knowing because it changes the denominator. `df["x"].mean()` cuts by the number of **present** values, not the row count.
 
-`skipna=False` makes them propagate, which is occasionally what you want when a missing value should invalidate the result.
+`skipna=False` makes them pass. This Is at times what you want when a missing value should invalidate the result.
 
-`sum()` of an all-missing column returns `0`, not `NaN`, which is defensible and surprising. `min_count=1` makes it return `NaN` instead.
+`sum()` of an all-missing column returns `0`, not `NaN`. This Is defensible and surprising. `min_count=1` makes it return `NaN` instead.
 
 `groupby` **drops** rows whose key is missing, unless `dropna=False`.
 
-`merge` treats `NaN` keys as non-matching in most cases.
+`merge` treats `NaN` keys as non-matching often.
 
-Sorting puts them last regardless of direction.
+Sorting puts them last even so of direction.
 
-Each of these is reasonable in isolation; together they mean missing data quietly changes several numbers at once, and the totals stop reconciling.
+Each of these is fair in alone. Together they mean missing data quietly changes a few numbers at once, and the totals stop merging.
 
 ## Filling within groups
 
-A global fill uses the least information available. A group fill uses more:
+A global fill uses the least data on hand. A group fill uses more:
 
 ```python
 df["temp"] = df["temp"].fillna(df.groupby("city")["temp"].transform("mean"))
 ```
 
-Each missing temperature gets the mean for its own city rather than the mean of everywhere.
+Each missing temp gets the mean for its own city rather than the mean of all over.
 
-The same pattern works with `median`, with `ffill` inside a group (`df.groupby("id")["v"].ffill()`), and with a lookup from another table.
+The same pattern works with `median`, with `ffill` inside a group (`df.groupby("id")["v"].ffill()`). With a lookup from another table.
 
-A group fill leaves gaps where a whole group is missing, so a global fallback afterwards is often needed:
+A group fill leaves gaps where a whole group is missing. A global fallback later is often needed:
 
 ```python
 filled = df.groupby("city")["temp"].transform("mean")
@@ -3841,7 +3841,7 @@ df["temp"] = df["temp"].fillna(filled).fillna(df["temp"].mean())
 
 The part that is easy to skip and matters most later.
 
-Record, in the code and in whatever the output is:
+Record, in the code and in what the output is:
 
 How many values were missing per column, before you touched them.
 
@@ -3849,21 +3849,21 @@ What you did &mdash; dropped, filled with what, interpolated how.
 
 Whether you added an indicator.
 
-The reason is that a filled value is indistinguishable from a measured one once it is in the frame. Six months later, nobody can tell which numbers were observed and which were invented, and the analysis cannot be reproduced or corrected.
+a filled value is the same from a measured one once it's in the frame. Six months later, no one can tell which numbers were seen and which were invented. The analysis can't be copied or corrected.
 
-A frame with an `x_imputed` boolean column carries that information with the data, which is more robust than a comment.
+A frame with an `x_imputed` boolean column carries that data with the data. This Is more robust than a comment.
 
 ## The order to work in
 
-Count them. Look at which rows they are in. Decide whether the missingness looks random. Add an indicator if it does not. Choose a strategy for each column separately &mdash; there is no reason the same one suits every column. Record what you did. Then proceed.
+Count them. Look at which rows they're in. Decide whether the missingness looks random. Add an indicator if it doesn't. Choose a plan for each column apart. There's no reason the same one suits each column. Record what you did. Then proceed.
 
 ## Missing values that pandas created
 
-Worth a separate checklist, because these are code problems rather than data problems and the fix is upstream.
+Worth a split checklist, because these are code problems rather than data problems and the fix is upstream.
 
-**A join that did not match** &mdash; the added columns are `NaN` for unmatched rows. `indicator=True` confirms it.
+**A join that didn't match**. The added columns are `NaN` for unmatched rows. `indicator=True` confirms it.
 
-**Alignment on assignment** &mdash; a Series with different labels assigned to a column fills the unmatched rows.
+**Alignment on set** &mdash; a Series with other labels assigned to a column fills the unmatched rows.
 
 **`shift`, `diff`, `pct_change`** &mdash; the first row of each has no predecessor.
 
@@ -3871,69 +3871,69 @@ Worth a separate checklist, because these are code problems rather than data pro
 
 **`cut` or `qcut`** &mdash; values outside the bin edges.
 
-**`reindex` or `unstack`** &mdash; combinations that did not occur in the data.
+**`reindex` or `unstack`** &mdash; mixes that didn't occur in the data.
 
-**`resample` upsampling** &mdash; periods with no observation.
+**`resample` upsampling** &mdash; periods with no finding.
 
-If a column gained missing values partway through a pipeline, one of these is the cause, and filling them is treating a symptom.
+If a column gained missing values partway through a pipeline, one of these is the cause. Filling them is treating a symptom.
 
 ## Interpolation options
 
-`interpolate()` defaults to `method="linear"`, which treats the values as evenly spaced regardless of the index.
+`interpolate()` defaults to `method="linear"`. This Treats the values as evenly spaced even so of the index.
 
-`method="time"` uses the actual time gaps, which is what you want on an irregular time series &mdash; without it, a value after a three-week gap is weighted the same as one after an hour.
+`method="time"` uses the actual time gaps. This Is what you want on an irregular time series. Without it, a value after a three-week gap is weighted the same as one after an hour.
 
-`method="nearest"`, `"polynomial"`, `"spline"` fit other shapes; the last two need an `order`.
+`method="nearest"`, `"polynomial"`, `"spline"` fit other shapes. The last two need an `order`.
 
-`limit_direction` controls whether leading and trailing gaps are filled. By default `interpolate` fills forward only, so a leading `NaN` survives.
+`limit_direction` controls whether leading and trailing gaps are filled. By default `interpolate` fills forward only. A leading `NaN` lives.
 
-`limit_area="inside"` restricts filling to gaps between real observations, which is usually the honest choice &mdash; interpolating beyond the ends of your data is extrapolation, and it should be a deliberate decision rather than a default.
+`limit_area="inside"` restricts filling to gaps between real findings. This Is often the honest choice. Interpolating beyond the ends of your data is extrapolation. It should be a deliberate choice rather than a default.
 
 ## Choosing per column
 
-There is no reason one strategy suits every column, and treating them uniformly is usually wrong.
+There's no reason one plan suits each column, and treating them uniformly is often wrong.
 
-An **identifier** with gaps is a data problem; the rows probably cannot be used.
+An **identifier** with gaps is a data problem. The rows probably can't be used.
 
-A **category** can take an explicit `"unknown"` level, which is honest and keeps the rows.
+A **group** can take an clear `"unknown"` level. This Is honest and keeps the rows.
 
 A **count** where missing means none takes zero.
 
-A **measurement** takes a group mean, an interpolation, or nothing &mdash; depending on why it is missing.
+A **reading** takes a group mean, an blending, or nothing. Based on why it's missing.
 
-A **timestamp** rarely takes a fill at all; a missing date usually means the event did not happen.
+A **timestamp** rarely takes a fill at all. A missing date often means the event didn't happen.
 
-Writing the decision down per column, in code, is more maintainable than a single `fillna(0)` across the frame &mdash; which is the most common and least defensible choice.
+Writing the choice down per column, in code, is more maintainable than a single `fillna(0)` across the frame. Which is the most common and least defensible choice.
 
 ## A summary
 
-`isna()` finds all three markers; equality never works.
+`isna()` finds all three markers. Equality never works.
 
-Count per column, as a share, and count the rows you would lose, before deciding anything.
+Count per column, as a share, and count the rows you'd lose, before deciding anything.
 
-`dropna()` drops on **any** missing value; `subset=` is usually what you want.
+`dropna()` drops on **any** missing value. `subset=` is often what you want.
 
-Zero shifts the mean; the mean shrinks the variance; neither is neutral.
+Zero shifts the mean. The mean shrinks the variance. Neither is neutral.
 
-`ffill`/`bfill` for ordered data, with a `limit`.
+`ffill`/`bfill` for sorted data, with a `limit`.
 
 `interpolate(method="time")` for irregular series.
 
-Group fills use information a global fill discards.
+Group fills use data a global fill discards.
 
-Add an indicator when missingness might be informative &mdash; it often is.
+Add an indicator when missingness might be helpful &mdash; it often is.
 
-And record what you did, because a filled value is indistinguishable from a measured one the moment it enters the frame.
+And record what you did. A filled value is the same from a measured one the moment it enters the frame.
 
 ## A closing note
 
-Handling missing data is the part of this track where the code is easiest and the decisions are hardest.
+Handling missing data is the part of this track where the code is easiest and the choices are hardest.
 
-`isna`, `dropna` and `fillna` take a few minutes to learn. What they cannot tell you is whether the values are missing at random, whether the rows you are about to drop share something, or whether filling with a mean is defensible for this particular column.
+`isna`, `dropna` and `fillna` take a few minutes to learn. What they can't tell you is whether the values are missing at random, whether the rows you're about to drop share a thing, or whether filling with a mean is defensible for this given column.
 
-Those are questions about the data rather than about pandas, and the honest answer is often that missingness is informative &mdash; that a value is absent precisely because of what it would have been. In that case both dropping and imputing bias the result, and an indicator column preserves the signal that filling would erase.
+Those are questions about the data rather than about pandas. The honest answer is often that missingness is helpful. That a value is absent just because of what it would have been. In that case both dropping and imputing bias the result. An indicator column preserves the signal that filling would erase.
 
-The practical minimum is: count them per column and as a share, look at which rows they are in, choose per column rather than uniformly, and record what you did &mdash; because once a filled value is in the frame, nothing distinguishes it from a measured one.
+The hands-on min is: count them per column and as a share, look at which rows they're in, choose per column rather than uniformly. Record what you did. Because once a filled value is in the frame, nothing sets apart it from a measured one.
 ''',
     [
         {"q": "Which test finds NaN, None and pd.NA alike?",
@@ -4095,69 +4095,69 @@ intro: Finding repeated rows and deciding which one to keep.
 
 ## duplicated marks the copies
 
-`df.duplicated()` returns a boolean Series: `True` for a row that has been seen before, `False` for its first occurrence.
+`df.duplicated()` returns a boolean Series: `True` for a row that has been seen before, `False` for its first case.
 
-That asymmetry is deliberate. It means `df[~df.duplicated()]` keeps exactly one of each, and `df[df.duplicated()]` shows you what would be removed.
+That skew is deliberate. It means `df[~df.duplicated()]` keeps just one of each. `df[df.duplicated()]` shows you what would be removed.
 
-`keep` controls which occurrence is treated as the original:
+`keep` controls which case is treated as the first:
 
-`keep="first"` (the default) flags every copy after the first.
+`keep="first"` (the default) flags each copy after the first.
 
-`keep="last"` flags every copy before the last.
+`keep="last"` flags each copy before the last.
 
-`keep=False` flags **all** of them, including the first. This is the one to use when inspecting, because it shows you the complete groups rather than half of each.
+`keep=False` flags **all** of them, including the first. This is the one to use when inspecting. It shows you the full groups rather than half of each.
 
 ## subset is the important argument
 
-Whole-row duplicates &mdash; every column identical &mdash; are the easy case and often not the real one.
+Whole-row copies &mdash; each column same &mdash; are the easy case and often not the real one.
 
-The question that usually matters is whether a **key** is repeated. Two rows with the same customer id and different scores are not identical rows, but they may well be a data problem.
+The question that often matters is whether a **key** is repeated. Two rows with the same customer id and other scores aren't same rows. They may well be a data problem.
 
-`df.duplicated(subset=["id"])` asks that question. Combined with `keep=False`, it shows you every conflicting group:
+`df.duplicated(subset=["id"])` asks that question. Mixed with `keep=False`, it shows you each conflicting group:
 
 ```python
 df[df.duplicated(subset=["id"], keep=False)].sort_values("id")
 ```
 
-That is the first thing to run when a key is supposed to be unique and something downstream suggests it is not.
+That is the first thing to run when a key is supposed to be unique and a thing downstream suggests it isn't.
 
 ## Order decides what survives
 
 `drop_duplicates` keeps the first matching row **in the frame's current order**.
 
-That order is whatever the data happened to arrive in. If the rows represent versions of a record and you want the newest, keeping the first is arbitrary &mdash; it will be right sometimes and wrong sometimes, and nothing will tell you which.
+That order is what the data happened to arrive in. If the rows represent versions of a record and you want the newest, keeping the first is any. It will be right at times and wrong at times. Nothing will tell you which.
 
-Sort deliberately first:
+Sort on purpose first:
 
 ```python
 df.sort_values("updated").drop_duplicates(subset=["id"], keep="last")
 ```
 
-Now "the newest per id" is what the code says, and it does not depend on how the file was written.
+Now "the newest per id" is what the code says. It doesn't depend on how the file was written.
 
-This is one of the most common silent errors in data cleaning, because the result always looks plausible: you asked for one row per id and you got one row per id.
+This is one of the most common silent errors in data cleaning. The result always looks plausible. You asked for one row per id and you got one row per id.
 
 ## Near-duplicates
 
-Exact matching misses the duplicates that actually occur in real data.
+Exact matching misses the copies that really occur in real data.
 
-`"Pune"`, `"pune "` and `"PUNE"` are three distinct values to pandas and one city to everyone else. So are `"Ltd"` and `"Ltd."`, or a name with a double space.
+`"Pune"`, `"pune "` and `"PUNE"` are three distinct values to pandas and one city to all else. So are `"Ltd"` and `"Ltd."`, or a name with a double space.
 
-Normalise before deduplicating:
+Norm before deduplicating:
 
 ```python
 df["city"] = df["city"].str.strip().str.lower()
 ```
 
-`value_counts()` on the column before and after is the quickest way to see how much difference it made, and to spot the variants you had not thought of.
+`value_counts()` on the column before and after is the quickest way to see how much gap it made. To spot the variants you had not thought of.
 
-For genuinely fuzzy matching &mdash; misspellings, transpositions &mdash; pandas has nothing built in, and the answer is a dedicated library. But stripping and lowercasing catches the large majority of real cases and costs one line.
+For truly fuzzy matching &mdash; misspellings, transpositions &mdash; pandas has nothing built in. The answer is a dedicated library. But stripping and lowercasing catches the large majority of real cases and costs one line.
 
 ## Sometimes the repeat is the data
 
-Not every repeated value is an error. Five orders from the same customer are five orders.
+Not each repeated value is an error. Five orders from the same customer are five orders.
 
-The tell is whether the rows carry independent information. If the duplicate rows differ in a meaningful column, dropping them destroys data; the operation you want is an aggregation:
+The tell is whether the rows carry split data. If the copy rows differ in a real column, dropping them destroys data. The step you want is an aggregation:
 
 ```python
 orders.groupby("customer", as_index=False).agg(
@@ -4166,7 +4166,7 @@ orders.groupby("customer", as_index=False).agg(
 )
 ```
 
-That collapses each customer to one row and keeps what the repeats were telling you.
+That merges each customer to one row and keeps what the repeats were telling you.
 
 Reaching for `drop_duplicates` when you meant `groupby` is a quiet way to lose most of a dataset.
 
@@ -4174,39 +4174,39 @@ Reaching for `drop_duplicates` when you meant `groupby` is a quiet way to lose m
 
 `s.is_unique` is a cheap check, and `df.index.is_unique` covers the index.
 
-Where a key is supposed to be unique &mdash; because it is a primary key, or because a later merge depends on it &mdash; an explicit assertion is worth the line:
+Where a key is supposed to be unique. Because it's a main key, or because a later merge depends on it. An clear assertion is worth the line:
 
 ```python
 assert df["id"].is_unique, "id must be unique"
 ```
 
-The reason is specific: a duplicated key on either side of a `merge` silently multiplies rows. Ten thousand rows join to eleven thousand, nobody notices, and every subsequent sum is inflated. `merge(..., validate="one_to_one")` catches it at the join, and asserting earlier catches it closer to the cause.
+The reason is exact: a duplicated key on either side of a `merge` silently times rows. Ten thousand rows join to eleven thousand, no one notices. Each later sum is inflated. `merge(..., validate="one_to_one")` catches it at the join. Asserting earlier catches it closer to the cause.
 
 ## Duplicates as a data-quality signal
 
-A duplicate is rarely just a duplicate. It usually means one of a small number of things, and identifying which changes what you should do.
+A copy is rarely just a copy. It often means one of a small number of things. Finding which changes what you should do.
 
-**A repeated load.** The same file processed twice, or an append that ran again. Whole-row duplicates, exact. Safe to drop.
+**A repeated load.** The same file processed twice, or an append that ran again. Whole-row copies, exact. Safe to drop.
 
-**A join that multiplied rows.** Duplicates in some columns and not others, appearing only after a merge. The fix is at the merge, not here.
+**A join that times'd rows.** copies in some columns and not others, appearing only after a merge. The fix is at the merge, not here.
 
-**Genuine repeated events.** Two orders from the same customer. Not duplicates at all; aggregate rather than drop.
+**Genuine repeated events.** Two orders from the same customer. Not copies at all. Aggregate rather than drop.
 
-**Multiple versions of a record.** Same key, different timestamps. Keep one, and *which* one matters &mdash; sort first.
+**Multiple versions of a record.** Same key, other timestamps. Keep one. *which* one matters &mdash; sort first.
 
-**Near-duplicates from inconsistent entry.** Same entity, different spelling. Normalise first, or you will keep both.
+**Near-copies from inconsistent entry.** Same entity, other spelling. Norm first, or you'll keep both.
 
-Running `df.duplicated().sum()` and `df.duplicated(subset=[key]).sum()` and comparing the two numbers usually tells you which case you are in.
+Running `df.duplicated().sum()` and `df.duplicated(subset=[key]).sum()` and checking the two numbers often tells you which case you're in.
 
 ## Finding what differs
 
-When a key is duplicated but the rows are not identical, the useful question is which columns disagree:
+When a key is duplicated but the rows aren't same, the handy question is which columns disagree:
 
 ```python
 dupes = df[df.duplicated(subset=["id"], keep=False)].sort_values("id")
 ```
 
-Sorting by the key puts the conflicting rows next to each other, which makes the differing column obvious by eye on a small number of groups.
+Sorting by the key puts the conflicting rows next to each other. This Makes the differing column obvious by eye on a small number of groups.
 
 For a systematic answer, group by the key and count distinct values per column:
 
@@ -4214,17 +4214,17 @@ For a systematic answer, group by the key and count distinct values per column:
 df.groupby("id").nunique().max()
 ```
 
-Any column with a maximum above 1 disagrees somewhere. That points straight at the columns worth investigating.
+Any column with a max above 1 disagrees one spot. That points straight at the columns worth investigating.
 
 ## Deduplicating with a rule
 
-"Keep the newest" is the most common rule, and it is two steps:
+"Keep the newest" is the most common rule, and it's two steps:
 
 ```python
 df.sort_values("updated").drop_duplicates(subset=["id"], keep="last")
 ```
 
-"Keep the most complete" is a different rule and needs a helper column:
+"Keep the most full" is a other rule and needs a helper column:
 
 ```python
 df.assign(filled=df.notna().sum(axis=1))
@@ -4238,21 +4238,21 @@ df.assign(filled=df.notna().sum(axis=1))
 df.groupby("id", as_index=False).first()
 ```
 
-`first()` skips missing values, so it combines partial records rather than picking one. That is often what people actually want when they reach for `drop_duplicates`.
+`first()` skips missing values, so it mixes partial records rather than picking one. That is often what people really want when they reach for `drop_duplicates`.
 
 ## Duplicated columns and index labels
 
-Duplicate **column names** are legal and cause real confusion: `df["a"]` returns a DataFrame rather than a Series when two columns are called `a`.
+copy **column names** are legal and cause real confusion: `df["a"]` returns a DataFrame rather than a Series when two columns are called `a`.
 
-`df.columns.duplicated()` finds them, and they usually arrive from a merge with overlapping names or a bad header row.
+`df.columns.duplicated()` finds them, and they often arrive from a merge with shared names or a bad header row.
 
 `df.loc[:, ~df.columns.duplicated()]` keeps the first of each.
 
-Duplicate **index labels** have the same problem for row selection, and `reset_index(drop=True)` is the usual fix.
+copy **index labels** have the same problem for row pick. `reset_index(drop=True)` is the usual fix.
 
 ## Before a join, always
 
-The single highest-value use of everything in this module is the check before a merge:
+The single highest-value use of all in this module is the check before a merge:
 
 ```python
 assert df["id"].is_unique
@@ -4260,106 +4260,106 @@ assert df["id"].is_unique
 
 on whichever side is supposed to be unique.
 
-A duplicate there multiplies rows silently, inflates every subsequent total, and is invisible in the output. Checking costs one line, and `merge(..., validate="many_to_one")` makes the check part of the operation itself.
+A copy there times rows silently, inflates each later total. Is invisible in the output. Checking costs one line. `merge(..., validate="many_to_one")` makes the check part of the step itself.
 
 ## Duplicates and the index
 
-Row duplicates and **index** duplicates are different problems with different symptoms.
+Row copies and **index** copies are other problems with other symptoms.
 
-A duplicated index makes `.loc[label]` return several rows where code expects one, breaks `reindex`, and makes some joins raise.
+A duplicated index makes `.loc[label]` return a few rows where code expects one, breaks `reindex`, and makes some joins raise.
 
-`df.index.is_unique` checks it; `df[df.index.duplicated(keep=False)]` shows the offenders; `reset_index(drop=True)` fixes it when the labels carry no meaning.
+`df.index.is_unique` checks it. `df[df.index.duplicated(keep=False)]` shows the offenders. `reset_index(drop=True)` fixes it when the labels carry no meaning.
 
-Duplicated index labels usually arrive from `concat` without `ignore_index=True`, or from `explode`, or from a group-by result that was reshaped. None of them warns.
+Duplicated index labels often arrive from `concat` without `ignore_index=True`, or from `explode`, or from a group-by result that was reshaped. None of them warns.
 
 ## Fuzzy duplicates
 
-Exact matching finds only the easy cases. Real duplicate records differ in ways that require judgement:
+Exact matching finds only the easy cases. Real copy records differ in ways that need judgement:
 
-Whitespace and case &mdash; fixed by normalising, and worth doing always.
+Whitespace and case &mdash; fixed by norming, and worth doing always.
 
 Punctuation &mdash; `"Ltd"` and `"Ltd."`.
 
 Abbreviations &mdash; `"Street"` and `"St"`.
 
-Transpositions and typos &mdash; genuinely fuzzy.
+Transpositions and typos &mdash; truly fuzzy.
 
-Different formats for the same value &mdash; phone numbers, dates as text.
+other formats for the same value. Phone numbers, dates as text.
 
-pandas handles the first two well and the rest not at all. For the rest, the honest options are a normalisation function encoding the domain's conventions, or a dedicated record-linkage library. What does not work is hoping `drop_duplicates` will catch them.
+pandas handles the first two well and the rest not at all. For the rest, the honest options are a scaling function encoding the domain's rules, or a dedicated record-linkage library. What doesn't work is hoping `drop_duplicates` will catch them.
 
-The practical approach: normalise aggressively into a **separate** key column, deduplicate on that, and keep the original values. That way the matching is explicit and the data is not damaged.
+The hands-on approach: norm aggressively into a **split** key column, deduplicate on that. Keep the first values. That way the matching is clear and the data isn't damaged.
 
 ## Counting rather than removing
 
-Before dropping anything, it is worth knowing what the duplicates represent:
+Before dropping anything, it's worth knowing what the copies represent:
 
 ```python
 counts = df["id"].value_counts()
 counts[counts > 1]
 ```
 
-If most keys appear once and a few appear twice, that is probably a data-entry issue. If every key appears exactly three times, the data has a structure you have not accounted for &mdash; three records per entity, perhaps one per year &mdash; and deduplicating would destroy it.
+If most keys appear once and a few appear twice, that is probably a data-entry issue. If each key appears just three times, the data has a structure you haven't accounted for. Three records per entity, perhaps one per year. And deduplicating would destroy it.
 
-That distinction is not visible from the duplicate count alone, and it changes the correct action completely.
+That gap isn't visible from the copy count alone. It changes the correct action fully.
 
 ## A summary
 
-`duplicated()` flags repeats but not the first; `keep=False` flags every copy.
+`duplicated()` flags repeats but not the first. `keep=False` flags each copy.
 
-`subset=` asks the question that usually matters: is the **key** duplicated?
+`subset=` asks the question that often matters: is the **key** duplicated?
 
-`drop_duplicates` keeps the first in current order &mdash; sort first if which survives matters.
+`drop_duplicates` keeps the first in current order. Sort first if which lives matters.
 
-Normalise case and whitespace before deduplicating.
+Norm case and whitespace before deduplicating.
 
-Repeated rows carrying independent information want `groupby`, not `drop_duplicates`.
+Repeated rows carrying split data want `groupby`, not `drop_duplicates`.
 
 `groupby(...).first()` merges partial records rather than picking one.
 
-And assert uniqueness before any merge that depends on it, because a duplicated key there multiplies rows and inflates every total downstream.
+And assert uniqueness before any merge that depends on it. A duplicated key there times rows and inflates each total downstream.
 
 ## A closing note
 
-The word "duplicate" hides several different situations, and choosing the right action depends on which one you have.
+The word "copy" hides a few other situations. Choosing the right action depends on which one you've.
 
-An exact repeated row from a double load can be dropped without thought. Two versions of a record need a sort and a rule about which survives. Repeated events carrying independent information need aggregating, not dropping. Near-duplicates from inconsistent text need normalising first, or they will not be found at all.
+An exact repeated row from a double load can be dropped without thought. Two versions of a record need a sort and a rule about which lives. Repeated events carrying split data need aggregating, not dropping. Near-copies from inconsistent text need norming first, or they won't be found at all.
 
-The diagnostic that separates them is comparing whole-row duplicates against key duplicates. If the key repeats but the row does not, something differs between the copies, and that difference is the thing to look at before deciding anything.
+The diagnostic that splits them is checking whole-row copies against key copies. If the key repeats but the row doesn't, a thing differs between the copies. That gap is the thing to look at before deciding anything.
 
-And the highest-value use of everything here is the check before a join. A duplicated key multiplies rows, inflates every total downstream, and produces output that looks entirely reasonable. One assertion prevents it.
+And the highest-value use of all here is the check before a join. A duplicated key times rows, inflates each total downstream. Makes output that looks fully fair. One assertion blocks it.
 
 ## Two more things worth knowing
 
-`drop_duplicates` accepts `ignore_index=True`, which renumbers the result rather than leaving gaps in the index where rows were removed. Without it the surviving labels are the original ones, which is correct and occasionally surprising when the result is printed.
+`drop_duplicates` accepts `ignore_index=True`, which renumbers the result rather than leaving gaps in the index where rows were removed. Without it the surviving labels are the first ones, which is correct and at times surprising when the result is printed.
 
-`df.duplicated()` compares whole rows including `NaN`, and two rows with a missing value in the same column **do** count as duplicates of each other &mdash; unlike almost everywhere else in pandas, where `NaN` never equals `NaN`. That inconsistency is deliberate and useful here, since two identically incomplete rows usually are duplicates.
+`df.duplicated()` checks whole rows including `NaN`. Two rows with a missing value in the same column **do** count as copies of each other. Unlike almost all over else in pandas. Here `NaN` never equals `NaN`. That inconsistency is deliberate and handy here. Two the same way incomplete rows often are copies.
 
-And for finding duplicates across a subset of columns while keeping the rest, `df.groupby(keys).filter(lambda g: len(g) > 1)` returns every row belonging to a repeated key, which is the inspection view that `keep=False` gives more directly.
+And for finding copies across a subset of columns while keeping the rest, `df.groupby(keys).filter(lambda g. Len(g) > 1)` returns each row belonging to a repeated key. This Is the inspection view that `keep=False` gives more right.
 
 ## Deduplicating across sources
 
-The hardest version of this problem is not duplicates within one table but the same entity appearing in two.
+The hardest version of this problem isn't copies within one table but the same entity appearing in two.
 
-The steps are always the same, and only the third is difficult.
+The steps are always the same, and only the third is hard.
 
-**Normalise** both sides into a comparable key &mdash; case, whitespace, punctuation, and any domain-specific standardisation.
+**Norm** both sides into a close key. Case, whitespace, punctuation, and any domain-exact standardisation.
 
 **Match** on the key, with `merge` or `isin`.
 
-**Decide** what to do with near-matches that the key does not unify.
+**Decide** what to do with near-matches that the key doesn't unify.
 
-pandas handles the first two well. The third is record linkage, and it is a genuinely open problem for messy data: the same person may appear with a different spelling, a maiden name, a typo'd date of birth.
+pandas handles the first two well. The third is record linkage. It's a truly open problem for messy data. The same person may appear with a other spelling, a maiden name, a typo'd date of birth.
 
-The pragmatic middle ground is to match exactly on a normalised key, count how many records fail to match, and inspect a sample of those. Often a small number of normalisation rules &mdash; drop punctuation, standardise abbreviations &mdash; resolves most of them, and the rest are genuinely ambiguous and better flagged for a human than resolved by code.
+The pragmatic middle ground is to match just on a normed key, count how many records fail to match. Inspect a sample of those. Often a small number of scaling rules. Drop punctuation, standardise abbreviations. Resolves most of them. The rest are truly ambiguous and better flagged for a human than resolved by code.
 
 ## In summary
 
-`duplicated` flags every copy but the first, which is what makes it a drop mask; `keep=False` flags them all, which is what you want for inspection.
+`duplicated` flags each copy but the first. This Is what makes it a drop mask. `keep=False` flags them all. This Is what you want for inspection.
 
-The question that matters is usually about the **key** rather than the whole row, and `subset=` asks it.
+The question that matters is often about the **key** rather than the whole row, and `subset=` asks it.
 
-Sort before dropping, or which row survives is arbitrary. Normalise text first, or the same value counts as several. And if the repeated rows carry independent information, the operation you want is an aggregation, not a deletion.
+Sort before dropping, or which row lives is any. Norm text first, or the same value counts as a few. And if the repeated rows carry split data, the step you want is an aggregation, not a deletion.
 ''',
     [
         {"q": "What does `duplicated()` return for the first occurrence of a repeated row?",
@@ -4530,102 +4530,102 @@ intro: The .str accessor, and what it does with missing values.
 
 ## Why the accessor exists
 
-A Series of strings is a column of Python string objects. You could loop over them, and `apply(str.strip)` would work, but both are slow and neither reads well.
+A Series of strings is a column of Python string objects. You could loop over them. `apply(str.strip)` would work. Both are slow and neither reads well.
 
 `.str` exposes the string methods so they apply to the whole column: `s.str.strip()`, `s.str.lower()`, `s.str.len()`.
 
 Each returns a Series, so they chain: `s.str.strip().str.lower().str.replace(" ", "_")`.
 
-The accessor is required. `s.strip()` is not the same thing &mdash; it either does something unrelated to the Series or fails, because `strip` is not a Series method. Forgetting `.str` is the most common beginner error here, and the resulting `AttributeError` at least says so clearly.
+The accessor is needed. `s.strip()` isn't the same thing. It either does a thing unrelated to the Series or fails. `strip` isn't a Series method. Losing `.str` is the most common beginner error here. The resulting `AttributeError` at least says so clearly.
 
 ## Missing values pass through
 
 `.str` methods return `NaN` for missing input rather than raising or returning an empty string.
 
-That is usually right: the uppercase of an unknown value is unknown.
+That is often right: the uppercase of an unknown value is unknown.
 
-It becomes a problem for **predicates**. `s.str.contains("a")` returns `True`, `False` **or `NaN`**, and a mask containing `NaN` cannot be used to index a frame &mdash; pandas raises "Cannot mask with non-boolean array containing NA / NaN values".
+It turns a problem for **predicates**. `s.str.holds("a")` returns `True`, `False` **or `NaN`**. A mask holding `NaN` can't be used to index a frame. Pandas raises "Can't mask with non-boolean array holding NA / NaN values".
 
-The fix is `na=False`, which decides what a missing value should count as:
+The fix is `na=False`. This Decides what a missing value should count as:
 
 ```python
 df[df["name"].str.contains("ana", na=False)]
 ```
 
-Pass it every time you filter on a text predicate. `na=True` is occasionally what you want, when missing should be included.
+Pass it each time you filter on a text predicate. `na=True` is at times what you want, when missing should be included.
 
-This is the single most common runtime error in text cleaning, and it appears only when the data has a gap &mdash; so it usually shows up in production rather than on the sample.
+This is the single most common runtime error in text cleaning. It appears only when the data has a gap. So it often shows up in production rather than on the sample.
 
 ## Testing
 
-`contains` searches anywhere in the string. `startswith` and `endswith` anchor. `match` anchors at the start, `fullmatch` at both ends.
+`holds` searches anywhere in the string. `startswith` and `endswith` anchor. `match` anchors at the start, `fullmatch` at both ends.
 
-**`contains` takes a regular expression by default.** That matters more than it sounds, because it means `s.str.contains(".")` matches every non-empty string rather than finding a literal dot, and `s.str.contains("a|b")` is an alternation rather than a search for the three characters.
+**`holds` takes a regular formula by default.** That matters more than it sounds. It means `s.str.holds(".")` matches each non-empty string rather than finding a literal dot. `s.str.holds("a|b")` is an alternation rather than a search for the three characters.
 
-Pass `regex=False` for a literal search. It is also faster.
+Pass `regex=False` for a literal search. It's also faster.
 
-`case=False` makes the test case-insensitive without a separate `.lower()` pass.
+`case=False` makes the test case-insensitive without a split `.lower()` pass.
 
-`startswith` and `endswith` do **not** take a regex, which is an inconsistency worth remembering rather than deriving.
+`startswith` and `endswith` do **not** take a regex. This Is an inconsistency worth remembering rather than deriving.
 
 ## Splitting and extracting
 
-`s.str.split("-")` gives a Series of lists. That is rarely what you want directly.
+`s.str.split("-")` gives a Series of lists. That is rarely what you want right.
 
-`expand=True` turns it into a DataFrame with one column per piece, which is how you split a combined field into real columns. Rows with fewer pieces get `None` in the trailing columns.
+`expand=True` turns it into a DataFrame with one column per piece. This Is how you split a mixed field into real columns. Rows with fewer pieces get `None` in the trailing columns.
 
 `s.str.split("-").str[0]` takes one piece &mdash; the second `.str` indexes into the lists.
 
-`extract` is usually better when the structure is known. It takes a regex with capture groups and returns one column per group, and named groups become column names:
+`extract` is often better when the structure is known. It takes a regex with capture groups and returns one column per group. Named groups become column names:
 
 ```python
 s.str.extract(r"(?P<kind>[a-z]+)-(?P<num>\\d+)")
 ```
 
-Rows that do not match give `NaN` across the row, which makes non-matching input visible rather than silently mangled.
+Rows that don't match give `NaN` across the row. This Makes non-matching input visible rather than silently mangled.
 
-`extract` returns **text**, even for digits. Convert afterwards with `pd.to_numeric` if you need numbers.
+`extract` returns **text**, even for digits. Convert later with `pd.to_numeric` if you need numbers.
 
-`extractall` returns every match rather than the first, with a MultiIndex.
+`extractall` returns each match rather than the first, with a MultiIndex.
 
 ## Replacing
 
-`s.str.replace(old, new, regex=...)` requires the `regex` argument to be explicit in pandas 2. The default changed, and code written against pandas 1 that relied on the old behaviour can silently do the wrong thing.
+`s.str.replace(old, new, regex=...)` needs the `regex` arg to be clear in pandas 2. The default changed. Code written against pandas 1 that leaned on the old action can silently do the wrong thing.
 
-Two clean-ups earn their place in almost every script:
+Two clean-ups earn their place in almost each script:
 
-Collapsing whitespace: `s.str.replace(r"\\s+", " ", regex=True).str.strip()`.
+Merging whitespace: `s.str.replace(r"\\s+", " ", regex=True).str.strip()`.
 
-Normalising column names:
+Norming column names:
 
 ```python
 df.columns = (df.columns.str.strip().str.lower()
               .str.replace(r"[^a-z0-9]+", "_", regex=True).str.strip("_"))
 ```
 
-That turns `"  First Name "` and `"AGE (years)"` into `first_name` and `age_years`, and it handles a whole spreadsheet's worth of inconsistent headers without listing them.
+That turns `"  First Name "` and `"AGE (years)"` into `first_name` and `age_years`. It handles a whole spreadsheet's worth of inconsistent headers without listing them.
 
-Note `df.columns.str` works too &mdash; the column index is an Index, and Index has a `.str` accessor as well.
+Note `df.columns.str` works too &mdash; the column index is an Index. Index has a `.str` accessor as well.
 
 ## The cost
 
 `.str` is a convenience, not a vectorisation.
 
-Object columns hold pointers to Python strings, so every operation walks them one at a time in Python. The last editor shows text work running far slower than arithmetic on the same number of rows.
+Object columns hold pointers to Python strings. Each step walks them one at a time in Python. The last editor shows text work running far slower than math on the same number of rows.
 
 Three things help.
 
-**Do it once.** Clean text at load time rather than repeatedly inside a loop or a function called per group.
+**Do it once.** Clean text at load time rather than again and again inside a loop or a function called per group.
 
-**Convert to `category`** when values repeat. Operations then run on the small set of distinct values rather than every row.
+**Convert to `group`** when values repeat. steps then run on the small set of distinct values rather than each row.
 
-**Consider the `string` dtype.** `astype("string")` gives the nullable extension type, which has clearer missing-value semantics than `object` and is where pandas' future optimisation work is going.
+**Consider the `string` dtype.** `astype("string")` gives the nullable extension type. This Has clearer missing-value semantics than `object` and is where pandas' future tuning work is going.
 
-For very large text columns, the honest answer is that pandas is not the right tool, and the work belongs in a database or a purpose-built library.
+For very large text columns, the honest answer is that pandas isn't the right tool. The work belongs in a DB or a purpose-built library.
 
 ## The cleaning pipeline
 
-Text from the real world needs the same handful of operations almost every time, and doing them in one pass at load time is far better than scattering them through the analysis:
+Text from the real world needs the same handful of steps almost each time. Doing them in one pass at load time is far better than scattering them through the analysis:
 
 ```python
 df["city"] = (df["city"]
@@ -4634,33 +4634,33 @@ df["city"] = (df["city"]
               .str.replace(r"\s+", " ", regex=True))
 ```
 
-Strip the ends, normalise case, collapse internal whitespace. That alone resolves most of the "same value counted twice" problems that show up in a group-by.
+Strip the ends, norm case, collapse inner whitespace. That alone resolves most of the "same value counted twice" problems that show up in a group-by.
 
-For text that will be compared or joined on, consider also removing punctuation and accents. `unicodedata.normalize` handles accents; pandas has no built-in for it, and `.str.normalize("NFKD")` plus an ASCII encode is the usual idiom.
+For text that will be checked or joined on, consider also dropping punctuation and accents. `unicodedata.norm` handles accents. Pandas has no built-in for it. `.str.norm("NFKD")` plus an ASCII encode is the usual idiom.
 
 ## Extracting structure
 
-`str.extract` with named groups is the most useful of the extraction methods, because it names the outputs:
+`str.extract` with named groups is the most handy of the extraction methods. It names the outputs:
 
 ```python
 df[["kind", "num"]] = df["ref"].str.extract(r"(?P<kind>[a-z]+)-(?P<num>\d+)")
 ```
 
-Rows that do not match give `NaN` across the row, so counting them afterwards tells you how well the pattern fits:
+Rows that don't match give `NaN` across the row. Counting them later tells you how well the pattern fits:
 
 ```python
 unmatched = df["kind"].isna().sum()
 ```
 
-That check is worth making. A regex that matches 90% of rows silently discards the other 10%, and the only sign is a column with gaps.
+That check is worth making. A regex that matches 90% of rows silently discards the other 10%. The only sign is a column with gaps.
 
-`str.extractall` returns every match rather than the first, with a MultiIndex that has a `match` level.
+`str.extractall` returns each match rather than the first, with a MultiIndex that has a `match` level.
 
-`str.findall` returns a list per row, which is harder to work with and occasionally what you want.
+`str.findall` returns a list per row. This Is harder to work with and at times what you want.
 
 ## Testing and counting
 
-`str.contains` &mdash; anywhere, regex by default, needs `na=False` for filtering.
+`str.holds` &mdash; anywhere, regex by default, needs `na=False` for filtering.
 
 `str.startswith` / `str.endswith` &mdash; anchored, **no regex**.
 
@@ -4672,23 +4672,23 @@ That check is worth making. A regex that matches 90% of rows silently discards t
 
 `str.len` &mdash; length, which is a quick way to spot truncated or padded fields.
 
-A frequent need is "does this contain any of these words":
+A frequent need is "does this hold any of these words":
 
 ```python
 df["text"].str.contains("|".join(words), case=False, na=False)
 ```
 
-Building an alternation is fine for a handful of words. For a long list, and for whole-word matching, it is worth escaping the parts with `re.escape` and adding word boundaries, or the results will surprise you.
+Building an alternation is fine for a handful of words. For a long list. For whole-word matching, it's worth escaping the parts with `re.escape` and adding word boundaries, or the results will surprise you.
 
 ## Splitting into columns
 
-`str.split(sep, expand=True)` gives a DataFrame. Rows with fewer parts get `None` in the trailing columns, and rows with more parts are **truncated** unless you pass `n` to limit the splits.
+`str.split(sep, expand=True)` gives a DataFrame. Rows with fewer parts get `None` in the trailing columns. Rows with more parts are **truncated** unless you pass `n` to limit the splits.
 
-`n=1` splits only on the first separator, which is what you want for `key: value` text where the value may contain the separator.
+`n=1` splits only on the first separator. This Is what you want for `key. Value` text where the value may hold the separator.
 
-`str.rsplit` splits from the right, which handles "everything before the last dot" cleanly.
+`str.rsplit` splits from the right. This Handles "all before the last dot" cleanly.
 
-`str.partition` returns exactly three columns &mdash; before, separator, after &mdash; which avoids the variable-width problem entirely.
+`str.split` returns just three columns. Before, separator, after &mdash; which avoids the var-width problem fully.
 
 ## Categorical text
 
@@ -4698,23 +4698,23 @@ Once text is cleaned, if it repeats, convert it:
 df["city"] = df["city"].astype("category")
 ```
 
-The `.str` accessor still works on a categorical column, and pandas applies the operation to the **categories** rather than to every row &mdash; so `df["city"].str.upper()` on a million rows with four cities does four operations, not a million.
+The `.str` accessor still works on a cat column. Pandas applies the step to the **groups** rather than to each row. So `df["city"].str.upper()` on a million rows with four cities does four steps, not a million.
 
-That is the single largest speed-up available for repeated text work, and it is a one-line change.
+That is the single largest speed-up on hand for repeated text work, and it's a one-line change.
 
 ## When to stop using pandas for text
 
-pandas is a reasonable place to clean and extract from moderate amounts of text. It is not a text-processing engine.
+pandas is a fair place to clean and extract from moderate amounts of text. It isn't a text-handling engine.
 
-For tokenisation, stemming, language detection or anything linguistic, a dedicated library is the right tool.
+For token split, stemming, language spotting or anything linguistic, a dedicated library is the right tool.
 
-For very large corpora, the `object` dtype's per-row Python cost dominates, and the work belongs in a database, in Polars, or in a purpose-built pipeline.
+For very large corpora, the `object` dtype's per-row Python cost dominates. The work belongs in a DB, in Polars, or in a purpose-built pipeline.
 
-The signal is usually the profile: if `.str` operations are the slowest part of your script and the frame is large, the answer is a different tool rather than a cleverer regex.
+The signal is often the profile: if `.str` steps are the slowest part of your script and the frame is large, the answer is a other tool rather than a cleverer regex.
 
 ## Regex, briefly
 
-Several `.str` methods take a regular expression, and a small vocabulary covers most data cleaning:
+a few `.str` methods take a regular formula. A small vocab covers most data cleaning:
 
 `\d` digit, `\w` word character, `\s` whitespace, `.` any character.
 
@@ -4728,63 +4728,63 @@ Several `.str` methods take a regular expression, and a small vocabulary covers 
 
 `|` alternation.
 
-Two habits prevent most regex trouble in pandas. Use **raw strings** &mdash; `r"\d+"` &mdash; so backslashes reach the regex engine intact. And test the pattern on a handful of values before applying it to the column, because a pattern that matches nothing produces a column of `NaN` rather than an error.
+Two habits prevent most regex trouble in pandas. Use **raw strings**. `r"\d+"`. So backslashes reach the regex engine intact. And test the pattern on a handful of values before applying it to the column. A pattern that matches nothing makes a column of `NaN` rather than an error.
 
-`str.contains(..., regex=False)` and `str.replace(..., regex=False)` are both faster and safer when the pattern is a literal.
+`str.holds(..., regex=False)` and `str.replace(..., regex=False)` are both faster and safer when the pattern is a literal.
 
 ## Encoding problems
 
-Text that arrives mangled &mdash; `Ã©` where `é` belongs &mdash; was decoded with the wrong encoding, usually at read time.
+Text that arrives mangled &mdash; `Ã©` where `é` belongs &mdash; was decoded with the wrong encoding, often at read time.
 
-The fix is at `read_csv`, with `encoding="latin-1"` or `encoding="cp1252"`, not in pandas afterwards. Repairing mojibake after the fact is possible and unreliable.
+The fix is at `read_csv`, with `encoding="latin-1"` or `encoding="cp1252"`, not in pandas later. Repairing mojibake after the fact is possible and unreliable.
 
-`df["col"].str.encode("utf-8").str.decode("utf-8")` round-trips text and raises on anything invalid, which is a way to find the offending rows.
+`df["col"].str.encode("utf-8").str.decode("utf-8")` round-trips text and raises on anything invalid. This Is a way to find the offending rows.
 
-For matching across accented and unaccented spellings, normalising with `str.normalize("NFKD")` and stripping combining characters puts both forms into the same shape.
+For matching across accented and unaccented spellings, norming with `str.norm("NFKD")` and stripping mixing characters puts both forms into the same shape.
 
 ## Performance, restated
 
 Three things make text work faster, in order of effect:
 
-**Convert to `category`** when values repeat. Operations then apply to the categories, not the rows.
+**Convert to `group`** when values repeat. steps then apply to the groups, not the rows.
 
 **Do the cleaning once**, at load time, rather than inside a function called per group or per row.
 
 **Use `regex=False`** where the pattern is a literal.
 
-And the structural point: if `.str` operations dominate the profile on a large frame, pandas is the wrong layer for that work. A database, Polars, or a purpose-built text pipeline will do it in a fraction of the time.
+And the structural point: if `.str` steps dominate the profile on a large frame, pandas is the wrong layer for that work. A DB, Polars, or a purpose-built text pipeline will do it in a fraction of the time.
 
 ## A summary
 
 `.str` applies string methods elementwise and chains.
 
-Missing values pass through as `NaN`; pass `na=False` on any predicate used for filtering.
+Missing values pass through as `NaN`. Pass `na=False` on any predicate used for filtering.
 
-`contains` is a regex by default; `startswith` is not a regex at all.
+`holds` is a regex by default. `startswith` isn't a regex at all.
 
-`split(expand=True)` makes columns; `extract` with named groups is usually clearer.
+`split(expand=True)` makes columns. `extract` with named groups is often clearer.
 
-`replace` needs an explicit `regex=` in pandas 2.
+`replace` needs an clear `regex=` in pandas 2.
 
-Normalise column names and text values once, at load.
+Norm column names and text values once, at load.
 
-Convert repeated text to `category`.
+Convert repeated text to `group`.
 
-And check how many rows a pattern actually matched, rather than assuming it matched them all.
+And check how many rows a pattern really matched, rather than given it matched them all.
 
 ## A closing note
 
-Text is where pandas is least like an array library and most like ordinary Python, and both facts show.
+Text is where pandas is least like an array library and most like plain Python, and both facts show.
 
-`.str` gives you the string methods across a whole column, which is convenient and reads well. Underneath it is per-element Python over a column of pointers, which is why text work is an order of magnitude slower than arithmetic on the same number of rows.
+`.str` gives you the string methods across a whole column. This Is convenient and reads well. Underneath it's per-element Python over a column of pointers. This Is why text work is an order of magnitude slower than math on the same number of rows.
 
-Two things follow. Clean text **once**, at load, rather than repeatedly in the middle of a pipeline. And convert repeated values to `category`, after which `.str` operations apply to the handful of distinct values rather than to every row &mdash; usually the largest single speed-up available, for a one-line change.
+Two things follow. Clean text **once**, at load, rather than again and again in the middle of a pipeline. And convert repeated values to `group`, after which `.str` steps apply to the handful of distinct values rather than to each row. Often the largest single speed-up on hand, for a one-line change.
 
-The correctness trap is missing values. `.str` predicates return `NaN` rather than `False`, and a mask containing `NaN` cannot index a frame. `na=False` on every `.str` filter is the habit, and its absence is the error that appears only once the data has a gap.
+The correctness trap is missing values. `.str` predicates return `NaN` rather than `False`. A mask holding `NaN` can't index a frame. `na=False` on each `.str` filter is the habit. Its lack is the error that appears only once the data has a gap.
 
 ## One more thing
 
-`str.get(i)` indexes into each string or list, which is the concise form of `str[i]` and works the same way. It returns `NaN` rather than raising where the index is out of range, which is usually what you want on ragged data.
+`str.get(i)` indexes into each string or list. This Is the concise form of `str[i]` and works the same way. It returns `NaN` rather than raising where the index is out of range. This Is often what you want on ragged data.
 ''',
     [
         {"q": "Why does `df[df['name'].str.contains('a')]` sometimes raise?",
@@ -4949,111 +4949,111 @@ print("display is the convention that causes the fewest surprises.")'''),
     ],
     '''
 title: Dates and Times
-intro: Parsing them, the .dt accessor, and why a text date breaks everything downstream.
+intro: Parsing them, the .dt accessor, and why a text date breaks all downstream.
 
 ## They arrive as text
 
-`read_csv` does not parse dates unless you tell it to. A date column comes in as `object`, and everything you do with it is then string behaviour wearing a date's clothes.
+`read_csv` doesn't parse dates unless you tell it to. A date column comes in as `object`. All you do with it's then string action wearing a date's clothes.
 
-Sorting is lexical. For ISO format &mdash; `YYYY-MM-DD` &mdash; that happens to give the right answer, which is why the problem often goes unnoticed until the data arrives in another format. `"15/01/2024"` sorts before `"01/03/2024"` as text, and there is no error.
+Sorting is lexical. For ISO format. `YYYY-MM-DD`. That happens to give the right answer. This Is why the problem often goes unnoticed until the data arrives in another format. `"15/01/2024"` sorts before `"01/03/2024"` as text, and there's no error.
 
-Comparison has the same problem, as does anything asking for a month, a weekday or a difference in days.
+compare has the same problem, as does anything asking for a month, a weekday or a gap in days.
 
-The fix is `pd.to_datetime`, or `parse_dates=["col"]` at read time, which is faster because it happens during the read.
+The fix is `pd.to_datetime`, or `parse_dates=["col"]` at read time. This Is faster because it happens during the read.
 
-Checking `df.dtypes` after loading catches this, which is why it is in the inspection routine.
+Checking `df.dtypes` after loading catches this. This Is why it's in the inspection routine.
 
 ## Parsing
 
 `pd.to_datetime` is good at guessing, and guessing is the problem.
 
-`05/04/2024` is 5 April in most of the world and 4 May in the United States. pandas has to pick one, and it will not necessarily pick yours.
+`05/04/2024` is 5 April in most of the world and 4 May in the United States. pandas has to pick one. It won't always pick yours.
 
-`dayfirst=True` states the convention. Better still, `format="%d/%m/%Y"` states the whole shape. That removes the ambiguity **and** is substantially faster, because pandas can skip inference entirely &mdash; on a large column the difference is large enough to notice.
+`dayfirst=True` states the rule. Better still, `format="%d/%m/%Y"` states the whole shape. That drops the ambiguity **and** is much faster. Pandas can skip inference fully. On a large column the gap is large enough to notice.
 
-For messy input, `errors="coerce"` turns unparseable values into `NaT` (the datetime equivalent of NaN) rather than raising on the first bad row. Then `df[df["date"].isna()]` shows you exactly what failed, which is far more useful than a traceback naming one value.
+For messy input, `errors="coerce"` turns unparseable values into `NaT` (the datetime equal of NaN) rather than raising on the first bad row. Then `df[df["date"].isna()]` shows you just what failed. This Is far more handy than a traceback naming one value.
 
-`NaT` behaves like NaN: it fails every comparison and is caught by `isna()`.
+`NaT` behaves like NaN: it fails each compare and is caught by `isna()`.
 
 ## The .dt accessor
 
-Exactly parallel to `.str`.
+just parallel to `.str`.
 
-`s.dt.year`, `.month`, `.day`, `.hour`, `.minute` pull out components as integers.
+`s.dt.year`, `.month`, `.day`, `.hour`, `.minute` pull out parts as ints.
 
 `s.dt.day_name()` and `s.dt.month_name()` give text.
 
-`s.dt.quarter`, `.dayofweek`, `.dayofyear`, `.is_month_end` cover the derived questions that would otherwise need arithmetic.
+`s.dt.quarter`, `.dayofweek`, `.dayofyear`, `.is_month_end` cover the derived questions that would else need math.
 
-`s.dt.date` drops the time and returns Python `date` objects &mdash; note that this gives an `object` column, which is usually not what you want. `s.dt.normalize()` keeps it a proper datetime column set to midnight, and is the better choice for grouping by day.
+`s.dt.date` drops the time and returns Python `date` objects. Note that this gives an `object` column. This Is often not what you want. `s.dt.norm()` keeps it a proper datetime column set to midnight. Is the better choice for grouping by day.
 
-`s.dt.strftime(fmt)` formats for output, returning text. That is the last step before display, not something to do in the middle of a pipeline.
+`s.dt.strftime(fmt)` formats for output, returning text. That is the last step before display, not a thing to do in the middle of a pipeline.
 
 ## Arithmetic
 
 Subtracting two datetime columns gives a `timedelta64` column.
 
-`gap.dt.days` gives whole days; `gap.dt.total_seconds()` gives the full duration as a float, which is what you want for anything sub-day or for converting to arbitrary units.
+`gap.dt.days` gives whole days. `gap.dt.total_seconds()` gives the full duration as a float. This Is what you want for anything sub-day or for converting to any units.
 
 Adding a fixed duration uses `pd.Timedelta(days=30)`.
 
-Adding a **calendar** period uses `pd.DateOffset(months=1)`. The distinction matters: a month is not a fixed number of days, so "one month after 31 January" is a calendar question, not an arithmetic one. `DateOffset` handles month ends and leap years; `Timedelta` cannot, because it does not know what month it is in.
+Adding a **calendar** period uses `pd.DateOffset(months=1)`. The gap matters. A month isn't a fixed number of days. "one month after 31 January" is a calendar question, not an math one. `DateOffset` handles month ends and leap years. `Timedelta` can't. It doesn't know what month it's in.
 
 ## DatetimeIndex
 
-Putting the dates in the index unlocks the time-aware selection that makes pandas pleasant for time series.
+Putting the dates in the index unlocks the time-aware pick that makes pandas pleasant for time series.
 
-`s["2024-02"]` selects the whole of February. `s["2024"]` selects the year. This is **partial string indexing**, and it works because pandas understands the index is a timeline.
+`s["2024-02"]` selects the whole of February. `s["2024"]` selects the year. This is **partial string indexing**. It works because pandas understands the index is a timeline.
 
 `s["2024-01-10":"2024-01-20"]` slices a range, inclusive of both endpoints as label slicing always is.
 
-`pd.date_range(start, periods=n, freq=...)` builds such an index. The frequency aliases are worth knowing: `D` daily, `W` weekly, `ME` month end, `MS` month start, `h` hourly. Note that pandas 2.2 renamed several of these &mdash; `M` became `ME` and `H` became `h` &mdash; so older code raises a deprecation warning or an error depending on version.
+`pd.date_range(start, periods=n, freq=...)` builds such an index. The rate aliases are worth knowing: `D` daily, `W` weekly, `ME` month end, `MS` month start, `h` hourly. Note that pandas 2.2 renamed a few of these. `M` became `ME` and `H` became `h`. So older code raises a deprecation warning or an error based on version.
 
-A DatetimeIndex is also what `resample` requires, which is the subject of a later module.
+A DatetimeIndex is also what `resample` needs. This Is the subject of a later module.
 
 ## Time zones
 
-A timestamp is either **naive** (no zone) or **aware** (a zone attached). The two cannot be compared or subtracted, and the error when you try is clear.
+A timestamp is either **naive** (no zone) or **aware** (a zone attached). The two can't be checked or subtracted. The error when you try is clear.
 
 `s.dt.tz_localize("UTC")` attaches a zone to naive timestamps, asserting what they always meant. `s.dt.tz_convert("Asia/Kolkata")` converts an aware timestamp to another zone.
 
-Getting these backwards is the usual mistake: `tz_localize` on data that is already aware raises, and `tz_convert` on naive data raises too.
+Getting these backwards is the usual mistake: `tz_localize` on data that is already aware raises. `tz_convert` on naive data raises too.
 
-The convention that causes the fewest problems is to store everything in UTC and convert only for display. Mixed-zone data in one column is not representable as a proper datetime dtype at all &mdash; it falls back to `object` &mdash; which is a strong hint that normalising early is the right move.
+The rule that causes the fewest problems is to store all in UTC and convert only for display. Mixed-zone data in one column isn't representable as a proper datetime dtype at all. It falls back to `object`. Which is a strong hint that norming early is the right move.
 
 ## Parsing performance
 
-Date parsing is one of the slowest parts of loading a large file, and it is almost entirely avoidable.
+Date parsing is one of the slowest parts of loading a large file, and it's almost fully avoidable.
 
-`pd.to_datetime` without a format tries to infer one, per value in the worst case. With `format=` it uses a single known pattern and runs far faster &mdash; often by an order of magnitude on a large column.
+`pd.to_datetime` without a format tries to infer one, per value in the worst case. With `format=` it uses a single known pattern and runs far faster. Often by an order of magnitude on a large column.
 
 `format="ISO8601"` handles the common ISO variants without full inference.
 
 `cache=True` (the default for large inputs) helps enormously when the same date string repeats, as it does in any dataset with many rows per day.
 
-Parsing at read time with `parse_dates=` is faster than parsing afterwards, because pandas can do it while it already has the strings in hand.
+Parsing at read time with `parse_dates=` is faster than parsing later. Pandas can do it while it already has the strings in hand.
 
 ## Periods and offsets
 
-`Timestamp` is a point in time. `Period` is a span &mdash; a whole month, a quarter, a year.
+`Timestamp` is a point in time. `Period` is a span. A whole month, a quarter, a year.
 
-`s.dt.to_period("M")` converts timestamps to monthly periods. Grouping by that is often more natural than grouping by year and month separately, and it sorts correctly.
+`s.dt.to_period("M")` converts timestamps to monthly periods. Grouping by that is often more natural than grouping by year and month apart, and it sorts right.
 
-`PeriodIndex` supports arithmetic in period units: adding 1 to a monthly period gives the next month, without the day-of-month ambiguity that plagues timestamp arithmetic.
+`PeriodIndex` supports math in period units: adding 1 to a monthly period gives the next month, without the day-of-month ambiguity that plagues timestamp math.
 
-Offsets sit between the two. `pd.offsets.MonthEnd(1)`, `BusinessDay(3)`, `Week(weekday=0)` describe calendar movements. `df["date"] + pd.offsets.MonthEnd(0)` snaps each date to the end of its month, which is a common alignment step before joining monthly data.
+Offsets sit between the two. `pd.offsets.MonthEnd(1)`, `BusinessDay(3)`, `Week(weekday=0)` show calendar movements. `df["date"] + pd.offsets.MonthEnd(0)` snaps each date to the end of its month. This Is a common alignment step before joining monthly data.
 
-Business-day offsets understand weekends, and can take a holiday calendar, which is the sort of thing that is tedious to write by hand and easy to get subtly wrong.
+Business-day offsets understand weekends, and can take a holiday calendar. This Is the sort of thing that is tedious to write by hand and easy to get subtly wrong.
 
 ## Components, and the leap-year trap
 
-`.dt.year`, `.month`, `.day` are obvious. Two are not.
+`.dt.year`, `.month`, `.day` are obvious. Two aren't.
 
-`.dt.isocalendar()` returns ISO year, week and day, which is what you want for week-based reporting. The ISO year is **not** always the calendar year &mdash; the first days of January can belong to the previous ISO year &mdash; so grouping by `.dt.year` and ISO week together produces wrong groups at the boundary.
+`.dt.isocalendar()` returns ISO year, week and day. This Is what you want for week-based reporting. The ISO year is **not** always the calendar year. The first days of January can belong to the previous ISO year. So grouping by `.dt.year` and ISO week together makes wrong groups at the boundary.
 
-`.dt.dayofweek` is 0 for Monday; `.dt.day_name()` gives the name and respects locale settings.
+`.dt.dayofweek` is 0 for Monday. `.dt.day_name()` gives the name and respects locale settings.
 
-Computing an age or a duration in years by dividing days by 365 is wrong by a day every four years and accumulates. For exact calendar differences, subtract periods or use `dateutil.relativedelta`.
+finding an age or a duration in years by cutting days by 365 is wrong by a day each four years and builds up. For exact calendar differences, subtract periods or use `dateutil.relativedelta`.
 
 ## Time zones, in more depth
 
@@ -5063,29 +5063,29 @@ The rule that avoids nearly all trouble: **store UTC, convert for display**.
 
 `tz_convert` moves an aware timestamp to another zone. It raises on naive data.
 
-Getting these the wrong way round is the usual error, and the messages are clear about which you needed.
+Getting these the wrong way round is the usual error. The messages are clear about which you needed.
 
-Two edge cases are worth knowing because they are real and they raise:
+Two edge cases are worth knowing because they're real and they raise:
 
 **Ambiguous times** &mdash; when clocks go back, an hour occurs twice. `ambiguous="infer"`, `True`, `False`, or `NaT` decides.
 
-**Nonexistent times** &mdash; when clocks go forward, an hour does not exist. `nonexistent="shift_forward"` or `NaT` decides.
+**Nonexistent times** &mdash; when clocks go forward, an hour doesn't exist. `nonexistent="shift_forward"` or `NaT` decides.
 
-Both only appear on real local-time data crossing a DST boundary, which is exactly when you least want a surprise.
+Both only appear on real local-time data crossing a DST boundary. This Is just when you least want a surprise.
 
-A column mixing time zones cannot be a proper datetime dtype and falls back to `object`, losing `.dt` entirely. Normalising on the way in prevents that.
+A column mixing time zones can't be a proper datetime dtype and falls back to `object`, losing `.dt` fully. Norming on the way in blocks that.
 
 ## A checklist for date columns
 
-Parse them at read time, with an explicit format.
+Parse them at read time, with an clear format.
 
-Check `dtype` afterwards &mdash; `datetime64[ns]` means it worked, `object` means it did not.
+Check `dtype` later &mdash; `datetime64[ns]` means it worked, `object` means it didn't.
 
-Check the range with `min()` and `max()`. Dates in 1970 usually mean a zero timestamp; dates in 2099 usually mean a sentinel.
+Check the range with `min()` and `max()`. Dates in 1970 often mean a zero timestamp. Dates in 2099 often mean a sentinel.
 
 Decide on a time zone and apply it once.
 
-Set the index if you will resample or select by period.
+Set the index if you'll resample or select by period.
 
 Sort, if anything downstream will `diff`, `shift` or `rolling`.
 
@@ -5093,29 +5093,29 @@ Sort, if anything downstream will `diff`, `shift` or `rolling`.
 
 **Not parsing at all.** The column stays `object`, sorts lexically, and `.dt` raises. Check `dtypes`.
 
-**Letting the format be inferred** on ambiguous data. `05/04` is two different dates depending on convention.
+**Letting the format be inferred** on ambiguous data. `05/04` is two other dates based on rule.
 
-**Dividing days by 365** to get years. Wrong by a day every four years, and it accumulates.
+**Cutting days by 365** to get years. Wrong by a day each four years, and it builds up.
 
-**Grouping by `.dt.year` and ISO week together.** The ISO year differs from the calendar year at the start of January, so the boundary weeks land in the wrong group.
+**Grouping by `.dt.year` and ISO week together.** The ISO year differs from the calendar year at the start of January. The boundary weeks land in the wrong group.
 
-**Mixing naive and aware timestamps.** Raises, which is the good case; the bad case is a column that falls back to `object` and loses `.dt`.
+**Mixing naive and aware timestamps.** Raises. This Is the good case. The bad case is a column that falls back to `object` and loses `.dt`.
 
-**Using `.dt.date`** and getting an `object` column. `.dt.normalize()` keeps it a datetime.
+**Using `.dt.date`** and getting an `object` column. `.dt.norm()` keeps it a datetime.
 
-**Assuming rows are sorted.** `diff` and `rolling` produce numbers regardless.
+**given rows are sorted.** `diff` and `rolling` give numbers even so.
 
 ## Working with durations
 
 A `timedelta64` column comes from subtracting two datetime columns.
 
-`gap.dt.days` truncates toward zero and discards the remainder; `gap.dt.total_seconds()` keeps everything and is the safer basis for converting to arbitrary units.
+`gap.dt.days` truncates toward zero and discards the remainder. `gap.dt.total_seconds()` keeps all and is the safer basis for converting to any units.
 
-`gap.dt.components` breaks a duration into days, hours, minutes and so on as separate columns.
+`gap.dt.parts` breaks a duration into days, hours, minutes and so on as split columns.
 
-Durations aggregate: `mean`, `sum` and `describe` all work, and print in a readable form.
+Durations aggregate: `mean`, `sum` and `show` all work, and print in a readable form.
 
-For business durations &mdash; elapsed working days rather than calendar days &mdash; `np.busday_count` is the tool, and it takes a holiday list.
+For business durations &mdash; elapsed working days rather than calendar days &mdash; `np.busday_count` is the tool. It takes a holiday list.
 
 ## Generating date ranges
 
@@ -5123,11 +5123,11 @@ For business durations &mdash; elapsed working days rather than calendar days &m
 
 Three uses worth knowing:
 
-**Reindexing onto a complete calendar**, so missing days become explicit `NaN` rows rather than being absent.
+**Reindexing onto a full calendar**. So Missing days become clear `NaN` rows rather than being absent.
 
 **Building test data** with a known shape.
 
-**Checking for gaps** &mdash; comparing the actual index against a complete range shows exactly which periods are missing:
+**Checking for gaps** &mdash; checking the actual index against a full range shows just which periods are missing:
 
 ```python
 full = pd.date_range(s.index.min(), s.index.max(), freq="D")
@@ -5140,33 +5140,33 @@ That is a better answer than counting rows, because it names the gaps.
 
 ## A summary
 
-Parse at read time with an explicit format.
+Parse at read time with an clear format.
 
-Check the dtype is `datetime64[ns]` afterwards, and check the min and max for sentinel dates.
+Check the dtype is `datetime64[ns]` later, and check the min and max for sentinel dates.
 
-`.dt` for components, `strftime` only for display.
+`.dt` for parts, `strftime` only for display.
 
 `Timedelta` for fixed durations, `DateOffset` for calendar ones.
 
-Store UTC; convert for display.
+Store UTC. Convert for display.
 
-Set a `DatetimeIndex` when you need period selection or `resample`.
+Set a `DatetimeIndex` when you need period pick or `resample`.
 
-Sort before anything that compares a row with its neighbour.
+Sort before anything that checks a row with its neighbour.
 
-And remember pandas 2.2 renamed the frequency aliases &mdash; `M` to `ME`, `H` to `h` &mdash; which is the usual reason a copied example no longer runs.
+And note pandas 2.2 renamed the rate aliases. `M` to `ME`, `H` to `h`. Which is the usual reason a copied example no longer runs.
 
 ## A closing note
 
-Dates arrive as text, and everything that follows depends on noticing that.
+Dates arrive as text, and all that follows depends on noticing that.
 
-An unparsed date column sorts lexically, cannot do arithmetic, and has no `.dt`. For ISO-formatted dates the lexical sort happens to be correct, which is precisely why the problem often survives until the data arrives in a different format.
+An unparsed date column sorts lexically, can't do math. Has no `.dt`. For ISO-formatted dates the lexical sort happens to be correct. This Is just why the problem often lives until the data arrives in a other format.
 
-Parsing with an explicit `format=` removes both the ambiguity between day-first and month-first and most of the parsing cost, which on a large column is substantial.
+Parsing with an clear `format=` drops both the ambiguity between day-first and month-first and most of the parsing cost. This On a large column is large.
 
-After that, the two things worth being deliberate about are time zones and calendar arithmetic. Store UTC and convert for display, because mixed-zone columns cannot be a proper datetime dtype at all. And use `DateOffset` rather than `Timedelta` when you mean a calendar month, since a month is not a fixed number of days and only one of the two knows that.
+After that, the two things worth being deliberate about are time zones and calendar math. Store UTC and convert for display. Mixed-zone columns can't be a proper datetime dtype at all. And use `DateOffset` rather than `Timedelta` when you mean a calendar month. A month isn't a fixed number of days and only one of the two knows that.
 
-Finally, pandas 2.2 renamed the frequency aliases. When a copied example stops working, that is usually why.
+Finally, pandas 2.2 renamed the rate aliases. When a copied example stops working, that is often why.
 ''',
     [
         {"q": "Why does a date column read as text often seem to sort correctly?",
@@ -5328,67 +5328,67 @@ intro: sort_values, nlargest and rank, and where the missing values end up.
 
 ## sort_values
 
-`df.sort_values("sales")` sorts by one column. A list sorts by several, in order, and `ascending` takes a matching list so each key can have its own direction:
+`df.sort_values("sales")` sorts by one column. A list sorts by a few, in order. `ascending` takes a matching list so each key can have its own direction:
 
 ```python
 df.sort_values(["city", "sales"], ascending=[True, False])
 ```
 
-That is "by city A to Z, and within each city by sales high to low" &mdash; the shape of most reporting orders.
+That is "by city A to Z. Within each city by sales high to low". The shape of most reporting orders.
 
-The result is a **new** frame carrying the original index labels. If downstream code thinks positionally, `reset_index(drop=True)` afterwards.
+The result is a **new** frame carrying the first index labels. If downstream code thinks positionally, `reset_index(drop=True)` later.
 
-`kind` selects the algorithm. The default is not stable, so equal rows can come out in any order. Pass `kind="stable"` when ties must keep their original relative order &mdash; which matters if you are sorting by a second key after already sorting by a first, rather than passing both keys at once.
+`kind` selects the method. The default isn't stable. Equal rows can come out in any order. Pass `kind="stable"` when ties must keep their first scaled order. Which matters if you're sorting by a second key after already sorting by a first, rather than passing both keys at once.
 
 ## Missing values sort last
 
-`NaN` goes to the **end** in both ascending and descending order. It is not treated as very large or very small; it is simply put aside.
+`NaN` goes to the **end** in both ascending and descending order. It isn't treated as very large or very small. It's simply put aside.
 
-The consequence catches people: reversing an ascending sort is **not** the same as sorting descending, because the NaNs move relative to everything else.
+The result catches people: reversing an ascending sort is **not** the same as sorting descending. The NaNs move scaled to all else.
 
-`na_position="first"` puts them at the front instead, which is useful when the missing rows are the ones you want to look at.
+`na_position="first"` puts them at the front instead. This Is handy when the missing rows are the ones you want to look at.
 
 ## sort_index
 
-`sort_index()` orders by the index labels rather than the data. It is what you want after operations that leave the index shuffled, and it is required for label-range slicing on a non-unique index.
+`sort_index()` orders by the index labels rather than the data. It's what you want after steps that leave the index shuffled. It's needed for label-range slicing on a non-unique index.
 
-`sort_index(axis=1)` orders the **columns** alphabetically, which is a quick way to make two frames comparable.
+`sort_index(axis=1)` orders the **columns** alphabetically. This Is a quick way to make two frames close.
 
-Group-by results already come back sorted by key, so an extra `sort_index` there is usually redundant.
+Group-by results already come back sorted by key. An extra `sort_index` there's often redundant.
 
 ## nlargest and nsmallest
 
 Sorting 200,000 rows to look at five is wasted work.
 
-`df.nlargest(5, "v")` finds the top five without ordering the rest, and the last-but-one editor measures the difference.
+`df.nlargest(5, "v")` finds the top five without sorting the rest. The last-but-one editor measures the gap.
 
-Both take a list of columns for tie-breaking, and a `keep` argument controlling what happens when the boundary value is tied: `"first"`, `"last"` or `"all"`. `keep="all"` can return more than `n` rows, which is occasionally what you want and worth knowing before it surprises you.
+Both take a list of columns for tie-breaking. A `keep` arg controlling what happens when the boundary value is tied: `"first"`, `"last"` or `"all"`. `keep="all"` can return more than `n` rows. This Is at times what you want and worth knowing before it surprises you.
 
-For a single extreme value, neither is needed: `df["v"].max()` is a reduction and far cheaper than any sort. `idxmax()` gives the label of the row that holds it, which is how you get "the row with the highest value" in one step.
+For a single extreme value, neither is needed: `df["v"].max()` is a reduction and far cheaper than any sort. `idxmax()` gives the label of the row that holds it. This Is how you get "the row with the highest value" in one step.
 
 ## rank
 
-`rank` converts values into positions, and the interesting part is what it does with ties.
+`rank` converts values into spots, and the notable part is what it does with ties.
 
-`method="average"` (the default) gives tied values the mean of the ranks they span &mdash; two values tied for 2nd and 3rd both get 2.5. That is the statistically conventional choice and it produces fractional ranks, which surprises people expecting integers.
+`method="mean"` (the default) gives tied values the mean of the ranks they span. Two values tied for 2nd and 3rd both get 2.5. That is the statistically standard choice and it makes fractional ranks. This Surprises people expecting ints.
 
-`method="min"` gives both 2 and skips 3. This is competition ranking, the "joint second" of a leaderboard.
+`method="min"` gives both 2 and skips 3. This is contest ranking, the "joint second" of a leaderboard.
 
 `method="max"` gives both 3.
 
-`method="dense"` gives both 2 and makes the next value 3 &mdash; no gaps, which is what you want for grouping into levels.
+`method="dense"` gives both 2 and makes the next value 3. No gaps. This Is what you want for grouping into levels.
 
-`method="first"` breaks ties by order of appearance, giving strictly distinct integer ranks.
+`method="first"` breaks ties by order of appearance, giving strictly distinct int ranks.
 
-`ascending=False` ranks from the top. `pct=True` returns percentiles rather than positions, which is the quick route to "what fraction of rows are below this one".
+`ascending=False` ranks from the top. `pct=True` returns percentiles rather than spots. This Is the quick route to "what fraction of rows are below this one".
 
 `rank` also takes a `na_option`, and by default missing values get `NaN` ranks rather than being placed anywhere.
 
 ## The cost
 
-Sorting is `O(n log n)` and allocates a new frame. On a large table it is one of the more expensive things you can do.
+Sorting is `O(n log n)` and allocates a new frame. On a large table it's one of the more costly things you can do.
 
-Three cheaper alternatives cover most reasons people sort:
+Three cheaper options cover most reasons people sort:
 
 **An extreme value**: `max`, `min`, `idxmax`, `idxmin` &mdash; a single linear pass.
 
@@ -5396,38 +5396,38 @@ Three cheaper alternatives cover most reasons people sort:
 
 **Deduplication order**: sorting is genuinely required here, and it is the one case where sorting before `drop_duplicates` is not optional.
 
-Sort when the order is the actual output &mdash; a report, a chart, a file someone will read. Otherwise there is usually a reduction that answers the same question for a fraction of the cost.
+Sort when the order is the actual output. A report, a chart, a file someone will read. else there's often a reduction that answers the same question for a fraction of the cost.
 
 ## Sorting by something that is not a column
 
-`key=` applies a function to the sort keys before comparing, without changing the data:
+`key=` applies a function to the sort keys before checking, without changing the data:
 
 ```python
 df.sort_values("city", key=lambda s: s.str.lower())
 ```
 
-That sorts case-insensitively while leaving the original values intact. It is much cleaner than adding a helper column, sorting, and dropping it.
+That sorts case-insensitively while leaving the first values intact. It's much cleaner than adding a helper column, sorting, and dropping it.
 
-For a **custom order** &mdash; small, medium, large &mdash; the right tool is an ordered categorical:
+For a **custom order** &mdash; small, medium, large &mdash; the right tool is an sorted cat:
 
 ```python
 df["size"] = pd.Categorical(df["size"], ["small", "medium", "large"], ordered=True)
 df.sort_values("size")
 ```
 
-The order then belongs to the column and applies to every later sort, group-by and comparison, rather than being repeated at each call site.
+The order then belongs to the column and applies to each later sort, group-by and compare, rather than being repeated at each call site.
 
-Sorting by string length, by the last character, or by any derived value is `key=` with the appropriate `.str` operation.
+Sorting by string length, by the last character, or by any derived value is `key=` with the right `.str` step.
 
 ## Sorting a group-by result
 
-Group-by output arrives sorted by key. Usually you want it sorted by the value:
+Group-by output arrives sorted by key. often you want it sorted by the value:
 
 ```python
 df.groupby("city")["sales"].sum().sort_values(ascending=False)
 ```
 
-`sort=False` on the group-by itself skips the key sort, which is faster on many groups and gives order of first appearance.
+`sort=False` on the group-by itself skips the key sort. This Is faster on many groups and gives order of first appearance.
 
 For "the top n within each group", the pattern is a group-wise rank and a filter:
 
@@ -5435,55 +5435,55 @@ For "the top n within each group", the pattern is a group-wise rank and a filter
 df[df.groupby("city")["sales"].rank(ascending=False) <= 3]
 ```
 
-`groupby(...).head(3)` also works and takes the first three **rows** of each group in current order, so it needs a sort first to mean "the top three".
+`groupby(...).head(3)` also works and takes the first three **rows** of each group in current order. It needs a sort first to mean "the top three".
 
 ## Stability, in practice
 
-The default sort is not stable, so equal elements can come out in any order.
+The default sort isn't stable. So Equal elements can come out in any order.
 
 That matters in two situations.
 
-**A multi-pass sort.** Sorting by one column, then another, only works if the second sort preserves the first ordering. Pass `kind="stable"`, or better, sort by both keys in one call with a list.
+**A multi-pass sort.** Sorting by one column, then another, only works if the second sort preserves the first sorting. Pass `kind="stable"`, or better, sort by both keys in one call with a list.
 
-**Reproducible output.** Two runs on the same data can order ties differently, which makes diffs noisy and tests flaky. `kind="stable"` fixes it.
+**Reproducible output.** Two runs on the same data can order ties differently. This Makes diffs noisy and tests flaky. `kind="stable"` fixes it.
 
-The cost is small enough that using `kind="stable"` by default when the output is compared or written to a file is a reasonable habit.
+The cost is small enough that using `kind="stable"` by default when the output is checked or written to a file is a fair habit.
 
 ## Sorting large frames
 
-Sorting is `O(n log n)` and copies the frame. On a large table it is often the most expensive single operation in a script.
+Sorting is `O(n log n)` and copies the frame. On a large table it's often the most costly single step in a script.
 
-The alternatives, in order of preference:
+The options, in order of preference:
 
 **A reduction** &mdash; `max`, `min`, `idxmax`, `idxmin` for an extreme.
 
 **`nlargest` / `nsmallest`** for a top n.
 
-**`sort_index`** if the data is already nearly sorted by that key; it is cheaper than a full value sort.
+**`sort_index`** if the data is already nearly sorted by that key. It's cheaper than a full value sort.
 
-**Sorting once** and reusing the result, rather than sorting inside a loop or a function called repeatedly.
+**Sorting once** and reusing the result, rather than sorting inside a loop or a function called again and again.
 
-And when the sort *is* the output &mdash; a report, a leaderboard, a file someone reads &mdash; it is not overhead, it is the deliverable.
+And when the sort *is* the output. A report, a leaderboard, a file someone reads. It isn't cost, it's the deliverable.
 
 ## Ranking, and what to do with ties
 
-The five methods differ only in tie handling, and the right choice depends on what the rank is for.
+The five methods differ only in tie handling. The right choice depends on what the rank is for.
 
 For a **leaderboard**, `min` gives the familiar "joint second, then fourth".
 
 For **levels or bands**, `dense` avoids gaps.
 
-For a **statistic** &mdash; a rank correlation, a percentile &mdash; `average` is the conventional choice and is the default for that reason.
+For a **statistic** &mdash; a rank link, a percentile &mdash; `mean` is the standard choice and is the default for that reason.
 
-For a **deterministic ordering** where ties must be broken, `first` uses order of appearance, which means the result depends on how the frame is sorted.
+For a **fixed sorting** where ties must be broken, `first` uses order of appearance. This Means the result depends on how the frame is sorted.
 
-`pct=True` gives percentile ranks in `[0, 1]`, which is the quick route to "what fraction of rows are at or below this one" and is comparable across datasets of different sizes.
+`pct=True` gives percentile ranks in `[0, 1]`. This Is the quick route to "what fraction of rows are at or below this one" and is close across datasets of other sizes.
 
 ## Sorting the columns rather than the rows
 
-`df.sort_index(axis=1)` orders columns alphabetically, which makes two frames easier to compare and diffs easier to read.
+`df.sort_index(axis=1)` orders columns alphabetically. This Makes two frames easier to compare and diffs easier to read.
 
-For a deliberate order, selection is clearer: `df[["id", "date", "value"]]`.
+For a deliberate order, pick is clearer: `df[["id", "date", "value"]]`.
 
 For a partial order &mdash; pin some columns to the front, keep the rest &mdash; build the list:
 
@@ -5492,37 +5492,37 @@ first = ["id", "date"]
 df = df[first + [c for c in df.columns if c not in first]]
 ```
 
-That survives a schema change, where a hard-coded full list does not.
+That lives a schema change. Here A hard-coded full list doesn't.
 
 ## Sorting for output
 
-When the sort is the deliverable, a few details matter that do not otherwise.
+When the sort is the deliverable, a few details matter that don't else.
 
 `na_position="first"` when missing rows are what the reader should notice.
 
-`key=` for case-insensitive or natural ordering.
+`key=` for case-insensitive or natural sorting.
 
-An **ordered categorical** for a domain order &mdash; small/medium/large &mdash; so every later operation uses it too.
+An **sorted cat** for a domain order. Small/medium/large. So each later step uses it too.
 
-`reset_index(drop=True)` if row numbers will be displayed, so they read 0, 1, 2 rather than the original labels.
+`reset_index(drop=True)` if row numbers will be displayed. They read 0, 1, 2 rather than the first labels.
 
-`kind="stable"` so that re-running produces byte-identical output, which matters if the result is committed or diffed.
+`kind="stable"` so that re-running makes byte-same output. This Matters if the result is committed or diffed.
 
 ## Ties, restated
 
-The choice of tie-handling is a decision about meaning, not a technicality:
+The choice of tie-handling is a choice about meaning, not a detail:
 
-`average` &mdash; the statistical convention; produces fractional ranks.
+`mean` &mdash; the statistical rule. Makes fractional ranks.
 
-`min` &mdash; competition ranking; joint second, then fourth.
+`min` &mdash; contest ranking. Joint second, then fourth.
 
-`dense` &mdash; no gaps; for bands and levels.
+`dense` &mdash; no gaps. For bands and levels.
 
 `max` &mdash; the pessimistic reading.
 
-`first` &mdash; arbitrary but deterministic, and dependent on the current row order.
+`first` &mdash; any but fixed, and dependent on the current row order.
 
-If ranks are shown to people, `min` or `dense` usually matches their expectations. If ranks feed a statistic, `average` is the right default.
+If ranks are shown to people, `min` or `dense` often matches their expectations. If ranks feed a statistic, `mean` is the right default.
 
 ## A summary
 
@@ -5530,43 +5530,43 @@ If ranks are shown to people, `min` or `dense` usually matches their expectation
 
 A list of keys with a matching list of directions handles multi-key sorts in one call.
 
-Missing values go last in both directions, so reversing is not the same as descending.
+Missing values go last in both directions. So Reversing isn't the same as descending.
 
-`nlargest`/`nsmallest` for a top n; `idxmax`/`idxmin` for a single extreme.
+`nlargest`/`nsmallest` for a top n. `idxmax`/`idxmin` for a single extreme.
 
-`key=` for derived orderings; ordered categoricals for domain orderings.
+`key=` for derived orderings. Sorted cats for domain orderings.
 
 `kind="stable"` when ties must keep their order or output must be reproducible.
 
-And sorting is expensive &mdash; do it once, late, and only when the order is part of the answer.
+And sorting is costly &mdash; do it once, late. Only when the order is part of the answer.
 
 ## A closing note
 
-Sorting is expensive and frequently unnecessary, which makes it worth asking what the order is for.
+Sorting is costly and often not needed. This Makes it worth asking what the order is for.
 
-If the answer is "to find the largest", a reduction does it in one pass. If it is "to find the top ten", `nlargest` does it without ordering the rest. If it is "so deduplication keeps the right row", the sort is essential and skipping it makes the result arbitrary. If it is "because the output is a report", the sort is the deliverable and its cost is the point.
+If the answer is "to find the largest", a reduction does it in one pass. If it's "to find the top ten", `nlargest` does it without sorting the rest. If it's "so deduplication keeps the right row", the sort is essential and skipping it makes the result any. If it's "because the output is a report", the sort is the deliverable and its cost is the point.
 
-Ranking is the same operation asked differently, and its only real subtlety is ties. The default averages them, which produces fractional ranks and surprises people expecting integers; leaderboards usually want `min`, and bands usually want `dense`.
+Ranking is the same step asked differently. Its only real subtlety is ties. The default means them. This Makes fractional ranks and surprises people expecting ints. Leaderboards often want `min`, and bands often want `dense`.
 
-And missing values sort last in both directions, which means reversing an ascending sort is not the same as sorting descending &mdash; a small asymmetry that produces a wrong answer at the ends.
+And missing values sort last in both directions. This Means reversing an ascending sort isn't the same as sorting descending. A small skew that makes a wrong answer at the ends.
 
 ## One more thing
 
-`sort_values` accepts `ignore_index=True`, which renumbers the result rather than carrying the original labels along. That saves a separate `reset_index(drop=True)` when the sorted output is going to be displayed or written with row numbers.
+`sort_values` accepts `ignore_index=True`, which renumbers the result rather than carrying the first labels along. That saves a split `reset_index(drop=True)` when the sorted output is going to be displayed or written with row numbers.
 
-And `nlargest` and `nsmallest` exist on `groupby` objects too, so "the top three per group" is `df.groupby("city")["sales"].nlargest(3)` &mdash; which returns a MultiIndexed Series with the group and the original label, and usually wants `reset_index` before going anywhere else.
+And `nlargest` and `nsmallest` exist on `groupby` objects too. "the top three per group" is `df.groupby("city")["sales"].nlargest(3)`. Which returns a MultiIndexed Series with the group and the first label. Often wants `reset_index` before going anywhere else.
 
 ## A note on reproducibility
 
-Output that will be committed to a repository, diffed, or compared between runs should be deterministic, and sorting is where non-determinism creeps in.
+Output that will be committed to a store, diffed, or checked between runs should be fixed. Sorting is where non-determinism creeps in.
 
-The default sort is not stable, so tied rows can appear in different orders on different runs or different pandas versions. A file written from that output produces spurious diffs, and a test comparing it fails intermittently.
+The default sort isn't stable. Tied rows can appear in other orders on other runs or other pandas versions. A file written from that output makes spurious diffs. A test checking it fails intermittently.
 
-`kind="stable"` fixes it, at a cost small enough to ignore.
+`kind="stable"` fixes it, at a cost small enough to skip.
 
-The same applies to group-by, which sorts keys by default but says nothing about the order of rows within a group, and to `drop_duplicates`, whose survivor depends entirely on the current order.
+The same applies to group-by. This Sorts keys by default but says nothing about the order of rows within a group. To `drop_duplicates`, whose survivor depends fully on the current order.
 
-For anything whose output is compared, the rule is: sort explicitly, sort stably, and make the sort keys sufficient to determine the order uniquely.
+For anything whose output is checked, the rule is. Sort by name, sort stably. Make the sort keys enough to find the order uniquely.
 ''',
     [
         {"q": "Where do NaN values go when sorting descending?",
@@ -5732,7 +5732,7 @@ print(df.groupby("city")["sales"].nunique())'''),
     ],
     '''
 title: groupby
-intro: Split, apply, combine - the operation that is the reason to use pandas.
+intro: Split, apply, combine - the step that is the reason to use pandas.
 
 ## The three steps
 
@@ -5744,53 +5744,53 @@ intro: Split, apply, combine - the operation that is the reason to use pandas.
 
 **Combine** the results into one object, one row per group.
 
-Almost every question about aggregated data has this shape, and recognising it is most of what makes pandas worth using. The alternative in plain Python &mdash; a dict, a loop, a decision about missing keys, another loop to compute the summary &mdash; is a dozen lines that this replaces with one.
+Almost each question about aggregated data has this shape. Recognising it's most of what makes pandas worth using. The option in plain Python. A dict, a loop, a choice about missing keys, another loop to find the summary. Is a dozen lines that this replaces with one.
 
 ## The keys become the index
 
-By default the group keys become the index of the result. That is convenient for lookup and for plotting, and it is a surprise if you expected a plain column.
+By default the group keys become the index of the result. That is convenient for lookup and for plotting. It's a surprise if you expected a plain column.
 
-`as_index=False` keeps them as ordinary columns, giving a result that looks more like a table. `reset_index()` afterwards does the same thing.
+`as_index=False` keeps them as plain columns, giving a result that looks more like a table. `reset_index()` later does the same thing.
 
-Which you want depends on what happens next. If the result feeds a merge or gets written to a file, the flat form is usually easier. If you are going to select groups by name, the index form is better.
+Which you want depends on what happens next. If the result feeds a merge or gets written to a file, the flat form is often easier. If you're going to select groups by name, the index form is better.
 
-Results come back **sorted by key**. `sort=False` skips that sort, which is faster on many groups and gives you the order of first appearance instead.
+Results come back **sorted by key**. `sort=False` skips that sort. This Is faster on many groups and gives you the order of first appearance instead.
 
 ## The object is lazy
 
-`df.groupby("city")` computes nothing. It returns an object that knows how the rows would be split.
+`df.groupby("city")` finds nothing. It returns an object that knows how the rows would be split.
 
-That is why you can inspect it cheaply: `ngroups` counts the groups, `size()` gives rows per group, `get_group(name)` pulls one out, and iterating yields `(name, subframe)` pairs.
+That is why you can inspect it cheaply: `ngroups` counts the groups, `size()` gives rows per group, `get_group(name)` pulls one out. Iterating yields `(name, subframe)` pairs.
 
-Iterating is legitimate for inspection and almost always the wrong way to compute something. The loop runs Python once per group, which is the same performance trap as `apply`. If you find yourself accumulating results in a list inside a groupby loop, there is nearly always an `agg` that does it in one call.
+Iterating is legitimate for inspection and almost always the wrong way to find a thing. The loop runs Python once per group. This Is the same speed trap as `apply`. If you find yourself building up results in a list inside a groupby loop, there's nearly always an `agg` that does it in one call.
 
 ## Several keys
 
 `df.groupby(["city", "year"])` gives one level of index per key, in the order named.
 
-The result is a Series or frame with a **MultiIndex**, which has its own module later. Two operations cover most immediate needs:
+The result is a Series or frame with a **MultiIndex**. This Has its own module later. Two steps cover most direct needs:
 
-`unstack()` moves the last index level into columns, turning a long result into a wide table &mdash; cities down the side, years across the top.
+`unstack()` moves the last index level into columns, turning a long result into a wide table. Cities down the side, years across the top.
 
-`reset_index()` flattens everything back into ordinary columns.
+`reset_index()` flattens all back into plain columns.
 
 ## Missing keys disappear
 
-This is the behaviour most likely to produce a wrong number quietly.
+This is the action most likely to give a wrong number quietly.
 
-Rows whose group key is `NaN` are **excluded** by default. They are not put in a separate group; they are dropped.
+Rows whose group key is `NaN` are **excluded** by default. They aren't put in a split group. They're dropped.
 
-The result is that group totals do not add up to the frame total, and nothing says so. On a frame where 5% of the key column is missing, every aggregate is quietly computed on 95% of the data.
+The result is that group totals don't add up to the frame total. Nothing says so. On a frame where 5% of the key column is missing, each aggregate is quietly found on 95% of the data.
 
 `dropna=False` keeps them as a group with a `NaN` key.
 
-The habit worth forming: after any group-by that matters, check that the total of the result matches the total of the input. It is one line and it catches this immediately.
+The habit worth forming: after any group-by that matters, check that the total of the result matches the total of the input. It's one line and it catches this at once.
 
 ## Aggregating
 
-`df.groupby("city").sum(numeric_only=True)` applies one function to every numeric column.
+`df.groupby("city").sum(numeric_only=True)` applies one function to each numeric column.
 
-`agg({"sales": "sum", "units": "mean"})` applies a different function per column.
+`agg({"sales": "sum", "units": "mean"})` applies a other function per column.
 
 **Named aggregation** is the clearest form and the one to prefer:
 
@@ -5802,27 +5802,27 @@ df.groupby("city").agg(
 )
 ```
 
-Each output column is named explicitly, several statistics can come from the same input column, and the result has flat column names rather than the MultiIndex that a dict-of-lists produces. That last point saves a cleanup step almost every time.
+Each output column is named by name, a few statistics can come from the same input column. The result has flat column names rather than the MultiIndex that a dict-of-lists makes. That last point saves a cleanup step almost each time.
 
-Functions can be strings (`"sum"`, `"mean"`, `"nunique"`), NumPy functions, or your own callables. The strings are fastest, because they dispatch to compiled implementations rather than calling back into Python.
+Functions can be strings (`"sum"`, `"mean"`, `"nunique"`), NumPy functions, or your own callables. The strings are fastest. They dispatch to compiled setups rather than calling back into Python.
 
 ## size versus count
 
-A distinction that matters exactly where the data is imperfect.
+A gap that matters just where the data is imperfect.
 
 `size()` counts **rows** in each group, including rows with missing values.
 
-`count()` counts **non-missing values**, per column, so a group of five rows with two gaps in a column reports three for that column.
+`count()` counts **non-missing values**, per column. A group of five rows with two gaps in a column reports three for that column.
 
 `nunique()` counts distinct values.
 
-Using `count` where you meant `size` undercounts wherever data is missing, which is precisely where you are least likely to notice.
+Using `count` where you meant `size` undercounts wherever data is missing. This Is just where you're least likely to notice.
 
 ## Grouping by something that is not a column
 
 `groupby` accepts more than a column name.
 
-**A Series** of the same length groups by its values, which is how you group by a derived value without adding a column:
+**A Series** of the same length groups by its values. This Is how you group by a derived value without adding a column:
 
 ```python
 df.groupby(df["date"].dt.year)["sales"].sum()
@@ -5832,29 +5832,29 @@ df.groupby(df["date"].dt.year)["sales"].sum()
 
 **A function** is applied to each index label and groups by the result.
 
-**`pd.Grouper`** handles time: `groupby(pd.Grouper(key="date", freq="ME"))` groups by month without needing a DatetimeIndex, which is what makes it useful alongside other keys.
+**`pd.Grouper`** handles time: `groupby(pd.Grouper(key="date", freq="ME"))` groups by month without needing a DatetimeIndex. This Is what makes it handy alongside other keys.
 
 **`level=`** groups by an index level rather than a column.
 
-That flexibility means most "I need to add a column just to group by it" situations do not need the column.
+That flexibility means most "I need to add a column just to group by it" situations don't need the column.
 
 ## as_index, sort and dropna
 
-Three arguments change the shape or content of the result, and all three are worth passing deliberately.
+Three args change the shape or content of the result. All three are worth passing on purpose.
 
-`as_index=False` keeps the keys as columns. The result looks like a table rather than an indexed Series, and it is usually what you want when the output feeds a merge or a file.
+`as_index=False` keeps the keys as columns. The result looks like a table rather than an indexed Series. It's often what you want when the output feeds a merge or a file.
 
-`sort=False` skips sorting the keys. On many groups that is a real saving, and it gives order of first appearance instead of sorted order.
+`sort=False` skips sorting the keys. On many groups that is a real saving. It gives order of first appearance instead of sorted order.
 
-`dropna=False` keeps rows whose key is missing. The default drops them, which is the behaviour most likely to produce a total that does not reconcile.
+`dropna=False` keeps rows whose key is missing. The default drops them. This Is the action most likely to give a total that doesn't merge.
 
-`observed=True` matters for categorical keys: without it, group-by produces a row for **every** category including absent ones, which fills the result with zeros.
+`seen=True` matters for cat keys: without it, group-by makes a row for **each** group including absent ones. This Fills the result with zeros.
 
 ## Aggregating strings and other non-numerics
 
-`sum` on a string column concatenates, which is occasionally useful and often an accident.
+`sum` on a string column concatenates. This Is at times handy and often an accident.
 
-The aggregations that actually make sense on text:
+The aggregations that really make sense on text:
 
 `"first"` / `"last"` &mdash; a representative value, skipping missing.
 
@@ -5864,9 +5864,9 @@ The aggregations that actually make sense on text:
 
 `lambda s: ", ".join(s)` &mdash; collect them into one string.
 
-`list` &mdash; collect them into a list, giving a column of lists. Convenient, and it makes the column `object`, so it is a display or export step rather than something to compute on.
+`list` &mdash; collect them into a list, giving a column of lists. Convenient. It makes the column `object`. It's a display or export step rather than a thing to find on.
 
-`numeric_only=True` on `sum` and `mean` skips non-numeric columns rather than doing something surprising with them. It is worth passing explicitly, since the default has changed across versions.
+`numeric_only=True` on `sum` and `mean` skips non-numeric columns rather than doing a thing surprising with them. It's worth passing by name. The default has changed across versions.
 
 ## Group-by is a split, and splits can be expensive
 
@@ -5874,27 +5874,27 @@ The cost of a group-by is roughly: hashing the keys, sorting or grouping the row
 
 Three things make it faster:
 
-**A categorical key.** Grouping on integer codes beats grouping on strings, often substantially.
+**A cat key.** Grouping on int codes beats grouping on strings, often much.
 
-**`sort=False`** when you do not need sorted output.
+**`sort=False`** when you don't need sorted output.
 
-**A string aggregation name** rather than a lambda. `"sum"` dispatches to compiled code; `lambda s: s.sum()` calls Python once per group.
+**A string aggregation name** rather than a lambda. `"sum"` dispatches to compiled code. `lambda s: s.sum()` calls Python once per group.
 
-That last one is the most common avoidable slowdown. `agg("sum")` and `agg(lambda s: s.sum())` produce identical results and differ by an order of magnitude on many groups.
+That last one is the most common avoidable slowdown. `agg("sum")` and `agg(lambda s. S.sum())` give same results and differ by an order of magnitude on many groups.
 
 ## Checking a group-by
 
 Two checks catch most errors:
 
-**Do the totals reconcile?** `result["sales"].sum()` against `df["sales"].sum()`. If they differ, a key was missing and the rows were dropped.
+**Do the totals merge?** `result["sales"].sum()` against `df["sales"].sum()`. If they differ, a key was missing and the rows were dropped.
 
-**Is the group count what you expect?** `df.groupby(k).ngroups` against `df[k].nunique()`. If the group count is larger, the key has variants you did not know about &mdash; whitespace, case, or a type mismatch.
+**Is the group count what you expect?** `df.groupby(k).ngroups` against `df[k].nunique()`. If the group count is larger, the key has variants you didn't know about. Whitespace, case, or a type mismatch.
 
-Both are one line, and both catch problems that otherwise surface as a number that is slightly wrong.
+Both are one line, and both catch problems that else surface as a number that is slightly wrong.
 
 ## Reading a group-by result
 
-The output shape depends on what you selected and how you aggregated, and knowing which of four shapes you have prevents most downstream confusion.
+The output shape depends on what you selected and how you aggregated. Knowing which of four shapes you've blocks most downstream confusion.
 
 `df.groupby("k")["v"].sum()` &mdash; a **Series**, indexed by key.
 
@@ -5904,43 +5904,43 @@ The output shape depends on what you selected and how you aggregated, and knowin
 
 `df.groupby(["k", "j"])["v"].sum()` &mdash; a Series with a **MultiIndex**.
 
-The double-bracket detail is the one people miss: selecting one column with `["v"]` gives a Series, and with `[["v"]]` gives a one-column frame. That difference propagates to everything after it.
+The double-bracket detail is the one people miss. Selecting one column with `["v"]` gives a Series. With `[["v"]]` gives a one-column frame. That gap passes to all after it.
 
 ## Aggregations worth knowing
 
 Beyond `sum`, `mean` and `count`:
 
-`nunique` &mdash; distinct values per group, which answers "how many different products did each customer buy".
+`nunique` &mdash; distinct values per group. This Answers "how many other products did each customer buy".
 
-`first` / `last` &mdash; skip missing values, so they combine partial records.
+`first` / `last` &mdash; skip missing values. So They combine partial records.
 
-`idxmax` / `idxmin` &mdash; the **label** of the extreme row, which is how you get "the best row per group" rather than just its value: `df.loc[df.groupby("k")["v"].idxmax()]`.
+`idxmax` / `idxmin` &mdash; the **label** of the extreme row. This Is how you get "the best row per group" rather than just its value: `df.loc[df.groupby("k")["v"].idxmax()]`.
 
 `agg(lambda s: ...)` &mdash; anything else, at the cost of a Python call per group.
 
-`describe()` &mdash; a full summary per group, useful for exploration and too wide for a report.
+`show()` &mdash; a full summary per group, handy for exploration and too wide for a report.
 
-That `idxmax` pattern is worth remembering; it comes up constantly and the obvious alternatives are all worse.
+That `idxmax` pattern is worth remembering. It comes up constantly and the obvious options are all worse.
 
 ## Empty groups and missing keys
 
-Two different things that both cause totals not to reconcile.
+Two other things that both cause totals not to merge.
 
 **Missing keys** &mdash; rows whose group key is `NaN` are dropped unless `dropna=False`.
 
-**Empty groups** &mdash; a categorical key produces a row for every category, including ones with no rows, unless `observed=True`.
+**Empty groups** &mdash; a cat key makes a row for each group, including ones with no rows, unless `seen=True`.
 
-The first loses data silently. The second adds rows of zeros that were never in the data. Both defaults have changed across versions, which is a reason to pass them explicitly rather than rely on the current behaviour.
+The first loses data silently. The second adds rows of zeros that were never in the data. Both defaults have changed across versions. This Is a reason to pass them by name rather than lean on the current action.
 
 ## A summary
 
-Split, apply, combine &mdash; and the group keys become the index unless you say otherwise.
+Split, apply, combine &mdash; and the group keys become the index unless you say else.
 
-The object is lazy; nothing runs until you aggregate.
+The object is lazy. Nothing runs until you aggregate.
 
 Missing keys are dropped by default.
 
-Named aggregation gives flat column names and lets one column feed several statistics.
+Named aggregation gives flat column names and lets one column feed a few statistics.
 
 `size` counts rows, `count` counts non-missing values.
 
@@ -5948,31 +5948,31 @@ String aggregation names are much faster than lambdas.
 
 `idxmax` plus `.loc` gets the whole extreme row per group.
 
-And check that the group total matches the frame total &mdash; one line that catches the most common silent error here.
+And check that the group total matches the frame total. One line that catches the most common silent error here.
 
 ## A closing note
 
-Group-by is what pandas is for, and most of its surprises are about what silently does not appear in the result.
+Group-by is what pandas is for. Most of its surprises are about what silently doesn't appear in the result.
 
-Rows whose key is missing are dropped. Categorical keys produce rows for categories that never occurred. `count` and `size` differ wherever data is missing. Each default is defensible on its own, and together they mean a group-by result can fail to reconcile with the frame it came from in several ways at once.
+Rows whose key is missing are dropped. cat keys give rows for groups that never occurred. `count` and `size` differ wherever data is missing. Each default is defensible on its own. Together they mean a group-by result can fail to merge with the frame it came from in a few ways at once.
 
-The check that catches all of them is one line: compare the total of the result against the total of the input. If they differ, something was excluded, and the reason will be one of the above.
+The check that catches all of them is one line. Compare the total of the result against the total of the input. If they differ, a thing was excluded. The reason will be one of the above.
 
-Beyond that, the practical advice is to prefer named aggregation, which produces flat column names and lets one input column feed several statistics, and to use string aggregation names rather than lambdas, which is the difference between compiled code and a Python call per group.
+Beyond that, the hands-on advice is to prefer named aggregation. This Makes flat column names and lets one input column feed a few statistics. To use string aggregation names rather than lambdas. This Is the gap between compiled code and a Python call per group.
 
 ## One more thing
 
-A groupby object supports `nth(0)`, which takes the nth row of each group and is not the same as `first()`: `first()` skips missing values and `nth(0)` does not. When a group's first row has a gap, the two give different answers, and which you want depends on whether "first" means the first row or the first available value.
+A groupby object supports `nth(0)`. This Takes the nth row of each group and isn't the same as `first()`: `first()` skips missing values and `nth(0)` doesn't. When a group's first row has a gap, the two give other answers. Which you want depends on whether "first" means the first row or the first on hand value.
 
-`ngroup()` numbers the groups, which is a compact way to turn a set of keys into a single integer label for indexing or plotting.
+`ngroup()` numbers the groups. This Is a compact way to turn a set of keys into a single int label for indexing or plotting.
 
 ## In summary
 
 Split, apply, combine &mdash; and the details that decide whether the answer reconciles.
 
-Missing keys are dropped unless you say otherwise. Categorical keys produce rows for categories that never appeared. `size` counts rows and `count` counts values, and they differ wherever data is missing.
+Missing keys are dropped unless you say else. cat keys give rows for groups that never appeared. `size` counts rows and `count` counts values. They differ wherever data is missing.
 
-Named aggregation is the clearest form and gives flat column names. String aggregation names are much faster than lambdas. And comparing the result's total against the input's total is one line that catches the most common silent failure.
+Named aggregation is the clearest form and gives flat column names. String aggregation names are much faster than lambdas. And checking the result's total against the input's total is one line that catches the most common silent failure.
 ''',
     [
         {"q": "What happens to rows whose group key is NaN?",
@@ -6138,100 +6138,100 @@ print("  fewer rows  -> filter")'''),
     ],
     '''
 title: transform and filter
-intro: Group statistics broadcast back to every row.
+intro: Group statistics broadcast back to each row.
 
 ## The shape decides the method
 
-Three group-by operations differ only in the shape of what they return, and choosing between them is nearly always obvious once you ask what shape you want.
+Three group-by steps differ only in the shape of what they return. Choosing between them is nearly always obvious once you ask what shape you want.
 
 `agg` returns **one row per group**. A summary table.
 
-`transform` returns **one row per original row**. A new column.
+`transform` returns **one row per first row**. A new column.
 
-`filter` returns **a subset of the original rows**. Fewer rows, same columns.
+`filter` returns **a subset of the first rows**. Fewer rows, same columns.
 
-Most confusion here is someone reaching for `agg` when they wanted `transform`, then writing a merge to get back to the original shape.
+Most confusion here is someone reaching for `agg` when they wanted `transform`, then writing a merge to get back to the first shape.
 
 ## transform
 
-`df.groupby("city")["sales"].transform("sum")` gives every row its city's total.
+`df.groupby("city")["sales"].transform("sum")` gives each row its city's total.
 
-Because the result is aligned with the original frame, it assigns straight back:
+Because the result is aligned with the first frame, it assigns straight back:
 
 ```python
 df["city_total"] = df.groupby("city")["sales"].transform("sum")
 df["share"] = df["sales"] / df["city_total"]
 ```
 
-Two lines for "what fraction of its city's sales is this row", which is a question that otherwise needs an aggregation, a rename, a merge and a check that the merge did not change anything.
+Two lines for "what fraction of its city's sales is this row". This Is a question that else needs an aggregation, a rename, a merge and a check that the merge didn't change anything.
 
-That last point is the real argument. The aggregate-then-merge route is three steps, each of which can go wrong: the aggregate can drop `NaN` keys, the merge can multiply rows if the key is not unique, and the result can come back in a different order. `transform` cannot do any of those, because it never leaves the original index.
+That last point is the real arg. The aggregate-then-merge route is three steps, each of which can go wrong. The aggregate can drop `NaN` keys, the merge can times rows if the key isn't unique. The result can come back in a other order. `transform` can't do any of those. It never leaves the first index.
 
 ## What transform accepts
 
-A string naming a built-in (`"sum"`, `"mean"`, `"max"`, `"count"`) is fastest, because it dispatches to compiled code.
+A string naming a built-in (`"sum"`, `"mean"`, `"max"`, `"count"`) is fastest. It dispatches to compiled code.
 
-A function that maps a Series to a Series of the same length also works &mdash; `transform(lambda s: s - s.mean())` centres within group.
+A function that maps a Series to a Series of the same length also works. `transform(lambda s: s - s.mean())` centres within group.
 
-A function returning a **scalar** is broadcast to the whole group, which is why `transform("sum")` works at all.
+A function returning a **scalar** is broadcast to the whole group. This Is why `transform("sum")` works at all.
 
-What it cannot do is change the shape. A function returning a different length raises, which is the difference between `transform` and `apply` and the reason `transform` is predictable.
+What it can't do is change the shape. A function returning a other length raises. This Is the gap between `transform` and `apply` and the reason `transform` is predictable.
 
-Some methods exist directly on the groupby object and do not need `transform`: `rank`, `cumsum`, `cumcount`, `shift`, `diff` and `pct_change` all return per-row results already. `g.rank()` is both clearer and faster than `g.transform("rank")`.
+Some methods exist right on the groupby object and don't need `transform`: `rank`, `cumsum`, `cumcount`, `shift`, `diff` and `pct_change` all return per-row results already. `g.rank()` is both clearer and faster than `g.transform("rank")`.
 
 ## Common uses
 
 **A share of the group total** &mdash; the example above.
 
-**Centring within group** &mdash; `df["v"] - g.transform("mean")`. Standard preprocessing when groups have different baselines.
+**Centring within group** &mdash; `df["v"] - g.transform("mean")`. Standard prep when groups have other baselines.
 
 **Rank within group** &mdash; `g.rank(ascending=False)`. "Where does this row come in its own team."
 
-**Group-wise fill** &mdash; `df["temp"].fillna(g.transform("mean"))`. Filling a missing temperature with the mean for that *city* rather than the mean of everywhere, which uses information a global fill throws away.
+**Group-wise fill** &mdash; `df["temp"].fillna(g.transform("mean"))`. Filling a missing temp with the mean for that *city* rather than the mean of all over. This Uses data a global fill throws away.
 
-**Flagging outliers relative to the group** &mdash; comparing each value against its group's standard deviation.
+**Flagging outliers scaled to the group**. Checking each value against its group's standard deviation.
 
 ## filter
 
-`df.groupby("city").filter(lambda g: len(g) >= 2)` keeps every row belonging to a group with at least two rows.
+`df.groupby("city").filter(lambda g: len(g) >= 2)` keeps each row belonging to a group with at least two rows.
 
-The predicate receives the whole sub-frame and returns a single `True` or `False`. It is asked once per group, and the answer applies to all that group's rows.
+The predicate receives the whole sub-frame and returns a single `True` or `False`. It's asked once per group. The answer applies to all that group's rows.
 
-The result is **rows**, not groups &mdash; the same columns as the input, with whole groups removed.
+The result is **rows**, not groups. The same columns as the input, with whole groups removed.
 
-Typical uses: dropping groups with too little data to be meaningful, keeping only customers with more than one order, or removing categories below a volume threshold.
+Common uses: dropping groups with too little data to be real, keeping only customers with more than one order, or dropping groups below a volume threshold.
 
-Note this is a Python callback per group, so it is slower than an aggregation. For simple size conditions, computing sizes with `transform("size")` and filtering with a boolean mask is faster and does the same thing:
+Note this is a Python callback per group. It's slower than an aggregation. For simple size rules, finding sizes with `transform("size")` and filtering with a boolean mask is faster and does the same thing:
 
 ```python
 df[df.groupby("city")["sales"].transform("size") >= 2]
 ```
 
-That form is worth knowing because it composes with other conditions, whereas `filter` does not.
+That form is worth knowing because it composes with other rules, whereas `filter` doesn't.
 
 ## A note on apply
 
 `groupby(...).apply(func)` is the general escape hatch, and it can return any shape.
 
-That flexibility costs speed &mdash; it is a Python call per group &mdash; and predictability, since the shape of the result depends on what the function returned. In pandas 2.2 it also warns about whether the grouping columns are passed to the function, which is a sign of how awkward its semantics have become.
+That flexibility costs speed &mdash; it's a Python call per group &mdash; and predictability. The shape of the result depends on what the function returned. In pandas 2.2 it also warns about whether the grouping columns are passed to the function. This Is a sign of how awkward its semantics have become.
 
-Reach for `agg`, `transform` or `filter` first. They cover the large majority of cases, run in compiled code, and return a shape you can predict from the method name alone.
+Reach for `agg`, `transform` or `filter` first. They cover the large majority of cases, run in compiled code. Return a shape you can predict from the method name alone.
 
 ## Ranking and cumulative operations within groups
 
-Several methods on a groupby already return one row per input row, so they need no `transform`:
+a few methods on a groupby already return one row per input row. They need no `transform`:
 
 `cumsum`, `cumcount`, `cummax` &mdash; running totals and counters within each group.
 
-`rank` &mdash; position within the group.
+`rank` &mdash; spot within the group.
 
-`shift`, `diff`, `pct_change` &mdash; comparison with the previous row **of the same group**.
+`shift`, `diff`, `pct_change` &mdash; compare with the previous row **of the same group**.
 
-That last set matters more than it looks. `df["v"].diff()` on a frame containing several entities computes a difference across the boundary between one entity and the next, which is meaningless. `df.groupby("id")["v"].diff()` does not.
+That last set matters more than it looks. `df["v"].diff()` on a frame holding a few entities finds a gap across the boundary between one entity and the next. This Is meaningless. `df.groupby("id")["v"].diff()` doesn't.
 
-Any time you use `shift`, `diff` or `rolling` on panel data &mdash; several entities stacked in one frame &mdash; the group-by version is almost certainly the one you want, and using the plain version is a quiet, plausible-looking error.
+Any time you use `shift`, `diff` or `rolling` on panel data. A few entities stacked in one frame. The group-by version is almost certainly the one you want. Using the plain version is a quiet, plausible-looking error.
 
-`cumcount()` numbers the rows within each group from zero, which is how you take "the first three per group" or label repeat visits.
+`cumcount()` numbers the rows within each group from zero. This Is how you take "the first three per group" or label repeat visits.
 
 ## Percentages and shares
 
@@ -6247,22 +6247,22 @@ A share of the **whole frame** needs no group-by: `df["sales"] / df["sales"].sum
 
 A share **within a nested group** takes a list of keys: `transform("sum")` on `groupby(["region", "city"])`.
 
-Because the denominator comes back aligned, these compose &mdash; you can compute a share of city and a share of region in the same frame and compare them.
+Because the denominator comes back aligned, these compose. You can find a share of city and a share of region in the same frame and compare them.
 
 ## Standardising within groups
 
-Centring and scaling relative to a group is standard preprocessing when groups have different baselines &mdash; different stores, different sensors, different years:
+Centring and scaling scaled to a group is standard prep when groups have other baselines. Other stores, other sensors, other years:
 
 ```python
 g = df.groupby("store")["sales"]
 df["z"] = (df["sales"] - g.transform("mean")) / g.transform("std")
 ```
 
-Two cautions. A group with one row has a standard deviation of `NaN`, so the result is `NaN` for that row rather than zero. And a group with zero variance divides by zero, giving `inf`. Both are worth handling explicitly rather than discovering downstream.
+Two cautions. A group with one row has a standard deviation of `NaN`. The result is `NaN` for that row rather than zero. And a group with zero variance cuts by zero, giving `inf`. Both are worth handling by name rather than discovering downstream.
 
 ## Filtering by a group property
 
-`filter` takes a callback per group, which is flexible and slow.
+`filter` takes a callback per group. This Is flexible and slow.
 
 For the common cases, a `transform` and a boolean mask is faster and composes better:
 
@@ -6271,21 +6271,21 @@ df[df.groupby("city")["sales"].transform("size") >= 5]
 df[df.groupby("city")["sales"].transform("sum") > 1000]
 ```
 
-The mask form can be combined with other conditions using `&`, which `filter` cannot. It is also easier to reason about, because it is the same masking you use everywhere else.
+The mask form can be mixed with other rules using `&`. This `filter` can't. It's also easier to reason about. It's the same masking you use all over else.
 
-Reach for `filter` when the predicate genuinely needs the whole sub-frame &mdash; a condition involving several columns at once, or a statistical test per group.
+Reach for `filter` when the predicate truly needs the whole sub-frame. A rule involving a few columns at once, or a statistical test per group.
 
 ## Why apply is the last resort
 
-`groupby(...).apply(func)` can return anything, which is its appeal and its problem.
+`groupby(...).apply(func)` can return anything. This Is its appeal and its problem.
 
-It is a Python call per group, so it is slow.
+It's a Python call per group, so it's slow.
 
-The shape of the result depends on what the function returned, which makes it unpredictable to read.
+The shape of the result depends on what the function returned. This Makes it unpredictable to read.
 
-And in pandas 2.2 it warns about whether the grouping columns are passed to the function, because the historical behaviour was ambiguous enough to need changing.
+And in pandas 2.2 it warns about whether the grouping columns are passed to the function. The historical action was ambiguous enough to need changing.
 
-Before using it, check whether the operation is:
+Before using it, check whether the step is:
 
 a summary per group &mdash; `agg`;
 
@@ -6293,13 +6293,13 @@ a value per row &mdash; `transform`, or a groupby method like `rank` or `cumsum`
 
 a subset of rows &mdash; a mask built from `transform`, or `filter`;
 
-several columns from one computation &mdash; `agg` with named aggregation.
+a few columns from one math &mdash; `agg` with named aggregation.
 
-Those four cover the large majority of cases, run in compiled code, and return a shape you can predict from the method name.
+Those four cover the large majority of cases, run in compiled code. Return a shape you can predict from the method name.
 
 ## A worked example
 
-A frequent request: for each customer, how does this order compare with their own average, and where does it rank among their orders?
+A frequent request: for each customer, how does this order compare with their own mean. Where does it rank among their orders?
 
 ```python
 g = df.groupby("customer")["amount"]
@@ -6311,69 +6311,69 @@ df["share"]     = df["amount"] / g.transform("sum")
 df["order_no"]  = df.groupby("customer").cumcount() + 1
 ```
 
-Five columns, no loop, no merge, and every one aligned with the original rows.
+Five columns, no loop, no merge, and each one aligned with the first rows.
 
-Written with an aggregate-and-merge it would be four separate summaries and four joins, each of which could change the row count.
+Written with an aggregate-and-merge it would be four split summaries and four joins, each of which could change the row count.
 
 ## When transform is not enough
 
-`transform` requires the function to return either a scalar or something the same length as the group. Two cases fall outside that.
+`transform` needs the function to return either a scalar or a thing the same length as the group. Two cases fall outside that.
 
-**A different number of rows per group** &mdash; taking the top two per group, for instance. That is a filter: rank with `transform` or a groupby method, then mask.
+**A other number of rows per group**. Taking the top two per group, say. That is a filter. Rank with `transform` or a groupby method, then mask.
 
-**Several columns from one computation** &mdash; `transform` operates column by column, so a calculation needing two columns together does not fit. `groupby(...).apply` handles it, or restructure so each output column is computed separately.
+**a few columns from one math**. `transform` operates column by column. A math needing two columns together doesn't fit. `groupby(...).apply` handles it, or restructure so each output column is found apart.
 
 ## filter versus a mask
 
-They do the same job with different trade-offs.
+They do the same job with other trade-offs.
 
-`filter(lambda g: ...)` &mdash; the callback sees the whole sub-frame, so any condition is expressible. It is a Python call per group.
+`filter(lambda g: ...)` &mdash; the callback sees the whole sub-frame. Any rule is expressible. It's a Python call per group.
 
-`df[df.groupby(k)[c].transform("size") >= n]` &mdash; compiled, faster, and composes with other conditions using `&`.
+`df[df.groupby(k)[c].transform("size") >= n]` &mdash; compiled, faster, and composes with other rules using `&`.
 
-Use the mask for simple conditions on a single statistic, which is most of them. Use `filter` when the predicate genuinely needs several columns or a computation with no vectorised form.
+Use the mask for simple rules on a single statistic. This Is most of them. Use `filter` when the predicate truly needs a few columns or a math with no vectorised form.
 
 ## A summary
 
 `agg` reduces, `transform` broadcasts, `filter` selects rows.
 
-`transform` assigns straight back, because it keeps the original index.
+`transform` assigns straight back, because it keeps the first index.
 
 It replaces aggregate-then-merge, without the risk of changing row count or order.
 
 Group-wise `rank`, `cumsum`, `cumcount`, `shift` and `diff` are methods in their own right &mdash; no `transform` needed.
 
-On panel data, always use the group-wise `shift`/`diff`, or the comparison crosses between entities.
+On panel data, always use the group-wise `shift`/`diff`, or the compare crosses between entities.
 
-Group fills use information a global fill throws away.
+Group fills use data a global fill throws away.
 
-And prefer a `transform`-built mask to `filter` for simple size or total conditions.
+And prefer a `transform`-built mask to `filter` for simple size or total rules.
 
 ## A closing note
 
-`transform` is the operation that removes the most unnecessary joins from real pandas code.
+`transform` is the step that drops the most not needed joins from real pandas code.
 
-The pattern it replaces &mdash; aggregate to a summary, rename the column, merge it back &mdash; is three steps, each of which can change the row count or the order, and all of which exist only to get a group statistic aligned with the rows it came from. `transform` does that by construction, because it never leaves the original index.
+The pattern it replaces &mdash; aggregate to a summary, rename the column, merge it back &mdash; is three steps, each of which can change the row count or the order. All of which exist only to get a group statistic aligned with the rows it came from. `transform` does that by build. It never leaves the first index.
 
-Once you have it, a family of questions becomes one line each: this row's share of its group, its rank within its group, its distance from its group's mean, its group's size as a filter.
+Once you've it, a family of questions turns one line each. This row's share of its group, its rank within its group, its distance from its group's mean, its group's size as a filter.
 
-`filter` is the less-used sibling and is usually better expressed as a mask built from `transform`, which composes with other conditions and runs in compiled code.
+`filter` is the less-used sibling and is often better expressed as a mask built from `transform`. This Composes with other rules and runs in compiled code.
 
-Between `agg`, `transform` and a mask, the general-purpose `apply` is rarely needed &mdash; which is the point, because it is the slow and unpredictable one.
+Between `agg`, `transform` and a mask, the all-round `apply` is rarely needed. Which is the point. It's the slow and unpredictable one.
 
 ## One more thing
 
-`transform` accepts a list of functions in recent pandas, returning one column per function with a hierarchical column index. That is occasionally convenient and usually clearer written as separate assignments, since each output then has a name you chose.
+`transform` accepts a list of functions in recent pandas, returning one column per function with a nested column index. That is at times convenient and often clearer written as split sets. Each output then has a name you chose.
 
-More useful is that `transform` works on a whole frame, not just one column: `df.groupby("k").transform("mean")` returns a frame of group means for every numeric column at once, aligned with the original rows. Subtracting it centres the entire frame within groups in a single expression.
+More handy is that `transform` works on a whole frame, not just one column: `df.groupby("k").transform("mean")` returns a frame of group means for each numeric column at once, aligned with the first rows. Subtracting it centres the entire frame within groups in a single formula.
 
 ## In summary
 
-Three operations, distinguished only by the shape they return: `agg` gives one row per group, `transform` one row per input row, `filter` a subset of rows.
+Three steps, distinguished only by the shape they return: `agg` gives one row per group, `transform` one row per input row, `filter` a subset of rows.
 
-`transform` is the one that removes work, because it replaces the aggregate-rename-merge pattern with a single expression that cannot change the row count or the order.
+`transform` is the one that drops work. It replaces the aggregate-rename-merge pattern with a single formula that can't change the row count or the order.
 
-Prefer the group-by methods that already return per-row results &mdash; `rank`, `cumsum`, `cumcount`, `shift`, `diff` &mdash; over `transform` where they apply, and use the group-wise forms on panel data so comparisons do not cross between entities.
+Prefer the group-by methods that already return per-row results. `rank`, `cumsum`, `cumcount`, `shift`, `diff`. Over `transform` where they apply. Use the group-wise forms on panel data so checks don't cross between entities.
 ''',
     [
         {"q": "What is the difference between `agg` and `transform`?",
@@ -6531,17 +6531,17 @@ intro: value_counts, cut and crosstab.
 
 ## value_counts
 
-The most-used single method in exploratory work, and the first thing to run on any categorical column.
+The most-used single method in exploratory work. The first thing to run on any cat column.
 
-By default it counts each distinct value and sorts by frequency, descending. Three arguments change what it tells you:
+By default it counts each distinct value and sorts by rate, descending. Three args change what it tells you:
 
-`normalize=True` gives proportions rather than counts, which is what you want when comparing two datasets of different sizes.
+`norm=True` gives proportions rather than counts. This Is what you want when checking two datasets of other sizes.
 
-`dropna=False` includes missing values in the count. Without it, missing data is invisible here &mdash; and "invisible" is exactly the wrong property for the thing you most need to notice.
+`dropna=False` includes missing values in the count. Without it, missing data is invisible here. And "invisible" is just the wrong property for the thing you most need to notice.
 
-`sort=False` keeps the values in their natural order rather than by frequency; `.sort_index()` afterwards does the same job more explicitly.
+`sort=False` keeps the values in their natural order rather than by rate. `.sort_index()` later does the same job more by name.
 
-On a DataFrame, `df.value_counts()` counts distinct **combinations** of all columns, which is a quick way to find duplicated records.
+On a DataFrame, `df.value_counts()` counts distinct **mixes** of all columns. This Is a quick way to find duplicated records.
 
 ## cut
 
@@ -6551,41 +6551,41 @@ On a DataFrame, `df.value_counts()` counts distinct **combinations** of all colu
 pd.cut(ages, bins=[0, 17, 64, 200], labels=["child", "adult", "senior"])
 ```
 
-Bins are **right-inclusive** by default &mdash; the interval is `(left, right]`. So with an edge at 17, the value 17 is a child and 18 is an adult. `right=False` flips this to `[left, right)`, which is what you usually want for things like age where the convention is "18 and over".
+Bins are **right-inclusive** by default. The interval is `(left, right]`. So with an edge at 17, the value 17 is a child and 18 is an adult. `right=False` flips this to `[left, right)`. This Is what you often want for things like age where the rule is "18 and over".
 
-Getting this backwards produces an off-by-one at every boundary, and it does not raise.
+Getting this backwards makes an off-by-one at each boundary, and it doesn't raise.
 
-The result is a **categorical** with an order, so it sorts correctly and groups efficiently.
+The result is a **cat** with an order. So It sorts right and groups fast.
 
 ## Values outside the bins vanish
 
-Anything below the first edge or above the last becomes `NaN`.
+Anything below the first edge or above the last turns `NaN`.
 
-This is the failure mode to watch. A negative value, an outlier, a sentinel like `-1` or `9999` &mdash; all silently disappear from every count that follows, and the totals no longer match the row count.
+This is the failure mode to watch. A minus value, an outlier, a sentinel like `-1` or `9999`. All silently disappear from each count that follows. The totals no longer match the row count.
 
-Two defences. Use `-np.inf` and `np.inf` as the outer edges when the range is not known in advance. And check `result.notna().sum()` against `len(df)` after binning, which takes one line and catches it immediately.
+Two defences. Use `-np.inf` and `np.inf` as the outer edges when the range isn't known in advance. And check `result.notna().sum()` against `len(df)` after binning. This Takes one line and catches it at once.
 
-Passing an integer instead of a list &mdash; `pd.cut(s, 4)` &mdash; makes four equal-width bins spanning the data, so nothing falls outside. That is safe but rarely gives meaningful boundaries.
+Passing an int instead of a list. `pd.cut(s, 4)`. Makes four equal-width bins spanning the data. Nothing falls outside. That is safe but rarely gives real boundaries.
 
 ## qcut
 
 `pd.cut` makes bands of equal **width**. `pd.qcut` makes bands of equal **count**.
 
-The difference matters whenever the data is skewed. With a few large outliers, equal-width bins put almost every row in the first bucket and leave the rest nearly empty. Equal-count bins give you quartiles, deciles, or whatever split you asked for, each with the same number of rows.
+The gap matters when the data is skewed. With a few large outliers, equal-width bins put almost each row in the first bucket and leave the rest nearly empty. Equal-count bins give you quartiles, deciles, or what split you asked for, each with the same number of rows.
 
-Use `cut` when the boundaries have external meaning &mdash; age brackets, price tiers, pass marks. Use `qcut` when you want relative position &mdash; top quartile, bottom decile.
+Use `cut` when the boundaries have external meaning. Age brackets, price tiers, pass marks. Use `qcut` when you want scaled spot. Top quartile, bottom decile.
 
-`qcut` raises when repeated values make an even split impossible. `duplicates="drop"` merges the offending edges and returns fewer bins than requested, which is usually acceptable and worth knowing about before it fails on a column of mostly-zeros.
+`qcut` raises when repeated values make an even split hopeless. `copies="drop"` merges the offending edges and returns fewer bins than requested. This Is often acceptable and worth knowing about before it fails on a column of mostly-zeros.
 
 ## crosstab
 
-`pd.crosstab(df["city"], df["plan"])` gives a frequency table: cities down the side, plans across the top, counts in the cells.
+`pd.crosstab(df["city"], df["plan"])` gives a rate table: cities down the side, plans across the top, counts in the cells.
 
 `margins=True` adds row and column totals.
 
-`normalize="index"` gives row percentages, `"columns"` gives column percentages, and `True` gives the share of the grand total. Row percentages are usually the interesting ones &mdash; "what proportion of Delhi users are on the paid plan" &mdash; and are not the default.
+`norm="index"` gives row percentages, `"columns"` gives column percentages. `True` gives the share of the grand total. Row percentages are often the notable ones. "what proportion of Delhi users are on the paid plan". And aren't the default.
 
-`values=` with `aggfunc=` turns it from a count into any aggregation, at which point it is `pivot_table` with different spelling.
+`values=` with `aggfunc=` turns it from a count into any aggregation, at which point it's `pivot_table` with other spelling.
 
 ## The general form
 
@@ -6595,51 +6595,51 @@ Use `cut` when the boundaries have external meaning &mdash; age brackets, price 
 df.groupby("city")["plan"].value_counts().unstack(fill_value=0)
 ```
 
-That gives the same table. The long form &mdash; before `unstack` &mdash; is often more useful for further processing, and the wide form is better for reading.
+That gives the same table. The long form. Before `unstack`. Is often more handy for further handling. The wide form is better for reading.
 
-Knowing both matters because `crosstab` runs out of road quickly: more than two variables, custom aggregations, or anything feeding another computation is easier with group-by. Reach for `crosstab` when you want a table to look at, and group-by when the result has somewhere else to go.
+Knowing both matters because `crosstab` runs out of road quickly. More than two vars, custom aggregations, or anything feeding another math is easier with group-by. Reach for `crosstab` when you want a table to look at. Group-by when the result has one spot else to go.
 
 ## Counting combinations
 
-`df.value_counts()` on a whole frame counts distinct **row** combinations, which is a fast way to find duplicated records or to see which pairs of categories actually occur.
+`df.value_counts()` on a whole frame counts distinct **row** mixes. This Is a fast way to find duplicated records or to see which pairs of groups really occur.
 
-`df[["city", "plan"]].value_counts()` restricts it to two columns and gives a Series with a MultiIndex &mdash; the long form of a crosstab.
+`df[["city", "plan"]].value_counts()` restricts it to two columns and gives a Series with a MultiIndex. The long form of a crosstab.
 
-`normalize=True` works here too, giving the share of each combination.
+`norm=True` works here too, giving the share of each mix.
 
-`df.groupby(["city", "plan"]).size()` gives the same numbers with a different name, and is worth knowing because it composes with other group-by operations.
+`df.groupby(["city", "plan"]).size()` gives the same numbers with a other name. Is worth knowing because it composes with other group-by steps.
 
 ## Binning with meaningful edges
 
-The edges are usually the interesting decision, and there are three sources for them.
+The edges are often the notable choice, and there are three sources for them.
 
-**External definitions** &mdash; age brackets, tax bands, grade boundaries. These come from the domain, and `cut` with an explicit list is right.
+**External meanings** &mdash; age brackets, tax bands, grade boundaries. These come from the domain. `cut` with an clear list is right.
 
-**The data's distribution** &mdash; quartiles, deciles. `qcut` with a count.
+**The data's spread** &mdash; quartiles, deciles. `qcut` with a count.
 
-**Round numbers** &mdash; `np.arange(0, 101, 10)` for ten-point bands. Readable, and often better for communication than quantiles even when quantiles are statistically neater.
+**Round numbers** &mdash; `np.arange(0, 101, 10)` for ten-point bands. Readable. Often better for exchange than quantiles even when quantiles are statistically neater.
 
-`cut` also accepts an integer, giving equal-width bins across the observed range. The boundaries are then arbitrary decimals, which is fine for a quick look and poor for anything anyone reads.
+`cut` also accepts an int, giving equal-width bins across the seen range. The boundaries are then any decimals. This Is fine for a quick look and poor for anything anyone reads.
 
-`retbins=True` returns the edges alongside the result, which is how you apply the *same* bins to another dataset later &mdash; important when comparing two periods, because bins computed separately are not comparable.
+`retbins=True` returns the edges alongside the result. This Is how you apply the *same* bins to another dataset later. key when checking two periods. Bins found apart aren't close.
 
 ## Ordered categories from binning
 
-`cut` and `qcut` return an **ordered categorical**. That has three useful consequences.
+`cut` and `qcut` return an **sorted cat**. That has three handy results.
 
-Sorting works in bin order rather than alphabetically, which is why `value_counts().sort_index()` produces a sensible table.
+Sorting works in bin order rather than alphabetically. This Is why `value_counts().sort_index()` makes a sensible table.
 
-Comparison works: `df[df["band"] > "low"]` is meaningful.
+compare works: `df[df["band"] > "low"]` is real.
 
-Group-by on the result includes every bin, including empty ones &mdash; which is usually desirable in a report and occasionally surprising. `observed=True` restricts it to occupied bins.
+Group-by on the result includes each bin, including empty ones. Which is often wanted in a report and at times surprising. `seen=True` restricts it to occupied bins.
 
 ## Histograms
 
-`np.histogram` and `plt.hist` both bin and count in one step, and `pd.cut` plus `value_counts` gives the same numbers with labels you control.
+`np.histogram` and `plt.hist` both bin and count in one step. `pd.cut` plus `value_counts` gives the same numbers with labels you control.
 
-The bin count matters more than people expect: too few hides structure, too many turns the distribution into noise. `bins="auto"` in NumPy applies a rule of thumb, and looking at two or three bin counts is usually more informative than trusting one.
+The bin count matters more than people expect. Too few hides structure, too many turns the spread into noise. `bins="auto"` in NumPy applies a rule of thumb. Looking at two or three bin counts is often more helpful than trusting one.
 
-For comparing distributions between groups, counts are misleading when the groups are different sizes. `normalize=True`, or `crosstab(..., normalize="index")`, puts them on a comparable footing.
+For checking spreads between groups, counts are misleading when the groups are other sizes. `norm=True`, or `crosstab(..., norm="index")`, puts them on a close footing.
 
 ## The checks worth making
 
@@ -6651,13 +6651,13 @@ binned.value_counts().sort_index()   # is any bin empty or dominant
 len(binned) == len(df)       # nothing lost
 ```
 
-The first is the one that matters. Values outside the edges become `NaN` silently, and every count after that is computed on a subset without saying so.
+The first is the one that matters. Values outside the edges become `NaN` silently. Each count after that is found on a subset without saying so.
 
-And when the bins will be reused &mdash; on next month's data, or on a test set &mdash; save the edges rather than recomputing them. Bins derived from different data are not comparable, and quantile bins in particular will differ every time.
+And when the bins will be reused. On next month's data, or on a test set. Save the edges rather than recomputing them. Bins derived from other data aren't close. Quantile bins in given will differ each time.
 
 ## Reusing bins across datasets
 
-Bins computed from one dataset do not apply to another, and comparing two sets of quantile bins computed separately is meaningless &mdash; the boundaries differ.
+Bins found from one dataset don't apply to another. Checking two sets of quantile bins found apart is meaningless &mdash; the boundaries differ.
 
 `retbins=True` returns the edges:
 
@@ -6666,17 +6666,17 @@ train_binned, edges = pd.cut(train["score"], 4, retbins=True)
 test_binned = pd.cut(test["score"], bins=edges)
 ```
 
-The test data now uses the training boundaries, which is what makes the two comparable. Values outside the training range fall outside the bins and become `NaN`, which is honest &mdash; they are outside what the bins describe.
+The test data now uses the training boundaries. This Is what makes the two close. Values outside the training range fall outside the bins and become `NaN`. This Is honest. They're outside what the bins show.
 
-The same applies to any before-and-after comparison, and to production scoring against a model trained earlier. Saving the edges alongside the model is part of saving the model.
+The same applies to any before-and-after compare. To production scoring against a model trained earlier. Saving the edges alongside the model is part of saving the model.
 
 ## Counting with weights
 
-`value_counts` counts rows. When each row represents several things &mdash; a quantity column, a sampling weight &mdash; counting rows is the wrong number.
+`value_counts` counts rows. When each row shows a few things. A quantity column, a sampling weight. Counting rows is the wrong number.
 
 `df.groupby("city")["qty"].sum()` is the weighted version.
 
-`np.bincount`-style weighting has no direct `value_counts` equivalent, and group-by is the general answer.
+`np.bincount`-style weighting has no direct `value_counts` equal, and group-by is the general answer.
 
 For crosstabs, `pd.crosstab(a, b, values=c, aggfunc="sum")` weights the cells by another column.
 
@@ -6684,57 +6684,57 @@ For crosstabs, `pd.crosstab(a, b, values=c, aggfunc="sum")` weights the cells by
 
 `nunique()` against `len(df)` classifies a column in one number:
 
-**1** &mdash; constant; carries no information.
+**1** &mdash; constant. Carries no data.
 
 **2** &mdash; binary.
 
-**Low, relative to the rows** &mdash; a category; convert it.
+**Low, scaled to the rows** &mdash; a group. Convert it.
 
-**Close to the row count** &mdash; an identifier; not a feature.
+**Close to the row count** &mdash; an identifier. Not a feature.
 
-**Moderate and unexpected** &mdash; usually a sign of unnormalised text, where the same value appears in several spellings.
+**Moderate and surprise** &mdash; often a sign of unnormalised text. Here The same value appears in a few spellings.
 
-Running `df.nunique().sort_values()` across a new frame takes a second and tells you what kind of column each one is, which is the first thing you need to know.
+Running `df.nunique().sort_values()` across a new frame takes a second and tells you what kind of column each one is. This Is the first thing you need to know.
 
 ## A summary
 
-`value_counts` first, with `dropna=False` and sometimes `normalize=True`.
+`value_counts` first, with `dropna=False` and at times `norm=True`.
 
-`cut` for meaningful boundaries, `qcut` for equal-sized groups.
+`cut` for real boundaries, `qcut` for equal-sized groups.
 
-Bins are right-inclusive by default; `right=False` flips it.
+Bins are right-inclusive by default. `right=False` flips it.
 
-Values outside the edges become `NaN` silently &mdash; use infinite outer edges, and check the count afterwards.
+Values outside the edges become `NaN` silently. Use infinite outer edges, and check the count later.
 
 Save the edges when the bins will be reused.
 
-`crosstab` for a table to look at; `groupby` plus `unstack` when the result goes somewhere else.
+`crosstab` for a table to look at. `groupby` plus `unstack` when the result goes one spot else.
 
-And weight the counts when rows are not the unit you actually mean to count.
+And weight the counts when rows aren't the unit you really mean to count.
 
 ## A closing note
 
-Counting is the least glamorous operation in pandas and the one that catches the most problems.
+Counting is the least glamorous step in pandas and the one that catches the most problems.
 
-`value_counts` on every categorical column, run before any analysis, finds the typos, the stray capitals, the trailing spaces and the categories nobody mentioned. Each of those would otherwise become a silently split group in an aggregation.
+`value_counts` on each cat column, run before any analysis, finds the typos, the stray capitals, the trailing spaces and the groups no one mentioned. Each of those would else become a silently split group in an aggregation.
 
-Binning turns continuous data into the categories a question is actually about &mdash; age brackets, price tiers, quartiles. The two things to hold onto are that bins are right-inclusive by default, and that values outside the edges vanish into `NaN` without a word.
+Binning turns smooth data into the groups a question is really about. Age brackets, price tiers, quartiles. The two things to hold onto are that bins are right-inclusive by default. That values outside the edges vanish into `NaN` without a word.
 
-Both are worth checking with one line each: the boundary convention against a value that sits on a boundary, and the count of non-missing results against the row count. Together they take a few seconds and prevent an entire class of quietly wrong summaries.
+Both are worth checking with one line each. The boundary rule against a value that sits on a boundary. The count of non-missing results against the row count. Together they take a few seconds and prevent an entire class of quietly wrong summaries.
 
 ## Two more things worth knowing
 
-`pd.cut` accepts `labels=False`, which returns the **bin number** rather than a label. That is what you want when the bins feed a model or a further computation rather than a report, and it avoids the categorical dtype entirely.
+`pd.cut` accepts `labels=False`, which returns the **bin number** rather than a label. That is what you want when the bins feed a model or a further math rather than a report. It avoids the cat dtype fully.
 
-`value_counts` has a `bins=` argument that bins and counts in one step for numeric data: `s.value_counts(bins=5)` is `pd.cut` followed by counting, which is convenient for a quick look at a distribution.
+`value_counts` has a `bins=` arg that bins and counts in one step for numeric data: `s.value_counts(bins=5)` is `pd.cut` followed by counting. This Is convenient for a quick look at a spread.
 
-And `pd.crosstab` accepts lists for either axis, giving hierarchical rows or columns, and `dropna=False` keeps combinations that never occurred. The second is worth knowing when two crosstabs must have the same shape to be compared &mdash; without it, a category absent from one dataset simply does not appear, and the tables no longer line up.
+And `pd.crosstab` accepts lists for either axis, giving nested rows or columns. `dropna=False` keeps mixes that never occurred. The second is worth knowing when two crosstabs must have the same shape to be checked. Without it, a group absent from one dataset simply doesn't appear. The tables no longer line up.
 
 ## Counting for comparison
 
-Counts answer "how many". Comparing two groups needs proportions, because raw counts confound size with rate.
+Counts answer "how many". Checking two groups needs proportions. Raw counts confound size with rate.
 
-A city with twice the population has twice the customers on any plan, and comparing the counts says nothing. `normalize="index"` on a crosstab, or `value_counts(normalize=True)` within a group-by, puts them on the same footing:
+A city with twice the group has twice the customers on any plan. Checking the counts says nothing. `norm="index"` on a crosstab, or `value_counts(norm=True)` within a group-by, puts them on the same footing:
 
 ```python
 (df.groupby("city")["plan"]
@@ -6743,17 +6743,17 @@ A city with twice the population has twice the customers on any plan, and compar
    .round(3))
 ```
 
-That reads as "what fraction of each city's customers are on each plan", which is usually the question people mean.
+That reads as "what fraction of each city's customers are on each plan". This Is often the question people mean.
 
-The reverse normalisation &mdash; `normalize="columns"` &mdash; answers a different question: "what fraction of paid customers are in each city". Both are legitimate and they are not interchangeable, and stating which one a table shows is worth a line of text next to it, because the numbers alone do not say.
+The reverse scaling &mdash; `norm="columns"` &mdash; answers a other question: "what fraction of paid customers are in each city". Both are legitimate and they aren't the same. Stating which one a table shows is worth a line of text next to it. The numbers alone don't say.
 
 ## In summary
 
-`value_counts` on every categorical column is the cheapest diagnostic in pandas, and it finds the variants that would otherwise split a group-by silently.
+`value_counts` on each cat column is the cheapest diagnostic in pandas. It finds the variants that would else split a group-by silently.
 
-`cut` bands by boundaries you choose and `qcut` by quantiles, and the choice depends on whether the boundaries have external meaning or you want equal-sized groups.
+`cut` bands by boundaries you choose and `qcut` by quantiles. The choice depends on whether the boundaries have external meaning or you want equal-sized groups.
 
-Two things to check every time: which convention the bin edges use, since they are right-inclusive by default, and how many values fell outside the edges, since those become `NaN` without a word and every count afterwards is computed on a subset.
+Two things to check each time: which rule the bin edges use. They're right-inclusive by default. How many values fell outside the edges, since those become `NaN` without a word and each count later is found on a subset.
 ''',
     [
         {"q": "In `pd.cut(ages, bins=[0, 17, 64, 200])`, which band does 17 fall into?",
@@ -6918,55 +6918,55 @@ print("On 200 rows, apply is fine. On 200,000 it is the bottleneck.")'''),
     ],
     '''
 title: apply, map and Vectorising
-intro: The escape hatch, what it costs, and the form that usually replaces it.
+intro: The escape hatch, what it costs, and the form that often replaces it.
 
 ## Three different things
 
-`Series.map` looks each value up in a dict, a Series, or a function. It is for **substitution**.
+`Series.map` looks each value up in a dict, a Series, or a function. It's for **substitution**.
 
-`Series.apply` calls a function on each value. It is for **computation** that has no array form.
+`Series.apply` calls a function on each value. It's for **math** that has no array form.
 
 `DataFrame.apply` calls a function on each column (`axis=0`) or each row (`axis=1`).
 
-`DataFrame.map` &mdash; formerly `applymap` &mdash; calls a function on every individual cell.
+`DataFrame.map` &mdash; formerly `applymap` &mdash; calls a function on each single cell.
 
-They look interchangeable in small examples and are not, and the differences show up in both speed and behaviour with missing values.
+They look the same in small examples and aren't. The differences show up in both speed and action with missing values.
 
 ## map
 
 `s.map({"a": "apple"})` replaces values by lookup.
 
-Anything not in the mapping becomes `NaN`. That is a reasonable default and frequently not what people want &mdash; a typo in a key silently blanks a column.
+Anything not in the mapping turns `NaN`. That is a fair default and often not what people want. A typo in a key silently blanks a column.
 
-`s.map(lookup).fillna(s)` keeps the original where there was no match, which is usually the intended behaviour for a partial rename.
+`s.map(lookup).fillna(s)` keeps the first where there was no match. This Is often the intended action for a partial rename.
 
-`na_action="ignore"` skips missing input rather than passing `NaN` to the function, which matters when the function would fail on it.
+`na_action="skip"` skips missing input rather than passing `NaN` to the function. This Matters when the function would fail on it.
 
-`map` with a dict is fast, because it is a lookup rather than a call. `map` with a **function** is exactly as slow as `apply`.
+`map` with a dict is fast. It's a lookup rather than a call. `map` with a **function** is just as slow as `apply`.
 
 ## What apply costs
 
-`apply` does not vectorise anything. It calls your function once per element and assembles the results.
+`apply` doesn't vectorise anything. It calls your function once per element and assembles the results.
 
-The third editor measures it: on 200,000 rows, `apply` runs roughly an order of magnitude slower than the equivalent arithmetic, and is no faster than a plain list comprehension &mdash; because that is essentially what it is.
+The third editor measures it: on 200,000 rows, `apply` runs roughly an order of magnitude slower than the equal math. Is no faster than a plain list comprehension. Because that is what it's.
 
-There is a persistent belief that `apply` is "the pandas way" and therefore fast. It is neither. It is the escape hatch for when there is no array expression.
+There's a persistent belief that `apply` is "the pandas way" and so fast. It's neither. It's the escape hatch for when there's no array formula.
 
 ## axis=1 is the expensive one
 
-`df.apply(func, axis=1)` constructs a **Series object for every row** and passes it to your function. That is object creation per row on top of the Python call.
+`df.apply(func, axis=1)` makes a **Series object for each row** and passes it to your function. That is object creation per row on top of the Python call.
 
-It is the single most common reason a pandas script is slow, and it is nearly always replaceable.
+It's the single most common reason a pandas script is slow, and it's nearly always replaceable.
 
-The tell is a lambda that indexes into the row: `lambda row: row["a"] * row["b"]`. That is `df["a"] * df["b"]`, which operates on whole columns in compiled code.
+The tell is a lambda that indexes into the row: `lambda row: row["a"] * row["b"]`. That is `df["a"] * df["b"]`. This Operates on whole columns in compiled code.
 
 ## The replacements
 
-Nearly every row-wise `apply` is one of a handful of patterns:
+Nearly each row-wise `apply` is one of a handful of patterns:
 
-**A conditional** &mdash; `np.where(cond, a, b)`. The vectorised if/else.
+**A gated** &mdash; `np.where(cond, a, b)`. The vectorised if/else.
 
-**Several conditions** &mdash; `np.select([c1, c2], [v1, v2], default=v3)`. Evaluated in order, first match wins.
+**a few rules** &mdash; `np.select([c1, c2], [v1, v2], default=v3)`. checked in order, first match wins.
 
 **A lookup** &mdash; `map` with a dict.
 
@@ -6974,75 +6974,75 @@ Nearly every row-wise `apply` is one of a handful of patterns:
 
 **String work** &mdash; the `.str` accessor.
 
-**Row-wise arithmetic** &mdash; ordinary column arithmetic.
+**Row-wise math** &mdash; plain column math.
 
 **A group statistic per row** &mdash; `groupby(...).transform(...)`.
 
-Between them these cover the large majority of real cases. When you find yourself writing `apply(axis=1)`, it is worth thirty seconds to check this list first.
+Between them these cover the large majority of real cases. When you find yourself writing `apply(axis=1)`, it's worth thirty seconds to check this list first.
 
 ## When apply is right
 
-It genuinely earns its place in a few situations.
+It truly earns its place in a few situations.
 
-**Wrapping an existing scalar function** you cannot or should not rewrite &mdash; a parser, a validator, a call into another library.
+**Wrapping an existing scalar function** you can't or shouldn't rewrite. A parser, a checker, a call into another library.
 
-**Per-row logic with no array equivalent** &mdash; something that branches on several columns in a way `np.select` cannot express cleanly, or that returns a variable number of fields.
+**Per-row logic with no array equal**. A thing that branches on a few columns in a way `np.select` can't express cleanly, or that returns a var number of fields.
 
-**Returning several columns at once**, by returning a Series from the function, as the last editor shows.
+**Returning a few columns at once**, by returning a Series from the function, as the last editor shows.
 
-**Small frames**, where the whole operation takes microseconds either way and clarity is the only thing that matters.
+**Small frames**, where the whole step takes microseconds either way and clarity is the only thing that matters.
 
-That last point deserves emphasis. Optimising an `apply` over 200 rows is wasted effort, and a readable `apply` can be better code than a clever vectorised expression nobody can modify. The question is always whether the frame is large enough for the difference to matter.
+That last point deserves emphasis. Optimising an `apply` over 200 rows is wasted effort. A readable `apply` can be better code than a clever vectorised formula no one can modify. The question is always whether the frame is large enough for the gap to matter.
 
 ## If it must stay a loop
 
-When the logic really is sequential and per-row, and the frame is large, pandas is not the tool. The options are to move the loop into NumPy, compile it with Numba, or restructure the problem.
+When the logic really is sequential and per-row. The frame is large, pandas isn't the tool. The options are to move the loop into NumPy, compile it with Numba, or restructure the problem.
 
-What is never right is `iterrows`. It is slower than `apply(axis=1)`, it loses dtypes by converting each row to an object Series, and there is no situation where it is the best available option. `itertuples` is considerably faster if you genuinely need to iterate, and preserves types.
+What is never right is `iterrows`. It's slower than `apply(axis=1)`, it loses dtypes by converting each row to an object Series. There's no situation where it's the best on hand option. `itertuples` is a lot faster if you truly need to iterate, and preserves types.
 
 ## DataFrame.map and the applymap rename
 
-`DataFrame.map(func)` applies a function to **every cell**. It was called `applymap` until pandas 2.1, and the old name is deprecated.
+`DataFrame.map(func)` applies a function to **each cell**. It was called `applymap` until pandas 2.1. The old name is deprecated.
 
-It is rarely the right tool. Applying a function to every cell of a table usually means either the operation belongs on specific columns, or the frame should have been reshaped first.
+It's rarely the right tool. Applying a function to each cell of a table often means either the step belongs on exact columns, or the frame should have been reshaped first.
 
-The legitimate uses are formatting for display and elementwise type coercion across a homogeneous frame &mdash; both of which are end-of-pipeline steps.
+The legitimate uses are formatting for display and elementwise type coercion across a homogeneous frame. Both of which are end-of-pipeline steps.
 
 ## Returning several values
 
-A function that returns a Series gives several columns:
+A function that returns a Series gives a few columns:
 
 ```python
 df.apply(lambda r: pd.Series({"a": ..., "b": ...}), axis=1)
 ```
 
-That works and is slow twice over &mdash; a Python call and a Series construction per row.
+That works and is slow twice over. A Python call and a Series build per row.
 
-The faster shape is usually to compute each output column separately with vectorised expressions, even if that means traversing the input more than once. Three passes over a column in compiled code beat one pass in Python by a wide margin.
+The faster shape is often to find each output column apart with vectorised expressions, even if that means traversing the input more than once. Three passes over a column in compiled code beat one pass in Python by a wide margin.
 
-When the computation genuinely produces several values at once and cannot be split, `zip(*df.apply(...))` or building lists and assigning at the end avoids the Series construction.
+When the math truly makes a few values at once and can't be split, `zip(*df.apply(...))` or building lists and assigning at the end avoids the Series build.
 
 ## result_type and the empty-frame trap
 
-`df.apply(func, axis=1)` on an **empty** frame does not call the function at all, so pandas cannot infer the result shape. The result is often an empty DataFrame where the code expected an empty Series, and the next operation fails with a confusing error.
+`df.apply(func, axis=1)` on an **empty** frame doesn't call the function at all. Pandas can't infer the result shape. The result is often an empty DataFrame where the code expected an empty Series. The next step fails with a confusing error.
 
-Code that runs `apply` on a frame that may be empty should handle that case explicitly, because the failure appears only when the input happens to be empty &mdash; which is exactly the edge case least likely to be tested.
+Code that runs `apply` on a frame that may be empty should handle that case by name. The failure appears only when the input happens to be empty. Which is just the edge case least likely to be tested.
 
-`result_type=` controls how a list-returning function is interpreted: `"expand"` makes columns, `"reduce"` keeps a Series.
+`result_type=` controls how a list-returning function is read: `"expand"` makes columns, `"reduce"` keeps a Series.
 
 ## Choosing the right escape hatch
 
-When something genuinely cannot be vectorised, `apply` is not the only option, and often not the best one.
+When a thing truly can't be vectorised, `apply` isn't the only option. Often not the best one.
 
-**`np.vectorize`** &mdash; despite the name, a loop. It handles broadcasting and dtypes for you, and offers no speed benefit.
+**`np.vectorize`** &mdash; despite the name, a loop. It handles broadcasting and dtypes for you, and offers no speed gain.
 
-**A list comprehension over `zip` of the columns** &mdash; frequently *faster* than `apply(axis=1)`, because it skips the per-row Series construction. Less idiomatic, measurably quicker.
+**A list comprehension over `zip` of the columns**. Often *faster* than `apply(axis=1)`. It skips the per-row Series build. Less idiomatic, measurably quicker.
 
-**`itertuples`** &mdash; fast iteration with dtypes preserved, when you need the whole row.
+**`itertuples`** &mdash; fast loop with dtypes preserved, when you need the whole row.
 
-**Numba** &mdash; compiles a numeric loop to machine code. The right answer when the logic is genuinely sequential and the frame is large.
+**Numba** &mdash; compiles a numeric loop to machine code. The right answer when the logic is truly sequential and the frame is large.
 
-**Restructuring** &mdash; often the real answer. A loop over rows to look something up is a `merge`. A loop to compute a group statistic is a `transform`. A loop with a condition is `np.select`.
+**Restructuring** &mdash; often the real answer. A loop over rows to look a thing up is a `merge`. A loop to find a group statistic is a `transform`. A loop with a rule is `np.select`.
 
 ## A worked replacement
 
@@ -7059,7 +7059,7 @@ def band(row):
 df["band"] = df.apply(band, axis=1)
 ```
 
-becomes:
+turns:
 
 ```python
 conds = [
@@ -7070,36 +7070,36 @@ conds = [
 df["band"] = np.select(conds, ["A", "B", "C"], default="F")
 ```
 
-The conditions are evaluated in order and the first match wins, which is exactly the semantics of the if/elif chain. It is longer to read the first time and orders of magnitude faster, and the conditions can be built programmatically in a way the function cannot.
+The rules are checked in order and the first match wins. This Is just the semantics of the if/elif chain. It's longer to read the first time and orders of magnitude faster. The rules can be built programmatically in a way the function can't.
 
 ## The honest summary
 
-`apply` is not forbidden. It is a Python loop with a pandas-shaped interface, and it should be used when that is what you want: awkward per-row logic, an existing function you cannot rewrite, or a frame small enough that the difference is unmeasurable.
+`apply` isn't forbidden. It's a Python loop with a pandas-shaped interface. It should be used when that is what you want. Awkward per-row logic, an existing function you can't rewrite, or a frame small enough that the gap is unmeasurable.
 
-The mistake is reaching for it reflexively for arithmetic, conditionals and lookups, all of which have vectorised forms that are shorter as well as faster.
+The mistake is reaching for it reflexively for math, conditionals and lookups, all of which have vectorised forms that are shorter and faster.
 
 ## Mapping with a Series
 
-`map` accepts a Series as well as a dict, which makes a lookup table out of another frame:
+`map` accepts a Series and a dict. This Makes a lookup table out of another frame:
 
 ```python
 lookup = ref.set_index("code")["label"]
 df["label"] = df["code"].map(lookup)
 ```
 
-This is often better than a merge for a simple one-column lookup. It cannot multiply rows, it needs no `how` or `validate`, and unmatched codes become `NaN` rather than dropping the row.
+This is often better than a merge for a simple one-column lookup. It can't times rows, it needs no `how` or `validate`. Unmatched codes become `NaN` rather than dropping the row.
 
-The requirement is that the lookup's index is unique. If it is not, `map` raises &mdash; which is a better failure than a merge silently duplicating rows.
+The need is that the lookup's index is unique. If it isn't, `map` raises. Which is a better failure than a merge silently duplicating rows.
 
-For a lookup that must bring several columns, a merge is the right tool.
+For a lookup that must bring a few columns, a merge is the right tool.
 
 ## Missing values in apply and map
 
-`map` passes `NaN` to the function unless `na_action="ignore"`. A function that calls `.lower()` or does arithmetic will fail on it, and the traceback points at your function rather than at the data.
+`map` passes `NaN` to the function unless `na_action="skip"`. A function that calls `.lower()` or does math will fail on it. The traceback points at your function rather than at the data.
 
 `apply` does the same.
 
-Two options: guard inside the function, or filter first and assign back through `.loc`. The second is usually cleaner, because it keeps the function simple:
+Two options: guard inside the function, or filter first and assign back through `.loc`. The second is often cleaner. It keeps the function simple:
 
 ```python
 ok = df["text"].notna()
@@ -7108,53 +7108,53 @@ df.loc[ok, "parsed"] = df.loc[ok, "text"].apply(parse)
 
 ## Measuring before optimising
 
-`apply` is slow relative to vectorised operations and fast relative to nothing at all. Whether it matters depends entirely on size.
+`apply` is slow scaled to vectorised steps and fast scaled to nothing at all. Whether it matters depends fully on size.
 
-On a thousand rows, an `apply` takes about a millisecond. Replacing it with `np.select` saves a millisecond and costs readability if the logic is genuinely branchy.
+On a thousand rows, an `apply` takes about a millisecond. Replacing it with `np.select` saves a millisecond and costs readability if the logic is truly branchy.
 
 On a million rows, the same `apply` takes seconds and dominates the script.
 
-The decision rule is to measure the actual frame, not to apply a blanket rule. `%timeit` on the real data answers it in seconds, and often the answer is that this particular `apply` is irrelevant and a different line is the problem.
+The choice rule is to measure the actual frame, not to apply a blanket rule. `%timeit` on the real data answers it in seconds. Often the answer is that this given `apply` is irrelevant and a other line is the problem.
 
 ## A summary
 
-`map` for lookups &mdash; dict or Series &mdash; and remember unmatched keys become `NaN`.
+`map` for lookups &mdash; dict or Series &mdash; and note unmatched keys become `NaN`.
 
-`apply` on a Series is a loop; on a frame with `axis=1` it is a slower loop.
+`apply` on a Series is a loop. On a frame with `axis=1` it's a slower loop.
 
-`DataFrame.map` (formerly `applymap`) touches every cell and is rarely the right tool.
+`DataFrame.map` (formerly `applymap`) touches each cell and is rarely the right tool.
 
 `np.where`, `np.select`, `pd.cut`, `.str` and `transform` replace most row-wise applies.
 
 A list comprehension over `zip` of columns often beats `apply(axis=1)`.
 
-`iterrows` is never the right choice; `itertuples` if you must iterate.
+`iterrows` is never the right choice. `itertuples` if you must iterate.
 
 And the size of the frame decides whether any of this matters.
 
 ## A closing note
 
-`apply` occupies a strange place: it is the most reached-for method in pandas and rarely the right one.
+`apply` occupies a strange place: it's the most reached-for method in pandas and rarely the right one.
 
-The reason is that it looks like the pandas way of doing something per row, and pandas has a reputation for speed, so it feels like it should be fast. It is a Python loop with a method-call interface, and it is no faster than the list comprehension it replaces.
+it looks like the pandas way of doing a thing per row. Pandas has a reputation for speed. It feels like it should be fast. It's a Python loop with a method-call interface, and it's no faster than the list comprehension it replaces.
 
-Nearly every row-wise `apply` is one of a handful of patterns with a vectorised form: a conditional is `np.where` or `np.select`, a lookup is `map`, a numeric band is `pd.cut`, string work is `.str`, and a group statistic is `transform`.
+Nearly each row-wise `apply` is one of a handful of patterns with a vectorised form. A gated is `np.where` or `np.select`, a lookup is `map`, a numeric band is `pd.cut`, string work is `.str`. A group statistic is `transform`.
 
-That said, the honest position is not that `apply` is forbidden. On a small frame the difference is unmeasurable, and a readable `apply` beats a clever expression nobody can modify. The mistake is reaching for it by default rather than deciding, and never measuring whether it matters.
+That said, the honest spot isn't that `apply` is forbidden. On a small frame the gap is unmeasurable. A readable `apply` beats a clever formula no one can modify. The mistake is reaching for it by default rather than deciding. Never measuring whether it matters.
 
 ## One more thing
 
-`Series.map` accepts a **function with a default** through `collections.defaultdict`, which is the neat way to map known values and leave everything else at a fallback without a separate `fillna`.
+`Series.map` accepts a **function with a default** through `sets.defaultdict`. This Is the neat way to map known values and leave all else at a fallback without a split `fillna`.
 
-And `apply` on a groupby is where `include_groups=False` now matters: in pandas 2.2 the grouping columns are passed to the function by default and that behaviour is being changed, so passing the argument explicitly is how you write code that behaves the same before and after the change.
+And `apply` on a groupby is where `include_groups=False` now matters. In pandas 2.2 the grouping columns are passed to the function by default and that action is being changed. Passing the arg by name is how you write code that behaves the same before and after the change.
 
 ## In summary
 
-`map` substitutes, `apply` computes, and both call Python once per element.
+`map` substitutes, `apply` finds, and both call Python once per element.
 
-Nearly every row-wise `apply` has a vectorised equivalent &mdash; `np.where`, `np.select`, `map`, `pd.cut`, `.str`, `transform` &mdash; that is shorter as well as faster.
+Nearly each row-wise `apply` has a vectorised equal. `np.where`, `np.select`, `map`, `pd.cut`, `.str`, `transform`. That is shorter and faster.
 
-`apply` remains the right answer for genuinely awkward per-row logic, for wrapping a function you cannot rewrite, and on frames small enough that the difference is unmeasurable. The mistake is reaching for it without deciding, and never measuring whether it matters.
+`apply` remains the right answer for truly awkward per-row logic, for wrapping a function you can't rewrite. On frames small enough that the gap is unmeasurable. The mistake is reaching for it without deciding. Never measuring whether it matters.
 ''',
     [
         {"q": "What happens to a value not present in the dict passed to `map`?",
@@ -7321,31 +7321,31 @@ intro: Adding rows or columns from another frame.
 
 `pd.concat([a, b], axis=1)` stacks **columns**: the result is wider.
 
-Which axis you are joining along decides which axis does the *aligning*, and that is the part worth being deliberate about.
+Which axis you're joining along decides which axis does the *aligning*. That is the part worth being deliberate about.
 
 Stacking rows aligns the **columns** by name. Stacking columns aligns the **index** by label.
 
 ## Stacking rows
 
-The default keeps both frames' index labels, so the result can have repeated labels &mdash; two rows both labelled 0.
+The default keeps both frames' index labels. The result can have repeated labels. Two rows both labelled 0.
 
-That is legal, and it breaks things later: `.loc[0]` returns two rows instead of one, and code expecting a scalar fails. It is also invisible until something depends on it.
+That is legal, and it breaks things later: `.loc[0]` returns two rows instead of one, and code expecting a scalar fails. It's also invisible until a thing depends on it.
 
 `ignore_index=True` renumbers from 0. Pass it unless the index labels carry meaning you need to keep.
 
-Columns are matched **by name**. A column present in one frame and not the other is filled with `NaN` for the missing rows, and the result has the union of all columns. `join="inner"` keeps only columns present in every frame.
+Columns are matched **by name**. A column present in one frame and not the other is filled with `NaN` for the missing rows. The result has the union of all columns. `join="inner"` keeps only columns present in each frame.
 
-The name-matching is a feature: two frames with the same columns in different orders line up correctly. It is also a trap when a column has been misspelled in one source, because you get two columns each half-full rather than an error.
+The name-matching is a feature: two frames with the same columns in other orders line up right. It's also a trap when a column has been misspelled in one source. You get two columns each half-full rather than an error.
 
-Checking `result.columns` and the `isna()` counts after a concat catches that immediately.
+Checking `result.columns` and the `isna()` counts after a concat catches that at once.
 
 ## Stacking columns
 
 `axis=1` puts frames side by side, aligning on the index.
 
-If the two frames have different labels, the union is used and gaps become `NaN`. If they have the same labels in a different order, pandas reorders to match &mdash; which is correct and is not what positional intuition expects.
+If the two frames have other labels, the union is used and gaps become `NaN`. If they've the same labels in a other order, pandas reorders to match. Which is correct and isn't what spot-based intuition expects.
 
-The common mistake is concatenating two frames that *should* correspond row-for-row but whose indexes have drifted apart, usually because one of them was filtered. The result is a frame with far more rows than either input, mostly `NaN`.
+The common mistake is concatenating two frames that *should* match row-for-row but whose indexes have drifted apart, often because one of them was filtered. The result is a frame with far more rows than either input, mostly `NaN`.
 
 If you mean "these are the same rows in the same order", reset both indexes first:
 
@@ -7353,7 +7353,7 @@ If you mean "these are the same rows in the same order", reset both indexes firs
 pd.concat([a.reset_index(drop=True), b.reset_index(drop=True)], axis=1)
 ```
 
-That makes the positional intent explicit rather than relying on labels that may not match.
+That makes the spot-based intent clear rather than leaning on labels that may not match.
 
 `join="inner"` keeps only rows present in both.
 
@@ -7361,13 +7361,13 @@ That makes the positional intent explicit rather than relying on labels that may
 
 `pd.concat([jan, feb], keys=["jan", "feb"])` adds an outer index level recording which frame each row came from.
 
-This is how you combine monthly files, or results from several runs, without losing track of the source. `out.loc["jan"]` selects one back out, and `reset_index(level=0)` turns the label into an ordinary column.
+This is how you combine monthly files, or results from a few runs, without losing track of the source. `out.loc["jan"]` selects one back out. `reset_index(level=0)` turns the label into an plain column.
 
-Without `keys`, that information is gone the moment the frames are stacked, and reconstructing it means remembering how many rows each contributed.
+Without `keys`, that data is gone the moment the frames are stacked. Rebuilding it means remembering how many rows each contributed.
 
 ## Never concat in a loop
 
-`pd.concat` allocates a new frame and copies everything into it. Inside a loop that is quadratic, and it is one of the most common performance mistakes in pandas.
+`pd.concat` allocates a new frame and copies all into it. Inside a loop that is quadratic. It's one of the most common speed mistakes in pandas.
 
 Collect the pieces in a Python list and call `concat` **once**:
 
@@ -7376,17 +7376,17 @@ frames = [process(f) for f in files]
 out = pd.concat(frames, ignore_index=True)
 ```
 
-The last-but-one editor measures the difference. It grows with the number of iterations, so a pattern that seems fine on ten files becomes unusable on a thousand.
+The last-but-one editor measures the gap. It grows with the number of loops. A pattern that seems fine on ten files turns unusable on a thousand.
 
 ## Dtypes shift
 
-When frames disagree about a column's type, the result is promoted to something that holds both: `int` plus `float` gives `float`, and anything plus a string gives `object`.
+When frames disagree about a column's type, the result is promoted to a thing that holds both: `int` plus `float` gives `float`. Anything plus a string gives `object`.
 
-There is a specific version of this worth knowing: starting with an **empty** frame and concatenating into it. An empty column has no meaningful dtype, and combining it with real data can widen the result to `object` &mdash; at which point the column is slow and no longer numeric.
+There's a exact version of this worth knowing. Starting with an **empty** frame and concatenating into it. An empty column has no real dtype. Mixing it with real data can widen the result to `object`. At which point the column is slow and no longer numeric.
 
-That is another reason the list-then-concat pattern is better: there is no empty seed frame to poison the types.
+That is another reason the list-then-concat pattern is better: there's no empty seed frame to poison the types.
 
-After any concat that combines sources, `result.dtypes` is worth a glance for exactly this.
+After any concat that mixes sources, `result.dtypes` is worth a glance for just this.
 
 ## Combining files
 
@@ -7403,53 +7403,53 @@ df = pd.concat(frames, ignore_index=True)
 
 Three details make this robust.
 
-**Tag the source** before appending, so a row can be traced back to its file. `keys=` does the same thing through the index if you prefer.
+**Tag the source** before appending. So A row can be traced back to its file. `keys=` does the same thing through the index if you prefer.
 
-**Sort the paths**, so the result is deterministic rather than depending on filesystem order.
+**Sort the paths**, so the result is fixed rather than based on filesystem order.
 
 **Concat once**, outside the loop.
 
-The frequent surprise is that the files do not agree: a column renamed halfway through the year, an extra column in later exports. Concat unions the columns and fills the gaps with `NaN`, silently. Checking `df.isna().mean()` afterwards shows immediately which columns are only present in some files.
+The frequent surprise is that the files don't agree. A column renamed halfway through the year, an extra column in later exports. Concat unions the columns and fills the gaps with `NaN`, silently. Checking `df.isna().mean()` later shows at once which columns are only present in some files.
 
 ## verify_integrity and sort
 
-`verify_integrity=True` raises if the result would contain duplicate index labels. It costs a check and prevents a duplicated index propagating silently.
+`verify_integrity=True` raises if the result would hold copy index labels. It costs a check and blocks a duplicated index passing silently.
 
-`sort=True` sorts the columns alphabetically when frames have different sets. The default leaves them in order of first appearance, which is usually more readable.
+`sort=True` sorts the columns alphabetically when frames have other sets. The default leaves them in order of first appearance. This Is often more readable.
 
 ## What concat cannot do
 
 `concat` aligns on labels. It does **not** join on values.
 
-Combining two frames on a shared **key column** is `merge`, not `concat(axis=1)`. Using `concat` for that works only if the key happens to be the index of both frames and both are sorted the same way, which is a coincidence rather than a design.
+Mixing two frames on a shared **key column** is `merge`, not `concat(axis=1)`. Using `concat` for that works only if the key happens to be the index of both frames and both are sorted the same way. This Is a coincidence rather than a design.
 
-The tell is `axis=1` on frames whose indexes were not deliberately made to correspond. If you find yourself resetting indexes to make a `concat` line up, you probably wanted `merge`.
+The tell is `axis=1` on frames whose indexes weren't on purpose made to match. If you find yourself resetting indexes to make a `concat` line up, you probably wanted `merge`.
 
 ## Memory during a concat
 
-`concat` allocates a frame the size of all the inputs combined, and the inputs stay alive until it returns. Peak memory is therefore roughly twice the final size.
+`concat` allocates a frame the size of all the inputs mixed. The inputs stay alive until it returns. Peak memory is so roughly twice the final size.
 
-On a large combine that is the binding constraint, and there are two ways around it.
+On a large combine that is the binding constraint. There are two ways around it.
 
-**Process and reduce each piece before combining** &mdash; filter, select columns, aggregate. Concatenating summaries is far cheaper than concatenating raw data.
+**Process and reduce each piece before mixing**. Filter, select columns, aggregate. Concatenating summaries is far cheaper than concatenating raw data.
 
-**Delete the list afterwards** &mdash; `del frames` releases the inputs, which otherwise stay referenced.
+**Delete the list later** &mdash; `del frames` releases the inputs. This Else stay referenced.
 
-For files larger than memory in total, the answer is not pandas: read in chunks and aggregate incrementally, or use Dask, DuckDB or Polars, all of which are built for it.
+For files larger than memory in total, the answer isn't pandas. Read in chunks and aggregate incrementally, or use Dask, DuckDB or Polars, all of which are built for it.
 
 ## A summary
 
 **Same columns, more rows** &mdash; `concat([a, b], ignore_index=True)`.
 
-**Same rows, more columns, aligned by label** &mdash; `concat([a, b], axis=1)`, only when the indexes genuinely correspond.
+**Same rows, more columns, aligned by label**. `concat([a, b], axis=1)`, only when the indexes truly match.
 
 **Joining on a key** &mdash; `merge`, not concat.
 
 **Many files** &mdash; a list comprehension and one concat, with a source tag.
 
-**Recording provenance** &mdash; `keys=`, or an explicit column.
+**Recording provenance** &mdash; `keys=`, or an clear column.
 
-And afterwards, three checks: the row count, `dtypes`, and `isna().mean()`. Between them they catch the mismatched columns, the promoted types and the frames that were not what you assumed.
+And later, three checks: the row count, `dtypes`. `isna().mean()`. Between them they catch the mismatched columns, the promoted types and the frames that weren't what you assumed.
 
 ## Concat versus merge, decided
 
@@ -7457,15 +7457,15 @@ The question that settles it: are you adding **rows of the same kind**, or **col
 
 Same kind of rows &mdash; this month's data added to last month's &mdash; is `concat`.
 
-Columns about the same rows, matched on a key &mdash; adding customer details to orders &mdash; is `merge`.
+Columns about the same rows, matched on a key. Adding customer details to orders &mdash; is `merge`.
 
-`concat(axis=1)` looks like the second but matches on the **index**, not on a key column. It is right only when the indexes were deliberately made to correspond, which is rarer than it looks.
+`concat(axis=1)` looks like the second but matches on the **index**, not on a key column. It's right only when the indexes were on purpose made to match. This Is rarer than it looks.
 
-If you find yourself resetting indexes so a `concat(axis=1)` lines up, the operation you wanted was a merge.
+If you find yourself resetting indexes so a `concat(axis=1)` lines up, the step you wanted was a merge.
 
 ## Checking after a concat
 
-Three lines, and each catches a different failure:
+Three lines, and each catches a other failure:
 
 ```python
 len(out) == sum(len(f) for f in frames)   # nothing lost or duplicated
@@ -7479,7 +7479,7 @@ The third is the one that finds a column renamed partway through a series of fil
 
 `keys=["jan", "feb"]` adds an index level naming the source.
 
-`names=["month"]` names that level, so `reset_index` produces a sensible column name rather than `level_0`.
+`names=["month"]` names that level, so `reset_index` makes a sensible column name rather than `level_0`.
 
 For a flat result, a column is simpler:
 
@@ -7487,31 +7487,31 @@ For a flat result, a column is simpler:
 frames = [d.assign(source=name) for name, d in items]
 ```
 
-Either way, recording where a row came from is worth doing at the moment of combining, because afterwards the information is gone and reconstructing it means remembering row counts.
+Either way, recording where a row came from is worth doing at the moment of mixing. Later the data is gone and rebuilding it means remembering row counts.
 
 ## A closing note
 
 `concat` is simple enough that its failures are all about expectations rather than mechanics.
 
-The row-stacking case is nearly always right, and the two things to remember are `ignore_index=True` and that columns match by name, so a renamed column in one file becomes two half-full columns rather than an error.
+The row-stacking case is nearly always right. The two things to note are `ignore_index=True` and that columns match by name. A renamed column in one file turns two half-full columns rather than an error.
 
-The column-stacking case is the one to be suspicious of. It aligns on the index, and indexes drift apart the moment anything is filtered. If the frames should correspond row for row, reset both indexes and say so; if they should be matched on a key, the operation is a merge.
+The column-stacking case is the one to be suspicious of. It aligns on the index. Indexes drift apart the moment anything is filtered. If the frames should match row for row, reset both indexes and say so. If they should be matched on a key, the step is a merge.
 
-And the loop rule applies here as everywhere: collect the pieces, combine once. It is the same lesson as `np.append` and `df.loc[len(df)]`, and it is the single most common avoidable slowdown in code that reads many files.
+And the loop rule applies here as all over. Collect the pieces, combine once. It's the same lesson as `np.append` and `df.loc[len(df)]`. It's the single most common avoidable slowdown in code that reads many files.
 
 ## Two more things worth knowing
 
-`pd.concat` accepts a **dict** as well as a list, in which case the keys become the outer index level automatically: `pd.concat({"jan": a, "feb": b})` is the same as passing `keys=`. That reads well when the pieces already live in a dict keyed by their source.
+`pd.concat` accepts a **dict** and a list, in which case the keys become the outer index level on its own: `pd.concat({"jan": a, "feb": b})` is the same as passing `keys=`. That reads well when the pieces already live in a dict keyed by their source.
 
-The `axis` argument also accepts the string names `"index"` and `"columns"`, which are harder to misread than `0` and `1` in code someone else will maintain.
+The `axis` arg also accepts the string names `"index"` and `"columns"`. This Are harder to misread than `0` and `1` in code someone else will maintain.
 
-And one behaviour worth expecting: concatenating frames whose columns are in different orders produces the union in order of first appearance, not sorted, unless you pass `sort=True`. Two files exported months apart with the columns reordered will therefore combine correctly but present in an order that matches neither, which is harmless and briefly confusing.
+And one action worth expecting: concatenating frames whose columns are in other orders makes the union in order of first appearance, not sorted, unless you pass `sort=True`. Two files exported months apart with the columns reordered will so combine right but present in an order that matches neither. This Is harmless and briefly confusing.
 
 ## Combining results, not raw data
 
 The most scalable use of `concat` is on **summaries** rather than on source data.
 
-Reading a hundred files and concatenating them raw builds one frame holding everything, and peak memory is roughly twice its final size because the pieces stay alive until the concat returns. Reading each file, reducing it to what the question needs, and concatenating the small results costs a fraction of that and scales to more files than fit in memory.
+Reading a hundred files and concatenating them raw builds one frame holding all. Peak memory is roughly twice its final size because the pieces stay alive until the concat returns. Reading each file, reducing it to what the question needs. Concatenating the small results costs a fraction of that and scales to more files than fit in memory.
 
 ```python
 parts = []
@@ -7521,17 +7521,17 @@ for path in paths:
 out = pd.concat(parts, ignore_index=True).groupby("city", as_index=False).sum()
 ```
 
-The double aggregation is the pattern: reduce per file, combine, reduce again. It works for sums, counts and maxima &mdash; anything associative &mdash; and not for medians or exact distinct counts, which need the whole dataset at once.
+The double aggregation is the pattern: reduce per file, combine, reduce again. It works for sums, counts and maxima. Anything associative. And not for medians or exact distinct counts. This Need the whole dataset at once.
 
-That distinction, between aggregations that decompose and those that do not, is worth knowing before designing a pipeline around chunked reading.
+That gap, between aggregations that break down and those that don't, is worth knowing before designing a pipeline around chunked reading.
 
 ## In summary
 
-Row stacking aligns columns by name; column stacking aligns the index by label. Knowing which axis you are joining along tells you which axis is doing the matching, and that predicts every surprise this function produces.
+Row stacking aligns columns by name. Column stacking aligns the index by label. Knowing which axis you're joining along tells you which axis is doing the matching. That predicts each surprise this function makes.
 
-Pass `ignore_index=True` unless the labels mean something, record provenance with `keys=` or an explicit column, and never call it inside a loop.
+Pass `ignore_index=True` unless the labels mean a thing, record provenance with `keys=` or an clear column. Never call it inside a loop.
 
-Afterwards, check the row count, the dtypes and the missingness &mdash; between them they catch the mismatched columns, the promoted types, and the file whose schema quietly changed.
+later, check the row count, the dtypes and the missingness. Between them they catch the mismatched columns, the promoted types. The file whose schema quietly changed.
 ''',
     [
         {"q": "What does `pd.concat([a, b])` do with the two frames' indexes?",
@@ -7687,89 +7687,89 @@ print("reason to set_index on a key you join on repeatedly.")'''),
     ],
     '''
 title: merge and join
-intro: SQL-style joins, and the duplicate key that silently multiplies your rows.
+intro: SQL-style joins, and the copy key that silently times your rows.
 
 ## The four kinds
 
-`merge` combines two frames on one or more key columns. `how` decides what happens to keys that appear on only one side.
+`merge` mixes two frames on one or more key columns. `how` decides what happens to keys that appear on only one side.
 
-`inner` &mdash; only keys present in both. **This is the default**, and it means unmatched rows are silently discarded.
+`inner` &mdash; only keys present in both. **This is the default**. It means unmatched rows are silently discarded.
 
-`left` &mdash; every row from the left frame, with `NaN` where the right had no match. This is usually what you want when enriching a table with a lookup: you are adding information, not filtering.
+`left` &mdash; each row from the left frame, with `NaN` where the right had no match. This is often what you want when enriching a table with a lookup: you're adding data, not filtering.
 
 `right` &mdash; the mirror image, and rarely used, since swapping the operands is clearer.
 
-`outer` &mdash; every key from either side.
+`outer` &mdash; each key from either side.
 
-The default being `inner` is worth remembering. A join that was meant to add a column can quietly remove rows, and the only sign is a row count you were not checking.
+The default being `inner` is worth remembering. A join that was meant to add a column can quietly drop rows. The only sign is a row count you weren't checking.
 
 ## Check what happened
 
-Two habits catch nearly every join problem.
+Two habits catch nearly each join problem.
 
-**Compare row counts.** `len(before)` against `len(after)`. If a left join changed the count, something is duplicated. If an inner join dropped rows, some keys did not match.
+**Compare row counts.** `len(before)` against `len(after)`. If a left join changed the count, a thing is duplicated. If an inner join dropped rows, some keys didn't match.
 
-**Use `indicator=True`.** It adds a `_merge` column with values `left_only`, `right_only` or `both`, and `value_counts()` on it summarises the whole join in one line.
+**Use `indicator=True`.** It adds a `_merge` column with values `left_only`, `right_only` or `both`. `value_counts()` on it summarises the whole join in one line.
 
-That is far better than guessing. It tells you not just that rows went missing but which ones, so you can look at them and find out whether the key is misspelled, differently typed, or genuinely absent.
+That is far better than guessing. It tells you not just that rows went missing but which ones. You can look at them and find out whether the key is misspelled, differently typed, or truly absent.
 
-A frequent cause of a "failed" join is a **dtype mismatch**: `1` as an integer on one side and `"1"` as a string on the other never match, and nothing warns. Checking both key columns' dtypes takes a second.
+A frequent cause of a "failed" join is a **dtype mismatch**: `1` as an int on one side and `"1"` as a string on the other never match. Nothing warns. Checking both key columns' dtypes takes a second.
 
-Whitespace and case do the same thing to string keys, which is why the cleaning modules come before this one.
+Whitespace and case do the same thing to string keys. This Is why the cleaning modules come before this one.
 
 ## The duplicate-key multiplication
 
 This is the most damaging silent bug in pandas.
 
-If a key appears twice on the right, every matching left row is duplicated. Two orders joined to a lookup with a repeated id produce three rows. The frame still looks like orders, still has an `amount` column, and every sum computed from it is now wrong.
+If a key appears twice on the right, each matching left row is duplicated. Two orders joined to a lookup with a repeated id give three rows. The frame still looks like orders, still has an `amount` column. Each sum found from it's now wrong.
 
-Nothing warns, because a many-to-one join *becoming* many-to-many is a legitimate operation &mdash; pandas cannot know you did not intend it.
+Nothing warns, because a many-to-one join *turning* many-to-many is a legitimate step. Pandas can't know you didn't intend it.
 
-The consequences are quiet and severe: inflated revenue, double-counted users, a model trained on duplicated rows.
+The results are quiet and severe: inflated revenue, double-counted users, a model trained on duplicated rows.
 
 ## validate
 
-`validate=` states the relationship you expect and raises if it does not hold:
+`validate=` states the link you expect and raises if it doesn't hold:
 
 `"one_to_one"` &mdash; keys unique on both sides.
 
 `"one_to_many"` &mdash; unique on the left.
 
-`"many_to_one"` &mdash; unique on the right. This is the common case for a lookup table, and the one worth reaching for by default when joining reference data.
+`"many_to_one"` &mdash; unique on the right. This is the common case for a lookup table. The one worth reaching for by default when joining link data.
 
-`"many_to_many"` &mdash; no constraint, which is the current behaviour spelled out loud.
+`"many_to_many"` &mdash; no constraint. This Is the current action spelled out loud.
 
-Adding it costs one argument and converts an invisible data-corruption bug into a clear exception at the point it happens. On any join that feeds a number someone will act on, it is worth having.
+Adding it costs one arg and converts an invisible data-corruption bug into a clear exception at the point it happens. On any join that feeds a number someone will act on, it's worth having.
 
 ## Different names, colliding names
 
-`left_on` and `right_on` join columns with different names. `left_index=True` / `right_index=True` use the index on that side.
+`left_on` and `right_on` join columns with other names. `left_index=True` / `right_index=True` use the index on that side.
 
 When both frames have a column with the same name that is *not* a key, pandas keeps both and appends `_x` and `_y`.
 
-That is where a subtle error lives: `v_x` and `v_y` both look plausible, and picking the wrong one produces a working analysis of the wrong column. Set `suffixes=("_orders", "_lookup")` so the names say where they came from, or drop the redundant column before merging.
+That is where a subtle error lives: `v_x` and `v_y` both look plausible. Picking the wrong one makes a working analysis of the wrong column. Set `suffixes=("_orders", "_lookup")` so the names say where they came from, or drop the redundant column before merging.
 
 ## join
 
-`df.join(other)` is `merge` with the index as the key, and it defaults to a **left** join rather than an inner one.
+`df.join(other)` is `merge` with the index as the key. It defaults to a **left** join rather than an inner one.
 
-Two different defaults for two similar methods is a genuine wart. When it matters, use `merge` with explicit arguments; `join` is a convenience for the index case.
+Two other defaults for two similar methods is a genuine wart. When it matters, use `merge` with clear args. `join` is a convenience for the index case.
 
-Index joins are faster than column joins on a sorted, unique index, which is a reason to `set_index` on a key you join on repeatedly rather than passing `on=` every time.
+Index joins are faster than column joins on a sorted, unique index. This Is a reason to `set_index` on a key you join on again and again rather than passing `on=` each time.
 
 ## An order of operations
 
-Clean the keys &mdash; type, case, whitespace. Check uniqueness on the side that should be unique. Choose `how` deliberately rather than taking the default. Add `validate`. Compare row counts afterwards.
+Clean the keys &mdash; type, case, whitespace. Check uniqueness on the side that should be unique. Choose `how` on purpose rather than taking the default. Add `validate`. Compare row counts later.
 
-That sounds like a lot for one operation. It is five seconds of typing, and joins are where the expensive, silent errors live.
+That sounds like a lot for one step. It's five seconds of typing. Joins are where the costly, silent errors live.
 
 ## Joining on several keys
 
-`on=["date", "store"]` joins on a composite key. Both frames need all the named columns, and rows match only when **every** key agrees.
+`on=["date", "store"]` joins on a composite key. Both frames need all the named columns. Rows match only when **each** key agrees.
 
-The usual failure is a type mismatch on one of several keys &mdash; the dates match but one side stores the store id as text. The join then returns far fewer rows than expected, and `indicator=True` shows a large `left_only` count without saying why.
+The usual failure is a type mismatch on one of a few keys. The dates match but one side stores the store id as text. The join then returns far fewer rows than expected. `indicator=True` shows a large `left_only` count without saying why.
 
-Checking the dtypes of every key column on both sides takes one line:
+Checking the dtypes of each key column on both sides takes one line:
 
 ```python
 print(left[keys].dtypes, right[keys].dtypes, sep="\n")
@@ -7779,31 +7779,31 @@ print(left[keys].dtypes, right[keys].dtypes, sep="\n")
 
 Two common intentions are filters rather than enrichments.
 
-**Keep rows whose key exists elsewhere** &mdash; a semi-join. pandas has no dedicated method, and `df[df["id"].isin(other["id"])]` is the right implementation. It cannot multiply rows, which an inner join can.
+**Keep rows whose key exists elsewhere**. A semi-join. pandas has no dedicated method. `df[df["id"].isin(other["id"])]` is the right setup. It can't times rows. This An inner join can.
 
-**Keep rows whose key does not exist elsewhere** &mdash; an anti-join. `df[~df["id"].isin(other["id"])]`, or an outer join with `indicator=True` filtered to `left_only` when you also want the other side's columns.
+**Keep rows whose key doesn't exist elsewhere**. An anti-join. `df[~df["id"].isin(other["id"])]`, or an outer join with `indicator=True` filtered to `left_only` when you also want the other side's columns.
 
-Using a merge for either is a common way to introduce accidental row multiplication.
+Using a merge for either is a common way to add accidental row product.
 
 ## Ordered and nearest-match joins
 
-`pd.merge_ordered` merges two ordered frames and can fill forward across the join, which suits time series with different sampling.
+`pd.merge_ordered` merges two sorted frames and can fill forward across the join. This Suits time series with other sampling.
 
-`pd.merge_asof` joins on the **nearest** key rather than an exact match, which is the standard tool for joining a measurement to the most recent preceding reference value &mdash; a trade to the latest quote, a reading to the last calibration.
+`pd.merge_asof` joins on the **nearest** key rather than an exact match. This Is the standard tool for joining a reading to the most recent preceding link value. A trade to the latest quote, a reading to the last tuning.
 
-Both require sorted inputs and both are much faster than the alternative of a cross join and a filter, which on real data does not fit in memory.
+Both need sorted inputs and both are much faster than the option of a cross join and a filter. This On real data doesn't fit in memory.
 
-`direction="backward"` (the default), `"forward"` or `"nearest"` and a `tolerance` control the matching.
+`direction="backward"` (the default), `"forward"` or `"nearest"` and a `handling` control the matching.
 
 ## Performance
 
-Merging is roughly `O(n + m)` with hashing, and the practical costs are elsewhere:
+Merging is roughly `O(n + m)` with hashing, and the hands-on costs are elsewhere:
 
-**Key dtype.** Joining on integers or categoricals is faster than on strings.
+**Key dtype.** Joining on ints or cats is faster than on strings.
 
-**Index joins.** A sorted, unique index makes `join` faster than a column merge, which is a reason to `set_index` on a key used repeatedly.
+**Index joins.** A sorted, unique index makes `join` faster than a column merge. This Is a reason to `set_index` on a key used again and again.
 
-**Result size.** A many-to-many join can produce a frame far larger than either input. Checking the expected size before running it &mdash; the product of the group counts &mdash; avoids allocating something that does not fit.
+**Result size.** A many-to-many join can give a frame far larger than either input. Checking the expected size before running it. The product of the group counts. Avoids allocating a thing that doesn't fit.
 
 **Column count.** Selecting only the columns you need from the right frame before merging avoids carrying passengers through the join and into memory.
 
@@ -7821,11 +7821,11 @@ Select only the columns you need from the right frame.
 
 During:
 
-Choose `how` deliberately; the default is `inner`.
+Choose `how` on purpose. The default is `inner`.
 
-Set `validate` to the relationship you expect.
+Set `validate` to the link you expect.
 
-Set `suffixes` if column names overlap.
+Set `suffixes` if column names share.
 
 Add `indicator=True` while developing.
 
@@ -7835,7 +7835,7 @@ Compare row counts with the input.
 
 Check the `_merge` counts.
 
-Check `isna()` on the newly added columns &mdash; a left join that matched nothing gives a column that is entirely null, which is easy to miss and obvious once looked for.
+Check `isna()` on the newly added columns. A left join that matched nothing gives a column that is fully null. This Is easy to miss and obvious once looked for.
 
 ## What to do when a join goes wrong
 
@@ -7845,17 +7845,17 @@ A structured approach beats guessing, and it takes about a minute.
 
 **Rows missing?** An inner join with unmatched keys. Switch to `how="left"` and `indicator=True` to see which.
 
-**Everything unmatched?** A dtype mismatch on the key, or whitespace or case in a string key. Compare `dtypes` and look at a few values from each side.
+**all unmatched?** A dtype mismatch on the key, or whitespace or case in a string key. Compare `dtypes` and look at a few values from each side.
 
-**New columns entirely null?** The join matched no rows, or matched on the wrong column.
+**New columns fully null?** The join matched no rows, or matched on the wrong column.
 
-**Unexpected `_x` / `_y` columns?** Overlapping non-key names. Set `suffixes`, or select the columns you need before merging.
+**surprise `_x` / `_y` columns?** shared non-key names. Set `suffixes`, or select the columns you need before merging.
 
-The tool for the first three is `indicator=True`, and the habit of comparing `len(before)` to `len(after)` catches all of them earlier than anything else.
+The tool for the first three is `indicator=True`. The habit of checking `len(before)` to `len(after)` catches all of them earlier than anything else.
 
 ## Joining a summary back to detail
 
-A frequent shape: compute a per-group statistic, then attach it to every row.
+A frequent shape: find a per-group statistic, then attach it to each row.
 
 The merge version works and has three steps and a risk.
 
@@ -7865,65 +7865,65 @@ The `transform` version has one step and no risk:
 df["city_total"] = df.groupby("city")["sales"].transform("sum")
 ```
 
-Reaching for a merge where a `transform` fits is one of the most common unnecessary joins, and it is worth recognising because the merge route is where the row-multiplication bugs live.
+Reaching for a merge where a `transform` fits is one of the most common not needed joins. It's worth recognising because the merge route is where the row-product bugs live.
 
 ## Set-like operations without a join
 
-Several questions phrased as joins are really membership tests:
+a few questions phrased as joins are really membership tests:
 
 "Which of these ids exist in that table?" &mdash; `isin`.
 
-"Which do not?" &mdash; `~isin`.
+"Which don't?" &mdash; `~isin`.
 
-"What is the overlap between two key sets?" &mdash; `a.index.intersection(b.index)`, or set operations on the columns.
+"What is the share between two key sets?". `a.index.intersection(b.index)`, or set steps on the columns.
 
-All three avoid the join machinery entirely and cannot change the row count, which makes them both safer and clearer when the answer is a filter rather than an enrichment.
+All three avoid the join machinery fully and can't change the row count. This Makes them both safer and clearer when the answer is a filter rather than an enrichment.
 
 ## A summary
 
 `how="inner"` is the default and drops unmatched rows silently.
 
-`indicator=True` while developing; it explains the result.
+`indicator=True` while developing. It shows the result.
 
-`validate=` states the relationship and turns silent multiplication into an error.
+`validate=` states the link and turns silent product into an error.
 
-Clean and type-check the key columns first &mdash; most failed joins are dtype or whitespace.
+Clean and type-check the key columns first. Most failed joins are dtype or whitespace.
 
 Select only the columns you need from the right frame.
 
-Set `suffixes` when names overlap.
+Set `suffixes` when names share.
 
 `join()` merges on the index and defaults to `left`, unlike `merge`.
 
-Use `transform` instead of a self-join for group statistics, and `isin` instead of a join for membership.
+Use `transform` instead of a self-join for group statistics. `isin` instead of a join for membership.
 
-And compare row counts before and after, every time.
+And compare row counts before and after, each time.
 
 ## A closing note
 
-Joins are where the expensive, quiet errors live.
+Joins are where the costly, quiet errors live.
 
-An inner join silently drops the rows that did not match. A duplicated key on either side silently multiplies the rows that did. Neither raises, both produce output of the right shape, and every number computed afterwards is wrong in a way that looks reasonable.
+An inner join silently drops the rows that didn't match. A duplicated key on either side silently times the rows that did. Neither raises, both give output of the right shape. Each number found later is wrong in a way that looks fair.
 
-Three habits reduce almost all of it to nothing. Check the key columns' dtypes before joining, because most "nothing matched" cases are an integer against a string. Pass `validate=` to state the relationship you expect. And compare the row count before and after, every single time.
+Three habits reduce almost all of it to nothing. Check the key columns' dtypes before joining. Most "nothing matched" cases are an int against a string. Pass `validate=` to state the link you expect. And compare the row count before and after, each single time.
 
-Those cost a few seconds and replace the alternative, which is discovering months later that a total has been inflated because one reference table gained a duplicate.
+Those cost a few seconds and replace the option. This Is discovering months later that a total has been inflated because one link table gained a copy.
 
-And a good share of joins are not joins at all: a group statistic wants `transform`, and a membership test wants `isin`. Both are safer, because neither can change the number of rows.
+And a good share of joins aren't joins at all. A group statistic wants `transform`. A membership test wants `isin`. Both are safer. Neither can change the number of rows.
 
 ## One more thing
 
-`merge` accepts `how="cross"`, producing every combination of rows from both frames. It is occasionally what you want &mdash; building a complete grid of parameters, or every store crossed with every date &mdash; and it is worth knowing that the result's size is the product of the inputs, which grows alarmingly fast.
+`merge` accepts `how="cross"`, making each mix of rows from both frames. It's at times what you want. Building a full grid of params, or each store crossed with each date. And it's worth knowing that the result's size is the product of the inputs. This Grows alarmingly fast.
 
-For the common case of filling out a complete grid before joining sparse data onto it, `pd.MultiIndex.from_product` and `reindex` are usually the better route.
+For the common case of filling out a full grid before joining sparse data onto it, `pd.MultiIndex.from_product` and `reindex` are often the better route.
 
 ## In summary
 
-The default is an inner join, which drops unmatched rows without a word, and a duplicated key on either side multiplies rows without a word either.
+The default is an inner join. This Drops unmatched rows without a word. A duplicated key on either side times rows without a word either.
 
-Both are prevented by the same short routine: clean and type-check the keys, assert uniqueness where you assume it, pass `validate=`, and compare the row count before and after.
+Both are blocked by the same short routine. Clean and type-check the keys, assert uniqueness where you assume it, pass `validate=`. Compare the row count before and after.
 
-And a good number of operations phrased as joins are not: a group statistic is `transform`, and a membership test is `isin`. Both are safer, because neither can change how many rows you have.
+And a good number of steps phrased as joins aren't. A group statistic is `transform`. A membership test is `isin`. Both are safer. Neither can change how many rows you've.
 ''',
     [
         {"q": "What is `merge`'s default `how`?",
@@ -8098,43 +8098,43 @@ intro: Long to wide and back, and when each shape is right.
 
 The same data can be laid out two ways.
 
-**Long** (or tidy) has one row per observation, with columns naming the variable and holding the value. City, year, sales &mdash; four rows for two cities over two years.
+**Long** (or tidy) has one row per finding, with columns naming the var and holding the value. City, year, sales. Four rows for two cities over two years.
 
-**Wide** has one row per subject and a column per variable. Two rows, one per city, with a `2023` and a `2024` column.
+**Wide** has one row per subject and a column per var. Two rows, one per city, with a `2023` and a `2024` column.
 
-Neither is more correct. They suit different purposes, and most real work involves converting between them.
+Neither is more correct. They suit other purposes. Most real work involves converting between them.
 
-Long form is better for **storage and computation**. Adding a year adds rows, not columns, so nothing downstream changes. Group-by works naturally. Missing combinations simply do not appear. Databases and most plotting libraries expect it.
+Long form is better for **storage and math**. Adding a year adds rows, not columns. Nothing downstream changes. Group-by works on its own. Missing mixes simply don't appear. DBs and most plotting libraries expect it.
 
-Wide form is better for **reading**. A table with years across the top is what people want to look at, and it is what a spreadsheet or a report needs.
+Wide form is better for **reading**. A table with years across the top is what people want to look at. It's what a spreadsheet or a report needs.
 
 ## pivot
 
 `df.pivot(index="city", columns="year", values="sales")` goes long to wide.
 
-Three arguments: what becomes the row index, what becomes the columns, and what fills the cells.
+Three args: what turns the row index, what turns the columns, and what fills the cells.
 
-`pivot` is strict. If a given index/column pair appears more than once, it **raises**, because there is no way to decide which value wins. That strictness is a feature &mdash; it tells you the data is not what you assumed rather than silently keeping one row.
+`pivot` is strict. If a given index/column pair appears more than once, it **raises**. There's no way to decide which value wins. That strictness is a feature. It tells you the data isn't what you assumed rather than silently keeping one row.
 
 ## pivot_table
 
-`pivot_table` is the general version: when a cell has several values, it **aggregates** them.
+`pivot_table` is the general version: when a cell has a few values, it **aggregates** them.
 
 ```python
 df.pivot_table(index="city", columns="plan", values="sales", aggfunc="sum")
 ```
 
-`aggfunc` defaults to `"mean"`, which is worth knowing before it surprises you &mdash; a pivot table of sales that averages when you expected a total looks entirely plausible.
+`aggfunc` defaults to `"mean"`. This Is worth knowing before it surprises you. A pivot table of sales that means when you expected a total looks fully plausible.
 
-`fill_value` replaces the `NaN` in empty cells, usually with 0.
+`fill_value` replaces the `NaN` in empty cells, often with 0.
 
 `margins=True` adds row and column totals, labelled `All`.
 
-A list for `aggfunc` gives several statistics; a list for `index` or `columns` gives hierarchical axes.
+A list for `aggfunc` gives a few statistics. A list for `index` or `columns` gives nested axes.
 
-One wart, current as of pandas 2.2: `"size"` inside an `aggfunc` **list** raises `AttributeError`, while `"count"` in the same position works. `groupby(...).agg(["sum", "size"])` handles it without complaint, and is the fallback when you want a row count alongside other statistics. The difference between the two is the one from the group-by module &mdash; `size` counts rows, `count` counts non-missing values.
+One wart, current as of pandas 2.2: `"size"` inside an `aggfunc` **list** raises `AttributeError`, while `"count"` in the same spot works. `groupby(...).agg(["sum", "size"])` handles it without complaint. Is the fallback when you want a row count alongside other statistics. The gap between the two is the one from the group-by module. `size` counts rows, `count` counts non-missing values.
 
-`pivot_table` is essentially group-by with a nicer layout, and anything it does can be done with `groupby` plus `unstack`. It is worth using when the output is a table for a human.
+`pivot_table` is group-by with a nicer layout. Anything it does can be done with `groupby` plus `unstack`. It's worth using when the output is a table for a human.
 
 ## melt
 
@@ -8144,13 +8144,13 @@ One wart, current as of pandas 2.2: `"size"` inside an `aggfunc` **list** raises
 wide.melt(id_vars="city", var_name="year", value_name="sales")
 ```
 
-`id_vars` are the columns to keep as identifiers. Everything else is unpivoted into two columns: one holding the old column names, one holding the values.
+`id_vars` are the columns to keep as identifiers. all else is unpivoted into two columns. One holding the old column names, one holding the values.
 
-Name both outputs. The defaults are `variable` and `value`, which say nothing and have to be renamed later anyway.
+Name both outputs. The defaults are `var` and `value`. This Say nothing and have to be renamed later anyway.
 
 `value_vars` restricts which columns are melted, when you want to unpivot some and keep others as identifiers.
 
-This is the operation for data that arrived from a spreadsheet with one column per month &mdash; a shape that is convenient to type and painful to compute with.
+This is the step for data that arrived from a spreadsheet with one column per month. A shape that is convenient to type and painful to find with.
 
 ## stack and unstack
 
@@ -8158,81 +8158,81 @@ The same reshape expressed through the index.
 
 `stack()` moves the innermost **column** level into the index, making the frame taller and narrower. `unstack()` moves the innermost **index** level into the columns.
 
-These are what you reach for after a group-by with several keys, where the result already has a MultiIndex. `groupby(["city","year"]).sum().unstack()` gives the wide table directly.
+These are what you reach for after a group-by with a few keys. Here The result already has a MultiIndex. `groupby(["city","year"]).sum().unstack()` gives the wide table right.
 
 `unstack(fill_value=0)` fills the gaps, and `unstack(level=0)` chooses which level moves when there are more than two.
 
 ## Which to work in
 
-The practical advice is to **keep data long and pivot at the end**.
+The hands-on advice is to **keep data long and pivot at the end**.
 
-The reason is maintenance. In wide form, a new year means a new column, and every expression that named the old columns has to change. In long form it means new rows, and nothing changes at all.
+The reason is maintenance. In wide form, a new year means a new column. Each formula that named the old columns has to change. In long form it means new rows, and nothing changes at all.
 
-Long form also composes with everything else in pandas &mdash; group-by, filtering, joins all assume one row per observation.
+Long form also composes with all else in pandas. Group-by, filtering, joins all assume one row per finding.
 
-Pivot when the output is a table someone will read, a chart, or a file for a tool that expects wide. That is a display step, and it belongs at the end of the pipeline rather than the middle.
+Pivot when the output is a table someone will read, a chart, or a file for a tool that expects wide. That is a display step. It belongs at the end of the pipeline rather than the middle.
 
 ## Tidy data
 
-The long form has a name and a definition, from Hadley Wickham's tidy data:
+The long form has a name and a meaning, from Hadley Wickham's tidy data:
 
-Each **variable** is a column. Each **observation** is a row. Each type of observational unit is a table.
+Each **var** is a column. Each **finding** is a row. Each type of observational unit is a table.
 
-Data that follows those rules composes with everything: group-by, filtering, joins and most plotting libraries all assume it.
+Data that follows those rules composes with all: group-by, filtering, joins and most plotting libraries all assume it.
 
 The common violations are worth recognising, because each has a standard fix.
 
-**Column headers are values, not variable names** &mdash; a column per year. Fix with `melt`.
+**Column headers are values, not var names**. A column per year. Fix with `melt`.
 
-**Several variables in one column** &mdash; a `measure` column holding both height and weight. Fix with `pivot`.
+**a few vars in one column**. A `measure` column holding both height and weight. Fix with `pivot`.
 
-**Variables in both rows and columns** &mdash; fix with `melt` then `pivot`.
+**vars in both rows and columns**. Fix with `melt` then `pivot`.
 
-**Several values in one cell** &mdash; `"a, b, c"` in one field. Fix with `str.split` and `explode`.
+**a few values in one cell**. `"a, b, c"` in one field. Fix with `str.split` and `explode`.
 
 ## explode
 
 `df.explode("tags")` turns a column of lists into one row per element, repeating the other columns.
 
-It is the tool for data that arrived with several values per cell:
+It's the tool for data that arrived with a few values per cell:
 
 ```python
 df.assign(tag=df["tags"].str.split(",")).explode("tag")
 ```
 
-Each tag becomes its own row, at which point it can be grouped and counted normally.
+Each tag turns its own row, at which point it can be grouped and counted most times.
 
 The inverse is a group-by with `list` or `", ".join` as the aggregation.
 
-`explode` produces duplicate index labels, so `reset_index(drop=True)` usually follows.
+`explode` makes copy index labels, so `reset_index(drop=True)` often follows.
 
 ## pivot_table in more depth
 
-Beyond the basics, three arguments do real work.
+Beyond the basics, three args do real work.
 
-`aggfunc` accepts a **dict** keyed by column, so different values can be summarised differently in one table.
+`aggfunc` accepts a **dict** keyed by column. Other values can be summarised differently in one table.
 
-`index` and `columns` accept **lists**, giving hierarchical axes &mdash; region and city down the side, year and quarter across the top.
+`index` and `columns` accept **lists**, giving nested axes. Region and city down the side, year and quarter across the top.
 
-`dropna=False` keeps columns that are entirely empty, which matters when the table must have a fixed shape for comparison.
+`dropna=False` keeps columns that are fully empty. This Matters when the table must have a fixed shape for compare.
 
 `margins_name` renames the `All` row and column.
 
-The output is a frame with a MultiIndex on one or both axes, so the flattening step from the MultiIndex module usually follows if the result is going anywhere other than the screen.
+The output is a frame with a MultiIndex on one or both axes. The flattening step from the MultiIndex module often follows if the result is going anywhere other than the screen.
 
 ## Reshaping and memory
 
-Wide data with many empty cells is sparse, and pivoting long data into it can allocate far more than the input.
+Wide data with many empty cells is sparse. Pivoting long data into it can allocate far more than the input.
 
 A long frame with 100,000 rows covering 5,000 users and 3,000 products pivots into a 15,000,000-cell table, most of it `NaN`. The long form held 100,000 values.
 
-That is the main practical argument for staying long: the wide form materialises every combination, whether or not it occurred.
+That is the main hands-on arg for staying long: the wide form materialises each mix, whether or not it occurred.
 
-When a wide layout is genuinely needed for a sparse dataset, `pivot_table` with `fill_value=0` at least avoids the float promotion that `NaN` forces, and a sparse dtype or a different tool is worth considering past a certain size.
+When a wide layout is truly needed for a sparse dataset, `pivot_table` with `fill_value=0` at least avoids the float promotion that `NaN` forces. A sparse dtype or a other tool is worth considering past a certain size.
 
 ## Which operation, by shape
 
-**Long to wide, no duplicates** &mdash; `pivot`.
+**Long to wide, no copies** &mdash; `pivot`.
 
 **Long to wide, with aggregation** &mdash; `pivot_table`.
 
@@ -8244,41 +8244,41 @@ When a wide layout is genuinely needed for a sparse dataset, `pivot_table` with 
 
 **Lists in cells into rows** &mdash; `explode`.
 
-**A frequency table of two variables** &mdash; `crosstab`, or `groupby` plus `unstack`.
+**A rate table of two vars**. `crosstab`, or `groupby` plus `unstack`.
 
-The reliable way to choose is to write down the shape you have and the shape you want, in rows and columns, and pick the operation that moves one to the other. Reshaping goes wrong when it is attempted by trial and error rather than by naming the target.
+The solid way to choose is to write down the shape you've and the shape you want, in rows and columns. Pick the step that moves one to the other. Reshaping goes wrong when it's attempted by trial and error rather than by naming the target.
 
 ## Reshaping for a chart
 
-Most plotting expects one of two shapes, and knowing which saves a lot of trial and error.
+Most plotting expects one of two shapes. Knowing which saves a lot of trial and error.
 
-`df.plot()` on a **wide** frame draws one line per column, using the index as the x-axis. That is why `groupby(...).unstack().plot()` works so neatly &mdash; unstack produces exactly that shape.
+`df.plot()` on a **wide** frame draws one line per column, using the index as the x-axis. That is why `groupby(...).unstack().plot()` works so neatly. Unstack makes just that shape.
 
-Seaborn and similar libraries generally want **long** data, with columns naming the variable and the value, and a `hue=` argument doing the splitting.
+Seaborn and similar libraries often want **long** data, with columns naming the var and the value. A `hue=` arg doing the splitting.
 
-So the reshape before plotting depends on the library, and it is usually one call in either direction. Knowing which shape the function wants is faster than adjusting the data until the chart looks right.
+So the reshape before plotting depends on the library. It's often one call in either direction. Knowing which shape the function wants is faster than adjusting the data until the chart looks right.
 
 ## Round-tripping
 
-`melt` then `pivot` returns to where you started, provided the identifier columns uniquely determine a row. If they do not, `pivot` raises on duplicates &mdash; which is a useful check that the identifiers are what you thought.
+`melt` then `pivot` returns to where you started, given the identifier columns uniquely find a row. If they don't, `pivot` raises on copies. Which is a handy check that the identifiers are what you thought.
 
-That round trip is a quick way to test an assumption about the data's grain: if `pivot` complains, the key you believed was unique is not.
+That round trip is a quick way to test an assumption about the data's grain. If `pivot` complains, the key you believed was unique isn't.
 
 ## Column names after reshaping
 
-`pivot` and `pivot_table` use the values of the `columns` argument as column names, so the result's columns are data. That has two consequences.
+`pivot` and `pivot_table` use the values of the `columns` arg as column names. The result's columns are data. That has two results.
 
-They may not be valid identifiers &mdash; a year is an integer, a product name may contain spaces &mdash; so `df.column_name` will not work and `df["2024"]` may need to be `df[2024]`.
+They may not be valid identifiers. A year is an int, a product name may hold spaces. So `df.column_name` won't work and `df["2024"]` may need to be `df[2024]`.
 
-They change when the data changes. Code that names them breaks when a new category appears, which is the maintenance argument for staying long.
+They change when the data changes. Code that names them breaks when a new group appears. This Is the maintenance arg for staying long.
 
-`rename_axis(columns=None)` removes the axis name that pivoting leaves behind, which otherwise shows up as a stray label above the columns when printing.
+`rename_axis(columns=None)` drops the axis name that pivoting leaves behind. This Else shows up as a stray label above the columns when printing.
 
 ## A summary
 
-Long is one row per observation; wide is one row per subject.
+Long is one row per finding. Wide is one row per subject.
 
-`pivot` for long to wide with unique pairs; `pivot_table` when aggregation is needed.
+`pivot` for long to wide with unique pairs. `pivot_table` when aggregation is needed.
 
 `melt` for wide to long, naming both output columns.
 
@@ -8286,35 +8286,35 @@ Long is one row per observation; wide is one row per subject.
 
 `explode` for lists in cells.
 
-Wide materialises every combination, so it can be far larger than the long form.
+Wide materialises each mix, so it can be far larger than the long form.
 
 Work long, pivot at the end, for display.
 
-And when a reshape is confusing, write down the shape you have and the shape you want &mdash; the operation follows from that, and trial and error rarely converges.
+And when a reshape is confusing, write down the shape you've and the shape you want. The step follows from that. Trial and error rarely settles.
 
 ## A closing note
 
-Reshaping is the operation people most often approach by trial and error, and the one where that approach works worst.
+Reshaping is the step people most often approach by trial and error. The one where that approach works worst.
 
-The reliable method is to write down the shape you have and the shape you want &mdash; what is a row, what is a column &mdash; and pick the operation that moves between them. Long to wide is `pivot`, or `pivot_table` if any cell would hold more than one value. Wide to long is `melt`. Through the index instead of named columns, it is `stack` and `unstack`.
+The solid method is to write down the shape you've and the shape you want. What is a row, what is a column. And pick the step that moves between them. Long to wide is `pivot`, or `pivot_table` if any cell would hold more than one value. Wide to long is `melt`. Through the index instead of named columns, it's `stack` and `unstack`.
 
-The default that catches people is `pivot_table`'s `aggfunc="mean"`. A table of sales that quietly averages where you expected a total looks entirely plausible, and nothing indicates otherwise.
+The default that catches people is `pivot_table`'s `aggfunc="mean"`. A table of sales that quietly means where you expected a total looks fully plausible, and nothing shows else.
 
-And the structural advice is to stay long until the end. Wide data materialises every combination whether it occurred or not, and every new category changes the columns &mdash; and therefore every expression that names them.
+And the structural advice is to stay long until the end. Wide data materialises each mix whether it occurred or not. Each new group changes the columns. And so each formula that names them.
 
 ## One more thing
 
-`melt` accepts `ignore_index=False`, which keeps the original index rather than renumbering. That matters when the identifiers you want to keep are in the index rather than in columns, since `id_vars` only names columns.
+`melt` accepts `ignore_index=False`, which keeps the first index rather than renumbering. That matters when the identifiers you want to keep are in the index rather than in columns, since `id_vars` only names columns.
 
-And `wide_to_long` handles the specific case of columns named with a stem and a suffix &mdash; `sales_2023`, `sales_2024` &mdash; unpivoting them into a stem column and a suffix column in one call, which is otherwise a `melt` followed by a `str.extract`.
+And `wide_to_long` handles the exact case of columns named with a stem and a suffix. `sales_2023`, `sales_2024`. Unpivoting them into a stem column and a suffix column in one call. This Is else a `melt` followed by a `str.extract`.
 
 ## In summary
 
-Long form is one row per observation and composes with everything; wide form is one row per subject and reads better.
+Long form is one row per finding and composes with all. Wide form is one row per subject and reads better.
 
-Convert with `pivot` and `melt`, or through the index with `stack` and `unstack`, and use `pivot_table` when a cell could hold more than one value &mdash; remembering that its `aggfunc` defaults to `mean`.
+Convert with `pivot` and `melt`, or through the index with `stack` and `unstack`. Use `pivot_table` when a cell could hold more than one value. Remembering that its `aggfunc` defaults to `mean`.
 
-Work long and pivot at the end. In wide form a new category is a new column, and every expression that named the old columns has to change.
+Work long and pivot at the end. In wide form a new group is a new column. Each formula that named the old columns has to change.
 ''',
     [
         {"q": "Why does `pivot` raise on duplicate index/column pairs?",
@@ -8482,7 +8482,7 @@ intro: More than one level on an axis, and when to flatten it away.
 
 ## It arrives whether you asked or not
 
-Almost nobody constructs a MultiIndex deliberately. It appears as the result of operations you were doing anyway:
+Almost no one makes a MultiIndex on purpose. It appears as the result of steps you were doing anyway:
 
 `groupby(["city", "year"])` gives one level per key.
 
@@ -8490,37 +8490,37 @@ Almost nobody constructs a MultiIndex deliberately. It appears as the result of 
 
 `stack()` moves a column level into the index.
 
-`agg` with several statistics per column gives hierarchical **columns**.
+`agg` with a few statistics per column gives nested **columns**.
 
-So the practical question is rarely "should I build one" and almost always "I have one, now what".
+So the hands-on question is rarely "should I build one" and almost always "I have one, now what".
 
 ## Selecting
 
-The mental model: a tuple addresses the levels in order, the way a nested dictionary would.
+The mental model: a tuple handles the levels in order, the way a nested dict would.
 
 `s.loc["pune"]` selects on the outer level and returns a sub-object with that level dropped.
 
-`s.loc[("pune", 2024)]` addresses both levels and returns a scalar.
+`s.loc[("pune", 2024)]` handles both levels and returns a scalar.
 
 `s.loc[["pune", "delhi"]]` takes a list of outer keys.
 
-The awkward case is selecting on an **inner** level while taking everything from the outer one. Two ways:
+The awkward case is selecting on an **inner** level while taking all from the outer one. Two ways:
 
 `s.xs(2024, level="year")` is the readable form for a single cross-section.
 
-`s.loc[(slice(None), 2024), ]` is the general form. `slice(None)` is the wildcard, needed because you cannot write a bare colon inside a tuple. `pd.IndexSlice` makes it look more like normal slicing: `s.loc[pd.IndexSlice[:, 2024]]`.
+`s.loc[(slice(None), 2024), ]` is the general form. `slice(None)` is the wildcard, needed because you can't write a bare colon inside a tuple. `pd.IndexSlice` makes it look more like normal slicing: `s.loc[pd.IndexSlice[:, 2024]]`.
 
-Selection on inner levels generally requires a **sorted** index. `sort_index()` first if you get a `UnsortedIndexError`, and as a habit after building one.
+Pick on inner levels often needs a **sorted** index. `sort_index()` first if you get a `UnsortedIndexError`. As a habit after building one.
 
 ## Aggregating over a level
 
-`s.groupby(level="city").sum()` collapses one level, keeping the others.
+`s.groupby(level="city").sum()` merges one level, keeping the others.
 
-That is usually what you want when the keys are already in the index &mdash; there is no need to `reset_index` and group by the column again.
+That is often what you want when the keys are already in the index. There's no need to `reset_index` and group by the column again.
 
-`sum(level=...)` used to exist as a shortcut and was removed; `groupby(level=...)` is the current spelling.
+`sum(level=...)` used to exist as a shortcut and was removed. `groupby(level=...)` is the current spelling.
 
-`unstack()` moves a level into the columns and is often more useful than aggregating: it turns a two-level Series into a readable two-dimensional table.
+`unstack()` moves a level into the columns and is often more handy than aggregating. It turns a two-level Series into a readable two-dimensional table.
 
 ## Hierarchical columns
 
@@ -8528,59 +8528,59 @@ That is usually what you want when the keys are already in the index &mdash; the
 
 Selecting needs the tuple: `out[("sales", "sum")]`.
 
-This is where named aggregation earns its place. `agg(total=("sales", "sum"), avg=("sales", "mean"))` produces flat column names and skips this problem entirely.
+This is where named aggregation earns its place. `agg(total=("sales", "sum"), avg=("sales", "mean"))` makes flat column names and skips this problem fully.
 
-When you do end up with hierarchical columns, flattening is one line:
+When you do end up with nested columns, flattening is one line:
 
 ```python
 out.columns = ["_".join(c).strip("_") for c in out.columns]
 ```
 
-Forgetting that step is a common source of confusion later, when something downstream cannot find a column called `sales` because the column is really `("sales", "sum")`.
+Losing that step is a common source of confusion later, when a thing downstream can't find a column called `sales` because the column is really `("sales", "sum")`.
 
 ## When to keep it, when to flatten
 
-**Keep it** when you are going to select through it, `unstack` it into a table, or aggregate over its levels. For genuinely hierarchical data &mdash; country/region/city, or a panel indexed by entity and date &mdash; it is the right structure and makes those operations natural.
+**Keep it** when you're going to select through it, `unstack` it into a table, or aggregate over its levels. For truly nested data. Country/region/city, or a panel indexed by entity and date. It's the right structure and makes those steps natural.
 
-**Flatten it** when the result is leaving pandas or going into an operation that does not care about hierarchy: a merge, a CSV, a plotting call, a model.
+**Flatten it** when the result is leaving pandas or going into an step that doesn't care about tree. A merge, a CSV, a plotting call, a model.
 
-`reset_index()` turns index levels into ordinary columns. `groupby(..., as_index=False)` avoids creating one in the first place.
+`reset_index()` turns index levels into plain columns. `groupby(..., as_index=False)` avoids creating one in the first place.
 
-The honest summary is that a MultiIndex is powerful and awkward in roughly equal measure. It rewards you when the hierarchy is real and the operations use it; it costs you an extra concept at every step when it is merely an artefact of how the result was computed. Most of the time, in ordinary analysis code, flattening early is the kinder choice.
+The honest summary is that a MultiIndex is powerful and awkward in roughly equal measure. It rewards you when the tree is real and the steps use it. It costs you an extra concept at each step when it's merely an artefact of how the result was found. Most of the time, in plain analysis code, flattening early is the kinder choice.
 
 ## Building one deliberately
 
-Occasionally you want a MultiIndex before any group-by:
+at times you want a MultiIndex before any group-by:
 
-`pd.MultiIndex.from_tuples([...], names=[...])` &mdash; from explicit pairs.
+`pd.MultiIndex.from_tuples([...], names=[...])` &mdash; from clear pairs.
 
-`pd.MultiIndex.from_product([["a","b"], [2023, 2024]])` &mdash; every combination, which is how you build a complete frame to reindex sparse data onto.
+`pd.MultiIndex.from_product([["a","b"], [2023, 2024]])` &mdash; each mix. This Is how you build a full frame to reindex sparse data onto.
 
 `pd.MultiIndex.from_arrays([...])` &mdash; from parallel label arrays.
 
-`df.set_index(["city", "year"])` &mdash; from existing columns, which is the usual route.
+`df.set_index(["city", "year"])` &mdash; from existing columns. This Is the usual route.
 
-`from_product` plus `reindex` is the standard way to make a sparse panel dense: build every expected combination, reindex onto it, and the missing ones appear as `NaN` rather than being silently absent.
+`from_product` plus `reindex` is the standard way to make a sparse panel dense. Build each expected mix, reindex onto it. The missing ones appear as `NaN` rather than being silently absent.
 
 ## Sorting matters more here
 
-Selection on inner levels requires a **lexsorted** index. Without it, pandas raises `UnsortedIndexError` or performs badly.
+Pick on inner levels needs a **lexsorted** index. Without it, pandas raises `UnsortedIndexError` or performs badly.
 
 `df.index.is_monotonic_increasing` checks. `sort_index()` fixes.
 
-The habit worth forming is to call `sort_index()` immediately after building or reshaping a MultiIndexed object. It is cheap, it removes a class of error, and it makes label ranges work.
+The habit worth forming is to call `sort_index()` at once after building or reshaping a MultiIndexed object. It's cheap, it drops a class of error. It makes label ranges work.
 
-`df.index.lexsort_depth` reports how many levels are sorted, which explains why selection works on the first level and fails on the second.
+`df.index.lexsort_depth` reports how many levels are sorted. This Shows why pick works on the first level and fails on the second.
 
 ## droplevel, swaplevel, reorder_levels
 
-`droplevel("year")` removes a level entirely &mdash; useful after selecting a single value from it leaves a redundant level behind.
+`droplevel("year")` drops a level fully. Handy after selecting a single value from it leaves a redundant level behind.
 
-`swaplevel(0, 1)` exchanges two levels, and `sort_index()` afterwards is almost always needed for the result to be usable.
+`swaplevel(0, 1)` exchanges two levels, and `sort_index()` later is almost always needed for the result to be usable.
 
 `reorder_levels([...])` handles more than two.
 
-These come up after a `groupby` produced levels in an order that does not suit the next step, and they are cheaper than regrouping.
+These come up after a `groupby` made levels in an order that doesn't suit the next step, and they're cheaper than regrouping.
 
 ## Aggregating and selecting together
 
@@ -8590,15 +8590,15 @@ Two patterns cover most work with a MultiIndexed result.
 
 **Move a level to columns**: `df.unstack("year")`, giving a wide table.
 
-`unstack` takes a `level` by name or position, and `fill_value` for the gaps. Chaining `unstack().plot()` is the usual route from a two-key group-by to a chart.
+`unstack` takes a `level` by name or spot. `fill_value` for the gaps. Chaining `unstack().plot()` is the usual route from a two-key group-by to a chart.
 
-`stack()` reverses it. In recent pandas it has a `future_stack=True` option that changes some edge-case behaviour around missing values; the default is being migrated, so pinning the behaviour explicitly is worth doing in code that must keep working.
+`stack()` reverses it. In recent pandas it has a `future_stack=True` option that changes some edge-case action around missing values. The default is being migrated. Pinning the action by name is worth doing in code that must keep working.
 
 ## Should you use one at all
 
-The honest position: a MultiIndex is the right structure for genuinely hierarchical data that you will select through, and an unnecessary complication otherwise.
+The honest spot: a MultiIndex is the right structure for truly nested data that you'll select through. An not needed complication else.
 
-Signs it is earning its place:
+Signs it's earning its place:
 
 You select by partial key regularly.
 
@@ -8606,101 +8606,101 @@ You aggregate over one level and keep the others.
 
 You unstack it into tables.
 
-The hierarchy is real &mdash; a panel indexed by entity and time, geography at several levels.
+The tree is real &mdash; a panel indexed by entity and time, geography at a few levels.
 
-Signs it is not:
+Signs it isn't:
 
-You immediately `reset_index()` after every operation that produces one.
+You at once `reset_index()` after each step that makes one.
 
-You are fighting `UnsortedIndexError` and `slice(None)`.
+You're fighting `UnsortedIndexError` and `slice(None)`.
 
 The result is heading for a merge, a CSV or a plotting call.
 
-In the second case, `as_index=False` on the group-by avoids creating it at all, which is simpler than creating and flattening.
+In the second case, `as_index=False` on the group-by avoids creating it at all. This Is simpler than creating and flattening.
 
 ## Getting values out
 
-A recurring need is turning a MultiIndexed result into something ordinary code can use.
+A recurring need is turning a MultiIndexed result into a thing plain code can use.
 
-`reset_index()` &mdash; every level becomes a column.
+`reset_index()` &mdash; each level turns a column.
 
-`reset_index(level="year")` &mdash; one level becomes a column, the rest stay.
+`reset_index(level="year")` &mdash; one level turns a column, the rest stay.
 
-`droplevel("year")` &mdash; discard a level entirely.
+`droplevel("year")` &mdash; discard a level fully.
 
 `to_frame()` on the index &mdash; the labels as a frame, for inspection.
 
 `list(df.index)` &mdash; the labels as tuples.
 
-`df.index.get_level_values("city")` &mdash; one level as a flat array, which is what you want for filtering or for building a mask without resetting anything.
+`df.index.get_level_values("city")` &mdash; one level as a flat array. This Is what you want for filtering or for building a mask without resetting anything.
 
 That last one is under-used: `df[df.index.get_level_values("year") == 2024]` filters on a level without any `slice(None)` syntax.
 
 ## Column MultiIndexes in particular
 
-Hierarchical **columns** cause more day-to-day friction than hierarchical rows, because most code expects flat column names.
+nested **columns** cause more day-to-day friction than nested rows. Most code expects flat column names.
 
-They arrive from `agg` with a list of functions, from `pivot_table` with several value columns, and from `unstack`.
+They arrive from `agg` with a list of functions, from `pivot_table` with a few value columns, and from `unstack`.
 
-The flattening idiom is worth memorising:
+The flattening idiom is worth storing:
 
 ```python
 df.columns = ["_".join(map(str, c)).strip("_") for c in df.columns]
 ```
 
-`map(str, ...)` matters because levels are often not strings &mdash; a year is an integer, and `join` fails on it.
+`map(str, ...)` matters because levels are often not strings. A year is an int, and `join` fails on it.
 
-The better answer is usually to avoid creating them: **named aggregation** produces flat names directly, and is clearer at the call site as well.
+The better answer is often to avoid creating them: **named aggregation** makes flat names right. Is clearer at the call site as well.
 
 ## Performance
 
-A MultiIndex is a set of integer codes plus level values, so it is compact &mdash; often more so than the equivalent columns, because repeated labels are stored once.
+A MultiIndex is a set of int codes plus level values. It's compact. Often more so than the equal columns. Repeated labels are stored once.
 
-Selection is fast on a lexsorted index and slow otherwise, which is why `sort_index()` matters here more than elsewhere.
+Pick is fast on a lexsorted index and slow else. This Is why `sort_index()` matters here more than elsewhere.
 
-Group-by on index levels is comparable to group-by on columns.
+Group-by on index levels is close to group-by on columns.
 
-The costs are in usability rather than speed: more concepts, more edge cases, and code that other people find harder to follow.
+The costs are in usability rather than speed: more concepts, more edge cases. Code that other people find harder to follow.
 
 ## A summary
 
 They arrive from group-by, `concat(keys=)`, `stack` and `agg` rather than being built.
 
-A tuple addresses the levels; `xs` takes a cross-section; `slice(None)` is the wildcard.
+A tuple handles the levels. `xs` takes a cross-section. `slice(None)` is the wildcard.
 
 `sort_index()` after building one, always.
 
 `groupby(level=...)` aggregates over a level.
 
-`unstack` turns a level into columns and is often what you actually wanted.
+`unstack` turns a level into columns and is often what you really wanted.
 
-Flatten hierarchical columns with a join over the tuples, or avoid them with named aggregation.
+Flatten nested columns with a join over the tuples, or avoid them with named aggregation.
 
-Keep it when the hierarchy is real and you select through it; `reset_index()` when it is an artefact.
+Keep it when the tree is real and you select through it. `reset_index()` when it's an artefact.
 
 ## Where it fits
 
-Hierarchical indexes are the price of hierarchical questions. A panel of entities over time, sales by region and city and month, a survey by respondent and question &mdash; all of these have a natural nesting, and a MultiIndex expresses it directly.
+nested indexes are the price of nested questions. A panel of entities over time, sales by region and city and month, a survey by respondent and question. All of these have a natural nesting. A MultiIndex expresses it right.
 
-The friction comes when the nesting is incidental rather than meaningful: a group-by on two keys produces one whether or not you wanted the structure.
+The friction comes when the nesting is incidental rather than real. A group-by on two keys makes one whether or not you wanted the structure.
 
-The test is whether you will use the hierarchy. If the next operation selects a level, aggregates over one, or unstacks it into a table, keep it. If the next operation is a merge, a plot or a file, flatten it and move on.
+The test is whether you'll use the tree. If the next step selects a level, aggregates over one, or unstacks it into a table, keep it. If the next step is a merge, a plot or a file, flatten it and move on.
 
-Neither choice is permanent. `set_index` and `reset_index` are cheap and reversible, so the decision can be made per step rather than committed to at the start.
+Neither choice is permanent. `set_index` and `reset_index` are cheap and reversible. The choice can be made per step rather than committed to at the start.
 
-The one thing worth doing consistently is `sort_index()` after building one. Almost every confusing MultiIndex error traces back to an unsorted index, and the fix is a single call that costs nothing on data of ordinary size.
+The one thing worth doing always is `sort_index()` after building one. Almost each confusing MultiIndex error traces back to an unsorted index. The fix is a single call that costs nothing on data of plain size.
 
 ## Two more things worth knowing
 
-`df.index.names` gives the level names and is writable, so an index built without names can be labelled after the fact. Named levels make every later `groupby(level=...)`, `xs` and `unstack` call readable, and unnamed ones force you to count positions.
+`df.index.names` gives the level names and is writable. An index built without names can be labelled after the fact. Named levels make each later `groupby(level=...)`, `xs` and `unstack` call readable. Unnamed ones force you to count spots.
 
-`pd.IndexSlice` deserves a mention on its own. Written as `idx = pd.IndexSlice`, it turns the awkward `df.loc[(slice(None), 2024), :]` into `df.loc[idx[:, 2024], :]`, which is close enough to ordinary slicing to read at a glance.
+`pd.IndexSlice` deserves a mention on its own. Written as `idx = pd.IndexSlice`, it turns the awkward `df.loc[(slice(None), 2024), :]` into `df.loc[idx[:, 2024], :]`. This Is close enough to plain slicing to read at a glance.
 
-Finally, a MultiIndex on the **columns** and one on the **rows** can coexist, which is what `pivot_table` with lists for both `index` and `columns` produces. That is a genuinely useful shape for a printed report and a genuinely awkward one to compute against, which is the trade this whole module describes: the structure that displays best is rarely the structure that manipulates best.
+Finally, a MultiIndex on the **columns** and one on the **rows** can coexist. This Is what `pivot_table` with lists for both `index` and `columns` makes. That is a truly handy shape for a printed report and a truly awkward one to find against. This Is the trade this whole module shows. The structure that displays best is rarely the structure that changes best.
 
 ## A worked selection
 
-Putting the selection tools together on one object makes the pattern clearer than any of them alone.
+Putting the pick tools together on one object makes the pattern clearer than any of them alone.
 
 Given sales indexed by `(city, year)`:
 
@@ -8714,21 +8714,21 @@ Given sales indexed by `(city, year)`:
 
 `s.loc[pd.IndexSlice[:, 2024]]` &mdash; the same, in slice form.
 
-`s[s.index.get_level_values("year") == 2024]` &mdash; the same again, as an ordinary mask, and the form that composes with other conditions.
+`s[s.index.get_level_values("year") == 2024]` &mdash; the same again, as an plain mask. The form that composes with other rules.
 
 `s.groupby(level="city").sum()` &mdash; totals per city.
 
 `s.unstack("year")` &mdash; a table, cities down, years across.
 
-Six ways to ask about one year, which is a fair summary of why MultiIndexes feel heavy. The last two are the ones worth reaching for by default: aggregate a level, or unstack it into a shape that reads.
+Six ways to ask about one year. This Is a fair summary of why MultiIndexes feel heavy. The last two are the ones worth reaching for by default. Aggregate a level, or unstack it into a shape that reads.
 
 ## In summary
 
-A MultiIndex arrives from operations you were doing anyway, and the useful question is whether to keep it.
+A MultiIndex arrives from steps you were doing anyway. The handy question is whether to keep it.
 
-Keep it when the hierarchy is real and the next step selects a level, aggregates over one, or unstacks it into a table. Flatten it when the result is heading for a merge, a file or a chart.
+Keep it when the tree is real and the next step selects a level, aggregates over one, or unstacks it into a table. Flatten it when the result is heading for a merge, a file or a chart.
 
-Sort it as soon as you build it, because most confusing errors here are an unsorted index. Use `xs` or a mask on `get_level_values` rather than fighting `slice(None)`. And prefer named aggregation, which avoids hierarchical columns entirely rather than requiring them to be flattened afterwards.
+Sort it as soon as you build it. Most confusing errors here are an unsorted index. Use `xs` or a mask on `get_level_values` rather than fighting `slice(None)`. And prefer named aggregation. This Avoids nested columns fully rather than needing them to be flattened later.
 ''',
     [
         {"q": "Where do most MultiIndexes come from?",
@@ -8890,119 +8890,119 @@ intro: resample, rolling and shift.
 
 ## The index does the work
 
-Everything in this module depends on the frame having a `DatetimeIndex`. `resample` raises without one, and time-based windows have nothing to measure against.
+all in this module depends on the frame having a `DatetimeIndex`. `resample` raises without one. Time-based windows have nothing to measure against.
 
-`df.set_index("date")` after `pd.to_datetime` is the usual setup, and it is the step people skip before wondering why `resample` will not run.
+`df.set_index("date")` after `pd.to_datetime` is the usual setup. It's the step people skip before wondering why `resample` won't run.
 
-Once the index is a timeline, pandas can do things that would otherwise need a lot of arithmetic: select a month by name, aggregate by period, window by duration rather than by row count.
+Once the index is a timeline, pandas can do things that would else need a lot of math. Select a month by name, aggregate by period, window by duration rather than by row count.
 
 ## resample
 
 `resample` is group-by where the groups are time periods.
 
-**Downsampling** &mdash; daily to monthly &mdash; aggregates, and takes the same methods as `groupby`: `sum()`, `mean()`, `agg(["sum", "mean"])`.
+**Downsampling** &mdash; daily to monthly &mdash; aggregates. Takes the same methods as `groupby`: `sum()`, `mean()`, `agg(["sum", "mean"])`.
 
-The frequency string is the argument that matters. `D` daily, `W` weekly, `ME` month end, `MS` month start, `QE` quarter end, `YE` year end, `h` hourly, `min` minutely.
+The rate string is the arg that matters. `D` daily, `W` weekly, `ME` month end, `MS` month start, `QE` quarter end, `YE` year end, `h` hourly, `min` minutely.
 
-Note that pandas 2.2 **renamed** several of these. `M` became `ME`, `H` became `h`, `T` became `min`. Older code and older tutorials use the old spellings, which now warn or fail depending on version. If a frequency string does not work, that rename is the likely reason.
+Note that pandas 2.2 **renamed** a few of these. `M` became `ME`, `H` became `h`, `T` became `min`. Older code and older tutorials use the old spellings. This Now warn or fail based on version. If a rate string doesn't work, that rename is the likely reason.
 
-The label of each output row is the **end** of the period for `ME`, and the start for `MS`. `label=` and `closed=` control which boundary is used and which side is inclusive, and they matter when periods must line up with something external.
+The label of each output row is the **end** of the period for `ME`. The start for `MS`. `label=` and `closed=` control which boundary is used and which side is inclusive. They matter when periods must line up with a thing external.
 
 ## Upsampling invents rows
 
-Going to a finer frequency creates rows that did not exist, and they start as `NaN`.
+Going to a finer rate creates rows that didn't exist, and they start as `NaN`.
 
-`asfreq()` leaves them empty, which is honest and rarely useful on its own.
+`asfreq()` leaves them empty. This Is honest and rarely handy on its own.
 
-`ffill()` carries the last known value forward. That asserts the value **held constant** until the next observation &mdash; correct for a price, a status, a setting.
+`ffill()` carries the last known value forward. That asserts the value **held constant** until the next finding. Correct for a price, a status, a setting.
 
-`interpolate()` fits between the known points. That asserts the value **moved smoothly** &mdash; correct for a temperature, a position, anything continuous.
+`interpolate()` fits between the known points. That asserts the value **moved smoothly**. Correct for a temp, a spot, anything smooth.
 
-These are different claims about the world, and choosing between them is a modelling decision rather than a formatting one. Both fabricate data; the question is which fabrication is less wrong for what the number means.
+These are other claims about the world. Choosing between them is a modelling choice rather than a formatting one. Both fabricate data. The question is which fabrication is less wrong for what the number means.
 
 ## rolling
 
-`s.rolling(3).mean()` gives a moving average over the last three **rows**.
+`s.rolling(3).mean()` gives a moving mean over the last three **rows**.
 
-The first two results are `NaN`, because the window is not yet full. That is deliberate &mdash; a three-row average computed from one row is not a three-row average. `min_periods=1` overrides it and starts computing immediately, which is convenient and slightly dishonest at the edges.
+The first two results are `NaN`. The window isn't yet full. That is deliberate. A three-row mean found from one row isn't a three-row mean. `min_periods=1` replaces it and starts finding at once. This Is convenient and slightly dishonest at the edges.
 
-`s.rolling("3D")` windows by **time** rather than row count. This is the one to use when observations are irregularly spaced, because three rows might span three days or three months, and only the time-based window means what you said.
+`s.rolling("3D")` windows by **time** rather than row count. This is the one to use when findings are irregularly spaced. Three rows might span three days or three months. Only the time-based window means what you said.
 
-`center=True` puts the window around each point rather than behind it. It is right for smoothing a curve for display and wrong for anything predictive, because it uses future values.
+`center=True` puts the window around each point rather than behind it. It's right for smoothing a curve for display and wrong for anything predictive. It uses future values.
 
-`expanding()` is a window that grows from the start &mdash; a running total or a cumulative mean.
+`expanding()` is a window that grows from the start. A running total or a cumulative mean.
 
-`ewm()` gives exponentially weighted statistics, where recent observations count for more.
+`ewm()` gives fast weighted statistics. Here Recent findings count for more.
 
 ## shift, diff, pct_change
 
-`shift(1)` moves every value down one row, so each row can see the previous one. `shift(-1)` looks forward.
+`shift(1)` moves each value down one row. Each row can see the previous one. `shift(-1)` looks forward.
 
-`diff()` is `s - s.shift(1)`. `pct_change()` is the relative version.
+`diff()` is `s - s.shift(1)`. `pct_change()` is the scaled version.
 
-These are how you build lagged features, growth rates and change detection. The first row is always `NaN`, because it has no predecessor.
+These are how you build lagged features, growth rates and change spotting. The first row is always `NaN`. It has no predecessor.
 
-Within groups, use the group-by versions &mdash; `df.groupby("id")["v"].diff()` &mdash; or the shift crosses from one entity into another and produces a difference between unrelated rows. That is a common and quiet error in panel data.
+Within groups, use the group-by versions. `df.groupby("id")["v"].diff()`. Or the shift crosses from one entity into another and makes a gap between unrelated rows. That is a common and quiet error in panel data.
 
 ## Order is assumed, not checked
 
-Every operation here &mdash; `shift`, `diff`, `rolling`, `resample` &mdash; assumes the rows are in time order.
+each step here &mdash; `shift`, `diff`, `rolling`, `resample` &mdash; assumes the rows are in time order.
 
-pandas does **not** verify it. `diff()` on unsorted data returns numbers, and they are meaningless.
+pandas does **not** verify it. `diff()` on unsorted data returns numbers, and they're meaningless.
 
-`sort_index()` before any of these on data you did not sort yourself. It is one line, and the failure it prevents produces plausible output rather than an error.
+`sort_index()` before any of these on data you didn't sort yourself. It's one line. The failure it blocks makes plausible output rather than an error.
 
-The same applies to duplicated timestamps: two rows for the same instant make `diff` and `rolling` ambiguous, and are usually a sign of a data problem worth looking at before aggregating over it.
+The same applies to duplicated timestamps: two rows for the same instant make `diff` and `rolling` ambiguous. Are often a sign of a data problem worth looking at before aggregating over it.
 
 ## Frequency strings
 
-The alias is the argument that decides what `resample` and `date_range` do, and pandas 2.2 renamed several of them.
+The alias is the arg that decides what `resample` and `date_range` do. Pandas 2.2 renamed a few of them.
 
 `D` day, `B` business day, `W` week (ending Sunday by default, `W-MON` to change it), `MS` month start, `ME` month end, `QS`/`QE` quarter, `YS`/`YE` year, `h` hour, `min` minute, `s` second.
 
-The renames: `M` to `ME`, `H` to `h`, `T` to `min`, `S` to `s`. Older code and most tutorials use the old spellings, which now warn or fail. When a frequency string does not work, this is the first thing to check.
+The renames: `M` to `ME`, `H` to `h`, `T` to `min`, `S` to `s`. Older code and most tutorials use the old spellings. This Now warn or fail. When a rate string doesn't work, this is the first thing to check.
 
 Multiples work: `"15min"`, `"2W"`, `"3ME"`.
 
-Anchored offsets pin the boundary: `"W-FRI"` for weeks ending Friday, `"QE-JAN"` for quarters ending in January, which matters for fiscal years that do not start in January.
+Anchored offsets pin the boundary: `"W-FRI"` for weeks ending Friday, `"QE-JAN"` for quarters ending in January. This Matters for fiscal years that don't start in January.
 
 ## Which label a period gets
 
-`resample("ME")` labels each group with the **end** of the period; `"MS"` with the start.
+`resample("ME")` labels each group with the **end** of the period. `"MS"` with the start.
 
-`label="left"` or `"right"` overrides which boundary names the group, and `closed=` decides which end is inclusive.
+`label="left"` or `"right"` replaces which boundary names the group. `closed=` decides which end is inclusive.
 
-These matter whenever the output must line up with something produced elsewhere. A monthly total labelled 2024-01-31 and one labelled 2024-01-01 are the same number with different index labels, and joining them gives nothing.
+These matter when the output must line up with a thing made elsewhere. A monthly total labelled 2024-01-31 and one labelled 2024-01-01 are the same number with other index labels, and joining them gives nothing.
 
-Settling on a convention early &mdash; usually period start &mdash; saves reconciliation later.
+Settling on a rule early. Often period start &mdash; saves reconciliation later.
 
 ## Grouping by time and something else
 
-`resample` groups by time only. To group by time **and** a category, `pd.Grouper` combines with ordinary keys:
+`resample` groups by time only. To group by time **and** a group, `pd.Grouper` mixes with plain keys:
 
 ```python
 df.groupby([pd.Grouper(key="date", freq="ME"), "city"])["sales"].sum()
 ```
 
-`key=` names the date column, so this works without setting an index, which is what makes `Grouper` more useful than `resample` in practice.
+`key=` names the date column. So This works without setting an index. This Is what makes `Grouper` more handy than `resample` .
 
 The result is a MultiIndex, and `unstack("city")` gives the wide table.
 
 ## Rolling in more depth
 
-`min_periods` decides how many observations a window needs before producing a value. The default for a fixed-size window is the window size; for a time-based window it is 1.
+`min_periods` decides how many findings a window needs before making a value. The default for a fixed-size window is the window size. For a time-based window it's 1.
 
-`closed=` controls whether the window includes its endpoints, which matters for time-based windows where an observation may sit exactly on the boundary.
+`closed=` controls whether the window includes its endpoints. This Matters for time-based windows where an finding may sit just on the boundary.
 
-`win_type` gives weighted windows &mdash; Gaussian, triangular &mdash; for smoothing.
+`win_type` gives weighted windows &mdash; Gaussian, tri &mdash; for smoothing.
 
-`rolling(...).apply(func, raw=True)` runs a custom function per window. `raw=True` passes a NumPy array rather than a Series and is substantially faster.
+`rolling(...).apply(func, raw=True)` runs a custom function per window. `raw=True` passes a NumPy array rather than a Series and is much faster.
 
-Within groups, `df.groupby("id")["v"].rolling(3).mean()` windows inside each group and returns a MultiIndexed result, which usually needs `droplevel(0)` before it can be assigned back.
+Within groups, `df.groupby("id")["v"].rolling(3).mean()` windows inside each group and returns a MultiIndexed result. This Often needs `droplevel(0)` before it can be assigned back.
 
 ## Gaps, and what they hide
 
-A rolling window over rows assumes the rows are evenly spaced. Real time series have gaps &mdash; weekends, outages, missing readings &mdash; and a three-row window may span three days or three weeks.
+A rolling window over rows assumes the rows are evenly spaced. Real time series have gaps. Weekends, outages, missing readings. And a three-row window may span three days or three weeks.
 
 Two fixes:
 
@@ -9010,7 +9010,7 @@ Two fixes:
 
 **Regularise first**: `resample("D").mean()` produces a row per day, with `NaN` where there was no data, after which row-based windows mean what they say.
 
-Which is right depends on whether an absent observation should count as missing or simply not exist. That is a modelling question, and `resample` forces you to answer it, which is an argument for doing it early.
+Which is right depends on whether an absent finding should count as missing or simply not exist. That is a modelling question. `resample` forces you to answer it. This Is an arg for doing it early.
 
 ## A checklist for time-series work
 
@@ -9024,64 +9024,64 @@ Check for duplicated timestamps.
 
 Decide on a time zone, or commit to naive throughout.
 
-Decide whether gaps are missing or absent, and regularise if they are missing.
+Decide whether gaps are missing or absent, and smooth if they're missing.
 
 Then `resample`, `rolling` and `shift` mean what they appear to mean.
 
 ## Aligning two series with different frequencies
 
-A common task: daily data and monthly targets, joined for comparison.
+A common task: daily data and monthly targets, joined for compare.
 
-The wrong approach is a merge on dates, which matches almost nothing.
+The wrong approach is a merge on dates. This Matches almost nothing.
 
-The right approach is to bring both to the same frequency first:
+The right approach is to bring both to the same rate first:
 
 ```python
 monthly = daily.resample("MS").sum()
 combined = monthly.join(targets)
 ```
 
-Or, going the other way, upsample the monthly figure and forward-fill it so every day carries its month's target.
+Or, going the other way, upsample the monthly figure and forward-fill it so each day carries its month's target.
 
-Which direction is right depends on the question. Aggregating up loses detail and is usually correct for reporting; spreading down invents precision and is usually correct for per-row comparison. Either way, the alignment step is explicit rather than implied by a join.
+Which direction is right depends on the question. Aggregating up loses detail and is often correct for reporting. Spreading down invents precision and is often correct for per-row compare. Either way, the alignment step is clear rather than implied by a join.
 
-`MS` versus `ME` matters here: two monthly series labelled at opposite ends of the month will not join at all.
+`MS` versus `ME` matters here: two monthly series labelled at opposite ends of the month won't join at all.
 
 ## Lags and leads for modelling
 
-`shift(1)` gives the previous value &mdash; a lag, safe to use as a predictor.
+`shift(1)` gives the previous value. A lag, safe to use as a predictor.
 
-`shift(-1)` gives the next value &mdash; a lead, which is the **target** in a forecasting problem and must never be a feature.
+`shift(-1)` gives the next value. A lead. This Is the **target** in a forecasting problem and must never be a feature.
 
-Using a lead as a feature is data leakage, and it produces models that score beautifully and fail in production. Because both are one method with a sign, the mistake is easy to make and invisible in the code.
+Using a lead as a feature is data leakage. It makes models that score beautifully and fail in production. Because both are one method with a sign, the mistake is easy to make and invisible in the code.
 
-Rolling features have the same hazard: `rolling(3, center=True)` uses future values. For anything predictive, windows must look backwards only, which is the default without `center`.
+Rolling features have the same hazard: `rolling(3, center=True)` uses future values. For anything predictive, windows must look backwards only. This Is the default without `center`.
 
 Within groups, all of these need the group-wise form, or the lag crosses from one entity to the next.
 
 ## Missing periods
 
-A gap in a time series is either "no observation" or "no event", and the two need different handling.
+A gap in a time series is either "no finding" or "no event". The two need other handling.
 
-`resample("D").sum()` gives 0 for days with no rows &mdash; correct if the series counts events.
+`resample("D").sum()` gives 0 for days with no rows. Correct if the series counts events.
 
-`resample("D").mean()` gives `NaN` &mdash; correct if the series measures something that existed but was not recorded.
+`resample("D").mean()` gives `NaN` &mdash; correct if the series measures a thing that existed but wasn't recorded.
 
-Choosing the wrong one produces a series that looks complete and is wrong at exactly the interesting points.
+Choosing the wrong one makes a series that looks full and is wrong at just the notable points.
 
-`asfreq()` makes the gaps explicit without aggregating, which is the honest first step when you are not yet sure.
+`asfreq()` makes the gaps clear without aggregating. This Is the honest first step when you aren't yet sure.
 
 ## A summary
 
 A `DatetimeIndex` is the prerequisite for `resample` and time-based windows.
 
-Frequency aliases were renamed in pandas 2.2 &mdash; `ME`, `h`, `min`.
+rate aliases were renamed in pandas 2.2 &mdash; `ME`, `h`, `min`.
 
-Downsampling aggregates; upsampling invents rows that need filling deliberately.
+Downsampling aggregates. Upsampling invents rows that need filling on purpose.
 
-`ffill` asserts a value held; `interpolate` asserts it moved smoothly.
+`ffill` asserts a value held. `interpolate` asserts it moved smoothly.
 
-`rolling("3D")` for irregular spacing; `min_periods` for the edges.
+`rolling("3D")` for irregular spacing. `min_periods` for the edges.
 
 `shift(-1)` is a lead and belongs only in a target, never a feature.
 
@@ -9093,15 +9093,15 @@ Use the group-wise forms on panel data.
 
 Time series work rewards setting things up properly and punishes assumptions.
 
-The setup is short: parse the dates with an explicit format, check the dtype, decide on a time zone, set a `DatetimeIndex` if you need period selection, and sort. Every operation in this module assumes that order and none of them check it, so `diff` on unsorted rows returns numbers that mean nothing.
+The setup is short: parse the dates with an clear format, check the dtype, decide on a time zone, set a `DatetimeIndex` if you need period pick. Sort. each step in this module assumes that order and none of them check it. `diff` on unsorted rows returns numbers that mean nothing.
 
-The recurring decision is what a gap means. A day with no rows is either zero events or an unrecorded measurement, and `resample("D").sum()` and `.mean()` encode those two different answers. Choosing without noticing gives a series that looks complete and is wrong exactly where the interesting things happen.
+The recurring choice is what a gap means. A day with no rows is either zero events or an unrecorded reading. `resample("D").sum()` and `.mean()` encode those two other answers. Choosing without noticing gives a series that looks full and is wrong just where the notable things happen.
 
-And on panel data &mdash; several entities stacked in one frame &mdash; `shift`, `diff` and `rolling` must be done within groups, or the comparison runs across the boundary from one entity into the next and produces a plausible number from unrelated rows.
+And on panel data &mdash; a few entities stacked in one frame &mdash; `shift`, `diff` and `rolling` must be done within groups, or the compare runs across the boundary from one entity into the next and makes a plausible number from unrelated rows.
 
 ## One more thing
 
-`resample` accepts `origin=` and `offset=`, which control where the period boundaries fall. That matters for data that should be bucketed on something other than midnight or the first of the month &mdash; a business day starting at 6am, or weeks aligned to a fiscal calendar.
+`resample` accepts `origin=` and `offset=`. This Control where the period boundaries fall. That matters for data that should be bucketed on a thing other than midnight or the first of the month. A business day starting at 6am, or weeks aligned to a fiscal calendar.
 ''',
     [
         {"q": "What does `resample` require?",
@@ -9258,99 +9258,99 @@ print("the dtypes down and restore them on read.")'''),
     ],
     '''
 title: Reading and Writing Files
-intro: read_csv's arguments, and the ones that prevent a class of bug.
+intro: read_csv's args, and the ones that prevent a class of bug.
 
 ## Inference is convenient and lossy
 
-`read_csv` guesses a dtype per column. That is why it is pleasant to use and why the same three problems appear in almost every project.
+`read_csv` guesses a dtype per column. That is why it's pleasant to use and why the same three problems appear in almost each project.
 
-**Leading zeros disappear.** An id column of `007`, `008` is read as integers, and the zeros are gone permanently. No error, and the values still look like ids.
+**Leading zeros disappear.** An id column of `007`, `008` is read as ints. The zeros are gone permanently. No error. The values still look like ids.
 
-**Dates stay text.** Nothing is parsed as a date unless you ask. The column sorts lexically, `.dt` does not work, and date arithmetic is unavailable.
+**Dates stay text.** Nothing is parsed as a date unless you ask. The column sorts lexically, `.dt` doesn't work, and date math is down.
 
-**One gap makes a column float.** NumPy integers cannot hold `NaN`, so a single missing value promotes the whole column, and ids print as `1001.0`.
+**One gap makes a column float.** NumPy ints can't hold `NaN`. A single missing value promotes the whole column, and ids print as `1001.0`.
 
 All three are fixed at read time by saying what you know.
 
 ## The arguments that matter
 
-`dtype={"id": str}` keeps identifiers as text. This is the fix for leading zeros, and it should be the default for anything that is a code rather than a quantity &mdash; postcodes, account numbers, phone numbers.
+`dtype={"id": str}` keeps identifiers as text. This is the fix for leading zeros. It should be the default for anything that is a code rather than a quantity. Postcodes, account numbers, phone numbers.
 
-`dtype={"amount": "Int64"}` uses the nullable integer type, so the column holds gaps without becoming float.
+`dtype={"amount": "Int64"}` uses the nullable int type. So The column holds gaps without turning float.
 
-`parse_dates=["joined"]` converts during the read, which is faster than converting after. Add `date_format=` when the format is known and unambiguous.
+`parse_dates=["joined"]` converts during the read. This Is faster than converting after. Add `date_format=` when the format is known and unambiguous.
 
-`usecols=["a", "d"]` reads only the columns you name. On a wide file this saves both time and memory, and it is the single most effective argument for large data.
+`usecols=["a", "d"]` reads only the columns you name. On a wide file this saves both time and memory. It's the single most good arg for large data.
 
-`nrows=1000` reads a sample. Always look at a sample of an unfamiliar file before loading all of it &mdash; it is how you find out that the delimiter is wrong, or that there are three header rows, or that the file is not what you were told.
+`nrows=1000` reads a sample. Always look at a sample of an unseen file before loading all of it. It's how you find out that the delimiter is wrong, or that there are three header rows, or that the file isn't what you were told.
 
 `index_col="id"` sets the index during the read.
 
-`na_values=["missing", "-999"]` adds markers. pandas recognises a standard list &mdash; empty, `NA`, `N/A`, `null`, `NaN` and a few more &mdash; but it cannot know that this dataset writes `missing`, or that `-999` is a sentinel. Left alone, the text markers make the column `object` and the numeric sentinel is treated as a real value, which quietly poisons every average.
+`na_values=["missing", "-999"]` adds markers. pandas recognises a standard list. Empty, `NA`, `N/A`, `null`, `NaN` and a few more. But it can't know that this dataset writes `missing`, or that `-999` is a sentinel. Left alone, the text markers make the column `object` and the numeric sentinel is treated as a real value. This Quietly poisons each mean.
 
-`skiprows`, `header=None` and `names=[...]` handle files whose top is not a clean header row.
+`skiprows`, `header=None` and `names=[...]` handle files whose top isn't a clean header row.
 
-`chunksize=n` returns an iterator of frames rather than one frame, which is how you process a file larger than memory.
+`chunksize=n` returns an iterator of frames rather than one frame. This Is how you process a file larger than memory.
 
 ## Writing
 
 `to_csv()` writes the index as an unnamed first column by default.
 
-Read that file back and you get a spurious `Unnamed: 0` column. It is harmless, ubiquitous, and entirely avoidable: **pass `index=False`** unless the index is meaningful data.
+Read that file back and you get a spurious `Unnamed: 0` column. It's harmless, ubiquitous. Fully avoidable: **pass `index=False`** unless the index is real data.
 
-Other arguments worth knowing: `float_format="%.2f"` controls precision, `columns=` selects what to write, `sep=` changes the delimiter, and `encoding="utf-8"` is worth being explicit about when the data leaves your machine.
+Other args worth knowing: `float_format="%.2f"` controls precision, `columns=` selects what to write, `sep=` changes the delimiter. `encoding="utf-8"` is worth being clear about when the data leaves your machine.
 
 ## CSV loses what the frame knew
 
-A CSV is text. Everything pandas knew about the data is discarded on the way out:
+A CSV is text. all pandas knew about the data is discarded on the way out:
 
-`Int64` becomes plain `int64` on the way back, or `float64` if there were gaps.
+`Int64` turns plain `int64` on the way back, or `float64` if there were gaps.
 
-`category` becomes `object`, and the category order is gone.
+`group` turns `object`, and the group order is gone.
 
 Datetimes become strings again, unless the reader is told to parse them.
 
-The index becomes a column, or vanishes.
+The index turns a column, or vanishes.
 
-That round-trip loss is the argument for a binary format when the data is going to be read back by pandas:
+That round-trip loss is the arg for a binary format when the data is going to be read back by pandas:
 
-**Parquet** (`to_parquet` / `read_parquet`) preserves dtypes, is columnar, compresses well, and is readable by many tools. It needs `pyarrow` installed &mdash; which is why the editors here use CSV.
+**Parquet** (`to_parquet` / `read_parquet`) preserves dtypes, is columnar, compresses well. Is readable by many tools. It needs `pyarrow` installed. Which is why the editors here use CSV.
 
-**Pickle** (`to_pickle`) preserves everything exactly, including categories and custom objects, but is Python-specific, version-fragile, and **executes code on load**. Never unpickle a file you did not create.
+**Pickle** (`to_pickle`) preserves all just, including groups and custom objects. Is Python-exact, version-fragile. **runs code on load**. Never unpickle a file you didn't create.
 
 **HDF5** suits very large numeric data with partial reads.
 
-For anything you will read back yourself, Parquet is usually the right answer. For anything a human or another tool must read, CSV is worth its losses &mdash; but write down the dtypes somewhere, because the reader will have to guess exactly as you did.
+For anything you'll read back yourself, Parquet is often the right answer. For anything a human or another tool must read, CSV is worth its losses. But write down the dtypes one spot. The reader will have to guess just as you did.
 
 ## A loading routine
 
-Read a sample with `nrows`. Look at it. Decide the dtypes, the date columns, the missing markers and the columns you actually need. Then read the whole file with those arguments set.
+Read a sample with `nrows`. Look at it. Decide the dtypes, the date columns, the missing markers and the columns you really need. Then read the whole file with those args set.
 
-That takes a minute and removes most of what the cleaning modules exist to fix.
+That takes a minute and drops most of what the cleaning modules exist to fix.
 
 ## Files that are not quite CSV
 
-Real exports are rarely clean, and `read_csv` has an argument for each common defect.
+Real exports are rarely clean, and `read_csv` has an arg for each common defect.
 
 `sep="\t"` for tab-separated; `sep=None` with `engine="python"` sniffs the delimiter.
 
-`skiprows=3` skips a preamble; `skiprows=lambda i: i % 2` skips selectively.
+`skiprows=3` skips a preamble. `skiprows=lambda i: i % 2` skips selectively.
 
 `header=None` with `names=[...]` handles a file with no header row.
 
-`skipfooter=2` drops trailing summary lines, and requires `engine="python"`.
+`skipfooter=2` drops trailing summary lines, and needs `engine="python"`.
 
 `thousands=","` parses `1,234` as a number rather than leaving it as text. Without it, a single formatted number makes the whole column `object`.
 
 `decimal=","` handles European decimal commas.
 
-`encoding="latin-1"` when UTF-8 fails, which is the usual cause of a `UnicodeDecodeError` on files from older Windows tools.
+`encoding="latin-1"` when UTF-8 fails. This Is the usual cause of a `UnicodeDecodeError` on files from older Windows tools.
 
 `quotechar` and `escapechar` for embedded delimiters.
 
-`comment="#"` ignores comment lines.
+`comment="#"` skips comment lines.
 
-When a file will not parse, working through that list is faster than writing a custom reader.
+When a file won't parse, working through that list is faster than writing a custom reader.
 
 ## Reading in chunks
 
@@ -9363,7 +9363,7 @@ for chunk in pd.read_csv(path, chunksize=100_000):
 result = pd.concat(totals).groupby(level=0).sum()
 ```
 
-That processes a file larger than memory, provided the operation can be done piecewise. Sums, counts and group sums can; a median cannot, without more work.
+That processes a file larger than memory, given the step can be done piecewise. Sums, counts and group sums can. A median can't, without more work.
 
 The pattern is: reduce each chunk, collect the small results, combine at the end. Collecting the raw chunks and concatenating them defeats the purpose.
 
@@ -9371,56 +9371,56 @@ The pattern is: reduce each chunk, collect the small results, combine at the end
 
 `pd.read_excel(path, sheet_name="Sheet1")` needs `openpyxl` for `.xlsx`.
 
-`sheet_name=None` reads **every** sheet into a dict of frames, which is the quickest way to see what a workbook contains.
+`sheet_name=None` reads **each** sheet into a dict of frames. This Is the quickest way to see what a workbook holds.
 
-Excel files carry types, so dates usually arrive parsed &mdash; but they also carry merged cells, hidden rows and formatting that mean nothing to pandas, and a sheet that looks tabular on screen is often not.
+Excel files carry types, so dates often arrive parsed. But they also carry merged cells, hidden rows and formatting that mean nothing to pandas. A sheet that looks tabular on screen is often not.
 
 `header=`, `usecols="B:D"` and `skiprows=` do the same jobs as in `read_csv`.
 
-Writing several frames to one workbook uses `pd.ExcelWriter` as a context manager, with one `to_excel` call per sheet.
+Writing a few frames to one workbook uses `pd.ExcelWriter` as a context manager, with one `to_excel` call per sheet.
 
 ## Compression and paths
 
-`read_csv` and `to_csv` handle compression transparently from the extension: `.gz`, `.bz2`, `.zip`, `.xz`. A gzipped CSV is often a third of the size and costs little to read.
+`read_csv` and `to_csv` handle packing transparently from the extension: `.gz`, `.bz2`, `.zip`, `.xz`. A gzipped CSV is often a third of the size and costs little to read.
 
-Both accept URLs as well as paths, which is convenient for public datasets and a bad idea in production code, where the file should be fetched and cached deliberately.
+Both accept URLs and paths. This Is convenient for public datasets and a bad idea in production code. Here The file should be fetched and cached on purpose.
 
 `pathlib.Path` objects work anywhere a path string does.
 
 ## Choosing a format
 
-**CSV** &mdash; universal, human-readable, lossy about types, slow to parse. Right when something other than pandas must read it.
+**CSV** &mdash; universal, human-readable, lossy about types, slow to parse. Right when a thing other than pandas must read it.
 
 **Parquet** &mdash; typed, columnar, compressed, fast, readable by many tools. The right default for data pandas will read back. Needs `pyarrow`.
 
-**Pickle** &mdash; preserves everything exactly, Python-only, version-fragile, and **executes code on load**. Fine for a short-lived cache you created; never for input you did not.
+**Pickle** &mdash; preserves all just, Python-only, version-fragile. **runs code on load**. Fine for a short-lived cache you created. Never for input you didn't.
 
 **JSON** &mdash; good for nested data, verbose for tabular, and `json_normalize` handles the flattening.
 
 **HDF5** &mdash; large numeric arrays with partial reads.
 
-**SQL** &mdash; when several processes need the data, or it outgrows one machine.
+**SQL** &mdash; when a few processes need the data, or it outgrows one machine.
 
-The decision is mostly: who reads this next? If the answer is pandas, use Parquet. If it is a person or another tool, use CSV and accept the losses. If it is a system, use a database.
+The choice is mostly: who reads this next? If the answer is pandas, use Parquet. If it's a person or another tool, use CSV and accept the losses. If it's a system, use a DB.
 
 ## Writing for a round trip
 
 If pandas will read the file back, the goal is to lose nothing.
 
-Parquet does that: dtypes, categories and datetimes all survive, and it is smaller and faster than CSV.
+Parquet does that: dtypes, groups and datetimes all live. It's smaller and faster than CSV.
 
-If Parquet is unavailable, CSV plus an explicit read specification is the workaround &mdash; record the dtypes alongside the file, and pass them on read:
+If Parquet is down, CSV plus an clear read specification is the workaround. Record the dtypes alongside the file, and pass them on read:
 
 ```python
 dtypes = df.dtypes.astype(str).to_dict()
 json.dump(dtypes, open("schema.json", "w"))
 ```
 
-That is clumsy and it works. What does not work is assuming the reader will infer the same types you had, because inference depends on the data and the data changes.
+That is clumsy and it works. What doesn't work is given the reader will infer the same types you had. Inference depends on the data and the data changes.
 
 ## Validating on load
 
-The most useful place for checks is immediately after reading, where a problem is closest to its cause:
+The most handy place for checks is at once after reading. Here A problem is closest to its cause:
 
 ```python
 df = pd.read_csv(path, dtype=..., parse_dates=[...])
@@ -9431,7 +9431,7 @@ assert df["date"].notna().all()
 assert len(df) > 0
 ```
 
-Column-name checks are the highest value of these. An upstream export that renames or reorders columns is common, and without a check the failure appears much later as a `KeyError` or, worse, as a column of the wrong data under the right name.
+Column-name checks are the highest value of these. An upstream export that renames or reorders columns is common. Without a check the failure appears much later as a `KeyError` or, worse, as a column of the wrong data under the right name.
 
 ## Large files
 
@@ -9441,17 +9441,17 @@ The order to try, as a file grows:
 
 `nrows` for development, so the edit-run cycle stays fast.
 
-`chunksize` with per-chunk reduction, when the whole file cannot be held.
+`chunksize` with per-chunk reduction, when the whole file can't be held.
 
 Parquet, which reads only the columns requested and is far faster to parse.
 
-A database or DuckDB, when the data outgrows one machine's memory even column-wise.
+A DB or DuckDB, when the data outgrows one machine's memory even column-wise.
 
-Reaching for the last option first is a common mistake; `usecols` and `dtype` frequently make a "too large" file comfortable.
+Reaching for the last option first is a common mistake. `usecols` and `dtype` often make a "too large" file comfortable.
 
 ## A summary
 
-`read_csv` infers, and inference loses leading zeros, leaves dates as text, and turns integers with gaps into floats.
+`read_csv` infers, and inference loses leading zeros, leaves dates as text, and turns ints with gaps into floats.
 
 `dtype`, `parse_dates`, `usecols` and `na_values` prevent all of that at read time.
 
@@ -9459,37 +9459,37 @@ Read a sample with `nrows` before committing to a large file.
 
 `to_csv(index=False)` unless the index is data.
 
-CSV loses types; Parquet does not.
+CSV loses types. Parquet doesn't.
 
-`allow_pickle`-style trust applies to `read_pickle` too &mdash; never load one you did not create.
+`allow_pickle`-style trust applies to `read_pickle` too. Never load one you didn't create.
 
-Validate immediately after loading, especially the column names.
+Validate at once after loading, above all the column names.
 
 And for a large file, `usecols` and `dtype` are the first thing to try, not the last.
 
 ## A closing note
 
-The boundary between a file and a DataFrame is where most silent damage happens, and it is the cheapest place to prevent it.
+The boundary between a file and a DataFrame is where most silent damage happens. It's the cheapest place to prevent it.
 
-`read_csv` guesses, and its guesses lose leading zeros, leave dates as text, and turn integers with a single gap into floats. Every one of those is fixed by an argument, and every one of them is much harder to fix later &mdash; leading zeros in particular are gone for good.
+`read_csv` guesses, and its guesses lose leading zeros, leave dates as text, and turn ints with a single gap into floats. each one of those is fixed by an arg, and each one of them is much harder to fix later. Leading zeros in given are gone for good.
 
-The habit worth building is to read a sample first, look at it, decide the types, and then read the file properly. That takes a minute and replaces an afternoon of confused debugging.
+The habit worth building is to read a sample first, look at it, decide the types. Then read the file properly. That takes a minute and replaces an afternoon of confused debugging.
 
-On the way out, `index=False` unless the index is data, and Parquet rather than CSV whenever pandas will be the one reading it back. CSV is a text interchange format, and treating it as a storage format means accepting that everything the frame knew about its own types is discarded each time.
+On the way out, `index=False` unless the index is data. Parquet rather than CSV when pandas will be the one reading it back. CSV is a text interchange format. Treating it as a storage format means accepting that all the frame knew about its own types is discarded each time.
 
 ## One more thing
 
-`read_csv` accepts a `converters` dict mapping column names to functions, applied during the read. It is slower than `dtype` and handles cases `dtype` cannot &mdash; stripping a currency symbol, parsing a bespoke format &mdash; without a separate cleaning pass afterwards.
+`read_csv` accepts a `converters` dict mapping column names to functions, applied during the read. It's slower than `dtype` and handles cases `dtype` can't. Stripping a currency symbol, parsing a bespoke format. Without a split cleaning pass later.
 
-And `to_csv` with no path returns the CSV as a **string** rather than writing a file, which is how you round-trip through `io.StringIO` in a test, or hand the text to something that wants a string rather than a filename.
+And `to_csv` with no path returns the CSV as a **string** rather than writing a file. This Is how you round-trip through `io.StringIO` in a test, or hand the text to a thing that wants a string rather than a filename.
 
 ## In summary
 
-The read is where types are decided, and inference makes three predictable mistakes: leading zeros lost, dates left as text, integers with a gap turned into floats.
+The read is where types are decided. Inference makes three predictable mistakes. Leading zeros lost, dates left as text, ints with a gap turned into floats.
 
-`dtype`, `parse_dates`, `usecols` and `na_values` prevent all three, cost nothing, and are far cheaper than repairing the damage afterwards.
+`dtype`, `parse_dates`, `usecols` and `na_values` prevent all three, cost nothing. Are far cheaper than repairing the damage later.
 
-Read a sample first and look at it. Validate the column names on load. Write with `index=False`. And when pandas will be the one reading the file back, use Parquet, because CSV discards everything the frame knew about itself.
+Read a sample first and look at it. Validate the column names on load. Write with `index=False`. And when pandas will be the one reading the file back, use Parquet. CSV discards all the frame knew about itself.
 ''',
     [
         {"q": "A CSV id column contains 007. What does `read_csv` do by default?",
@@ -9692,213 +9692,213 @@ print("Optimising the arithmetic would have gained nothing.")'''),
     ],
     '''
 title: Performance
-intro: Where the time actually goes, in the order worth fixing it.
+intro: Where the time really goes, in the order worth fixing it.
 
 ## The order to work in
 
-Pandas performance work is unusually predictable. In descending order of payoff:
+Pandas speed work is unusually predictable. In descending order of payoff:
 
-1. **Remove per-row Python.** Worth 10&ndash;100x, and it is nearly always the whole problem.
-2. **Right-size the dtypes.** Halves or better on memory, and speeds up everything that touches the column.
+1. **Drop per-row Python.** Worth 10&ndash;100x, and it's nearly always the whole problem.
+2. **Right-size the dtypes.** Halves or better on memory. Speeds up all that touches the column.
 3. **Filter early.** Free, and often the largest structural win.
 4. **Reduce copies.** Worth a modest amount, and only in hot paths.
-5. **Reach past pandas.** When the data or the algorithm genuinely does not suit it.
+5. **Reach past pandas.** When the data or the method truly doesn't suit it.
 
 Working down that list in order means the large wins come first. Working up it means spending an afternoon on step 4 while a `apply(axis=1)` sits untouched.
 
 ## Per-row Python
 
-`df.apply(func, axis=1)`, `iterrows`, and a `for` loop over rows all do the same thing: call back into the interpreter once per row.
+`df.apply(func, axis=1)`, `iterrows`, and a `for` loop over rows all do the same thing. Call back into the interpreter once per row.
 
-The first editor measures four spellings of the same multiplication. The vectorised form is orders of magnitude faster than `apply(axis=1)`, and interestingly a plain `zip` over two columns beats `apply` comfortably &mdash; because `apply` also builds a Series object per row.
+The first editor measures four spellings of the same product. The vectorised form is orders of magnitude faster than `apply(axis=1)`. notably a plain `zip` over two columns beats `apply` comfortably. Because `apply` also builds a Series object per row.
 
-The practical rule: if a lambda indexes into a row, the operation is column arithmetic in disguise.
+The hands-on rule: if a lambda indexes into a row, the step is column math in disguise.
 
 ## iterrows
 
-Worth singling out because it is common and there is no situation where it is the right choice.
+Worth singling out because it's common and there's no situation where it's the right choice.
 
-It is much slower than `itertuples`, and it **converts each row to a Series**. A row containing an integer and a string becomes an `object` Series, so the integer arrives as an object. Code that then does arithmetic on it is slower again, and code that checks types breaks.
+It's much slower than `itertuples`, and it **converts each row to a Series**. A row holding an int and a string turns an `object` Series. The int arrives as an object. Code that then does math on it's slower again, and code that checks types breaks.
 
-`itertuples` is faster and preserves dtypes. If you must iterate, use that. Better still, do not iterate.
+`itertuples` is faster and preserves dtypes. If you must iterate, use that. Better still, don't iterate.
 
 ## dtypes
 
-Covered in its own module, and it belongs here too because memory and speed are the same problem: less data to move is less time spent moving it.
+Covered in its own module, and it belongs here too because memory and speed are the same problem. Less data to move is less time spent moving it.
 
-`category` for repeated text is the biggest single win on most real frames, and it speeds up group-by and comparison as well as saving memory. `to_numeric(downcast=...)` narrows numeric columns.
+`group` for repeated text is the biggest single win on most real frames. It speeds up group-by and compare and saving memory. `to_numeric(downcast=...)` narrows numeric columns.
 
 The third editor shows both applied to one frame.
 
 ## Filter early
 
-Every operation costs in proportion to the rows it touches. Filtering to 5% of the data before computing means every later step does 5% of the work.
+each step costs in proportion to the rows it touches. Filtering to 5% of the data before finding means each later step does 5% of the work.
 
-This is obvious stated plainly and routinely done backwards, because a filter reads more naturally at the end of a chain than in the middle of one. `df.assign(...).query(...)` computes for every row and then throws most of them away; `df.query(...).assign(...)` does not.
+This is obvious stated plainly and routinely done backwards. A filter reads more on its own at the end of a chain than in the middle of one. `df.assign(...).query(...)` finds for each row and then throws most of them away. `df.query(...).assign(...)` doesn't.
 
-The same applies to columns: `usecols` at read time, and dropping columns you will not use, both reduce everything downstream.
+The same applies to columns: `usecols` at read time. Dropping columns you won't use, both reduce all downstream.
 
 ## Copies
 
-Most pandas operations return a new object. A chain of three `assign` calls allocates three frames.
+Most pandas steps return a new object. A chain of three `assign` calls allocates three frames.
 
-That is usually the right trade &mdash; the chain is readable, does not mutate anything, and works well in a notebook. The cost only matters inside a loop or on a frame large enough that allocation dominates.
+That is often the right trade. The chain is readable, doesn't mutate anything. Works well in a notebook. The cost only matters inside a loop or on a frame large enough that allocation dominates.
 
-Two things to know rather than to apply everywhere: direct assignment (`df["b"] = ...`) modifies in place and skips the copy, and `inplace=True` on other methods generally does **not** avoid a copy despite its name, while breaking chaining and returning `None`. It is not the optimisation it appears to be.
+Two things to know rather than to apply all over. Direct set (`df["b"] = ...`) modifies in place and skips the copy. `inplace=True` on other methods often does **not** avoid a copy despite its name, while breaking chaining and returning `None`. It isn't the tuning it appears to be.
 
 ## Measure
 
-The last editor times four operations on the same frame. The ranking is not what most people would guess, and it changes with the data.
+The last editor times four steps on the same frame. The ranking isn't what most people would guess. It changes with the data.
 
-`%timeit` in a notebook, or `time.perf_counter` around a block, is enough for most decisions. Take the best of several runs rather than the mean, since the slow runs are measuring the machine.
+`%timeit` in a notebook, or `time.perf_counter` around a block, is enough for most choices. Take the best of a few runs rather than the mean. The slow runs are measuring the machine.
 
 Two rules that save the most wasted effort:
 
-**Profile the real workload.** A small sample has different characteristics &mdash; different memory pressure, different cache behaviour, sometimes a different code path.
+**Profile the real workload.** A small sample has other traits. Other memory pressure, other cache action, at times a other code path.
 
-**Fix the top item and measure again.** The bottleneck moves, and the second item on the original list is often no longer second.
+**Fix the top item and measure again.** The bottleneck moves. The second item on the first list is often no longer second.
 
-And keep the ceiling in view: an operation taking 5% of the runtime cannot give back more than 5%, however cleverly it is rewritten.
+And keep the ceiling in view: an step taking 5% of the runtime can't give back more than 5%. Cleverly it's rewritten.
 
 ## When to leave pandas
 
-pandas assumes the data fits in memory on one machine, and it is optimised for convenience rather than raw speed.
+pandas assumes the data fits in memory on one machine. It's optimised for convenience rather than raw speed.
 
 **Polars** is much faster on large joins and aggregations, with a similar model and a lazy engine.
 
-**DuckDB** runs SQL over frames and files, and is excellent for analytical queries larger than memory.
+**DuckDB** runs SQL over frames and files. Is great for analytical queries larger than memory.
 
-**Dask** partitions frames across cores or machines with a pandas-like API.
+**Dask** splits frames across cores or machines with a pandas-like API.
 
-**NumPy** directly, when the data is homogeneous and you do not need labels.
+**NumPy** right, when the data is homogeneous and you don't need labels.
 
-The signal that it is time is usually memory rather than speed: when a frame no longer fits, no amount of optimisation inside pandas fixes it.
+The signal that it's time is often memory rather than speed. When a frame no longer fits, no amount of tuning inside pandas fixes it.
 
 ## Profiling a pandas script
 
-`%timeit` in a notebook and `time.perf_counter` around a block cover most decisions.
+`%timeit` in a notebook and `time.perf_counter` around a block cover most choices.
 
-For a whole script, `cProfile` finds the hot function and `line_profiler` finds the line inside it. Array code often has one line taking most of the time, which line-level profiling shows immediately and function-level profiling hides.
+For a whole script, `cProfile` finds the hot function and `line_profiler` finds the line inside it. Array code often has one line taking most of the time. This Line-level profiling shows at once and function-level profiling hides.
 
 `df.info(memory_usage="deep")` and `memory_profiler` cover the memory side.
 
-Two rules save the most wasted effort. Profile the **real** workload, because a small sample has different cache behaviour and sometimes takes a different code path. And re-profile after each fix, because the bottleneck moves.
+Two rules save the most wasted effort. Profile the **real** workload. A small sample has other cache action and at times takes a other code path. And re-profile after each fix, because the bottleneck moves.
 
 ## Reducing before combining
 
-The largest structural wins usually come from doing less work rather than doing the same work faster.
+The largest structural wins often come from doing less work rather than doing the same work faster.
 
 **Read fewer columns** &mdash; `usecols` at read time.
 
 **Read fewer rows** &mdash; filter during the chunk loop rather than after.
 
-**Aggregate before joining** &mdash; joining two summaries is far cheaper than joining raw tables and summarising afterwards.
+**Aggregate before joining** &mdash; joining two summaries is far cheaper than joining raw tables and summarising later.
 
 **Select columns before merging** &mdash; carrying twenty unused columns through a join costs memory and time.
 
-Each of these changes the size of what everything downstream touches, which compounds through a pipeline in a way that micro-optimisation does not.
+Each of these changes the size of what all downstream touches. This Compounds through a pipeline in a way that micro-tuning doesn't.
 
 ## Categoricals as an optimisation
 
-Converting a repeated string column to `category` helps in four places at once:
+Converting a repeated string column to `group` helps in four places at once:
 
 Memory, often by an order of magnitude.
 
-Group-by, which then operates on integer codes.
+Group-by, which then operates on int codes.
 
-Merge, when both sides share the same categories.
+Merge, when both sides share the same groups.
 
-`.str` operations, which apply to the categories rather than to every row.
+`.str` steps, which apply to the groups rather than to each row.
 
-That last one is worth restating: `df["city"].str.upper()` on a million rows with four distinct cities does four operations when the column is categorical, and a million when it is `object`.
+That last one is worth restating: `df["city"].str.upper()` on a million rows with four distinct cities does four steps when the column is cat. A million when it's `object`.
 
-The cost is the conversion itself and the care needed when combining frames with different category sets.
+The cost is the conversion itself and the care needed when mixing frames with other group sets.
 
 ## Avoiding repeated work
 
 Two patterns that quietly dominate slow scripts:
 
-**Recomputing inside a loop.** A group statistic, a lookup table, a parsed date &mdash; computed once outside the loop rather than once per iteration.
+**Recomputing inside a loop.** A group statistic, a lookup table, a parsed date. Found once outside the loop rather than once per loop.
 
-**Repeated boolean masks.** Building the same mask several times to select different columns. Build it once, name it, reuse it.
+**Repeated boolean masks.** Building the same mask a few times to select other columns. Build it once, name it, reuse it.
 
-Both are ordinary programming discipline rather than anything pandas-specific, and both are easy to miss because each individual line looks cheap.
+Both are plain programming discipline rather than anything pandas-exact. Both are easy to miss because each single line looks cheap.
 
 ## The limits
 
-pandas is single-threaded for most operations, holds everything in memory, and is optimised for convenience.
+pandas is single-threaded for most steps, holds all in memory, and is optimised for convenience.
 
 A rough guide to when to look elsewhere:
 
-**Under a million rows** &mdash; pandas is comfortable; optimisation is rarely needed beyond removing loops.
+**Under a million rows** &mdash; pandas is comfortable. Tuning is rarely needed beyond dropping loops.
 
-**One to ten million** &mdash; dtypes and access patterns start to matter, and the techniques in this module earn their keep.
+**One to ten million** &mdash; dtypes and access patterns start to matter. The techniques in this module earn their keep.
 
-**Over ten million, or wider than memory** &mdash; the constraint is usually memory rather than speed, and Polars, DuckDB or Dask are the answer rather than a cleverer pandas expression.
+**Over ten million, or wider than memory**. The constraint is often memory rather than speed. Polars, DuckDB or Dask are the answer rather than a cleverer pandas formula.
 
-**Genuinely sequential algorithms** &mdash; Numba or a rewrite, at any size.
+**truly sequential methods** &mdash; Numba or a rewrite, at any size.
 
-Recognising which regime you are in prevents both premature optimisation and the opposite mistake of spending days making pandas do something it structurally cannot.
+Recognising which regime you're in blocks both premature tuning and the opposite mistake of spending days making pandas do a thing it structurally can't.
 
 ## A short checklist
 
-Is there a loop over rows? Remove it.
+Is there a loop over rows? Drop it.
 
 Is anything growing in a loop? Collect and combine once.
 
-Are the dtypes right? Categories for repeated text, narrow numerics where bounded.
+Are the dtypes right? groups for repeated text, narrow numerics where bounded.
 
 Is the filter as early as it can be?
 
 Have you measured, or are you guessing?
 
-The first two account for most real slowdowns, and neither requires knowing anything about pandas internals.
+The first two account for most real slowdowns. Neither needs knowing anything about pandas internals.
 
 ## A worked speed-up
 
-A slow script usually has one dominant problem, and the sequence for finding it is always the same.
+A slow script often has one dominant problem. The sequence for finding it's always the same.
 
 Time the whole thing. Time each stage. Find the stage taking most of it. Look at what that stage does per row.
 
-The fixes, in the order they usually apply:
+The fixes, in the order they often apply:
 
-A row-wise `apply` becomes column arithmetic or `np.select`.
+A row-wise `apply` turns column math or `np.select`.
 
-A loop building a frame becomes a list and one `concat`.
+A loop building a frame turns a list and one `concat`.
 
-A merge inside a loop becomes one merge outside it.
+A merge inside a loop turns one merge outside it.
 
-A repeated group statistic becomes one `transform`.
+A repeated group statistic turns one `transform`.
 
-An `object` column that should be a category becomes one.
+An `object` column that should be a group turns one.
 
 A filter at the end moves to the beginning.
 
-Each of those is a small edit with a large effect, and together they account for most of the difference between a script that takes minutes and one that takes seconds.
+Each of those is a small edit with a large effect. Together they account for most of the gap between a script that takes minutes and one that takes seconds.
 
 ## Memory, when the frame will not fit
 
-The techniques differ from the speed ones, because the constraint is different.
+The techniques differ from the speed ones, because the constraint is other.
 
-`usecols` at read time &mdash; never load what you will not use.
+`usecols` at read time &mdash; never load what you won't use.
 
-`dtype` at read time &mdash; categories and narrow numerics.
+`dtype` at read time &mdash; groups and narrow numerics.
 
 `chunksize` &mdash; process and reduce a piece at a time.
 
-`del` and `gc.collect()` &mdash; release intermediates explicitly in a long-running process.
+`del` and `gc.collect()` &mdash; release intermediates by name in a long-running process.
 
-Avoid keeping both a frame and a transformed copy alive; reassign rather than naming a new variable, when the old one is not needed.
+Avoid keeping both a frame and a transformed copy alive. Reassign rather than naming a new var, when the old one isn't needed.
 
-And check whether the operation needs the whole frame at all. Many aggregations can be computed chunk-wise and combined.
+And check whether the step needs the whole frame at all. Many aggregations can be found chunk-wise and mixed.
 
 ## What not to optimise
 
-Some things are already fast and are commonly rewritten for no gain:
+Some things are already fast and are often rewritten for no gain:
 
-**Column arithmetic** &mdash; already compiled.
+**Column math** &mdash; already compiled.
 
-**Boolean masking** &mdash; already compiled; the cost is the copy, not the comparison.
+**Boolean masking** &mdash; already compiled. The cost is the copy, not the compare.
 
 **`groupby` with a string aggregation** &mdash; already compiled.
 
@@ -9906,37 +9906,37 @@ Some things are already fast and are commonly rewritten for no gain:
 
 **Anything running once on a small frame.**
 
-Rewriting these produces less readable code and no measurable improvement, which is a bad trade. The measurement step exists to prevent exactly that.
+Rewriting these makes less readable code and no measurable gain. This Is a bad trade. The reading step exists to prevent just that.
 
 ## A summary
 
-Remove per-row Python first; it is usually the whole problem.
+Drop per-row Python first. It's often the whole problem.
 
 Never grow a frame in a loop.
 
-Right-size dtypes &mdash; categories and narrow numerics.
+Right-size dtypes &mdash; groups and narrow numerics.
 
-Filter early, so everything downstream does less.
+Filter early, so all downstream does less.
 
-`itertuples` if you must iterate; never `iterrows`.
+`itertuples` if you must iterate. Never `iterrows`.
 
-`inplace=True` is not an optimisation.
+`inplace=True` isn't an tuning.
 
 Measure the real workload, fix the top item, measure again.
 
-And know when the answer is a different tool &mdash; when the data does not fit, no pandas technique fixes it.
+And know when the answer is a other tool. When the data doesn't fit, no pandas technique fixes it.
 
 ## A closing note
 
-Pandas performance is unusually predictable, which makes it unusually easy to get right.
+Pandas speed is unusually predictable. This Makes it unusually easy to get right.
 
-Almost every slow script has the same cause: Python running once per row, spelled as `apply(axis=1)`, `iterrows`, or a loop. Removing it is worth one or two orders of magnitude, and nothing else on the list comes close.
+Almost each slow script has the same cause: Python running once per row, spelled as `apply(axis=1)`, `iterrows`, or a loop. Dropping it's worth one or two orders of magnitude. Nothing else on the list comes close.
 
-After that the wins are structural rather than clever &mdash; do not grow frames in loops, filter before computing rather than after, and give columns types that fit the data. None of these require knowing anything about pandas internals.
+After that the wins are structural rather than clever. Don't grow frames in loops, filter before finding rather than after. Give columns types that fit the data. None of these need knowing anything about pandas internals.
 
-What does require discipline is measuring. The bottleneck is regularly not where it feels like it is, and the operations people most often rewrite &mdash; column arithmetic, boolean masks, group-by with a string aggregation &mdash; are already compiled and already fast.
+What does need discipline is measuring. The bottleneck is regularly not where it feels like it's. The steps people most often rewrite. Column math, boolean masks, group-by with a string aggregation. Are already compiled and already fast.
 
-And there is a ceiling. When the data no longer fits in memory, no pandas technique fixes it, and the answer is Polars, DuckDB, Dask or a database.
+And there's a ceiling. When the data no longer fits in memory, no pandas technique fixes it. The answer is Polars, DuckDB, Dask or a DB.
 ''',
     [
         {"q": "What is nearly always the largest performance problem in a pandas script?",
@@ -10111,11 +10111,11 @@ print("Six steps, no intermediate names, and each line is one idea.")'''),
     ],
     '''
 title: Method Chaining
-intro: Writing a pipeline as one expression.
+intro: Writing a pipeline as one formula.
 
 ## What it buys
 
-Most pandas methods return a new object, which means they compose:
+Most pandas methods return a new object. This Means they compose:
 
 ```python
 out = (df
@@ -10124,41 +10124,41 @@ out = (df
        .groupby("city", as_index=False)["doubled"].sum())
 ```
 
-Three things follow, and they are the actual argument for the style.
+Three things follow, and they're the actual arg for the style.
 
-**No intermediate names.** The `tmp`, `tmp2`, `df_clean`, `df_clean2` sequence is where stale-variable bugs live &mdash; particularly in a notebook where cells run out of order, and `df` is no longer what the cell above assumed.
+**No mid names.** The `tmp`, `tmp2`, `df_clean`, `df_clean2` sequence is where stale-var bugs live. Above all in a notebook where cells run out of order. `df` is no longer what the cell above assumed.
 
-**Nothing is mutated.** The original frame is untouched, so re-running a cell gives the same answer. That alone removes a large class of notebook confusion.
+**Nothing is mutated.** The first frame is untouched. Re-running a cell gives the same answer. That alone drops a large class of notebook confusion.
 
-**Each line is one operation.** The chain reads top to bottom in the order the work happens, which nested function calls do not.
+**Each line is one step.** The chain reads top to bottom in the order the work happens. This Nested function calls don't.
 
-The wrapping parentheses are what allow the line breaks. Without them the expression has to fit on one line or carry backslashes.
+The wrapping parentheses are what allow the line breaks. Without them the formula has to fit on one line or carry backslashes.
 
 ## assign and the lambda
 
-`assign` is what makes computation chainable, and the lambda is what makes `assign` work mid-chain.
+`assign` is what makes math chainable, and the lambda is what makes `assign` work mid-chain.
 
-`d.assign(b=d["a"] * 10)` computes against the frame **as it was before the chain started**. Inside a chain that is usually wrong, and if the column it needs was created two steps earlier it raises `KeyError`.
+`d.assign(b=d["a"] * 10)` finds against the frame **as it was before the chain started**. Inside a chain that is often wrong. If the column it needs was created two steps earlier it raises `KeyError`.
 
-`d.assign(b=lambda d: d["a"] * 10)` receives the frame **at that point**, so it sees everything earlier steps produced.
+`d.assign(b=lambda d: d["a"] * 10)` receives the frame **at that point**. It sees all earlier steps made.
 
-Use the lambda form by default in a chain. It costs eight characters and removes the class of error entirely.
+Use the lambda form by default in a chain. It costs eight characters and drops the class of error fully.
 
 ## pipe
 
-Not every step is a pandas method. `pipe` inserts your own function without breaking the chain:
+Not each step is a pandas method. `pipe` inserts your own function without breaking the chain:
 
 ```python
 df.pipe(drop_small, threshold=10).pipe(add_share)
 ```
 
-`df.pipe(f, x)` is exactly `f(df, x)`. The gain is order: the nested form, `add_share(drop_small(df, 10))`, reads inside out and gets worse with every step.
+`df.pipe(f, x)` is just `f(df, x)`. The gain is order. The nested form, `add_share(drop_small(df, 10))`, reads inside out and gets worse with each step.
 
-For this to work, your functions should take a frame as the first argument and return a frame. That is a good shape for them anyway &mdash; it makes them testable in isolation.
+For this to work, your functions should take a frame as the first arg and return a frame. That is a good shape for them anyway. It makes them testable in alone.
 
 ## Debugging
 
-The standard objection to chaining is that you cannot see what is happening in the middle, and cannot set a breakpoint on a step.
+The standard objection to chaining is that you can't see what is happening in the middle. Can't set a breakpoint on a step.
 
 The answer is a pipe that inspects and returns unchanged:
 
@@ -10170,19 +10170,19 @@ def show(d, label):
 
 Dropped into the chain, it prints the shape at each stage without changing the result. Most chain bugs are a shape or a column name, and that catches both.
 
-For a heavier version, log `d.head()` or write the intermediate to a file. The principle is the same: a function that returns its input can go anywhere in a chain.
+For a heavier version, log `d.head()` or write the mid to a file. The principle is the same. A function that returns its input can go anywhere in a chain.
 
 ## Where to stop
 
 Chaining is a style, not a virtue, and it stops paying at some length.
 
-**The traceback problem.** When a fifteen-step chain raises `KeyError: 'typo'`, the traceback points at the whole expression. You know it failed; you do not immediately know where. The last-but-one editor shows this.
+**The traceback problem.** When a fifteen-step chain raises `KeyError: 'typo'`, the traceback points at the whole formula. You know it failed. You don't at once know where. The last-but-one editor shows this.
 
-**The reading problem.** A chain is one expression, so it has to be understood as a whole. Past a certain length that is harder than reading five named steps.
+**The reading problem.** A chain is one formula. It has to be understood as a whole. Past a certain length that is harder than reading five named steps.
 
-**The reuse problem.** An intermediate result needed twice has to be computed twice, or the chain has to be broken anyway.
+**The reuse problem.** An mid result needed twice has to be found twice, or the chain has to be broken anyway.
 
-A workable rule: chain a coherent stage &mdash; loading and cleaning, or aggregating and formatting &mdash; and give each stage a name.
+A workable rule: chain a coherent stage. Loading and cleaning, or aggregating and formatting. And give each stage a name.
 
 ```python
 clean = (raw.pipe(normalise_columns).dropna(subset=["id"]))
@@ -10193,31 +10193,31 @@ Two names instead of ten, and each chain is short enough to debug.
 
 ## Where it fits
 
-The style suits **load, clean, aggregate** work particularly well, because that work is naturally a sequence of transformations with no branching.
+The style suits **load, clean, aggregate** work above all well. That work is on its own a sequence of changes with no branching.
 
 It suits exploratory notebook work, because immutability makes re-running cells safe.
 
-It suits less well anything with branching logic, loops, or steps whose output feeds two different places &mdash; at which point named intermediates are simply clearer, and there is nothing wrong with using them.
+It suits less well anything with branching logic, loops, or steps whose output feeds two other places. At which point named intermediates are simply clearer. There's nothing wrong with using them.
 
 ## Which methods chain
 
-Anything returning a DataFrame or Series can be chained, which is most of the API:
+Anything returning a DataFrame or Series can be chained. This Is most of the API:
 
-Selection &mdash; `query`, `loc` with a callable, `filter`, `head`, `sample`, `nlargest`.
+Pick &mdash; `query`, `loc` with a callable, `filter`, `head`, `sample`, `nlargest`.
 
-Modification &mdash; `assign`, `rename`, `drop`, `astype`, `fillna`, `replace`, `round`.
+change &mdash; `assign`, `rename`, `drop`, `astype`, `fillna`, `replace`, `round`.
 
 Reshaping &mdash; `sort_values`, `set_index`, `reset_index`, `melt`, `pivot`, `stack`, `unstack`, `explode`.
 
-Aggregation &mdash; `groupby(...).agg(...)`, `value_counts`, `describe`.
+Aggregation &mdash; `groupby(...).agg(...)`, `value_counts`, `show`.
 
 Anything else &mdash; `pipe`.
 
-The methods that break a chain are the ones returning `None`: anything with `inplace=True`, and `sort` / `shuffle`-style in-place methods. That is one more reason to avoid `inplace`.
+The methods that break a chain are the ones returning `None`. Anything with `inplace=True`. `sort` / `shuffle`-style in-place methods. That is one more reason to avoid `inplace`.
 
 ## Naming the stages
 
-The practical shape for a real script is a few named stages rather than one long chain:
+The hands-on shape for a real script is a few named stages rather than one long chain:
 
 ```python
 raw = pd.read_csv(path, dtype=..., parse_dates=[...])
@@ -10233,49 +10233,49 @@ summary = (clean
            .agg(total=("sales", "sum")))
 ```
 
-Each stage is short enough to debug, each name says what the data is at that point, and the intermediates are available for inspection without breaking anything apart.
+Each stage is short enough to debug, each name says what the data is at that point. The intermediates are on hand for inspection without breaking anything apart.
 
-That structure also tests well: `normalise_columns` and each stage can be checked independently.
+That structure also tests well: `normalise_columns` and each stage can be checked on its own.
 
 ## Chaining and memory
 
-Each step in a chain allocates. A ten-step chain on a large frame allocates ten frames, though earlier ones are freed as it proceeds, so peak memory is roughly two at a time rather than ten.
+Each step in a chain allocates. A ten-step chain on a large frame allocates ten frames, though earlier ones are freed as it proceeds. Peak memory is roughly two at a time rather than ten.
 
-That is acceptable for most work and worth knowing when the frame is large enough that a single copy is significant.
+That is acceptable for most work and worth knowing when the frame is large enough that a single copy is large.
 
-Filtering early in the chain reduces every allocation after it, which is the same advice as everywhere else and matters more here because there are more of them.
+Filtering early in the chain reduces each allocation after it. This Is the same advice as all over else and matters more here because there are more of them.
 
 ## Common chaining mistakes
 
-**Forgetting the lambda in `assign`.** The expression is then evaluated against the pre-chain frame, and raises if it needs a column made mid-chain.
+**Losing the lambda in `assign`.** The formula is then checked against the pre-chain frame. Raises if it needs a column made mid-chain.
 
 **Using `inplace=True` in a chain.** Returns `None`, and the next method raises `AttributeError` on `NoneType`.
 
-**Assuming the index survives.** `reset_index(drop=True)` at the point it matters, not at the end.
+**given the index lives.** `reset_index(drop=True)` at the point it matters, not at the end.
 
-**A chain that is really two operations.** If an intermediate is needed twice, the chain has to compute it twice or be broken. Break it.
+**A chain that is really two steps.** If an mid is needed twice, the chain has to find it twice or be broken. Break it.
 
-**Debugging by deleting lines.** Better to insert a `pipe` that prints, which does not change the structure.
+**Debugging by deleting lines.** Better to insert a `pipe` that prints. This Doesn't change the structure.
 
 ## When not to chain
 
-Chaining suits linear transformation. It does not suit:
+Chaining suits linear change. It doesn't suit:
 
-**Branching** &mdash; different handling depending on a condition.
+**Branching** &mdash; other handling based on a rule.
 
-**Loops** &mdash; over files, groups or parameters.
+**Loops** &mdash; over files, groups or params.
 
-**Reuse** &mdash; an intermediate needed by two downstream steps.
+**Reuse** &mdash; an mid needed by two downstream steps.
 
 **Error handling** &mdash; a try/except around one step.
 
-In all four cases, named intermediates are clearer, and reaching for a chain anyway produces code that is harder to read than the thing it replaced.
+In all four cases, named intermediates are clearer. Reaching for a chain anyway makes code that is harder to read than the thing it replaced.
 
-The style is a tool for the common case of "load, clean, aggregate, output", where it genuinely reads better than the alternative. It is not a standard to hold all code to.
+The style is a tool for the common case of "load, clean, aggregate, output". Here It truly reads better than the option. It isn't a standard to hold all code to.
 
 ## A realistic shape for a script
 
-Chaining works best as a few named stages rather than one long expression or a hundred separate statements:
+Chaining works best as a few named stages rather than one long formula or a hundred split statements:
 
 ```python
 def load(path):
@@ -10298,37 +10298,37 @@ def summarise(d):
 result = summarise(clean(load(path)))
 ```
 
-Each function is testable on its own, each chain is short enough to debug, and the top-level line reads as what the script does.
+Each function is testable on its own, each chain is short enough to debug. The top-level line reads as what the script does.
 
-`load(path).pipe(clean).pipe(summarise)` expresses the same thing in chain form, which reads in order rather than inside out.
+`load(path).pipe(clean).pipe(summarise)` expresses the same thing in chain form. This Reads in order rather than inside out.
 
 ## Chaining and notebooks
 
-The style suits notebooks particularly well, for a reason worth stating: cells get re-run, out of order, repeatedly.
+The style suits notebooks above all well, for a reason worth stating: cells get re-run, out of order, again and again.
 
-A chain does not mutate its input, so re-running a cell gives the same result. A sequence of in-place modifications does not &mdash; running it twice applies the transformation twice, and the frame is now wrong in a way nothing indicates.
+A chain doesn't mutate its input. Re-running a cell gives the same result. A sequence of in-place changes doesn't. Running it twice applies the change twice. The frame is now wrong in a way nothing shows.
 
-That failure is common enough that "restart and run all" is standard advice. Chaining removes most of the need for it.
+That failure is common enough that "restart and run all" is standard advice. Chaining drops most of the need for it.
 
 ## Readability in practice
 
-A few conventions make chains easier to read:
+A few rules make chains easier to read:
 
-One operation per line.
+One step per line.
 
 Wrapping parentheses, so no backslashes are needed.
 
 A blank line between logical stages within a long chain.
 
-`pipe` for anything that is not a pandas method, rather than breaking out.
+`pipe` for anything that isn't a pandas method, rather than breaking out.
 
 Names for intermediates at genuine stage boundaries.
 
-And a limit: if you cannot see the whole chain on one screen, split it. The point of the style is clarity, and a chain that has to be scrolled has stopped providing it.
+And a limit: if you can't see the whole chain on one screen, split it. The point of the style is clarity. A chain that has to be scrolled has stopped giving it.
 
 ## A summary
 
-Chaining removes intermediate names and the stale-variable bugs that come with them.
+Chaining drops mid names and the stale-var bugs that come with them.
 
 Nothing is mutated, so re-running is safe.
 
@@ -10340,31 +10340,31 @@ A `pipe` that prints and returns its input lets you debug without breaking the c
 
 Long chains hide which link failed &mdash; name coherent stages instead.
 
-And it is a style for linear transformation, not a rule for all code; branching, loops and reuse are clearer with names.
+And it's a style for linear change, not a rule for all code. Branching, loops and reuse are clearer with names.
 
 ## A closing note
 
 Method chaining is one of the few stylistic choices in pandas that changes how many bugs you write rather than merely how the code looks.
 
-The mechanism is not elegance. It is that intermediate names are where stale state lives: `df_clean` that was cleaned by an earlier version of the cell above, `tmp2` that is a filtered copy of `tmp` from before the filter changed. A chain has nowhere for that to hide.
+The method isn't elegance. It's that mid names are where stale state lives: `df_clean` that was cleaned by an earlier version of the cell above, `tmp2` that is a filtered copy of `tmp` from before the filter changed. A chain has nowhere for that to hide.
 
-The immutability matters for the same reason. Code that does not modify its input produces the same answer on the second run as the first, which is the property notebooks most often lack.
+The immutability matters for the same reason. Code that doesn't modify its input makes the same answer on the second run as the first. This Is the property notebooks most often lack.
 
-Against that, a chain is one expression, and one expression fails as a unit. The balance is struck by keeping chains to a coherent stage and giving each stage a name &mdash; which is ordinary good structure, applied to data transformation.
+Against that, a chain is one formula. One formula fails as a unit. The balance is struck by keeping chains to a coherent stage and giving each stage a name. Which is plain good structure, applied to data change.
 
 ## Two more things worth knowing
 
-`pipe` has a second form for functions whose frame argument is not first: `df.pipe((func, "data"), other_arg)` tells pandas which parameter receives the frame. It is rarely needed, and it exists so that third-party functions with awkward signatures can still be chained.
+`pipe` has a second form for functions whose frame arg isn't first: `df.pipe((func, "data"), other_arg)` tells pandas which param receives the frame. It's rarely needed. It exists so that third-party functions with awkward signatures can still be chained.
 
-`assign` accepts plain values as well as lambdas, and mixing the two in one call is legal. The rule is that a plain value is evaluated once, against the frame as it was before the chain started, so a plain value referring to a column made mid-chain will fail. Using lambdas uniformly avoids having to hold that distinction in mind.
+`assign` accepts plain values and lambdas. Mixing the two in one call is legal. The rule is that a plain value is checked once, against the frame as it was before the chain started. A plain value referring to a column made mid-chain will fail. Using lambdas uniformly avoids having to hold that gap in mind.
 
-Finally, chains and comments coexist badly &mdash; there is no natural place to explain a step. That is a real argument for named stages: a function name is a comment that cannot drift out of date.
+Finally, chains and comments coexist badly. There's no natural place to explain a step. That is a real arg for named stages. A function name is a comment that can't drift out of date.
 
 ## Chaining and testing
 
-One practical benefit of the named-stage structure is that it makes a pipeline testable without any test framework ceremony.
+One hands-on gain of the named-stage structure is that it makes a pipeline testable without any test framework ceremony.
 
-Each stage takes a frame and returns a frame, so each can be checked on a small hand-built input:
+Each stage takes a frame and returns a frame. Each can be checked on a small hand-built input:
 
 ```python
 def test_clean():
@@ -10374,19 +10374,19 @@ def test_clean():
     assert list(out["city"]) == ["pune"]
 ```
 
-That is a genuine unit test of a data transformation, and it is possible only because `clean` is a function rather than a sequence of statements operating on a global `df`.
+That is a genuine unit test of a data change. It's possible only because `clean` is a function rather than a sequence of statements operating on a global `df`.
 
-The same structure makes the pipeline reusable across scripts and notebooks, and makes it obvious where a new step belongs. Chaining, in this reading, is less about elegance than about pushing data transformations into functions that can be named, tested and reused &mdash; which is ordinary software practice arriving somewhere it is often skipped.
+The same structure makes the pipeline reusable across scripts and notebooks. Makes it obvious where a new step belongs. Chaining, in this reading, is less about elegance than about pushing data changes into functions that can be named, tested and reused. Which is plain software practice arriving one spot it's often skipped.
 
 ## In summary
 
-Chaining is a style that suits linear transformation, which is most of what data cleaning is.
+Chaining is a style that suits linear change. This Is most of what data cleaning is.
 
-It removes intermediate names and the stale-state bugs that live in them, it does not mutate its input so re-running is safe, and it reads in the order the work happens.
+It drops mid names and the stale-state bugs that live in them, it doesn't mutate its input so re-running is safe. It reads in the order the work happens.
 
-Its costs are real: a failure points at the whole expression, an intermediate needed twice forces a break, and branching or looping does not fit at all.
+Its costs are real: a failure points at the whole formula, an mid needed twice forces a break. Branching or looping doesn't fit at all.
 
-The resolution is named stages of a handful of steps each, which keeps the benefits and makes each stage short enough to debug and small enough to test.
+The detail is named stages of a handful of steps each. This Keeps the gains and makes each stage short enough to debug and small enough to test.
 ''',
     [
         {"q": "Why does `assign` take a lambda inside a chain?",

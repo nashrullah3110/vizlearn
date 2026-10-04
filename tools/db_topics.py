@@ -131,46 +131,46 @@ INSERT INTO orders (id, customer_id, total) VALUES (1, 2, 5.00);
     ],
     article="""
 title: Primary and Foreign Keys
-intro: The two constraints that make a row impossible to write if it could not be true.
+intro: The two constraints that make a row hopeless to write if it couldn't be true.
 
 ## A key is a promise about identity
 
-A **primary key** is the column, or set of columns, whose value identifies a
-row uniquely and permanently. Declaring one asks the database for two
-guarantees at once: no two rows share this value, and no row leaves it NULL.
+A **main key** is the column, or set of columns, whose value spots a
+row uniquely and permanently. Declaring one asks the DB for two
+ensures at once: no two rows share this value, and no row leaves it NULL.
 
 That second half is easy to overlook and does real work. NULL means unknown. A
-row whose identity is unknown cannot be referred to, updated with confidence,
-or joined against, so a nullable identifier is not an identifier at all.
+row whose identity is unknown can't be referred to, updated with trust,
+or joined against, so a nullable identifier isn't an identifier at all.
 
 Run the first statement in the editor. The insert is refused, and the message
-comes from SQLite rather than from anything on this page:
-`UNIQUE constraint failed: orders.id`. Nothing in the application had to check
+comes from SQLite rather than from any of it on this page:
+`UNIQUE constraint failed: orders.id`. Nothing in the use had to check
 first, and no amount of concurrent traffic can slip a duplicate past it.
 
 ## A foreign key is a promise about reference
 
-A **foreign key** says: whatever value sits in this column must already exist
-in that column of that table. `orders.customer_id` references `customers.id`,
+A **foreign key** says: what value sits in this column must already exist
+in that column of that table. `orders.customer_id` refs `customers.id`,
 so an order can only belong to a customer who is really there.
 
 Uncomment the second statement and run it. Order 9 claims customer 77, and
-customer 77 does not exist, so the write fails. Without the constraint the row
+customer 77 doesn't exist, so the write fails. Without the constraint the row
 would be accepted and the problem would surface much later, as a join that
-silently returns fewer rows than expected or a report whose totals do not
-reconcile.
+silently returns fewer rows than expected or a report whose totals don't
+merge.
 
-This is the value of the constraint and it is worth stating plainly: it turns a
-data-quality problem, which is discovered weeks later by a human, into a write
-error, which is discovered immediately by a machine.
+This is the value of the constraint and it's worth stating plainly: it turns a
+data-quality problem, which is found weeks later by a human, into a write
+error, which is found right away by a machine.
 
 ## What happens to the other side
 
 Uncomment the third statement. Deleting customer 1 is refused, because orders 1
-and 2 point at that customer and removing it would leave them pointing at
-nothing. The database will not create the orphan.
+and 2 point at that customer and dropping it would leave them pointing at
+nothing. The DB won't create the orphan.
 
-Refusing is one of several available answers, chosen with `ON DELETE`:
+Refusing is one of a few available answers, chosen with `ON DELETE`:
 
 | Clause | Behaviour |
 |---|---|
@@ -180,40 +180,40 @@ Refusing is one of several available answers, chosen with `ON DELETE`:
 | `SET DEFAULT` | point the children at a default row |
 
 `CASCADE` is convenient and worth respecting. Deleting one customer can silently
-remove thousands of orders, and a cascade that runs through several tables can
-remove a great deal more than the person pressing the button expected.
+drop thousands of orders, and a cascade that runs through a few tables can
+drop a great deal more than the person pressing the button expected.
 
 ## Natural against surrogate
 
-Given a table of people, is the primary key the email address or an integer
+Given a table of people, is the main key the email address or an int
 that means nothing?
 
 An email address is a **natural key**: it comes from the domain and carries
-meaning. It is also mutable, occasionally shared, sometimes absent, and awkward
-to index. Every row that references it stores a whole string, and a person
-changing their address means updating every one of them.
+meaning. It's also mutable, at times shared, at times absent, and awkward
+to index. each row that refs it stores a whole string, and a person
+changing their address means updating each one of them.
 
-A meaningless integer is a **surrogate key**. It is stable because nothing in
+A meaningless int is a **surrogate key**. It's stable because nothing in
 the world can force it to change, compact to store and to index, and safe to
 scatter across a dozen referencing tables.
 
-The usual practice is a surrogate primary key plus a `UNIQUE` constraint on the
+The usual practice is a surrogate main key plus a `UNIQUE` constraint on the
 natural one, which buys stable identity and still refuses two accounts on the
 same address.
 
 ## Composite keys
 
-A key can span several columns. A table recording which student is enrolled on
-which course has a primary key of `(student_id, course_id)`: neither column
-alone identifies a row, and the pair does. That declaration also states a
+A key can span a few columns. A table recording which student is enrolled on
+which course has a main key of `(student_id, course_id)`: neither column
+alone spots a row, and the pair does. That declaration also states a
 business rule &mdash; a student can enrol on a course once &mdash; which the
-database will now enforce for free.
+DB will now enforce for free.
 
 ## Why the child side needs its own index
 
-The parent side of a foreign key is indexed for free &mdash; it is a primary key.
-The child side usually is not, and that omission turns cheap operations into full
-scans, because every referential action has to ask "are there children?" and
+The parent side of a foreign key is indexed for free. It's a main key.
+The child side often isn't, and that omission turns cheap ops into full
+scans, because each referential action has to ask "are there children?" and
 answer it by looking.
 
 Delete a customer with 5,000,000 orders in the child table. With no index on
@@ -225,17 +225,17 @@ Delete a customer with 5,000,000 orders in the child table. With no index on
 |`ON DELETE CASCADE`|scan to find the children|seek straight to them|
 |a join `customers &#8904; orders`|scan the child table|indexed lookup|
 
-The database enforces the constraint correctly either way; the difference is
+The DB enforces the constraint right either way. The difference is
 whether each check is a seek or a scan of the whole child table. This is the
 quiet reason a schema "with foreign keys" can still be slow: the constraint was
-declared, the supporting index on the referencing column was not, and every
+declared, the supporting index on the referencing column wasn't, and each
 delete or cascade pays for it.
 
 ## Why the surrogate key is usually smaller too
 
-The natural-versus-surrogate choice has a storage side that compounds with every
-referencing table. A natural key &mdash; an email, a UUID string &mdash; is copied
-into every child row that references it, so its width is paid once per reference,
+The natural-versus-surrogate choice has a storage side that compounds with each
+referencing table. A natural key. An email, a UUID string &mdash; is copied
+into each child row that refs it. So Its width is paid once per ref,
 not once per person:
 
 |key in 5 child tables, 10M rows each|storage in the children|
@@ -243,30 +243,30 @@ not once per person:
 |email as the foreign key (~30 bytes)|~1,500 MB|
 |surrogate integer (4 bytes)|~200 MB|
 
-The surrogate is not just stable against change &mdash; it is seven times smaller
-across the references, and a smaller key means more index entries per page, so the
+The surrogate isn't just stable against change. It's seven times smaller
+across the refs, and a smaller key means more index entries per page, so the
 indexes that use it are smaller and shallower too. The natural key still earns a
 `UNIQUE` constraint so the real-world rule ("one account per email") is enforced;
-it simply does not also have to be the value scattered across a dozen tables. That
-is the reasoning behind "surrogate primary key plus a unique natural key" &mdash;
+it simply doesn't also have to be the value scattered across a dozen tables. That
+is the thinking behind "surrogate main key plus a unique natural key" &mdash;
 stable, compact identity for the machine, and the business rule kept as well.
 
 ## Where it goes wrong
 
-**Turning foreign keys off for performance.** They cost something on write. The
-cost of not having them is discovered in production, in data that no longer
-makes sense, and it is much harder to pay.
+**Turning foreign keys off for speed.** They cost a thing on write. The
+cost of not having them is found in production, in data that no longer
+makes sense, and it's much harder to pay.
 
-**Forgetting the pragma.** SQLite ships with foreign key enforcement off for
-backwards compatibility. A schema full of `REFERENCES` clauses that were never
-enforced looks correct and guarantees nothing.
+**Losing the pragma.** SQLite ships with foreign key enforcement off for
+backwards compatibility. A schema full of `Refs` clauses that were never
+enforced looks correct and ensures nothing.
 
-**Making the primary key meaningful.** Anything that carries meaning can change,
-and a primary key that changes has to be chased through every table that
-references it.
+**Making the main key real.** any of it that carries meaning can change,
+and a main key that changes has to be chased through each table that
+refs it.
 
 **Leaving the foreign key column unindexed.** The parent side is indexed by its
-primary key automatically. The child side usually is not, and every cascade or
+main key automatically. The child side often isn't, and each cascade or
 referential check then scans the whole child table.
 """,
     check=[
@@ -343,36 +343,36 @@ INSERT INTO staff (id, email, age, salary) VALUES (4, 'ada@example.com', 30, 500
     ],
     article="""
 title: Constraints: UNIQUE, CHECK and NOT NULL
-intro: Rules written once in the schema, enforced against every client, forever.
+intro: Rules written once in the schema, enforced against each client, forever.
 
 ## Where a rule should live
 
 "Age must be at least 18" can be written in three places: the form in the
 browser, the service that handles the request, or the table itself.
 
-The first two are worth having and neither is sufficient. A browser check is a
-courtesy to the user and is bypassed by anything that is not a browser. A
+The first two are worth having and neither is enough. A browser check is a
+courtesy to the user and is bypassed by any of it that isn't a browser. A
 service check holds until someone writes a second service, a migration script,
-a bulk import or a manual fix at the console &mdash; and every one of those is
-written by someone who was not thinking about the rule at the time.
+a bulk import or a manual fix at the console. And each one of those is
+written by someone who wasn't thinking about the rule at the time.
 
 A constraint in the schema holds for all of them, including the ones that do
-not exist yet. It is checked on every write, by the one component every path
+not exist yet. It's checked on each write, by the one component each path
 must go through.
 
 ## The three, and what each says
 
-**NOT NULL** &mdash; the value must be known. NULL is not a value; it is the
-absence of one. Allowing it means allowing rows where the question was never
-answered, and every query that touches the column then has to decide what to do
+**NOT NULL** &mdash; the value must be known. NULL isn't a value. It's the
+lack of one. Allowing it means allowing rows where the question was never
+answered, and each query that touches the column then has to decide what to do
 about that.
 
-**UNIQUE** &mdash; no other row may hold this value. It is what stops two
-accounts sharing an email address without requiring a read-then-write in the
-application, which is a race condition even when it looks correct.
+**UNIQUE** &mdash; no other row may hold this value. It's what stops two
+accounts sharing an email address without needing a read-then-write in the
+use, which is a race rule even when it looks correct.
 
-**CHECK** &mdash; this expression must be true for every row. It is the general
-case that the other two are special instances of, and it takes ordinary SQL:
+**CHECK** &mdash; this formula must be true for each row. It's the general
+case that the other two are special instances of, and it takes plain SQL:
 
 ```
 CHECK (age >= 18)
@@ -383,11 +383,11 @@ CHECK (end_date IS NULL OR end_date > start_date)
 
 That last one is worth noticing. A constraint can relate two columns of the same
 row, so "an end date, if present, must come after the start date" is enforceable
-&mdash; a rule that is otherwise checked nowhere and violated eventually.
+&mdash; a rule that is or else checked nowhere and violated eventually.
 
 ## Read the error, not the row count
 
-Run each commented statement in turn. The value of doing so is that every one
+Run each commented statement in turn. The value of doing so is that each one
 fails differently, and the message names the constraint that stopped it:
 
 | Attempt | Message |
@@ -398,37 +398,37 @@ fails differently, and the message names the constraint that stopped it:
 | Grade `'boss'` | `CHECK constraint failed` |
 | Missing salary | `NOT NULL constraint failed: staff.salary` |
 
-Naming constraints explicitly &mdash; `CONSTRAINT staff_age_adult CHECK (...)`
-&mdash; makes those messages far more useful, because "CHECK constraint failed"
+Naming constraints by name &mdash; `CONSTRAINT staff_age_adult CHECK (...)`
+&mdash; makes those messages far more handy, because "CHECK constraint failed"
 tells you nothing when a table has six of them.
 
 ## The NULL subtlety in UNIQUE
 
-`UNIQUE` allows more than one NULL in almost every engine, and people are
-surprised by this until they see the reasoning.
+`UNIQUE` allows more than one NULL in almost each engine, and people are
+surprised by this until they see the thinking.
 
-`UNIQUE` forbids two rows being *equal*. Comparing NULL to NULL does not
-produce true; it produces NULL, because two unknown values are not known to be
-the same. So two NULLs are not equal, and the constraint has nothing to object
+`UNIQUE` forbids two rows being *equal*. Checking NULL to NULL doesn't
+give true. It makes NULL, because two unknown values aren't known to be
+the same. So two NULLs aren't equal, and the constraint has nothing to object
 to.
 
-The practical consequence is that `UNIQUE` on a nullable column does not
-guarantee one row per real-world thing &mdash; it guarantees one row per *known*
-value. If that is not what you meant, add `NOT NULL`.
+The hands-on consequence is that `UNIQUE` on a nullable column doesn't
+ensure one row per real-world thing. It ensures one row per *known*
+value. If that isn't what you meant, add `NOT NULL`.
 
 ## DEFAULT is not a constraint
 
 `DEFAULT 'junior'` supplies a value when the insert omits the column. It
-constrains nothing: an insert that explicitly passes NULL gets NULL, not the
+constrains nothing: an insert that by name passes NULL gets NULL, not the
 default, unless `NOT NULL` refuses it.
 
-Defaults and constraints are frequently paired for this reason. The default
+Defaults and constraints are often paired for this reason. The default
 handles the common case, and the constraint handles the case where someone was
-explicit about something they should not have been.
+clear about a thing they shouldn't have been.
 
 ## The NULL count that surprises people, measured
 
-`UNIQUE` allowing many NULLs is not a quirk to memorise but a consequence to see.
+`UNIQUE` allowing many NULLs isn't a quirk to store but a consequence to see.
 Because NULL = NULL is *unknown* rather than true, two NULLs are never "equal" and
 the constraint has nothing to reject. In the SQLite this page runs, a `UNIQUE`
 column happily accepts row after row of NULL:
@@ -440,16 +440,16 @@ INSERT INTO t VALUES ('a@x.com');
 INSERT INTO t VALUES ('a@x.com');              -- THIS one fails
 ```
 
-Three unknown emails coexist; the first repeated *known* value is refused. This is
-not even consistent across engines &mdash; SQL Server permits exactly one NULL in a
+Three unknown emails coexist. The first repeated *known* value is refused. This is
+not even steady across engines. SQL Server permits just one NULL in a
 unique column, while PostgreSQL, MySQL and SQLite permit many &mdash; so a schema
-that relies on either behaviour is not portable. If the rule you meant was "one row
-per real address", `UNIQUE` alone does not say it; `UNIQUE` plus `NOT NULL` does.
+that leans on either action isn't portable. If the rule you meant was "one row
+per real address", `UNIQUE` alone doesn't say it. `UNIQUE` plus `NOT NULL` does.
 
 ## Adding one to a large table is not free
 
-A constraint added at `CREATE TABLE` costs nothing; one added later has to be
-*proved* against every existing row before the database will accept it. Adding
+A constraint added at `CREATE TABLE` costs nothing. One added later has to be
+*proved* against each existing row before the DB will accept it. Adding
 `CHECK (age >= 18)` or a `NOT NULL` to a 50-million-row table means the engine
 reads all 50 million rows to confirm none already violates it, and in most engines
 it holds a lock on the table while it does:
@@ -461,10 +461,10 @@ it holds a lock on the table while it does:
 
 So the same declaration is instant on an empty table and an outage on a full one.
 This is why constraints should encode what is *structurally* true &mdash; a
-salary is positive, an end date follows a start date &mdash; rather than current
+salary is plus, an end date follows a start date &mdash; rather than current
 policy: a `CHECK` on this year's VAT rate has to be dropped and re-verified across
-every row each time the rate changes, and re-verifying a large table is the
-expensive operation above, paid on a schedule set by the tax authority rather
+each row each time the rate changes, and re-verifying a large table is the
+costly op above, paid on a schedule set by the tax authority rather
 than by you.
 
 ## Where it goes wrong
@@ -476,11 +476,11 @@ than by you.
 migrated when the rate changes, and migrating a constraint on a large table is
 not free. Constrain what is structurally true, not what is currently true.
 
-**Assuming UNIQUE means one per thing.** With NULLs allowed it means one per
+**given UNIQUE means one per thing.** With NULLs allowed it means one per
 known value.
 
-**Adding a constraint to a large live table without thinking.** The database has
-to verify every existing row before it can accept the constraint, and in most
+**Adding a constraint to a large live table without thinking.** The DB has
+to verify each existing row before it can accept the constraint, and in most
 engines that takes a lock while it does.
 """,
     check=[
@@ -592,27 +592,27 @@ WHERE  temp_c IS NULL;"""},
     ],
     article="""
 title: Aggregate Functions and the NULL Trap
-intro: Five functions that collapse many rows into one, and the one behaviour they share that quietly changes your answers.
+intro: Five functions that collapse many rows into one. The one action they share that quietly changes your answers.
 
 ## Many rows in, one value out
 
 An aggregate function takes a set of rows and returns a single value. With no
-`GROUP BY`, the set is the whole table; with one, it is each group in turn.
+`GROUP BY`, the set is the whole table. With one, it's each group in turn.
 
 The five that matter are `COUNT`, `SUM`, `AVG`, `MIN` and `MAX`. Run the
 starter query and all five appear side by side over the same nine rows. The
-numbers do not agree with each other in the way you might expect, and the reason
+numbers don't agree with each other in the way you might expect, and the reason
 is NULL.
 
 ## COUNT(*) and COUNT(col) are different functions
 
-This is the single most useful distinction on the page.
+This is the single most handy gap on the page.
 
-`COUNT(*)` counts **rows**. It does not look at any column, cannot be affected
+`COUNT(*)` counts **rows**. It doesn't look at any column, can't be affected
 by NULL, and answers "how many records are there".
 
 `COUNT(temp_c)` counts **non-NULL values in that column**. It answers "how many
-records actually have a reading".
+records really have a reading".
 
 The table has nine rows and four of them have no temperature. So `COUNT(*)` is
 9 and `COUNT(temp_c)` is 5, and the gap between them is a free measure of
@@ -622,17 +622,17 @@ missing data:
 SELECT COUNT(*) - COUNT(temp_c) AS missing FROM readings;
 ```
 
-That one line is worth reaching for whenever a column's quality is in question.
+That one line is worth reaching for when a column's quality is in question.
 It needs no subquery, no `IS NULL` filter and no second pass.
 
 ## Everything else skips NULL silently
 
-`SUM`, `AVG`, `MIN` and `MAX` all ignore NULL. They do not fail, warn, or
-return NULL because a NULL was present &mdash; they behave as though those rows
-were not there.
+`SUM`, `AVG`, `MIN` and `MAX` all skip NULL. They don't fail, warn, or
+return NULL because a NULL was present. They behave as though those rows
+weren't there.
 
-For `SUM`, `MIN` and `MAX` this is almost always what you want. For `AVG` it is
-the thing that catches people, because **AVG divides by the count of values, not
+For `SUM`, `MIN` and `MAX` this is almost always what you want. For `AVG` it's
+the thing that catches people. **AVG cuts by the count of values, not
 the count of rows**:
 
 ```
@@ -640,7 +640,7 @@ AVG(temp_c)  =  SUM(temp_c) / COUNT(temp_c)
 ```
 
 Run the second variant. Three numbers appear that all have a claim to being
-"the average temperature", and they differ substantially:
+"the mean temperature", and they differ a lot:
 
 | Expression | What it means |
 |---|---|
@@ -648,42 +648,42 @@ Run the second variant. Three numbers appear that all have a claim to being
 | `AVG(COALESCE(temp_c, 0))` | mean if a broken sensor means zero degrees |
 | `SUM(temp_c) / COUNT(*)` | total spread across all rows including the broken ones |
 
-Which is correct depends entirely on what NULL means in your data. If the sensor
+Which is correct depends fully on what NULL means in your data. If the sensor
 failed, the first is right and the others are nonsense &mdash; a broken sensor
-is not a reading of zero. If NULL means "no sales that day", the second may well
-be right. The database cannot decide this for you, and it will not ask.
+isn't a reading of zero. If NULL means "no sales that day", the second may well
+be right. The DB can't decide this for you, and it won't ask.
 
 ## The empty group
 
 Run the fourth variant. It restricts to the rows that have no reading at all,
-so there are four rows and zero values, and every aggregate has to say what it
+so there are four rows and zero values. Each aggregate has to say what it
 does with nothing.
 
 `COUNT(*)` is 4 and `COUNT(temp_c)` is 0, as expected. `SUM`, `AVG`, `MIN` and
-`MAX` all come back **NULL** &mdash; not zero, and not an error. The rule is
+`MAX` all come back **NULL**. Not zero, and not an error. The rule is
 that an aggregate over zero values returns NULL, and the single exception is
-`COUNT`, which returns 0 because counting nothing genuinely is zero.
+`COUNT`, which returns 0 because counting nothing truly is zero.
 
-This matters when an aggregate feeds arithmetic. `SUM(amount) * 1.2` over a
-group with no rows is NULL, and NULL propagates through every operation it
-touches until something wraps it in `COALESCE`.
+This matters when an aggregate feeds math. `SUM(amount) * 1.2` over a
+group with no rows is NULL, and NULL passes through each op it
+touches until a thing wraps it in `COALESCE`.
 
 ## GROUP BY and the shape of the result
 
 Adding `GROUP BY station` changes the result from one row to one row per
-station. The rule that follows is the one beginners trip on: every column in the
+station. The rule that follows is the one beginners trip on: each column in the
 `SELECT` list must either be aggregated or appear in the `GROUP BY`.
 
-The reason is that the query has to produce exactly one value per group. Given
-three readings for `north`, there is no answer to "what is the id" &mdash;
-there are three, and the database will not choose one. Some engines historically
-allowed it and returned an arbitrary row, which is worse than an error because
-it works until it does not.
+the query has to give just one value per group. Given
+three readings for `north`, there's no answer to "what is the id" &mdash;
+there are three, and the DB won't choose one. Some engines once
+allowed it and returned an any row. This Is worse than an error because
+it works until it doesn't.
 
 ## Three averages of the same column
 
-The "AVG divides by the count of values, not rows" rule is best seen as three
-numbers that all claim to be the average. Five rows, two of them with a NULL
+The "AVG cuts by the count of values, not rows" rule is best seen as three
+numbers that all claim to be the mean. Five rows, two of them with a NULL
 reading, the three present values being 10, 20 and 30 (sum 60):
 
 |expression|value|what it computed|
@@ -692,18 +692,18 @@ reading, the three present values being 10, 20 and 30 (sum 60):
 |`SUM(t) / COUNT(*)`|**12**|60 / 5, the total spread across all rows|
 |`AVG(COALESCE(t, 0))`|**12**|same, treating a missing reading as zero|
 
-Confirmed in the SQLite this page runs. The gap between 20 and 12 is not rounding
-&mdash; it is the two NULLs, counted by `COUNT(*)` and skipped by `AVG`. Which one
+Confirmed in the SQLite this page runs. The gap between 20 and 12 isn't rounding
+&mdash; it's the two NULLs, counted by `COUNT(*)` and skipped by `AVG`. Which one
 is correct is a question about the data, not the SQL: if a NULL means a sensor
-failed, 20 is right and 12 invents readings of zero; if it means "no sales that
-day", 12 is right and 20 overstates the typical day. The database will compute
+failed, 20 is right and 12 invents readings of zero. If it means "no sales that
+day", 12 is right and 20 overstates the common day. The DB will find
 whichever you write and warn you about neither.
 
 ## The empty group returns NULL, not zero
 
-There is one more NULL behaviour that breaks arithmetic downstream: an aggregate
+There's one more NULL action that breaks math downstream: an aggregate
 over *no values* returns NULL, and only `COUNT` returns 0. Restrict to rows that
-have no reading at all &mdash; a real group with zero values &mdash; and:
+have no reading at all. A real group with zero values &mdash; and:
 
 |aggregate|over an empty group|
 |---|---|
@@ -712,26 +712,26 @@ have no reading at all &mdash; a real group with zero values &mdash; and:
 |`SUM`, `AVG`, `MIN`, `MAX`|**NULL**|
 
 `SUM` of nothing being NULL rather than 0 is the one that bites, because NULL then
-propagates: `SUM(amount) * 1.2` over an empty group is NULL, and it stays NULL
-through every operation until something wraps it in `COALESCE`. A report that
-subtotals by group and then does arithmetic on the subtotals will show blanks, not
-zeros, for the empty groups &mdash; and a blank where a number was expected is how
-this surfaces, usually in front of someone who trusts the report.
+passes: `SUM(amount) * 1.2` over an empty group is NULL, and it stays NULL
+through each op until a thing wraps it in `COALESCE`. A report that
+subtotals by group and then does math on the subtotals will show blanks, not
+zeros, for the empty groups. And a blank where a number was expected is how
+this surfaces, often in front of someone who trusts the report.
 
 ## Where it goes wrong
 
-**Using AVG on data where NULL means zero.** The average silently rises. Use
-`COALESCE` when absence really is a zero.
+**Using AVG on data where NULL means zero.** The mean silently rises. Use
+`COALESCE` when lack really is a zero.
 
-**Assuming COUNT(col) is a faster COUNT(*).** They answer different questions.
+**given COUNT(col) is a faster COUNT(*).** They answer different questions.
 On a nullable column they return different numbers.
 
 **Filtering aggregates in WHERE.** `WHERE COUNT(*) > 5` is an error &mdash;
 `WHERE` runs before grouping, so no counts exist yet. That is what
 [HAVING](having_in_sql.html) is for.
 
-**Forgetting that NULL breaks arithmetic.** One NULL anywhere in an expression
-makes the whole expression NULL.
+**Losing that NULL breaks math.** One NULL anywhere in an formula
+makes the whole formula NULL.
 """,
     check=[
         {"q": "What is the difference between COUNT(*) and COUNT(temp_c)?",
@@ -838,7 +838,7 @@ WHERE  NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id);"""},
     ],
     article="""
 title: EXISTS, IN and JOIN
-intro: Three ways to ask whether a related row exists, and the one that is quietly wrong.
+intro: Three ways to ask whether a related row exists. The one that is quietly wrong.
 
 ## The same question
 
@@ -846,36 +846,36 @@ intro: Three ways to ask whether a related row exists, and the one that is quiet
 or as a `JOIN`. Run the first three variants above and all three return Ada and
 Grace &mdash; except that the JOIN returns Ada twice.
 
-That difference is the first thing to understand, and the NULL behaviour of the
+That difference is the first thing to understand, and the NULL action of the
 fourth is the second.
 
 ## JOIN multiplies rows
 
-A join does not filter the left table. It pairs every row on the left with every
-matching row on the right, so a customer with three orders produces three
+A join doesn't filter the left table. It pairs each row on the left with each
+matching row on the right. So A customer with three orders makes three
 result rows.
 
-When you want the orders, that is exactly right. When you want the customers,
-it is a bug, and the usual patch is `DISTINCT`. That works, but it is worth
-knowing what it costs: the database produced the duplicate rows and then sorted
-or hashed them away. `EXISTS` never produces them in the first place.
+When you want the orders, that is just right. When you want the customers,
+it's a bug, and the usual patch is `DISTINCT`. That works, but it's worth
+knowing what it costs: the DB made the duplicate rows and then sorted
+or hashed them away. `EXISTS` never makes them in the first place.
 
 The rule of thumb: **join when you want columns from the other table, use
-EXISTS when you only want to know whether it is there**.
+EXISTS when you only want to know whether it's there**.
 
 ## EXISTS stops early
 
 `EXISTS (subquery)` is true if the subquery returns at least one row. Not how
 many, not which &mdash; just whether. That is why `SELECT 1` is the conventional
-body: nothing in the select list is ever read, so there is no reason to name a
+body: nothing in the select list is ever read. There's no reason to name a
 column.
 
 Because only existence matters, the engine can stop scanning the moment it finds
 one match. For a customer with ten thousand orders, `EXISTS` looks at one.
 
-`EXISTS` is also *correlated*: the subquery references `c.id` from the outer
-query, so it is conceptually re-evaluated per outer row. Planners rarely execute
-it that literally, but writing it that way is what makes the early exit
+`EXISTS` is also *linked*: the subquery refs `c.id` from the outer
+query, so it's conceptually re-tested per outer row. Planners rarely execute
+it that truly, but writing it that way is what makes the early exit
 available.
 
 ## Where NOT IN breaks
@@ -892,33 +892,33 @@ NULL, and the subquery returns the list `(1, 1, 2, NULL)`.
 c.id <> 1  AND  c.id <> 1  AND  c.id <> 2  AND  c.id <> NULL
 ```
 
-The final comparison is not false &mdash; it is **unknown**. Alan's id is 3, and
-whether 3 differs from an unknown value cannot be determined. `AND` with unknown
+The final check isn't false. It's **unknown**. Alan's id is 3, and
+whether 3 differs from an unknown value can't be found. `AND` with unknown
 gives unknown, `WHERE` keeps only rows that are definitely true, and so nothing
-survives. Every row is filtered out, for every customer, silently and without an
+lives. each row is filtered out, for each customer, silently and without an
 error.
 
-`NOT EXISTS` is unaffected because it never compares anything to NULL. It asks
-whether a matching row was found, and the answer to that is always yes or no.
+`NOT EXISTS` is unaffected because it never checks any of it to NULL. It asks
+whether a matching row was found. The answer to that is always yes or no.
 
-This is the practical rule, and it is worth committing to memory:
+This is the hands-on rule, and it's worth committing to memory:
 
 > **`NOT IN` with a nullable subquery column is a bug.** Use `NOT EXISTS`, or
-> add `WHERE customer_id IS NOT NULL` to the subquery.
+> add `WHERE customer_id Isn't NULL` to the subquery.
 
-The positive forms do not have this problem. `IN` returns true as soon as it
-finds a real match, and an unknown among the remaining comparisons cannot take
+The plus forms don't have this problem. `IN` returns true as soon as it
+finds a real match, and an unknown among the left checks can't take
 that away.
 
 ## What about performance
 
-Twenty years ago these three had genuinely different costs and the advice was
+Twenty years ago these three had truly different costs and the advice was
 elaborate. Modern planners in PostgreSQL, SQL Server and Oracle recognise all
-three shapes and frequently compile them to the same physical plan &mdash;
-usually a semi-join, which is precisely "find whether a match exists, do not
+three shapes and often compile them to the same physical plan &mdash;
+often a semi-join, which is just "find whether a match exists, don't
 duplicate rows".
 
-So performance is rarely the reason to choose. The reasons that survive are:
+So speed is rarely the reason to choose. The reasons that live are:
 
 | Want | Use | Because |
 |---|---|---|
@@ -932,10 +932,10 @@ in ten seconds what a rule of thumb argues about indefinitely.
 
 ## The NOT IN failure, run in this engine
 
-The `NOT IN` trap is worth seeing execute rather than reasoning about, because it
-produces no error &mdash; only a wrong answer. Three customers, an orders table
+The `NOT IN` trap is worth seeing execute rather than thinking about, because it
+makes no error &mdash; only a wrong answer. Three customers, an orders table
 where one order is anonymous (a NULL `customer_id`), asked which customers never
-ordered:
+sorted:
 
 |query|result|
 |---|---|
@@ -944,18 +944,18 @@ ordered:
 
 The single NULL in the subquery poisons the whole `NOT IN`: `3 <> NULL` is
 unknown, `AND` with unknown is unknown, and `WHERE` keeps only rows that are
-definitely true, so every customer is filtered out. `NOT EXISTS` never compares
-anything to NULL &mdash; it asks whether a matching row was found &mdash; so it
-returns the right answer on the same data. This is not a corner case to file away;
-a nullable column is the normal situation, which is why `NOT EXISTS` is the safe
+definitely true, so each customer is filtered out. `NOT EXISTS` never checks
+any of it to NULL. It asks whether a matching row was found &mdash; so it
+returns the right answer on the same data. This isn't a corner case to file away;
+a nullable column is the normal situation. This Is why `NOT EXISTS` is the safe
 default and `NOT IN` earns its place only on a column that is provably `NOT NULL`.
 
 ## EXISTS stops at the first match
 
-The early exit is the other reason to prefer `EXISTS`, and it is a real difference
+The early exit is the other reason to prefer `EXISTS`, and it's a real difference
 in work done. `EXISTS` is true the moment one matching row is found, so for a
-customer with ten thousand orders it examines one; `COUNT(*) > 0`, the common
-alternative, counts all ten thousand before comparing:
+customer with ten thousand orders it checks one. `COUNT(*) > 0`, the common
+option, counts all ten thousand before checking:
 
 |test|rows the subquery examines|
 |---|---|
@@ -963,20 +963,20 @@ alternative, counts all ten thousand before comparing:
 |`(SELECT COUNT(*) ...) > 0`|all of them|
 
 The two return the same answer and do wildly different amounts of work, and the
-gap grows with how many matches there are &mdash; exactly the case where you least
+gap grows with how many matches there are. Just the case where you least
 want to count them. So the habit worth forming is `EXISTS` for "is there at least
 one", never `COUNT(*) > 0`: the question is existence, and existence is answered
 by the first row, not the last.
 
 ## Where it goes wrong
 
-**`NOT IN` on anything nullable.** The query returns zero rows and looks like a
+**`NOT IN` on any of it nullable.** The query returns zero rows and looks like a
 data problem.
 
 **`SELECT *` inside `EXISTS`.** Harmless but misleading &mdash; it suggests the
 columns are read, and they never are.
 
-**`DISTINCT` as a reflex.** If a join is producing duplicates, ask whether you
+**`DISTINCT` as a reflex.** If a join is making duplicates, ask whether you
 wanted the join at all. `DISTINCT` hides the symptom and pays for the rows twice.
 """,
     check=[
@@ -1086,8 +1086,8 @@ intro: A table joined to itself, and the three questions that need one.
 
 ## Nothing new, except the alias
 
-A self-join is an ordinary join in which both sides are the same table. There
-is no special keyword and no special execution; the only thing that changes is
+A self-join is an plain join in which both sides are the same table. There
+is no special keyword and no special run. The only thing that changes is
 that aliases become mandatory.
 
 ```
@@ -1095,24 +1095,24 @@ FROM  employees e
 JOIN  employees m ON e.manager_id = m.id
 ```
 
-`e` and `m` are two independent views of the same rows. Without them, `name`
-would be ambiguous &mdash; the database has two columns with that name in scope
+`e` and `m` are two free views of the same rows. Without them, `name`
+would be ambiguous &mdash; the DB has two columns with that name in scope
 and no way to guess which was meant.
 
 The mental move that makes this click is to stop thinking of `e` and `m` as one
 table used twice, and start thinking of them as two tables that happen to
-contain identical data. Everything else about joins then applies unchanged.
+hold the same data. All else about joins then applies unchanged.
 
 ## When you need one
 
-Self-joins answer questions that involve **comparing a row to another row of the
-same kind**, which SQL otherwise makes awkward.
+Self-joins answer questions that involve **checking a row to another row of the
+same kind**, which SQL or else makes awkward.
 
 **Hierarchies stored in one table.** An employee's manager is another employee.
 A category's parent is another category. A reply's target is another comment.
-Joining the table to itself resolves the reference into real columns.
+Joining the table to itself resolves the ref into real columns.
 
-**Row-to-row comparisons.** "Who earns more than their manager" needs both
+**Row-to-row checks.** "Who earns more than their manager" needs both
 salaries available at once. Run the third variant: Barbara earns 101,000 and
 reports to Grace on 98,000, and the join is what puts those two numbers in one
 row so a `WHERE` can compare them.
@@ -1122,32 +1122,32 @@ table with itself on `manager_id`.
 
 ## The two conditions that keep pairs sane
 
-The fourth variant contains a detail that looks small and is not:
+The fourth variant holds a detail that looks small and isn't:
 
 ```
 ON a.manager_id = b.manager_id AND a.id < b.id
 ```
 
-Without `a.id < b.id`, two things go wrong. Every row pairs with **itself**,
-because a row trivially shares its own manager. And every genuine pair appears
+Without `a.id < b.id`, two things go wrong. each row pairs with **itself**,
+because a row trivially shares its own manager. And each genuine pair appears
 **twice**, once as (Alan, Grace) and once as (Grace, Alan).
 
 Writing `a.id <> b.id` fixes the first problem and not the second. Writing
-`a.id < b.id` fixes both at once, because for any two distinct rows exactly one
-ordering satisfies it. That is the standard idiom for "each unordered pair once"
-and it is worth recognising on sight.
+`a.id < b.id` fixes both at once. For any two distinct rows just one
+sorting meets it. That is the standard idiom for "each unordered pair once"
+and it's worth recognising on sight.
 
 ## The top of the hierarchy disappears
 
 Run the first variant and count the rows: five, not six. Ada is missing.
 
 Ada is the root &mdash; her `manager_id` is NULL &mdash; and an inner join
-requires a match on both sides. NULL matches nothing, so her row is dropped
+needs a match on both sides. NULL matches nothing. So Her row is dropped
 without comment.
 
 The second variant uses `LEFT JOIN` and Ada reappears with a NULL manager. This
 is nearly always what was intended, and the failure is quiet enough to reach
-production: the query works, returns plausible rows, and is missing exactly the
+production: the query works, returns plausible rows, and is missing just the
 most senior person in the organisation.
 
 ## Depth is where it stops
@@ -1161,20 +1161,20 @@ JOIN employees m  ON e.manager_id = m.id
 JOIN employees mm ON m.manager_id = mm.id
 ```
 
-Three levels needs three, and an arbitrary depth cannot be written this way at
+Three levels needs three, and an any depth can't be written this way at
 all, because the number of joins would have to depend on the data.
 
 That is the boundary where the technique runs out and
 [recursive CTEs](recursive_ctes_in_sql.html) take over. A recursive CTE walks
-down as many levels as exist, and it is the correct tool the moment the depth is
+down as many levels as exist. It's the correct tool the moment the depth is
 not known in advance.
 
 ## Why the pair condition is not optional
 
-The `a.id < b.id` line is easy to read past, so it is worth seeing what its
-absence does to the row count. Pairing a group against itself is a Cartesian
-product within the group: `n` colleagues under one manager produce `n &times; n`
-ordered pairs before any condition trims them.
+The `a.id < b.id` line is easy to read past. It's worth seeing what its
+lack does to the row count. Pairing a group against itself is a Cartesian
+product within the group: `n` colleagues under one manager give `n &times; n`
+sorted pairs before any rule trims them.
 
 |colleagues under a manager|no condition (n&sup2;)|`a.id <> b.id`|`a.id < b.id`|
 |---|---|---|---|
@@ -1182,10 +1182,10 @@ ordered pairs before any condition trims them.
 |10|100|90|45|
 |50|2,500|2,450|1,225|
 
-The middle column still counts every pair twice; only `a.id < b.id` gives the
+The middle column still counts each pair twice. Only `a.id < b.id` gives the
 `n(n-1)/2` unordered pairs you meant. And the gap is quadratic, so on a manager
-with fifty reports the wrong condition does not return a few extra rows &mdash; it
-returns 2,500 where 1,225 were wanted, and any total computed over them comes out
+with fifty reports the wrong rule doesn't return a few extra rows &mdash; it
+returns 2,500 where 1,225 were wanted, and any total found over them comes out
 roughly doubled. That is why the idiom is worth recognising on sight rather than
 rediscovering after a report reads twice what it should.
 
@@ -1200,25 +1200,25 @@ a hash build in between. On `employees` self-joined on `manager_id`:
 |indexed|SEARCH the second copy per row &mdash; a seek|
 |unindexed|SCAN both copies, hash-join in memory|
 
-On a hundred employees nobody notices. On a hundred thousand, the unindexed
-version builds a hash table of every row and probes it with every row &mdash; the
+On a hundred employees no one notices. On a hundred thousand, the unindexed
+version builds a hash table of each row and probes it with each row &mdash; the
 work grows with the square of the table where the indexed plan grows with its
 logarithm. A hundred thousand employees joined without that index is on the order of ten
-billion row comparisons; with it, a hundred thousand seeks of about seventeen
+billion row checks. With it, a hundred thousand seeks of about seventeen
 steps each &mdash; the difference between a query that returns and one that does
 not. The index on the parent column that a foreign key would give you is on
-the *referenced* side; the self-join reads the *referencing* column, which is the
-one that usually lacks an index, so this is easy to miss until the table grows.
+the *referenced* side. The self-join reads the *referencing* column, which is the
+one that often lacks an index. This is easy to miss until the table grows.
 
 ## Where it goes wrong
 
 **Inner join on a nullable parent.** The root vanishes. This is the single most
 common self-join bug.
 
-**Forgetting the anti-self condition.** Without `a.id < b.id` every row pairs
+**Losing the anti-self rule.** Without `a.id < b.id` each row pairs
 with itself, and totals come out roughly double.
 
-**Using one for arbitrary depth.** If the query has four copies of the same
+**Using one for any depth.** If the query has four copies of the same
 table and someone is about to add a fifth, it wants to be recursive.
 
 **Leaving the join column unindexed.** A self-join reads the table twice. On a
@@ -1351,17 +1351,17 @@ SELECT n, n * n AS squared FROM nums;"""},
     ],
     article="""
 title: Recursive CTEs
-intro: The one construct in SQL that can follow a chain of unknown length.
+intro: The one make in SQL that can follow a chain of unknown length.
 
 ## Why plain SQL cannot do this
 
 A self-join resolves one level of a hierarchy. Two joins resolve two. To resolve
-five you write five, and to resolve "however many there are" you cannot write
-anything at all, because the number of joins would have to depend on data the
-query has not read yet.
+five you write five, and to resolve "but many there are" you can't write
+any of it at all. The number of joins would have to depend on data the
+query hasn't read yet.
 
-A **recursive CTE** removes that limit. It runs a query, feeds the result back
-into itself, and keeps going until a round produces nothing new.
+A **recursive CTE** drops that limit. It runs a query, feeds the result back
+into itself, and keeps going until a round makes nothing new.
 
 ## The two halves
 
@@ -1374,44 +1374,44 @@ WITH RECURSIVE chain(...) AS (
 SELECT ... FROM chain;
 ```
 
-The **anchor** is an ordinary query. It runs once and produces the starting
+The **anchor** is an plain query. It runs once and makes the starting
 rows. In the first variant it selects the employee whose `manager_id` is NULL
 &mdash; the root.
 
 The **recursive step** is a query that refers to the CTE by name. It runs against
-the rows the previous round produced, not against everything accumulated so far.
-That distinction is what makes the walk proceed one level at a time.
+the rows the previous round made, not against all built up so far.
+That gap is what makes the walk proceed one level at a time.
 
-Execution goes: anchor produces Ada. Step runs against {Ada} and produces Grace
-and Alan. Step runs against {Grace, Alan} and produces Edsger, Barbara, Donald.
-Step runs against those and produces Tony. Then Niklaus. Then the step finds
-nobody reporting to Niklaus, returns no rows, and the recursion halts.
+Run goes: anchor makes Ada. Step runs against {Ada} and makes Grace
+and Alan. Step runs against {Grace, Alan} and makes Edsger, Barbara, Donald.
+Step runs against those and makes Tony. Then Niklaus. Then the step finds
+no one reporting to Niklaus, returns no rows, and the recursion halts.
 
-**The empty result is the only stopping condition.** There is no iteration limit
+**The empty result is the only stopping rule.** There's no iteration limit
 and no depth check unless you write one.
 
 ## Carrying state through
 
-The `level` column in the starter query is not special syntax. It is an ordinary
-column: the anchor sets it to 1, and the step sets it to `c.level + 1`. Anything
-computed the same way rides along with the recursion.
+The `level` column in the starter query isn't special syntax. It's an plain
+column: the anchor sets it to 1. The step sets it to `c.level + 1`. any of it
+found the same way rides along with the recursion.
 
 The third variant builds a text path this way, concatenating each name onto the
-one before to produce `Ada > Grace > Edsger > Tony`. Ordering by that string
-gives a correctly nested listing, which is a small trick worth knowing: sorting
-by path sorts a tree into document order.
+one before to give `Ada > Grace > Edsger > Tony`. Sorting by that string
+gives a right nested listing. This Is a small trick worth knowing: sorting
+by path sorts a tree into doc order.
 
 ## Direction is just the join condition
 
 Run the second variant. It starts at Niklaus and walks *up*, and the only thing
-that changed is which side of the join condition is which:
+that changed is which side of the join rule is which:
 
 ```
 down:  JOIN chain c ON e.manager_id = c.id
 up:    JOIN up    u ON u.manager_id = m.id
 ```
 
-Same construct, opposite direction. Ancestors and descendants are the same
+Same make, opposite direction. Ancestors and descendants are the same
 problem with the arrow reversed.
 
 ## Generating rows from nothing
@@ -1419,36 +1419,36 @@ problem with the arrow reversed.
 The fourth variant has no table in it. The anchor is `SELECT 1` and the step
 adds one until it reaches ten.
 
-This is how you produce a sequence without a helper table: a row per day across
+This is how you give a sequence without a helper table: a row per day across
 a date range so a report shows zeros for days with no sales, a row per bucket
-for a histogram, a numbers table for splitting strings. It is one of the most
-useful applications and the one people find last.
+for a histogram, a numbers table for splitting strings. It's one of the most
+handy uses and the one people find last.
 
 ## Cycles
 
-Everything above assumes the data is a tree. If someone becomes their own
+All above assumes the data is a tree. If someone turns their own
 manager's manager, the step never returns empty and the query runs until the
 server stops it.
 
-Real data acquires cycles. The defences, in increasing order of robustness:
+Real data acquires cycles. The defences, in growing order of robustness:
 
 - Carry a depth column and add `WHERE level < 50` to the step.
 - Carry the path and add `WHERE instr(path, e.name) = 0` to refuse revisiting.
-- Use `UNION` instead of `UNION ALL`, which deduplicates &mdash; this stops a
-  cycle but costs a comparison against the whole accumulated set each round.
-- In PostgreSQL, use the `CYCLE` clause, which does this properly.
+- Use `UNION` instead of `UNION ALL`. This Deduplicates &mdash; this stops a
+  cycle but costs a check against the whole built up set each round.
+- In PostgreSQL, use the `CYCLE` clause. This Does this properly.
 
 A depth cap costs almost nothing and turns a hung query into a wrong-but-finite
 answer, which is far easier to notice.
 
 ## Filling gaps: the row-per-day spine
 
-The sequence trick earns its own worked case, because it solves a problem every
+The sequence trick earns its own worked case. It solves a problem each
 reporting query hits: a `GROUP BY day` over a table with no sales on some days
-simply has no row for those days, so the chart skips them and a week with a
+simply has no row for those days. The chart skips them and a week with a
 zero-sales Tuesday looks like a six-day week.
 
-The fix is to generate every day in the range and `LEFT JOIN` the data onto it:
+The fix is to make each day in the range and `LEFT JOIN` the data onto it:
 
 ```
 WITH RECURSIVE days(d) AS (
@@ -1462,10 +1462,10 @@ GROUP BY days.d;
 ```
 
 The anchor is one date, the step adds a day until it reaches the end, and 31 rows
-come out of no table at all. The `LEFT JOIN` then keeps every day, and
-`COALESCE` turns the missing matches into zeros. A gap in the data becomes a
-visible zero rather than an invisible skip &mdash; the difference between a chart
-that lies by omission and one that does not.
+come out of no table at all. The `LEFT JOIN` then keeps each day, and
+`COALESCE` turns the missing matches into zeros. A gap in the data turns a
+visible zero rather than an invisible skip. The difference between a chart
+that lies by omission and one that doesn't.
 
 ## What a cycle actually does
 
@@ -1480,15 +1480,15 @@ before the server kills it:
 |10|512|
 |20|524,288|
 
-That is not a slow query; it is a query trying to build a billion-row
-intermediate from a handful of cyclic rows. A `WHERE level < 50` guard turns it
+That isn't a slow query. It's a query trying to build a billion-row
+mid from a handful of cyclic rows. A `WHERE level < 50` guard turns it
 into a wrong-but-finite answer that returns at once and is obvious in the output,
-which is far easier to notice than a connection that simply never comes back.
+which is far easier to notice than a link that simply never comes back.
 `UNION` instead of `UNION ALL` stops it too, by deduplicating &mdash; but that
-compares each new row against everything found so far, every round, so on
+checks each new row against all found so far, each round, so on
 acyclic data it makes a correct query needlessly quadratic. The depth cap costs
-one integer comparison per row; reach for it first. A path-based guard &mdash; refusing to revisit a name already on the accumulated
-path &mdash; is stricter and costs a substring check per row, and it is the right
+one int check per row. Reach for it first. A path-based guard. Refusing to revisit a name already on the built up
+path &mdash; is stricter and costs a substring check per row, and it's the right
 choice when the data is a graph rather than a tree and genuine repeats are
 expected.
 
@@ -1496,10 +1496,10 @@ expected.
 
 **No termination guard.** Cyclic data plus `UNION ALL` runs forever.
 
-**An anchor that matches too much.** If the anchor selects every row rather than
-the roots, every row is a starting point and the result is enormous.
+**An anchor that matches too much.** If the anchor selects each row rather than
+the roots, each row is a starting point and the result is huge.
 
-**Expecting the step to see everything found so far.** It sees the previous
+**Expecting the step to see all found so far.** It sees the previous
 round only. Aggregating across all levels has to happen in the outer query.
 
 **Recursing over a large table without an index on the join column.** Each round
@@ -1599,16 +1599,16 @@ SELECT * FROM orders WHERE customer_id + 0 = 42;"""},
     ],
     article="""
 title: EXPLAIN and Query Plans
-intro: The database will tell you what it plans to do. Very few people ask.
+intro: The DB will tell you what it plans to do. Very few people ask.
 
 ## SQL says what, not how
 
 A query states the result you want. It says nothing about how to get it: which
 table to read first, whether to use an index, whether to sort or hash for a
-join. All of that is chosen by the **query optimiser**, at runtime, from the
+join. All of that is chosen by the **query tuner**, at runtime, from the
 statistics it holds about your data.
 
-Which means that two queries returning identical results can differ by orders of
+Which means that two queries returning the same results can differ by orders of
 magnitude in cost, and nothing about the SQL text tells you which is which.
 `EXPLAIN` is how you find out, and it takes about ten seconds.
 
@@ -1620,8 +1620,8 @@ Run the first variant. The plan reads:
 SCAN orders
 ```
 
-`SCAN` means the database intends to read **every row** and test each one. Five
-thousand rows here; five million in production, at which point the query is a
+`SCAN` means the DB intends to read **each row** and test each one. Five
+thousand rows here. Five million in production, at which point the query is a
 problem.
 
 Run the second variant to create an index on `customer_id`, then the third. The
@@ -1631,27 +1631,27 @@ plan now reads:
 SEARCH orders USING INDEX idx_orders_customer (customer_id=?)
 ```
 
-`SEARCH` means it can jump directly to the matching rows. The query text did not
-change. The result does not change. The work changed from thousands of row reads
+`SEARCH` means it can jump right to the matching rows. The query text didn't
+change. The result doesn't change. The work changed from thousands of row reads
 to a handful.
 
 That contrast is the whole skill: **look for SCAN on a large table where you
 expected a lookup.** Other engines use different words &mdash; PostgreSQL says
 `Seq Scan` against `Index Scan`, MySQL fills in a `type` column with `ALL`
-against `ref` &mdash; but the distinction is the same everywhere.
+against `ref` &mdash; but the gap is the same all over.
 
 ## The index it will not use
 
-Run the fourth variant. The index still exists, the query means exactly the same
+Run the fourth variant. The index still exists, the query means just the same
 thing, and the plan is back to `SCAN`.
 
 The difference is `customer_id + 0` instead of `customer_id`. An index stores
-values of the column, in order. It does not store values of *expressions over*
-the column, so the moment the column is wrapped in anything, the ordering the
-index provides no longer corresponds to what the query is asking about.
+values of the column, in order. It doesn't store values of *expressions over*
+the column, so the moment the column is wrapped in any of it, the sorting the
+index gives no longer matches to what the query is asking about.
 
-This is the most common way a perfectly good index goes unused, and it hides
-inside ordinary-looking SQL:
+This is the most common way a just right good index goes unused, and it hides
+inside plain-looking SQL:
 
 | Written | Problem | Instead |
 |---|---|---|
@@ -1660,31 +1660,31 @@ inside ordinary-looking SQL:
 | `WHERE id + 0 = 42` | arithmetic on the column | `WHERE id = 42` |
 | `WHERE status LIKE '%paid'` | leading wildcard | no index can help; a B-tree is ordered by prefix |
 
-The rule: **keep the indexed column bare on one side of the comparison.**
+The rule: **keep the indexed column bare on one side of the check.**
 
 ## A scan is not always wrong
 
 On a table of fifty rows, reading all fifty is cheaper than consulting an index
-and then fetching rows one at a time. Optimisers know this and will correctly
-ignore an index on a small table.
+and then fetching rows one at a time. Tuners know this and will right
+skip an index on a small table.
 
-The same applies to selectivity. A query matching 60% of the rows is usually
-better served by a scan, because an index gives a list of row locations that
-then have to be fetched individually &mdash; and fetching most of the table one
+The same applies to selectivity. A query matching 60% of the rows is often
+better served by a scan. An index gives a list of row locations that
+then have to be fetched on their own. And fetching most of the table one
 row at a time costs more than reading it in order.
 
-This is why plans change as tables grow, and why a query that was fast in staging
+This is why plans change as tables grow. Why a query that was fast in staging
 can be slow in production with the same schema and different statistics.
 
 ## Estimated against actual
 
-`EXPLAIN` alone shows what the optimiser *intends*, using row-count estimates.
-Those estimates come from statistics that can be stale or simply wrong.
+`EXPLAIN` alone shows what the tuner *intends*, using row-count guesses.
+Those guesses come from statistics that can be stale or simply wrong.
 
 Most engines offer a form that runs the query and reports what really happened
 &mdash; `EXPLAIN ANALYZE` in PostgreSQL, `EXPLAIN ANALYZE` in MySQL 8.0.18 and
-later. Comparing estimated rows against actual rows is the fastest way to find
-out that the optimiser expected 10 rows and got 400,000, which is almost always
+later. Checking guessed rows against actual rows is the fastest way to find
+out that the tuner expected 10 rows and got 400,000. This Is almost always
 the reason a plan is bad.
 
 Two habits follow: run `ANALYZE` after a bulk load so the statistics reflect the
@@ -1693,9 +1693,9 @@ order of magnitude.
 
 ## What SCAN against SEARCH costs, in row reads
 
-The `SCAN` / `SEARCH` distinction is easy to nod at and worth turning into
+The `SCAN` / `SEARCH` gap is easy to nod at and worth turning into
 numbers, because that is what makes it urgent on a growing table. `SCAN` reads
-every row and tests it; `SEARCH` through a B-tree index descends a sorted
+each row and tests it. `SEARCH` through a B-tree index descends a sorted
 structure, so it does on the order of `log2(rows)` steps to reach the block it
 wants:
 
@@ -1704,21 +1704,21 @@ wants:
 |5,000 rows|5,000|~13|
 |5,000,000 rows|5,000,000|~23|
 
-Two things follow. The gap is not constant &mdash; it widens as the table grows,
-because the scan is linear and the search is logarithmic, so the query that was
+Two things follow. The gap isn't constant. It widens as the table grows,
+because the scan is linear and the search is logarithmic. So The query that was
 "fine in staging" on 5,000 rows is a thousandfold worse in production on five
-million while the indexed version barely moved from 13 steps to 23. And it is why
+million while the indexed version barely moved from 13 steps to 23. And it's why
 `SCAN` on a large table where you expected a lookup is the single most valuable
-thing to spot in a plan: it is the difference between reading a handful of pages
+thing to spot in a plan: it's the difference between reading a handful of pages
 and reading the whole table.
 
 ## Why a scan can beat the index
 
-"A scan is not always wrong" deserves the reason, because it explains why the
-optimiser sometimes ignores an index you built for it. An index gives a list of
+"A scan isn't always wrong" deserves the reason, because it shows why the
+tuner at times skips an index you built for it. An index gives a list of
 row locations, which then have to be fetched one at a time &mdash; random access.
-A scan reads the table in order &mdash; sequential access, which is far cheaper per
-row. So there is a crossover in selectivity:
+A scan reads the table in order. Sequential access. This Is far cheaper per
+row. So there's a crossover in selectivity:
 
 |query matches|index path|better plan|
 |---|---|---|
@@ -1727,26 +1727,26 @@ row. So there is a crossover in selectivity:
 
 Fetching 60% of a table one row at a time through an index costs more than reading
 the whole table sequentially and discarding 40%, because random reads dominate the
-bill. This is why the optimiser's choice depends on the *statistics*, not just the
+bill. This is why the tuner's choice depends on the *statistics*, not just the
 SQL &mdash; and why a query that used the index in staging, against a few hundred
-rows, can correctly switch to a scan in production, against millions with a
-different distribution. The plan changing under you is the optimiser doing its
+rows, can right switch to a scan in production, against millions with a
+different spread. The plan changing under you is the tuner doing its
 job, not misbehaving.
 
 ## Where it goes wrong
 
 **Guessing instead of asking.** The plan is one command away and settles the
-argument.
+arg.
 
 **Reading a plan for a query with no data.** Plans on an empty or tiny table
 tell you nothing about production.
 
-**Adding indexes until it is fast.** Every index costs write time and space, and
+**Adding indexes until it's fast.** each index costs write time and space, and
 an unused index costs both for nothing. Add the one the plan asks for, then
 check the plan again.
 
-**Assuming the plan is stable.** It is recomputed as statistics change. Today's
-plan is not a guarantee.
+**given the plan is stable.** It's recomputed as statistics change. Today's
+plan isn't a ensure.
 """,
     check=[
         {"q": "In a plan, what does SCAN tell you?",
@@ -1846,22 +1846,22 @@ SELECT status, customer_id FROM orders WHERE status = 'paid';"""},
     ],
     article="""
 title: Composite and Covering Indexes
-intro: Why column order decides which queries an index can serve, and why one query never touches the table.
+intro: Why column order decides which queries an index can serve. Why one query never touches the table.
 
 ## An index is a sorted copy
 
 A single-column index is a sorted list of that column's values, each paired with
-a pointer to its row. Sorted means the database can binary-search it instead of
-reading everything.
+a pointer to its row. Sorted means the DB can binary-search it instead of
+reading all.
 
 A **composite index** on `(status, customer_id)` is a sorted list too, sorted by
 `status` first and, within each status, by `customer_id`. That is the whole
-mechanism, and every rule about composite indexes falls out of it.
+mechanism, and each rule about composite indexes falls out of it.
 
-Think of a phone book ordered by surname then first name. Finding everyone
+Think of a phone book sorted by surname then first name. Finding everyone
 called Hopper is easy. Finding Grace Hopper is easy. Finding everyone whose
-first name is Grace is not &mdash; the Graces are scattered throughout, one per
-surname, and you would have to read the lot.
+first name is Grace isn't. The Graces are scattered throughout, one per
+surname, and you'd have to read the lot.
 
 ## The leftmost prefix rule
 
@@ -1874,27 +1874,27 @@ narrows to `customer_id` within it, and lands on the rows.
 contiguous, so the index finds the block and reads it. A prefix of the index is
 itself a usable index.
 
-**Second column only** &mdash; `SCAN`. This is the important one. The index
-exists, `customer_id` is in it, and the query cannot use it for a seek, because
-rows for customer 42 are spread across every status value. There is no
+**Second column only** &mdash; `SCAN`. This is the key one. The index
+exists, `customer_id` is in it, and the query can't use it for a seek, because
+rows for customer 42 are spread across each status value. There's no
 contiguous block to find.
 
 **Covering** &mdash; `USING COVERING INDEX`, discussed below.
 
 So an index on `(a, b, c)` can serve queries filtering on `a`, on `a, b`, or on
-`a, b, c`. It cannot serve `b`, `c`, or `b, c`. **Leading prefixes only.**
+`a, b, c`. It can't serve `b`, `c`, or `b, c`. **Leading prefixes only.**
 
 ## The ordering rule that follows
 
-Given that, the column order in a composite index is a design decision, not a
+Given that, the column order in a composite index is a design choice, not a
 detail. Two guidelines:
 
 **Equality before range.** An index on `(status, created_at)` serves
 `WHERE status = 'paid' AND created_at > ?` well: the equality picks a block and
-the range narrows inside it. Reversed, the range comes first and everything
-after it is scattered, so only the range column is really used.
+the range narrows inside it. Reversed, the range comes first and all
+after it's scattered, so only the range column is really used.
 
-**Order for the queries you actually run.** If most queries filter by customer
+**Order for the queries you really run.** If most queries filter by customer
 and only some also filter by status, lead with customer. Reading the workload is
 the only way to decide.
 
@@ -1904,13 +1904,13 @@ The fourth variant selects only `status` and `customer_id` &mdash; both of which
 are already stored in the index. The plan says `USING COVERING INDEX`, and the
 table is never read at all.
 
-This is worth understanding because of what an index normally costs. An ordinary
+This is worth understanding because of what an index most times costs. An plain
 index lookup happens in two stages: find the entries in the index, then fetch
-each corresponding row from the table. That second stage is random access, and
+each matching row from the table. That second stage is random access, and
 on a large table it dominates. Returning a thousand rows can mean a thousand
 scattered reads.
 
-A covering index removes the second stage entirely. Everything the query needs is
+A covering index drops the second stage fully. All the query needs is
 already in the sorted structure it just searched.
 
 Some engines let you add columns purely for coverage without making them part of
@@ -1922,31 +1922,31 @@ the index narrow where it matters for searching while still avoiding the table.
 A common mistake is to assume that indexes on `(a)` and `(b)` do the work of an
 index on `(a, b)`.
 
-They do not. Given both, a database can search each separately and intersect the
-row sets, which some engines will do &mdash; but that means two searches and a
-merge, against one search on a composite index. It is materially worse, and for
-`ORDER BY a, b` the separate indexes provide no useful ordering at all.
+They don't. Given both, a DB can search each apart and intersect the
+row sets, which some engines will do. But that means two searches and a
+merge, against one search on a composite index. It's materially worse, and for
+`ORDER BY a, b` the separate indexes provide no handy sorting at all.
 
-The reverse substitution does work: `(a, b)` covers everything `(a)` alone would
-have, so having both is usually redundant.
+The reverse substitution does work: `(a, b)` covers all `(a)` alone would
+have, so having both is often redundant.
 
 ## The cost side
 
-Indexes are not free. Every one must be updated on every insert, update and
-delete of an indexed column, so a table with eight indexes does roughly nine
+Indexes aren't free. each one must be updated on each insert, update and
+delete of an indexed column. So A table with eight indexes does roughly nine
 units of write work instead of one. They take space, they take memory in cache
-that data pages could have used, and an index nobody queries costs all of that
+that data pages could have used, and an index no one queries costs all of that
 for nothing.
 
-The practical loop is: find the slow query, read its
+The hands-on loop is: find the slow query, read its
 [plan](explain_and_query_plans.html), add the one index the plan asks for, read
 the plan again. Not: add indexes and hope.
 
 ## Why two single indexes are not one composite
 
-The claim that `(a)` and `(b)` cannot replace `(a, b)` is worth making concrete,
-because it is where "but I indexed both columns" goes wrong. An index on
-`(status, customer_id)` is sorted by status first, so `customer_id` values for any
+The claim that `(a)` and `(b)` can't replace `(a, b)` is worth making concrete,
+because it's where "but I indexed both columns" goes wrong. An index on
+`(status, customer_id)` is sorted by status first. So `customer_id` values for any
 one customer are scattered one per status &mdash; the phone-book-by-first-name
 problem. That decides which queries get a seek:
 
@@ -1957,22 +1957,22 @@ problem. That decides which queries get a seek:
 |`WHERE customer_id = ?`|**SCAN** (not a prefix)|
 
 Given instead two separate indexes, `(status)` and `(customer_id)`, the engine can
-search each and intersect the results &mdash; two lookups and a merge, against one
-lookup on the composite &mdash; and neither provides the ordering for
+search each and intersect the results. Two lookups and a merge, against one
+lookup on the composite &mdash; and neither gives the sorting for
 `ORDER BY status, customer_id`, so that still sorts. The composite is strictly
-more capable for queries that lead with `status`, which is why column order is a
-design decision: it is chosen for the queries you actually run, and it is the
+more capable for queries that lead with `status`. This Is why column order is a
+design choice: it's chosen for the queries you really run, and it's the
 leading column that a second query can borrow, never the trailing one.
 
 ## Where it goes wrong
 
-**Indexing every column separately.** Expensive on write, and none of them
+**Indexing each column apart.** costly on write, and none of them
 serves a multi-column filter well.
 
-**Putting the range column first.** Everything after it becomes unusable.
+**Putting the range column first.** All after it turns unusable.
 
-**Forgetting the sort.** `ORDER BY` can use an index too, and a composite index
-that matches the ordering removes the sort step entirely.
+**Losing the sort.** `ORDER BY` can use an index too, and a composite index
+that matches the sorting drops the sort step fully.
 
 **Leaving redundant indexes in place.** If `(a, b)` exists, `(a)` is almost
 certainly dead weight.
@@ -2084,30 +2084,30 @@ intro: What one transaction is allowed to see while another is still running.
 
 ## The dial
 
-The I in ACID is isolation: the degree to which concurrent transactions are kept
+The I in ACID is alone: the degree to which concurrent transactions are kept
 from seeing each other's work in progress.
 
-Perfect isolation is easy to define &mdash; run every transaction one after
-another &mdash; and unacceptable in practice, because a database serving one
-transaction at a time serves almost nobody. So the standard defines a dial with
-four settings, described not by what they do but by which **anomalies** they
+Perfect alone is easy to define. Run each transaction one after
+another &mdash; and unacceptable because a DB serving one
+transaction at a time serves almost no one. So the standard defines a dial with
+four settings, given not by what they do but by which **outliers** they
 permit.
 
 Step through the timeline above at each of the four levels. The schedule never
-changes. What A sees changes at nearly every step.
+changes. What A sees changes at nearly each step.
 
 ## The three anomalies
 
 **Dirty read.** Transaction A reads a row that B has changed but not committed.
 If B rolls back, A acted on data that never existed. Step 5 at READ UNCOMMITTED
-shows this: A reads 1500 from a change that is still provisional.
+shows this: A reads 1500 from a change that is still draft.
 
 **Non-repeatable read.** A reads a row, B updates it and commits, A reads the
 same row again and gets a different value. Step 7 at READ COMMITTED shows it: A
 reads 1000 and then 1500 inside one transaction, with no error and no warning.
 
-**Phantom read.** A runs a query, B inserts a row matching its condition and
-commits, A runs the same query and gets an extra row. Step 9. The distinction
+**Phantom read.** A runs a query, B inserts a row matching its rule and
+commits, A runs the same query and gets an extra row. Step 9. The gap
 from a non-repeatable read is that no row A saw has changed &mdash; a new one
 has arrived.
 
@@ -2120,33 +2120,33 @@ has arrived.
 | REPEATABLE READ | prevented | prevented | allowed by the standard |
 | SERIALIZABLE | prevented | prevented | prevented |
 
-**READ UNCOMMITTED** is essentially unused. PostgreSQL accepts the syntax and
+**READ UNCOMMITTED** is unused. PostgreSQL accepts the syntax and
 silently gives you READ COMMITTED instead, because its architecture has no way
 to expose uncommitted data.
 
 **READ COMMITTED** is the default in PostgreSQL, Oracle and SQL Server. Each
-*statement* sees a fresh view of committed data. It is a sensible default and
-the anomaly it permits is real: two queries in one transaction can disagree, so
-a report that reads the same table twice can produce internally inconsistent
+*statement* sees a fresh view of committed data. It's a sensible default and
+the outlier it permits is real: two queries in one transaction can disagree, so
+a report that reads the same table twice can give inside inconsistent
 totals.
 
 **REPEATABLE READ** pins the transaction to a snapshot taken at its first read.
-Everything it sees is consistent as of that moment, no matter what commits
-elsewhere. It is MySQL InnoDB's default.
+All it sees is steady as of that moment, no matter what commits
+elsewhere. It's MySQL InnoDB's default.
 
-**SERIALIZABLE** guarantees the result is equivalent to some serial order.
-Modern implementations achieve this without locking everything, by tracking
+**SERIALIZABLE** ensures the result is equal to some serial order.
+Modern setups achieve this without locking all, by tracking
 which transactions read which rows and aborting one when a genuine conflict is
 found.
 
 ## The thing about SERIALIZABLE that surprises people
 
-It does not make your code wait. It makes your code **fail**.
+It doesn't make your code wait. It makes your code **fail**.
 
 At step 10 under SERIALIZABLE, A may get a serialization failure instead of a
-successful commit. That is not a malfunction &mdash; it is how the guarantee is
+good commit. That isn't a malfunction. It's how the ensure is
 delivered. The engine allowed both transactions to proceed optimistically,
-found afterwards that no serial order explains what happened, and rejected one.
+found afterwards that no serial order shows what happened, and rejected one.
 
 So any code running at SERIALIZABLE must catch that error and retry the whole
 transaction. Code that assumes commit succeeds will fail intermittently under
@@ -2154,33 +2154,33 @@ load, which is the worst kind of bug to diagnose.
 
 ## Where the standard stops helping
 
-The standard defines levels by which anomalies are *permitted*, not which are
-prevented. An engine is free to prevent more than required, and they do.
+The standard defines levels by which outliers are *permitted*, not which are
+blocked. An engine is free to prevent more than needed, and they do.
 
-PostgreSQL's REPEATABLE READ uses a full snapshot and therefore prevents
-phantoms, which the standard does not require. MySQL's InnoDB prevents them at
-that level too, by a different mechanism (gap locks). So code that relies on
-phantoms being prevented at REPEATABLE READ works on both and is not portable by
-the standard, and code that relies on phantoms *appearing* is wrong on both.
+PostgreSQL's REPEATABLE READ uses a full snapshot and so blocks
+phantoms, which the standard doesn't need. MySQL's InnoDB blocks them at
+that level too, by a different mechanism (gap locks). So code that leans on
+phantoms being blocked at REPEATABLE READ works on both and isn't portable by
+the standard, and code that leans on phantoms *appearing* is wrong on both.
 
 This is why "we use REPEATABLE READ" is an incomplete statement about a system's
-behaviour. The engine matters.
+action. The engine matters.
 
 ## Choosing
 
-Most applications should stay on the engine's default and reach for something
-stronger where a specific invariant demands it. The pattern that most often
-needs it is read-then-write: check a balance, then deduct from it. Between the
+Most uses should stay on the engine's default and reach for a thing
+stronger where a exact rule demands it. The pattern that most often
+needs it's read-then-write: check a balance, then deduct from it. Between the
 check and the write, another transaction can change the balance, and no
-isolation level below SERIALIZABLE stops that on its own.
+alone level below SERIALIZABLE stops that on its own.
 
-The alternatives are explicit locking (`SELECT ... FOR UPDATE`) or letting the
-database enforce the invariant with a constraint, which needs no isolation
-reasoning at all.
+The options are clear locking (`SELECT ... FOR UPDATE`) or letting the
+DB enforce the rule with a constraint. This Needs no alone
+thinking at all.
 
 ## The lost update the levels do not stop
 
-The read-then-write hazard is best seen as one arithmetic. Two transactions both
+The read-then-write hazard is best seen as one math. Two transactions both
 withdraw 100 from an account holding 1,000, each reading before either writes:
 
 |step|transaction A|transaction B|
@@ -2194,16 +2194,16 @@ withdraw 100 from an account holding 1,000, each reading before either writes:
 Two withdrawals of 100 leave the balance at **900, not 800** &mdash; one
 withdrawal has vanished. Nothing here is a dirty or non-repeatable read, so
 READ COMMITTED and even REPEATABLE READ permit it: both transactions read
-committed data and each is internally consistent. Only SERIALIZABLE stops it on
-its own, by aborting one at commit &mdash; which is why this pattern needs either
-that level with a retry, an explicit `SELECT ... FOR UPDATE`, or a single
-`UPDATE ... SET balance = balance - 100` that never reads into the application at
-all. Reasoning about isolation is the hard way; letting one statement do the
-arithmetic is the safe one.
+committed data and each is inside steady. Only SERIALIZABLE stops it on
+its own, by aborting one at commit. Which is why this pattern needs either
+that level with a retry, an clear `SELECT ... FOR UPDATE`, or a single
+`UPDATE ... SET balance = balance - 100` that never reads into the use at
+all. Thinking about alone is the hard way. Letting one statement do the
+math is the safe one.
 
 ## READ UNCOMMITTED is often a no-op
 
-One level on the dial frequently does nothing, and assuming otherwise is a portable
+One level on the dial often does nothing, and given or else is a portable
 source of confusion. `READ UNCOMMITTED` is meant to permit dirty reads &mdash;
 seeing another transaction's uncommitted changes &mdash; but a
 [snapshot-based](mvcc_in_databases.html) engine has no uncommitted version to
@@ -2215,25 +2215,25 @@ instead:
 |PostgreSQL|accepted, runs as READ COMMITTED|
 |MySQL InnoDB|honoured; dirty reads are possible|
 
-So the same statement means two different things on two databases, and a
-"performance" isolation level chosen on one has no effect on the other. This is a
-particular case of the general rule already stated &mdash; the standard names the
-anomalies a level *permits*, and an engine may prevent more &mdash; and it is why
+So the same statement means two different things on two DBs, and a
+"speed" alone level chosen on one has no effect on the other. This is a
+given case of the general rule already stated. The standard names the
+outliers a level *permits*, and an engine may prevent more &mdash; and it's why
 the level a system runs at is a fact about the engine as much as about the
 `SET` statement.
 
 ## Where it goes wrong
 
-**Assuming a default.** They differ between engines, and code written against
-one silently changes behaviour on the other.
+**given a default.** They differ between engines, and code written against
+one silently changes action on the other.
 
 **Using SERIALIZABLE without retry logic.** Intermittent failures under load.
 
 **Long-running read transactions.** A snapshot held open forces the engine to
-retain old row versions, which bloats storage and slows everything.
+retain old row versions. This Bloats storage and slows all.
 
-**Reasoning about isolation instead of using a constraint.** A `UNIQUE`
-constraint settles "no two of these" regardless of what any transaction sees.
+**Thinking about alone instead of using a constraint.** A `UNIQUE`
+constraint settles "no two of these" even so of what any transaction sees.
 """,
     check=[
         {"q": "What is a non-repeatable read?",
@@ -2330,61 +2330,61 @@ intro: Two transactions, two rows, and the one detail that decides whether they 
 ## Waiting is normal; a cycle is not
 
 When a transaction updates a row it takes an exclusive lock and holds it until
-it commits or rolls back. Anything else wanting that row waits.
+it commits or rolls back. any of it else wanting that row waits.
 
-Waiting is ordinary and self-resolving: the holder finishes, the waiter
-proceeds. A **deadlock** is different. It is a *cycle* in who is waiting for
-whom, and a cycle cannot resolve itself, because every participant is waiting
+Waiting is plain and self-resolving: the holder finishes, the waiter
+proceeds. A **deadlock** is different. It's a *cycle* in who is waiting for
+whom, and a cycle can't resolve itself, because each participant is waiting
 for another participant that will never move.
 
 Step through the timeline with "opposite order" selected. Nothing is wrong at
 step 4 &mdash; two transactions holding different rows is just concurrency. The
 problem appears at step 6, when the second edge closes the loop: A holds row 1
-and wants row 2; B holds row 2 and wants row 1. Neither can proceed and neither
+and wants row 2. B holds row 2 and wants row 1. Neither can proceed and neither
 will give up what it has.
 
 ## The database will break it, badly
 
-Engines run a deadlock detector that periodically looks for cycles in the
-wait-for graph. When it finds one it picks a **victim** &mdash; usually the
-transaction that has done the least work, so the least is lost &mdash; and kills
+Engines run a deadlock finder that now and then looks for cycles in the
+wait-for graph. When it finds one it picks a **victim** &mdash; often the
+transaction that has done the least work. So The least is lost &mdash; and kills
 it with a deadlock error. The survivor continues.
 
-That resolution is necessary and it is not a fix. The victim's work is gone. If
-the application does not catch the error and retry, a user's action simply
+That detail is needed and it isn't a fix. The victim's work is gone. If
+the use doesn't catch the error and retry, a user's action simply
 failed, and it failed intermittently, under load, in a way that is very hard to
-reproduce.
+copy.
 
 ## The fix is ordering
 
 Switch the timeline to "same order" and step through again. The schedule is
-almost identical; the only change is that B asks for row 1 before row 2, exactly
+almost the same. The only change is that B asks for row 1 before row 2, just
 as A does.
 
 Now B blocks at step 4 and stays blocked. A proceeds, finishes and releases both
-locks. B unblocks and completes. Both transactions succeed, no error is raised,
+locks. B unblocks and ends. Both transactions succeed, no error is raised,
 and nothing is retried.
 
-This is the whole technique: **acquire locks in a consistent order everywhere in
-the application.** A cycle requires two transactions to disagree about the order,
-so if nobody disagrees, no cycle can form. Ordering by primary key is the usual
-choice because it is total, arbitrary and easy to apply mechanically.
+This is the whole technique: **acquire locks in a steady order all over in
+the use.** A cycle needs two transactions to disagree about the order,
+so if no one disagrees, no cycle can form. Sorting by main key is the usual
+choice because it's total, any and easy to apply mechanically.
 
 The classic case is a transfer between two accounts. Written naively it locks
 the source then the destination, and two transfers in opposite directions
-deadlock immediately. Written as "lock the lower id first, then the higher" they
+deadlock right away. Written as "lock the lower id first, then the higher" they
 queue instead.
 
 ## What makes it more likely
 
-**Long transactions.** Locks are held to the end, so the longer a transaction
-runs the wider the window in which someone can interleave with it. Do not open a
+**Long transactions.** Locks are held to the end. So The longer a transaction
+runs the wider the window in which someone can interleave with it. Don't open a
 transaction and then call an external API inside it.
 
 **Broad locks.** A statement without an index may lock far more rows than it
-needs, because rows it examines and rejects can still be locked. Adding the index
-narrows the query and the locking together, which is why an index sometimes
-fixes a deadlock nobody thought was an index problem.
+needs, because rows it checks and rejects can still be locked. Adding the index
+narrows the query and the locking together. This Is why an index at times
+fixes a deadlock no one thought was an index problem.
 
 **Escalation.** Some engines convert many row locks into one table lock past a
 threshold, turning a narrow conflict into a broad one.
@@ -2398,18 +2398,18 @@ tends to appear when two features written months apart meet under load.
 Even with good discipline, deadlocks happen. The handling is a small amount of
 code and it has to be right:
 
-1. Catch the deadlock error specifically, not every error.
+1. Catch the deadlock error in detail, not each error.
 2. Retry the **whole transaction** from the beginning. Re-running the failed
-   statement alone is wrong &mdash; the transaction was rolled back entirely.
-3. Back off before retrying, with some randomness, so two victims do not
+   statement alone is wrong &mdash; the transaction was rolled back fully.
+3. Back off before retrying, with some noise, so two victims don't
    collide again on the same schedule.
-4. Cap the attempts and log what happened, so a genuine design problem does not
+4. Cap the attempts and log what happened. So A genuine design problem doesn't
    hide behind a retry loop that quietly succeeds on the fourth attempt.
 
 ## The transfer, in both lock orders
 
 The fix is one worked example away. Two transfers run at once &mdash; A moves money
-from account 1 to 2, B from account 2 to 1 &mdash; and the only thing that differs
+from account 1 to 2, B from account 2 to 1. And the only thing that differs
 is the order each takes its locks.
 
 |step|naive (lock source first)|ordered (lock lower id first)|
@@ -2419,18 +2419,18 @@ is the order each takes its locks.
 |3|A wants 2 &rarr; **blocked**|A locks 2, works, commits|
 |4|B wants 1 &rarr; **deadlock**|B proceeds, commits|
 
-Naively, A holds 1 and wants 2 while B holds 2 and wants 1 &mdash; a cycle, and the
-detector kills one of them. Ordered by account id, B simply waits at step 2 for a
+Naively, A holds 1 and wants 2 while B holds 2 and wants 1. A cycle, and the
+finder kills one of them. Sorted by account id, B simply waits at step 2 for a
 lock A already holds, A finishes, and B continues. Same two transfers, same rows,
-no error &mdash; because a cycle requires the two to disagree about order, and
-"always lock the lower id first" removes the disagreement. That is the entire
-technique, and it is code discipline, not a database setting.
+no error &mdash; because a cycle needs the two to disagree about order, and
+"always lock the lower id first" drops the disagreement. That is the entire
+technique, and it's code discipline, not a DB setting.
 
 ## Retry with backoff, not in lockstep
 
 The retry after a deadlock has one detail that decides whether it helps: the wait
 before retrying must be *randomised*. Both victims of a deadlock were doing similar
-work at the same time, so if both retry immediately &mdash; or both after exactly
+work also, so if both retry right away. Or both after just
 100 ms &mdash; they collide again on the same schedule, and again after that:
 
 |retry strategy|outcome under contention|
@@ -2441,21 +2441,21 @@ work at the same time, so if both retry immediately &mdash; or both after exactl
 
 Exponential backoff spreads successive attempts (100 ms, 200 ms, 400 ms), and the
 jitter &mdash; a random fraction added to each &mdash; breaks the symmetry so the
-two transactions stop arriving together. Without the randomness a deadlock can
-become a livelock: no cycle in the wait graph, but two transactions retrying in
+two transactions stop arriving together. Without the noise a deadlock can
+become a livelock: no cycle in the wait graph. But Two transactions retrying in
 step and failing each other forever. The fix for a deadlock and the fix for the
 retry storm it can cause are different, and both are needed.
 
 ## Where it goes wrong
 
-**Treating it as a database configuration problem.** No setting prevents
+**Treating it as a DB configuration problem.** No setting blocks
 deadlocks. The order in which your code takes locks does.
 
 **Retrying the statement instead of the transaction.** The rollback undid
-everything, so the retry starts from a state that no longer exists.
+all, so the retry starts from a state that no longer exists.
 
-**Assuming reads are safe.** `SELECT ... FOR UPDATE` takes locks and
-participates in cycles exactly like an update.
+**given reads are safe.** `SELECT ... FOR UPDATE` takes locks and
+participates in cycles just like an update.
 
 **Silently swallowing the retry.** A rising deadlock rate is a signal about the
 system's design. Log it.
@@ -2511,30 +2511,30 @@ topic(
     ],
     """
 title: MVCC: How Readers Avoid Blocking Writers
-intro: The idea that lets a long report run while the database keeps taking writes.
+intro: The idea that lets a long report run while the DB keeps taking writes.
 
 ## The problem with locks
 
 The simple way to keep transactions from interfering is locking: a reader takes
-a shared lock, a writer takes an exclusive one, and the two cannot be held at
+a shared lock, a writer takes an exclusive one. The two can't be held at
 once.
 
-It is correct, and on a busy system it is miserable. A report that scans a large
-table holds read locks for its whole run, so every write to that table waits.
-Meanwhile a long write transaction blocks every reader. The database spends its
-time queueing rather than working, and the symptom is an application that is fast
-until it is inexplicably not.
+It's correct, and on a busy system it's miserable. A report that scans a large
+table holds read locks for its whole run. So Each write to that table waits.
+Meanwhile a long write transaction blocks each reader. The DB spends its
+time queueing rather than working, and the symptom is an use that is fast
+until it's inexplicably not.
 
 ## Versions instead of locks
 
-**Multi-version concurrency control** removes the conflict by refusing to destroy
-anything. A write does not overwrite a row; it creates a *new version* of it, and
-the old version stays until nobody can still need it.
+**Multi-version concurrency control** drops the conflict by refusing to destroy
+any of it. A write doesn't overwrite a row. It creates a *new version* of it, and
+the old version stays until no one can still need it.
 
-Every transaction is given a **snapshot** &mdash; effectively a rule saying which
+each transaction is given a **snapshot**. In effect a rule saying which
 versions count as visible &mdash; fixed at the moment it starts, or at the moment
-each statement starts, depending on the
-[isolation level](isolation_levels.html).
+each statement starts, based on the
+[alone level](isolation_levels.html).
 
 A reader that began before a write simply continues to see the older version.
 Nothing waits.
@@ -2551,56 +2551,56 @@ id  | balance | created_by | deleted_by
 7   |    850  |    142     |    NULL
 ```
 
-Transaction 142 changed the balance. It did not edit the first line; it marked it
+Transaction 142 changed the balance. It didn't edit the first line. It marked it
 deleted and appended the second. A transaction with a snapshot older than 142 is
-shown the first version, a newer one the second. Visibility becomes an arithmetic
-comparison of transaction ids rather than a queue.
+shown the first version, a newer one the second. Visibility turns an math
+check of transaction ids rather than a queue.
 
 ## What MVCC does not solve
 
-This is the part that gets missed. MVCC eliminates reader/writer conflicts. It
-does **not** eliminate writer/writer conflicts.
+This is the part that gets missed. MVCC removes reader/writer conflicts. It
+does **not** remove writer/writer conflicts.
 
 Two transactions updating the same row still contend: the second must wait for
-the first to commit or roll back, because they would otherwise both produce a new
+the first to commit or roll back. They would or else both give a new
 version from the same old one and one update would vanish. That is the
-[lost update](isolation_levels.html) problem, and MVCC's answer to it is either a
+[lost update](isolation_levels.html) problem, and MVCC's answer to it's either a
 lock on that row or a serialisation failure at commit.
 
 So the rule is: **readers never wait, writers to the same row still do.**
 
 ## The cost: garbage
 
-Old versions accumulate. Something has to decide when a version can no longer be
+Old versions build up. a thing has to decide when a version can no longer be
 seen by any live snapshot and reclaim the space.
 
-In PostgreSQL that job is `VACUUM`, usually run by autovacuum. When it cannot
-keep up &mdash; typically because a very old transaction is still open and
-pinning every version created since &mdash; tables **bloat**: the row count is
-unchanged while the file grows, and every scan reads more pages for the same
+In PostgreSQL that job is `VACUUM`, often run by autovacuum. When it can't
+keep up &mdash; often because a very old transaction is still open and
+pinning each version created since. Tables **bloat**: the row count is
+unchanged while the file grows, and each scan reads more pages for the same
 data.
 
-The practical consequence is worth stating plainly: **a transaction left open
-does damage even when it is doing nothing**, because it holds back cleanup for
-the whole database. An idle-in-transaction connection is a bug, not a small
-inefficiency.
+The hands-on consequence is worth stating plainly: **a transaction left open
+does damage even when it's doing nothing**, because it holds back cleanup for
+the whole DB. An idle-in-transaction link is a bug, not a small
+waste.
 
 Different engines pay this differently. PostgreSQL keeps old versions in the
 table itself and vacuums them. MySQL's InnoDB keeps them in a separate undo log
 and purges it. Oracle uses undo segments, and the same open-transaction problem
-appears as `ORA-01555 snapshot too old` &mdash; the old version needed was
+appears as `ORA-01555 snapshot too old`. The old version needed was
 already discarded.
 
 ## What an open transaction actually costs
 
-"Does damage even when it is doing nothing" is measurable. A snapshot cannot be
-released while any transaction that might still need it is open, so every row
+"Does damage even when it's doing nothing" is measurable. A snapshot can't be
+released while any transaction that might still need it's open, so each row
 version superseded *after* that transaction began has to be kept.
 
 Picture a table taking a steady 1,000 updates a second. Each update leaves a dead
 version behind. A reporting transaction that opens and then sits idle &mdash; a
-connection returned to a pool without a commit, a debugger stopped at a
-breakpoint &mdash; pins cleanup for as long as it stays open:
+link returned to a pool without a commit, a debugger stopped at a
+breakpoint &mdash; pins cleanup for if it stays open:
 
 |idle for|dead versions pinned|
 |---|---|
@@ -2609,17 +2609,17 @@ breakpoint &mdash; pins cleanup for as long as it stays open:
 |1 hour|3,600,000|
 
 The live row count never moved. But the table now holds millions of dead
-versions the vacuum cannot touch, every scan reads the pages they sit on, and the
-file keeps growing. One forgotten transaction, doing nothing, taxes every query
-against that table until it is closed &mdash; which is why "idle in transaction"
+versions the vacuum can't touch, each scan reads the pages they sit on, and the
+file keeps growing. One forgotten transaction, doing nothing, taxes each query
+against that table until it's closed. Which is why "idle in transaction"
 is a state worth alerting on, not just avoiding.
 
 ## Visibility is one comparison
 
-The claim that visibility becomes arithmetic rather than a queue is worth making
-literal, because it is why reads never wait. A version is visible to a snapshot
-`S` exactly when `created_by <= S AND (deleted_by IS NULL OR deleted_by > S)`.
-Take the two versions from earlier &mdash; v1 created by 100 and deleted by 142,
+The claim that visibility turns math rather than a queue is worth making
+literal, because it's why reads never wait. A version is visible to a snapshot
+`S` just when `created_by <= S AND (deleted_by IS NULL OR deleted_by > S)`.
+Take the two versions from earlier. V1 created by 100 and deleted by 142,
 v2 created by 142 and still live:
 
 |snapshot|v1 (100&ndash;142)|v2 (142&ndash;)|sees|
@@ -2627,25 +2627,25 @@ v2 created by 142 and still live:
 |120|100&le;120 and 142&gt;120 &rarr; **yes**|142&le;120 &rarr; no|v1, balance 1000|
 |150|142&gt;150 is false &rarr; no|142&le;150 and live &rarr; **yes**|v2, balance 850|
 
-No lock is consulted and nothing blocks; each reader compares transaction ids and
+No lock is consulted and nothing blocks. Each reader checks transaction ids and
 picks its version. A snapshot of 120 keeps seeing 1000 no matter how many times
-142 commits, because the numbers do not change once fixed. That is the entire
-mechanism by which a long report runs undisturbed beside a stream of writes. It is also why the visible version is found without a scan of the history: the
-engine keeps versions chained newest-first and walks until the comparison first
-succeeds, which for a recently-read row is usually the very first link.
+142 commits, because the numbers don't change once fixed. That is the entire
+mechanism by which a long report runs undisturbed beside a stream of writes. It's also why the visible version is found without a scan of the history: the
+engine keeps versions chained newest-first and walks until the check first
+succeeds, which for a recently-read row is often the very first link.
 
 ## Where it goes wrong
 
-**Long-running transactions.** They pin versions across the entire database.
-Keep them short, and never leave one open across a user interaction.
+**Long-running transactions.** They pin versions across the entire DB.
+Keep them short, and never leave one open across a user interplay.
 
-**Assuming no waiting at all.** Writers to the same row still contend, and the
+**given no waiting at all.** Writers to the same row still contend, and the
 error surfaces as a lock wait or a serialisation failure.
 
-**Treating table bloat as a disk problem.** It is a symptom of vacuum not
+**Treating table bloat as a disk problem.** It's a symptom of vacuum not
 keeping up, and adding disk hides it rather than fixing it.
 
-**Counting rows to check for bloat.** The row count is right; the file size is
+**Counting rows to check for bloat.** The row count is right. The file size is
 the thing that grew.
 """,
     [
@@ -2729,26 +2729,26 @@ topic(
     ],
     """
 title: Partitioning by Range and Hash
-intro: Cutting one table into pieces the planner can skip, and the choice of where to cut.
+intro: Cutting one table into pieces the planner can skip. The choice of where to cut.
 
 ## One table, several files
 
-Partitioning splits a table into physical pieces by a rule on one or more
-columns. Applications keep querying the single logical table; the engine decides
+Splitting splits a table into physical pieces by a rule on one or more
+columns. uses keep querying the single logical table. The engine decides
 which pieces are involved.
 
-This is **not** sharding. Every partition lives in the same database on the same
+This is **not** sharding. each split lives in the same DB on the same
 server. [Sharding](sharding_in_databases.html) spreads data across separate
 machines and is a much larger commitment.
 
-The query above builds three range partitions and a view that unions them, which
-is the shape a partitioned table has underneath. Run the variants to see what
+The query above builds three range splits and a view that unions them, which
+is the shape a split table has underneath. Run the variants to see what
 each strategy costs.
 
 ## Range partitioning
 
-Pick an ordered column &mdash; almost always a timestamp &mdash; and give each
-partition a bounded interval.
+Pick an sorted column &mdash; almost always a timestamp &mdash; and give each
+split a bounded interval.
 
 ```
 orders_2024  :  order_date >= '2024-01-01' AND < '2025-01-01'
@@ -2757,29 +2757,29 @@ orders_2026  :  order_date >= '2026-01-01' AND < '2027-01-01'
 ```
 
 A query with `WHERE order_date >= '2026-01-01'` can be proved to need only the
-last partition, so the engine reads one file instead of three. That proof is
-**partition pruning**, and it is where nearly all the benefit is.
+last split, so the engine reads one file instead of three. That proof is
+**split pruning**, and it's where nearly all the gain is.
 
-The second benefit is administrative and, for time-series data, often the bigger
+The second gain is admin and, for time-series data, often the bigger
 one. Deleting a year of orders with `DELETE` writes a row version per deleted
-row, generates enormous WAL traffic, and leaves the table bloated. `DROP TABLE
+row, makes huge WAL traffic, and leaves the table bloated. `DROP TABLE
 orders_2024` unlinks a file. Retention policies are the standard reason to
-partition.
+split.
 
 ## Hash partitioning
 
-Hash the key, take the remainder modulo the partition count, and store the row
-there. Rows spread evenly regardless of what the values look like.
+Hash the key, take the remainder modulo the split count, and store the row
+there. Rows spread evenly even so of what the values look like.
 
-This is the right choice when there is no natural ordering to exploit and the
-goal is to spread contention &mdash; many concurrent writers hitting one hot
-page, for instance.
+This is the right choice when there's no natural sorting to exploit and the
+goal is to spread contention. Many concurrent writers hitting one hot
+page, say.
 
-The trade-off is that **hash partitioning prunes only on equality**. A query for
-one `customer_id` reaches one partition; a query for a *range* of customer ids
-reaches all of them, because hashing destroys order. Range partitioning is the
+The trade-off is that **hash splitting prunes only on equality**. A query for
+one `customer_id` reaches one split. A query for a *range* of customer ids
+reaches all of them, because hashing destroys order. Range splitting is the
 opposite: it prunes ranges beautifully and can leave you with one very hot
-partition if recent data is where all the traffic goes.
+split if recent data is where all the traffic goes.
 
 | | Range | Hash |
 |---|---|---|
@@ -2791,24 +2791,24 @@ partition if recent data is where all the traffic goes.
 
 ## Choosing the key
 
-The partition key must appear in the `WHERE` clause of the queries you care
-about. This is the whole game, and it is where partitioning schemes go wrong.
+The split key must appear in the `WHERE` clause of the queries you care
+about. This is the whole game, and it's where splitting schemes go wrong.
 
-Partition by `order_date` and then run reports by `customer_id`, and every report
-reads every partition &mdash; you have added complexity and gained nothing. Worse
-than nothing: each partition has its own indexes, so a query that scans them all
+Split by `order_date` and then run reports by `customer_id`, and each report
+reads each split &mdash; you've added cost and gained nothing. Worse
+than nothing: each split has its own indexes. So A query that scans them all
 does more index work than it would have on a single table.
 
-A second constraint follows: a unique constraint has to include the partition
-key, because the engine cannot cheaply enforce uniqueness across pieces it is
+A second constraint follows: a unique constraint has to include the split
+key, because the engine can't cheaply enforce uniqueness across pieces it's
 trying not to read.
 
 ## What pruning is worth, and what caps it
 
-The payoff scales with how much the query skips, and that is just arithmetic.
-Take 120 million orders over five years, partitioned by month &mdash; 60
-partitions of two million rows each. A report over a single month, filtering on
-the partition key, prunes to one partition:
+The payoff scales with how much the query skips, and that is just math.
+Take 120 million orders over five years, split by month &mdash; 60
+splits of two million rows each. A report over a single month, filtering on
+the split key, prunes to one split:
 
 |query| rows the engine must touch |fraction of the table|
 |---|---|---|
@@ -2816,17 +2816,17 @@ the partition key, prunes to one partition:
 |one quarter|6,000,000|5.0% (3/60)|
 |no partition-key filter|120,000,000|100%|
 
-The single-month query does **60&times; less scanning** &mdash; and the number is
-exactly the partition count, because pruning reads one of 60 equal pieces. Finer
-partitions prune harder: weekly partitions would make that same month prune to a
+The single-month query does **60&times; less scanning**. And the number is
+just the split count, because pruning reads one of 60 equal pieces. Finer
+splits prune harder: weekly splits would make that same month prune to a
 quarter of the rows again.
 
 ## Sizing
 
-So why not partition into thousands of tiny pieces? Because pruning saves scan
-work and the planner spends it back. The planner evaluates every partition when it
-builds the plan, so planning cost grows roughly linearly with the partition count
-&mdash; a fixed overhead paid on every query whether or not pruning helps it:
+So why not split into thousands of tiny pieces? Because pruning saves scan
+work and the planner spends it back. The planner tests each split when it
+builds the plan, so planning cost grows roughly linearly with the split count
+&mdash; a fixed cost paid on each query whether or not pruning helps it:
 
 |partitions|rough planning overhead|
 |---|---|
@@ -2835,43 +2835,43 @@ builds the plan, so planning cost grows roughly linearly with the partition coun
 |5,000|can exceed the query's own runtime|
 
 For a lookup that executes in a couple of milliseconds, planning across thousands
-of partitions is the dominant cost, and the partitioning has made the query
-slower. That is the ceiling the two forces set between them: too few partitions
-and pruning barely helps; too many and planning overwhelms the saving. Somewhere
-between a few dozen and a few hundred is the usual advice, and monthly partitions
-over a couple of years land naturally in that band.
+of splits is the dominant cost, and the splitting has made the query
+slower. That is the ceiling the two forces set between them: too few splits
+and pruning barely helps. Too many and planning overwhelms the saving. a place
+between a few dozen and a few hundred is the usual advice, and monthly splits
+over a couple of years land on its own in that band.
 
-Partitions can also be **subpartitioned** &mdash; range by month, then hash by
+Splits can also be **subpartitioned**. Range by month, then hash by
 customer within each month &mdash; when both access patterns matter.
 
 ## Joins get a second, quieter benefit
 
-Pruning is the benefit everyone knows. The other one shows up when two tables are
-partitioned on the *same* key &mdash; orders and order-items both by `customer_id`,
+Pruning is the gain everyone knows. The other one shows up when two tables are
+split on the *same* key. Orders and order-items both by `customer_id`,
 say. A row in bucket `i` of one table can only match rows in bucket `i` of the
-other, so the engine performs a **partition-wise join**: 60 small joins of
+other, so the engine performs a **split-wise join**: 60 small joins of
 aligned buckets, rather than one join over the whole product.
 
-The arithmetic is the same shape as pruning. With 60 buckets a side, matched
-partitioning means 60 aligned partition-joins; unmatched, any bucket of one table
-could hold a match for any bucket of the other, which is 60 &times; 60 = 3,600
-partition-pairs to consider. And each aligned join is small enough that its hash
+The math is the same shape as pruning. With 60 buckets a side, matched
+splitting means 60 aligned split-joins. Unmatched, any bucket of one table
+could hold a match for any bucket of the other. This Is 60 &times; 60 = 3,600
+split-pairs to consider. And each aligned join is small enough that its hash
 table &mdash; two million rows, not 120 million &mdash; fits in memory instead of
-spilling to disk. This is why data warehouses partition fact and dimension tables
+spilling to disk. This is why data warehouses split fact and dim tables
 on the join key: the join, not just the scan, gets cut into pieces the engine can
 hold.
 
 ## Where it goes wrong
 
-**Partitioning a small table.** Under a few million rows, a good index is
-simpler and usually faster.
+**Splitting a small table.** Under a few million rows, a good index is
+simpler and often faster.
 
-**A partition key the queries do not filter on.** No pruning, more index
-overhead.
+**A split key the queries don't filter on.** No pruning, more index
+cost.
 
-**Hash partitioning then querying ranges.** Every partition, every time.
+**Hash splitting then querying ranges.** each split, each time.
 
-**Forgetting the default partition.** A row that matches no partition is an error
+**Losing the default split.** A row that matches no split is an error
 unless a catch-all exists, and a data-loading job that fails at midnight on New
 Year's Day is the classic version of this.
 """,
@@ -2966,85 +2966,85 @@ topic(
     ],
     """
 title: Sharding
-intro: The last resort of scaling, what it buys, and the four things it takes away.
+intro: The last resort of scaling, what it buys. The four things it takes away.
 
 ## What it is
 
-Sharding splits a dataset across independent database servers. Each **shard**
+Sharding splits a dataset across free DB servers. Each **shard**
 holds a subset of the rows and knows nothing about the others.
 
-The distinction from [partitioning](partitioning_in_databases.html) is the
-machine boundary, and it is the whole difficulty. Partitions share a query
+The gap from [splitting](partitioning_in_databases.html) is the
+machine boundary, and it's the whole trouble. Splits share a query
 planner, a transaction manager and a lock table. Shards share nothing, so
-anything that needed a global view has to be rebuilt in the application or given
+any of it that needed a global view has to be rebuilt in the use or given
 up.
 
 ## The shard key
 
-One column decides where a row lives. Usually the key is hashed and the remainder
+One column decides where a row lives. often the key is hashed and the remainder
 taken modulo the shard count, so a routing rule might be
 `shard = hash(customer_id) % 4`.
 
-The query above computes exactly that for a set of customers, and the variants
+The query above finds just that for a set of customers, and the variants
 show what different access patterns cost.
 
 The consequence is stark and worth stating as a rule:
 
-**A query that names the shard key touches one node. A query that does not
+**A query that names the shard key touches one node. A query that doesn't
 touches all of them.**
 
 A lookup by `customer_id` is a single-node request and stays fast as the fleet
-grows. A report grouped by `product_id` has to be sent to every shard and the
+grows. A report grouped by `product_id` has to be sent to each shard and the
 partial results merged &mdash; a *scatter-gather*, whose latency is the slowest
-shard's, not the average.
+shard's, not the mean.
 
-So the shard key is not a schema detail. It is a decision about which queries
-stay cheap forever and which never will, and it is extremely expensive to change
+So the shard key isn't a schema detail. It's a choice about which queries
+stay cheap forever and which never will, and it's extremely costly to change
 afterwards.
 
 ## What you give up
 
 **Cross-shard joins.** Customers on shard 1, orders on shard 3, and no engine can
-join them. Either the join moves into the application, or related data is
-deliberately placed together &mdash; sharding orders by `customer_id` so a
+join them. Either the join moves into the use, or related data is
+on purpose placed together &mdash; sharding orders by `customer_id` so a
 customer's orders live beside them.
 
-**Global uniqueness.** `UNIQUE(email)` cannot be enforced across independent
+**Global uniqueness.** `UNIQUE(email)` can't be enforced across free
 servers. The usual answers are a separate lookup service that owns emails, or
-generating ids that are unique by construction &mdash; UUIDs, or Snowflake-style
+making ids that are unique by build &mdash; UUIDs, or Snowflake-style
 ids with a shard number embedded.
 
 **Cross-shard transactions.** ACID stops at the shard boundary. Spanning shards
-means two-phase commit, which is slow and introduces a coordinator that can fail
-mid-protocol, or sagas, which are eventually consistent with explicit
+means two-phase commit, which is slow and adds a coordinator that can fail
+mid-protocol, or sagas, which are eventually steady with clear
 compensation. Most teams design so that transactions never span shards.
 
-**`AUTO_INCREMENT`.** Every shard would start at 1. Ids must come from elsewhere.
+**`AUTO_INCREMENT`.** each shard would start at 1. Ids must come from elsewhere.
 
 ## Rebalancing
 
 Adding a shard when the rule is `hash(key) % 4` changes it to `% 5`, and almost
-every row's destination moves. Migrating the whole dataset while serving traffic
+each row's destination moves. Migrating the whole dataset while serving traffic
 is the single worst part of operating a sharded system.
 
-Two designs avoid it. **Consistent hashing** places shards on a ring so adding
-one moves only the keys in its arc, rather than reshuffling everything.
+Two designs avoid it. **Steady hashing** places shards on a ring so adding
+one moves only the keys in its arc, rather than reshuffling all.
 **Virtual buckets** hash keys into a fixed large number of buckets &mdash; say
-1024 &mdash; and map buckets to physical shards; adding a shard moves a few
+1024 &mdash; and map buckets to physical shards. Adding a shard moves a few
 buckets and the hash rule never changes. The bucket approach is what most modern
 systems use, because moving is then a matter of copying a bucket and updating a
 map.
 
 ## Do the cheaper things first
 
-Sharding is close to irreversible and touches every part of the application.
+Sharding is close to irreversible and touches each part of the use.
 Before it:
 
 1. **Index properly.** A great many "we need to shard" conversations end at a
    missing [composite index](composite_and_covering_indexes.html).
 2. **Read replicas**, if reads dominate. Cheap, and reversible.
 3. **Caching**, for the hot small set.
-4. **Partitioning**, if one table is the problem.
+4. **Splitting**, if one table is the problem.
 5. **A bigger machine.** Unglamorous, and modern hardware goes a very long way.
 
 Shard when writes exceed what one machine can take, or the working set no longer
@@ -3052,10 +3052,10 @@ fits in memory anywhere, and not before.
 
 ## Why naive rebalancing is the nightmare
 
-"Almost every row's destination moves" is not hyperbole, and the number is the
-reason consistent hashing and virtual buckets exist. With the rule
-`hash(key) % N`, adding one shard changes the divisor, and a key moves whenever
-`hash % N` differs from `hash % (N+1)` &mdash; which is almost always:
+"Almost each row's destination moves" isn't hyperbole, and the number is the
+reason steady hashing and virtual buckets exist. With the rule
+`hash(key) % N`, adding one shard changes the divisor, and a key moves when
+`hash % N` differs from `hash % (N+1)`. Which is almost always:
 
 |change|keys that must move|
 |---|---|
@@ -3063,19 +3063,19 @@ reason consistent hashing and virtual buckets exist. With the rule
 |`% 100` &rarr; `% 101`|~99%|
 
 Measured over two hundred thousand random keys, the `% 4` to `% 5` change relocated
-79.8% of them, and it only gets worse as the fleet grows. Consistent hashing and
-virtual buckets bring that down to roughly `1/(N+1)` &mdash; about 20% and 1% for
+79.8% of them, and it only gets worse as the fleet grows. Steady hashing and
+virtual buckets bring that down to roughly `1/(N+1)`. About 20% and 1% for
 the two rows above &mdash; because a new shard takes a slice from its neighbours
-instead of forcing every key to recompute against a new divisor. Moving 1% of the
-data to add a machine is an afternoon; moving 99% while serving traffic is the
+instead of forcing each key to recompute against a new divisor. Moving 1% of the
+data to add a machine is an afternoon. Moving 99% while serving traffic is the
 project everyone dreads.
 
 ## The slowest shard sets the latency
 
-"Scatter-gather latency is the slowest shard's, not the average" is a statement
-about tail probability, and the arithmetic is unforgiving. If each shard answers
+"Scatter-gather latency is the slowest shard's, not the mean" is a statement
+about tail chance, and the math is unforgiving. If each shard answers
 within its target 99% of the time, a query that must wait for *all* of them is
-fast only if *every* shard was fast &mdash; and that probability falls as the
+fast only if *each* shard was fast. And that chance falls as the
 fan-out grows:
 
 |shards in the fan-out|each 99% fast|chance the query hits a slow shard|
@@ -3085,25 +3085,25 @@ fan-out grows:
 |100|0.999|9.5%|
 
 A hundred-shard query with per-shard 99% latency is slow *most of the time*,
-because 0.99&#8313;&#8304; is only 0.366. The fan-out has turned a rare per-shard
+because 0.99&#8313;&#8304. Is only 0.366. The fan-out has turned a rare per-shard
 event into the common case, and the only cures are to make each shard far more
-reliable (the third row) or to avoid the fan-out by putting the shard key in the
+solid (the third row) or to avoid the fan-out by putting the shard key in the
 query. This is why a single degraded node makes an entire sharded tier feel slow,
-and why "the average shard is fast" is the wrong thing to measure.
+and why "the mean shard is fast" is the wrong thing to measure.
 
 ## Where it goes wrong
 
 **A shard key with skew.** Sharding by country puts most of the traffic on one
 node. Check the distribution of real values.
 
-**Sharding by a key the queries do not use.** Every query becomes
-scatter-gather, and you have bought distributed-systems problems for no
+**Sharding by a key the queries don't use.** each query turns
+scatter-gather, and you've bought spread-systems problems for no
 throughput.
 
-**Assuming transactions still work.** They work within a shard. Across shards
-they do not, and code written before sharding usually assumes otherwise.
+**given transactions still work.** They work within a shard. Across shards
+they don't, and code written before sharding often assumes or else.
 
-**Forgetting the slowest shard sets the latency.** One degraded node makes every
+**Losing the slowest shard sets the latency.** One degraded node makes each
 fan-out query slow.
 """,
     [
@@ -3203,27 +3203,27 @@ topic(
     ],
     """
 title: Replication, Read Replicas and Lag
-intro: How to serve more reads than one machine can, and the staleness that comes with it.
+intro: How to serve more reads than one machine can. The staleness that comes with it.
 
 ## The arrangement
 
-One server &mdash; the **primary** &mdash; accepts every write. It records each
+One server &mdash; the **main** &mdash; accepts each write. It records each
 change in a log, and streams that log to one or more **replicas**, which apply
 the changes to their own copies and serve read queries.
 
 The appeal is that most workloads are overwhelmingly reads. Adding replicas
-multiplies read capacity without any change to the data model, and unlike
-[sharding](sharding_in_databases.html) it is reversible: a replica that is not
+times read room without any change to the data model, and unlike
+[sharding](sharding_in_databases.html) it's reversible: a replica that isn't
 helping can simply be removed.
 
-Replicas also serve as warm standbys. If the primary fails, one is promoted.
+Replicas also serve as warm standbys. If the main fails, one is promoted.
 
 ## How far reads actually scale
 
-"Multiplies read capacity" has a limit, and the limit is worth seeing because it
-decides when replicas stop being the answer. Every replica serves reads *and*
-must apply every write the primary takes &mdash; the write load is not shared out,
-it is copied to all of them. So if one machine handles 10,000 operations a second,
+"Times read room" has a limit, and the limit is worth seeing because it
+decides when replicas stop being the answer. each replica serves reads *and*
+must apply each write the main takes. The write load isn't shared out,
+it's copied to all of them. So if one machine handles 10,000 ops a second,
 a replica taking `W` writes per second has only `10,000 - W` left for reads, and
 `N` replicas serve `N &times; (10,000 - W)`:
 
@@ -3233,43 +3233,43 @@ a replica taking `W` writes per second has only `10,000 - W` left for reads, and
 |2,000/s (20%)|8,000|24,000|80,000|
 |5,000/s (50%)|5,000|15,000|50,000|
 
-At a light write rate reads scale almost linearly &mdash; ten replicas give nearly
-ten times the read throughput, which is why read replicas are the standard answer
+At a light write rate reads scale almost linearly. Ten replicas give nearly
+ten times the read throughput. This Is why read replicas are the standard answer
 for read-heavy workloads. But look down the columns rather than across: as writes
-climb, every replica loses that capacity to apply work, and the whole fleet's
+climb, each replica loses that room to apply work, and the whole fleet's
 read ceiling drops with it. Once writes alone approach what one machine can do,
 `10,000 - W` heads toward zero and adding replicas buys almost nothing &mdash;
-each new machine spends all its capacity just keeping up with the write stream.
+each new machine spends all its room just keeping up with the write stream.
 
 That is the wall replicas hit and [sharding](sharding_in_databases.html) is built
-to get past: sharding splits the writes across machines, so it is the tool for a
-write-bound system exactly where more replicas is the tool for a read-bound one.
+to get past: sharding splits the writes across machines. It's the tool for a
+write-bound system just where more replicas is the tool for a read-bound one.
 
 ## Lag
 
-A change committed on the primary is not instantly present on a replica. It has
+A change committed on the main isn't instantly present on a replica. It has
 to be written to the log, sent over a network, received, and applied. The gap is
-**replication lag**, and it is never zero.
+**replication lag**, and it's never zero.
 
-Under normal conditions it is milliseconds. Under load it is not, and the reasons
+Under normal rules it's milliseconds. Under load it isn't, and the reasons
 matter:
 
-**A large write.** A single statement updating a million rows produces a great
+**A large write.** A single statement updating a million rows makes a great
 deal of log to ship and apply.
 
-**Single-threaded apply.** Some engines apply the log serially even though the
-primary generated it with many concurrent connections. The replica simply cannot
-keep up with a busy primary.
+**Single-threaded apply.** Some engines apply the log serially though the
+main made it with many concurrent links. The replica simply can't
+keep up with a busy main.
 
 **A long query on the replica.** Applying a change that conflicts with a running
 read forces a choice between cancelling the query and pausing replication. Both
-happen, depending on configuration.
+happen, based on configuration.
 
 **Network.** A cross-region replica has a floor set by the speed of light.
 
 ## The bug this causes
 
-The failure mode is specific and extremely common:
+The failure mode is exact and extremely common:
 
 ```
 1. User updates their profile        -> primary
@@ -3278,38 +3278,38 @@ The failure mode is specific and extremely common:
 4. User sees their OLD profile
 ```
 
-Nothing errored. The user changed something, was shown the previous value, and
-reasonably concluded the save failed.
+Nothing errored. The user changed a thing, was shown the previous value, and
+fairly concluded the save failed.
 
 The standard fixes, in rough order of preference:
 
 **Read-your-writes routing.** After a write, send that user's reads to the
-primary for a short window. Simple and effective.
+main for a short window. Simple and effective.
 
-**Route by criticality.** Anything the user just affected reads from the primary;
+**Route by criticality.** any of it the user just affected reads from the main;
 dashboards and search read from replicas.
 
-**Wait for the log position.** Record the primary's log position at commit and
+**Wait for the log spot.** Record the main's log spot at commit and
 have the replica wait until it has applied at least that far. Correct, and
-requires engine support.
+needs engine support.
 
-**Do not redirect to a read.** Render the result from what was just written.
+**Don't redirect to a read.** Render the result from what was just written.
 
 ## Synchronous replication
 
 The lag can be removed. `synchronous_commit` in PostgreSQL, semi-sync in MySQL:
-the primary does not acknowledge a commit until at least one replica confirms it
+the main doesn't confirm a commit until at least one replica confirms it
 has the change.
 
-The cost is unavoidable and appears on every write: a commit now includes a
+The cost is unavoidable and appears on each write: a commit now includes a
 network round trip. Throughput falls, and latency rises by the distance to the
-replica. If the synchronous replica becomes unreachable, writes stall entirely
+replica. If the synchronous replica turns unreachable, writes stall fully
 unless a fallback is configured.
 
-That "distance to the replica" is not a figure of speech &mdash; it has a floor set
+That "distance to the replica" isn't a figure of speech. It has a floor set
 by physics, and the floor is worth knowing before choosing where a synchronous
 replica lives. Light in fibre travels at about two-thirds of `c`, so the
-round-trip *cannot* be faster than twice the distance over that speed:
+round-trip *can't* be faster than twice the distance over that speed:
 
 |synchronous replica|round-trip floor|added to every commit|
 |---|---|---|
@@ -3318,38 +3318,38 @@ round-trip *cannot* be faster than twice the distance over that speed:
 |across a continent (~5,500 km)|~56 ms|every write waits 56 ms+|
 
 Real fibre paths run about half again longer than the straight-line distance, so
-the cross-continent figure is nearer 70&nbsp;ms in practice. That is per commit, and
-no amount of hardware removes it &mdash; it is the reason a synchronous replica is
+the cross-continent figure is nearer 70&nbsp;ms . That is per commit, and
+no amount of hardware drops it. It's the reason a synchronous replica is
 kept nearby and durability across regions is bought with asynchronous copies plus
 the accepted risk of the section above.
 
-This is a direct instance of the [CAP](cap_theorem.html) trade: consistency
-across replicas costs availability and latency, and no configuration escapes it.
+This is a direct instance of the [CAP](cap_theorem.html) trade: agreement
+across replicas costs uptime and latency, and no configuration escapes it.
 The usual compromise is one synchronous replica nearby for durability, and
-asynchronous replicas further away for read capacity.
+asynchronous replicas further away for read room.
 
 ## Failover and lost writes
 
-If the primary fails while a replica is 200ms behind, promoting that replica
-loses 200ms of committed writes. They were acknowledged to clients and are gone.
+If the main fails while a replica is 200ms behind, promoting that replica
+loses 200ms of committed writes. They were confirmed to clients and are gone.
 
-Which is why durability requirements and replication mode are the same decision.
+Which is why durability needs and replication mode are the same choice.
 Asynchronous replication means accepting that a failover can lose the most recent
 writes.
 
 ## Where it goes wrong
 
-**Assuming replicas are current.** They are not, and the window is where the bugs
+**given replicas are current.** They aren't, and the window is where the bugs
 live.
 
-**Sending a write to a replica.** It is read-only; the error is confusing when
-routing is implicit.
+**Sending a write to a replica.** It's read-only. The error is confusing when
+routing is silent.
 
-**Monitoring lag in bytes only.** Bytes behind does not translate to seconds
+**Monitoring lag in bytes only.** Bytes behind doesn't translate to seconds
 behind. Track both.
 
-**Using replicas for locking or counters.** Anything read-then-write must go to
-the primary, or two clients read the same stale value.
+**Using replicas for locking or counters.** any of it read-then-write must go to
+the main, or two clients read the same stale value.
 """,
     [
         {"q": "Why does a user sometimes not see their own change after saving?",
@@ -3434,59 +3434,59 @@ topic(
     ],
     """
 title: The CAP Theorem
-intro: The most quoted and most misquoted result in distributed data, and what it actually constrains.
+intro: The most quoted and most misquoted result in spread data, and what it really constrains.
 
 ## What the three letters mean
 
-**Consistency** here means *linearisability*: every read sees the most recent
-write, as if there were one copy. It is not the C in ACID, which is about
-constraints being satisfied. Two different ideas, one letter, endless confusion.
+**Agreement** here means *linearisability*: each read sees the most recent
+write, as if there were one copy. It isn't the C in ACID, which is about
+constraints being met. Two different ideas, one letter, endless confusion.
 
-**Availability** means every request to a non-failed node gets a non-error
-response. Not "mostly up" &mdash; every request, every working node.
+**Uptime** means each request to a non-failed node gets a non-error
+response. Not "mostly up" &mdash; each request, each working node.
 
-**Partition tolerance** means the system keeps operating when the network drops
+**Split handling** means the system keeps operating when the network drops
 or delays messages between nodes.
 
 ## The theorem, stated properly
 
-The popular phrasing &mdash; "pick two of three" &mdash; is memorable and wrong
+The common phrasing &mdash; "pick two of three" &mdash; is catchy and wrong
 in a way that matters.
 
-Partitions are not a design choice. Networks fail: cables are cut, switches
-reboot, a cloud availability zone becomes unreachable. Any system spanning more
-than one machine will be partitioned eventually, so **P is not optional**.
+Splits aren't a design choice. Networks fail: cables are cut, switches
+reboot, a cloud uptime zone turns unreachable. Any system spanning more
+than one machine will be split eventually, so **P isn't optional**.
 
-What the theorem actually says is narrower and more useful:
+What the theorem really says is narrower and more handy:
 
-> When a partition occurs, you must choose between consistency and availability.
+> When a split occurs, you must choose between agreement and uptime.
 
-That is it. When the network is healthy, a system can be both consistent and
-available, and most are. The theorem constrains behaviour during a specific,
+That is it. When the network is healthy, a system can be both steady and
+available, and most are. The theorem constrains action during a exact,
 temporary failure.
 
 ## The choice, concretely
 
 Two nodes can no longer talk. A write arrives at one of them.
 
-**CP &mdash; refuse.** Return an error, because acknowledging a write the other
-side cannot see risks two different answers to the same question. Correct, and
-temporarily unavailable to whoever cannot reach a quorum.
+**CP &mdash; refuse.** Return an error, because confirming a write the other
+side can't see risks two different answers to the same question. Correct, and
+temporarily down to whoever can't reach a quorum.
 
-Choose this when a wrong answer is worse than no answer: account balances,
-inventory that must not oversell, anything involving money or safety.
+Choose this when a wrong answer is worse than no answer: account weighs,
+inventory that must not oversell, any of it involving money or safety.
 
 **AP &mdash; accept.** Take the write locally, serve reads from local state, and
-reconcile when the partition heals. Always answering, and during the partition
+merge when the split heals. Always answering, and during the split
 two clients can see different values.
 
-Choose this when an answer now is worth more than a perfectly current one: a
-shopping cart, a social feed, a view counter, a DNS record. Amazon's original
-Dynamo paper made this argument for carts explicitly &mdash; a cart that
-occasionally resurrects a deleted item is better business than a cart that is
-sometimes unavailable.
+Choose this when an answer now is worth more than a just right current one: a
+shopping cart, a social feed, a view counter, a DNS record. Amazon's first
+Dynamo paper made this arg for carts by name &mdash; a cart that
+at times resurrects a deleted item is better business than a cart that is
+at times down.
 
-Step the timeline above through both settings and the difference is one decision
+Step the timeline above through both settings and the difference is one choice
 made at one moment.
 
 ## Reconciling afterwards
@@ -3494,45 +3494,45 @@ made at one moment.
 An AP system must resolve conflicting versions once the network returns.
 **Last-write-wins** is simple and silently discards data when clocks disagree.
 **Vector clocks** detect concurrent writes and hand the conflict to the
-application. **CRDTs** are data types designed so concurrent updates merge
+use. **CRDTs** are data types designed so concurrent updates merge
 deterministically &mdash; which is why counters, sets and collaborative text
 editors are the AP success stories.
 
 ## PACELC, which is the more useful version
 
-CAP only describes partitions, and partitions are rare. Daniel Abadi's extension
+CAP only shows splits, and splits are rare. Daniel Abadi's extension
 covers the rest of the time:
 
 > **if P**artition then **A**vailability or **C**onsistency, **E**lse
 > **L**atency or **C**onsistency.
 
 The second half is the one engineers meet daily. With the network healthy, a
-system can still choose to confirm every write with remote replicas &mdash;
-consistent and slower &mdash; or acknowledge locally and replicate afterwards
+system can still choose to confirm each write with remote replicas &mdash;
+steady and slower &mdash; or confirm locally and replicate afterwards
 &mdash; faster and briefly stale.
 
-That is exactly the [synchronous versus asynchronous replication
-choice](replication_and_lag.html), and unlike CAP's trade it is live on every
+That is just the [synchronous versus asynchronous replication
+choice](replication_and_lag.html), and unlike CAP's trade it's live on each
 request.
 
-That "live on every request" is the whole reason the extension earns its keep. A
-partition is a rare event &mdash; the network between healthy nodes works the vast
-majority of the time &mdash; so CAP's consistency-or-availability choice is one you
-actually pay only during those rare failures. The latency-or-consistency choice,
-by contrast, is paid on *every single request* the system ever serves. PACELC is
-"the more useful version" precisely because it names the trade you make billions
+That "live on each request" is the whole reason the extension earns its keep. A
+split is a rare event. The network between healthy nodes works the vast
+majority of the time &mdash; so CAP's agreement-or-uptime choice is one you
+really pay only during those rare failures. The latency-or-agreement choice,
+by contrast, is paid on *each single request* the system ever serves. PACELC is
+"the more handy version" just because it names the trade you make billions
 of times a day rather than the one you make on the bad afternoon a cable is cut.
 
 ## The tunable, made concrete: R + W > N
 
 The last "where it goes wrong" note below says the labels are tunable per query.
-That tuning is one inequality, and it is worth seeing because it is how a single
+That tuning is one inequality, and it's worth seeing because it's how a single
 system offers both answers.
 
-Keep `N` copies of each row. Let a write wait for `W` of them to acknowledge, and
+Keep `N` copies of each row. Let a write wait for `W` of them to confirm, and
 a read collect answers from `R` of them and take the newest. The read is
-guaranteed to see the latest write whenever the read set and the write set must
-overlap &mdash; which is exactly when **R + W > N**. Below that they can miss each
+ensured to see the latest write when the read set and the write set must
+share &mdash; which is just when **R + W > N**. Below that they can miss each
 other, and a read can come back stale.
 
 On `N = 3`:
@@ -3545,29 +3545,29 @@ On `N = 3`:
 |1|3|yes|strong, instant writes, but a read needs all three up|
 
 Read the `W=1, R=1` row against the `W=2, R=2` row: same three machines, and the
-choice between a possibly-stale answer and a guaranteed-current one is nothing but
-how many replicas each operation waits for. That is the AP/CP dial from earlier,
+choice between a possibly-stale answer and a ensured-current one is nothing but
+how many replicas each op waits for. That is the AP/CP dial from earlier,
 turned per request instead of per system.
 
 Quorum &mdash; `W = R = 2` &mdash; is the common default because 2 + 2 = 4 > 3
-overlaps by one replica *and* still completes with a single node down, where the
-`R = 1` and `R = 3` rows each give up availability on one side. This is precisely
-what Cassandra's `ONE` / `QUORUM` / `ALL` levels and DynamoDB's strongly-consistent
+shares by one replica *and* still ends with a single node down, where the
+`R = 1` and `R = 3` rows each give up uptime on one side. This is just
+what Cassandra's `ONE` / `QUORUM` / `ALL` levels and DynamoDB's strongly-steady
 reads are selecting.
 
 ## Where it goes wrong
 
-**"We chose AP, so we gave up consistency."** You gave up linearisability during
-partitions. Most of the time the system is consistent.
+**"We chose AP, so we gave up agreement."** You gave up linearisability during
+splits. Most of the time the system is steady.
 
 **Confusing CAP's C with ACID's C.** Different properties.
 
-**Calling a single-node database CP.** With one node there is no partition and
-the theorem does not apply.
+**Calling a single-node DB CP.** With one node there's no split and
+the theorem doesn't apply.
 
 **Treating the labels as fixed.** Many systems are tunable per query &mdash;
-Cassandra's consistency levels, DynamoDB's strongly consistent reads &mdash; so
-the choice belongs to the operation, not the product.
+Cassandra's agreement levels, DynamoDB's strongly steady reads &mdash; so
+the choice belongs to the op, not the product.
 """,
     [
         {"q": "What is wrong with 'pick two of three'?",
@@ -3649,12 +3649,12 @@ topic(
     ],
     """
 title: The Document Model against Rows
-intro: One order, stored two ways, and an honest account of which questions each shape answers well.
+intro: One order, stored two ways. An honest account of which questions each shape answers well.
 
 ## The same order, two shapes
 
-Run the query above and then the variants. The identical order is stored as
-normalised rows and as a single JSON document, and both are queried in the same
+Run the query above and then the variants. The the same order is stored as
+normed rows and as a single JSON doc, and both are queried in the same
 session &mdash; because modern SQL engines support both.
 
 **Relational**: an `orders` row, several `order_items` rows referring back to it,
@@ -3665,75 +3665,75 @@ the customer details copied in.
 
 ## What documents make easy
 
-**One read for one thing.** Fetching an order means retrieving one document.
+**One read for one thing.** Fetching an order means pulling one doc.
 No joins, no round trips, and the data is contiguous on disk. For a
-read-this-whole-object access pattern, this is genuinely faster and the gap
+read-this-whole-object access pattern, this is truly faster and the gap
 widens as the object gets more parts.
 
-**A shape that matches the code.** The document deserialises straight into an
+**A shape that matches the code.** The doc deserialises straight into an
 object. No object-relational mapping layer reassembling a graph from five result
 sets.
 
-**Schema flexibility.** Adding a field to some documents and not others requires
-no migration. For genuinely heterogeneous data &mdash; product catalogues where
-a book and a fridge share almost no attributes &mdash; this is a real advantage
+**Schema flexibility.** Adding a field to some docs and not others needs
+no migration. For truly heterogeneous data &mdash; product catalogues where
+a book and a fridge share almost no fields. This is a real edge
 rather than laziness.
 
 ## What rows make easy
 
 **Querying from any direction.** "Which customers bought product 902" is
-straightforward relationally and awkward in a document store, because the data
-is organised around orders, not products. Documents optimise one access path and
+straightforward relationally and awkward in a doc store, because the data
+is organised around orders, not products. docs optimise one access path and
 make the others harder.
 
-**Updating a shared fact once.** If the customer's address is copied into every
-order document, changing it means finding and rewriting every one. Relationally
-it is a single `UPDATE`. This is the classic normalisation argument and it has
+**Updating a shared fact once.** If the customer's address is copied into each
+order doc, changing it means finding and rewriting each one. Relationally
+it's a single `UPDATE`. This is the classic norming arg and it has
 not stopped being true.
 
-**Integrity the database enforces.** Foreign keys, uniqueness and check
-constraints are declared once and cannot be bypassed. In a document store these
-usually become application code, which means they hold until some other code
+**Integrity the DB enforces.** Foreign keys, uniqueness and check
+constraints are declared once and can't be bypassed. In a doc store these
+often become use code. This Means they hold until some other code
 path forgets.
 
-**Ad-hoc analysis.** Aggregating across documents means either a scan or a
+**Ad-hoc analysis.** Aggregating across docs means either a scan or a
 purpose-built index, and the queries are harder to write.
 
 ## Denormalisation is the actual trade
 
-Nesting the items inside the order is fine &mdash; an order item belongs to
-exactly one order and is never queried independently. That is not duplication,
+Nesting the items inside the order is fine. An order item belongs to
+just one order and is never queried on its own. That isn't duplication,
 just co-location.
 
-Copying the customer's name and address into every order is duplication, and it
-buys read speed at the cost of update cost and the risk of divergence. Sometimes
+Copying the customer's name and address into each order is duplication, and it
+buys read speed at the cost of update cost and the risk of divergence. at times
 that is right: an invoice arguably *should* record the address as it was at the
-time, in which case it is not duplication at all but a historical fact.
+time, in which case it isn't duplication at all but a historical fact.
 
 The question is always whether the copies must agree. If they must, storing them
-separately means keeping them in sync forever.
+apart means keeping them in sync forever.
 
 ## The distinction has mostly dissolved
 
 PostgreSQL's `jsonb` is indexable, queryable and transactional. MySQL and SQLite
 have JSON functions &mdash; the queries on this page use SQLite's, in the same
-session as ordinary tables.
+session as plain tables.
 
-So the modern answer is usually neither purely one nor the other: relational
-tables for the entities that are queried from several directions and must stay
-consistent, and a JSON column for the parts that are genuinely variable and only
+So the modern answer is often neither purely one nor the other: relational
+tables for the entities that are queried from a few directions and must stay
+steady, and a JSON column for the parts that are truly variable and only
 ever read alongside their parent.
 
-What a dedicated document database still offers is horizontal scaling and
+What a dedicated doc DB still offers is flat scaling and
 operational tooling built around that model from the start. What it gives up is
-joins and multi-document transactions &mdash; though MongoDB has had the latter
-since 4.0, which narrowed the gap considerably.
+joins and multi-doc transactions &mdash; though MongoDB has had the latter
+since 4.0, which narrowed the gap a lot.
 
 ## The number behind the update argument
 
-"Rewriting every one" is the whole cost of copying a shared fact, and it is worth
+"Rewriting each one" is the whole cost of copying a shared fact, and it's worth
 seeing at scale. Suppose the customer's address is denormalised into each of
-their order documents. Changing it is not one write:
+their order docs. Changing it isn't one write:
 
 |orders holding the copy|document store: rewrites|relational: rows changed|
 |---|---|---|
@@ -3742,17 +3742,17 @@ their order documents. Changing it is not one write:
 |1,000,000|1,000,000|1|
 
 Relationally the address lives in one `customers` row and one `UPDATE` changes it;
-every order simply keeps pointing at it. The document shape trades that single
-write for one per copy, and while the copies are being rewritten the database
+each order simply keeps pointing at it. The doc shape trades that single
+write for one per copy, and while the copies are being rewritten the DB
 briefly disagrees with itself about where the customer lives. That is the exact
-trade: the document read is faster because the join was done once at write time,
-and every later change to a shared fact pays it back in full.
+trade: the doc read is faster because the join was done once at write time,
+and each later change to a shared fact pays it back in full.
 
 ## The read the document shape wins
 
-The mirror image of the update cost is the read, and it is why the trade exists
-at all. Assembling one order &mdash; the order, its five line items, the customer
-&mdash; from normalised tables means touching three tables, and an ORM that loads
+The mirror image of the update cost is the read. It's why the trade exists
+at all. Assembling one order. The order, its five line items, the customer
+&mdash; from normed tables means touching three tables, and an ORM that loads
 them naively issues one query for the order and then one per related set:
 
 |shape|reads to assemble one order|
@@ -3761,29 +3761,29 @@ them naively issues one query for the order and then one per related set:
 |relational, one join query|3 tables joined|
 |relational, naive ORM|1 + N round trips (the N+1 problem)|
 
-The document was written with the join already done, so the read is a single
-contiguous fetch with no reassembly. That is a real advantage for a
+The doc was written with the join already done. So The read is a single
+contiguous fetch with no reassembly. That is a real edge for a
 read-this-whole-object access pattern, and it grows as the object gains parts. It
-is the same coin as the update cost: the document pays once at write time to make
-this read cheap, and the relational shape pays a little at read time to keep every
+is the same coin as the update cost: the doc pays once at write time to make
+this read cheap, and the relational shape pays a little at read time to keep each
 fact in one place. Which way that trade should fall is a property of the workload, not of the
-database &mdash; read-mostly and object-shaped leans document, write-shared and
+DB &mdash; read-mostly and object-shaped leans doc, write-shared and
 queried-many-ways leans relational.
 
 ## Where it goes wrong
 
-**Choosing documents to avoid schema design.** The schema still exists; it has
-moved into the application, where nothing enforces it.
+**Choosing docs to avoid schema design.** The schema still exists. It has
+moved into the use, where nothing enforces it.
 
-**Unbounded arrays.** A document that grows without limit &mdash; every event
+**Unbounded arrays.** A doc that grows without limit &mdash; each event
 appended to one record &mdash; eventually exceeds the size limit and rewrites
-the whole thing on every append.
+the whole thing on each append.
 
-**Duplicating a fact that must stay consistent.** Fine for a historical snapshot,
+**Duplicating a fact that must stay steady.** Fine for a historical snapshot,
 a slow disaster for live data.
 
-**Using JSON columns for well-structured data.** If every row has the same
-fields, they are columns. Putting them in JSON gives up type checking and
+**Using JSON columns for well-structured data.** If each row has the same
+fields, they're columns. Putting them in JSON gives up type checking and
 constraints for nothing.
 """,
     [
@@ -3902,11 +3902,11 @@ topic(
     ],
     """
 title: Key-Value and Graph Models
-intro: The simplest data model and the most relationship-centred one, and when each is worth leaving SQL for.
+intro: The simplest data model and the most tie-centred one. When each is worth leaving SQL for.
 
 ## Key-value: doing less on purpose
 
-The interface is three operations:
+The interface is three ops:
 
 ```
 get(key)  ->  value
@@ -3914,53 +3914,53 @@ put(key, value)
 delete(key)
 ```
 
-The value is opaque &mdash; a blob the store does not interpret. You cannot query
-by its contents, sort by it, or join on it. There is no schema and no query
+The value is opaque &mdash; a blob the store doesn't read. You can't query
+by its contents, sort by it, or join on it. There's no schema and no query
 language.
 
-That poverty is the point. With no query planner, no join algorithms and no
+That poverty is the point. With no query planner, no join methods and no
 secondary indexes to maintain, a lookup is a hash and a read. Redis, Memcached,
-DynamoDB in its simplest mode and etcd all live here, and they are fast in a way
-a general-purpose database cannot match, because they have far less to do.
+DynamoDB in its simplest mode and etcd all live here. They're fast in a way
+a all-round DB can't match, because they've far less to do.
 
-The cost is that every access path must be designed in advance, encoded in the
+The cost is that each access path must be designed in advance, coded in the
 key. Fetching a user by id means `user:1234`. Fetching them by email means
-maintaining a second key, `email:ada@example.com -> 1234`, and keeping the two in
-step yourself &mdash; there is no unique constraint and no transaction spanning
+keeping a second key, `email:ada@example.com -> 1234`, and keeping the two in
+step yourself &mdash; there's no unique constraint and no transaction spanning
 them.
 
 The first variant above shows the shape: a two-column table used as nothing but a
 key lookup.
 
 **Where it fits.** Caches, sessions, feature flags, rate limiters, leaderboards,
-service discovery. Anything with one obvious access path and a strong preference
+service find. any of it with one obvious access path and a strong preference
 for speed.
 
-**Where it does not.** Anything needing an ad-hoc question. "How many active
-sessions are from Leeds" is not answerable without scanning every key, which the
-model is not built for.
+**Where it doesn't.** any of it needing an ad-hoc question. "How many active
+sessions are from Leeds" isn't answerable without scanning each key, which the
+model isn't built for.
 
 ## Graph: relationships as the primary thing
 
 A graph model stores **nodes** and **edges**, and both can carry properties. The
-edges are not derived from matching values, as a foreign key is; they are stored
+edges aren't derived from matching values, as a foreign key is. They're stored
 objects, and traversing one is following a pointer.
 
-The difference shows up in queries about *paths*. "Who reports to Ada, directly
+The difference shows up in queries about *paths*. "Who reports to Ada, right
 or indirectly, to any depth" is one traversal in a graph and a recursive CTE in
-SQL &mdash; run the variant and compare it against the ordinary join beside it.
+SQL &mdash; run the variant and compare it against the plain join beside it.
 
 The gap widens with depth. Each level of a relational traversal is another join,
-and the planner's estimates degrade as they compound; a graph engine follows
-edges directly, and cost scales with the number of edges actually visited rather
+and the planner's guesses degrade as they compound. A graph engine follows
+edges right, and cost scales with the number of edges really visited rather
 than with the size of the tables.
 
 **Where it fits.** Social networks, org charts, fraud rings, dependency graphs,
 recommendation paths, network topology, knowledge graphs. The test is whether
-your interesting questions are about connections rather than about attributes.
+your notable questions are about links rather than about fields.
 
-**Where it does not.** Aggregating over millions of rows. A graph engine is
-usually worse at "total revenue by month" than any relational database.
+**Where it doesn't.** Aggregating over millions of rows. A graph engine is
+often worse at "total revenue by month" than any relational DB.
 
 ## The honest comparison
 
@@ -3975,28 +3975,28 @@ usually worse at "total revenue by month" than any relational database.
 
 ## Do you need to leave SQL?
 
-Frequently not, and the variants above are the argument.
+Often not, and the variants above are the arg.
 
-A key-value table in Postgres &mdash; a primary key and a `jsonb` column &mdash;
+A key-value table in Postgres. A main key and a `jsonb` column &mdash;
 gets you most of the model with transactions and the option of querying the
-value later. Redis wins on raw latency; if that is not the binding constraint,
-the simpler operational story usually is.
+value later. Redis wins on raw latency. If that isn't the binding constraint,
+the simpler operational story often is.
 
 Recursive CTEs handle graph traversal, and for a few hundred thousand edges at
-modest depth they are perfectly good. Dedicated graph engines start winning at
+modest depth they're just right good. Dedicated graph engines start winning at
 deep traversals over large graphs, and at query *expressibility* &mdash; Cypher
 and Gremlin say in one line what a recursive CTE says in fifteen.
 
-The strong argument for a separate store is when the workload is
-overwhelmingly of one shape. The weak argument is that the model is fashionable.
+The strong arg for a separate store is when the workload is
+overwhelmingly of one shape. The weak arg is that the model is fashionable.
 
 ## Why traversal depth is where graphs win
 
-The graph advantage is not vague; it scales with depth, and the arithmetic shows
+The graph edge isn't vague. It scales with depth, and the math shows
 where the crossover is. "Friends of friends of friends" over a social graph with
-an average of 100 connections per person touches, level by level, roughly 100 then
+an mean of 100 links per person touches, level by level, roughly 100 then
 10,000 then 1,000,000 people. A relational engine reaches each level with another
-join, and the planner's row estimates degrade as they multiply:
+join, and the planner's row guesses degrade as they times:
 
 |depth|people reached (branching ~100)|relational cost|
 |---|---|---|
@@ -4004,9 +4004,9 @@ join, and the planner's row estimates degrade as they multiply:
 |2|10,000|join of a join|
 |3|1,000,000|three joins, estimates compounding|
 
-A graph engine follows stored edges directly, so its cost tracks *edges actually
-visited* rather than the product of table sizes, and it does not re-estimate a
-join at each level. At depth one or two a recursive CTE is perfectly good; by
+A graph engine follows stored edges right. So Its cost tracks *edges really
+visited* rather than the product of table sizes, and it doesn't re-guess a
+join at each level. At depth one or two a recursive CTE is just right good. By
 depth three or four over a large graph the relational plan is doing work
 proportional to the tables while the graph is doing work proportional to the
 answer. That divergence &mdash; not lookup speed &mdash; is the real reason to
@@ -4014,22 +4014,22 @@ reach for a graph.
 
 ## The lookup, and why it is O(1)
 
-The reason a key-value store outruns a general database on its one job is the
-absence of a tree. A relational primary-key lookup descends a B-tree &mdash; about
-`log2(n)` steps &mdash; while a hash-based key-value `get` computes one hash and
-does one read, regardless of size:
+The reason a key-value store outruns a general DB on its one job is the
+lack of a tree. A relational main-key lookup descends a B-tree &mdash; about
+`log2(n)` steps &mdash; while a hash-based key-value `get` finds one hash and
+does one read, even so of size:
 
 |keys stored|B-tree lookup|hash lookup|
 |---|---|---|
 |1,000,000|~20 steps|~1 probe|
 |1,000,000,000|~30 steps|~1 probe|
 
-The B-tree's cost grows, slowly, forever; the hash's does not grow at all. That
-flat line is the whole value proposition, and it is bought by giving up
-everything a tree enables &mdash; ordered scans, range queries, "the next key
-after this one" &mdash; none of which a hash can answer. So the choice is not
-"key-value is faster" but "key-value is faster at point lookups and cannot do
-ranges at all", which is exactly the trade to weigh before moving a workload off
+The B-tree's cost grows, slowly, forever. The hash's doesn't grow at all. That
+flat line is the whole value proposition, and it's bought by giving up
+all a tree enables &mdash; sorted scans, range queries, "the next key
+after this one" &mdash; none of which a hash can answer. So the choice isn't
+"key-value is faster" but "key-value is faster at point lookups and can't do
+ranges at all", which is just the trade to weigh before moving a workload off
 SQL for speed.
 
 ## Where it goes wrong
@@ -4037,14 +4037,14 @@ SQL for speed.
 **Using a key-value store as the system of record without a plan for secondary
 access.** The second access path is your problem, forever.
 
-**Assuming a graph database is faster at everything.** It is faster at
+**given a graph DB is faster at all.** It's faster at
 traversals and often slower at aggregates.
 
 **Recursive CTEs without a depth limit.** A cycle in the data is an infinite
-loop; the variant here carries a guard for exactly that reason.
+loop. The variant here carries a guard for just that reason.
 
-**Modelling everything as a graph.** If the questions are about attributes rather
-than connections, a table is the better graph.
+**Modelling all as a graph.** If the questions are about fields rather
+than links, a table is the better graph.
 """,
     [
         {"q": "Why is a key-value store fast?",
@@ -4164,19 +4164,19 @@ topic(
     ],
     """
 title: OLTP, OLAP and Columnar Storage
-intro: Why the database that runs your application is the wrong one for your dashboards.
+intro: Why the DB that runs your use is the wrong one for your dashboards.
 
 ## Two workloads
 
-**OLTP** &mdash; online transaction processing &mdash; is the application
-database. Many concurrent connections, each doing something small: fetch this
+**OLTP** &mdash; online transaction processing &mdash; is the use
+DB. Many concurrent links, each doing a thing small: fetch this
 order, insert this payment, update this status. Queries touch few rows and
-usually want all of a row's columns. Latency per query matters enormously.
+often want all of a row's columns. Latency per query matters enormously.
 
 **OLAP** &mdash; online analytical processing &mdash; is the reporting workload.
-Few concurrent users, each asking something enormous: revenue by region by month
-for three years. Queries touch millions of rows and usually want three or four
-columns out of fifty. Throughput matters; a query taking two seconds instead of
+Few concurrent users, each asking a thing huge: revenue by region by month
+for three years. Queries touch millions of rows and often want three or four
+columns out of fifty. Throughput matters. A query taking two seconds instead of
 two hundred milliseconds is fine.
 
 These want opposite things, and the disagreement is about physical layout.
@@ -4189,10 +4189,10 @@ A **row store** keeps each row's fields contiguously:
 [1|Ada|Leeds|2026-08-01|120.00][2|Bo|Bristol|2026-08-03|64.50]...
 ```
 
-Fetching order 2 is a single page read, and everything needed is there. Perfect
+Fetching order 2 is a single page read, and all needed is there. Perfect
 for OLTP.
 
-Now compute the average of `total` over ten million orders. Every page has to be
+Now find the mean of `total` over ten million orders. each page has to be
 read, because the totals are scattered one per row, separated by all the other
 columns. To read 8 bytes of interest you read a 200-byte row, and 96% of the I/O
 is waste.
@@ -4207,25 +4207,25 @@ names:   [Ada][Bo][Cy][Di]...
 totals:  [120.00][64.50][45.00][220.00]...
 ```
 
-That average now reads only the `totals` region. Reading a fiftieth of the data
-is roughly a fiftieth of the time, and the advantage grows with the width of the
+That mean now reads only the `totals` region. Reading a fiftieth of the data
+is roughly a fiftieth of the time. The edge grows with the width of the
 table.
 
 Two further wins follow from the layout rather than being added to it.
 
 **Compression.** A column holds one type, and often few distinct values. A
 `country` column across ten million rows compresses to almost nothing with
-dictionary encoding; a sorted date column run-length encodes brilliantly. Mixed
-row data does none of this. Ten-times ratios are ordinary, and the speed-up is
+dict encoding. A sorted date column run-length codes brilliantly. Mixed
+row data does none of this. Ten-times ratios are plain, and the speed-up is
 mostly the reduced I/O.
 
-**Vectorised execution.** Values of one type packed contiguously can be processed
+**Vectorised run.** Values of one type packed contiguously can be processed
 in batches with SIMD instructions, instead of one row at a time through a tuple
 interface.
 
 The cost is the mirror image: fetching one whole row means one read per column
 and reassembly, and inserting a row means writing into fifty places. Columnar
-stores are therefore usually append-oriented and batch-loaded, not
+stores are so often append-oriented and batch-loaded, not
 update-in-place.
 
 ## Choosing
@@ -4241,19 +4241,19 @@ update-in-place.
 
 ## Do not run both on one database
 
-The usual mistake is analytics against the production OLTP database. A report
-scanning ten million rows evicts the working set from the buffer cache, and every
-application query afterwards goes to disk. The dashboard is slow *and* the
+The usual mistake is analytics against the production OLTP DB. A report
+scanning ten million rows evicts the working set from the buffer cache, and each
+use query afterwards goes to disk. The dashboard is slow *and* the
 checkout is slow.
 
-The standard arrangement separates them: OLTP handles the application, data is
+The standard setup separates them: OLTP handles the use, data is
 copied into an analytical store on a schedule or a stream, and reports run there
 with a [star schema](star_schema.html) shaped for them. The copy is stale by
 minutes or hours, which is almost always acceptable for reporting and is the
 price of not having the two workloads fight.
 
 The variants above make the difference concrete: the same table queried the OLTP
-way and the OLAP way, with a note on how much of each row each one actually
+way and the OLAP way, with a note on how much of each row each one really
 needs.
 
 ## Where the line has blurred
@@ -4261,37 +4261,37 @@ needs.
 **DuckDB** is columnar, embedded and single-file &mdash; analytical power with no
 cluster. **Postgres** has columnar extensions and can query Parquet through
 foreign data wrappers. **Parquet** itself has made columnar a file format rather
-than a database, so the same data can be read by many engines.
+than a DB, so the same data can be read by many engines.
 
 The result is that "we need a data warehouse" is a much bigger claim than it was.
 For datasets under a few hundred gigabytes, DuckDB over Parquet on one machine
-frequently outperforms a cluster.
+often beats a cluster.
 
 ## The I/O gap, in bytes
 
-"A fiftieth of the data" deserves a concrete figure, because it is the whole
-argument for columnar. Take ten million orders, fifty columns, eight bytes each,
-and average one column:
+"A fiftieth of the data" deserves a concrete figure, because it's the whole
+arg for columnar. Take ten million orders, fifty columns, eight bytes each,
+and mean one column:
 
 |layout|bytes read for `AVG(total)`|
 |---|---|
 |row store|10M &times; 50 &times; 8 = **4.0 GB**|
 |column store|10M &times; 8 = **80 MB**|
 
-The row store must pass over every column of every row to reach the one it needs,
+The row store must pass over each column of each row to reach the one it needs,
 so it reads the whole four gigabytes to sum eighty megabytes of actual interest.
-The column store reads only the `total` region &mdash; fifty times less &mdash; and
+The column store reads only the `total` region. Fifty times less &mdash; and
 that ratio is why an aggregate that takes seconds on a row store returns in
 milliseconds on a columnar one. It also compounds with compression: that single
-column, being one type with few distinct values, often compresses several-fold
+column, being one type with few distinct values, often compresses a few-fold
 again, so the real read is smaller still. The wider the table, the larger the
-gap, which is exactly backwards from what OLTP wants.
+gap, which is just backwards from what OLTP wants.
 
 ## Where the ten-times compression comes from
 
-"Ten-times ratios are ordinary" is not a hope; it falls out of a column holding
+"Ten-times ratios are plain" isn't a hope. It falls out of a column holding
 one type with few distinct values. A `country` column over ten million rows has
-maybe 200 distinct values, so dictionary encoding stores a one-byte code per row
+maybe 200 distinct values, so dict encoding stores a one-byte code per row
 plus a tiny lookup, instead of the full string each time:
 
 |encoding|size of the country column|
@@ -4299,25 +4299,25 @@ plus a tiny lookup, instead of the full string each time:
 |raw text (~10 bytes/value)|~100 MB|
 |dictionary (1 byte/row + dict)|~10 MB|
 
-Ten to one, and a sorted or slowly-changing column run-length encodes even harder
+Ten to one, and a sorted or slowly-changing column run-length codes even harder
 &mdash; a date column that repeats each value for a day's worth of rows stores a
-value and a count rather than the value a million times. A row store cannot do any
+value and a count rather than the value a million times. A row store can't do any
 of this, because each value sits between bytes of other columns of other types,
-with nothing to compress against. The compression is not a feature bolted on; it
+with nothing to compress against. The compression isn't a feature bolted on. It
 is a consequence of putting like values next to like, and most of the resulting
-speed-up is simply that there is less to read.
+speed-up is simply that there's less to read.
 
 ## Where it goes wrong
 
-**Reporting off the primary.** Cache eviction makes the application slow, and the
-cause is not obvious from the application's own metrics.
+**Reporting off the main.** Cache eviction makes the use slow, and the
+cause isn't obvious from the use's own metrics.
 
-**Row-by-row inserts into a columnar store.** They are built for batches; single
+**Row-by-row inserts into a columnar store.** They're built for batches. Single
 inserts are pathologically slow.
 
-**`SELECT *` on a column store.** It gives up the entire advantage.
+**`SELECT *` on a column store.** It gives up the entire edge.
 
-**Assuming you need a cluster.** Measure on one machine first.
+**given you need a cluster.** Measure on one machine first.
 """,
     [
         {"q": "Why is a row store slow at averaging one column over ten million rows?",
@@ -4422,71 +4422,71 @@ topic(
     ],
     """
 title: Star Schema: Facts and Dimensions
-intro: The one schema design that analytical databases are actually optimised for.
+intro: The one schema design that analytical DBs are really optimised for.
 
 ## Two kinds of table
 
-A star schema splits everything into facts and dimensions, and the split is
+A star schema splits all into facts and dims, and the split is
 sharper than it first sounds.
 
-A **fact** is a measurement of something that happened. One row per sale, per
-click, per sensor reading. It contains numbers you want to aggregate &mdash;
-quantity, amount, duration &mdash; and foreign keys pointing at the dimensions.
-Almost nothing else. Fact tables are enormous and narrow.
+A **fact** is a reading of a thing that happened. One row per sale, per
+click, per sensor reading. It holds numbers you want to aggregate &mdash;
+quantity, amount, duration &mdash; and foreign keys pointing at the dims.
+Almost nothing else. Fact tables are huge and narrow.
 
-A **dimension** describes the context of a fact. The product dimension holds the
-name, category, brand, supplier; the date dimension holds the day, month,
-quarter, day of week, whether it was a holiday. Dimension tables are small and
+A **dim** shows the context of a fact. The product dim holds the
+name, category, brand, supplier. The date dim holds the day, month,
+quarter, day of week, whether it was a holiday. dim tables are small and
 wide, and mostly text.
 
-Drawn out, the fact table sits in the middle with dimensions radiating from it,
+Drawn out, the fact table sits in the middle with dims radiating from it,
 which is where the name comes from.
 
 ## Why it is shaped that way
 
-Every analytical question has the same form: *aggregate some measure, sliced by
-some attributes, filtered by others*. Revenue by category by month for one
+each analytical question has the same form: *aggregate some measure, sliced by
+some fields, filtered by others*. Revenue by category by month for one
 region. Units sold by store by weekday.
 
-In a star schema every such query is the same join: fact table to the dimensions
-the question mentions, group by their attributes, aggregate the fact's measures.
-Run the variants above and they are all that shape.
+In a star schema each such query is the same join: fact table to the dims
+the question mentions, group by their fields, aggregate the fact's measures.
+Run the variants above and they're all that shape.
 
 That uniformity has three consequences worth having.
 
 **Query planners handle it well.** The pattern is recognisable enough that
 analytical engines have a dedicated *star join* optimisation: filter the small
-dimensions first, use the result to restrict the fact-table scan, and never
-materialise a large intermediate.
+dims first, use the result to restrict the fact-table scan, and never
+materialise a large mid.
 
 **Analysts can write the queries.** Adding a slice means adding a join and a
-group-by column. No investigation of a normalised graph is required.
+group-by column. No investigation of a normed graph is needed.
 
-**BI tools generate them.** Tableau, Looker and Power BI all assume this model,
-and produce good SQL against it and poor SQL against anything else.
+**BI tools make them.** Tableau, Looker and Power BI all assume this model,
+and give good SQL against it and poor SQL against any of it else.
 
 ## The date dimension
 
-A table of dates looks redundant &mdash; a database has date functions. It earns
+A table of dates looks redundant. A DB has date functions. It earns
 its place anyway, because it holds things no function knows: your fiscal
-calendar, public holidays in the markets you sell in, which weeks were promotion
+calendar, public holidays in the markets you sell in. This Weeks were promotion
 periods, whether a day was a weekday in the local sense.
 
-`WHERE d.is_holiday` and `GROUP BY d.fiscal_quarter` are then ordinary joins
+`WHERE d.is_holiday` and `GROUP BY d.fiscal_quarter` are then plain joins
 rather than a growing pile of `CASE` expressions.
 
 ## Grain
 
-The most consequential decision is the **grain**: what exactly one fact row
-represents.
+The most consequential choice is the **grain**: what just one fact row
+shows.
 
 "One row per order line" and "one row per order" are different grains, and mixing
-them corrupts every aggregate &mdash; sum a per-order total across order lines
-and you have multiplied the revenue by the number of lines. This is the most
-common defect in real warehouses, and it is silent.
+them corrupts each aggregate &mdash; sum a per-order total across order lines
+and you've times'd the revenue by the number of lines. This is the most
+common defect in real warehouses, and it's silent.
 
-State the grain in one sentence before creating the table, and make every measure
-consistent with it.
+State the grain in one sentence before creating the table, and make each measure
+steady with it.
 
 ## Slowly changing dimensions
 
@@ -4497,29 +4497,29 @@ new one?
 report changes.
 
 **Type 2**: add a new dimension row with validity dates and point new facts at
-it. History is preserved and the dimension grows. This is the usual choice, and
-it is why dimension tables have surrogate keys rather than using the natural
+it. History is preserved and the dim grows. This is the usual choice, and
+it's why dim tables have surrogate keys rather than using the natural
 business key.
 
 **Type 3**: keep a `previous_category` column. Enough for one level of history,
-rarely enough in practice.
+rarely enough .
 
 ## Star against snowflake
 
-Normalising the dimensions &mdash; splitting `product` into product, category and
-supplier tables &mdash; gives a **snowflake schema**. It removes redundancy and
+Norming the dims &mdash; splitting `product` into product, category and
+supplier tables &mdash; gives a **snowflake schema**. It drops redundancy and
 adds joins.
 
-For warehouses the star is usually preferred, because dimensions are small
+For warehouses the star is often preferred, because dims are small
 enough that the redundancy costs little, the extra joins cost real query time,
-and the denormalised version is far easier to read. The exception is a genuinely
-large dimension &mdash; tens of millions of customers &mdash; where the
+and the denormalised version is far easier to read. The exception is a truly
+large dim &mdash; tens of millions of customers &mdash; where the
 duplication starts to matter.
 
 ## Mixed grain, shown inflating a total
 
-"Multiplied the revenue by the number of lines" is the most expensive silent bug
-in warehousing, so it is worth watching happen. Three orders of $100 each, with
+"Times'd the revenue by the number of lines" is the most costly silent bug
+in warehousing, so it's worth watching happen. Three orders of $100 each, with
 3, 2 and 1 line items, joined fact-to-lines and summed the wrong way:
 
 |query|result|
@@ -4527,19 +4527,19 @@ in warehousing, so it is worth watching happen. Three orders of $100 each, with
 |`SUM(total)` over orders|**$300** (correct)|
 |`SUM(total)` after joining order lines|**$600** (wrong)|
 
-The join repeats each order's total once per line, so the three-line order counts
-its $100 three times, and the total comes out exactly doubled &mdash; here 2&times;,
-but the factor is the average number of lines per order, whatever that happens to
-be. Nothing errors, the number is plausible, and it is wrong on every run. This is
-what "state the grain in one sentence" prevents: a measure at order grain must be
-summed at order grain, and mixing it with a per-line join silently multiplies it.
+The join repeats each order's total once per line. So The three-line order counts
+its $100 three times, and the total comes out just doubled &mdash; here 2&times;,
+but the factor is the mean number of lines per order, what that happens to
+be. Nothing errors, the number is plausible, and it's wrong on each run. This is
+what "state the grain in one sentence" blocks: a measure at order grain must be
+summed at order grain, and mixing it with a per-line join silently times it.
 
 ## Text belongs in the dimension, and here is the cost
 
-"Text in the fact table" sounds harmless until you remember which table is
-enormous. The fact table has one row per event &mdash; hundreds of millions of
-them &mdash; while dimensions are small. Storing a 20-byte product name on every
-fact row, instead of a 4-byte key pointing at the product dimension, widens the
+"Text in the fact table" sounds harmless until you note which table is
+huge. The fact table has one row per event. Hundreds of millions of
+them &mdash; while dims are small. Storing a 20-byte product name on each
+fact row, instead of a 4-byte key pointing at the product dim, widens the
 largest table in the warehouse:
 
 |on a 100M-row fact table|storage|
@@ -4547,26 +4547,26 @@ largest table in the warehouse:
 |a 20-byte text column|~2.0 GB|
 |a 4-byte foreign key to a dimension|~0.4 GB|
 
-Five times the space, on the table every analytical scan has to read, for data
-that is duplicated millions of times &mdash; the same product name written on
-every one of its sales. The dimension stores it once. And because columnar
-warehouses scan the columns a query touches, a bloated fact table is not just disk;
-it is read on every query that goes near it. Narrow facts, wide dimensions is not
-an aesthetic preference &mdash; it is keeping the big table small and the
-redundancy in the place where it is cheap.
+Five times the space, on the table each analytical scan has to read, for data
+that is duplicated millions of times. The same product name written on
+each one of its sales. The dim stores it once. And because columnar
+warehouses scan the columns a query touches, a bloated fact table isn't just disk;
+it's read on each query that goes near it. Narrow facts, wide dims isn't
+an aesthetic preference &mdash; it's keeping the big table small and the
+redundancy in the place where it's cheap.
 
 ## Where it goes wrong
 
-**Mixed grain.** Silent, and it inflates every total.
+**Mixed grain.** Silent, and it inflates each total.
 
-**Text in the fact table.** It belongs in a dimension; it makes the largest table
-wider for no benefit.
+**Text in the fact table.** It belongs in a dim. It makes the largest table
+wider for no gain.
 
-**No date dimension.** Fiscal calendars and holidays end up as `CASE`
+**No date dim.** Fiscal calendars and holidays end up as `CASE`
 expressions copied between queries.
 
-**Type 1 everywhere.** History quietly rewrites itself, and last quarter's report
-no longer reproduces.
+**Type 1 all over.** History quietly rewrites itself, and last quarter's report
+no longer copies.
 """,
     [
         {"q": "What does a fact table contain?",
@@ -4705,16 +4705,16 @@ Build a query by pasting user input into a string:
 "SELECT * FROM users WHERE name = '" + name + "'"
 ```
 
-With `name = "Ada"` this produces a sensible query. With
-`name = "' OR '1'='1"` it produces:
+With `name = "Ada"` this makes a sensible query. With
+`name = "' OR '1'='1"` it makes:
 
 ```
 SELECT * FROM users WHERE name = '' OR '1'='1'
 ```
 
-The quote closed the string early, and everything after it became **syntax**
-rather than data. The database is not confused or exploited &mdash; it is
-correctly executing the query it was given. The bug happened before it arrived.
+The quote closed the string early, and all after it became **syntax**
+rather than data. The DB isn't confused or exploited &mdash; it's
+right running the query it was given. The bug happened before it arrived.
 
 Run the variants above to see it: the same lookup, safe and unsafe, with a normal
 value and then a crafted one.
@@ -4724,59 +4724,59 @@ value and then a crafted one.
 A closed quote gives an attacker the whole language.
 
 **Authentication bypass.** `' OR '1'='1` as a password makes the `WHERE` clause
-true for every row.
+true for each row.
 
 **Reading other tables.** A `UNION SELECT` appends results from anywhere the
-database user can read.
+DB user can read.
 
 **Writing.** If the driver allows multiple statements, a semicolon starts a new
 one.
 
-**Blind extraction.** Even with no output at all, a condition that changes
+**Blind extraction.** Even with no output at all, a rule that changes
 whether the page errors, or how long it takes, leaks one bit per request &mdash;
 and one bit per request is enough to read a password hash.
 
-That last one is worth costing out, because "one bit per request" sounds slow
-and is not. Ask a yes/no question the query answers through its behaviour &mdash;
+That last one is worth costing out. "one bit per request" sounds slow
+and isn't. Ask a yes/no question the query answers through its action &mdash;
 *is the first character of the admin's hash greater than `m`?* &mdash; and binary
 search finds each character in `ceil(log2(95)) = 7` requests across the printable
-ASCII range. A bcrypt hash is 60 characters, so the whole thing comes out in
+ASCII range. A bcrypt hash is 60 characters. So The whole thing comes out in
 about 60 &times; 7 = **420 requests**, plus a handful to find the length first.
-At a modest 100 requests a second that is **four seconds**, and it is entirely
+At a modest 100 requests a second that is **four seconds**, and it's fully
 automated &mdash; the attacker writes none of it by hand. The naive
-character-by-character guess would take 2,850 requests; binary search is what
-makes a channel that leaks one bit at a time genuinely fast.
+character-by-character guess would take 2,850 requests. Binary search is what
+makes a channel that leaks one bit at a time truly fast.
 
 ## The fix
 
-Send the query and the values separately:
+Send the query and the values apart:
 
 ```
 cursor.execute("SELECT * FROM users WHERE name = ?", (name,))
 ```
 
-The `?` is a **placeholder**. The database receives the query text and the value
+The `?` is a **placeholder**. The DB receives the query text and the value
 through different channels, parses the statement first, and then binds the value
 into an already-parsed plan.
 
-The value therefore cannot alter the structure of the query, because parsing has
-already finished by the time it arrives. `' OR '1'='1` becomes a search for a
-user whose name is literally `' OR '1'='1`, which finds nothing.
+The value so can't alter the structure of the query, because parsing has
+already finished by the time it arrives. `' OR '1'='1` turns a search for a
+user whose name is truly `' OR '1'='1`, which finds nothing.
 
-This is not a filter that might miss something. It is a structural guarantee:
-there is no input for which a bound parameter becomes syntax.
+This isn't a filter that might miss a thing. It's a structural ensure:
+there's no input for which a bound param turns syntax.
 
 ## The same property also makes it faster
 
 The security comes from one fact: the query text is fixed and the values arrive
-separately. That same fact is a performance win, and the two are not a
-coincidence &mdash; they are the same mechanism seen from two sides.
+apart. That same fact is a speed win, and the two aren't a
+coincidence &mdash; they're the same mechanism seen from two sides.
 
-A database parses a query string, plans it, and only then runs it. When the text
+A DB parses a query string, plans it. Only then runs it. When the text
 is fixed, that parse-and-plan happens once and the plan is cached and reused for
-every later execution with different bound values. When the query is built by
-concatenation, every call is a *different* string &mdash; `name = 'user1'`,
-`name = 'user2'` &mdash; so the cache never hits and the planner runs every time.
+each later run with different bound values. When the query is built by
+concatenation, each call is a *different* string &mdash; `name = 'user1'`,
+`name = 'user2'` &mdash; so the cache never hits and the planner runs each time.
 
 Measured in the SQLite this page runs, reusing one prepared statement against
 re-parsing a fresh query string each time is about **1.8&times; faster** (7.5 vs
@@ -4788,17 +4788,17 @@ an attacker a foothold is the same fixed string the planner can cache.
 ## Why escaping is not the fix
 
 Escaping tries to neutralise dangerous characters in the input. It fails for
-reasons that are not obvious in advance:
+reasons that aren't obvious in advance:
 
 **Numeric contexts have no quotes.** `WHERE id = " + id` needs no quote to
 escape, and `1 OR 1=1` needs no special characters at all.
 
-**Character sets.** Multi-byte encodings have historically allowed a byte
-sequence that becomes a quote after the escaping function has run.
+**Character sets.** Multi-byte encodings have once allowed a byte
+sequence that turns a quote after the escaping function has run.
 
-**It is a blacklist.** Every blacklist is a claim to have thought of everything.
+**It's a blacklist.** each blacklist is a claim to have thought of all.
 
-**It is per-engine.** Rules differ between MySQL, PostgreSQL and SQLite, and code
+**It's per-engine.** Rules differ between MySQL, PostgreSQL and SQLite, and code
 that moves between them silently stops being correct.
 
 Parameterisation avoids all of this by never putting the value in the query text
@@ -4814,7 +4814,7 @@ table or column name:
 ```
 
 The correct approach is an **allowlist**: map the user's input to a known-good
-identifier and reject anything unrecognised.
+identifier and reject any of it unrecognised.
 
 ```
 allowed = {"name": "name", "date": "created_at"}
@@ -4824,9 +4824,9 @@ if column is None: reject()
 
 Never sanitise an identifier by escaping. Choose it from a fixed set.
 
-There is one more case that sends people back to concatenation, and it should
+There's one more case that sends people back to concatenation, and it should
 not: a variable-length `IN` list. `WHERE id IN (?)` does **not** bind a list to
-the single placeholder &mdash; it binds one value. The correct move is to generate
+the single placeholder &mdash; it binds one value. The correct move is to make
 *one placeholder per element* and bind them positionally:
 
 ```
@@ -4835,36 +4835,36 @@ marks = ",".join("?" for _ in ids)      # "?,?,?"
 cursor.execute("... WHERE id IN (%s)" % marks, ids)
 ```
 
-The `%` here builds only punctuation &mdash; commas and question marks, never the
-values &mdash; so nothing user-controlled reaches the query text. Every id is still
-bound. It looks like string-building, and the thing being built contains no data,
-which is exactly the line that keeps it safe.
+The `%` here builds only punctuation. Commas and question marks, never the
+values &mdash; so nothing user-controlled reaches the query text. each id is still
+bound. It looks like string-building, and the thing being built holds no data,
+which is just the line that keeps it safe.
 
 ## The other layers
 
-Parameterise everywhere, and then:
+Parameterise all over, and then:
 
-**Least privilege.** The application's database user should not own the schema or
+**Least privilege.** The use's DB user shouldn't own the schema or
 be able to `DROP`. It limits the damage of any bug, not just this one.
 
-**Do not show database errors.** Error text is how blind extraction is made
+**Don't show DB errors.** Error text is how blind extraction is made
 fast.
 
-**ORMs help but do not immunise.** Their query builders parameterise by default,
-and every one of them has a raw-SQL escape hatch that does not. The escape hatch
+**ORMs help but don't immunise.** Their query builders parameterise by default,
+and each one of them has a raw-SQL escape hatch that doesn't. The escape hatch
 is where the vulnerabilities are.
 
 ## Where it goes wrong
 
-**"It is an internal tool."** Internal input is still input, and internal tools
+**"It's an inner tool."** inner input is still input, and inner tools
 get exposed.
 
 **Parameterising most of a query.** One concatenated fragment is enough.
 
 **Trusting a value because it came from a dropdown.** The dropdown is in the
-client. The request is not.
+client. The request isn't.
 
-**Escaping instead of binding.** Even when correct today, it is one encoding
+**Escaping instead of binding.** Even when correct today, it's one encoding
 change from not being.
 """,
     [

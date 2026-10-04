@@ -113,11 +113,11 @@ print(type((5,)))   # tuple
      "One element needs a trailing comma: <code class='mono-font'>(5,)</code>. "
      "Without it you have brackets round a number."],
     """title: Tuples and Unpacking: A Practical Guide
-intro: A tuple is a sequence that cannot be changed once built. That single restriction is what makes it usable as a dictionary key, safe to hand around, and the natural way to return more than one value.
+intro: A tuple is a sequence that can't be changed once built. That single restriction is what makes it usable as a dict key, safe to hand around. The natural way to return more than one value.
 
 ## The difference that matters
 
-A list and a tuple both hold an ordered run of items, and both index the same way. The difference is one word: a tuple is immutable. Once it exists, no element can be replaced.
+A list and a tuple both hold an sorted run of items. Both index the same way. The difference is one word. A tuple is immutable. Once it exists, no element can be replaced.
 
 
 ```python
@@ -126,41 +126,41 @@ point[0] = 99  # TypeError
 ```
 
 
-That sounds like a limitation and is mostly a guarantee. If you hand a list to a function, the function can change it under you. Hand it a tuple and it cannot.
+That sounds like a limitation and is mostly a ensure. If you hand a list to a function, the function can change it under you. Hand it a tuple and it can't.
 
 ## Why immutability buys you a dictionary key
 
-A dictionary key has to be hashable, which in practice means it must never change &mdash; if it changed, the dictionary would look for it in the wrong place. Lists are mutable, so they are unhashable, so they cannot be keys. Tuples can.
+A dict key has to be hashable. This means it must never change. If it changed, the dict would look for it in the wrong place. Lists are mutable. They're unhashable. So They can't be keys. Tuples can.
 
 grid[(2, 3)] = "wall"
 
-That is how you key anything by a coordinate pair, a date triple, or any other small fixed group.
+That is how you key any of it by a coord pair, a date triple, or any other small fixed group.
 
 ## Unpacking is the point
 
-Unpacking assigns each position to a name in one statement:
+Unpacking assigns each spot to a name in one statement:
 
 x, y = point
 
-It is not a special tuple feature &mdash; it works on any sequence &mdash; but tuples are where you meet it. The number of names must match the number of items, or Python raises `ValueError`, which is a feature: it catches the case where the shape you expected is not the shape you got.
+It isn't a special tuple feature. It works on any sequence. But tuples are where you meet it. The number of names must match the number of items, or Python raises `ValueError`. This Is a feature. It catches the case where the shape you expected isn't the shape you got.
 
 The swap idiom falls straight out of it:
 
 a, b = b, a
 
-The right-hand side is evaluated first, into a tuple, and only then unpacked. No temporary variable, and no ordering bug.
+The right-hand side is tested first, into a tuple. Only then unpacked. No temporary variable, and no sorting bug.
 
 ## Returning more than one thing
 
-Python has no special syntax for multiple return values because it does not need any. `return min(xs), max(xs)` returns a tuple, and the caller unpacks it:
+Python has no special syntax for multiple return values because it doesn't need any. `return min(xs), max(xs)` returns a tuple, and the caller unpacks it:
 
 low, high = min_max(values)
 
-This reads better than returning a list, because the shape is fixed: exactly two things, in a known order.
+This reads better than returning a list. The shape is fixed: just two things, in a known order.
 
 ## The comma is the tuple
 
-The most common surprise is that brackets do not make a tuple &mdash; commas do.
+The most common surprise is that brackets don't make a tuple &mdash; commas do.
 
 
 ```python
@@ -169,7 +169,7 @@ type((5,))  # tuple
 ```
 
 
-A single-element tuple needs the trailing comma. It looks like a typo and is not. This bites when a function is supposed to return one item as a tuple and quietly returns the item instead.
+A single-element tuple needs the trailing comma. It looks like a typo and isn't. This bites when a function is supposed to return one item as a tuple and quietly returns the item instead.
 
 """,
     [{"q": "Why can a tuple be a dictionary key when a list cannot?",
@@ -267,7 +267,7 @@ print(f"set lookup : {set_ms:.3f} ms")
      "Membership is roughly constant time on a set and a full scan on a list. "
      "That gap is the whole reason to convert."],
     """title: Sets and Set Operations: A Practical Guide
-intro: A set holds unique items in no particular order. That trade &mdash; giving up order and duplicates &mdash; buys near-instant membership tests and a small algebra for comparing two groups.
+intro: A set holds unique items in no given order. That trade. Giving up order and duplicates. Buys near-instant membership tests and a small algebra for checking two groups.
 
 ## What a set gives up, and what it buys
 
@@ -275,33 +275,33 @@ Write a set with braces:
 
 seen = {"red", "green", "red", "blue"}
 
-Three items come out, not four: duplicates collapse silently. Print it twice and the order may differ, because there is no order to preserve.
+Three items come out, not four: duplicates collapse silently. Print it twice and the order may differ. There's no order to preserve.
 
-In exchange, `x in some_set` is roughly constant time. On a list, the same question is a scan: Python looks at each element until it finds a match or runs out. On a few dozen items nobody notices. On two hundred thousand, the difference is milliseconds against microseconds, and the second program on this page measures it rather than asserting it.
+In exchange, `x in some_set` is roughly constant time. On a list, the same question is a scan: Python looks at each element until it finds a match or runs out. On a few dozen items no one notices. On two hundred thousand, the difference is milliseconds against microseconds. The second program on this page measures it rather than asserting it.
 
 ## Deduplicating
 
-The most common use is removing duplicates:
+The most common use is dropping duplicates:
 
 unique = set(votes)
 
-If you need a list back, wrap it: `list(set(votes))`. If you need the original order kept, a set will not do it &mdash; use `list(dict.fromkeys(votes))`, since dictionaries do preserve insertion order.
+If you need a list back, wrap it: `list(set(votes))`. If you need the first order kept, a set won't do it. Use `list(dict.fromkeys(votes))`. Dicts do preserve insertion order.
 
 ## The algebra
 
 Four operators compare two sets, and they read like the English:
 
-python &amp; sql&nbsp;&nbsp;# in both<br>python | sql&nbsp;&nbsp;# in either<br>python - sql&nbsp;&nbsp;# in the first only<br>python ^ sql&nbsp;&nbsp;# in exactly one
+python &amp; sql&nbsp;&nbsp;# in both<br>python | sql&nbsp;&nbsp;# in either<br>python - sql&nbsp;&nbsp;# in the first only<br>python ^ sql&nbsp;&nbsp;# in just one
 
-Each replaces a loop with an `if` inside it. "Which users have both skills" is one character. Writing it as a loop is not wrong, it is just more code to read and more places to make a mistake.
+Each replaces a loop with an `if` inside it. "Which users have both skills" is one character. Writing it as a loop isn't wrong, it's just more code to read and more places to make a mistake.
 
 ## The empty-set trap
 
-`{}` is an empty <em>dictionary</em>. It has to be, because dictionaries claimed the braces first. An empty set is `set()`. This is worth remembering because `{}` looks exactly like what you want and behaves nothing like it.
+`{}` is an empty <em>dict</em>. It has to be. Dicts claimed the braces first. An empty set is `set()`. This is worth remembering because `{}` looks just like what you want and behaves nothing like it.
 
 ## When not to use one
 
-If order matters, if duplicates are meaningful, or if you need to index by position, use a list. A set answers one question extremely well &mdash; "is this in here?" &mdash; and refuses most others.
+If order matters, if duplicates are real, or if you need to index by spot, use a list. A set answers one question extremely well. "is this in here?". And refuses most others.
 """,
     [{"q": "What does `{}` create?",
       "options": ["An empty set", "An empty dictionary", "An empty tuple", "A syntax error"],
@@ -391,7 +391,7 @@ print("Doubling n doubles the sequential work and quadruples the nested work.")
      "If both loops walk the same list, you are usually comparing every pair. "
      "That is often a sign a set or dict would do it in one pass."],
     """title: Nested For Loops: A Practical Guide
-intro: A loop inside a loop runs the inner one from the top on every pass of the outer one. That is easy to say and easy to under-estimate: the bodies multiply, they do not add.
+intro: A loop inside a loop runs the inner one from the top on each pass of the outer one. That is easy to say and easy to under-guess: the bodies times, they don't add.
 
 ## The order things happen
 
@@ -403,17 +403,17 @@ for row in range(3):
 ```
 
 
-The outer loop takes `row = 0` and then hands control to the inner loop, which runs all four of its passes before the outer loop moves to `row = 1`. Twelve lines print, in row-major order. The inner variable resets each time; the outer one does not.
+The outer loop takes `row = 0` and then hands control to the inner loop. This Runs all four of its passes before the outer loop moves to `row = 1`. Twelve lines print, in row-major order. The inner variable resets each time. The outer one doesn't.
 
-This is the natural shape for anything two-dimensional: a grid, a table of rows and columns, every pairing of two lists.
+This is the natural shape for any of it two-dimensional. A grid, a table of rows and columns, each pairing of two lists.
 
 ## Where the newline goes
 
-A detail that catches people: `print()` after the inner loop, indented to the outer loop, ends the row. Indent it one level further and you get a newline after every cell instead. The indentation is the logic here, not decoration.
+A detail that catches people: `print()` after the inner loop, indented to the outer loop, ends the row. Indent it one level further and you get a newline after each cell instead. The indentation is the logic here, not decoration.
 
 ## The cost multiplies
 
-One loop over n items runs n bodies. Two nested loops over n items run n&times;n. Put them side by side instead of inside each other and you get 2n. The difference between n&sup2; and 2n is the difference between a program that scales and one that does not:
+One loop over n items runs n bodies. Two nested loops over n items run n&times;n. Put them side by side instead of inside each other and you get 2n. The difference between n&sup2; and 2n is the difference between a program that scales and one that doesn't:
 
 - n = 100: nested runs 10,000 bodies, sequential runs 200
 - n = 400: nested runs 160,000, sequential runs 800
@@ -514,11 +514,11 @@ print("gen sum    :", sum(n * n for n in range(10_000)))
      "ideal inside <code class='mono-font'>sum()</code> or "
      "<code class='mono-font'>any()</code>."],
     """title: List Comprehensions: A Practical Guide
-intro: A comprehension is a loop that builds a list, written as a single expression. It is the same work in fewer lines &mdash; and past a certain complexity, in far less readable ones.
+intro: A comprehension is a loop that builds a list, written as a single formula. It's the same work in fewer lines. And past a certain cost, in far less readable ones.
 
 ## The translation
 
-Nearly every comprehension started life as this shape:
+Nearly each comprehension started life as this shape:
 
 
 ```python
@@ -528,11 +528,11 @@ for item in things:
 ```
 
 
-which becomes:
+which turns:
 
 result = [f(item) for item in things]
 
-Read it left to right: <em>what to build</em>, then <em>where the items come from</em>. The three moving parts of the loop &mdash; create the list, iterate, append &mdash; collapse into one line where the intent is the first thing you see.
+Read it left to right: <em>what to build</em>, then <em>where the items come from</em>. The three moving parts of the loop. Create the list, iterate, append. Collapse into one line where the intent is the first thing you see.
 
 ## Filtering
 
@@ -540,7 +540,7 @@ An `if` at the end keeps only some items:
 
 evens = [n for n in nums if n % 2 == 0]
 
-That is the filter position, and it takes no `else`. If you want to choose between two values rather than keep or drop, the conditional goes in the expression at the front instead:
+That is the filter spot, and it takes no `else`. If you want to choose between two values rather than keep or drop, the if-based goes in the formula at the front instead:
 
 labels = ["even" if n % 2 == 0 else "odd" for n in nums]
 
@@ -550,17 +550,17 @@ Two different `if`s, in two different places, doing two different jobs. Mixing t
 
 [n for row in grid for n in row]
 
-The clauses come in the same order as the nested loops would: `for row` outside, `for n` inside. It reads oddly because the expression sits before both, but the order after the expression is exactly the loop order.
+The clauses come in the same order as the nested loops would: `for row` outside, `for n` inside. It reads oddly because the formula sits before both. The order after the formula is just the loop order.
 
-One level of nesting is defensible. Two, plus a filter, is a line that will cost you a minute every time you come back to it &mdash; and the loop version costs nothing. The second program on this page puts both side by side and prints the same answer from each.
+One level of nesting is defensible. Two, plus a filter, is a line that will cost you a minute each time you come back to it. And the loop version costs nothing. The second program on this page puts both side by side and prints the same answer from each.
 
 ## Comprehension or generator
 
-Swap the brackets for round ones and you get a generator expression:
+Swap the brackets for round ones and you get a gen formula:
 
 total = sum(n * n for n in range(10_000))
 
-The comprehension builds the whole list first &mdash; every element in memory &mdash; then sums it. The generator produces one value at a time and never builds a list at all. When the result is consumed immediately by `sum`, `any`, `max` or a `for`, the generator is the better default, and the size difference is measurable: the page prints both.
+The comprehension builds the whole list first. each element in memory. Then sums it. The gen makes one value at a time and never builds a list at all. When the result is consumed right away by `sum`, `any`, `max` or a `for`, the gen is the better default. The size difference is measurable: the page prints both.
 
 """,
     [{"q": "Where does the filtering `if` go in a comprehension?",
@@ -654,15 +654,15 @@ for item, qty, price in [("apple", 3, 1.5), ("banana", 12, 0.25)]:
      "<code class='mono-font'>f\"{x = }\"</code> prints both the expression and "
      "its value - the fastest debug print there is."],
     """title: f-strings and Formatting: A Practical Guide
-intro: An f-string puts values inside a string where they will appear, and a small format language after each colon controls exactly how they are printed.
+intro: An f-string puts values inside a string where they'll appear. A small format language after each colon controls just how they're printed.
 
 ## The prefix does the work
 
 f"{name} scored {score}"
 
-The `f` before the quote is what turns braces into slots. Without it you get the literal characters. Inside the braces goes any expression &mdash; a variable, a method call, arithmetic &mdash; evaluated at that point and inserted.
+The `f` before the quote is what turns braces into slots. Without it you get the literal characters. Inside the braces goes any formula. A variable, a method call, math. Tested at that point and inserted.
 
-That is the whole idea, and it is why f-strings replaced everything before them: the value appears in the source where it appears in the output. Concatenation with `+` scatters the sentence across quotes and plus signs, and `%` and `.format()` push the values to the end, away from the slots they fill.
+That is the whole idea, and it's why f-strings replaced all before them. The value appears in the source where it appears in the output. Concatenation with `+` scatters the sentence across quotes and plus signs, and `%` and `.format()` push the values to the end, away from the slots they fill.
 
 ## The format spec
 
@@ -670,7 +670,7 @@ After a colon comes a compact language for presentation:
 
 - `:.2f` &mdash; two decimal places
 - `:,` &mdash; thousands separators
-- `:>8` &mdash; right-align in eight columns; `<` left, `^` centre
+- `:>8` &mdash; right-align in eight columns. `<` left, `^` centre
 - `:03d` &mdash; pad to three digits with zeros
 - `:.1%` &mdash; show as a percentage with one decimal
 
@@ -678,17 +678,17 @@ They combine: `{price:>10.2f}` right-aligns in ten columns with two decimals. Th
 
 ## Formatting is not rounding
 
-`f"{value:.2f}"` changes how the number is <em>displayed</em>. The variable is untouched, still carrying every digit it had. This matters when you print a rounded figure and then keep computing with the original: the printed total and the computed total can differ, and the program is not wrong &mdash; the display was never the value.
+`f"{value:.2f}"` changes how the number is <em>displayed</em>. The variable is untouched, still carrying each digit it had. This matters when you print a rounded figure and then keep finding with the first. The printed total and the found total can differ. The program isn't wrong. The display was never the value.
 
 ## The debugging shortcut
 
 f"{total = }"
 
-prints `total = 42` &mdash; the expression and its value. It works for any expression, so `f"{len(items) = }"` prints both the call and its result. It is the fastest way to instrument a function, and it removes the classic mistake of printing a label that no longer matches the variable beside it.
+prints `total = 42` &mdash; the formula and its value. It works for any formula. `f"{len(items) = }"` prints both the call and its result. It's the fastest way to instrument a function. It drops the classic mistake of printing a label that no longer matches the variable beside it.
 
 ## Which to use
 
-Use f-strings. `%` formatting and `.format()` still work and you will meet them in older code, but they exist now mainly to be read, not written. The one place `.format()` still earns its keep is when the template is stored separately from the values &mdash; a message in a config file, for instance &mdash; because an f-string is evaluated where it is written.
+Use f-strings. `%` formatting and `.format()` still work and you'll meet them in older code. They exist now mainly to be read, not written. The one place `.format()` still earns its keep is when the template is stored apart from the values. A message in a config file, say. Because an f-string is tested where it's written.
 """,
     [{"q": "What does `f\"{2/3:.2f}\"` produce?",
       "options": ["'0.67'", "'0.666666'", "0.67 as a float", "A syntax error"],
@@ -776,29 +776,29 @@ print("after another call       :", id(add_item.__defaults__[0]))
      "Never default to a list or dict. Default to "
      "<code class='mono-font'>None</code> and build it inside."],
     """title: Function Arguments: A Practical Guide
-intro: Python matches arguments to parameters two ways &mdash; by position and by name &mdash; and gives parameters default values. One of those defaults has a trap in it that every Python programmer meets exactly once.
+intro: Python matches args to params two ways. By spot and by name. And gives params default values. One of those defaults has a trap in it that each Python programmer meets just once.
 
 ## Positional and keyword
 
 def greet(name, greeting="Hello"):
 
-`greet("ana")` matches by position: the first argument becomes `name`. `greet("ana", greeting="Hi")` names the second explicitly. Both reach the same function; the difference is what the call site tells a reader.
+`greet("ana")` matches by spot: the first arg turns `name`. `greet("ana", greeting="Hi")` names the second by name. Both reach the same function. The difference is what the call site tells a reader.
 
-Keywords earn their place when the value alone is meaningless. `send(msg, True)` tells you nothing; `send(msg, urgent=True)` tells you everything. A boolean argument is almost always worth naming.
+Keywords earn their place when the value alone is meaningless. `send(msg, True)` tells you nothing. `send(msg, urgent=True)` tells you all. A boolean arg is almost always worth naming.
 
-One rule: in a call, positional arguments come first. `f(greeting="Hi", "ana")` is a syntax error, because Python cannot tell where the positional one was meant to go.
+One rule: in a call, spot-based args come first. `f(greeting="Hi", "ana")` is a syntax error. Python can't tell where the spot-based one was meant to go.
 
 ## Defaults
 
-A parameter with a default becomes optional:
+A param with a default turns optional:
 
 def greet(name, greeting="Hello", excited=False):
 
-Callers supply what they care about and ignore the rest. Defaults must come after all non-default parameters, for the same reason: otherwise a positional call would be ambiguous.
+Callers supply what they care about and skip the rest. Defaults must come after all non-default params, for the same reason: or else a spot-based call would be ambiguous.
 
 ## The mutable default trap
 
-This looks reasonable and is not:
+This looks reasonable and isn't:
 
 
 ```python
@@ -808,11 +808,11 @@ def add_item(item, basket=[]):
 ```
 
 
-Call it three times with no basket and you get one item, then two, then three &mdash; all in the same list. The reason is a single rule with a large consequence: <strong>default values are evaluated once, when the `def` runs</strong>, not on each call. That one list is created at definition time and reused forever, so every mutation accumulates.
+Call it three times with no basket and you get one item, then two, then three. All in the same list. The reason is a single rule with a large consequence: <strong>default values are tested once, when the `def` runs</strong>, not on each call. That one list is created at meaning time and reused forever, so each mutation builds up.
 
 The second program on this page prints the id of the default object before and after a call, to show it really is the same object rather than a new one that happens to have old contents.
 
-The fix is idiomatic and worth memorising:
+The fix is idiomatic and worth storing:
 
 
 ```python
@@ -822,9 +822,9 @@ def add_item(item, basket=None):
 ```
 
 
-`None` is immutable, so there is nothing to accumulate, and the fresh list is built inside the call where it belongs.
+`None` is immutable, so there's nothing to build up. The fresh list is built inside the call where it belongs.
 
-Immutable defaults &mdash; numbers, strings, `True`, `None`, tuples &mdash; are all safe. The rule is simply: never default a parameter to a list, dict or set.
+Immutable defaults &mdash; numbers, strings, `True`, `None`, tuples &mdash; are all safe. The rule is simply. Never default a param to a list, dict or set.
 
 """,
     [{"q": "When is a default argument value evaluated?",
@@ -923,7 +923,7 @@ print("merged dict :", {**{"x": 1}, **{"y": 2}})
      "At a call site the stars do the reverse - they spread a list or dict "
      "back into arguments."],
     """title: *args and **kwargs: A Practical Guide
-intro: One star collects any number of positional arguments into a tuple; two stars collect keyword arguments into a dictionary. At a call site the same stars run in reverse, spreading a collection back out into arguments.
+intro: One star collects any number of spot-based args into a tuple. Two stars collect keyword args into a dict. At a call site the same stars run in reverse, spreading a collection back out into args.
 
 ## Collecting
 
@@ -934,21 +934,21 @@ def total(*args):
 ```
 
 
-`total(1, 2, 3)` gives `args = (1, 2, 3)`. `total()` gives `args = ()`. The function accepts any number of positional arguments without knowing in advance how many, and inside it `args` is an ordinary tuple.
+`total(1, 2, 3)` gives `args = (1, 2, 3)`. `total()` gives `args = ()`. The function accepts any number of spot-based args without knowing in advance how many. Inside it `args` is an plain tuple.
 
-Two stars do the same for keyword arguments:
+Two stars do the same for keyword args:
 
-def describe(**kwargs):
+def show(**kwargs):
 
-`describe(name="ana", score=91)` gives `kwargs = {"name": "ana", "score": 91}` &mdash; an ordinary dict.
+`show(name="ana", score=91)` gives `kwargs = {"name": "ana", "score": 91}` &mdash; an plain dict.
 
-The names are pure convention. `*items` and `**options` work identically; the stars carry the meaning. Convention is strong enough here that using different names in a general-purpose helper will raise eyebrows, but in a specific function a descriptive name often reads better.
+The names are pure rule. `*items` and `**options` work the same way. The stars carry the meaning. rule is strong enough here that using different names in a all-round helper will raise eyebrows. In a exact function a descriptive name often reads better.
 
 ## Order in a definition
 
 def report(label, *values, **options):
 
-Named parameters first, then `*args`, then `**kwargs`. Python needs the fixed ones before the variable ones so it knows what to bind where.
+Named params first, then `*args`, then `**kwargs`. Python needs the fixed ones before the variable ones so it knows what to bind where.
 
 ## Spreading
 
@@ -961,15 +961,15 @@ volume(*dims)    # same as volume(2, 3, 4)
 ```
 
 
-Without the star you pass one argument &mdash; the list itself &mdash; and get a `TypeError` about missing parameters. With it, the list is spread across the parameters in order.
+Without the star you pass one arg. The list itself. And get a `TypeError` about missing params. With it, the list is spread across the params in order.
 
-`**` does the same for a dict, matching keys to parameter names:
+`**` does the same for a dict, matching keys to param names:
 
 volume(**{"length": 2, "width": 3, "height": 4})
 
 ## The pass-through pattern
 
-This is where the two halves meet, and it is by far the most common real use:
+This is where the two halves meet. It's by far the most common real use:
 
 
 ```python
@@ -979,7 +979,7 @@ def logged(func, *args, **kwargs):
 ```
 
 
-`logged` accepts anything and forwards it untouched. It does not need to know the signature of what it is wrapping. Every decorator, every wrapper, every "do this then call that" helper is built on this shape.
+`logged` accepts any of it and forwards it untouched. It doesn't need to know the signature of what it's wrapping. each decorator, each wrapper, each "do this then call that" helper is built on this shape.
 
 ## Merging collections
 
@@ -1097,7 +1097,7 @@ print("len is a builtin:", len)
      "<code class='mono-font'>global</code> rebinds a module name; "
      "<code class='mono-font'>nonlocal</code> rebinds the enclosing function's."],
     """title: Variable Scope: A Practical Guide
-intro: When Python meets a name, it looks in four places in a fixed order &mdash; local, enclosing, global, builtin &mdash; and stops at the first one that has it. Almost every scope surprise comes from one rule about assignment.
+intro: When Python meets a name, it looks in four places in a fixed order. Local, enclosing, global, builtin. And stops at the first one that has it. Almost each scope surprise comes from one rule about set.
 
 ## The four places
 
@@ -1108,7 +1108,7 @@ LEGB is the order:
 - <strong>Global</strong> &mdash; names at module level
 - <strong>Builtin</strong> &mdash; `len`, `print`, `range` and friends
 
-The first match wins, which is why naming a variable `list` or `sum` shadows the builtin for the rest of that scope. It is legal and it will confuse you later.
+The first match wins. This Is why naming a variable `list` or `sum` shadows the builtin for the rest of that scope. It's legal and it will confuse you later.
 
 ## Reading is easy, assigning is the trap
 
@@ -1122,11 +1122,11 @@ def show():
 ```
 
 
-But assigning to that name inside the function does not change the outer one. It creates a new local name that happens to be spelled the same, and it disappears when the function returns.
+But assigning to that name inside the function doesn't change the outer one. It creates a new local name that happens to be spelled the same. It disappears when the function returns.
 
 ## The rule that catches everyone
 
-<strong>If a name is assigned anywhere in a function, it is local for the entire function</strong> &mdash; including lines that run before the assignment.
+<strong>If a name is assigned anywhere in a function, it's local for the entire function</strong>. Including lines that run before the set.
 
 
 ```python
@@ -1136,7 +1136,7 @@ def broken():
 ```
 
 
-That `print` looks like it should read the global, and it would have, if the line below it did not exist. Python decides local-or-not when it compiles the function, not while running it. The error message &mdash; "local variable referenced before assignment" &mdash; is precise once you know this, and baffling before.
+That `print` looks like it should read the global. It would have, if the line below it didn't exist. Python decides local-or-not when it compiles the function, not while running it. The error message. "local variable referenced before set". Is precise once you know this, and baffling before.
 
 ## global and nonlocal
 
@@ -1150,7 +1150,7 @@ def bump():
 ```
 
 
-`global` reaches module level. `nonlocal` reaches the nearest enclosing function, which is what makes closures able to keep state:
+`global` reaches module level. `nonlocal` reaches the nearest enclosing function. This Is what makes closures able to keep state:
 
 
 ```python
@@ -1162,11 +1162,11 @@ def counter():
 ```
 
 
-Both are worth knowing and neither is worth reaching for often. A function that rebinds globals is a function whose behaviour depends on when you call it, which is exactly the kind of thing that makes bugs hard to find. Returning a value is nearly always better.
+Both are worth knowing and neither is worth reaching for often. A function that rebinds globals is a function whose action depends on when you call it. This Is just the kind of thing that makes bugs hard to find. Returning a value is nearly always better.
 
 ## Mutating is not assigning
 
-One clarification that resolves a lot of confusion: `items.append(1)` is not an assignment. It mutates the object the name already points at, so it affects the outer list without needing `global`. `items = [1]` is an assignment, and creates a local. The distinction is the object versus the name.
+One clarification that resolves a lot of confusion: `items.append(1)` isn't an set. It mutates the object the name already points at. It affects the outer list without needing `global`. `items = [1]` is an set. Creates a local. The gap is the object versus the name.
 """,
     [{"q": "What order does Python search for a name?",
       "options": ["Global, Local, Builtin, Enclosing", "Local, Enclosing, Global, Builtin",
@@ -1284,7 +1284,7 @@ except ValueError as e:
      "<code class='mono-font'>as e</code> gives you the exception object, which "
      "carries the detail worth logging."],
     """title: try and except: A Practical Guide
-intro: A try block runs code that might fail; an except block says what to do when a specific failure happens. The difficulty is not the syntax &mdash; it is being disciplined about which failures you actually catch.
+intro: A try block runs code that might fail. An except block says what to do when a exact failure happens. The trouble isn't the syntax. It's being disciplined about which failures you really catch.
 
 ## The shape
 
@@ -1297,19 +1297,19 @@ except ValueError:
 ```
 
 
-If `int()` raises `ValueError`, control jumps to the handler. If it raises anything else, the handler is skipped and the error keeps travelling up. That selectivity is the point.
+If `int()` raises `ValueError`, control jumps to the handler. If it raises any of it else, the handler is skipped and the error keeps travelling up. That selectivity is the point.
 
 ## Catch what you expect, nothing more
 
-except:&nbsp;&nbsp;&nbsp;&nbsp;# catches everything
+except:&nbsp;&nbsp;&nbsp;&nbsp;# catches all
 
-This is almost always a mistake. It catches the error you were thinking of, and also your typos, your `NameError`s, your `AttributeError`s from a refactor you half-finished. The program stops crashing and starts producing wrong answers quietly, which is strictly worse: a crash tells you where to look.
+This is almost always a mistake. It catches the error you were thinking of. Also your typos, your `NameError`s, your `AttributeError`s from a refactor you half-finished. The program stops crashing and starts making wrong answers quietly. This Is strictly worse: a crash tells you where to look.
 
-The second program on this page has a deliberate typo inside a bare `except`. It returns 0, cheerfully, and nothing anywhere says a name was misspelled.
+The second program on this page has a deliberate typo inside a bare `except`. It returns 0, cheerfully. Nothing anywhere says a name was misspelled.
 
 Name the exception:
 
-except ValueError:<br>except (KeyError, IndexError):<br>except Exception as e:&nbsp;&nbsp;# broad, but at least not BaseException
+except ValueError:<br>except (KeyError, IndexError):<br>except Exception as e:&nbsp;&nbsp;# broad. But At least not BaseException
 
 ## as e, and why you want it
 
@@ -1320,18 +1320,18 @@ except ValueError as e:
 ```
 
 
-The exception object carries the detail &mdash; which key was missing, which value would not parse. Discarding it and printing "something went wrong" throws away the only part that would have helped.
+The exception object carries the detail. Which key was missing. This Value wouldn't parse. Discarding it and printing "a thing went wrong" throws away the only part that would have helped.
 
 ## else and finally
 
-- `else` runs when the `try` block raised nothing. It keeps the risky line alone in the `try`, so the handler cannot accidentally catch an error from the follow-up code.
-- `finally` runs either way, raised or not. It is where cleanup goes.
+- `else` runs when the `try` block raised nothing. It keeps the risky line alone in the `try`. The handler can't accidentally catch an error from the follow-up code.
+- `finally` runs either way, raised or not. It's where cleanup goes.
 
-For files and locks, prefer `with`, which does the same job with less ceremony.
+For files and locks, prefer `with`. This Does the same job with less ceremony.
 
 ## Raising your own
 
-Handling is half of it. When a caller hands you something impossible, say so:
+Handling is half of it. When a caller hands you a thing hopeless, say so:
 
 
 ```python
@@ -1340,11 +1340,11 @@ if age < 0:
 ```
 
 
-Include the offending value in the message. "Invalid input" costs the next person a debugging session; "got -1" ends it immediately.
+Include the offending value in the message. "Invalid input" costs the next person a debugging session. "got -1" ends it right away.
 
 ## Ask forgiveness, not permission
 
-Python leans toward trying the operation and handling the failure, rather than checking first. Checking `if key in d` before `d[key]` does the lookup twice and still has a gap between the check and the use. Try it and catch `KeyError`; it is faster in the common case and correct in all of them.
+Python leans toward trying the op and handling the failure, rather than checking first. Checking `if key in d` before `d[key]` does the lookup twice and still has a gap between the check and the use. Try it and catch `KeyError`. It's faster in the common case and correct in all of them.
 """,
     [{"q": "Why is a bare `except:` discouraged?",
       "options": ["It is slower", "It catches your own bugs too, hiding them",
@@ -1452,7 +1452,7 @@ print("with __repr__   :", NicePoint(1, 2))
      "Attributes on <code class='mono-font'>self</code> are per object. "
      "Attributes on the class are shared by all of them."],
     """title: Classes and Objects: A Practical Guide
-intro: A class bundles data with the functions that operate on it. The class is a template; each instance built from it carries its own copy of the data and shares the behaviour.
+intro: A class bundles data with the functions that operate on it. The class is a template. Each instance built from it carries its own copy of the data and shares the action.
 
 ## Template and instance
 
@@ -1464,21 +1464,21 @@ class Dog:
 ```
 
 
-`Dog` describes what a dog is. `Dog("rex", 3)` builds one. Build two and they are independent: changing `a.age` leaves `b.age` alone, because each instance has its own attributes.
+`Dog` shows what a dog is. `Dog("rex", 3)` builds one. Build two and they're free. Changing `a.age` leaves `b.age` alone. Each instance has its own fields.
 
 ## What __init__ does
 
-`__init__` runs immediately after the instance is created, and its job is to set up that instance's data. It is not a constructor in the C++ sense &mdash; the object already exists by the time it runs &mdash; but in practice it is where you put everything the object needs to start life.
+`__init__` runs right away after the instance is created. Its job is to set up that instance's data. It isn't a constructor in the C++ sense. The object already exists by the time it runs. But it's where you put all the object needs to start life.
 
-The double underscores mark it as a name Python itself calls. You almost never call `__init__` directly.
+The double underscores mark it as a name Python itself calls. You almost never call `__init__` right.
 
 ## self is not magic
 
-`self` is the instance, handed to the method as its first argument. Python does this for you: `a.speak()` is `Dog.speak(a)`, and the page prints both to show they are the same call.
+`self` is the instance, handed to the method as its first arg. Python does this for you: `a.speak()` is `Dog.speak(a)`. The page prints both to show they're the same call.
 
-The name `self` is convention rather than syntax &mdash; the first parameter could be called anything &mdash; but every Python programmer expects `self`, and using something else will read as a mistake.
+The name `self` is rule rather than syntax. The first param could be called any of it. But each Python programmer expects `self`. Using a thing else will read as a mistake.
 
-Every method that touches instance data needs it, and every attribute belonging to the instance is reached through it. Forgetting `self.` inside a method is the most common early error: you get a local variable that vanishes when the method returns.
+each method that touches instance data needs it. Each field belonging to the instance is reached through it. Losing `self.` inside a method is the most common early error. You get a local variable that vanishes when the method returns.
 
 ## Class attributes are shared
 
@@ -1491,11 +1491,11 @@ class Counter:
 ```
 
 
-`self.count` belongs to the object. `Counter.total` belongs to the class and every instance sees the same one. This is occasionally what you want &mdash; a registry, a shared cache, a constant &mdash; and is a bug the rest of the time, in the same family as the mutable default argument.
+`self.count` belongs to the object. `Counter.total` belongs to the class and each instance sees the same one. This is at times what you want. A registry, a shared cache, a constant. And is a bug the rest of the time, in the same family as the mutable default arg.
 
 ## __repr__ earns its keep immediately
 
-By default, printing an object gives you something like `&lt;__main__.Point object at 0x104...&gt;`, which tells you nothing. Define `__repr__` and you decide:
+By default, printing an object gives you a thing like `&lt;__main__.Point object at 0x104...&gt;`. This Tells you nothing. Define `__repr__` and you decide:
 
 
 ```python
@@ -1601,25 +1601,25 @@ print("-> `or` also replaces 0 and \\"\\", which are usually real values")
      "<code class='mono-font'>x or default</code> looks similar and is not: it "
      "also replaces <code class='mono-font'>0</code> and empty strings."],
     """title: Conditional Expressions: A Practical Guide
-intro: A conditional expression picks between two values in one line. It is not a shorter if statement &mdash; it is an expression, which means it produces a value and can appear anywhere a value can.
+intro: A if-based formula picks between two values in one line. It isn't a shorter if statement. It's an formula. This Means it makes a value and can appear anywhere a value can.
 
 ## The order takes a moment
 
 verdict = "pass" if score &gt;= 50 else "fail"
 
-The value comes first, then the condition, then the alternative. Most languages put the condition first, so the shape reads backwards at first. It becomes natural quickly, and the reason for it is that the common case reads as a sentence: "pass, if the score is at least fifty, otherwise fail".
+The value comes first, then the rule, then the option. Most languages put the rule first. The shape reads backwards at first. It turns natural quickly. The reason for it's that the common case reads as a sentence: "pass, if the score is at least fifty, or else fail".
 
 ## Where it earns its place
 
-Because it is an expression, it fits where a statement cannot:
+Because it's an formula, it fits where a statement can't:
 
 f"You {'passed' if ok else 'failed'}"<br>["even" if n % 2 == 0 else "odd" for n in nums]<br>func(timeout if timeout else 30)
 
-Inside an f-string, inside a comprehension, as an argument. A four-line `if` cannot go in any of those places, so the choice is not style &mdash; it is the only form that fits.
+Inside an f-string, inside a comprehension, as an arg. A four-line `if` can't go in any of those places. The choice isn't style. It's the only form that fits.
 
 ## The else is not optional
 
-An expression has to produce a value on every path, so there is no one-armed version. `x = 1 if cond` is a syntax error. If you want "set it only sometimes", that is a statement, and the statement form is what you want.
+An formula has to give a value on each path. There's no one-armed version. `x = 1 if cond` is a syntax error. If you want "set it only at times", that is a statement. The statement form is what you want.
 
 ## The `or` lookalike
 
@@ -1627,9 +1627,9 @@ This is the most common way the idea goes wrong:
 
 return value or "default"
 
-It looks like "use the default when value is missing", and it is really "use the default when value is falsy" &mdash; which includes `0`, `""`, `[]` and `False`. If `0` is a legitimate value, `or` silently discards it.
+It looks like "use the default when value is missing". It's really "use the default when value is falsy". Which includes `0`, `""`, `[]` and `False`. If `0` is a legitimate value, `or` silently discards it.
 
-return value if value is not None else "default"
+return value if value isn't None else "default"
 
 says what was meant. The page runs both over `"set"`, `""`, `0` and `None` so the divergence is visible rather than theoretical.
 """,
@@ -1747,7 +1747,7 @@ for n in (-5, 0, 42, 1000):
      "<code class='mono-font'>case Colour.RED</code> or "
      "<code class='mono-font'>case 200</code>, not a lone variable."],
     """title: match and case: A Practical Guide
-intro: match tests a value against patterns rather than conditions. For plain literals it is a tidier if-chain; for structured data it is something an if-chain cannot do at all, because the pattern takes the value apart while matching it.
+intro: match tests a value against patterns rather than rules. For plain literals it's a tidier if-chain. For structured data it's a thing an if-chain can't do at all. The pattern takes the value apart while matching it.
 
 ## The tidy version of an if-chain
 
@@ -1763,15 +1763,15 @@ match status:
 ```
 
 
-`|` groups alternatives, `_` is the default. The first matching case wins and the rest are skipped &mdash; there is no fall-through and no `break`.
+`|` groups options, `_` is the default. The first matching case wins and the rest are skipped. There's no fall-through and no `break`.
 
-If this were all `match` did it would be barely worth the keyword, and the page prints an if-chain beside it that agrees on every input.
+If this were all `match` did it would be barely worth the keyword. The page prints an if-chain beside it that agrees on each input.
 
 ## What it actually adds
 
 case {"type": "click", "x": x, "y": y}:
 
-This matches a dictionary that has a `type` of `"click"`, and in the same breath binds `x` and `y` to the values it found. One line replaces a type check, two key checks and two lookups &mdash; and it cannot go out of step with itself the way that sequence can.
+This matches a dict that has a `type` of `"click"`. In the same breath binds `x` and `y` to the values it found. One line replaces a type check, two key checks and two lookups. And it can't go out of step with itself the way that sequence can.
 
 The same applies to sequences:
 
@@ -1781,11 +1781,11 @@ matches any list and splits it into head and tail as it goes.
 
 ## Guards
 
-A pattern can carry a condition:
+A pattern can carry a rule:
 
 case int() if n &lt; 0:
 
-The pattern narrows the shape, the guard narrows the value. Together they express "an integer, and a negative one" in the place where you are already looking.
+The pattern narrows the shape, the guard narrows the value. Together they express "an int. A minus one" in the place where you're already looking.
 
 """,
     [{"q": "What does a bare `case status:` do?",
@@ -1893,7 +1893,7 @@ else:
      "Think of it as <em>nobreak</em>. That is the name it should have had.",
      "It replaces the found = False flag, which is the pattern it exists for."],
     """title: for/else and while/else: A Practical Guide
-intro: A loop can have an else. It runs when the loop finished normally &mdash; that is, when no break happened. Almost everyone reads it as "else if the loop did not run", and that is not what it means.
+intro: A loop can have an else. It runs when the loop finished most times. That is, when no break happened. Almost everyone reads it as "else if the loop didn't run". That isn't what it means.
 
 ## The rule, exactly
 
@@ -1907,9 +1907,9 @@ else:
 ```
 
 
-The `else` runs if the loop ran to completion without hitting `break`. Iterate zero times? The else runs. Iterate a million times and finish? The else runs. Break out on the first pass? It does not.
+The `else` runs if the loop ran to completion without hitting `break`. Iterate zero times? The else runs. Iterate a million times and finish? The else runs. Break out on the first pass? It doesn't.
 
-The keyword is badly chosen. If it were called `nobreak`, nobody would ever have been confused by it, and reading it that way in your head is the fastest way to make it click.
+The keyword is badly chosen. If it were called `nobreak`, no one would ever have been confused by it. Reading it that way in your head is the fastest way to make it click.
 
 ## What it replaces
 
@@ -1927,7 +1927,7 @@ if not found:
 ```
 
 
-The flag exists only to carry one bit of information past the end of the loop. `for/else` carries it for you: the else block <em>is</em> the "we never found it" branch. One fewer variable, and one fewer chance to forget to set it.
+The flag exists only to carry one bit of info past the end of the loop. `for/else` carries it for you. The else block <em>is</em> the "we never found it" branch. One fewer variable. One fewer chance to forget to set it.
 
 ## Where it genuinely reads well
 
@@ -1943,15 +1943,15 @@ else:
 ```
 
 
-"Tried every divisor, none worked" is exactly the else branch.
+"Tried each divisor, none worked" is just the else branch.
 
 ## while/else too
 
-The same rule applies to `while`: the else runs when the condition became false, and not when a `break` ended the loop. That maps onto retry loops neatly &mdash; the else is where "we exhausted every attempt" lives.
+The same rule applies to `while`: the else runs when the rule became false. Not when a `break` ended the loop. That maps onto retry loops neatly. The else is where "we exhausted each attempt" lives.
 
 ## Should you use it
 
-It is a genuine tool and it is also unfamiliar to many readers. Inside a small function whose whole point is the search, it reads well and saves a flag. Buried in a long function among other loops, a comment or a flag may serve the next person better. Knowing it matters more than using it, because you will meet it in other people's code and it must not be a mystery.
+It's a genuine tool and it's also unseen to many readers. Inside a small function whose whole point is the search, it reads well and saves a flag. Buried in a long function among other loops, a comment or a flag may serve the next person better. Knowing it matters more than using it. You'll meet it in other people's code and it must not be a mystery.
 """,
     [{"q": "When does a for/else's else block run?",
       "options": ["When the loop body never ran", "When the loop finished without "
@@ -2062,7 +2062,7 @@ print("agree:", all(band_elif(n) == band_nested(n) for n in (10, 60, 200)))
      "indentation, one decision.",
      "Three levels of indentation is the usual signal to extract a function."],
     """title: Nested Conditionals: A Practical Guide
-intro: An if inside an if is sometimes exactly right and more often a shape that grew. The useful skill is recognising which one you have, because most nesting can be flattened without changing the logic.
+intro: An if inside an if is at times just right and more often a shape that grew. The handy skill is recognising which one you've. Most nesting can be flattened without changing the logic.
 
 ## When nesting is just `and`
 
@@ -2074,11 +2074,11 @@ if age >= 18:
 ```
 
 
-If the inner `if` is the entire body of the outer one, and there is no `else` on either, the two conditions are simply both required:
+If the inner `if` is the entire body of the outer one. There's no `else` on either, the two rules are simply both needed:
 
 if age &gt;= 18 and member:
 
-Same behaviour, one level of indentation, and the condition reads as one thought instead of two.
+Same action, one level of indentation. The rule reads as one thought instead of two.
 
 ## Guard clauses flatten the rest
 
@@ -2093,7 +2093,7 @@ if active:
 ```
 
 
-Four levels deep, and the success case &mdash; the thing the function is for &mdash; is buried furthest from the left margin, while every failure sits in an `else` far from the condition that caused it.
+Four levels deep, and the success case. The thing the function is for. Is buried furthest from the left margin, while each failure sits in an `else` far from the rule that caused it.
 
 Inverted, each failure handles itself and leaves:
 
@@ -2106,13 +2106,13 @@ return "yes"
 ```
 
 
-Now every rule sits beside its own message, the happy path is the last line at zero indentation, and adding a rule is one line rather than another level. The page runs both over the same four cases and prints them side by side, because the point is that the behaviour is identical and only the shape changed.
+Now each rule sits beside its own message, the happy path is the last line at zero indentation. Adding a rule is one line rather than another level. The page runs both over the same four cases and prints them side by side. The point is that the action is the same and only the shape changed.
 
 ## elif is not nesting
 
 if n &gt; 100: ... elif n &gt; 50: ... else: ...
 
-An `elif` chain is one decision with several outcomes, all at the same indentation. Reaching for a nested `if` where an `elif` would do is how a flat choice becomes a staircase.
+An `elif` chain is one choice with a few outcomes, all at the same indentation. Reaching for a nested `if` where an `elif` would do is how a flat choice turns a staircase.
 
 ## The rule of thumb
 
@@ -2215,7 +2215,7 @@ for n, name in enumerate(["ana", "bo"], start=1):
      "<code class='mono-font'>for i in range(len(x))</code> is the pattern this "
      "replaces."],
     """title: enumerate(): A Practical Guide
-intro: enumerate walks a sequence and hands you the position along with the item. It replaces both of the usual workarounds &mdash; a counter you increment by hand, and indexing back into the list.
+intro: enumerate walks a sequence and hands you the spot along with the item. It replaces both of the usual workarounds. A counter you increment by hand. Indexing back into the list.
 
 ## The two things it replaces
 
@@ -2239,7 +2239,7 @@ for i in range(len(names)):
 ```
 
 
-Both work. The first has a variable to initialise and remember to increment; forget the increment and the loop runs forever printing zero. The second reads the list twice per pass &mdash; once for the length, once per lookup &mdash; and puts `names[i]` where you wanted `name`.
+Both work. The first has a variable to reset and note to increment. Forget the increment and the loop runs forever printing zero. The second reads the list twice per pass. Once for the length, once per lookup. And puts `names[i]` where you wanted `name`.
 
 for i, name in enumerate(names):
 
@@ -2339,13 +2339,13 @@ print("-> and they come back as tuples, not lists")
      "to build a dict from two lists.",
      "<code class='mono-font'>zip(*pairs)</code> unzips, and hands back tuples."],
     """title: zip(): A Practical Guide
-intro: zip walks several sequences in step, yielding one tuple per position. It is the clean answer to "I have two lists that line up" &mdash; with one behaviour worth knowing before it bites.
+intro: zip walks a few sequences in step, yielding one tuple per spot. It's the clean answer to "I have two lists that line up". With one action worth knowing before it bites.
 
 ## The basic shape
 
 for name, score in zip(names, scores):
 
-Each pass gives you the next item from each list. The alternative is `for i in range(len(names))` followed by two lookups, which works and puts an index between you and the values.
+Each pass gives you the next item from each list. The option is `for i in range(len(names))` followed by two lookups. This Works and puts an index between you and the values.
 
 It takes any number of iterables:
 
@@ -2439,15 +2439,15 @@ print("-> b still before a, because they tied and stability preserved it")
      "field then another.",
      "The sort is stable, so equal keys keep the order they came in."],
     """title: sorted() with key=: A Practical Guide
-intro: sorted arranges items by comparing them. key= lets you say what to compare instead &mdash; a length, a field, a computed score &mdash; without touching the items themselves.
+intro: sorted arranges items by checking them. key= lets you say what to compare instead. A length, a field, a found score. Without touching the items themselves.
 
 ## key is a function of one item
 
 sorted(words, key=len)
 
-`key` is called once per item and returns the value to sort on. Here `len` turns each word into its length, and the words come back shortest first. The items in the result are still the words; only the comparison changed.
+`key` is called once per item and returns the value to sort on. Here `len` turns each word into its length. The words come back shortest first. The items in the result are still the words. Only the check changed.
 
-Anything callable works: a builtin, a lambda, a named function.
+any of it callable works: a builtin, a lambda, a named function.
 
 
 ```python
@@ -2465,17 +2465,17 @@ nums.sort()         # rearranges in place, returns None
 ```
 
 
-The trap is writing `nums = nums.sort()`, which assigns `None` and destroys the list. It is a common enough mistake that recognising it is worth more than the rule: if a sort produced `None`, this is why.
+The trap is writing `nums = nums.sort()`. This Assigns `None` and destroys the list. It's a common enough mistake that recognising it's worth more than the rule. If a sort made `None`, this is why.
 
-`.sort()` exists only on lists. `sorted()` accepts any iterable &mdash; a tuple, a string, a set, a dict (giving its keys) &mdash; and always hands back a list.
+`.sort()` exists only on lists. `sorted()` accepts any iterable. A tuple, a string, a set, a dict (giving its keys). And always hands back a list.
 
 ## Stability, and why it matters
 
-Python's sort is stable: items that compare equal keep their original relative order. That is what makes multi-pass sorting work. Sort by name, then sort the result by score, and entries with the same score are still in name order. The page shows this directly, sorting only by the number and pointing out that the tied items did not shuffle.
+Python's sort is stable: items that compare equal keep their first scaled order. That is what makes multi-pass sorting work. Sort by name, then sort the result by score. Entries with the same score are still in name order. The page shows this right, sorting only by the number and pointing out that the tied items didn't shuffle.
 
 ## The performance note
 
-`key` is called exactly once per item, not on every comparison, so an expensive key function is affordable. Doing the same work inside a comparison would cost far more.
+`key` is called just once per item, not on each check. An costly key function is affordable. Doing the same work inside a check would cost far more.
 """,
     [{"q": "What does `nums = nums.sort()` leave in nums?",
       "options": ["The sorted list", "None", "The original list", "An error"],
@@ -2562,7 +2562,7 @@ print("999_999 in range(1_000_000):", 999_999 in range(1_000_000))
      "<code class='mono-font'>x[::-1]</code> usually reads better than a "
      "backwards range."],
     """title: range() with step: A Practical Guide
-intro: range takes up to three arguments &mdash; start, stop and step &mdash; and produces numbers without ever building a list. The two things worth internalising are that the stop is excluded, and what that means when counting down.
+intro: range takes up to three args. Start, stop and step. And makes numbers without ever building a list. The two things worth internalising are that the stop is excluded. What that means when counting down.
 
 ## The three forms
 
@@ -2574,11 +2574,11 @@ range(0, 10, 2)  # 0 2 4 6 8
 ```
 
 
-One argument is the stop. Two are start and stop. Three add the step. The step can be any non-zero integer.
+One arg is the stop. Two are start and stop. Three add the step. The step can be any non-zero int.
 
 ## The stop is never included
 
-`range(5)` gives five numbers ending at 4. This looks like an off-by-one waiting to happen and is the opposite: it is what makes `range(len(items))` produce exactly the valid indices of a list, and what makes `range(a, b)` produce `b - a` numbers.
+`range(5)` gives five numbers ending at 4. This looks like an off-by-one waiting to happen and is the opposite. It's what makes `range(len(items))` give just the valid indices of a list. What makes `range(a, b)` give `b - a` numbers.
 
 ## Counting down
 
@@ -2586,7 +2586,7 @@ Two things must both be true:
 
 range(5, 0, -1)&nbsp;&nbsp;&nbsp;&nbsp;# 5 4 3 2 1
 
-The step is negative <em>and</em> the stop is below the start. Get one wrong and you get an empty range, not an error &mdash; `range(5, 0)` with no step produces nothing at all, because it is counting up from 5 to 0.
+The step is minus <em>and</em> the stop is below the start. Get one wrong and you get an empty range, not an error. `range(5, 0)` with no step makes nothing at all. It's counting up from 5 to 0.
 
 The classic mistake is stopping at 0 when you meant to include it:
 
@@ -2597,7 +2597,7 @@ range(3, -1, -1)  # 3 2 1 0
 ```
 
 
-To walk a list backwards by index you need `range(len(items) - 1, -1, -1)`, which is three fiddly numbers in a row and exactly why the alternatives exist:
+To walk a list backwards by index you need `range(len(items) - 1, -1, -1)`. This Is three fiddly numbers in a row and just why the options exist:
 
 
 ```python
@@ -2606,17 +2606,17 @@ for x in items[::-1]:
 ```
 
 
-Both say "backwards" without arithmetic. Reach for a backwards `range` only when you genuinely need the index.
+Both say "backwards" without math. Reach for a backwards `range` only when you truly need the index.
 
 ## It does not build a list
 
-`range(1_000_000)` stores three integers &mdash; start, stop, step &mdash; and computes each value on demand. It is a few dozen bytes whatever the size, which the page prints beside the list version for contrast.
+`range(1_000_000)` stores three ints &mdash; start, stop, step &mdash; and finds each value on demand. It's a few dozen bytes what the size. This The page prints beside the list version for contrast.
 
-That laziness is also why `x in range(n)` is fast: it does arithmetic rather than searching. It is the one `in` test on a sequence that does not scan.
+That laziness is also why `x in range(n)` is fast. It does math rather than searching. It's the one `in` test on a sequence that doesn't scan.
 
 ## Only integers
 
-`range` refuses floats. For a fractional step, build the integers and divide, or use a library. `range(0, 1, 0.1)` is a TypeError, not a rounding problem.
+`range` refuses floats. For a fractional step, build the ints and divide, or use a library. `range(0, 1, 0.1)` is a TypeError, not a rounding problem.
 """,
     [{"q": "What does `list(range(5, 0))` give?",
       "options": ["[5, 4, 3, 2, 1]", "[]", "[0, 1, 2, 3, 4]", "An error"],
@@ -2708,19 +2708,19 @@ print("dict comp:", {k: v for k, v in pairs})
      "<code class='mono-font'>{v: k for k, v in d.items()}</code> inverts a "
      "dictionary in one line."],
     """title: Dict and Set Comprehensions: A Practical Guide
-intro: The comprehension syntax is not a list feature. The same shape builds dictionaries and sets; only the brackets and the expression change.
+intro: The comprehension syntax isn't a list feature. The same shape builds dicts and sets. Only the brackets and the formula change.
 
 ## Three forms, one idea
 
-[n * n for n in nums]&nbsp;&nbsp;&nbsp;&nbsp;# list<br>{n * n for n in nums}&nbsp;&nbsp;&nbsp;&nbsp;# set<br>{n: n * n for n in nums}&nbsp;# dict
+[n * n for n in nums]&nbsp;&nbsp;&nbsp;&nbsp;# list<br>{n * n for n in nums}&nbsp;&nbsp;&nbsp;&nbsp;# set<br>{n. N * n for n in nums}&nbsp;# dict
 
-Square brackets build a list. Braces build a set. Braces with a `key: value` in the expression slot build a dict. The `for` clause and any trailing `if` work identically in all three.
+Square brackets build a list. Braces build a set. Braces with a `key. Value` in the formula slot build a dict. The `for` clause and any trailing `if` work the same way in all three.
 
 ## Dict comprehensions
 
 {w: len(w) for w in words}
 
-The colon is the whole difference. Everything before it is the key, everything after is the value, and both are ordinary expressions evaluated per item.
+The colon is the whole difference. All before it's the key, all after is the value. Both are plain expressions tested per item.
 
 Two patterns come up constantly. Inverting:
 
@@ -2730,21 +2730,21 @@ and building from parallel lists:
 
 {k: v for k, v in zip(keys, values)}
 
-though `dict(zip(keys, values))` is shorter when there is no transformation to do.
+though `dict(zip(keys, values))` is shorter when there's no change to do.
 
 ## Duplicate keys do not complain
 
 {k: v for k, v in [("a", 1), ("a", 3)]}
 
-gives `{"a": 3}`. The later value overwrites the earlier one, with no error and no warning. If the input might contain duplicates and you care, that is something to check for, not something Python will tell you about.
+gives `{"a": 3}`. The later value overwrites the earlier one, with no error and no warning. If the input might hold duplicates and you care, that is a thing to check for, not a thing Python will tell you about.
 
 ## The empty-braces trap, again
 
-`{}` is an empty dict &mdash; dictionaries claimed the braces long before sets existed. There is no empty-set literal at all; `set()` is the only way. This is worth repeating because it is the one inconsistency in an otherwise tidy family.
+`{}` is an empty dict. Dicts claimed the braces long before sets existed. There's no empty-set literal at all. `set()` is the only way. This is worth repeating because it's the one inconsistency in an or else tidy family.
 
 ## When to use them
 
-Same rule as list comprehensions: when it fits on a line and reads as a sentence. A dict comprehension with a conditional key expression and a filter is a line you will re-read; a loop is fine, and often kinder.
+Same rule as list comprehensions: when it fits on a line and reads as a sentence. A dict comprehension with a if-based key formula and a filter is a line you'll re-read. A loop is fine, and often kinder.
 """,
     [{"q": "What does `{n for n in [1, 2, 2]}` build?",
       "options": ["A list", "A dict", "A set with two items", "A set with three items"],
@@ -2835,29 +2835,29 @@ print("odd cells :", [n for row in grid for n in row if n % 2])
      "Two trailing <code class='mono-font'>if</code>s mean the same as one "
      "<code class='mono-font'>and</code>."],
     """title: Conditional Comprehensions: A Practical Guide
-intro: A comprehension can carry an if in two different places. They do different jobs, only one of them accepts an else, and mixing them up is the single most common comprehension error.
+intro: A comprehension can carry an if in two different places. They do different jobs, only one of them accepts an else. Mixing them up is the single most common comprehension error.
 
 ## Filter: the trailing if
 
 [n for n in nums if n % 2 == 0]
 
-This drops items. Six numbers in, three out. The `if` sits after the `for`, and it takes no `else` &mdash; there is nowhere for an alternative to go, because a filter either keeps an item or does not.
+This drops items. Six numbers in, three out. The `if` sits after the `for`. It takes no `else`. There's nowhere for an option to go. A filter either keeps an item or doesn't.
 
-Writing `[n for n in nums if n % 2 == 0 else 0]` is a syntax error, and it is worth trying once so the error message becomes familiar.
+Writing `[n for n in nums if n % 2 == 0 else 0]` is a syntax error. It's worth trying once so the error message turns familiar.
 
 ## Choose: the conditional expression
 
 ["even" if n % 2 == 0 else "odd" for n in nums]
 
-This drops nothing. Six numbers in, six strings out. The `if/else` is part of the <em>expression</em> at the front &mdash; it is the conditional expression from earlier in the track, used inside a comprehension &mdash; so it must be complete, and the `else` is mandatory.
+This drops nothing. Six numbers in, six strings out. The `if/else` is part of the <em>formula</em> at the front. It's the if-based formula from earlier in the track, used inside a comprehension. So it must be complete, and the `else` is mandatory.
 
 ## Together
 
 ["big" if n &gt; 4 else "small" for n in nums if n % 2 == 0]
 
-Read it in execution order rather than left to right: take each `n`, keep it only if it is even, then turn what survives into "big" or "small". The filter runs first.
+Read it in run order rather than left to right. Take each `n`, keep it only if it's even, then turn what lives into "big" or "small". The filter runs first.
 
-That ordering is not a detail. If the filter is removing `None` values, the expression never sees them:
+That sorting isn't a detail. If the filter is dropping `None` values, the formula never sees them:
 
 
 ```python
@@ -2866,19 +2866,19 @@ That ordering is not a detail. If the filter is removing `None` values, the expr
 ```
 
 
-Swap the two and the comparison raises on the first missing score.
+Swap the two and the check raises on the first missing score.
 
 ## Several filters
 
 [n for n in nums if n % 3 == 0 if n % 5 == 0]
 
-Chained filters mean the same as one `and`. The `and` version is usually clearer; the chained form is worth recognising because you will meet it.
+Chained filters mean the same as one `and`. The `and` version is often clearer. The chained form is worth recognising because you'll meet it.
 
 ## In nested comprehensions
 
 [n for row in grid for n in row if n % 2]
 
-A trailing `if` attaches to the clause it follows &mdash; here the inner loop. Placing a filter after the first `for` instead would filter rows rather than cells. When there are two loops and a condition, this is where a comprehension starts costing more to read than it saves, and the loop version is the kinder choice.
+A trailing `if` attaches to the clause it follows. Here the inner loop. Placing a filter after the first `for` instead would filter rows rather than cells. When there are two loops and a rule, this is where a comprehension starts costing more to read than it saves. The loop version is the kinder choice.
 """,
     [{"q": "Which position takes an `else`?",
       "options": ["The trailing if", "The if/else in the expression at the front",
@@ -2977,31 +2977,31 @@ for v in [0, 1, "", "0", [], [0], None, {}]:
      "nearest even on a tie.",
      "<code class='mono-font'>bool(\"0\")</code> is True. Any non-empty string is."],
     """title: Type Conversion: A Practical Guide
-intro: Python does not convert types behind your back. You ask, using the type name as a function, and it either succeeds or raises &mdash; it will not guess.
+intro: Python doesn't convert types behind your back. You ask, using the type name as a function. It either succeeds or raises &mdash; it won't guess.
 
 ## The constructors
 
 int("42")&nbsp;&nbsp;&nbsp;&nbsp;float("3.14")&nbsp;&nbsp;&nbsp;&nbsp;str(42)&nbsp;&nbsp;&nbsp;&nbsp;list("abc")&nbsp;&nbsp;&nbsp;&nbsp;bool("")
 
-Each type's name doubles as its conversion. That is why there is nothing to memorise beyond the types themselves.
+Each type's name doubles as its conversion. That is why there's nothing to store beyond the types themselves.
 
 ## Text in, text out
 
-Anything read from a user, a file or a network arrives as text. `"10" + "10"` is `"1010"`, and no error is raised, because concatenating strings is a perfectly sensible thing to do. Converting is on you:
+any of it read from a user, a file or a network arrives as text. `"10" + "10"` is `"1010"`. No error is raised. Concatenating strings is a just right sensible thing to do. Converting is on you:
 
 int(text) + int(text)
 
-This is the single most common source of confusion for beginners, and it is not really about conversion &mdash; it is about noticing that input is always a string.
+This is the single most common source of confusion for beginners. It isn't really about conversion. It's about noticing that input is always a string.
 
 ## Floats are not decimals
 
 0.1 + 0.2 == 0.3&nbsp;&nbsp;# False
 
-Binary floating point cannot represent 0.1 exactly, so the sum is a hair off. This is not a Python quirk; it is how floats work everywhere. Compare with a tolerance, round before comparing, or use `decimal.Decimal` for money.
+Binary floating point can't represent 0.1 just. The sum is a hair off. This isn't a Python quirk. It's how floats work all over. Compare with a handling, round before checking, or use `decimal.Decimal` for money.
 
 ## bool() is broader than it looks
 
-`bool("0")` is `True`, because the string is not empty. Falsy values are: `0`, `0.0`, `""`, `[]`, `{}`, `set()`, `None` and `False`. Everything else is truthy, including `"False"`.
+`bool("0")` is `True`, because the string isn't empty. Falsy values are: `0`, `0.0`, `""`, `[]`, `{}`, `set()`, `None` and `False`. All else is truthy, including `"False"`.
 """,
     [{"q": "What does `int(\"3.9\")` do?",
       "options": ["Returns 3", "Returns 4", "Raises ValueError", "Returns 3.9"],
@@ -3097,15 +3097,15 @@ print("same object  :", id(None) == id(None))
      "<code class='mono-font'>if not result</code> on a function that can return "
      "0 is a real bug, not a style question."],
     """title: None and Truthiness: A Practical Guide
-intro: Any value can be used in a condition. Knowing which ones count as false, and when that is the wrong question to ask, prevents a class of bug that produces no error at all.
+intro: Any value can be used in a rule. Knowing which ones count as false. When that is the wrong question to ask, blocks a class of bug that makes no error at all.
 
 ## The falsy values
 
-There are not many, and the list is worth memorising:
+There aren't many, and the list is worth storing:
 
 None&nbsp;&nbsp;False&nbsp;&nbsp;0&nbsp;&nbsp;0.0&nbsp;&nbsp;""&nbsp;&nbsp;[]&nbsp;&nbsp;{}&nbsp;&nbsp;set()
 
-Everything else is truthy. That includes `"0"`, `"False"`, `[0]` and `-1`, all of which catch people out because they look empty or negative in some sense and are not.
+All else is truthy. That includes `"0"`, `"False"`, `[0]` and `-1`, all of which catch people out because they look empty or minus in some sense and aren't.
 
 ## Where it goes wrong
 
@@ -3119,17 +3119,17 @@ if not result:
 ```
 
 
-Index 0 is falsy, so "found at the first position" and "not found at all" take the same branch. Nothing raises. The program is simply wrong for one input, and that input is the first element, which many test cases skip.
+Index 0 is falsy, so "found at the first spot" and "not found at all" take the same branch. Nothing raises. The program is simply wrong for one input. That input is the first element. This Many test cases skip.
 
-The page runs exactly this, printing the wrong answer and then the fix.
+The page runs just this, printing the wrong answer and then the fix.
 
 ## `is None` asks a different question
 
 if result is None:
 
-This tests for one specific object, not for emptiness. It is true for `None` and nothing else &mdash; not for `0`, not for `""`. When a function returns "the thing, or None if there isn't one", this is the only correct test.
+This tests for one exact object, not for emptiness. It's true for `None` and nothing else. Not for `0`, not for `""`. When a function returns "the thing, or None if there isn't one", this is the only correct test.
 
-The rule that follows: use truthiness when you mean "empty or zero or missing, and I treat them the same". Use `is None` when `None` means something distinct from a legitimate empty value.
+The rule that follows: use truthiness when you mean "empty or zero or missing. I treat them the same". Use `is None` when `None` means a thing distinct from a legitimate empty value.
 
 """,
     [{"q": "Which of these is truthy?",
@@ -3240,11 +3240,11 @@ print(name)      # still "ana"
 ```
 
 
-Strings are immutable, so a method that "changes" one actually returns a new one. If you do not keep the result, nothing happened. The fix is to rebind:
+Strings are immutable, so a method that "changes" one really returns a new one. If you don't keep the result, nothing happened. The fix is to rebind:
 
 name = name.upper()
 
-This is the single most common string mistake, and it fails silently &mdash; no error, just the old value.
+This is the single most common string mistake. It fails silently. No error, just the old value.
 
 ## split and join
 
@@ -3255,31 +3255,31 @@ parts = "a,b,c".split(",")    # ['a', 'b', 'c']
 ```
 
 
-`join` is called on the separator, not on the list, which reads backwards until you have seen it a few times. Think of it as "put this between them".
+`join` is called on the separator, not on the list. This Reads backwards until you've seen it a few times. Think of it as "put this between them".
 
-`join` requires strings. A list of numbers raises `TypeError`, so convert first: `",".join(str(n) for n in nums)`.
+`join` needs strings. A list of numbers raises `TypeError`. Convert first: `",".join(str(n) for n in nums)`.
 
-`split()` with no argument is a different function in practice: it splits on any run of whitespace and discards empties, which is what you want for scruffy text. `split(" ")` splits on each single space and will hand you empty strings between doubled spaces.
+`split()` with no arg is a different function . It splits on any run of whitespace and discards empties. This Is what you want for scruffy text. `split(" ")` splits on each single space and will hand you empty strings between doubled spaces.
 
 ## strip removes characters, not a suffix
 
 "banana".strip("ab")
 
-removes any leading or trailing `a` or `b` &mdash; it does not remove the string `"ab"`. The argument is a set of characters. This trips people who write `filename.strip(".csv")` and find it also ate a trailing `s` or `v`.
+drops any leading or trailing `a` or `b`. It doesn't drop the string `"ab"`. The arg is a set of characters. This trips people who write `filename.strip(".csv")` and find it also ate a trailing `s` or `v`.
 
 For that job:
 
 "report.csv".removesuffix(".csv")
 
-`removeprefix` and `removesuffix` were added in Python 3.9 precisely because the `strip` misuse was so common.
+`removeprefix` and `removesuffix` were added in Python 3.9 just because the `strip` misuse was so common.
 
 ## Tests that read as English
 
-`startswith`, `endswith`, `isdigit`, `isalpha` all return booleans and read naturally in a condition. `endswith` accepts a tuple, so `name.endswith((".jpg", ".png"))` is one call rather than two comparisons.
+`startswith`, `endswith`, `isdigit`, `isalpha` all return booleans and read on its own in a rule. `endswith` accepts a tuple. `name.endswith((".jpg", ".png"))` is one call rather than two checks.
 
 ## Case methods and comparison
 
-`upper`, `lower` and `title` return new strings. For case-insensitive comparison, `lower()` both sides &mdash; or `casefold()`, which handles a few non-English cases `lower` does not.
+`upper`, `lower` and `title` return new strings. For case-insensitive check, `lower()` both sides. Or `casefold()`. This Handles a few non-English cases `lower` doesn't.
 """,
     [{"q": "After `name = 'ana'` then `name.upper()`, what is name?",
       "options": ["'ANA'", "'ana'", "None", "An error"],
@@ -3381,11 +3381,11 @@ print("joined:", ", ".join(["a", "b"]))
      "Convert with <code class='mono-font'>int()</code> inside a "
      "<code class='mono-font'>try</code>, because the user can type anything."],
     """title: input() and Output: A Practical Guide
-intro: input() reads one line from the user and returns it as a string &mdash; always a string, whatever it looks like. print() sends values the other way, with two options worth knowing.
+intro: input() reads one line from the user and returns it as a string. Always a string, what it looks like. print() sends values the other way, with two options worth knowing.
 
 ## A note about this page
 
-The editors here run Python in your browser, which has no keyboard attached to standard input, so `input()` raises `OSError`. The first program calls it inside a `try` so you can see exactly that, rather than the page pretending otherwise. Everything else uses a stand-in value, and behaves identically to what you would get from a real terminal.
+The editors here run Python in your browser. This Has no keyboard attached to standard input. `input()` raises `OSError`. The first program calls it inside a `try` so you can see just that, rather than the page pretending or else. All else uses a stand-in value. Behaves the same way to what you'd get from a real terminal.
 
 ## It is always text
 
@@ -3396,13 +3396,13 @@ typed + typed          # "4242", not 84
 ```
 
 
-This is the first surprise everyone meets. `input` cannot know whether "42" is meant as a number, a house number or a password, so it does not guess. Convert explicitly:
+This is the first surprise everyone meets. `input` can't know whether "42" is meant as a number, a house number or a password. It doesn't guess. Convert by name:
 
 age = int(input("Age: "))
 
 ## Convert defensively
 
-That one-liner raises `ValueError` the moment somebody types "forty" or presses enter on an empty line. For anything a real person will use:
+That one-liner raises `ValueError` the moment somebody types "forty" or presses enter on an empty line. For any of it a real person will use:
 
 
 ```python
@@ -3429,13 +3429,13 @@ print(i, end=" ")         # no newline
 ```
 
 
-`sep` sits between the values; the default is a single space. `end` goes after them; the default is a newline. `end=""` is how you build a line across several prints &mdash; and you then need a bare `print()` to close it, which the page demonstrates.
+`sep` sits between the values. The default is a single space. `end` goes after them. The default is a newline. `end=""` is how you build a line across a few prints. And you then need a bare `print()` to close it. This The page shows.
 
 ## print versus f-strings
 
-`print` calls `str()` on whatever you give it, which is fine for quick output. When the formatting matters &mdash; decimal places, alignment, thousands separators &mdash; build the string yourself with an f-string and print that. The two are complementary, not competing.
+`print` calls `str()` on what you give it. This Is fine for quick output. When the formatting matters. Decimal places, alignment, thousands separators. Build the string yourself with an f-string and print that. The two are complementary, not competing.
 
-One detail worth noticing: printing a list shows its `repr`, so strings appear with quotes. `", ".join(items)` is what you want when the output is for a person.
+One detail worth noticing: printing a list shows its `repr`. Strings appear with quotes. `", ".join(items)` is what you want when the output is for a person.
 """,
     [{"q": "The user types 42. What does `input()` return?",
       "options": ["The integer 42", "The string '42'", "42.0", "It depends"],
@@ -3537,15 +3537,15 @@ print("data.reverse()  :", data, " (in place, returns None)")
      "Slicing out of range is silent; indexing out of range raises "
      "<code class='mono-font'>IndexError</code>."],
     """title: Slicing with Step: A Practical Guide
-intro: A slice takes a piece of a sequence using up to three numbers: where to start, where to stop, and how big a step to take. Two rules explain nearly all of its behaviour.
+intro: A slice takes a piece of a sequence using up to three numbers: where to start. Here To stop. How big a step to take. Two rules explain nearly all of its action.
 
 ## The stop is excluded
 
 s[2:5]
 
-gives the items at 2, 3 and 4. This is the same rule as `range`, and it has the same payoff: `s[:3]` and `s[3:]` split the sequence with no overlap and no gap, and the length of `s[a:b]` is `b - a`.
+gives the items at 2, 3 and 4. This is the same rule as `range`. It has the same payoff: `s[:3]` and `s[3:]` split the sequence with no share and no gap. The length of `s[a:b]` is `b - a`.
 
-Leave either end off and it means "from the beginning" or "to the end". Leave both off and `s[:]` is the whole thing &mdash; which is the idiomatic shallow copy of a list.
+Leave either end off and it means "from the beginning" or "to the end". Leave both off and `s[:]` is the whole thing. Which is the idiomatic shallow copy of a list.
 
 ## Negative indices count from the right
 
@@ -3557,7 +3557,7 @@ s[:-2]   # everything except the last two
 ```
 
 
-`-1` is the last element, not "one before the start". Mixing the two conventions is fine: `s[2:-1]` is "from index 2 to the second-to-last".
+`-1` is the last element, not "one before the start". Mixing the two rules is fine: `s[2:-1]` is "from index 2 to the second-to-last".
 
 ## The third value is the step
 
@@ -3569,11 +3569,11 @@ s[::-1]   # reversed
 ```
 
 
-`[::-1]` is the standard reverse idiom and worth memorising as one symbol rather than parsing each time. A negative step walks backwards, so start and stop swap roles &mdash; which is why `s[5:2:-1]` gives you something and `s[2:5:-1]` gives you nothing.
+`[::-1]` is the standard reverse idiom and worth storing as one symbol rather than parsing each time. A minus step walks backwards. Start and stop swap roles. Which is why `s[5:2:-1]` gives you a thing and `s[2:5:-1]` gives you nothing.
 
 ## Reversing three ways
 
-`data[::-1]` builds a new reversed list. `reversed(data)` returns a lazy iterator and copies nothing. `data.reverse()` reorders in place and returns `None` &mdash; the same trap as `.sort()`.
+`data[::-1]` builds a new reversed list. `reversed(data)` returns a lazy iterator and copies nothing. `data.reverse()` reorders in place and returns `None`. The same trap as `.sort()`.
 """,
     [{"q": "What is `'abcdef'[1:4]`?",
       "options": ["'abcd'", "'bcd'", "'bcde'", "'bc'"],
@@ -3679,7 +3679,7 @@ print("with a comprehension:", grid)
      "<code class='mono-font'>[[0]*3]*3</code> repeats one inner list three "
      "times. Use a comprehension."],
     """title: Mutability and Aliasing: A Practical Guide
-intro: A name in Python is a label attached to an object, not a box holding a value. Once that clicks, a whole family of confusing behaviour becomes obvious.
+intro: A name in Python is a label attached to an object, not a box holding a value. Once that clicks, a whole family of confusing action turns obvious.
 
 ## Assignment does not copy
 
@@ -3692,13 +3692,13 @@ print(a)  # [1, 2, 3, 4]
 ```
 
 
-`b = a` attaches a second label to the same list. There is one list and two names for it, so a change through either name is visible through both. `a is b` is `True`, which is the test for "the same object" as opposed to `==`, which asks about contents.
+`b = a` attaches a second label to the same list. There's one list and two names for it. A change through either name is visible through both. `a is b` is `True`. This Is the test for "the same object" not `==`. This Asks about contents.
 
 To get a second list, ask for one: `a[:]`, `list(a)` or `a.copy()`.
 
 ## Rebinding versus mutating
 
-This is the distinction that explains the rest:
+This is the gap that shows the rest:
 
 
 ```python
@@ -3707,7 +3707,7 @@ y.append(3)  # mutating: change the object y points at
 ```
 
 
-Rebinding affects only that name. Mutating affects every name pointing at that object. Both use `y`, which is why they look similar and behave nothing alike.
+Rebinding affects only that name. Mutating affects each name pointing at that object. Both use `y`. This Is why they look similar and behave nothing alike.
 
 ## Inside functions
 
@@ -3725,13 +3725,13 @@ def replace(items):
 ```
 
 
-The parameter is another name for the caller's object. Mutate it and the caller's list changes. Rebind it and you have only pointed the local name elsewhere.
+The param is another name for the caller's object. Mutate it and the caller's list changes. Rebind it and you've only pointed the local name elsewhere.
 
-This is not "pass by reference" or "pass by value" &mdash; it is simply the same naming rule as everywhere else in the language.
+This isn't "pass by ref" or "pass by value". It's simply the same naming rule as all over else in the language.
 
 ## Immutable types dodge the question
 
-Numbers, strings and tuples cannot be mutated, so there is no way for one name to change what another sees. `n += 1` inside a function must rebind, because there is no other option. That is why the whole issue only ever comes up with lists, dicts and sets.
+Numbers, strings and tuples can't be mutated. There's no way for one name to change what another sees. `n += 1` inside a function must rebind. There's no other option. That is why the whole issue only ever comes up with lists, dicts and sets.
 
 ## The multiplication trap
 
@@ -3742,11 +3742,11 @@ grid[0][0] = 1  # every row changes
 ```
 
 
-`[0] * 3` builds one row. Multiplying the outer list by 3 does not build three rows &mdash; it stores three references to the same row. Setting one cell appears to set three.
+`[0] * 3` builds one row. Timesing the outer list by 3 doesn't build three rows. It stores three refs to the same row. Setting one cell appears to set three.
 
 grid = [[0] * 3 for _ in range(3)]
 
-The comprehension evaluates `[0] * 3` afresh each pass, so there really are three lists. This is the same rule as the mutable default argument: one object created once, shared everywhere.
+The comprehension tests `[0] * 3` afresh each pass. There really are three lists. This is the same rule as the mutable default arg: one object created once, shared all over.
 """,
     [{"q": "After `a = [1]; b = a; b.append(2)`, what is `a`?",
       "options": ["[1]", "[1, 2]", "[2]", "An error"],
@@ -3850,7 +3850,7 @@ print("shared inner stayed shared in the deep copy:", d[0] is d[1])
      "If everything inside is immutable, shallow is enough - there is nothing "
      "to share."],
     """title: Shallow vs Deep Copying: A Practical Guide
-intro: Copying a list gives you a new list. It does not give you new copies of the things inside it, and that distinction is where the bugs live.
+intro: Copying a list gives you a new list. It doesn't give you new copies of the things inside it. That gap is where the bugs live.
 
 ## What a shallow copy actually does
 
@@ -3863,21 +3863,21 @@ print(original)  # [[99, 2], [3, 4]]
 ```
 
 
-The outer list is new &mdash; `original is shallow` is `False`, and appending to one does not affect the other. But the two inner lists were not copied; both outer lists point at the same two inner lists. Change something one level down and both see it.
+The outer list is new. `first is shallow` is `False`. Appending to one doesn't affect the other. But the two inner lists weren't copied. Both outer lists point at the same two inner lists. Change a thing one level down and both see it.
 
-`original[0] is shallow[0]` is `True`, which is the whole story in one line.
+`first[0] is shallow[0]` is `True`. This Is the whole story in one line.
 
 ## The three shallow copies
 
 nums[:]&nbsp;&nbsp;&nbsp;&nbsp;list(nums)&nbsp;&nbsp;&nbsp;&nbsp;nums.copy()
 
-All equivalent. `dict.copy()` and `set.copy()` behave the same way, and `dict(d)` is the dict equivalent of `list(l)`.
+All equal. `dict.copy()` and `set.copy()` behave the same way. `dict(d)` is the dict equal of `list(l)`.
 
 ## When shallow is enough
 
-If everything inside is immutable &mdash; numbers, strings, tuples of those &mdash; a shallow copy is a complete copy in every way that matters. There is nothing shared that can change, so the distinction disappears.
+If all inside is immutable. Numbers, strings, tuples of those &mdash; a shallow copy is a complete copy in each way that matters. There's nothing shared that can change, so the gap disappears.
 
-That covers most everyday copying, which is why `[:]` is so common and why the problem stays hidden until the day your data has a list inside a list.
+That covers most everyday copying. This Is why `[:]` is so common and why the problem stays hidden until the day your data has a list inside a list.
 
 ## When you need deep
 
@@ -3888,7 +3888,7 @@ deep = copy.deepcopy(original)
 ```
 
 
-`deepcopy` walks the whole structure and rebuilds every mutable object it finds. Nested config dictionaries, lists of records, anything parsed from JSON &mdash; these are the cases.
+`deepcopy` walks the whole structure and rebuilds each mutable object it finds. Nested config dicts, lists of records, any of it parsed from JSON. These are the cases.
 
 ## The dict version of the trap
 
@@ -3900,11 +3900,11 @@ shallow["limits"]["max"] = 999
 ```
 
 
-The original now reads 999 too. This is the same rule and it bites harder with configuration, because the nesting is the point of the structure.
+The first now reads 999 too. This is the same rule and it bites harder with configuration. The nesting is the point of the structure.
 
 ## The rule
 
-Ask what is inside. Flat and immutable: use a slice or `.copy()`. Nested and mutable: use `deepcopy`, or restructure so you are not copying a mutable tree at all.
+Ask what is inside. Flat and immutable: use a slice or `.copy()`. Nested and mutable: use `deepcopy`, or restructure so you aren't copying a mutable tree at all.
 """,
     [{"q": "After a shallow copy of `[[1, 2]]`, changing `copy[0][0]`:",
       "options": ["Changes only the copy", "Changes the original too",
@@ -4007,7 +4007,7 @@ print("merge with |:", {"a": 1} | {"b": 2})
      "<code class='mono-font'>counts[w] = counts.get(w, 0) + 1</code> replaces "
      "the whole if/else counting block."],
     """title: Dictionary Methods: A Practical Guide
-intro: A handful of dictionary methods replace the same few blocks of code people write by hand. Learning them is mostly learning to recognise the pattern they collapse.
+intro: A handful of dict methods replace the same few blocks of code people write by hand. Learning them is mostly learning to recognise the pattern they collapse.
 
 ## get, instead of checking first
 
@@ -4019,17 +4019,17 @@ prices.get("kiwi", 0) # 0
 ```
 
 
-`get` is for when a missing key is expected and has a sensible default. Square brackets are for when a missing key is a bug &mdash; and there the `KeyError` is doing you a favour by failing loudly.
+`get` is for when a missing key is expected and has a sensible default. Square brackets are for when a missing key is a bug. And there the `KeyError` is doing you a favour by failing loudly.
 
-Do not reach for `get` reflexively. `d.get(k)` returning `None` where you expected a value produces a `TypeError` several lines later, far from the cause.
+Don't reach for `get` reflexively. `d.get(k)` returning `None` where you expected a value makes a `TypeError` a few lines later, far from the cause.
 
 ## items, keys, values
 
 for k, v in d.items():
 
-`items()` is what you want most of the time. Plain `for k in d` iterates keys, which is easy to forget and produces a confusing error when you then treat `k` as a value.
+`items()` is what you want most of the time. Plain `for k in d` iterates keys. This Is easy to forget and makes a confusing error when you then treat `k` as a value.
 
-All three are views, not lists: they reflect later changes to the dict and are cheap to create. Wrap in `list()` if you need a snapshot &mdash; and you do need one if you intend to modify the dict while looping.
+All three are views, not lists: they reflect later changes to the dict and are cheap to create. Wrap in `list()` if you need a snapshot. And you do need one if you intend to modify the dict while looping.
 
 ## The counting pattern
 
@@ -4044,19 +4044,19 @@ else:
 ```
 
 
-collapses to:
+merges to:
 
 counts[w] = counts.get(w, 0) + 1
 
-and, if counting is all you are doing, to `Counter(words)` from `collections`, which is faster and says what it means.
+and, if counting is all you're doing, to `Counter(words)` from `collections`. This Is faster and says what it means.
 
 ## The grouping pattern
 
 teams.setdefault(team, []).append(name)
 
-`setdefault` returns the value at that key, inserting the default first if the key was absent. So this reads "get the list for this team, making an empty one if needed, and append to it" &mdash; three lines in one.
+`setdefault` returns the value at that key, inserting the default first if the key was absent. So this reads "get the list for this team, making an empty one if needed. Append to it". Three lines in one.
 
-`defaultdict(list)` does the same job when every access should create a default. `setdefault` is better when only some do.
+`defaultdict(list)` does the same job when each access should create a default. `setdefault` is better when only some do.
 
 ## pop and update
 
@@ -4069,7 +4069,7 @@ a | b            # a new merged dict (3.9+)
 ```
 
 
-With `|`, the right-hand side wins on conflicts, which makes `defaults | overrides` a clean way to layer configuration.
+With `|`, the right-hand side wins on conflicts. This Makes `defaults | overrides` a clean way to layer configuration.
 """,
     [{"q": "What does `d.get('missing')` return?",
       "options": ["KeyError", "None", "An empty string", "0"],
@@ -4173,13 +4173,13 @@ print(json.dumps(teams, indent=2))
      "A nested comprehension flattens: "
      "<code class='mono-font'>[x for row in rows for x in row]</code>."],
     """title: Nested Data Structures: A Practical Guide
-intro: Real data is rarely a flat list. It is a list of records, each with fields, some of which are themselves lists. Working with it is the same handful of moves repeated at different depths.
+intro: Real data is rarely a flat list. It's a list of records, each with fields, some of which are themselves lists. Working with it's the same handful of moves repeated at different depths.
 
 ## Reading a path
 
 people[0]["langs"][1]
 
-Left to right: index the list, look up the key, index that list. Each step returns something, and the next step operates on it. If you are unsure what a line does, evaluate it one piece at a time &mdash; `people[0]`, then `people[0]["langs"]` &mdash; which is exactly what an editor's debugger shows you.
+Left to right: index the list, look up the key, index that list. Each step returns a thing. The next step operates on it. If you're unsure what a line does, test it one piece at a time. `people[0]`, then `people[0]["langs"]`. Which is just what an editor's debugger shows you.
 
 ## Walking it
 
@@ -4190,31 +4190,31 @@ for person in people:
 ```
 
 
-The outer loop takes records, the inner takes the list inside each one. That is the shape of most processing you will do, and the flatten version of it is a nested comprehension:
+The outer loop takes records, the inner takes the list inside each one. That is the shape of most processing you'll do. The flatten version of it's a nested comprehension:
 
 [lang for person in people for lang in person["langs"]]
 
-Same clause order as the loops, and worth using only when it fits on one line.
+Same clause order as the loops. Worth using only when it fits on one line.
 
 ## The missing-key problem
 
 data["user"]["settings"]["theme"]
 
-raises as soon as any level is absent, and the `KeyError` names only the key that failed, not the path you were walking. Two ways to be safe:
+raises as soon as any level is absent. The `KeyError` names only the key that failed, not the path you were walking. Two ways to be safe:
 
 data.get("user", {}).get("settings", {}).get("theme", "default")
 
-Each `get` returns `{}` rather than `None` when absent, so the next `get` still has a dictionary to call. That `{}` default is the trick that makes the chain work.
+Each `get` returns `{}` rather than `None` when absent. The next `get` still has a dict to call. That `{}` default is the trick that makes the chain work.
 
-For anything deeper than two or three levels, a small helper is clearer than a long chain, and a `try/except KeyError` around the whole path is clearer still when a missing value really is exceptional.
+For any of it deeper than two or three levels, a small helper is clearer than a long chain. A `try/except KeyError` around the whole path is clearer still when a missing value really is exceptional.
 
 ## Building nested shapes
 
-Flat rows into groups is the most common transformation:
+Flat rows into groups is the most common change:
 
 teams.setdefault(team, []).append(name)
 
-and summing across two levels is a single generator expression:
+and summing across two levels is a single gen formula:
 
 sum(item["price"] for o in orders for item in o["items"])
 
@@ -4312,21 +4312,21 @@ print("conditional in a lambda:", [ok(n) for n in (-2, 3)])
      "A comprehension usually reads better; "
      "<code class='mono-font'>sorted(key=...)</code> is where lambdas shine."],
     """title: lambda, map and filter: A Practical Guide
-intro: A lambda is a function written inline as an expression. map and filter are the two builtins that take one. All three are worth knowing, and in most Python code a comprehension is the better choice.
+intro: A lambda is a function written inline as an formula. map and filter are the two builtins that take one. All three are worth knowing. In most Python code a comprehension is the better choice.
 
 ## What a lambda is
 
 square = lambda n: n * n
 
-That is the same as a two-line `def`, minus the name. The body is a single expression and its value is returned automatically &mdash; there is no `return`, and no room for a statement. `lambda n: print(n); return n` is a syntax error.
+That is the same as a two-line `def`, minus the name. The body is a single formula and its value is returned automatically. There's no `return`. No room for a statement. `lambda n: print(n). Return n` is a syntax error.
 
-Assigning a lambda to a name, as above, is the one usage style guides actively discourage: if it deserves a name it deserves a `def`, which also gives it a useful name in tracebacks.
+Assigning a lambda to a name, as above, is the one usage style guides actively discourage. If it deserves a name it deserves a `def`. This Also gives it a handy name in tracebacks.
 
 ## Where a lambda earns its place
 
 sorted(people, key=lambda p: p[1])
 
-As an argument, where the function is tiny, used once, and naming it would add a line without adding meaning. `sorted`, `min`, `max` and `groupby` are where you will actually write them.
+As an arg, where the function is tiny, used once. Naming it would add a line without adding meaning. `sorted`, `min`, `max` and `groupby` are where you'll really write them.
 
 ## map and filter
 
@@ -4337,13 +4337,13 @@ filter(f, items)  # keep those where f is true
 ```
 
 
-Both are lazy: they return iterators, not lists. Printing one shows `&lt;map object&gt;`, and consuming it twice gives nothing the second time &mdash; the page demonstrates exactly that, because it catches people.
+Both are lazy: they return iterators, not lists. Printing one shows `&lt;map object&gt;`. Consuming it twice gives nothing the second time. The page shows just that, because it catches people.
 
-The comprehension equivalents are usually clearer:
+The comprehension equivalents are often clearer:
 
 [n * n for n in nums]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# instead of map<br>[n for n in nums if n % 2 == 0]&nbsp;# instead of filter
 
-They read left to right, they do not need `list()` around them, and they do not need a lambda at all.
+They read left to right, they don't need `list()` around them. They don't need a lambda at all.
 
 ## When map is genuinely better
 
@@ -4351,9 +4351,9 @@ Two cases. First, when the function already exists:
 
 map(int, words)
 
-No lambda, no comprehension variable &mdash; just "convert each of these". Writing `map(lambda w: int(w), words)` instead is pure ceremony.
+No lambda, no comprehension variable. Just "convert each of these". Writing `map(lambda w: int(w), words)` instead is pure ceremony.
 
-Second, when consuming several sequences in parallel:
+Second, when consuming a few sequences in parallel:
 
 map(lambda x, y: x + y, a, b)
 
@@ -4361,7 +4361,7 @@ though `[x + y for x, y in zip(a, b)]` says the same thing and most readers will
 
 ## The judgement
 
-Know all three, because you will read them. Write comprehensions by default, `map(existing_function, items)` when it is that shape exactly, and lambdas mainly as `key=` arguments.
+Know all three, because you'll read them. Write comprehensions by default, `map(existing_function, items)` when it's that shape just. Lambdas mainly as `key=` args.
 """,
     [{"q": "What can a lambda body contain?",
       "options": ["Any statements", "A single expression", "Up to three lines",
@@ -4459,11 +4459,11 @@ print("with block   :", g.closed, " <- closed automatically")
      "Lines keep their trailing newline. Use "
      "<code class='mono-font'>.rstrip()</code>."],
     """title: Files and with: A Practical Guide
-intro: Opening a file gives you an object to read or write. The with statement makes sure it is closed afterwards, which is the part that is easy to skip and expensive to get wrong.
+intro: Opening a file gives you an object to read or write. The with statement makes sure it's closed afterwards. This Is the part that is easy to skip and costly to get wrong.
 
 ## A note about this page
 
-These editors run Python in your browser against an in-memory filesystem. The files are real while the program runs and vanish afterwards, so everything below behaves exactly as it would on your machine &mdash; it just does not persist.
+These editors run Python in your browser against an in-memory filesystem. The files are real while the program runs and vanish afterwards. All below behaves just as it would on your machine. It just doesn't persist.
 
 ## with, and why
 
@@ -4474,9 +4474,9 @@ with open("notes.txt") as f:
 ```
 
 
-When the block ends the file is closed, whether it ended normally or by raising. Doing it by hand means `f.close()` in a `finally`, and forgetting it leaves the handle open &mdash; which on a long-running program eventually exhausts the operating system's limit, and on a write leaves data sitting in a buffer that never reaches the disk.
+When the block ends the file is closed, whether it ended most times or by raising. Doing it by hand means `f.close()` in a `finally`. Losing it leaves the handle open. Which on a long-running program eventually exhausts the operating system's limit. On a write leaves data sitting in a buffer that never reaches the disk.
 
-`with` is not a style preference here. It is the correct way to open a file.
+`with` isn't a style preference here. It's the correct way to open a file.
 
 ## Three ways to read
 
@@ -4488,21 +4488,21 @@ for line in f: # one line at a time
 ```
 
 
-The third is the one to reach for by default. It holds a single line in memory regardless of file size, so it works on a file larger than your RAM, and it reads no worse than the others.
+The third is the one to reach for by default. It holds a single line in memory even so of file size. It works on a file larger than your RAM. It reads no worse than the others.
 
 Lines keep their trailing `\\n`, which is why `line.rstrip()` appears in almost every loop over a file.
 
 ## The modes
 
-"r"&nbsp;&nbsp;read, the default &mdash; raises if the file is missing<br>"w"&nbsp;&nbsp;write &mdash; <strong>truncates immediately</strong><br>"a"&nbsp;&nbsp;append &mdash; writes to the end<br>"x"&nbsp;&nbsp;create &mdash; raises if it already exists
+"r"&nbsp;&nbsp;read, the default &mdash; raises if the file is missing<br>"w"&nbsp;&nbsp;write &mdash; <strong>truncates right away</strong><br>"a"&nbsp;&nbsp;append &mdash; writes to the end<br>"x"&nbsp;&nbsp;create &mdash; raises if it already exists
 
-`"w"` is the dangerous one. It empties the file the moment it is opened, before you write anything, so an `open(path, "w")` that then raises leaves you with nothing. When you mean "add to this", `"a"` is the mode.
+`"w"` is the dangerous one. It empties the file the moment it's opened, before you write any of it. An `open(path, "w")` that then raises leaves you with nothing. When you mean "add to this", `"a"` is the mode.
 
 `"x"` is worth remembering when overwriting would be a bug: it refuses rather than destroying.
 
 ## Missing files raise
 
-`open("nope.txt")` raises `FileNotFoundError`, it does not return an empty file. Handle it, or let it propagate &mdash; both are reasonable, but do not check with `os.path.exists` first: the file can disappear between the check and the open, and the `try` handles that correctly anyway.
+`open("nope.txt")` raises `FileNotFoundError`, it doesn't return an empty file. Handle it, or let it pass. Both are reasonable. Don't check with `os.path.exists` first. The file can disappear between the check and the open. The `try` handles that right anyway.
 
 """,
     [{"q": "What does `with` do for a file?",
@@ -4598,7 +4598,7 @@ print("math already loaded:", "math" in sys.modules)
      "Imports are cached: a module runs once per program, no matter how often "
      "it is imported."],
     """title: Modules and import: A Practical Guide
-intro: A module is a file of Python. import runs it once and gives you access to what it defines. The forms of import differ only in what ends up in your namespace, and that difference matters more than it first appears.
+intro: A module is a file of Python. import runs it once and gives you access to what it defines. The forms of import differ only in what ends up in your namespace. That difference matters more than it first appears.
 
 ## The three forms
 
@@ -4610,9 +4610,9 @@ import numpy as np     # np.array(...)
 ```
 
 
-The first keeps the module as a prefix. That is a feature: reading `math.sqrt` a hundred lines later tells you immediately where it came from, and it cannot collide with anything of yours.
+The first keeps the module as a prefix. That is a feature. Reading `math.sqrt` a hundred lines later tells you right away where it came from. It can't collide with any of it of yours.
 
-The second is shorter and right when you use one or two names heavily and there is no ambiguity.
+The second is shorter and right when you use one or two names heavily and there's no ambiguity.
 
 `as` renames on the way in, for length (`numpy as np`) or to avoid a clash with a name you already have.
 
@@ -4620,25 +4620,25 @@ The second is shorter and right when you use one or two names heavily and there 
 
 from math import *
 
-This pulls in every public name at once. Two problems, and the second is the serious one.
+This pulls in each public name at once. Two problems. The second is the serious one.
 
-You can no longer tell where a name came from. `sqrt(16)` appears from nowhere, and finding its source means guessing which of the star-imports supplied it.
+You can no longer tell where a name came from. `sqrt(16)` appears from nowhere. Finding its source means guessing which of the star-imports supplied it.
 
-Worse, it silently overwrites. If you defined `gamma` and then star-import a module that also defines `gamma`, yours is gone with no warning at all &mdash; the page demonstrates precisely that, printing the function's own output before and after.
+Worse, it silently overwrites. If you defined `gamma` and then star-import a module that also defines `gamma`, yours is gone with no warning at all. The page shows just that, printing the function's own output before and after.
 
-The place it is acceptable is an interactive session where you are exploring, and even there it is a habit worth not forming.
+The place it's acceptable is an interactive session where you're exploring. Even there it's a habit worth not forming.
 
 ## Imports are cached
 
-Importing a module twice does not run it twice. Python keeps a table in `sys.modules` and hands back the same module object. So imports are cheap to repeat, and any code at the top level of a module runs exactly once per program &mdash; which is why putting slow work or side effects at module level is a trap.
+Importing a module twice doesn't run it twice. Python keeps a table in `sys.modules` and hands back the same module object. So imports are cheap to repeat. Any code at the top level of a module runs just once per program. Which is why putting slow work or side effects at module level is a trap.
 
 ## Where imports go
 
-At the top of the file, one per line, standard library first, then third-party, then your own. That is not aesthetics: an import buried inside a function runs on every call and hides a dependency from anyone scanning the file.
+At the top of the file, one per line, standard library first, then third-party, then your own. That isn't aesthetics. An import buried inside a function runs on each call and hides a dependency from anyone scanning the file.
 
 ## The standard library is large
 
-Before installing anything, check what ships with Python. `collections`, `itertools`, `datetime`, `json`, `random`, `statistics`, `pathlib` and `re` cover an enormous amount of everyday work, and the page uses three of them in six lines.
+Before installing any of it, check what ships with Python. `collections`, `itertools`, `datetime`, `json`, `random`, `statistics`, `pathlib` and `re` cover an huge amount of everyday work. The page uses three of them in six lines.
 """,
     [{"q": "What is the main problem with `from module import *`?",
       "options": ["It is slow", "It hides where names came from and can silently "
@@ -4744,7 +4744,7 @@ print("-> nothing was stored; each value was pulled through on demand")
      "<code class='mono-font'>(x for x in y)</code> is a generator expression - "
      "a comprehension with round brackets."],
     """title: Generators and yield: A Practical Guide
-intro: A generator is a function that pauses. Instead of computing everything and returning it, it hands back one value, freezes, and resumes where it stopped when the next value is asked for.
+intro: A gen is a function that pauses. Instead of finding all and returning it, it hands back one value, freezes. Resumes where it stopped when the next value is asked for.
 
 ## yield instead of return
 
@@ -4757,13 +4757,13 @@ def countdown(n):
 ```
 
 
-`return` ends a function. `yield` suspends it, keeping every local variable exactly as it was, and the function continues from that line when the next value is requested.
+`return` ends a function. `yield` suspends it, keeping each local variable just as it was. The function continues from that line when the next value is requested.
 
-Calling `countdown(3)` runs none of the body. It returns a generator object; the code inside starts running only when something asks for a value &mdash; `next()`, a `for` loop, `list()`, `sum()`.
+Calling `countdown(3)` runs none of the body. It returns a gen object. The code inside starts running only when a thing asks for a value. `next()`, a `for` loop, `list()`, `sum()`.
 
 ## Why bother
 
-Memory. A list comprehension over a million items builds a million items. A generator holds a position and the local variables, which is a fixed few hundred bytes whatever the size &mdash; the page prints both.
+Memory. A list comprehension over a million items builds a million items. A gen holds a spot and the local variables. This Is a fixed few hundred bytes what the size. The page prints both.
 
 That is what makes infinite sequences possible:
 
@@ -4777,7 +4777,7 @@ def naturals():
 ```
 
 
-Nothing is built up front, so there is nothing to run out of. Take what you need with `itertools.islice`.
+Nothing is built up front. So There's nothing to run out of. Take what you need with `itertools.islice`.
 
 ## Exhausted after one pass
 
@@ -4789,13 +4789,13 @@ list(g)  # []
 ```
 
 
-A generator walks forward once and does not rewind. If you need the values twice, either store them in a list or call the generator function again to get a fresh one. This catches everyone once, usually as a mysteriously empty second loop.
+A gen walks forward once and doesn't rewind. If you need the values twice, either store them in a list or call the gen function again to get a fresh one. This catches everyone once, often as a mysteriously empty second loop.
 
 ## Generator expressions
 
 (n * n for n in nums)
 
-Round brackets instead of square. Identical syntax to a comprehension, no list built. Inside a call you can drop the extra brackets: `sum(n * n for n in nums)`.
+Round brackets instead of square. The same syntax to a comprehension, no list built. Inside a call you can drop the extra brackets: `sum(n * n for n in nums)`.
 """,
     [{"q": "What does calling a generator function do?",
       "options": ["Runs the body and returns a list", "Returns a generator "
@@ -4907,7 +4907,7 @@ print("lookup order :", [c.__name__ for c in LoudBase.__mro__][:4])
      "setup never runs.",
      "Prefer composition when the relationship is \"has a\" rather than \"is a\"."],
     """title: Inheritance: A Practical Guide
-intro: A class can be built on another one, taking its attributes and methods and changing only what differs. Used carefully it removes real duplication; used loosely it produces hierarchies nobody can follow.
+intro: A class can be built on another one, taking its fields and methods and changing only what differs. Used carefully it drops real duplication. Used loosely it makes hierarchies no one can follow.
 
 ## The basic move
 
@@ -4919,7 +4919,7 @@ class Dog(Animal):
 ```
 
 
-`Dog` gets everything `Animal` has. Where it defines a method of the same name, that version wins &mdash; that is overriding.
+`Dog` gets all `Animal` has. Where it defines a method of the same name, that version wins &mdash; that is overriding.
 
 The payoff shows up in methods the parent already wrote:
 
@@ -4930,7 +4930,7 @@ def describe(self):
 ```
 
 
-`describe` was written once on `Animal` and calls whichever `speak` the actual object has. Add a tenth animal and `describe` needs no change. That is the whole argument for inheritance in one method.
+`show` was written once on `Animal` and calls whichever `speak` the actual object has. Add a tenth animal and `show` needs no change. That is the whole arg for inheritance in one method.
 
 ## super()
 
@@ -4943,7 +4943,7 @@ class Dog(Animal):
 ```
 
 
-A subclass `__init__` replaces the parent's, so the parent's setup does not happen unless you ask for it. Forget `super().__init__(name)` and `self.name` never gets set &mdash; the failure arrives later as an `AttributeError` from some unrelated method, which the page demonstrates.
+A subclass `__init__` replaces the parent's. The parent's setup doesn't happen unless you ask for it. Forget `super().__init__(name)` and `self.name` never gets set. The failure arrives later as an `AttributeError` from some unrelated method. This The page shows.
 
 `super()` also works for extending rather than replacing:
 
@@ -4953,15 +4953,15 @@ Take the parent's answer, then modify it.
 
 ## The lookup order
 
-With several parents, Python walks a defined order &mdash; the MRO, visible as `Cls.__mro__` &mdash; taking the first match. Reading it is how you answer "which version actually ran".
+With a few parents, Python walks a defined order. The MRO, visible as `Cls.__mro__`. Taking the first match. Reading it's how you answer "which version really ran".
 
-Multiple inheritance is a sharp tool. Mixins with distinct responsibilities are fine; deep diamond hierarchies are how codebases become unreadable.
+Multiple inheritance is a sharp tool. Mixins with distinct jobs are fine. Deep diamond hierarchies are how codebases become unreadable.
 
 ## is-a, not has-a
 
-Inherit when the subclass genuinely <em>is</em> a kind of the parent and can be used wherever the parent is expected. A `Dog` is an `Animal`, so `describe` works on both.
+Inherit when the subclass truly <em>is</em> a kind of the parent and can be used wherever the parent is expected. A `Dog` is an `Animal`. `show` works on both.
 
-When the relationship is "has a" &mdash; a `Car` has an `Engine` &mdash; hold the other object as an attribute instead. Composition is easier to change later, because it does not tie two classes together permanently to share a couple of methods.
+When the tie is "has a". A `Car` has an `Engine`. Hold the other object as an field instead. Composition is easier to change later. It doesn't tie two classes together permanently to share a couple of methods.
 
 The common failure is inheriting to reuse a method. If that is the only reason, a function or a held object is nearly always the better answer.
 """,

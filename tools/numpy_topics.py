@@ -211,15 +211,15 @@ print("This is the shape of every fit, forward pass and score you will meet.")''
     ],
     '''
 title: What NumPy Is For
-intro: One type, laid out end to end, and why almost everything else follows from that.
+intro: One type, laid out end to end. Why almost all else follows from that.
 
 ## Two ways to hold five numbers
 
-A Python list of five integers is five pointers, each to a full `PyObject` sitting somewhere else in memory. Each of those objects carries a type, a reference count and the value. Adding two lists elementwise means following every pointer, checking every type, and building a new object for every result.
+A Python list of five ints is five pointers, each to a full `PyObject` sitting one spot else in memory. Each of those objects carries a type, a link count and the value. Adding two lists elementwise means following each pointer, checking each type. Building a new object for each result.
 
-A NumPy array of five integers is forty bytes: five 64-bit numbers, one after another, with the type recorded once for the whole array.
+A NumPy array of five ints is forty bytes. Five 64-bit numbers, one after another, with the type recorded once for the whole array.
 
-That single difference explains nearly everything else in this track. It is why arrays are fast, why they have a dtype, why they cannot hold mixed types, why slicing gives you a view instead of a copy, and why shapes matter so much.
+That single gap shows nearly all else in this track. It's why arrays are fast, why they've a dtype, why they can't hold mixed types, why slicing gives you a view instead of a copy. Why shapes matter so much.
 
 ## Vectorisation
 
@@ -229,136 +229,136 @@ Because the numbers are contiguous and all the same type, the loop can happen in
 doubled = arr * 2
 ```
 
-There is no Python-level iteration. NumPy hands the whole block to a C routine that walks it, and modern CPUs process several elements per instruction while it does.
+There's no Python-level loop. NumPy hands the whole block to a C routine that walks it. Modern CPUs process a few elements per instruction while it does.
 
-The mental shift is from *how do I loop over this* to *what operation am I applying*. That reads oddly at first and becomes the natural way to think within about a week.
+The mental shift is from *how do I loop over this* to *what step am I applying*. That reads oddly at first and turns the natural way to think within about a week.
 
 ## `+` means two different things
 
-Worth stating early because it is the first thing that surprises people converting code:
+Worth stating early because it's the first thing that surprises people converting code:
 
 ```python
 [1, 2] + [1, 2]                  # [1, 2, 1, 2]   - concatenation
 np.array([1, 2]) + np.array([1, 2])   # array([2, 4]) - addition
 ```
 
-Lists concatenate. Arrays add. Neither is wrong; they are different types with different meanings for the same symbol, and code that assumes one while holding the other produces something plausible rather than an error.
+Lists concatenate. Arrays add. Neither is wrong. They're other types with other meanings for the same symbol. Code that assumes one while holding the other makes a thing plausible rather than an error.
 
 ## One dtype, and it is decided for you
 
-Every element of an array has the same type, and NumPy picks the narrowest type that fits everything you gave it.
+each element of an array has the same type. NumPy picks the narrowest type that fits all you gave it.
 
-`[1, 2, 3]` becomes the platform's default integer. On most desktop machines that is `int64`; on this page, which runs 32-bit WebAssembly, it is `int32`. That difference is not cosmetic &mdash; an `int32` overflows at about 2.1 billion, silently and without a warning &mdash; and it is the reason examples here that multiply large integers ask for `dtype=np.int64` explicitly. Add one float and the whole array becomes `float64` &mdash; not a mixture. Add a string and every element becomes a fixed-width string, including the numbers.
+`[1, 2, 3]` turns the platform's default int. On most desktop machines that is `int64`. On this page. This Runs 32-bit WebAssembly, it's `int32`. That gap isn't cosmetic. An `int32` overflows at about 2.1 billion, silently and without a warning. And it's the reason examples here that times large ints ask for `dtype=np.int64` by name. Add one float and the whole array turns `float64`. Not a mixture. Add a string and each element turns a fixed-width string, including the numbers.
 
-That last case is worth watching for, because it produces an array that still looks reasonable when printed and does nothing you want arithmetically.
+That last case is worth watching for. It makes an array that still looks fair when printed and does nothing you want arithmetically.
 
-There is a consequence people meet early: assigning into an array cannot change its dtype. Put `9.7` into an `int64` array and it truncates to `9`, silently. The array's type was fixed when it was created.
+There's a result people meet early: assigning into an array can't change its dtype. Put `9.7` into an `int64` array and it truncates to `9`, silently. The array's type was fixed when it was created.
 
 ## Speed, honestly
 
-The fourth editor above measures it. Expect a large ratio, and read the ratio rather than the seconds.
+The fourth editor above measures it. Expect a large ratio. Read the ratio rather than the seconds.
 
-These pages run CPython compiled to WebAssembly, which is several times slower than a native interpreter for the Python parts. That penalty falls mostly on the Python loop, so if anything the gap here flatters NumPy. The direction is right and the magnitude is roughly right; the absolute numbers do not transfer to your laptop.
+These pages run CPython compiled to WebAssembly. This Is a few times slower than a native interpreter for the Python parts. That fine falls mostly on the Python loop. If anything the gap here flatters NumPy. The direction is right and the magnitude is roughly right. The abs numbers don't transfer to your laptop.
 
-The speed also has limits worth knowing now. Arrays are fast for whole-array operations on numeric data. They are not fast if you loop over them in Python one element at a time &mdash; that is slower than a list, because each element has to be boxed into a Python object on the way out.
+The speed also has limits worth knowing now. Arrays are fast for whole-array steps on numeric data. They aren't fast if you loop over them in Python one element at a time. That is slower than a list. Each element has to be boxed into a Python object on the way out.
 
 ## Shape
 
-An array carries a shape as well as contents, and most of the interesting behaviour in this library is about what shapes do when combined.
+An array carries a shape and contents. Most of the notable action in this library is about what shapes do when mixed.
 
 `a.shape` is a tuple. `(6,)` is one-dimensional with six elements. `(2, 3)` is two rows of three. `(2, 3, 4)` is two blocks of three rows of four.
 
-Reshaping is usually free, because it changes how the same block of memory is interpreted rather than moving anything. The last editor shows `np.shares_memory` confirming that the reshaped array is the same numbers.
+Reshaping is often free, because it changes how the same block of memory is read rather than moving anything. The last editor shows `np.shares_memory` confirming that the reshaped array is the same numbers.
 
 ## Where this sits
 
-Almost nothing in scientific Python reimplements arrays. pandas holds NumPy arrays under its columns. scikit-learn takes and returns them. SciPy builds on them. PyTorch and TensorFlow use their own tensor types deliberately modelled on the same interface, so that `@`, broadcasting and `.shape` mean what you already expect.
+Almost nothing in scientific Python reimplements arrays. pandas holds NumPy arrays under its columns. scikit-learn takes and returns them. SciPy builds on them. PyTorch and TensorFlow use their own tensor types on purpose modelled on the same interface. That `@`, broadcasting and `.shape` mean what you already expect.
 
-Learning NumPy properly is therefore not one library. It is the vocabulary that the rest of the stack assumes you have.
+Learning NumPy properly is so not one library. It's the vocab that the rest of the stack assumes you've.
 
 ## What this track covers
 
-The array itself first: creating one, its dtype, its shape, and what indexing gives you. Then operating on arrays: elementwise arithmetic, broadcasting, boolean masks, aggregation along an axis. Then structure: views versus copies, stacking, transposing, sorting. Then the numerical end: random numbers, linear algebra, missing data, and the performance rules that follow from the memory layout.
+The array itself first: creating one, its dtype, its shape. What indexing gives you. Then operating on arrays: elementwise math, broadcasting, boolean masks, aggregation along an axis. Then structure: views versus copies, stacking, transposing, sorting. Then the numeric end: random numbers, linear algebra, missing data. The speed rules that follow from the memory layout.
 
-Every idea is a small program on the page. Change the numbers and press Run; a shape rule you have watched break is one you will remember.
+each idea is a small program on the page. Change the numbers and press Run. A shape rule you've watched break is one you'll note.
 
 ## Why the list is slow, concretely
 
-It is worth being precise about where the time goes, because "Python is slow" is not an explanation and does not tell you what to change.
+It's worth being precise about where the time goes. "Python is slow" isn't an reason and doesn't tell you what to change.
 
-A Python list of five integers is an array of five **pointers**. Each pointer leads somewhere else in memory, to a `PyObject` that carries a reference count, a type pointer, and only then the actual value. A small integer occupies twenty-eight bytes and sits wherever the allocator put it.
+A Python list of five ints is an array of five **pointers**. Each pointer leads one spot else in memory, to a `PyObject` that carries a link count, a type pointer. Only then the actual value. A small int occupies twenty-eight bytes and sits wherever the allocator put it.
 
-Adding two lists elementwise therefore means: follow a pointer, check the type, extract the value, follow another pointer, check that type, extract that value, perform the addition, allocate a new object for the result, and store a pointer to it. Ten times over for ten elements.
+Adding two lists elementwise so means: follow a pointer, check the type, extract the value, follow another pointer, check that type, extract that value, perform the addition, allocate a new object for the result. Store a pointer to it. Ten times over for ten elements.
 
-The NumPy array is five integers, adjacent, with nothing between them. The addition is a loop in compiled C over contiguous memory, with the type checked once for the whole array rather than once per element.
+The NumPy array is five ints, adjacent, with nothing between them. The addition is a loop in compiled C over contiguous memory, with the type checked once for the whole array rather than once per element.
 
-Two separate wins come out of that. The obvious one is skipping the interpreter. The less obvious one is **locality**: the processor fetches memory in blocks, so reading consecutive values costs a fraction of what chasing scattered pointers costs. On large arrays the second effect can matter as much as the first.
+Two split wins come out of that. The obvious one is skipping the interpreter. The less obvious one is **nearness**. The processor fetches memory in blocks. Reading in a row values costs a fraction of what chasing scattered pointers costs. On large arrays the second effect can matter as much as the first.
 
-This also explains the cases where NumPy does not help. If your data is a thousand elements and you touch it once, the interpreter overhead you avoided was small and the conversion cost was not. The wins scale with array size.
+This also shows the cases where NumPy doesn't help. If your data is a thousand elements and you touch it once, the interpreter cost you avoided was small and the conversion cost wasn't. The wins scale with array size.
 
 ## What NumPy deliberately does not do
 
 Knowing the boundaries saves a lot of fighting with it.
 
-**It does not grow.** There is no efficient append. The size is fixed at creation, and every function that appears to extend an array is allocating a new one and copying. This is not an oversight; it is the price of the contiguous block that makes everything else fast.
+**It doesn't grow.** There's no fast append. The size is fixed at creation. Each function that appears to extend an array is allocating a new one and copying. This isn't an oversight. It's the price of the contiguous block that makes all else fast.
 
-**It does not mix types.** One dtype per array. A column of names and a column of ages are two arrays, or a structured dtype, or a pandas DataFrame &mdash; not one NumPy array of mixed values.
+**It doesn't mix types.** One dtype per array. A column of names and a column of ages are two arrays, or a structured dtype, or a pandas DataFrame. Not one NumPy array of mixed values.
 
-**It handles strings poorly.** NumPy strings are fixed width, and assigning a longer value silently truncates it. Object arrays hold real Python strings but give up every performance benefit, since they are back to storing pointers.
+**It handles strings poorly.** NumPy strings are fixed width. Assigning a longer value silently truncates it. Object arrays hold real Python strings but give up each speed gain. They're back to storing pointers.
 
-**It has no concept of missing data.** Floats can carry NaN, and integers cannot carry anything. There is no null.
+**It has no concept of missing data.** Floats can carry NaN. Ints can't carry anything. There's no null.
 
 ## When to use something else
 
-**Small data touched once.** A hundred values processed in a script: a list is simpler and the difference is unmeasurable.
+**Small data touched once.** A hundred values processed in a script: a list is simpler and the gap is unmeasurable.
 
-**Heterogeneous records with labels.** That is pandas. It is built on NumPy, so you lose nothing, and you gain named columns, mixed types per column and real handling of missing values.
+**Heterogeneous records with labels.** That is pandas. It's built on NumPy. You lose nothing. You gain named columns, mixed types per column and real handling of missing values.
 
-**Nested or ragged structure.** Lists of different lengths do not form an array. Forcing them into an object array gets you the syntax without the speed.
+**Nested or ragged structure.** Lists of other lengths don't form an array. Forcing them into an object array gets you the syntax without the speed.
 
-**Data larger than memory.** NumPy assumes the array fits. Dask, Zarr and HDF5 exist for when it does not.
+**Data larger than memory.** NumPy assumes the array fits. Dask, Zarr and HDF5 exist for when it doesn't.
 
 ## The model to carry forward
 
-Everything else in this track is a consequence of one idea: an array is a **flat block of identical values, plus a small description of how to read it** &mdash; the shape, the dtype, and the number of bytes to step for each axis.
+all else in this track is a result of one idea. An array is a **flat block of same values, plus a small description of how to read it**. The shape, the dtype. The number of bytes to step for each axis.
 
 Reshaping changes the description and not the block. Transposing changes the description. Slicing changes the description. All of them are free.
 
-Masking and fancy indexing cannot be described that way, so they copy.
+Masking and fancy indexing can't be given that way, so they copy.
 
-Arithmetic runs over the block in compiled code. Broadcasting is a rule for pretending two descriptions are compatible without changing either block.
+Math runs over the block in compiled code. Broadcasting is a rule for pretending two descriptions are matching without changing either block.
 
-Hold onto that and most of NumPy's behaviour stops being a set of rules to memorise and becomes something you can predict.
+Hold onto that and most of NumPy's action stops being a set of rules to store and turns a thing you can predict.
 
 ## Questions people ask at this point
 
 **Does NumPy replace Python lists?**
 
-No. Lists are the right structure for heterogeneous, growing collections of arbitrary objects, and they remain the right answer for most ordinary Python. NumPy is for a specific shape of problem: many values of the same type, operated on together. Reaching for an array to hold three configuration values is worse than a list, not better.
+No. Lists are the right structure for heterogeneous, growing sets of any objects. They remain the right answer for most plain Python. NumPy is for a exact shape of problem. Many values of the same type, operated on together. Reaching for an array to hold three config values is worse than a list, not better.
 
 **Do I need to install it?**
 
-NumPy is not in the standard library. It is `pip install numpy`, and it is a dependency of nearly everything numerical, so it is usually already present in a scientific environment. It ships as a compiled wheel for every common platform, so installation does not require a compiler.
+NumPy isn't in the standard library. It's `pip install numpy`. It's a dependency of nearly all numeric. It's often already present in a scientific setting. It ships as a compiled wheel for each common platform. So Installation doesn't need a compiler.
 
 **Why is it always imported as `np`?**
 
-Convention, and a strong one. Nearly all published code, documentation and examples use `import numpy as np`, so following it makes your code readable to anyone who has seen NumPy before. There is no technical reason, and no good reason to deviate.
+rule, and a strong one. Nearly all published code, docs and examples use `import numpy as np`. Following it makes your code readable to anyone who has seen NumPy before. There's no technical reason, and no good reason to deviate.
 
 **Is NumPy still relevant with pandas and PyTorch around?**
 
-It is underneath both. A pandas Series wraps a NumPy array; PyTorch tensors follow the same shape and broadcasting rules and convert to arrays in one call. Everything in this track transfers, which is a large part of why it is worth learning properly rather than by copying snippets.
+It's underneath both. A pandas Series wraps a NumPy array. PyTorch tensors follow the same shape and broadcasting rules and convert to arrays in one call. all in this track transfers. This Is a large part of why it's worth learning properly rather than by copying snippets.
 
 **How much of it do I need?**
 
-Less than the documentation suggests. NumPy has hundreds of functions and a working knowledge of maybe thirty covers most real code. The concepts &mdash; shape, dtype, views, broadcasting &mdash; matter far more than the function list, because they let you predict behaviour instead of looking it up.
+Less than the docs suggests. NumPy has hundreds of functions and a working knowledge of maybe thirty covers most real code. The concepts. Shape, dtype, views, broadcasting. Matter far more than the function list. They let you predict action instead of looking it up.
 
 ## How to work through this track
 
-Each module has runnable editors above the text. They are not decoration: the fastest way to build an accurate mental model of shapes and dtypes is to change a number, run it, and see what happens.
+Each module has runnable editors above the text. They aren't decoration. The fastest way to build an accurate mental model of shapes and dtypes is to change a number, run it, and see what happens.
 
-The parts worth slowing down on are the ones where NumPy's behaviour differs from Python's: integer overflow, views sharing memory, broadcasting shapes you did not intend, and NaN. Those four account for most of the surprises in real code, and each has a module.
+The parts worth slowing down on are the ones where NumPy's action differs from Python's. Int overflow, views sharing memory, broadcasting shapes you didn't intend. NaN. Those four account for most of the surprises in real code, and each has a module.
 
-The parts you can skim on a first pass are the function inventories &mdash; the specific names in stacking, sorting and set operations. Knowing that a function exists is enough; the signature is a search away.
+The parts you can skim on a first pass are the function inventories. The exact names in stacking, sorting and set steps. Knowing that a function exists is enough. The signature is a search away.
 ''',
     [
         {"q": "What is the fundamental difference between a list and an array?",
@@ -520,63 +520,63 @@ print("Better still: np.arange(2000.0) - no Python loop at all.")'''),
     ],
     '''
 title: Creating Arrays
-intro: The half-dozen constructors that cover almost everything, and which to reach for when.
+intro: The half-dozen constructors that cover almost all, and which to reach for when.
 
 ## From data you already have
 
-`np.array` takes a list, a tuple, or nested lists, and infers the shape from the nesting. One level gives you 1-D, two levels gives 2-D, and so on.
+`np.array` takes a list, a tuple, or nested lists. Infers the shape from the nesting. One level gives you 1-D, two levels gives 2-D, and so on.
 
-Rows must be the same length. Ragged input raises rather than guessing, which is the right choice &mdash; the alternative would be an array of Python list objects that looks like an array and behaves like nothing you want.
+Rows must be the same length. Ragged input raises rather than guessing. This Is the right choice. The option would be an array of Python list objects that looks like an array and behaves like nothing you want.
 
-If you genuinely have ragged data, you want a list of arrays, or padding to a rectangle, and you should decide which deliberately.
+If you truly have ragged data, you want a list of arrays, or padding to a rectangle. You should decide which on purpose.
 
 ## When you know the shape but not the values
 
-Most real code knows the shape first. Allocating it directly is both faster and clearer than building a list and converting.
+Most real code knows the shape first. Allocating it right is both faster and clearer than building a list and converting.
 
-`np.zeros(shape)` and `np.ones(shape)` are the common ones. `np.full(shape, value)` fills with anything. `np.eye(n)` is the identity matrix.
+`np.zeros(shape)` and `np.ones(shape)` are the common ones. `np.full(shape, value)` fills with anything. `np.eye(n)` is the identity mat.
 
-Note that the shape argument is a *tuple* for more than one dimension: `np.zeros((2, 3))`. `np.zeros(2, 3)` is a different function signature and will not do what you meant.
+Note that the shape arg is a *tuple* for more than one dim: `np.zeros((2, 3))`. `np.zeros(2, 3)` is a other function signature and won't do what you meant.
 
-`np.empty` deserves a warning. It allocates without initialising, so the contents are whatever happened to be in that memory &mdash; not zeros, not anything predictable. It is marginally faster than `zeros` and only correct when you are about to overwrite every element. Reaching for it by default produces bugs that appear only sometimes.
+`np.empty` deserves a warning. It allocates without resetting. The contents are what happened to be in that memory. Not zeros, not anything predictable. It's marginally faster than `zeros` and only correct when you're about to overwrite each element. Reaching for it by default makes bugs that appear only at times.
 
 ## arange and linspace
 
-Both make a sequence, and the difference is what you specify.
+Both make a sequence, and the gap is what you give.
 
-`np.arange(start, stop, step)` takes a **step** and excludes the stop, exactly like Python's `range`.
+`np.arange(start, stop, step)` takes a **step** and excludes the stop, just like Python's `range`.
 
 `np.linspace(start, stop, num)` takes a **count** and includes the stop.
 
-For integers, `arange` is natural. For floats, it is a trap: the number of elements depends on floating-point accumulation, so `np.arange(0, 1, 0.1)` may give you ten elements or eleven depending on rounding, and `np.arange(0, 0.3, 0.1)` can include a value slightly above 0.3.
+For ints, `arange` is natural. For floats, it's a trap. The number of elements depends on floating-point build-up. `np.arange(0, 1, 0.1)` may give you ten elements or eleven based on rounding. `np.arange(0, 0.3, 0.1)` can include a value slightly above 0.3.
 
-The rule is simple: **if the step is a float, use `linspace`.** You almost always know how many points you want, and `linspace` gives exactly that many, with the endpoint where you asked for it.
+The rule is simple: **if the step is a float, use `linspace`.** You almost always know how many points you want. `linspace` gives just that many, with the endpoint where you asked for it.
 
 ## Matching an existing array
 
 The `_like` family &mdash; `zeros_like`, `ones_like`, `empty_like`, `full_like` &mdash; copies both shape and dtype from an array you already have.
 
-The dtype part is the valuable half. In a pipeline working in `float32` for memory reasons, allocating a result with `np.zeros(shape)` gives `float64`, and the first operation that combines them widens everything back. `zeros_like` keeps the type you chose.
+The dtype part is the valuable half. In a pipeline working in `float32` for memory reasons, allocating a result with `np.zeros(shape)` gives `float64`. The first step that mixes them widens all back. `zeros_like` keeps the type you chose.
 
 ## Choosing a dtype
 
 The dtype is fixed at creation and worth choosing rather than accepting.
 
-Integers come in `int8`, `int16`, `int32` and `int64`, signed and unsigned. Floats come in `float32` and `float64` (and `float16`, with real precision costs).
+ints come in `int8`, `int16`, `int32` and `int64`, signed and unsigned. Floats come in `float32` and `float64` (and `float16`, with real precision costs).
 
-Two reasons to care. **Memory**: a million `float64` values is 8 MB; `float32` halves that, which matters once arrays are large. **Overflow**: an `int8` holds &minus;128 to 127, and `127 + 1` gives &minus;128 with no error and no warning. NumPy does not promote to a wider type to save you.
+Two reasons to care. **Memory**: a million `float64` values is 8 MB. `float32` halves that. This Matters once arrays are large. **Overflow**: an `int8` holds &minus;128 to 127. `127 + 1` gives &minus;128 with no error and no warning. NumPy doesn't promote to a wider type to save you.
 
-That silence is the important part. Python integers grow without limit; NumPy integers wrap. Code ported from lists to arrays can start producing wrong numbers rather than raising, which is much harder to notice.
+That silence is the key part. Python ints grow without limit. NumPy ints wrap. Code ported from lists to arrays can start making wrong numbers rather than raising. This Is much harder to notice.
 
-The default integer width is platform-dependent &mdash; `int64` on most desktops, `int32` on this page's 32-bit WebAssembly. Where the values may be large, say what you want.
+The default int width is platform-dependent. `int64` on most desktops, `int32` on this page's 32-bit WebAssembly. Where the values may be large, say what you want.
 
 ## Never grow an array in a loop
 
-`np.append` does not append. There is nowhere to append to: an array is a fixed block of memory, so `np.append` allocates a new one, copies everything across, and returns it. In a loop that is quadratic.
+`np.append` doesn't append. There's nowhere to append to. An array is a fixed block of memory. `np.append` allocates a new one, copies all across. Returns it. In a loop that is quadratic.
 
-The last editor measures it. The fix is the same as the string-concatenation fix in Python: allocate the result once and assign into it, or better, build the whole thing with a vectorised call and no Python loop at all.
+The last editor measures it. The fix is the same as the string-joining fix in Python. Allocate the result once and assign into it, or better, build the whole thing with a vectorised call and no Python loop at all.
 
-If you genuinely do not know the final size, collect into a Python list and convert once at the end &mdash; lists over-allocate and appending to them is cheap.
+If you truly don't know the final size, collect into a Python list and convert once at the end. Lists over-allocate and appending to them is cheap.
 
 ## Which to reach for
 
@@ -584,51 +584,51 @@ Data in hand: `np.array`.
 
 Known shape, zeros: `np.zeros`. Known shape, matching an existing array: `zeros_like`.
 
-Integer sequence: `np.arange`. Float sequence: `np.linspace`.
+int sequence: `np.arange`. Float sequence: `np.linspace`.
 
-A result you are about to fill completely: `np.empty`, and only then.
+A result you're about to fill fully: `np.empty`, and only then.
 
-Anything else in a loop: stop and ask whether a vectorised expression would build it in one call.
+Anything else in a loop: stop and ask whether a vectorised formula would build it in one call.
 
 ## empty is not zeros
 
-`np.zeros` writes zeros. `np.empty` allocates and writes nothing, so the contents are whatever was previously in that memory.
+`np.zeros` writes zeros. `np.empty` allocates and writes nothing. The contents are what was before in that memory.
 
-That makes `empty` faster, and it is the correct choice when you are about to overwrite every element. It is a bug waiting to happen when you are not.
+That makes `empty` faster, and it's the correct choice when you're about to overwrite each element. It's a bug waiting to happen when you aren't.
 
-The trap is that uninitialised memory is often zeros in practice, especially on a freshly started process, so code that accidentally relies on `empty` giving zeros can pass every test and then produce garbage under real load when the allocator hands back recycled memory.
+The trap is that uninitialised memory is often zeros above all on a freshly started process. Code that accidentally leans on `empty` giving zeros can pass each test and then give garbage under real load when the allocator hands back recycled memory.
 
-The rule: use `empty` only when the very next thing you do fills the whole array. If there is any branch where an element might not be written, use `zeros`.
+The rule: use `empty` only when the very next thing you do fills the whole array. If there's any branch where an element might not be written, use `zeros`.
 
 ## Bringing data in from elsewhere
 
-`np.array` on a list is the common case, but it is not the only door.
+`np.array` on a list is the common case. But It isn't the only door.
 
-`np.frombuffer` wraps existing bytes without copying &mdash; useful for data arriving from a socket, a file read, or another library. The result is read-only if the buffer is, and it shares memory with the source, so the usual view caveats apply.
+`np.frombuffer` wraps existing bytes without copying. handy for data arriving from a socket, a file read, or another library. The result is read-only if the buffer is. It shares memory with the source. The usual view caveats apply.
 
-`np.fromiter` builds an array from any iterable, consuming it lazily. This is the one to reach for with a generator, because `np.array(generator)` does **not** do what you would hope: it creates a zero-dimensional object array containing the generator itself. That failure is silent and confusing, and `fromiter` with an explicit `dtype` is the fix. Pass `count` when you know the length, and it can preallocate instead of growing internally.
+`np.fromiter` builds an array from any iterable, consuming it lazily. This is the one to reach for with a gen. `np.array(gen)` does **not** do what you'd hope. It creates a zero-dimensional object array holding the gen itself. That failure is silent and confusing. `fromiter` with an clear `dtype` is the fix. Pass `count` when you know the length. It can preallocate instead of growing inside.
 
 `np.loadtxt` and `np.load` cover files, and get a module of their own later.
 
 ## The structured constructors
 
-`np.eye(n)` gives an identity matrix; `np.identity(n)` is the same thing with fewer options. `np.eye` takes a `k` argument to offset the diagonal, which is how you build shift matrices.
+`np.eye(n)` gives an identity mat. `np.identity(n)` is the same thing with fewer options. `np.eye` takes a `k` arg to offset the main-line. This Is how you build shift mats.
 
-`np.diag` is two functions in one, depending on what you hand it. Given a 1-D array it builds a matrix with that diagonal. Given a 2-D array it extracts the diagonal. That overloading is convenient and occasionally surprising.
+`np.diag` is two functions in one, based on what you hand it. Given a 1-D array it builds a mat with that main-line. Given a 2-D array it extracts the main-line. That overloading is convenient and at times surprising.
 
-`np.full(shape, value)` fills with a constant, and is clearer than `np.ones(shape) * value` &mdash; it also gets the dtype right, inferring it from the fill value rather than starting from float.
+`np.full(shape, value)` fills with a constant. Is clearer than `np.ones(shape) * value`. It also gets the dtype right, inferring it from the fill value rather than starting from float.
 
-`np.tile` and `np.repeat` build larger arrays from smaller ones. They differ in a way worth remembering: `tile` repeats the whole array, `repeat` repeats each element in place. `np.tile([1,2], 2)` gives `1 2 1 2`; `np.repeat([1,2], 2)` gives `1 1 2 2`.
+`np.tile` and `np.repeat` build larger arrays from smaller ones. They differ in a way worth remembering: `tile` repeats the whole array, `repeat` repeats each element in place. `np.tile([1,2], 2)` gives `1 2 1 2`. `np.repeat([1,2], 2)` gives `1 1 2 2`.
 
 ## array versus asarray
 
-`np.array(x)` copies by default. `np.asarray(x)` does not copy if `x` is already an array of the right dtype.
+`np.array(x)` copies by default. `np.asarray(x)` doesn't copy if `x` is already an array of the right dtype.
 
-That distinction matters at function boundaries. A function that begins `a = np.asarray(a)` accepts lists and arrays alike, and costs nothing when given an array it can use directly. The same function written with `np.array` copies every call, which is wasteful in a loop and can be significant for large inputs.
+That gap matters at function boundaries. A function that begins `a = np.asarray(a)` accepts lists and arrays alike. Costs nothing when given an array it can use right. The same function written with `np.array` copies each call. This Is wasteful in a loop and can be large for large inputs.
 
-Use `asarray` for "make sure this is an array". Use `array` when you specifically want a copy that the caller cannot see you modify.
+Use `asarray` for "make sure this is an array". Use `array` when you namely want a copy that the caller can't see you modify.
 
-Note that `asarray` returning the original means you must not modify it in place unless you own it &mdash; the same views-and-copies question that runs through the whole library.
+Note that `asarray` returning the first means you must not modify it in place unless you own it. The same views-and-copies question that runs through the whole library.
 
 ## A checklist for choosing
 
@@ -636,51 +636,51 @@ Ask, in order:
 
 **Do I already have the values?** `np.array` or `np.asarray`.
 
-**Do I know the shape but not the values?** `zeros`, `ones`, `full`, or `empty` if every element will be overwritten.
+**Do I know the shape but not the values?** `zeros`, `ones`, `full`, or `empty` if each element will be overwritten.
 
-**Is it a sequence of numbers?** `arange` for a step, `linspace` for a count. Prefer `linspace` whenever the values are floats, because `arange` with a float step has an unpredictable length.
+**Is it a sequence of numbers?** `arange` for a step, `linspace` for a count. Prefer `linspace` when the values are floats. `arange` with a float step has an unpredictable length.
 
-**Should it match something I have?** The `_like` family, which copies shape and dtype together and prevents the two from drifting apart.
+**Should it match a thing I have?** The `_like` family. This Copies shape and dtype together and blocks the two from drifting apart.
 
-**Is it coming from a generator or a byte buffer?** `fromiter` or `frombuffer`, never bare `np.array`.
+**Is it coming from a gen or a byte buffer?** `fromiter` or `frombuffer`, never bare `np.array`.
 
-And in every branch, set the dtype at creation rather than converting later. `astype` allocates a whole second array, and choosing correctly the first time avoids both the copy and the class of bugs where an integer array silently refuses the float you assign into it.
+And in each branch, set the dtype at creation rather than converting later. `astype` allocates a whole second array. Choosing right the first time avoids both the copy and the class of bugs where an int array silently refuses the float you assign into it.
 
 ## Common mistakes at this stage
 
-**`np.array(generator)`.** This does not build an array from the generator's values. It builds a zero-dimensional object array containing the generator object itself, and every subsequent operation behaves bizarrely. `np.fromiter(gen, dtype=float)` is the correct call, and passing `count` when the length is known lets it preallocate.
+**`np.array(gen)`.** This doesn't build an array from the gen's values. It builds a zero-dimensional object array holding the gen object itself. Each later step behaves bizarrely. `np.fromiter(gen, dtype=float)` is the correct call. Passing `count` when the length is known lets it preallocate.
 
-**`np.array` on ragged input.** Lists of unequal length no longer produce an object array silently &mdash; modern NumPy raises. That is an improvement, because the object array it used to create looked like an array and performed like a list.
+**`np.array` on ragged input.** Lists of unequal length no longer give an object array silently. Modern NumPy raises. That is an gain. The object array it used to create looked like an array and performed like a list.
 
-**Forgetting that `np.zeros` is float.** `np.zeros(5)` has dtype `float64`, not integer. Code that fills it with counts and then uses it as an index has to convert, and the conversion is a copy. `np.zeros(5, dtype=int)` at creation avoids both.
+**Losing that `np.zeros` is float.** `np.zeros(5)` has dtype `float64`, not int. Code that fills it with counts and then uses it as an index has to convert. The conversion is a copy. `np.zeros(5, dtype=int)` at creation avoids both.
 
-**`np.empty` where `np.zeros` was meant.** Uninitialised memory frequently contains zeros in a fresh process, so this passes tests and fails in production.
+**`np.empty` where `np.zeros` was meant.** Uninitialised memory often holds zeros in a fresh process. This passes tests and fails in production.
 
-**Building with `np.append` in a loop.** Quadratic, and the single most common accidental slowdown in beginner NumPy code.
+**Building with `np.append` in a loop.** Quadratic. The single most common accidental slowdown in beginner NumPy code.
 
 ## A note on reproducible construction
 
-Test data and examples benefit from being deterministic.
+Test data and examples gain from being fixed.
 
-`np.arange` and `np.linspace` are deterministic by construction, which makes them good for examples where the values do not matter but reproducibility does.
+`np.arange` and `np.linspace` are fixed by build. This Makes them good for examples where the values don't matter but reproducibility does.
 
-Where random data is genuinely needed, `np.random.default_rng(seed)` gives a generator whose output is fixed. Seeding at the point of construction, rather than relying on a global, keeps the example self-contained &mdash; which is why every random example in this track creates its own generator.
+Where random data is truly needed, `np.random.default_rng(seed)` gives a gen whose output is fixed. Seeding at the point of build, rather than leaning on a global, keeps the example self-held. Which is why each random example in this track creates its own gen.
 
 ## Getting the shape right the first time
 
-Most construction bugs are shape bugs, and two habits prevent them.
+Most build bugs are shape bugs, and two habits prevent them.
 
-**Pass the shape as a tuple and read it back.** `np.zeros((3, 4))` is unambiguous. `np.zeros(3, 4)` is an error, because the second positional argument is the dtype &mdash; a genuinely confusing failure the first time it happens.
+**Pass the shape as a tuple and read it back.** `np.zeros((3, 4))` is unambiguous. `np.zeros(3, 4)` is an error. The second spot-based arg is the dtype. A truly confusing failure the first time it happens.
 
-**Use the `_like` family when an array should match another.** `np.zeros_like(a)` cannot drift out of sync with `a` the way a hard-coded shape can. When the shape of `a` changes, the output follows, and one fewer place needs editing.
+**Use the `_like` family when an array should match another.** `np.zeros_like(a)` can't drift out of sync with `a` the way a hard-coded shape can. When the shape of `a` changes, the output follows. One fewer place needs editing.
 
 ## A closing note
 
-Creation is the cheapest place to prevent problems, because the dtype and shape chosen here propagate through everything that follows.
+Creation is the cheapest place to prevent problems. The dtype and shape chosen here pass through all that follows.
 
-Setting the dtype at construction avoids a copy and a class of silent conversion bugs. Passing the shape as a tuple avoids the confusing failure where the second argument is read as a dtype. And using the `_like` family keeps derived arrays from drifting out of sync with their source.
+Setting the dtype at build avoids a copy and a class of silent conversion bugs. Passing the shape as a tuple avoids the confusing failure where the second arg is read as a dtype. And using the `_like` family keeps derived arrays from drifting out of sync with their source.
 
-Three small habits, applied once, that remove a disproportionate amount of later debugging.
+Three small habits, applied once, that drop a disproportionate amount of later debugging.
 ''',
     [
         {"q": "Why prefer `linspace` over `arange` for float steps?",
@@ -845,33 +845,33 @@ print("   difference         : %.6f" % abs(f32 - f64))'''),
     ],
     '''
 title: Dtypes
-intro: One type for the whole array: what it costs, when it overflows, and how promotion decides the result.
+intro: One type for the whole array: what it costs, when it overflows. How promotion decides the result.
 
 ## Kind and width
 
-A dtype records what kind of number and how many bytes. `int32` is a signed integer in four bytes; `float64` is a double-precision float in eight.
+A dtype records what kind of number and how many bytes. `int32` is a signed int in four bytes. `float64` is a double-precision float in eight.
 
-Both halves matter. The kind decides what operations mean; the width decides the range and the memory.
+Both halves matter. The kind decides what steps mean. The width decides the range and the memory.
 
-`np.iinfo` and `np.finfo` report the limits, and it is worth looking at them once rather than remembering approximations. The first editor prints them.
+`np.iinfo` and `np.finfo` report the limits. It's worth looking at them once rather than remembering guesses. The first editor prints them.
 
 ## Integers wrap
 
-This is the sharpest difference from ordinary Python and the one most likely to cause a quiet bug.
+This is the sharpest gap from plain Python and the one most likely to cause a quiet bug.
 
-A Python `int` grows to whatever size it needs. A NumPy integer is a fixed-width machine integer, and exceeding it wraps around. `int8` at 127 plus one is &minus;128. No exception, no warning.
+A Python `int` grows to what size it needs. A NumPy int is a fixed-width machine int. Exceeding it wraps around. `int8` at 127 plus one is &minus;128. No exception, no warning.
 
-Code that worked on lists can produce wrong numbers on arrays, and the failure is silent. That is worse than a crash, because nothing draws attention to it.
+Code that worked on lists can give wrong numbers on arrays. The failure is silent. That is worse than a crash. Nothing draws focus to it.
 
-Two habits help. Choose a width with headroom when values can grow. And be aware that the default integer is platform-dependent &mdash; `int64` on most desktops, `int32` on this page &mdash; so an example that is safe on your laptop may overflow elsewhere, and vice versa.
+Two habits help. Choose a width with headroom when values can grow. And be aware that the default int is platform-dependent. `int64` on most desktops, `int32` on this page. So an example that is safe on your laptop may overflow elsewhere, and vice versa.
 
 ## Promotion
 
-When two arrays of different dtype meet, NumPy finds a type that can hold both and converts before operating.
+When two arrays of other dtype meet, NumPy finds a type that can hold both and converts before operating.
 
-Mostly this is what you want. `int8 + int16` gives `int16`. `int32 + float32` gives `float64`, which surprises people the first time: `float32` cannot represent every `int32` exactly, so NumPy widens to something that can.
+Mostly this is what you want. `int8 + int16` gives `int16`. `int32 + float32` gives `float64`. This Surprises people the first time: `float32` can't represent each `int32` just. NumPy widens to a thing that can.
 
-The consequence worth knowing is memory. A carefully chosen `float32` array combined with anything `float64` produces a `float64` result, and a pipeline can quietly double its footprint at one careless line. If you are working in `float32` deliberately, keep constants and intermediate arrays in `float32` too.
+The result worth knowing is memory. A carefully chosen `float32` array mixed with anything `float64` makes a `float64` result. A pipeline can quietly double its footprint at one careless line. If you're working in `float32` on purpose, keep constants and mid arrays in `float32` too.
 
 ## Assignment converts, it does not widen
 
@@ -882,135 +882,135 @@ ints = np.arange(5)
 ints[0] = 9.99        # stores 9
 ```
 
-Truncation toward zero, silently. The array's type was decided at creation and a single assignment cannot change it.
+Truncation toward zero, silently. The array's type was decided at creation and a single set can't change it.
 
-The same applies to precision. Writing `1/3` into a `float32` array stores the nearest `float32`, and reading it back gives a value that differs from Python's float in the seventh decimal place.
+The same applies to precision. Writing `1/3` into a `float32` array stores the nearest `float32`. Reading it back gives a value that differs from Python's float in the seventh decimal place.
 
 ## astype
 
-`astype` produces a new array with a new dtype. Two things to remember.
+`astype` makes a new array with a new dtype. Two things to note.
 
 It **always copies**, even when the dtype is unchanged, unless you pass `copy=False`. That is a real cost on large arrays.
 
-It **converts without complaint**. Floats truncate toward zero rather than rounding, so `1.9` becomes `1` and `-1.9` becomes `-1`. Values outside the target range overflow. If you meant to round, call `np.round` first and then convert.
+It **converts without complaint**. Floats truncate toward zero rather than rounding. `1.9` turns `1` and `-1.9` turns `-1`. Values outside the target range overflow. If you meant to round, call `np.round` first and then convert.
 
 ## Choosing a width
 
 Two considerations, and they pull in opposite directions.
 
-**Memory.** A million `float64` values is 8 MB. In `float32` it is 4 MB, in `float16` 2 MB. On large arrays this is the difference between fitting in cache and not, which affects speed as much as capacity.
+**Memory.** A million `float64` values is 8 MB. In `float32` it's 4 MB, in `float16` 2 MB. On large arrays this is the gap between fitting in cache and not. This Affects speed as much as room.
 
-**Precision and range.** `float32` carries about seven significant decimal digits, `float64` about sixteen. For image pixels, neural network weights and most measured data, `float32` is ample. For accumulating a sum over millions of elements it is not &mdash; the running total grows until adding one more small value changes nothing.
+**Precision and range.** `float32` carries about seven large decimal digits, `float64` about sixteen. For image pixels, neural network weights and most measured data, `float32` is ample. For building up a sum over millions of elements it isn't. The running total grows until adding one more small value changes nothing.
 
-The last editor demonstrates that: summing a million ones in `float32` does not give a million. `sum(dtype=np.float64)` accumulates in double precision while keeping the array itself small, which is usually the right compromise.
+The last editor shows that: summing a million ones in `float32` doesn't give a million. `sum(dtype=np.float64)` builds up in double precision while keeping the array itself small. This Is often the right compromise.
 
 ## A working rule
 
-Default to `float64` for numerical work unless memory is a real constraint. Use `float32` deliberately, for large arrays, and keep the whole pipeline in it.
+Default to `float64` for numeric work unless memory is a real constraint. Use `float32` on purpose, for large arrays. Keep the whole pipeline in it.
 
-For integers, pick a width that fits your values with room to spare, and be explicit whenever the numbers might be large &mdash; the default is not the same everywhere.
+For ints, pick a width that fits your values with room to spare. Be clear when the numbers might be large. The default isn't the same all over.
 
-And whenever a result looks wrong by a factor of two, or negative when it should not be, check the dtype before checking your logic.
+And when a result looks wrong by a factor of two, or minus when it shouldn't be, check the dtype before checking your logic.
 
 ## What float precision actually buys you
 
-`float64` carries about 15 to 17 significant decimal digits. `float32` carries about 7. `float16` carries about 3.
+`float64` carries about 15 to 17 large decimal digits. `float32` carries about 7. `float16` carries about 3.
 
-Those numbers are the whole story for choosing, and the useful question is not "how much precision is available" but "how much does my data have".
+Those numbers are the whole story for choosing. The handy question isn't "how much precision is on hand" but "how much does my data have".
 
-A temperature sensor accurate to a tenth of a degree has three significant digits. Storing its readings in `float64` records twelve digits of noise very precisely. `float32` would be ample, and would halve the memory.
+A temp sensor accurate to a tenth of a degree has three large digits. Storing its readings in `float64` records twelve digits of noise very just. `float32` would be ample, and would halve the memory.
 
-The counter-argument is accumulation. Summing a million `float32` values loses precision faster than summing a million `float64` values, because the rounding error at each step is larger relative to the running total. NumPy mitigates this by using pairwise summation internally, which keeps the error growth much slower than a naive loop, but it does not eliminate it.
+The counter-arg is build-up. Summing a million `float32` values loses precision faster than summing a million `float64` values. The rounding error at each step is larger scaled to the running total. NumPy mitigates this by using pairwise summation inside. This Keeps the error growth much slower than a naive loop. It doesn't drop it.
 
-A practical compromise, and what many libraries do: store in `float32`, accumulate in `float64`. `a.sum(dtype=np.float64)` does exactly that &mdash; reads a narrow array, accumulates in a wide type.
+A hands-on compromise, and what many libraries do. Store in `float32`, build up in `float64`. `a.sum(dtype=np.float64)` does just that. Reads a narrow array, builds up in a wide type.
 
 ## Why 0.1 + 0.2 is not 0.3
 
-Binary floating point cannot represent 0.1 exactly, any more than decimal can represent one third exactly. The stored value is very slightly off, and the errors compound.
+Binary floating point can't represent 0.1 just, any more than decimal can represent one third just. The stored value is very slightly off, and the errors compound.
 
-This is not a NumPy issue &mdash; it is the same in plain Python, in C, and in every language using IEEE 754 &mdash; but it bites harder in array code because you are more likely to be comparing results of long computations.
+This isn't a NumPy issue. It's the same in plain Python, in C. In each language using IEEE 754. But it bites harder in array code because you're more likely to be checking results of long steps.
 
-The consequence: **never test floats for equality**.
+The result: **never test floats for equality**.
 
-`np.isclose(a, b)` compares elementwise with a tolerance. `np.allclose(a, b)` reduces that to a single boolean, and is the right thing in a test.
+`np.isclose(a, b)` checks elementwise with a handling. `np.allclose(a, b)` reduces that to a single boolean. Is the right thing in a test.
 
-Both take `rtol` and `atol`. The relative tolerance handles large values, where a fixed absolute difference is meaningless; the absolute tolerance handles values near zero, where a relative comparison breaks down. The defaults are sensible for typical data and worth overriding when your values are unusually large or unusually small.
+Both take `rtol` and `atol`. The scaled handling handles large values. Here A fixed abs gap is meaningless. The abs handling handles values near zero. Here A scaled compare breaks down. The defaults are sensible for common data and worth replacing when your values are unusually large or unusually small.
 
-`equal_nan=True` makes NaN compare equal to NaN, which is usually what you want when checking that two arrays came out the same.
+`equal_nan=True` makes NaN compare equal to NaN. This Is often what you want when checking that two arrays came out the same.
 
 ## Booleans
 
-`np.bool_` is one byte, not one bit. NumPy does not pack booleans, so a mask over a million elements costs a megabyte.
+`np.bool_` is one byte, not one bit. NumPy doesn't pack booleans. A mask over a million elements costs a megabyte.
 
-Booleans promote to integers in arithmetic, with `True` becoming 1. That is why `mask.sum()` counts matches, and it is one of the more useful accidents of the type system.
+Booleans promote to ints in math, with `True` turning 1. That is why `mask.sum()` counts matches. It's one of the more handy accidents of the type system.
 
-They do not promote silently in the other direction: assigning 2 into a boolean array stores `True`, since anything nonzero is true. That conversion is lossy and silent, and is a reason to be careful about which array you are assigning into.
+They don't promote silently in the other direction. Assigning 2 into a boolean array stores `True`. Anything nonzero is true. That conversion is lossy and silent. Is a reason to be careful about which array you're assigning into.
 
 ## Strings, and why they surprise people
 
 NumPy string dtypes are **fixed width**. An array created from `["ana", "bartholomew"]` gets dtype `<U11`, sized to the longest.
 
-Assign a longer string into it later and it is **silently truncated** to eleven characters. Nothing raises. This is the single most surprising behaviour in NumPy's type system, and it is a direct consequence of the fixed-size-elements design that makes everything else work.
+Assign a longer string into it later and it's **silently truncated** to eleven characters. Nothing raises. This is the single most surprising action in NumPy's type system. It's a direct result of the fixed-size-elements design that makes all else work.
 
-If you need real variable-length strings, the options are an object array &mdash; which stores pointers to Python strings and gives up every performance benefit &mdash; or pandas, which handles this properly.
+If you need real var-length strings, the options are an object array. Which stores pointers to Python strings and gives up each speed gain. Or pandas. This Handles this properly.
 
-NumPy 2.0 added a variable-width string dtype that addresses this, but it is recent enough that most code and most environments you will meet do not have it.
+NumPy 2.0 added a var-width string dtype that handles this. It's recent enough that most code and most settings you'll meet don't have it.
 
 ## Object arrays
 
-`dtype=object` makes an array of pointers to arbitrary Python objects. It looks like an array and supports the indexing syntax.
+`dtype=object` makes an array of pointers to any Python objects. It looks like an array and supports the indexing syntax.
 
-It is not fast. Every operation falls back to calling Python methods per element, which is a list with extra steps. It also cannot be saved without pickling, with the security consequences covered later.
+It isn't fast. each step falls back to calling Python methods per element. This Is a list with extra steps. It also can't be saved without pickling, with the security results covered later.
 
-Occasionally it is the right answer &mdash; a ragged collection that you genuinely need to index like an array. Usually its appearance is a sign that the data does not want to be a NumPy array at all, and it is worth checking whether a list, a dict or a DataFrame fits better before building on it.
+at times it's the right answer. A ragged set that you truly need to index like an array. often its appearance is a sign that the data doesn't want to be a NumPy array at all. It's worth checking whether a list, a dict or a DataFrame fits better before building on it.
 
 ## Working rules
 
-Set the dtype at creation. Check `a.dtype` when a result looks wrong &mdash; it is the second thing to look at after `a.shape`, and one of them explains most surprises.
+Set the dtype at creation. Check `a.dtype` when a result looks wrong. It's the second thing to look at after `a.shape`. One of them shows most surprises.
 
-Use `float32` when precision allows and memory matters, and accumulate in `float64`.
+Use `float32` when precision allows and memory matters, and build up in `float64`.
 
-Never compare floats with `==`; use `np.isclose` or `np.allclose`.
+Never compare floats with `==`. Use `np.isclose` or `np.allclose`.
 
-Treat integer arrays as capable of silently wrapping, and pick a width with headroom for the data you might see, not the data in front of you.
+Treat int arrays as capable of silently wrapping. Pick a width with headroom for the data you might see, not the data in front of you.
 
-And treat a fixed-width string dtype as a fixed-width string dtype &mdash; check the width before assigning into one.
+And treat a fixed-width string dtype as a fixed-width string dtype. Check the width before assigning into one.
 
 ## Checking dtypes in practice
 
-`a.dtype` is the direct question, and comparing it works as you would expect: `a.dtype == np.float64`.
+`a.dtype` is the direct question, and checking it works as you'd expect: `a.dtype == np.float64`.
 
-For a category rather than an exact type, `np.issubdtype(a.dtype, np.integer)` and `np.issubdtype(a.dtype, np.floating)` are the right tests. They handle every width at once, which a chain of equality comparisons does not.
+For a group rather than an exact type, `np.issubdtype(a.dtype, np.int)` and `np.issubdtype(a.dtype, np.floating)` are the right tests. They handle each width at once. This A chain of equality checks doesn't.
 
-`a.dtype.kind` gives a single character: `i` for signed integer, `u` for unsigned, `f` for float, `b` for boolean, `U` for unicode string, `O` for object. It is convenient for quick branching.
+`a.dtype.kind` gives a single character: `i` for signed int, `u` for unsigned, `f` for float, `b` for boolean, `U` for unicode string, `O` for object. It's convenient for quick branching.
 
-In a function that accepts arrays from callers, converting defensively is often better than checking: `a = np.asarray(a, dtype=float)` accepts lists, integer arrays and float arrays alike, and produces exactly one predictable type. It copies only when it has to.
+In a function that accepts arrays from callers, converting defensively is often better than checking: `a = np.asarray(a, dtype=float)` accepts lists, int arrays and float arrays alike. Makes just one predictable type. It copies only when it has to.
 
 ## The unsigned trap
 
-Unsigned integers behave surprisingly in subtraction.
+Unsigned ints behave oddly in subtraction.
 
-`np.uint8(3) - np.uint8(5)` is not `-2`. There are no negative values in an unsigned type, so it wraps to 254.
+`np.uint8(3) - np.uint8(5)` isn't `-2`. There are no minus values in an unsigned type. It wraps to 254.
 
-This bites most often with image data, which is commonly `uint8`. Subtracting two images to find a difference gives large positive values wherever the result should have been negative, and the resulting image looks wrong in a way that is easy to misread as a bug elsewhere.
+This bites most often with image data. This Is often `uint8`. Subtracting two images to find a gap gives large plus values wherever the result should have been minus. The resulting image looks wrong in a way that is easy to misread as a bug elsewhere.
 
 The fix is to convert before subtracting: `a.astype(np.int16) - b.astype(np.int16)`, then clip and convert back if needed.
 
-Mixed signed and unsigned arithmetic also promotes in ways that surprise. Combining `int64` and `uint64` gives `float64`, because no integer type can hold the full range of both &mdash; and that silent jump to float is a real source of precision loss on large integers.
+Mixed signed and unsigned math also promotes in ways that surprise. Mixing `int64` and `uint64` gives `float64`. No int type can hold the full range of both. And that silent jump to float is a real source of precision loss on large ints.
 
 ## Choosing, summarised
 
-**Floats.** `float64` unless memory matters. `float32` when it does and seven digits suffice, accumulating in `float64`.
+**Floats.** `float64` unless memory matters. `float32` when it does and seven digits suffice, building up in `float64`.
 
-**Integers.** The default platform integer is fine for indices and counts. Narrow deliberately for large arrays of small values, with headroom for the data you might see rather than the sample in front of you.
+**ints.** The default platform int is fine for indices and counts. Narrow on purpose for large arrays of small values, with headroom for the data you might see rather than the sample in front of you.
 
-**Booleans.** `bool_` for masks. One byte each, and they promote to integers so `sum` counts.
+**Booleans.** `bool_` for masks. One byte each, and they promote to ints so `sum` counts.
 
 **Strings.** Fixed width, silently truncating. Check the width before assigning, or use pandas.
 
-**Objects.** Almost always a sign the data does not want to be an array.
+**Objects.** Almost always a sign the data doesn't want to be an array.
 
-And in all cases: set it at creation. `astype` allocates a second full array, and getting it right the first time avoids both that copy and the class of bugs where an integer array quietly refuses the float you assigned into it.
+And in all cases: set it at creation. `astype` allocates a second full array. Getting it right the first time avoids both that copy and the class of bugs where an int array quietly refuses the float you assigned into it.
 ''',
     [
         {"q": "What does a NumPy int8 do at 127 + 1?",
@@ -1173,125 +1173,125 @@ print("   before:", odd.shape, " after:", odd.squeeze().shape)'''),
     ],
     '''
 title: Shape and Reshape
-intro: The same numbers read a different way, and why it usually costs nothing.
+intro: The same numbers read a other way, and why it often costs nothing.
 
 ## Three numbers
 
-`shape` is a tuple describing the extent of each axis. `ndim` is how many axes there are, which is just `len(shape)`. `size` is the total number of elements, which is the product of the shape.
+`shape` is a tuple showing the extent of each axis. `ndim` is how many axes there are. This Is just `len(shape)`. `size` is the total number of elements. This Is the product of the shape.
 
-When an operation complains about shapes, printing all three of these for both operands answers the question most of the time. It is worth making that reflex.
+When an step complains about shapes, printing all three of these for both operands answers the question most of the time. It's worth making that reflex.
 
-The empty tuple is a valid shape: `np.array(5).shape` is `()`, a zero-dimensional array holding one value. That comes up when an aggregation reduces everything away.
+The empty tuple is a valid shape: `np.array(5).shape` is `()`, a zero-dimensional array holding one value. That comes up when an aggregation reduces all away.
 
 ## Reshaping is free
 
 An array is a flat block of memory plus a description of how to walk it. `reshape` changes the description and leaves the memory alone.
 
-That means it returns a **view**, not a copy. Writing through the reshaped array changes the original, because there is only one set of numbers. `np.shares_memory` confirms it, and the second editor demonstrates the write going both ways.
+That means it returns a **view**, not a copy. Writing through the reshaped array changes the first. There's only one set of numbers. `np.shares_memory` confirms it. The second editor shows the write going both ways.
 
-This is the first appearance of a theme that runs through the whole track, and which has a module of its own: many NumPy operations give you a different window onto the same data rather than new data.
+This is the first appearance of a theme that runs through the whole track. Which has a module of its own. Many NumPy steps give you a other window onto the same data rather than new data.
 
-Reshape can only return a view when the result can be described by regular strides. If it cannot &mdash; usually after a transpose &mdash; NumPy copies instead, silently. If you need to know which happened, check `.base` or `np.shares_memory`.
+Reshape can only return a view when the result can be given by regular strides. If it can't. Often after a transpose. NumPy copies instead, silently. If you need to know which happened, check `.base` or `np.shares_memory`.
 
 ## -1
 
-One dimension can be `-1`, meaning "work this one out from the others and the total size".
+One dim can be `-1`, meaning "work this one out from the others and the total size".
 
-`a.reshape(3, -1)` says three rows, however many columns that takes. It is better than hard-coding the second number, because it keeps working when the input length changes.
+`a.reshape(3, -1)` says three rows. But Many columns that takes. It's better than hard-coding the second number. It keeps working when the input length changes.
 
-Only one axis can be `-1` &mdash; two would be ambiguous. And the total must divide exactly: reshaping twelve elements into rows of five raises, which is the correct behaviour and a useful early warning that an upstream length is not what you assumed.
+Only one axis can be `-1`. Two would be ambiguous. And the total must divide just. Reshaping twelve elements into rows of five raises. This Is the correct action and a handy early warning that an upstream length isn't what you assumed.
 
 ## Row-major order
 
-NumPy walks the **last axis fastest** by default, which is called C order or row-major. Filling a `(2, 3)` array from `[0, 1, 2, 3, 4, 5]` gives rows `[0, 1, 2]` and `[3, 4, 5]`.
+NumPy walks the **last axis fastest** by default. This Is called C order or row-major. Filling a `(2, 3)` array from `[0, 1, 2, 3, 4, 5]` gives rows `[0, 1, 2]` and `[3, 4, 5]`.
 
-Fortran order fills the first axis fastest, giving columns instead. `reshape` and `ravel` both take an `order` argument.
+Fortran order fills the first axis fastest, giving columns instead. `reshape` and `ravel` both take an `order` arg.
 
-You mostly do not need to think about this until you do: interfacing with code that expects column-major layout, reading a binary file written by something else, or debugging a reshape that produced a transposed-looking result. Knowing that the default is "last axis fastest" makes those predictable rather than mysterious.
+You mostly don't need to think about this until you do. Interfacing with code that expects column-major layout, reading a binary file written by a thing else, or debugging a reshape that made a transposed-looking result. Knowing that the default is "last axis fastest" makes those predictable rather than mysterious.
 
 ## ravel and flatten
 
-Both return a 1-D version. The difference is copying.
+Both return a 1-D version. The gap is copying.
 
-`ravel` returns a view when the layout permits, and a copy when it does not. `flatten` always copies.
+`ravel` returns a view when the layout permits. A copy when it doesn't. `flatten` always copies.
 
-So `ravel` is cheaper and shares memory; `flatten` is safe and independent. Use `ravel` when you are only reading, and `flatten` when you intend to modify the result without touching the original &mdash; or when you want a guarantee rather than a maybe.
+So `ravel` is cheaper and shares memory. `flatten` is safe and split. Use `ravel` when you're only reading. `flatten` when you intend to modify the result without touching the first. Or when you want a promise rather than a maybe.
 
-The fifth editor shows the difference directly: writing through the ravelled array changes the source, writing through the flattened one does not.
+The fifth editor shows the gap right: writing through the ravelled array changes the source, writing through the flattened one doesn't.
 
 ## Length-1 axes
 
-A large share of real shape errors are an axis of size one in the wrong position, usually when a column of data needs to be a column rather than a flat sequence.
+A large share of real shape errors are an axis of size one in the wrong spot, often when a column of data needs to be a column rather than a flat sequence.
 
 `a.reshape(-1, 1)` makes a column, `a.reshape(1, -1)` makes a row. `np.newaxis` in an index does the same thing and reads better in place: `a[:, np.newaxis]` says clearly that a new axis is being inserted at the end.
 
-`squeeze` goes the other way, removing every axis of length one. That is useful for cleaning up after an operation that kept dimensions you no longer need &mdash; and mildly dangerous in library code, because it removes axes you might have been relying on when a dimension happens to be one.
+`squeeze` goes the other way, dropping each axis of length one. That is handy for cleaning up after an step that kept dims you no longer need. And mildly dangerous in library code. It drops axes you might have been leaning on when a dim happens to be one.
 
-Getting these right matters most for broadcasting, which is the next module but one, and where the difference between shape `(3,)` and shape `(3, 1)` decides whether you get the answer you wanted or a much larger array you did not.
+Getting these right matters most for broadcasting. This Is the next module but one. Where the gap between shape `(3,)` and shape `(3, 1)` decides whether you get the answer you wanted or a much larger array you didn't.
 
 ## The invariant
 
-`a.size` is the product of `a.shape`, always. Every reshape must preserve it, which is why an impossible reshape raises rather than truncating or padding.
+`a.size` is the product of `a.shape`, always. each reshape must preserve it. This Is why an hopeless reshape raises rather than truncating or padding.
 
-That single constraint answers most "will this work" questions before you run anything. A 24-element array can become `(2,12)`, `(3,8)`, `(2,3,4)` or `(24,)`. It cannot become `(5,5)`.
+That single constraint answers most "will this work" questions before you run anything. A 24-element array can become `(2,12)`, `(3,8)`, `(2,3,4)` or `(24,)`. It can't become `(5,5)`.
 
 `a.ndim` is `len(a.shape)`, and is worth checking when writing functions that accept either a single sample or a batch of them.
 
 ## When reshape has to copy
 
-`reshape` returns a view when the requested shape can be expressed as a stride pattern over the existing memory, and a copy when it cannot.
+`reshape` returns a view when the requested shape can be expressed as a stride pattern over the existing memory. A copy when it can't.
 
-For a freshly created contiguous array, it is always a view.
+For a freshly created contiguous array, it's always a view.
 
-After a transpose, it usually is not. The transposed array reads the buffer column-first, and flattening it in row-major order means gathering scattered values &mdash; which requires new memory.
+After a transpose, it often isn't. The transposed array reads the buffer column-first. Flattening it in row-major order means gathering scattered values. Which needs new memory.
 
-NumPy does not tell you which happened. `np.shares_memory(a, b)` does.
+NumPy doesn't tell you which happened. `np.shares_memory(a, b)` does.
 
-If you need a guarantee in the other direction, `a.shape = (3, 4)` assigns the shape in place and **raises** if a view is impossible. That is a useful assertion: it fails loudly rather than silently copying, which is exactly what you want in code where an accidental copy of a large array would be a performance bug.
+If you need a promise in the other direction, `a.shape = (3, 4)` assigns the shape in place and **raises** if a view is hopeless. That is a handy assertion. It fails loudly rather than silently copying. This Is just what you want in code where an accidental copy of a large array would be a speed bug.
 
 ## Row-major, column-major, and order=
 
 C order, the default, means the **last** axis varies fastest. Reading `a.ravel()` on a `(2,3)` array gives the first row then the second.
 
-Fortran order means the first axis varies fastest, and reading gives the first column then the second.
+Fortran order means the first axis varies fastest. Reading gives the first column then the second.
 
-`reshape` and `ravel` both take `order="F"` to work column-first without changing the underlying data's actual layout, which is occasionally the clearest way to express an operation.
+`reshape` and `ravel` both take `order="F"` to work column-first without changing the underlying data's actual layout. This Is at times the clearest way to express an step.
 
-Genuine Fortran-ordered arrays &mdash; created with `np.asfortranarray` or `order="F"` &mdash; matter mainly when interfacing with Fortran or MATLAB-derived libraries, and some LAPACK routines are faster on them because they avoid an internal transpose.
+Genuine Fortran-sorted arrays &mdash; created with `np.asfortranarray` or `order="F"` &mdash; matter mainly when interfacing with Fortran or MATLAB-derived libraries. Some LAPACK routines are faster on them because they avoid an inner transpose.
 
-For everyday work, staying in C order and not thinking about it is the right default. The time to care is when `flags` tells you an array is not contiguous and something downstream is copying.
+For everyday work, staying in C order and not thinking about it's the right default. The time to care is when `flags` tells you an array isn't contiguous and a thing downstream is copying.
 
 ## reshape versus resize
 
-They sound like a pair and are not.
+They sound like a pair and aren't.
 
-`np.reshape` returns a new view or copy with a different shape, leaving the original alone. The size must match.
+`np.reshape` returns a new view or copy with a other shape, leaving the first alone. The size must match.
 
-`a.resize(shape)` modifies the array **in place** and can change the size, padding with zeros or truncating. It also refuses to run if the array shares memory with anything else, which is a sensible protection and an occasional annoyance.
+`a.resize(shape)` modifies the array **in place** and can change the size, padding with zeros or truncating. It also refuses to run if the array shares memory with anything else. This Is a sensible protection and an occasional annoyance.
 
-`np.resize(a, shape)` &mdash; the function, not the method &mdash; is different again: it repeats the data cyclically to fill the new shape.
+`np.resize(a, shape)` &mdash; the function, not the method &mdash; is other again. It repeats the data cyclically to fill the new shape.
 
-Three similarly named operations with three different behaviours. In practice `reshape` covers nearly everything, and the other two are worth recognising when you meet them rather than reaching for.
+Three likewise named steps with three other actions. `reshape` covers nearly all. The other two are worth recognising when you meet them rather than reaching for.
 
 ## Length-1 axes, and why they keep appearing
 
-`np.newaxis` (which is just `None`) inserts an axis of length 1. `np.expand_dims` does the same thing as a function call. `np.squeeze` removes every length-1 axis, or a named one.
+`np.newaxis` (which is just `None`) inserts an axis of length 1. `np.expand_dims` does the same thing as a function call. `np.squeeze` drops each length-1 axis, or a named one.
 
-These exist almost entirely to serve broadcasting. A length-1 axis is the one broadcasting will stretch, so inserting one is how you say "align this against that axis".
+These exist almost fully to serve broadcasting. A length-1 axis is the one broadcasting will stretch. Inserting one is how you say "align this against that axis".
 
-They also appear at the boundaries of libraries. A model that expects a batch gets a single sample wrapped with `x[None]`. A result that comes back as `(n, 1)` gets squeezed to `(n,)` before being handed to something expecting a vector.
+They also appear at the boundaries of libraries. A model that expects a batch gets a single sample wrapped with `x[None]`. A result that comes back as `(n, 1)` gets squeezed to `(n,)` before being handed to a thing expecting a vector.
 
-A caution on `squeeze` with no arguments: it removes *all* length-1 axes, which means a batch of one sample loses its batch dimension too. In code that handles variable batch sizes, that turns into an intermittent bug that only appears when the batch happens to contain one item. Naming the axis &mdash; `squeeze(axis=1)` &mdash; makes it safe.
+A caution on `squeeze` with no args: it drops *all* length-1 axes. This Means a batch of one sample loses its batch dim too. In code that handles var batch sizes, that turns into an intermittent bug that only appears when the batch happens to hold one item. Naming the axis. `squeeze(axis=1)` &mdash; makes it safe.
 
 ## Debugging shape errors
 
-Shape errors are the most common failure in array code, and they are also the easiest to diagnose, because the error message contains both shapes.
+Shape errors are the most common failure in array code. They're also the easiest to diagnose. The error message holds both shapes.
 
 The routine that resolves nearly all of them:
 
-Print the shapes of the inputs. Not the arrays &mdash; the shapes. Most of the time the mismatch is immediately visible and the fix is obvious.
+Print the shapes of the inputs. Not the arrays. The shapes. Most of the time the mismatch is at once visible and the fix is obvious.
 
-Ask which axis each one is supposed to represent. Shape errors are usually a semantic mistake &mdash; samples and features swapped, a batch axis missing &mdash; rather than an arithmetic one.
+Ask which axis each one is supposed to represent. Shape errors are often a semantic mistake. Samples and features swapped, a batch axis missing. Rather than an math one.
 
 Check whether a reduction removed an axis you needed. `keepdims=True` is the fix when the answer is yes.
 
@@ -1299,27 +1299,27 @@ And check `ndim` when a function accepts both single items and batches. A great 
 
 ## Common shape mistakes
 
-**Assuming `reshape` reorders.** It does not rearrange values, only how they are grouped. If the values come out in an unexpected arrangement, the data was in a different order than assumed, and reshaping again will not fix it &mdash; a transpose might.
+**given `reshape` reorders.** It doesn't rearrange values, only how they're grouped. If the values come out in an surprise setup, the data was in a other order than assumed. Reshaping again won't fix it &mdash; a transpose might.
 
-**Using `reshape` to transpose.** `a.reshape(4, 3)` on a `(3, 4)` array is not `a.T`. Both give a `(4, 3)` result and they contain different values in different places. This is a genuinely common bug because the shapes match and nothing raises.
+**Using `reshape` to transpose.** `a.reshape(4, 3)` on a `(3, 4)` array isn't `a.T`. Both give a `(4, 3)` result and they hold other values in other places. This is a truly common bug because the shapes match and nothing raises.
 
-**`squeeze()` with no argument** in code that handles variable batch sizes. It removes every length-1 axis, so a single-item batch loses its batch dimension.
+**`squeeze()` with no arg** in code that handles var batch sizes. It drops each length-1 axis. A single-item batch loses its batch dim.
 
-**Relying on `reshape` returning a view.** It usually does and sometimes does not. `np.shares_memory` answers it; assigning to `.shape` enforces it.
+**Leaning on `reshape` returning a view.** It often does and at times doesn't. `np.shares_memory` answers it. Assigning to `.shape` enforces it.
 
-**Losing an axis to an integer index** and then being surprised when broadcasting fails. `a[:, 0]` gives `(3,)`; `a[:, 0:1]` gives `(3, 1)`.
+**Losing an axis to an int index** and then being surprised when broadcasting fails. `a[:, 0]` gives `(3,)`. `a[:, 0:1]` gives `(3, 1)`.
 
 ## Reading a shape error
 
-The error message contains everything needed, and reading it beats guessing.
+The error message holds all needed, and reading it beats guessing.
 
-"operands could not be broadcast together with shapes (3,4) (3,)" names both shapes. Align them from the right: 4 against 3. They are not equal and neither is 1, so it fails. The fix is either `keepdims=True` on whatever produced the `(3,)`, or an explicit `[:, None]`.
+"operands couldn't be broadcast together with shapes (3,4) (3,)" names both shapes. Align them from the right: 4 against 3. They aren't equal and neither is 1. It fails. The fix is either `keepdims=True` on what made the `(3,)`, or an clear `[:, None]`.
 
-"cannot reshape array of size 12 into shape (5,5)" is an arithmetic statement: 12 is not 25. Something upstream produced a different amount of data than expected, and the reshape is reporting it rather than causing it.
+"can't reshape array of size 12 into shape (5,5)" is an math statement: 12 isn't 25. A thing upstream made a other amount of data than expected. The reshape is reporting it rather than causing it.
 
-"matmul: Input operand 1 has a mismatch in its core dimension" means the inner dimensions of a matrix product do not agree. Print both shapes and check which axis is meant to be the shared one.
+"matmul: Input operand 1 has a mismatch in its core dim" means the inner dims of a mat product don't agree. Print both shapes and check which axis is meant to be the shared one.
 
-In every case the productive move is the same: print the shapes of the inputs, decide what each axis is supposed to mean, and fix the one that is wrong. Shape errors are almost always semantic &mdash; a transposed input, a missing batch axis, a reduction that removed something &mdash; rather than arithmetic.
+In each case the productive move is the same. Print the shapes of the inputs, decide what each axis is supposed to mean. Fix the one that is wrong. Shape errors are almost always semantic. A transposed input, a missing batch axis, a reduction that removed a thing &mdash; rather than math.
 ''',
     [
         {"q": "Does `reshape` copy the data?",
@@ -1486,30 +1486,30 @@ print("and fails; against (3,1) it compares 4 with 1 and stretches.")'''),
     ],
     '''
 title: Indexing and Slicing
-intro: Elements, rows and rectangles - and the one behaviour that differs from lists in a way that matters.
+intro: Elements, rows and rectangles - and the one action that differs from lists in a way that matters.
 ## One index per axis
 
-A comma separates axes, so `a[1, 2]` means row one, column two. That is the idiomatic form and the efficient one.
+A comma splits axes, so `a[1, 2]` means row one, column two. That is the idiomatic form and the fast one.
 
-`a[1][2]` reaches the same element by first producing row one as an array, then indexing that. For reading a single value the difference is small; inside a loop it is a temporary array per iteration.
+`a[1][2]` reaches the same element by first making row one as an array, then indexing that. For reading a single value the gap is small. Inside a loop it's a temporary array per loop.
 
-Negative indices count from the end, exactly as in Python. `a[-1, -1]` is the last element of the last row.
+Minus indices count from the end, just as in Python. `a[-1, -1]` is the last element of the last row.
 
-Indexing with fewer indices than axes gives you everything in the remaining ones. On a `(3, 4)` array, `a[1]` is a row of four.
+Indexing with fewer indices than axes gives you all in the left ones. On a `(3, 4)` array, `a[1]` is a row of four.
 
 ## Slices, per axis
 
-The familiar `start:stop:step`, once per dimension.
+The familiar `start:stop:step`, once per dim.
 
-`a[1:3]` takes rows. `a[:, 1:4]` takes columns. `a[1:3, 1:4]` takes both and gives you a rectangle. `a[::2]` takes every other row, and `a[:, ::-1]` reverses the columns.
+`a[1:3]` takes rows. `a[:, 1:4]` takes columns. `a[1:3, 1:4]` takes both and gives you a rectangle. `a[::2]` takes every other row. `a[:, ::-1]` reverses the columns.
 
-This composability is most of what makes array code compact. A block of a matrix, a channel of an image, every second sample of a signal &mdash; all are one expression.
+This composability is most of what makes array code compact. A block of a mat, a channel of an image, each second sample of a signal. All are one formula.
 
 ## Slices are views
 
-Here is the behaviour that differs from lists, and it catches nearly everybody once.
+Here is the action that differs from lists, and it catches nearly everybody once.
 
-Slicing a **list** copies. Slicing an **array** gives you a view onto the same memory. Writing through the view changes the original.
+Slicing a **list** copies. Slicing an **array** gives you a view onto the same memory. Writing through the view changes the first.
 
 ```python
 arr = np.arange(5)
@@ -1517,157 +1517,157 @@ view = arr[1:4]
 view[0] = 99        # arr is now [0, 99, 2, 3, 4]
 ```
 
-That is deliberate and valuable: slicing a large array costs nothing, so you can pass windows around freely without copying gigabytes. It is also a source of bugs when a function slices its input, modifies the slice, and unintentionally alters the caller's data.
+That is deliberate and valuable: slicing a large array costs nothing. You can pass windows around freely without copying gigabytes. It's also a source of bugs when a function slices its input, modifies the slice. Unintentionally alters the caller's data.
 
-The defence is to be explicit. `arr[1:4].copy()` when you need independence, and `np.shares_memory(a, b)` when you are not sure what you have. There is a whole module on this later, because it applies to more operations than slicing.
+The defence is to be clear. `arr[1:4].copy()` when you need freedom. `np.shares_memory(a, b)` when you aren't sure what you've. There's a whole module on this later. It applies to more steps than slicing.
 
 ## Ellipsis
 
-Trailing axes you do not mention are taken whole, so on a three-dimensional array `a[0]` gives you everything under index zero.
+Trailing axes you don't mention are taken whole. On a three-dimensional array `a[0]` gives you all under index zero.
 
-`...` stands for as many axes as needed, wherever it appears. `a[..., 0]` is the first element along the **last** axis, whatever the number of leading axes.
+`...` stands for as many axes as needed, wherever it appears. `a[..., 0]` is the first element along the **last** axis, what the number of leading axes.
 
-That is genuinely useful in code that handles arrays of varying dimensionality: `a[..., -1]` takes the last column of a 2-D array, the last channel of a 3-D one, and the same thing again for higher dimensions, without a special case.
+That is truly handy in code that handles arrays of varying dimensionality: `a[..., -1]` takes the last column of a 2-D array, the last channel of a 3-D one. The same thing again for higher dims, without a special case.
 
 ## Assigning into a selection
 
-Anything you can select, you can assign to, and the assignment happens in place.
+Anything you can select, you can assign to, and the set happens in place.
 
-A scalar fills the whole region: `a[1] = 5` sets every element of row one. An array must match the shape of the target &mdash; or be broadcastable to it, which is the next module.
+A scalar fills the whole region: `a[1] = 5` sets each element of row one. An array must match the shape of the target. Or be broadcastable to it. This Is the next module.
 
-Getting a length wrong raises rather than doing something surprising, which is the behaviour you want. It is also a reliable early sign that an upstream shape is not what you assumed.
+Getting a length wrong raises rather than doing a thing surprising. This Is the action you want. It's also a solid early sign that an upstream shape isn't what you assumed.
 
 ## The axis-dropping rule
 
-This is small, easy to miss, and explains a great deal of later confusion.
+This is small, easy to miss, and shows a great deal of later confusion.
 
-An **integer** index removes that axis. `a[1]` on a `(3, 4)` array gives shape `(4,)`.
+An **int** index drops that axis. `a[1]` on a `(3, 4)` array gives shape `(4,)`.
 
 A **slice** keeps it. `a[1:2]` gives shape `(1, 4)`.
 
 The same applies to columns: `a[:, 2]` is `(3,)` while `a[:, 2:3]` is `(3, 1)`.
 
-Both contain the same three numbers, and they behave completely differently the moment they meet another array.
+Both hold the same three numbers. They behave fully differently the moment they meet another array.
 
-Broadcasting aligns shapes **from the right**. Against a `(3, 4)` array, a `(3,)` column compares 4 with 3 and **raises** &mdash; even though it came out of that very array. The `(3, 1)` version compares 4 with 1, stretches, and works.
+Broadcasting aligns shapes **from the right**. Against a `(3, 4)` array, a `(3,)` column checks 4 with 3 and **raises**. though it came out of that very array. The `(3, 1)` version checks 4 with 1, stretches, and works.
 
-The last editor shows exactly that: the same column, taken two ways, one of which is an error. It is worth running, because "I sliced this out of the array so of course it fits" is a reasonable-sounding assumption that is simply false.
+The last editor shows just that: the same column, taken two ways, one of which is an error. It's worth running. "I sliced this out of the array so it fits" is a fair-sounding assumption that is simply false.
 
-When an operation gives you a surprisingly large result, or complains about shapes that "obviously" match, this is the first thing to check.
+When an step gives you a oddly large result, or complains about shapes that "obviously" match, this is the first thing to check.
 
 ## Negative indices and reversal
 
-Negative indices count from the end, exactly as in Python lists. `a[-1]` is the last element, `a[-2]` the second last.
+Minus indices count from the end, just as in Python lists. `a[-1]` is the last element, `a[-2]` the second last.
 
-They work per axis, so `a[-1, -1]` is the bottom-right element of a 2-D array, and `a[:, -1]` is the last column.
+They work per axis, so `a[-1, -1]` is the bottom-right element of a 2-D array. `a[:, -1]` is the last column.
 
-A negative step reverses. `a[::-1]` gives the array backwards, and it is a **view** &mdash; no data is copied, the stride is simply negative. That makes reversal free, which is why sorting descending is written as `np.sort(a)[::-1]` without any performance concern.
+A minus step reverses. `a[::-1]` gives the array backwards. It's a **view**. No data is copied, the stride is simply minus. That makes reversal free. This Is why sorting descending is written as `np.sort(a)[::-1]` without any speed concern.
 
-On more than one axis, each gets its own direction: `a[::-1, :]` reverses the rows and leaves the columns; `a[::-1, ::-1]` reverses both, which is a 180-degree rotation.
+On more than one axis, each gets its own direction: `a[::-1, :]` reverses the rows and leaves the columns. `a[::-1, ::-1]` reverses both. This Is a 180-degree rotation.
 
 ## Steps
 
-The third slice component is the step. `a[::2]` takes every second element, `a[1::2]` every second starting from the first.
+The third slice part is the step. `a[::2]` takes each second element, `a[1::2]` each second starting from the first.
 
-Strided slices are views, because a regular step is exactly what a stride can express. That is worth knowing when working with large arrays: downsampling an image by taking every fourth pixel costs nothing until you write to the result.
+Strided slices are views, because a regular step is just what a stride can express. That is worth knowing when working with large arrays. Downsampling an image by taking each fourth pixel costs nothing until you write to the result.
 
-Combining a step with a negative direction works but reads badly, and `a[::-2]` is one of the few slice forms worth writing a comment for.
+Mixing a step with a minus direction works but reads badly. `a[::-2]` is one of the few slice forms worth writing a comment for.
 
 ## Out of range: slices clip, indices raise
 
-This asymmetry catches people.
+This skew catches people.
 
 `a[100]` on a ten-element array raises `IndexError`.
 
 `a[5:100]` on the same array returns five elements. Slices clip silently to what exists.
 
-Both behaviours are defensible &mdash; an out-of-range index has no meaningful answer, while an out-of-range slice does &mdash; but the inconsistency means a slice-based bug produces a short array rather than an exception, and the failure surfaces somewhere else.
+Both actions are defensible &mdash; an out-of-range index has no real answer, while an out-of-range slice does &mdash; but the inconsistency means a slice-based bug makes a short array rather than an exception. The failure surfaces one spot else.
 
-If a slice must produce a specific length, check the length rather than assuming it. `assert len(chunk) == n` at the point of slicing localises the problem far better than a shape error three functions later.
+If a slice must give a exact length, check the length rather than given it. `assert len(chunk) == n` at the point of slicing localises the problem far better than a shape error three functions later.
 
 ## Assignment through a selection
 
-Anything you can select, you can assign to, and the value must either match the selection's shape or broadcast to it.
+Anything you can select, you can assign to. The value must either match the pick's shape or broadcast to it.
 
 `a[0] = 5` fills the first row with fives, broadcasting the scalar.
 
-`a[0] = [1, 2, 3]` sets the row, requiring exactly three values.
+`a[0] = [1, 2, 3]` sets the row, needing just three values.
 
-`a[0] = [1, 2]` raises, because two values neither match three nor broadcast to it.
+`a[0] = [1, 2]` raises. Two values neither match three nor broadcast to it.
 
-Assignment also **converts silently to the array's dtype**. Assigning 3.7 into an integer array stores 3. Assigning a long string into a fixed-width string array truncates it. Neither warns. This is a direct consequence of the array owning its dtype: the block cannot change type to accommodate what you put in it.
+set also **converts silently to the array's dtype**. Assigning 3.7 into an int array stores 3. Assigning a long string into a fixed-width string array truncates it. Neither warns. This is a direct result of the array owning its dtype. The block can't change type to accommodate what you put in it.
 
 ## The rule that explains the shapes
 
-There is one rule that predicts the shape of any basic selection:
+There's one rule that predicts the shape of any basic pick:
 
-**An integer removes an axis. A slice keeps it.**
+**An int drops an axis. A slice keeps it.**
 
-`a[0]` on a `(3, 4)` array gives `(4,)` &mdash; the row axis is gone.
+`a[0]` on a `(3, 4)` array gives `(4,)`. The row axis is gone.
 
-`a[0:1]` gives `(1, 4)` &mdash; the axis survives with length one.
+`a[0:1]` gives `(1, 4)` &mdash; the axis lives with length one.
 
-`a[:, 0]` gives `(3,)`; `a[:, 0:1]` gives `(3, 1)`.
+`a[:, 0]` gives `(3,)`. `a[:, 0:1]` gives `(3, 1)`.
 
-That last pair is the one that matters in practice, because the `(3, 1)` form broadcasts down a column and the `(3,)` form does not. When a broadcast fails on something you expected to work, an integer index that dropped an axis is a likely cause.
+That last pair is the one that matters because the `(3, 1)` form broadcasts down a column and the `(3,)` form doesn't. When a broadcast fails on a thing you expected to work, an int index that dropped an axis is a likely cause.
 
 ## A note on tuples
 
-`a[0, 1]` and `a[(0, 1)]` are the same thing &mdash; the comma builds a tuple, and NumPy interprets a tuple as one index per axis.
+`a[0, 1]` and `a[(0, 1)]` are the same thing. The comma builds a tuple. NumPy reads a tuple as one index per axis.
 
-`a[[0, 1]]` is a **list** and means something else entirely: fancy indexing, selecting rows 0 and 1.
+`a[[0, 1]]` is a **list** and means a thing else fully: fancy indexing, selecting rows 0 and 1.
 
-That distinction between a tuple and a list inside brackets is invisible at a glance and changes both the meaning and whether you get a view. It is worth being deliberate about, especially when the index is built programmatically &mdash; a list assembled in a loop and passed as an index does fancy indexing, and `tuple(...)` around it is the fix when you meant per-axis selection.
+That gap between a tuple and a list inside brackets is invisible at a glance and changes both the meaning and whether you get a view. It's worth being deliberate about, above all when the index is built programmatically. A list assembled in a loop and passed as an index does fancy indexing. `tuple(...)` around it's the fix when you meant per-axis pick.
 
 ## Indexing that is built programmatically
 
-When an index is assembled at runtime rather than written literally, the tuple-versus-list distinction becomes a real hazard.
+When an index is assembled at runtime rather than written truly, the tuple-versus-list gap turns a real hazard.
 
-`a[tuple(idx)]` selects one element per axis. `a[list(idx)]` does fancy indexing along the first axis. The two produce completely different results from the same values, and neither raises.
+`a[tuple(idx)]` selects one element per axis. `a[list(idx)]` does fancy indexing along the first axis. The two give fully other results from the same values, and neither raises.
 
-For code that builds indices dynamically, `tuple()` around the result makes the intent explicit and matches what NumPy expects for per-axis selection.
+For code that builds indices dynamically, `tuple()` around the result makes the intent clear and matches what NumPy expects for per-axis pick.
 
-`np.s_` is a small convenience for storing a slice as a value: `sl = np.s_[1:3, ::2]` can be passed around and applied later as `a[sl]`. It is useful for configurable windows, and clearer than constructing `slice(1, 3)` objects by hand.
+`np.s_` is a small convenience for storing a slice as a value: `sl = np.s_[1:3, ::2]` can be passed around and applied later as `a[sl]`. It's handy for configurable windows. Clearer than making `slice(1, 3)` objects by hand.
 
 ## Views, once more
 
-Every basic slice is a view. That is the single most consequential fact in this module, and it is worth stating in its practical form:
+each basic slice is a view. That is the single most consequential fact in this module. It's worth stating in its hands-on form:
 
-**Writing into a slice writes into the original.**
+**Writing into a slice writes into the first.**
 
-`a[1:3] = 0` sets elements of `a`. `b = a[1:3]; b += 1` also modifies `a`. A function that slices its argument and writes to the slice modifies the caller's array.
+`a[1:3] = 0` sets elements of `a`. `b = a[1:3]. B += 1` also modifies `a`. A function that slices its arg and writes to the slice modifies the caller's array.
 
-This is not a flaw. It is why slicing large arrays costs nothing and why NumPy code can pass windows around freely. But it differs from Python lists, where `a[1:3]` is a copy, and that difference is the source of a whole category of surprising bugs for people arriving from ordinary Python.
+This isn't a flaw. It's why slicing large arrays costs nothing and why NumPy code can pass windows around freely. But it differs from Python lists. Here `a[1:3]` is a copy. That gap is the source of a whole group of surprising bugs for people arriving from plain Python.
 
-`np.shares_memory(a, b)` settles any specific case. `copy()` breaks the connection when you want it broken.
+`np.shares_memory(a, b)` settles any exact case. `copy()` breaks the link when you want it broken.
 
 ## A summary of the selection forms
 
-`a[i]` &mdash; one element or one sub-array; drops an axis.
+`a[i]` &mdash; one element or one sub-array. Drops an axis.
 
-`a[i:j]` &mdash; a range; keeps the axis; a view.
+`a[i:j]` &mdash; a range. Keeps the axis. A view.
 
-`a[i:j:k]` &mdash; a strided range; still a view.
+`a[i:j:k]` &mdash; a strided range. Still a view.
 
-`a[::-1]` &mdash; reversed; still a view.
+`a[::-1]` &mdash; reversed. Still a view.
 
 `a[i, j]` &mdash; one index per axis, via a tuple.
 
-`a[..., j]` &mdash; the last axis, whatever the dimensionality.
+`a[..., j]` &mdash; the last axis, what the dimensionality.
 
 `a[None]` &mdash; a new length-1 axis at the front.
 
-`a[mask]` &mdash; boolean selection; a copy.
+`a[mask]` &mdash; boolean pick. A copy.
 
-`a[[i, j]]` &mdash; fancy indexing; a copy; can reorder and repeat.
+`a[[i, j]]` &mdash; fancy indexing. A copy. Can reorder and repeat.
 
-The first seven are views and free. The last two allocate, and get modules of their own. Knowing which group an expression falls into predicts both its cost and whether writing to the result affects the original &mdash; which between them explains most of NumPy's indexing behaviour.
+The first seven are views and free. The last two allocate. Get modules of their own. Knowing which group an formula falls into predicts both its cost and whether writing to the result affects the first. Which between them shows most of NumPy's indexing action.
 
 ## A closing note
 
-Indexing is where NumPy diverges most visibly from ordinary Python, in two ways that both matter.
+Indexing is where NumPy diverges most visibly from plain Python, in two ways that both matter.
 
-A slice is a view rather than a copy, so writing through it reaches the original. And an integer index drops an axis while a length-one slice keeps it, which decides whether a later broadcast succeeds.
+A slice is a view rather than a copy. Writing through it reaches the first. And an int index drops an axis while a length-one slice keeps it. This Decides whether a later broadcast succeeds.
 
 Neither is complicated, and both explain a large share of the surprises that follow in later modules.
 ''',
@@ -1855,31 +1855,31 @@ print("the vectorised form of if/else, and the subject of a later module.")'''),
     ],
     '''
 title: Vectorised Arithmetic
-intro: Describing the operation instead of writing the loop, and the two habits that undo the benefit.
+intro: showing the step instead of writing the loop. The two habits that undo the gain.
 
 ## Operators apply to every element
 
-`a + b` adds the arrays elementwise. So do `-`, `*`, `/`, `//`, `%` and `**`. A scalar applies to every element: `a * 10` scales the whole array.
+`a + b` adds the arrays elementwise. So do `-`, `*`, `/`, `//`, `%` and `**`. A scalar applies to each element: `a * 10` scales the whole array.
 
-The one to be careful with is `*`. On arrays it is **elementwise multiplication**, not matrix multiplication. Matrix multiplication is `@`, and confusing the two produces an array of the wrong shape or, worse, the right shape and the wrong numbers. That has its own module later.
+The one to be careful with is `*`. On arrays it's **elementwise product**, not mat product. mat product is `@`. Confusing the two makes an array of the wrong shape or, worse, the right shape and the wrong numbers. That has its own module later.
 
-Comparisons work the same way and give a boolean array: `a > 2` is `[False, False, True, True]`, not a single answer. Using that in an `if` raises, because NumPy refuses to guess whether you meant "any" or "all".
+checks work the same way and give a boolean array: `a > 2` is `[False, False, True, True]`, not a single answer. Using that in an `if` raises. NumPy refuses to guess whether you meant "any" or "all".
 
 ## ufuncs
 
-The mathematical functions come in array form: `np.sqrt`, `np.exp`, `np.log`, `np.sin`, `np.abs`. These are called universal functions, and they apply elementwise to a whole array in compiled code.
+The math functions come in array form: `np.sqrt`, `np.exp`, `np.log`, `np.sin`, `np.abs`. These are called universal functions. They apply elementwise to a whole array in compiled code.
 
-Python's `math` module does not. `math.sqrt` takes one number and raises on an array. Reaching for `math` inside a loop over an array is one of the two common ways to lose everything NumPy offers.
+Python's `math` module doesn't. `math.sqrt` takes one number and raises on an array. Reaching for `math` inside a loop over an array is one of the two common ways to lose all NumPy offers.
 
 ## Division by zero does not raise
 
 This surprises people coming from plain Python.
 
-Float division by zero produces `inf`, `-inf` or `nan` and emits a RuntimeWarning. It does not stop. That follows the IEEE floating-point standard, and it is the right default for array work &mdash; one bad element in a million should not abort the whole computation.
+Float division by zero makes `inf`, `-inf` or `nan` and emits a RuntimeWarning. It doesn't stop. That follows the IEEE floating-point standard. It's the right default for array work. One bad element in a million shouldn't abort the whole math.
 
-The consequence is that you must look for those values afterwards rather than relying on an exception. `np.isnan` and `np.isfinite` are how, and there is a module on missing data later.
+The result is that you must look for those values later rather than leaning on an exception. `np.isnan` and `np.isfinite` are how. There's a module on missing data later.
 
-`np.errstate` controls the warnings when you are producing them deliberately, which is what the third editor uses to keep its output readable.
+`np.errstate` controls the warnings when you're making them on purpose. This Is what the third editor uses to keep its output readable.
 
 ## In place or not
 
@@ -1887,135 +1887,135 @@ The consequence is that you must look for those values afterwards rather than re
 
 Two reasons to care.
 
-**Memory.** The second form allocates a full-size temporary. In a chain like `a = a * 2 + b * 3`, several temporaries exist at once, which matters when arrays are large.
+**Memory.** The second form allocates a full-size temporary. In a chain like `a = a * 2 + b * 3`, a few temporaries exist at once. This Matters when arrays are large.
 
-**Aliasing.** If something else holds a reference to the same array &mdash; another variable, a list, a caller's data &mdash; the in-place form changes what they see and the rebinding form does not. The fourth editor shows an alias tracking one and being left behind by the other.
+**Aliasing.** If a thing else holds a link to the same array. Another var, a list, a caller's data. The in-place form changes what they see and the rebinding form doesn't. The fourth editor shows an alias tracking one and being left behind by the other.
 
-Neither is right in general. In-place is cheaper and can surprise; allocation is safer and costs memory. What matters is knowing which one you wrote.
+Neither is right . In-place is cheaper and can surprise. Allocation is safer and costs memory. What matters is knowing which one you wrote.
 
 ## The two ways to lose the benefit
 
-**Looping over an array in Python.** This is the big one. Reading `a[i]` from Python boxes that value into a Python object, and doing that in a loop is slower than the same loop over a list &mdash; you get the memory layout of an array and none of the speed. The fifth editor measures it.
+**Looping over an array in Python.** This is the big one. Reading `a[i]` from Python boxes that value into a Python object. Doing that in a loop is slower than the same loop over a list. You get the memory layout of an array and none of the speed. The fifth editor measures it.
 
-**Calling scalar functions per element.** `math.sqrt(a[i])` in a loop, or a Python function applied one value at a time. `np.vectorize` looks like a fix and is not: it is a convenience wrapper that still loops in Python, and its own documentation says so.
+**Calling scalar functions per element.** `math.sqrt(a[i])` in a loop, or a Python function applied one value at a time. `np.vectorize` looks like a fix and isn't. It's a convenience wrapper that still loops in Python. Its own docs says so.
 
-If you find yourself indexing an array inside a `for`, the useful question is what whole-array expression would produce the same result.
+If you find yourself indexing an array inside a `for`, the handy question is what whole-array formula would give the same result.
 
 ## Converting a loop
 
-The common shape is a loop with a condition, and it converts in two steps.
+The common shape is a loop with a rule, and it converts in two steps.
 
-Compute the branches for the **whole** array, then combine them with a mask. `np.where(condition, if_true, if_false)` chooses elementwise.
+Find the branches for the **whole** array, then combine them with a mask. `np.where(rule, if_true, if_false)` chooses elementwise.
 
-That does more arithmetic than the loop &mdash; it evaluates both branches everywhere &mdash; and is still dramatically faster, because the arithmetic happens in compiled code and the loop does not.
+That does more math than the loop. It tests both branches all over. And is still sharply faster. The math happens in compiled code and the loop doesn't.
 
-It also reads better once you are used to it: the condition and the two outcomes are each one expression, rather than being distributed across a loop body.
+It also reads better once you're used to it. The rule and the two outcomes are each one formula, rather than being spread across a loop body.
 
-Where both branches are expensive, or one is invalid for some inputs, masking gets more careful &mdash; and that is the boolean-masking module.
+Where both branches are costly, or one is invalid for some inputs, masking gets more careful. And that is the boolean-masking module.
 
 ## The ufunc machinery
 
-A ufunc is not just a function that happens to work elementwise. It is an object with methods, and three of them are worth knowing.
+A ufunc isn't just a function that happens to work elementwise. It's an object with methods. Three of them are worth knowing.
 
-`np.add.reduce(a)` is `a.sum()`. Every binary ufunc has a `reduce`, so `np.multiply.reduce` gives a product, `np.maximum.reduce` gives a maximum, and `np.logical_and.reduce` gives an all.
+`np.add.reduce(a)` is `a.sum()`. each binary ufunc has a `reduce`. `np.times.reduce` gives a product, `np.max.reduce` gives a max, and `np.logical_and.reduce` gives an all.
 
-`np.add.accumulate(a)` is `a.cumsum()`. The same generalisation: a running application of the operation.
+`np.add.build up(a)` is `a.cumsum()`. The same generalisation: a running use of the step.
 
-`np.add.outer(a, b)` applies the operation to every pair, giving a matrix from two vectors. `np.multiply.outer` is the outer product; `np.subtract.outer` gives a difference matrix, which is a one-line distance calculation.
+`np.add.outer(a, b)` applies the step to each pair, giving a mat from two vectors. `np.times.outer` is the outer product. `np.subtract.outer` gives a gap mat. This Is a one-line distance math.
 
-These matter because they cover operations with no dedicated function. There is no `np.cummax`, but `np.maximum.accumulate` is exactly that, and it is the standard way to compute a running high-water mark.
+These matter because they cover steps with no dedicated function. There's no `np.cummax`. `np.max.build up` is just that. It's the standard way to find a running high-water mark.
 
-Ufuncs also accept `where=`, which applies the operation only where a mask is True and leaves the rest of the output untouched. Combined with `out=`, that is conditional arithmetic without a branch or an intermediate array.
+Ufuncs also accept `where=`. This Applies the step only where a mask is True and leaves the rest of the output untouched. Mixed with `out=`, that is gated math without a branch or an mid array.
 
 ## Comparison and logic are ufuncs too
 
-`a > b` is `np.greater(a, b)`. `a == b` is `np.equal`. They broadcast, they take `out=`, they have `reduce`.
+`a > b` is `np.greater(a, b)`. `a == b` is `np.equal`. They broadcast, they take `out=`, they've `reduce`.
 
-That last one is useful: `np.logical_or.reduce(masks)` combines a list of masks, which is cleaner than chaining `|` when the number of conditions is not known in advance.
+That last one is handy: `np.logical_or.reduce(masks)` mixes a list of masks. This Is cleaner than chaining `|` when the number of rules isn't known in advance.
 
-The bitwise operators `&`, `|` and `~` are the array versions of `and`, `or` and `not`, and the Python keywords do not work on arrays at all &mdash; they raise, because Python needs a single truth value and an array has many. That error message, "the truth value of an array with more than one element is ambiguous", is one of the most frequently seen in NumPy, and it always means the same thing: replace `and` with `&`, and add parentheses.
+The bitwise ops `&`, `|` and `~` are the array versions of `and`, `or` and `not`. The Python keywords don't work on arrays at all. They raise. Python needs a single truth value and an array has many. That error message, "the truth value of an array with more than one element is ambiguous", is one of the most often seen in NumPy. It always means the same thing: replace `and` with `&`, and add parentheses.
 
 ## Controlling floating-point warnings
 
-`np.errstate` is a context manager that decides what happens on division by zero, overflow, underflow and invalid operations.
+`np.errstate` is a context manager that decides what happens on division by zero, overflow, underflow and invalid steps.
 
-The options are `"warn"` (the default for most), `"ignore"`, `"raise"` and `"call"`.
+The options are `"warn"` (the default for most), `"skip"`, `"raise"` and `"call"`.
 
-Two settings are worth knowing about. `np.errstate(all="raise")` turns silent NaN production into an exception, which is invaluable when hunting a NaN that appears somewhere in a long pipeline &mdash; it stops at the operation that created it rather than at the point where you noticed.
+Two settings are worth knowing about. `np.errstate(all="raise")` turns silent NaN production into an exception. This Is invaluable when hunting a NaN that appears one spot in a long pipeline. It stops at the step that created it rather than at the point where you noticed.
 
-`np.errstate(divide="ignore", invalid="ignore")` suppresses the warnings when the behaviour is intentional, which keeps genuine warnings visible instead of drowning in expected ones.
+`np.errstate(divide="skip", invalid="skip")` suppresses the warnings when the action is intentional. This Keeps genuine warnings visible instead of drowning in expected ones.
 
-`np.seterr` sets the same options globally, which is convenient in a notebook and inadvisable in a library, since it changes behaviour for everyone else's code too.
+`np.seterr` sets the same options globally. This Is convenient in a notebook and inadvisable in a library. It changes action for all else's code too.
 
 ## When a loop is still the right answer
 
 Vectorisation is the default, not a rule.
 
-**When each step depends on the last.** Simulations, iterative solvers, anything where element `n` needs the computed value of element `n-1`. Some of these have array formulations &mdash; a cumulative sum, an exponential moving average via `lfilter` &mdash; but many genuinely do not.
+**When each step depends on the last.** Models, iterative solvers, anything where element `n` needs the found value of element `n-1`. Some of these have array formulations. A cumulative sum, an steep moving mean via `lfilter`. But many truly don't.
 
-**When the array is small.** Under a few hundred elements, the per-call overhead of NumPy dominates and a list comprehension can be faster. Measure before assuming.
+**When the array is small.** Under a few hundred elements, the per-call cost of NumPy dominates and a list comprehension can be faster. Measure before given.
 
-**When the vectorised version is unreadable.** A three-line loop that a colleague understands is often better than a one-line expression with four `newaxis` insertions that nobody can modify safely. This is a real engineering trade-off, not a failure of nerve.
+**When the vectorised version is unreadable.** A three-line loop that a colleague understands is often better than a one-line formula with four `newaxis` insertions that no one can modify safely. This is a real engineering trade-off, not a failure of nerve.
 
-**When it would allocate too much.** Some vectorised formulations build a large intermediate &mdash; the classic being an n-by-n distance matrix for large n. A loop over chunks can be the only version that fits in memory.
+**When it would allocate too much.** Some vectorised formulations build a large mid. The classic being an n-by-n distance mat for large n. A loop over chunks can be the only version that fits in memory.
 
-The honest framing: reach for vectorisation first, because it is usually shorter and much faster. Fall back to a loop when the problem is sequential, the data is small, or the vectorised form costs more in clarity or memory than it returns in speed.
+The honest framing: reach for vectorisation first. It's often shorter and much faster. Fall back to a loop when the problem is sequential, the data is small, or the vectorised form costs more in clarity or memory than it returns in speed.
 
 ## np.vectorize is not vectorisation
 
 The name is misleading enough to be worth a warning.
 
-`np.vectorize(f)` wraps a scalar function so it accepts arrays. It handles broadcasting and dtype for you, and it is genuinely convenient.
+`np.vectorize(f)` wraps a scalar function so it accepts arrays. It handles broadcasting and dtype for you, and it's truly convenient.
 
-It is **a loop underneath**. The documentation says so. It provides the interface of a ufunc without the speed, and code that uses it expecting a performance gain gets none.
+It's **a loop underneath**. The docs says so. It gives the interface of a ufunc without the speed. Code that uses it expecting a speed gain gets none.
 
-Its real use is convenience: applying an existing scalar function to an array without rewriting it, where the array is small enough that speed does not matter. For anything in a hot path, the function needs to be rewritten in terms of array operations, or compiled with something like Numba.
+Its real use is convenience: applying an existing scalar function to an array without rewriting it. Here The array is small enough that speed doesn't matter. For anything in a hot path, the function needs to be rewritten by array steps, or compiled with something like Numba.
 
 ## Integer division and the modulo operator
 
-`//` and `%` work elementwise like everything else, and both have an edge worth knowing.
+`//` and `%` work elementwise like all else, and both have an edge worth knowing.
 
-Integer division by zero does not produce infinity, because integers have no infinity. It produces 0 and a warning, which is arguably worse than a NaN because it looks like a legitimate answer.
+int division by zero doesn't give infinity. Ints have no infinity. It makes 0 and a warning. This Is arguably worse than a NaN because it looks like a legitimate answer.
 
-`%` follows Python's sign convention rather than C's: the result takes the sign of the divisor, so `-7 % 3` is 2, not -1. That matches plain Python and differs from many other languages, which matters when porting an algorithm.
+`%` follows Python's sign rule rather than C's. The result takes the sign of the divisor. `-7 % 3` is 2, not -1. That matches plain Python and differs from many other languages. This Matters when porting an method.
 
-`np.divmod` returns both at once and is faster than computing them separately.
+`np.divmod` returns both at once and is faster than finding them apart.
 
 ## Power, and the integer surprise
 
-`a ** 2` on an integer array stays integer, and can overflow exactly as multiplication does.
+`a ** 2` on an int array stays int. Can overflow just as product does.
 
-`a ** -1` on an integer array **raises**, because a negative power of an integer is not an integer. This is a deliberate change from older NumPy, which returned nonsense. Convert to float first.
+`a ** -1` on an int array **raises**. A minus power of an int isn't an int. This is a deliberate change from older NumPy. This Returned nonsense. Convert to float first.
 
-`np.sqrt` of a negative float gives NaN with a warning, not a complex number. If complex results are wanted, the input must already be complex: `np.sqrt(np.array([-1+0j]))` gives `1j`. NumPy will not silently promote a real array to complex, because doing so would change the dtype of everything downstream.
+`np.sqrt` of a minus float gives NaN with a warning, not a complex number. If complex results are wanted, the input must already be complex: `np.sqrt(np.array([-1+0j]))` gives `1j`. NumPy won't silently promote a real array to complex. Doing so would change the dtype of all downstream.
 
 ## Rounding, and the rule that surprises people
 
 `np.round` uses **banker's rounding**: exact halves round to the nearest even number. `np.round(0.5)` is 0 and `np.round(1.5)` is 2.
 
-This is deliberate. Always rounding halves upward introduces a systematic upward bias when averaging many rounded values; rounding to even cancels it out.
+This is deliberate. Always rounding halves upward adds a systematic upward bias when blending many rounded values. Rounding to even cancels it out.
 
-It is also not what most people expect, and it is worth knowing before writing a test that asserts `round(0.5) == 1`.
+It's also not what most people expect. It's worth knowing before writing a test that asserts `round(0.5) == 1`.
 
 `np.floor`, `np.ceil` and `np.trunc` have no such subtlety. Note that `trunc` and `floor` differ for negatives: `floor(-1.5)` is -2, `trunc(-1.5)` is -1.
 
-Converting to integer with `astype(int)` truncates toward zero, which is `trunc`, not `round`. That difference produces off-by-one results in exactly the places that are hardest to notice.
+Converting to int with `astype(int)` truncates toward zero. This Is `trunc`, not `round`. That gap makes off-by-one results in just the places that are hardest to notice.
 
 ## A checklist for converting a loop
 
-When replacing a Python loop with array operations, the questions in order:
+When replacing a Python loop with array steps, the questions in order:
 
-**Does each iteration depend on the previous one?** If yes, it may not vectorise. Check whether it is a cumulative operation in disguise &mdash; `cumsum`, `cumprod`, `maximum.accumulate` cover more cases than people expect.
+**Does each loop depend on the previous one?** If yes, it may not vectorise. Check whether it's a cumulative step in disguise. `cumsum`, `cumprod`, `max.build up` cover more cases than people expect.
 
-**Is there a conditional inside?** `np.where` for two branches, `np.select` for more, or a boolean mask if the operation applies to a subset.
+**Is there a gated inside?** `np.where` for two branches, `np.select` for more, or a boolean mask if the step applies to a subset.
 
-**Is it building a list?** Preallocate the output array and assign into it, or express the whole thing as one expression.
+**Is it building a list?** Preallocate the output array and assign into it, or express the whole thing as one formula.
 
-**Is it combining every pair?** That is broadcasting with a `None` insertion, and it is worth checking the resulting size before running it.
+**Is it mixing each pair?** That is broadcasting with a `None` insertion. It's worth checking the resulting size before running it.
 
-**Is it a reduction?** `sum`, `max`, `any` with the right `axis`, rather than accumulating in a Python variable.
+**Is it a reduction?** `sum`, `max`, `any` with the right `axis`, rather than building up in a Python var.
 
-Most loops in numerical code fall into one of those five. The ones that do not are usually genuinely sequential, and are the right place for a loop &mdash; or for Numba, if the loop is the bottleneck.
+Most loops in numeric code fall into one of those five. The ones that don't are often truly sequential. Are the right place for a loop. Or for Numba, if the loop is the bottleneck.
 ''',
     [
         {"q": "What does `*` do between two arrays?",
@@ -2179,116 +2179,116 @@ intro: Two rules that decide whether shapes combine, and why a wrong guess costs
 
 ## Everyone already uses it
 
-`a + 10` on a `(2, 3)` array adds ten to every element. Conceptually the scalar is stretched to `(2, 3)`; in practice nothing is copied and NumPy simply reuses the value as it walks.
+`a + 10` on a `(2, 3)` array adds ten to each element. Conceptually the scalar is stretched to `(2, 3)`. nothing is copied and NumPy simply reuses the value as it walks.
 
 That is broadcasting. The general rules extend the same idea to arrays.
 
 ## The rules
 
-Line the shapes up **from the right** and compare them pair by pair. Each pair must satisfy one of:
+Line the shapes up **from the right** and compare them pair by pair. Each pair must meet one of:
 
-- the dimensions are **equal**, or
-- one of them is **1**, in which case it is stretched, or
-- one shape has **run out** of dimensions, in which case it is treated as 1.
+- the dims are **equal**, or
+- one of them is **1**, in which case it's stretched, or
+- one shape has **run out** of dims, in which case it's treated as 1.
 
-If every pair passes, the result takes the larger of each pair. If any pair fails, you get a `ValueError` that prints both shapes &mdash; which is genuinely helpful once you know to read it right-aligned.
+If each pair passes, the result takes the larger of each pair. If any pair fails, you get a `ValueError` that prints both shapes. Which is truly helpful once you know to read it right-aligned.
 
 So `(3, 4)` and `(4,)` work: 4 against 4, then 3 against nothing. `(3, 4)` and `(3,)` fail: 4 against 3.
 
-That second one catches people constantly, because the 3 "obviously" matches the rows. It does not, because alignment starts from the right.
+That second one catches people constantly. The 3 "obviously" matches the rows. It doesn't, because alignment starts from the right.
 
 ## Rows are the default
 
 A 1-D array of length *n* aligns with the **last** axis. Against a `(2, 3)` array, a `(3,)` array gives one value per column.
 
-To get one value per **row** you need shape `(2, 1)`. The idiomatic way is `v[:, None]`, which inserts a trailing axis and turns `(2,)` into `(2, 1)`.
+To get one value per **row** you need shape `(2, 1)`. The idiomatic way is `v[:, None]`. This Inserts a trailing axis and turns `(2,)` into `(2, 1)`.
 
-This is the single most useful thing to internalise about broadcasting, because it is what normalising by row or column comes down to:
+This is the single most handy thing to internalise about broadcasting. It's what norming by row or column comes down to:
 
 ```python
 a - a.mean(axis=0)              # subtract the column means
 a - a.mean(axis=1)[:, None]     # subtract the row means
 ```
 
-The first works because `mean(axis=0)` gives one value per column, which aligns naturally. The second needs the extra axis, and without it either raises or &mdash; if the array happens to be square &mdash; silently does the wrong thing. That last case is worth fearing: on a square array both alignments are legal and only one is what you meant.
+The first works because `mean(axis=0)` gives one value per column. This Aligns on its own. The second needs the extra axis. Without it either raises or. If the array happens to be square. Silently does the wrong thing. That last case is worth fearing. On a square array both alignments are legal and only one is what you meant.
 
 ## Nothing is copied
 
-Broadcasting does not materialise the stretched array. NumPy adjusts its stride bookkeeping so that walking the small array repeats values, and the operation reads them as if they were there.
+Broadcasting doesn't materialise the stretched array. NumPy adjusts its stride bookkeeping so that walking the small array repeats values. The step reads them as if they were there.
 
-So broadcasting itself is cheap. What can be expensive is the **result**.
+So broadcasting itself is cheap. What can be costly is the **result**.
 
 ## The accidental grid
 
-A column `(n, 1)` and a row `(1, m)` broadcast to `(n, m)`. That is exactly what you want for an outer product or a distance matrix, and it is the classic way to exhaust memory by accident.
+A column `(n, 1)` and a row `(1, m)` broadcast to `(n, m)`. That is just what you want for an outer product or a distance mat. It's the classic way to exhaust memory by accident.
 
-Two arrays of ten thousand elements each &mdash; 80 KB apiece &mdash; combine into a hundred million elements, which is 800 MB in `float64`. Nothing warns you; the expression looks small.
+Two arrays of ten thousand elements each. 80 KB apiece. Combine into a hundred million elements. This Is 800 MB in `float64`. Nothing warns you. The formula looks small.
 
-When an operation is unexpectedly slow or the process dies, this is the first thing to check. `np.broadcast_shapes` gives you the answer without allocating anything, and it is a good habit whenever an expression combines arrays whose shapes you have not thought about carefully.
+When an step is unexpectedly slow or the process dies, this is the first thing to check. `np.broadcast_shapes` gives you the answer without allocating anything. It's a good habit when an formula mixes arrays whose shapes you haven't thought about carefully.
 
 ## Inspecting
 
-`np.broadcast_shapes(s1, s2)` returns the result shape, or raises with the same error the real operation would.
+`np.broadcast_shapes(s1, s2)` returns the result shape, or raises with the same error the real step would.
 
-`np.broadcast_arrays(a, b)` returns views stretched to the common shape, which is useful for seeing what the operands look like after alignment. They are views, so the memory stays small &mdash; and they are read-only for that reason.
+`np.broadcast_arrays(a, b)` returns views stretched to the common shape. This Is handy for seeing what the operands look like after alignment. They're views. The memory stays small. And they're read-only for that reason.
 
-`np.newaxis` (which is just `None`) inserts an axis wherever you need one, and is the tool for making shapes line up deliberately rather than hopefully.
+`np.newaxis` (which is just `None`) inserts an axis wherever you need one. Is the tool for making shapes line up on purpose rather than hopefully.
 
 ## A working habit
 
 When two arrays combine, ask what shape you expect the result to be, and check.
 
-If the answer is bigger than either input, you are creating a grid &mdash; make sure that is what you meant. If an operation raises, right-align the two shapes on paper and find the pair that disagrees. And when adding a per-row quantity to a matrix, write `[:, None]` deliberately rather than discovering whether it was needed.
+If the answer is bigger than either input, you're creating a grid. Make sure that is what you meant. If an step raises, right-align the two shapes on paper and find the pair that disagrees. And when adding a per-row quantity to a mat, write `[:, None]` on purpose rather than discovering whether it was needed.
 
 ## Nothing is allocated
 
-This is the part that makes broadcasting worth understanding rather than merely tolerating.
+This is the part that makes broadcasting worth understanding rather than merely handling.
 
-When a `(1000, 1)` array broadcasts against a `(1, 1000)` array, NumPy does not build two `(1000, 1000)` arrays and then combine them. It sets the stride along the broadcast axis to **zero**, so reading any position along that axis returns the same element.
+When a `(1000, 1)` array broadcasts against a `(1, 1000)` array, NumPy doesn't build two `(1000, 1000)` arrays and then combine them. It sets the stride along the broadcast axis to **zero**. Reading any spot along that axis returns the same element.
 
-A zero stride means "do not move". That single trick is the entire implementation, and it is why broadcasting costs nothing in memory.
+A zero stride means "don't move". That single trick is the entire setup. It's why broadcasting costs nothing in memory.
 
-You can see it directly. `np.broadcast_to(a, shape)` returns the stretched view, and its strides contain zeros where stretching happened. The result is marked read-only, because writing to a position that maps to the same memory from a thousand directions has no sensible meaning.
+You can see it right. `np.broadcast_to(a, shape)` returns the stretched view. Its strides hold zeros where stretching happened. The result is marked read-only. Writing to a spot that maps to the same memory from a thousand directions has no sensible meaning.
 
-The output, of course, is fully materialised &mdash; a `(1000, 1000)` result is eight megabytes whatever produced it. Broadcasting saves the inputs, not the output, and that distinction is what the accidental-grid problem is about.
+The output, is fully materialised. A `(1000, 1000)` result is eight megabytes what made it. Broadcasting saves the inputs, not the output. That gap is what the accidental-grid problem is about.
 
 ## The patterns worth recognising
 
 Four shapes of problem cover most real broadcasting.
 
-**Centring or scaling a table.** Subtracting a per-column mean is `a - a.mean(axis=0)`, and works with no extra syntax because `(n_cols,)` already aligns with the last axis. Per-row requires `keepdims=True`.
+**Centring or scaling a table.** Subtracting a per-column mean is `a - a.mean(axis=0)`. Works with no extra syntax because `(n_cols,)` already aligns with the last axis. Per-row needs `keepdims=True`.
 
-**Pairwise differences.** `a[:, None] - b[None, :]` gives every combination. With a further reduction it becomes a distance matrix: `np.sqrt(((a[:, None] - b[None, :]) ** 2).sum(axis=-1))`. This is the standard formulation, and it is also the standard way to run out of memory, since the intermediate is `(len(a), len(b), n_features)`.
+**Pairwise differences.** `a[:, None] - b[None, :]` gives each mix. With a further reduction it turns a distance mat: `np.sqrt(((a[:, None] - b[None, :]) ** 2).sum(axis=-1))`. This is the standard formulation. It's also the standard way to run out of memory. The mid is `(len(a), len(b), n_features)`.
 
-**One-hot encoding.** `labels[:, None] == np.arange(n_classes)` gives a boolean matrix with one True per row. Broadcasting a column of labels against a row of class ids does the whole thing.
+**One-hot encoding.** `labels[:, None] == np.arange(n_classes)` gives a boolean mat with one True per row. Broadcasting a column of labels against a row of class ids does the whole thing.
 
-**Applying per-channel parameters.** An image of shape `(h, w, 3)` and a per-channel scale of shape `(3,)` multiply directly, because the trailing axes align. This is why image code broadcasts so cleanly when the channel axis is last, and why it needs a `[:, None, None]` when the channel axis is first.
+**Applying per-channel params.** An image of shape `(h, w, 3)` and a per-channel scale of shape `(3,)` times right. The trailing axes align. This is why image code broadcasts so cleanly when the channel axis is last. Why it needs a `[:, None, None]` when the channel axis is first.
 
 ## When to use einsum instead
 
-Once an expression needs three or four `None` insertions, it has stopped being readable, and `np.einsum` is usually clearer.
+Once an formula needs three or four `None` insertions, it has stopped being readable, and `np.einsum` is often clearer.
 
-`np.einsum("ij,jk->ik", a, b)` is matrix multiplication. `np.einsum("ij,ij->i", a, b)` is a row-wise dot product, which written with broadcasting requires a multiply and a sum with the right axis.
+`np.einsum("ij,jk->ik", a, b)` is mat product. `np.einsum("ij,ij->i", a, b)` is a row-wise dot product. This Written with broadcasting needs a times and a sum with the right axis.
 
-The subscript string names each axis, and the arrow says which survive. Axes that appear on the left but not the right are summed over; axes repeated between operands are matched.
+The subscript string names each axis. The arrow says which live. Axes that appear on the left but not the right are summed over. Axes repeated between operands are matched.
 
-It is not always faster &mdash; sometimes considerably slower than the equivalent `matmul`, since it is more general and less specialised. Its advantage is that the intent is written down. An einsum string can be read; a chain of `newaxis` insertions and transposes generally cannot.
+It isn't always faster &mdash; at times a lot slower than the equal `matmul`. It's more general and less specialised. Its edge is that the intent is written down. An einsum string can be read. A chain of `newaxis` insertions and transposes often can't.
 
 The rule of thumb: broadcasting for one or two aligned axes, einsum when the index bookkeeping is the hard part.
 
 ## Guarding against the accidental grid
 
-The failure mode of broadcasting is not an error. It is a result of the wrong shape that flows onward.
+The failure mode of broadcasting isn't an error. It's a result of the wrong shape that flows onward.
 
-Subtracting a `(1000,)` array from a `(1000, 1)` array gives `(1000, 1000)`. Both inputs are eight kilobytes; the result is eight megabytes. Nothing warns, because every rule was followed.
+Subtracting a `(1000,)` array from a `(1000, 1)` array gives `(1000, 1000)`. Both inputs are eight kilobytes. The result is eight megabytes. Nothing warns. Each rule was followed.
 
-Three defences, in increasing order of formality.
+Three defences, in growing order of formality.
 
-**Print the shape.** For interactive work, checking `result.shape` after any broadcasting expression catches this immediately.
+**Print the shape.** For interactive work, checking `result.shape` after any broadcasting formula catches this at once.
 
-**Assert it.** In code that matters, `assert result.shape == (n,)` documents the intent and fails at the right place.
+**Assert it.** In code that matters, `assert result.shape == (n,)` docs the intent and fails at the right place.
 
-**Predict it first.** `np.broadcast_shapes((1000, 1), (1000,))` returns the result shape without computing anything, which is how you check a broadcast against a large array without allocating the answer.
+**Predict it first.** `np.broadcast_shapes((1000, 1), (1000,))` returns the result shape without finding anything. This Is how you check a broadcast against a large array without allocating the answer.
 
 ## The habit that prevents most of it
 
@@ -2296,17 +2296,17 @@ Broadcasting errors and broadcasting surprises come from the same source: not kn
 
 Two things prevent nearly all of them.
 
-Be explicit about columns. `x[:, None]` says "this is a column" unambiguously, and reads better than relying on a reduction to have kept an axis.
+Be clear about columns. `x[:, None]` says "this is a column" unambiguously. Reads better than leaning on a reduction to have kept an axis.
 
-Use `keepdims=True` on any reduction whose result will be used against the original array. It costs nothing, it makes the intent visible, and it removes the asymmetry where centring by column works and centring by row raises.
+Use `keepdims=True` on any reduction whose result will be used against the first array. It costs nothing, it makes the intent visible. It drops the skew where centring by column works and centring by row raises.
 
-Both are about writing down the shape you mean instead of relying on it happening to be right &mdash; which is a reasonable summary of how to work with broadcasting in general.
+Both are about writing down the shape you mean instead of leaning on it happening to be right. Which is a fair summary of how to work with broadcasting .
 
 ## Reading a broadcast error
 
-The message is more informative than it first looks.
+The message is more helpful than it first looks.
 
-"operands could not be broadcast together with shapes (3,4) (3,)"
+"operands couldn't be broadcast together with shapes (3,4) (3,)"
 
 Write the shapes right-aligned:
 
@@ -2315,29 +2315,29 @@ Write the shapes right-aligned:
    (3,)
 ```
 
-Compare from the right: 4 against 3. Neither is 1 and they are not equal, so it fails. Axis 0 is never reached.
+Compare from the right: 4 against 3. Neither is 1 and they aren't equal. It fails. Axis 0 is never reached.
 
-Once you read it that way, the fix is usually obvious. Either the `(3,)` should have been `(3, 1)` &mdash; a column, which broadcasts down the rows &mdash; or one of the arrays is transposed relative to what was intended.
+Once you read it that way, the fix is often obvious. Either the `(3,)` should have been `(3, 1)`. A column. This Broadcasts down the rows. Or one of the arrays is transposed scaled to what was intended.
 
-The most common origin by far is a reduction that dropped an axis. `a.mean(axis=1)` on a `(3, 4)` array gives `(3,)`, and using that against `a` fails for exactly this reason. `keepdims=True` gives `(3, 1)` and it works.
+The most common origin by far is a reduction that dropped an axis. `a.mean(axis=1)` on a `(3, 4)` array gives `(3,)`. Using that against `a` fails for just this reason. `keepdims=True` gives `(3, 1)` and it works.
 
 ## The asymmetry worth internalising
 
-Because alignment is from the right, operations along the **last** axis need no help and operations along the first do.
+Because alignment is from the right, steps along the **last** axis need no help and steps along the first do.
 
-Centring a table by column: `a - a.mean(axis=0)` works directly, because `(4,)` aligns with the trailing 4.
+Centring a table by column: `a - a.mean(axis=0)` works right. `(4,)` aligns with the trailing 4.
 
 Centring by row: `a - a.mean(axis=1)` fails, and needs `keepdims=True`.
 
-This asymmetry is not arbitrary &mdash; it falls straight out of the right-alignment rule &mdash; but it does mean that two operations which sound symmetric are not, and only one of them tells you.
+This skew isn't any &mdash; it falls straight out of the right-alignment rule &mdash; but it does mean that two steps which sound even aren't. Only one of them tells you.
 
-Worse, on a **square** array both work, because 4 against 4 is legal in either direction. Code developed and tested on square arrays can be wrong in a way that only appears on rectangular data, and the failure is a wrong answer rather than an exception.
+Worse, on a **square** array both work. 4 against 4 is legal in either direction. Code developed and tested on square arrays can be wrong in a way that only appears on rectangular data. The failure is a wrong answer rather than an exception.
 
-That is a good reason to use `keepdims=True` by default on any reduction whose result feeds back into the original array, rather than only where it is required.
+That is a good reason to use `keepdims=True` by default on any reduction whose result feeds back into the first array, rather than only where it's needed.
 
 ## Broadcasting with more than two dimensions
 
-The rules do not change; there are just more axes to align.
+The rules don't change. There are just more axes to align.
 
 `(8, 1, 6, 1)` against `(7, 1, 5)` right-aligns as:
 
@@ -2346,27 +2346,27 @@ The rules do not change; there are just more axes to align.
    (7, 1, 5)
 ```
 
-Missing leading axes are treated as 1. Then, per column: 1 against 7 gives 7; 6 against 1 gives 6; 1 against 5 gives 5; and the leading 8 has nothing to compare against, so it survives. The result is `(8, 7, 6, 5)`.
+Missing leading axes are treated as 1. Then, per column: 1 against 7 gives 7. 6 against 1 gives 6. 1 against 5 gives 5. And the leading 8 has nothing to compare against. It lives. The result is `(8, 7, 6, 5)`.
 
-That is 1,680 elements from inputs of 48 and 35. The expansion is the point of the mechanism and also the hazard, and on real sizes it is how a plausible expression allocates a hundred gigabytes.
+That is 1,680 elements from inputs of 48 and 35. The expansion is the point of the method and also the hazard. On real sizes it's how a plausible formula allocates a hundred gigabytes.
 
-`np.broadcast_shapes` computes this without allocating anything, which is the safe way to check an expression before running it on real data.
+`np.broadcast_shapes` finds this without allocating anything. This Is the safe way to check an formula before running it on real data.
 
 ## A summary of the tools
 
 `x[:, None]` &mdash; make a column. The most-used piece of broadcasting syntax.
 
-`x[None, :]` &mdash; make a row. Often implicit, since a 1-D array already behaves as a row.
+`x[None, :]` &mdash; make a row. Often silent. A 1-D array already behaves as a row.
 
 `keepdims=True` &mdash; keep the reduced axis so the result aligns back.
 
-`np.broadcast_shapes(...)` &mdash; predict the result shape without computing it.
+`np.broadcast_shapes(...)` &mdash; predict the result shape without finding it.
 
 `np.broadcast_to(a, shape)` &mdash; materialise the stretched view, read-only, for inspection.
 
 `np.einsum` &mdash; when the index bookkeeping has become the hard part.
 
-Between them, those cover essentially every broadcasting situation, and the first two cover most of them.
+Between them, those cover each broadcasting situation, and the first two cover most of them.
 ''',
     [
         {"q": "How are shapes compared?",
@@ -2540,63 +2540,63 @@ print("   np.nan > -50 :", np.nan > -50)'''),
     ],
     '''
 title: Boolean Masking
-intro: A comparison gives an array of True and False - and that array is an index.
+intro: A compare gives an array of True and False - and that array is an index.
 
 ## A comparison is elementwise
 
-`a > 5` does not give one answer. It gives a boolean array with one entry per element.
+`a > 5` doesn't give one answer. It gives a boolean array with one entry per element.
 
-That is the whole idea. The mask has the same shape as the data, so it can be used to select from it, to count, or to decide where to write.
+That is the whole idea. The mask has the same shape as the data. It can be used to select from it, to count, or to decide where to write.
 
-It also explains an error people meet early: putting an array in an `if` raises, because Python needs one truth value and NumPy refuses to guess whether you meant `any` or `all`.
+It also shows an error people meet early. Putting an array in an `if` raises. Python needs one truth value and NumPy refuses to guess whether you meant `any` or `all`.
 
 ## Selecting
 
 `a[mask]` returns the elements where the mask is True, as a 1-D array.
 
-The result is 1-D even when the input is not, because the True positions are not generally rectangular. If you need to keep the shape, `np.where(mask, a, fill)` replaces rather than removes.
+The result is 1-D even when the input isn't. The True spots aren't often rectangular. If you need to keep the shape, `np.where(mask, a, fill)` replaces rather than drops.
 
 ## Counting for free
 
 A boolean array is numeric: `True` is 1.
 
-So `mask.sum()` counts matches and `mask.mean()` gives the proportion. That reads oddly for about a day and then becomes the obvious way to answer "how many rows satisfy this" without a loop or a length check.
+So `mask.sum()` counts matches and `mask.mean()` gives the proportion. That reads oddly for about a day and then turns the obvious way to answer "how many rows meet this" without a loop or a length check.
 
 ## Combining conditions
 
-Use `&` for and, `|` for or, `~` for not &mdash; and bracket each condition.
+Use `&` for and, `|` for or, `~` for not. And bracket each rule.
 
-The brackets are not optional. In Python `&` binds more tightly than `>`, so `a > 3 & a < 8` parses as `a > (3 & a) < 8` and does something unrelated. Writing `(a > 3) & (a < 8)` is not a style preference; it is what makes the expression mean what it looks like.
+The brackets aren't optional. In Python `&` binds more tightly than `>`. `a > 3 & a < 8` parses as `a > (3 & a) < 8` and does a thing unrelated. Writing `(a > 3) & (a < 8)` isn't a style preference. It's what makes the formula mean what it looks like.
 
-`and` and `or` cannot be used at all. They call `bool()` on their operands, which is exactly the error above. The error message is unusually good &mdash; it names `any()` and `all()` &mdash; and is worth reading rather than pattern-matching past.
+`and` and `or` can't be used at all. They call `bool()` on their operands. This Is just the error above. The error message is unusually good. It names `any()` and `all()`. And is worth reading rather than pattern-matching past.
 
 ## Assigning through a mask
 
-`a[a < 0] = 0` sets every negative element to zero, in place. The mask picks where to write.
+`a[a < 0] = 0` sets each minus element to zero, in place. The mask picks where to write.
 
-The right-hand side can be a scalar, or an array with as many elements as the mask has True values. Augmented assignment works too: `b[b % 2 == 0] *= 10`.
+The right-hand side can be a scalar, or an array with as many elements as the mask has True values. Boosted set works too: `b[b % 2 == 0] *= 10`.
 
-This is the vectorised form of a loop with an `if` inside, and it is usually clearer than the loop as well as faster.
+This is the vectorised form of a loop with an `if` inside. It's often clearer than the loop and faster.
 
-For the specific case of bounding values, `np.clip(a, low, high)` does both sides in one call and says what it means.
+For the exact case of bounding values, `np.clip(a, low, high)` does both sides in one call and says what it means.
 
 ## Masking copies, assigning does not
 
 This trips people who have just learned that slices are views.
 
-`a[mask]` **copies**. It has to: the selected elements are not evenly spaced, so there is no stride pattern that describes them, and no view is possible. Writing to the result does not affect the original.
+`a[mask]` **copies**. It has to: the selected elements aren't evenly spaced. There's no stride pattern that shows them. No view is possible. Writing to the result doesn't affect the first.
 
-`a[mask] = value` **writes in place**. The mask is being used to locate elements in the original array, not to build a new one.
+`a[mask] = value` **writes in place**. The mask is being used to locate elements in the first array, not to build a new one.
 
-So the same syntax reads as a copy and writes as a view. Both are correct and the distinction is worth holding.
+So the same syntax reads as a copy and writes as a view. Both are correct and the gap is worth holding.
 
 ## nan does not compare
 
 The one genuine trap in filtering real data.
 
-Every comparison involving `nan` is False &mdash; including `nan == nan`. So `a[a != np.nan]` keeps everything, and `a > 0` silently drops the NaNs into the False bucket whether or not you thought about them.
+each compare involving `nan` is False. Including `nan == nan`. So `a[a != np.nan]` keeps all. `a > 0` silently drops the NaNs into the False bucket whether or not you thought about them.
 
-Use `np.isnan` to find them and `~np.isnan(a)` to exclude them. There is a module on missing data later; for now, remember that a comparison will never find a NaN for you.
+Use `np.isnan` to find them and `~np.isnan(a)` to exclude them. There's a module on missing data later. For now, note that a compare will never find a NaN for you.
 
 ## The shape of real filtering
 
@@ -2607,75 +2607,75 @@ valid = ~np.isnan(temps) & (temps > -50)
 clean = temps[valid]
 ```
 
-Named masks read well, compose, and can be counted and inspected before you commit to them. `valid.sum()` before filtering tells you how much data survives, which is usually worth knowing.
+Named masks read well, compose, and can be counted and inspected before you commit to them. `valid.sum()` before filtering tells you how much data lives. This Is often worth knowing.
 
 ## where, in its three-argument form
 
-`np.where(cond)` returns the positions where the condition is true.
+`np.where(cond)` returns the spots where the rule is true.
 
-`np.where(cond, a, b)` is something else entirely: a vectorised conditional, choosing elementwise from `a` where the condition holds and `b` where it does not.
+`np.where(cond, a, b)` is a thing else fully: a vectorised gated, choosing elementwise from `a` where the rule holds and `b` where it doesn't.
 
-That second form is the array equivalent of a ternary expression, and it replaces a great many loops. `np.where(x < 0, 0, x)` clamps negatives to zero. `np.where(np.isnan(x), fill, x)` fills missing values.
+That second form is the array equal of a ternary formula. It replaces a great many loops. `np.where(x < 0, 0, x)` clamps negatives to zero. `np.where(np.isnan(x), fill, x)` fills missing values.
 
-All three arguments broadcast, so `a` and `b` can be scalars, or arrays of a compatible shape, or one of each.
+All three args broadcast, so `a` and `b` can be scalars, or arrays of a matching shape, or one of each.
 
-The one thing to watch: **both branches are evaluated in full**. `np.where(x != 0, 1/x, 0)` still computes `1/x` for every element, including the zeros, and emits a division warning even though those results are discarded. The correct form uses `out=` and `where=` on the division itself, or suppresses the warning deliberately with `errstate`.
+The one thing to watch: **both branches are checked in full**. `np.where(x != 0, 1/x, 0)` still finds `1/x` for each element, including the zeros. Emits a division warning though those results are discarded. The correct form uses `out=` and `where=` on the division itself, or suppresses the warning on purpose with `errstate`.
 
-For more than two branches, `np.select(conditions, choices, default=...)` takes a list of each and applies the first matching condition, which is cleaner than nesting `where` calls three deep.
+For more than two branches, `np.select(rules, choices, default=...)` takes a list of each and applies the first matching rule. This Is cleaner than nesting `where` calls three deep.
 
 ## The parenthesis rule
 
-`a > 2 & a < 5` does not do what it looks like.
+`a > 2 & a < 5` doesn't do what it looks like.
 
-`&` binds tighter than `>` in Python, so this parses as `a > (2 & a) < 5`, which is a bitwise and on the values followed by a chained comparison. The result is either an error or, worse, a plausible-looking wrong answer.
+`&` binds tighter than `>` in Python. This parses as `a > (2 & a) < 5`. This Is a bitwise and on the values followed by a chained compare. The result is either an error or, worse, a plausible-looking wrong answer.
 
-Every condition in a compound mask needs parentheses: `(a > 2) & (a < 5)`.
+each rule in a compound mask needs parentheses: `(a > 2) & (a < 5)`.
 
-There is no way to make this less error-prone within Python's grammar, and it is the single most common syntactic mistake in NumPy code. Parenthesise by reflex.
+There's no way to make this less error-prone within Python's grammar. It's the single most common syntactic mistake in NumPy code. Parenthesise by reflex.
 
-The related error is using `and` instead of `&`. Python's `and` requires a single truth value, and an array has many, so it raises "the truth value of an array with more than one element is ambiguous". That message always means the same thing.
+The related error is using `and` instead of `&`. Python's `and` needs a single truth value. An array has many. It raises "the truth value of an array with more than one element is ambiguous". That message always means the same thing.
 
 ## Counting
 
-`mask.sum()` counts True values, because booleans promote to integers.
+`mask.sum()` counts True values, because booleans promote to ints.
 
-`np.count_nonzero(mask)` does the same thing and is usually faster, since it does not build an integer intermediate. On a large mask the difference is measurable, and it is the better habit for that reason alone.
+`np.count_nonzero(mask)` does the same thing and is often faster. It doesn't build an int mid. On a large mask the gap is measurable. It's the better habit for that reason alone.
 
-`mask.any()` and `mask.all()` short-circuit conceptually but not in practice &mdash; NumPy evaluates the whole array. For an early exit on a huge array, `np.argmax(mask)` finds the first True in one pass and stops there.
+`mask.any()` and `mask.all()` short-circuit conceptually but not . NumPy tests the whole array. For an early exit on a huge array, `np.argmax(mask)` finds the first True in one pass and stops there.
 
-That last trick is worth remembering: `argmax` on a boolean array returns the index of the first True, because True is 1 and ties go to the first occurrence. If no element is True it returns 0, which is indistinguishable from a match at position zero &mdash; so check `mask.any()` first.
+That last trick is worth remembering: `argmax` on a boolean array returns the index of the first True. True is 1 and ties go to the first case. If no element is True it returns 0. This Is the same from a match at spot zero. So check `mask.any()` first.
 
 ## Masked arrays
 
 NumPy has a whole submodule, `np.ma`, for arrays that carry a mask of invalid entries alongside the data.
 
-`np.ma.masked_array(data, mask)` produces an array where masked elements are excluded from every operation. The mean skips them, the sum skips them, and the mask propagates through arithmetic.
+`np.ma.masked_array(data, mask)` makes an array where masked elements are excluded from each step. The mean skips them, the sum skips them. The mask passes through math.
 
-It solves a real problem &mdash; missing data in integer arrays, where NaN cannot help &mdash; and it is genuinely useful in domains like climate and oceanography where it is well established.
+It solves a real problem. Missing data in int arrays. Here NaN can't help &mdash; and it's truly handy in domains like climate and oceanography where it's well set.
 
-It is also comparatively slow, less widely supported by other libraries, and easy to lose track of when a masked array passes through a function that returns a plain one. Most code handles missing values with NaN and the `nan*` functions, or moves to pandas, rather than adopting `np.ma`.
+It's also comparatively slow, less widely supported by other libraries. Easy to lose track of when a masked array passes through a function that returns a plain one. Most code handles missing values with NaN and the `nan*` functions, or moves to pandas, rather than adopting `np.ma`.
 
-Worth knowing it exists; worth a deliberate decision before building on it.
+Worth knowing it exists. Worth a deliberate choice before building on it.
 
 ## What masking costs
 
-A boolean mask is one byte per element, so masking a million-element array allocates a megabyte for the mask.
+A boolean mask is one byte per element. Masking a million-element array allocates a megabyte for the mask.
 
-`a[mask]` then allocates the result, whose size depends on how many elements matched. Chaining several masked selections allocates at each step.
+`a[mask]` then allocates the result, whose size depends on how many elements matched. Chaining a few masked picks allocates at each step.
 
 Two ways to reduce that when it matters.
 
-**Combine conditions before selecting.** `a[(a > 2) & (a < 5)]` allocates one result; `a[a > 2][lambda r: r < 5]` allocates two.
+**Combine rules before selecting.** `a[(a > 2) & (a < 5)]` allocates one result. `a[a > 2][lambda r: r < 5]` allocates two.
 
-**Use the mask directly when you do not need the values.** Counting, summing or averaging matched elements can be done without extracting them: `a[mask].mean()` builds an intermediate array, while `a.sum(where=mask) / np.count_nonzero(mask)` does not.
+**Use the mask right when you don't need the values.** Counting, summing or blending matched elements can be done without extracting them: `a[mask].mean()` builds an mid array, while `a.sum(where=mask) / np.count_nonzero(mask)` doesn't.
 
-For most work this is irrelevant and the readable form wins. It becomes worth attention in a loop over large arrays, which is exactly where the intermediate allocations compound.
+For most work this is irrelevant and the readable form wins. It turns worth focus in a loop over large arrays. This Is just where the mid allocations compound.
 
 ## Masks as first-class values
 
-A mask is an array, which means it can be stored, named, combined and passed around like any other value.
+A mask is an array. This Means it can be stored, named, mixed and passed around like any other value.
 
-That is worth using. A filtering condition assembled from several parts is far more readable as named masks than as one long expression:
+That is worth using. A filtering rule assembled from a few parts is far more readable as named masks than as one long formula:
 
 ```python
 is_adult = age >= 18
@@ -2685,17 +2685,17 @@ recent = days_since < 30
 selected = data[is_adult & is_active & recent]
 ```
 
-Each name documents a condition, each can be counted independently while debugging, and the combination reads as the sentence it represents.
+Each name docs a rule, each can be counted on its own while debugging. The mix reads as the sentence it shows.
 
-`is_adult.sum()` at any point tells you how many passed that one filter, which is how you find out which condition is unexpectedly excluding everything.
+`is_adult.sum()` at any point tells you how many passed that one filter. This Is how you find out which rule is unexpectedly excluding all.
 
 ## Masks and NaN
 
-Comparisons involving NaN are all False, which has a specific consequence for filtering: **NaN values fail every condition**.
+checks involving NaN are all False. This Has a exact result for filtering: **NaN values fail each rule**.
 
 `a[a > 0]` silently excludes NaNs. So does `a[a <= 0]`. A value that is neither greater than nor less than zero disappears from both halves of what looks like an exhaustive split.
 
-That is occasionally the desired behaviour and frequently a source of quietly lost rows. If NaNs should be handled rather than dropped, they need an explicit branch:
+That is at times the desired action and often a source of quietly lost rows. If NaNs should be handled rather than dropped, they need an clear branch:
 
 ```python
 positive = a > 0
@@ -2703,37 +2703,37 @@ missing = np.isnan(a)
 other = ~positive & ~missing
 ```
 
-Three groups that actually cover everything, rather than two that appear to.
+Three groups that really cover all, rather than two that appear to.
 
 ## Assignment through a mask, and its limits
 
 `a[a < 0] = 0` modifies in place and is the standard way to clamp.
 
-The value assigned must be a scalar or must match the number of selected elements. `a[mask] = replacements` requires `len(replacements) == mask.sum()`, which is fine when the replacements were computed from the same mask and an error waiting to happen otherwise.
+The value assigned must be a scalar or must match the number of selected elements. `a[mask] = swaps` needs `len(swaps) == mask.sum()`. This Is fine when the swaps were found from the same mask and an error waiting to happen else.
 
-`np.where(mask, new, a)` is the non-mutating equivalent, and returns a new array rather than modifying the original. It is the safer default in a function that should not modify its argument.
+`np.where(mask, new, a)` is the non-mutating equal. Returns a new array rather than modifying the first. It's the safer default in a function that shouldn't modify its arg.
 
-`np.putmask` and `np.copyto` with a `where` argument cover the more specialised in-place cases.
+`np.putmask` and `np.copyto` with a `where` arg cover the more specialised in-place cases.
 
 ## Where masking fits among the alternatives
 
-`np.clip(a, lo, hi)` replaces the common two-sided clamp and is clearer than two masked assignments.
+`np.clip(a, lo, hi)` replaces the common two-sided clamp and is clearer than two masked sets.
 
-`np.where` handles the two-branch conditional without extracting anything.
+`np.where` handles the two-branch gated without extracting anything.
 
-`np.select` handles several branches in order.
+`np.select` handles a few branches in order.
 
-Masking proper is for when you want the **subset** &mdash; the values themselves, in a smaller array &mdash; rather than a transformed version of the whole.
+Masking proper is for when you want the **subset**. The values themselves, in a smaller array. Rather than a transformed version of the whole.
 
-Recognising which of those four you actually want removes a surprising amount of code. A great many hand-written mask-and-assign sequences are a `clip` or a `where` written the long way.
+Recognising which of those four you really want drops a surprising amount of code. A great many hand-written mask-and-assign sequences are a `clip` or a `where` written the long way.
 
-And the one rule that applies throughout: parenthesise every condition in a compound mask. `(a > 2) & (a < 5)`, always. The operator precedence will not do what you want otherwise, and it may not tell you.
+And the one rule that applies throughout: parenthesise each rule in a compound mask. `(a > 2) & (a < 5)`, always. The op precedence won't do what you want else. It may not tell you.
 
 ## A closing note
 
-Masking is the most-used feature in this track after arithmetic, and it is also where the syntax is least forgiving.
+Masking is the most-used feature in this track after math. It's also where the syntax is least forgiving.
 
-Two habits cover nearly all of it: parenthesise every condition in a compound expression, and name intermediate masks rather than building one long chain. The first prevents a precedence bug that does not always announce itself; the second makes it possible to count how many rows each condition removed, which is how you find out that one of them is excluding everything.
+Two habits cover nearly all of it: parenthesise each rule in a compound formula. Name mid masks rather than building one long chain. The first blocks a precedence bug that doesn't always announce itself. The second makes it possible to count how many rows each rule removed. This Is how you find out that one of them is excluding all.
 ''',
     [
         {"q": "Why does `a[(a > 3) and (a < 8)]` raise?",
@@ -2907,26 +2907,26 @@ except IndexError as e:
     ],
     '''
 title: Fancy Indexing
-intro: Selecting by a list of positions - reordering, repeating, and a result whose shape follows the index.
+intro: Selecting by a list of spots - reordering, repeating. A result whose shape follows the index.
 ## Indexing with an array
 
-Give an integer array where you would normally give a number, and you get those elements back:
+Give an int array where you'd most times give a number. You get those elements back:
 
 ```python
 a[[0, 2, 4]]
 ```
 
-Order is preserved as given, so this is also how you reorder. Positions may repeat, so it is also how you tile or expand. Negative indices work as usual.
+Order is preserved as given. So This is also how you reorder. spots may repeat, so it's also how you tile or expand. Minus indices work as usual.
 
-The result takes the shape of the **index**, not the source. Indexing a 1-D array with a `(2, 2)` index array gives a `(2, 2)` result. That is occasionally what you want and is worth knowing before it surprises you.
+The result takes the shape of the **index**, not the source. Indexing a 1-D array with a `(2, 2)` index array gives a `(2, 2)` result. That is at times what you want and is worth knowing before it surprises you.
 
 ## It copies
 
-Fancy indexing cannot return a view. The selected positions are arbitrary, and a view has to be describable as a start, a shape and a set of strides &mdash; which scattered positions are not.
+Fancy indexing can't return a view. The selected spots are any. A view has to be describable as a start, a shape and a set of strides. Which scattered spots aren't.
 
-So `a[[0, 2, 4]]` is new memory, and writing to it leaves the original alone.
+So `a[[0, 2, 4]]` is new memory, and writing to it leaves the first alone.
 
-Assigning **through** it is different: `a[[0, 2, 4]] = -1` writes into the original in place. Same as with boolean masks &mdash; reading copies, writing does not.
+Assigning **through** it's other: `a[[0, 2, 4]] = -1` writes into the first in place. Same as with boolean masks. Reading copies, writing doesn't.
 
 ## Repeated positions in an assignment
 
@@ -2936,11 +2936,11 @@ A sharp edge worth knowing about.
 b[[0, 0, 0]] += 1
 ```
 
-This does **not** add three. It reads the value once, adds one, and writes the result back three times, so the answer is one.
+This does **not** add three. It reads the value once, adds one. Writes the result back three times. The answer is one.
 
-That is a consequence of how augmented assignment is defined rather than a bug, and it catches people building histograms or accumulating into bins.
+That is a result of how boosted set is defined rather than a bug. It catches people building histograms or building up into bins.
 
-`np.add.at(b, [0, 0, 0], 1)` does the accumulating version. It is slower, because it cannot use the vectorised path, and it is correct. For counting specifically, `np.bincount` is faster still.
+`np.add.at(b, [0, 0, 0], 1)` does the building up version. It's slower. It can't use the vectorised path. It's correct. For counting namely, `np.bincount` is faster still.
 
 ## Two dimensions
 
@@ -2952,11 +2952,11 @@ a[[0, 2], [1, 3]]
 
 does **not** select rows 0 and 2 crossed with columns 1 and 3. It pairs them elementwise and returns the two elements at `(0, 1)` and `(2, 3)`.
 
-That behaviour is consistent &mdash; the index arrays broadcast against each other, then each pair is a coordinate &mdash; and it is not what most people expect the first time.
+That action is steady &mdash; the index arrays broadcast against each other, then each pair is a coord &mdash; and it isn't what most people expect the first time.
 
 For the rectangle, there are two idioms. `a[np.ix_(rows, cols)]` builds the open mesh for you and is the clearest. Or reshape one index to a column so the two broadcast into a grid: `a[np.array(rows)[:, None], cols]`.
 
-Once you have seen that the second form is just broadcasting applied to indices, the rule stops being a special case.
+Once you've seen that the second form is just broadcasting applied to indices, the rule stops being a special case.
 
 ## The everyday uses
 
@@ -2970,27 +2970,27 @@ Once you have seen that the second form is just broadcasting applied to indices,
 
 ## take
 
-`np.take(a, idx)` is fancy indexing as a function. It is often slightly faster on large arrays, and it takes a `mode` argument that plain indexing does not:
+`np.take(a, idx)` is fancy indexing as a function. It's often slightly faster on large arrays. It takes a `mode` arg that plain indexing doesn't:
 
 `mode='raise'` is the default and matches `a[idx]`. `mode='clip'` pins out-of-range indices to the ends. `mode='wrap'` wraps them around.
 
-Those modes are useful for boundary handling &mdash; a filter that would read past the edge, for instance &mdash; where the alternative is padding the array or special-casing the ends.
+Those modes are handy for boundary handling. A filter that would read past the edge, say. Where the option is padding the array or special-casing the ends.
 
 ## Mixing fancy indexing with slices
 
-Combining the two in one expression is where fancy indexing stops being intuitive.
+Mixing the two in one formula is where fancy indexing stops being natural.
 
 `a[[0, 2], 1:3]` works and does what you expect: rows 0 and 2, columns 1 to 2.
 
-But when fancy indices appear on **both sides** of a slice &mdash; `a[[0, 2], :, [1, 3]]` &mdash; NumPy has to decide where the resulting axis goes, and the rule is that the fancy-indexed axis moves to the **front**. The result's shape is not the one most people predict.
+But when fancy indices appear on **both sides** of a slice. `a[[0, 2], :, [1, 3]]`. NumPy has to decide where the resulting axis goes. The rule is that the fancy-indexed axis moves to the **front**. The result's shape isn't the one most people predict.
 
-The practical advice is to avoid the ambiguous forms. If an expression mixes fancy indices and slices in a way that makes you pause, split it into two steps. Two clear selections cost one extra intermediate array and save the next reader from working out the rule.
+The hands-on advice is to avoid the ambiguous forms. If an formula mixes fancy indices and slices in a way that makes you pause, split it into two steps. Two clear picks cost one extra mid array and save the next reader from working out the rule.
 
 ## np.ix_ builds the rectangle
 
 The most common thing people want from `a[[0, 2], [1, 3]]` is the four elements at the intersection of rows 0 and 2 with columns 1 and 3.
 
-What they get is two elements: `a[0,1]` and `a[2,3]`, because the index arrays are paired elementwise.
+What they get is two elements: `a[0,1]` and `a[2,3]`. The index arrays are paired elementwise.
 
 `np.ix_` converts a set of index lists into the shapes that broadcast into a grid:
 
@@ -2998,23 +2998,23 @@ What they get is two elements: `a[0,1]` and `a[2,3]`, because the index arrays a
 a[np.ix_([0, 2], [1, 3])]
 ```
 
-gives the `(2, 2)` rectangle. It works by reshaping the first list to a column and the second to a row, so broadcasting produces every combination &mdash; the same trick as `a[:, None]` against `b[None, :]`, packaged for readability.
+gives the `(2, 2)` rectangle. It works by reshaping the first list to a column and the second to a row. Broadcasting makes each mix. The same trick as `a[:, None]` against `b[None, :]`, packaged for readability.
 
-The alternative, `a[[0, 2]][:, [1, 3]]`, gives the same answer with two selections and two copies. `np.ix_` is one selection and says what it means.
+The option, `a[[0, 2]][:, [1, 3]]`, gives the same answer with two picks and two copies. `np.ix_` is one pick and says what it means.
 
 ## put, take and the clip modes
 
-`np.take(a, idx)` is fancy indexing as a function call. It is usually a little faster than bracket syntax on 1-D arrays, and it accepts an `axis` argument, which makes `np.take(a, idx, axis=1)` a clean way to select columns without a slice full of colons.
+`np.take(a, idx)` is fancy indexing as a function call. It's often a little faster than bracket syntax on 1-D arrays. It accepts an `axis` arg. This Makes `np.take(a, idx, axis=1)` a clean way to select columns without a slice full of colons.
 
-Its useful extra is `mode`. By default an out-of-range index raises, as with normal indexing. `mode="clip"` pins the index to the valid range, and `mode="wrap"` wraps it around.
+Its handy extra is `mode`. By default an out-of-range index raises, as with normal indexing. `mode="clip"` pins the index to the valid range, and `mode="wrap"` wraps it around.
 
-That turns a whole class of boundary-condition loops into a single call &mdash; sampling neighbours near the edge of an image, for instance, where the choice between clamping and wrapping is a parameter rather than a branch.
+That turns a whole class of boundary-rule loops into a single call. Sampling neighbours near the edge of an image, say. Here The choice between clamping and wrapping is a param rather than a branch.
 
-`np.put` is the assignment counterpart, writing values at given flat positions in place.
+`np.put` is the set counterpart, writing values at given flat spots in place.
 
 ## The idiom this all exists for
 
-Fancy indexing looks like a collection of tricks until you see the one pattern it is really for:
+Fancy indexing looks like a set of tricks until you see the one pattern it's really for:
 
 ```python
 order = np.argsort(key)
@@ -3022,7 +3022,7 @@ table_a = table_a[order]
 table_b = table_b[order]
 ```
 
-Compute an index array once, apply it to everything that needs to stay aligned. That is sorting a table by a column, taking the top n, shuffling a dataset, applying a train/test split, and reordering to match another array &mdash; all the same operation.
+Find an index array once, apply it to all that needs to stay aligned. That is sorting a table by a column, taking the top n, shuffling a dataset, applying a train/test split. Reordering to match another array. All the same step.
 
 Once you recognise it, most uses of fancy indexing in real code turn out to be an instance of it, and the rest are lookups.
 
@@ -3030,55 +3030,55 @@ Once you recognise it, most uses of fancy indexing in real code turn out to be a
 
 The second everyday use is treating an array as a lookup table.
 
-`labels[predictions]` converts an array of class indices into an array of names. `palette[image]` converts an index image into colours. `np.unique(..., return_inverse=True)` produces exactly the index array that this consumes.
+`labels[guesses]` converts an array of class indices into an array of names. `palette[image]` converts an index image into colours. `np.unique(..., return_inverse=True)` makes just the index array that this consumes.
 
-The pattern is `values[index_array]`, and the result has the shape of the *index*, not of the values. That is worth stating explicitly, because it is the opposite of the intuition built up from slicing, and it is what makes a `(h, w)` index array plus a `(256, 3)` palette produce an `(h, w, 3)` image.
+The pattern is `values[index_array]`, and the result has the shape of the *index*, not of the values. That is worth stating by name. It's the opposite of the intuition built up from slicing, and it's what makes a `(h, w)` index array plus a `(256, 3)` palette give an `(h, w, 3)` image.
 
 ## Choosing between the three ways to select
 
-**Basic slicing** when the selection is a regular range. It is a view, it is free, and it is the only one of the three that does not allocate.
+**Basic slicing** when the pick is a regular range. It's a view, it's free. It's the only one of the three that doesn't allocate.
 
-**Boolean masking** when the selection is a condition. The mask has the shape of the data, and it composes with `&` and `|`.
+**Boolean masking** when the pick is a rule. The mask has the shape of the data. It composes with `&` and `|`.
 
-**Fancy indexing** when the selection is a list of positions, or when the order matters. Masks cannot reorder or repeat; fancy indexing can do both.
+**Fancy indexing** when the pick is a list of spots, or when the order matters. Masks can't reorder or repeat. Fancy indexing can do both.
 
-The overlap is smaller than it looks. A condition wants a mask. A permutation wants an index array. A contiguous window wants a slice. When two of them would work, the one that expresses the intent directly is the right choice, and it is usually also the faster one.
+The share is smaller than it looks. A rule wants a mask. A permutation wants an index array. A contiguous window wants a slice. When two of them would work, the one that expresses the intent right is the right choice. It's often also the faster one.
 
 ## Repeated indices in assignment
 
 Selecting with repeated indices returns repeated values, which is unsurprising.
 
-Assigning with repeated indices is where it gets interesting. `a[[0, 0, 1]] = [10, 20, 30]` leaves element 0 holding 20 &mdash; the last write wins, and the earlier one is simply overwritten.
+Assigning with repeated indices is where it gets notable. `a[[0, 0, 1]] = [10, 20, 30]` leaves element 0 holding 20. The last write wins. The earlier one is simply overwritten.
 
-The version that catches people is the augmented form:
+The version that catches people is the boosted form:
 
 ```python
 a[[0, 0, 1]] += 1
 ```
 
-Element 0 is incremented **once**, not twice. The expression expands to a fetch, an add and a store: the fetch produces a copy containing element 0 twice, both copies get incremented, and both are written back to the same location.
+Element 0 is incremented **once**, not twice. The formula expands to a fetch, an add and a store. The fetch makes a copy holding element 0 twice, both copies get incremented. Both are written back to the same location.
 
-`np.add.at(a, [0, 0, 1], 1)` is the unbuffered version that does what the syntax suggests. Every ufunc has an `.at` method for this.
+`np.add.at(a, [0, 0, 1], 1)` is the unbuffered version that does what the syntax suggests. each ufunc has an `.at` method for this.
 
-This matters in any accumulation where indices repeat &mdash; building a histogram, scattering values into bins, accumulating gradients. The buffered version produces a plausible undercount rather than an error, which is the worst kind of wrong.
+This matters in any build-up where indices repeat. Building a histogram, scattering values into bins, building up grads. The buffered version makes a plausible undercount rather than an error. This Is the worst kind of wrong.
 
-For the specific case of counting or summing by integer key, `np.bincount(idx)` and `np.bincount(idx, weights=vals)` are both correct and considerably faster than `add.at`.
+For the exact case of counting or summing by int key, `np.bincount(idx)` and `np.bincount(idx, weights=vals)` are both correct and a lot faster than `add.at`.
 
 ## Negative indices work
 
-Fancy indexing accepts negative positions, counting from the end exactly as normal indexing does. `a[[-1, -2]]` takes the last two elements in reverse order.
+Fancy indexing accepts minus spots, counting from the end just as normal indexing does. `a[[-1, -2]]` takes the last two elements in reverse order.
 
-That is convenient and occasionally a hazard: an index array computed by subtraction that accidentally goes negative selects from the far end of the array instead of raising. A `-1` produced by "not found" logic silently returns the last element.
+That is convenient and at times a hazard. An index array found by subtraction that accidentally goes minus selects from the far end of the array instead of raising. A `-1` made by "not found" logic silently returns the last element.
 
-If out-of-range should be an error rather than a wrap, check the index array before using it, or use `np.take` with the default `mode="raise"`, which validates but treats negatives the same way.
+If out-of-range should be an error rather than a wrap, check the index array before using it, or use `np.take` with the default `mode="raise"`. This Validates but treats negatives the same way.
 
 ## The cost
 
-Fancy indexing always allocates. The result is a new array of the index's shape, and the values are gathered one by one from scattered positions.
+Fancy indexing always allocates. The result is a new array of the index's shape. The values are gathered one by one from scattered spots.
 
-That gathering is not free even beyond the allocation: scattered reads defeat the processor's cache in the way covered in the performance module. Fancy indexing a large array with a random permutation is meaningfully slower per element than reading it in order.
+That gathering isn't free even beyond the allocation. Scattered reads defeat the processor's cache in the way covered in the speed module. Fancy indexing a large array with a random permutation is usefully slower per element than reading it in order.
 
-The practical consequence is small &mdash; it is still far faster than a Python loop &mdash; but it means fancy indexing inside a tight loop over a large array is worth a second look. Sorting the index array first, where order does not matter, can help by making the reads more sequential.
+The hands-on result is small. It's still far faster than a Python loop &mdash; but it means fancy indexing inside a tight loop over a large array is worth a second look. Sorting the index array first. Here Order doesn't matter, can help by making the reads more sequential.
 
 ## The three selections, compared
 
@@ -3090,9 +3090,9 @@ The practical consequence is small &mdash; it is still far faster than a Python 
 | Can repeat | no | no | yes |
 | Result shape | derived from slice | 1-D, length = matches | shape of the index |
 
-The last row is the one that surprises people most. A boolean mask always flattens to a 1-D result, however many dimensions it covered. Fancy indexing takes the shape of the index array, so a `(h, w)` index array against a `(256, 3)` palette produces `(h, w, 3)`.
+The last row is the one that surprises people most. A boolean mask always flattens to a 1-D result. But Many dims it covered. Fancy indexing takes the shape of the index array. A `(h, w)` index array against a `(256, 3)` palette makes `(h, w, 3)`.
 
-Choosing correctly is mostly a matter of matching the tool to the question: a range wants a slice, a condition wants a mask, a list of positions wants fancy indexing. Where two would work, the one that states the intent is usually also the faster one.
+Choosing right is mostly a matter of matching the tool to the question. A range wants a slice, a rule wants a mask, a list of spots wants fancy indexing. Where two would work, the one that states the intent is often also the faster one.
 ''',
     [
         {"q": "What does `a[[0, 2], [1, 3]]` select from a 2-D array?",
@@ -3250,99 +3250,99 @@ print("   ", np.diff(np.array([1, 3, 6, 10])))'''),
     ],
     '''
 title: Aggregations and axis
-intro: sum, mean and max - and the one argument that decides what they mean.
+intro: sum, mean and max - and the one arg that decides what they mean.
 
 ## The default collapses everything
 
-`a.sum()` with no arguments adds every element, whatever the shape, and returns a single value.
+`a.sum()` with no args adds each element, what the shape, and returns a single value.
 
-That value is a NumPy scalar rather than a Python `int` or `float`. It behaves like one almost everywhere; wrap it in `int()` or `float()` when you need a genuine Python number, for JSON or for a format string that cares.
+That value is a NumPy scalar rather than a Python `int` or `float`. It behaves like one almost all over. Wrap it in `int()` or `float()` when you need a genuine Python number, for JSON or for a format string that cares.
 
 ## axis names what disappears
 
-This is the rule, and it is the opposite of how most people read it at first.
+This is the rule, and it's the opposite of how most people read it at first.
 
-`axis=0` does **not** mean "along the rows" in the sense of giving one answer per row. It means *collapse axis 0*. Axis 0 is the row axis, so the rows vanish and you are left with one value per column.
+`axis=0` does **not** mean "along the rows" in the sense of giving one answer per row. It means *collapse axis 0*. Axis 0 is the row axis. The rows vanish and you're left with one value per column.
 
-`axis=1` collapses the columns and leaves one value per row.
+`axis=1` merges the columns and leaves one value per row.
 
-Reading it as "which axis am I removing?" makes every case predictable, including higher dimensions where intuition runs out. The shape rule is simple: the result has the input shape with that axis deleted.
+Reading it as "which axis am I dropping?" makes each case predictable, including higher dims where intuition runs out. The shape rule is simple. The result has the input shape with that axis deleted.
 
-A useful check when unsure: print `a.shape` and `a.sum(axis=k).shape` and confirm the missing entry is the one you meant.
+A handy check when unsure: print `a.shape` and `a.sum(axis=k).shape` and confirm the missing entry is the one you meant.
 
 ## keepdims
 
-Reductions drop the axis, and that is usually what you want &mdash; until you try to use the result against the original array.
+Reductions drop the axis, and that is often what you want. Until you try to use the result against the first array.
 
-Row means of a `(3, 4)` array give shape `(3,)`. Subtracting that from the `(3, 4)` array fails, because broadcasting aligns from the right and compares 4 with 3.
+Row means of a `(3, 4)` array give shape `(3,)`. Subtracting that from the `(3, 4)` array fails. Broadcasting aligns from the right and checks 4 with 3.
 
-`keepdims=True` gives `(3, 1)` instead, which broadcasts down the rows correctly.
+`keepdims=True` gives `(3, 1)` instead. This Broadcasts down the rows right.
 
-Note the asymmetry: centring by **column** needs no `keepdims`, because `mean(axis=0)` gives `(4,)` which already aligns with the last axis. Centring by **row** needs it. That asymmetry is a direct consequence of right-aligned broadcasting, and it is why `keepdims` exists.
+Note the skew: centring by **column** needs no `keepdims`. `mean(axis=0)` gives `(4,)` which already aligns with the last axis. Centring by **row** needs it. That skew is a direct result of right-aligned broadcasting, and it's why `keepdims` exists.
 
-A square array hides the error &mdash; both alignments are legal &mdash; so this is worth getting right on principle rather than by testing.
+A square array hides the error. Both alignments are legal. So this is worth getting right on principle rather than by testing.
 
 ## Several axes at once
 
-`axis` takes a tuple. On a `(frames, rows, cols)` stack, `axis=(1, 2)` reduces each frame to one number, and `axis=0` averages across frames to give one image.
+`axis` takes a tuple. On a `(frames, rows, cols)` stack, `axis=(1, 2)` reduces each frame to one number. `axis=0` means across frames to give one image.
 
 That covers most of what people reach for loops to do with image or batch data.
 
 ## argmin and argmax
 
-These return **positions** rather than values.
+These return **spots** rather than values.
 
-On a 1-D array the position is an index. On a multi-dimensional array with no `axis`, the position is into the *flattened* array, which is rarely directly useful. `np.unravel_index(a.argmax(), a.shape)` converts it into coordinates.
+On a 1-D array the spot is an index. On a multi-dimensional array with no `axis`, the spot is into the *flattened* array. This Is rarely right handy. `np.unravel_index(a.argmax(), a.shape)` converts it into coords.
 
-With an `axis`, you get one position per remaining slice, which is usually what you want: `a.argmax(axis=1)` gives the column of the largest value in each row.
+With an `axis`, you get one spot per left slice. This Is often what you want: `a.argmax(axis=1)` gives the column of the largest value in each row.
 
-Ties resolve to the **first** occurrence. That matters when the maximum is not unique and something downstream assumes it is.
+Ties resolve to the **first** case. That matters when the max isn't unique and a thing downstream assumes it's.
 
 ## Cumulative operations
 
-`cumsum` and `cumprod` are not reductions: they keep the shape and fill in running totals. Without an axis they operate on the flattened array, which is occasionally what you want and often not, so pass `axis` deliberately.
+`cumsum` and `cumprod` aren't reductions: they keep the shape and fill in running totals. Without an axis they operate on the flattened array. This Is at times what you want and often not. Pass `axis` on purpose.
 
-`np.diff` is the inverse of `cumsum` &mdash; consecutive differences, one element shorter.
+`np.diff` is the inverse of `cumsum`. In a row differences, one element shorter.
 
 ## Boolean reductions
 
-`any` and `all` take `axis` exactly like `sum`, because a boolean array is numeric and these are just reductions over it.
+`any` and `all` take `axis` just like `sum`. A boolean array is numeric and these are just reductions over it.
 
-`mask.any(axis=0)` answers "does any row satisfy this, per column". `mask.sum(axis=1)` counts matches per row. Between them and `argmax`, most "find the first row where..." questions have a one-line answer.
+`mask.any(axis=0)` answers "does any row meet this, per column". `mask.sum(axis=1)` counts matches per row. Between them and `argmax`, most "find the first row where..." questions have a one-line answer.
 
 ## The common mistakes
 
 **Reading `axis=0` as "per row".** It gives per column. The axis named is the one removed.
 
-**Forgetting `keepdims` when centring by row.** It raises on a rectangular array and silently misbehaves on a square one.
+**Losing `keepdims` when centring by row.** It raises on a rectangular array and silently misbehaves on a square one.
 
-**Using a flat `argmax` as if it were coordinates.** Unravel it.
+**Using a flat `argmax` as if it were coords.** Unravel it.
 
-**Reducing without an axis by accident.** `a.mean()` on a 2-D array gives one number; if you wanted per-column means, the missing argument is the whole bug and the result still looks like a plausible number.
+**Reducing without an axis by accident.** `a.mean()` on a 2-D array gives one number. If you wanted per-column means, the missing arg is the whole bug and the result still looks like a plausible number.
 
 ## The accumulator dtype
 
-`a.sum()` on an integer array accumulates in that array's integer type, and that type can overflow.
+`a.sum()` on an int array builds up in that array's int type, and that type can overflow.
 
-Summing a million `int32` values each around ten thousand overflows silently and gives a negative answer. The array is fine; the accumulator is not.
+Summing a million `int32` values each around ten thousand overflows silently and gives a minus answer. The array is fine. The accumulator isn't.
 
-`a.sum(dtype=np.int64)` fixes it by accumulating in a wider type than the data. The same argument works on `mean`, `prod` and the rest.
+`a.sum(dtype=np.int64)` fixes it by building up in a wider type than the data. The same arg works on `mean`, `prod` and the rest.
 
-NumPy already does something like this by default for the narrowest types &mdash; summing `int8` accumulates in the platform integer &mdash; but it does not promote `int32` or `int64`, so the risk is real for exactly the widths people actually use.
+NumPy already does something like this by default for the narrowest types. Summing `int8` builds up in the platform int. But it doesn't promote `int32` or `int64`. The risk is real for just the widths people really use.
 
-For floats the concern is different: not overflow but precision loss. Summing many `float32` values accumulates rounding error. `a.sum(dtype=np.float64)` reads the narrow array and accumulates in the wide type, which is the standard compromise between memory and accuracy.
+For floats the concern is other: not overflow but precision loss. Summing many `float32` values builds up rounding error. `a.sum(dtype=np.float64)` reads the narrow array and builds up in the wide type. This Is the standard compromise between memory and score.
 
-NumPy uses pairwise summation internally rather than a naive running total, so the error grows far more slowly than a hand-written loop would. It is still worth being deliberate when summing millions of `float32` values.
+NumPy uses pairwise summation inside rather than a naive running total. The error grows far more slowly than a hand-written loop would. It's still worth being deliberate when summing millions of `float32` values.
 
 ## Weighted means and percentiles
 
-`np.average` is not a synonym for `np.mean`. It takes a `weights` argument, which `mean` does not.
+`np.mean` isn't a synonym for `np.mean`. It takes a `weights` arg, which `mean` doesn't.
 
-`np.average(x, weights=w)` computes the weighted mean, and `returned=True` also gives back the sum of the weights, which is what you need to combine averages from several groups correctly.
+`np.mean(x, weights=w)` finds the weighted mean. `returned=True` also gives back the sum of the weights. This Is what you need to combine means from a few groups right.
 
-`np.median` is the 50th percentile, and `np.percentile(a, q)` generalises it. Both accept an `axis`, so per-column medians are one call.
+`np.median` is the 50th percentile, and `np.percentile(a, q)` generalises it. Both accept an `axis`. Per-column medians are one call.
 
-Percentiles involve interpolation between the two nearest ranks when the requested quantile does not fall on an element. The `method` argument selects among several conventions, and different statistical packages default differently &mdash; which is the usual explanation when NumPy's answer disagrees slightly with another tool's.
+Percentiles involve blending between the two nearest ranks when the requested quantile doesn't fall on an element. The `method` arg selects among a few rules. Other statistical packages default differently. Which is the usual reason when NumPy's answer disagrees slightly with another tool's.
 
 `np.quantile` is the same function taking fractions rather than percentages.
 
@@ -3350,11 +3350,11 @@ All of these have `nan`-aware variants: `nanmedian`, `nanpercentile`, `nanquanti
 
 ## reduce and accumulate as the general form
 
-Every reduction has a ufunc underneath, and the ufunc's `reduce` method is the general case.
+each reduction has a ufunc underneath, and the ufunc's `reduce` method is the general case.
 
-`np.add.reduce(a, axis=0)` is `a.sum(axis=0)`. `np.maximum.reduce` is `a.max()`. `np.logical_and.reduce` is `a.all()`.
+`np.add.reduce(a, axis=0)` is `a.sum(axis=0)`. `np.max.reduce` is `a.max()`. `np.logical_and.reduce` is `a.all()`.
 
-This matters when you want a reduction NumPy does not name. A running maximum has no `cummax` function, but `np.maximum.accumulate(a)` is exactly that, and is the standard way to compute a drawdown baseline or a high-water mark.
+This matters when you want a reduction NumPy doesn't name. A running max has no `cummax` function. `np.max.build up(a)` is just that. Is the standard way to find a drawdown baseline or a high-water mark.
 
 `np.ufunc.reduceat` performs segmented reductions &mdash; a reduction over slices defined by a list of start indices &mdash; which is the closest thing NumPy has to a group-by on sorted data.
 
@@ -3364,49 +3364,49 @@ This matters when you want a reduction NumPy does not name. A running maximum ha
 
 `np.histogram` reduces to counts per bin and returns the bin edges alongside them.
 
-`np.bincount` counts occurrences of small non-negative integers, and is substantially faster than `unique(return_counts=True)` for that case because it indexes directly rather than sorting. Its `weights` argument turns it into a group-sum: `np.bincount(group_ids, weights=values)` sums values per group in one call, which is the fastest group-by NumPy offers.
+`np.bincount` counts cases of small non-minus ints. Is much faster than `unique(return_counts=True)` for that case because it indexes right rather than sorting. Its `weights` arg turns it into a group-sum: `np.bincount(group_ids, weights=values)` sums values per group in one call. This Is the fastest group-by NumPy offers.
 
 ## Empty arrays and the identity element
 
-`np.sum([])` is `0.0`. `np.prod([])` is `1.0`. Both return the identity element for the operation, which is mathematically the right answer.
+`np.sum([])` is `0.0`. `np.prod([])` is `1.0`. Both return the identity element for the step. This Is in math the right answer.
 
-`np.max([])` raises, because there is no identity for a maximum.
+`np.max([])` raises, because there's no identity for a max.
 
-`np.mean([])` returns `nan` with a warning, since it divides by zero.
+`np.mean([])` returns `nan` with a warning, since it cuts by zero.
 
-This matters in code that reduces over groups where some group might be empty. A sum silently gives zero, which may or may not be the meaning you want; a max raises, which at least tells you. Filtering out empty groups before reducing, or using the `initial` argument that `max` and `min` accept, makes the intent explicit.
+This matters in code that reduces over groups where some group might be empty. A sum silently gives zero. This May or may not be the meaning you want. A max raises. This At least tells you. Filtering out empty groups before reducing, or using the `initial` arg that `max` and `min` accept, makes the intent clear.
 
 ## The habits worth forming
 
-Pass `axis` explicitly. The default of "reduce everything" is right often enough to hide a missing argument, and wrong often enough to matter.
+Pass `axis` by name. The default of "reduce all" is right often enough to hide a missing arg. Wrong often enough to matter.
 
-Pass `keepdims=True` whenever the result will be used against the original array.
+Pass `keepdims=True` when the result will be used against the first array.
 
-Pass `dtype` when summing integers that could be large, or many `float32` values.
+Pass `dtype` when summing ints that could be large, or many `float32` values.
 
-Check the shape of the result rather than assuming it. One printed `.shape` resolves most confusion about which axis went where, and it is faster than reasoning about it.
+Check the shape of the result rather than given it. One printed `.shape` resolves most confusion about which axis went where. It's faster than thinking about it.
 
 ## Reductions on boolean arrays
 
-Because booleans promote to integers, every numeric reduction works on a mask and means something useful.
+Because booleans promote to ints, each numeric reduction works on a mask and means a thing handy.
 
-`mask.sum()` counts. `mask.mean()` gives the proportion &mdash; the fraction of elements satisfying the condition, which is often exactly the summary you want and avoids a division you would otherwise write by hand.
+`mask.sum()` counts. `mask.mean()` gives the proportion. The fraction of elements meeting the rule. This Is often just the summary you want and avoids a division you'd else write by hand.
 
-`mask.any()` and `mask.all()` are the logical reductions, and take `axis` like everything else.
+`mask.any()` and `mask.all()` are the logical reductions, and take `axis` like all else.
 
-`mask.argmax()` finds the first True, since True is 1 and ties go to the first occurrence. It returns 0 when nothing is True, which is indistinguishable from a match at position zero &mdash; check `mask.any()` first.
+`mask.argmax()` finds the first True, since True is 1 and ties go to the first case. It returns 0 when nothing is True. This Is the same from a match at spot zero &mdash; check `mask.any()` first.
 
-Combining these covers most "how many rows satisfy" and "which is the first row where" questions in one line each.
+Mixing these covers most "how many rows meet" and "which is the first row where" questions in one line each.
 
 ## Reductions with a condition
 
-Modern ufunc reductions accept `where`, which restricts the reduction to selected elements without building an intermediate array.
+Modern ufunc reductions accept `where`. This Restricts the reduction to selected elements without building an mid array.
 
-`a.sum(where=mask)` sums only the matching elements. `a.mean(where=mask)` averages them. Compared with `a[mask].sum()`, it avoids allocating the extracted subset, which matters on large arrays inside a loop.
+`a.sum(where=mask)` sums only the matching elements. `a.mean(where=mask)` means them. Checked with `a[mask].sum()`, it avoids allocating the extracted subset. This Matters on large arrays inside a loop.
 
-`initial` supplies a starting value, which is what makes `max` work on a possibly-empty selection: `a.max(initial=0, where=mask)` returns 0 rather than raising when nothing matches.
+`initial` supplies a starting value. This Is what makes `max` work on a possibly-empty pick: `a.max(initial=0, where=mask)` returns 0 rather than raising when nothing matches.
 
-Those two arguments together cover the awkward cases in group-wise reductions, where some groups may be empty and the plain functions either raise or return an identity that means something different.
+Those two args together cover the awkward cases in group-wise reductions. Here Some groups may be empty and the plain functions either raise or return an identity that means a thing other.
 
 ## Reductions across a stack of arrays
 
@@ -3418,31 +3418,31 @@ The answer is to stack them and reduce along the new axis:
 result = np.stack(arrays).mean(axis=0)
 ```
 
-That is the elementwise mean across all of them. `max(axis=0)` gives the elementwise maximum, and so on.
+That is the elementwise mean across all of them. `max(axis=0)` gives the elementwise max, and so on.
 
-For two arrays there are direct functions &mdash; `np.maximum(a, b)` and `np.minimum(a, b)` are elementwise and broadcast &mdash; and they are worth distinguishing from `np.max`, which reduces a single array. The names differ by one letter and the operations are entirely different, which is a recurring source of confusion.
+For two arrays there are direct functions. `np.max(a, b)` and `np.min(a, b)` are elementwise and broadcast. And they're worth distinguishing from `np.max`. This Reduces a single array. The names differ by one letter and the steps are fully other. This Is a recurring source of confusion.
 
-`np.maximum.reduce(arrays)` generalises the pairwise version to any number, without the intermediate stack.
+`np.max.reduce(arrays)` generalises the pairwise version to any number, without the mid stack.
 
 ## The summary
 
-Pass `axis` explicitly, and read it as "the axis that disappears".
+Pass `axis` by name, and read it as "the axis that disappears".
 
-Pass `keepdims=True` whenever the result will be used against the original.
+Pass `keepdims=True` when the result will be used against the first.
 
-Pass `dtype` when summing many integers or many `float32` values.
+Pass `dtype` when summing many ints or many `float32` values.
 
-Use the `nan*` variants when missing values are possible, and know that they make a decision on your behalf about what missing means.
+Use the `nan*` variants when missing values are possible. Know that they make a choice on your behalf about what missing means.
 
-Use `where` and `initial` for conditional reductions rather than extracting a subset first.
+Use `where` and `initial` for gated reductions rather than extracting a subset first.
 
-And when the result shape is not what you expected, print `a.shape` and the result's shape together. One comparison resolves nearly every axis confusion faster than reasoning about it does.
+And when the result shape isn't what you expected, print `a.shape` and the result's shape together. One compare resolves nearly each axis confusion faster than thinking about it does.
 
 ## A closing note
 
-Reductions are simple until an axis is involved, and then almost every confusion comes from one place: reading `axis=0` as "along the rows" rather than "collapse the rows".
+Reductions are simple until an axis is involved. Then almost each confusion comes from one place. Reading `axis=0` as "along the rows" rather than "collapse the rows".
 
-The axis named is the axis removed. Holding onto that phrasing makes the result shape predictable in any number of dimensions, and turns `keepdims`, tuple axes and higher-dimensional reductions from special cases into consequences of the same rule.
+The axis named is the axis removed. Holding onto that phrasing makes the result shape predictable in any number of dims. Turns `keepdims`, tuple axes and higher-dimensional reductions from special cases into results of the same rule.
 ''',
     [
         {"q": "On a (3,4) array, what does `a.sum(axis=0)` give?",
@@ -3610,17 +3610,17 @@ print("   a:", a, " b:", b)'''),
     ],
     '''
 title: Views versus Copies
-intro: Which operations give you a second window onto the same numbers, and why it matters.
+intro: Which steps give you a second window onto the same numbers, and why it matters.
 
 ## One buffer, several descriptions
 
-An array is a block of memory plus a description: where it starts, what shape it has, and how many bytes to step for each axis. Those steps are the **strides**.
+An array is a block of memory plus a description. Where it starts, what shape it has. How many bytes to step for each axis. Those steps are the **strides**.
 
-A **view** is a new description of the same block. Making one is free, and writing through it changes what every other description of that block sees.
+A **view** is a new description of the same block. Making one is free. Writing through it changes what every other description of that block sees.
 
-A **copy** is a new block. It costs time and memory, and it is independent.
+A **copy** is a new block. It costs time and memory, and it's split.
 
-Nearly every surprise in NumPy that is not about broadcasting is about this distinction.
+Nearly each surprise in NumPy that isn't about broadcasting is about this gap.
 
 ## Where the line falls
 
@@ -3628,25 +3628,25 @@ Nearly every surprise in NumPy that is not about broadcasting is about this dist
 
 **Copies**: boolean masking, fancy indexing, `flatten`, `copy`, `astype`, and most functions that return a new array.
 
-The rule underneath is mechanical. If the selected elements can be described by a start and a regular stride per axis, a view works. A slice steps evenly, so it can. A boolean mask picks scattered positions with no single step size, so it cannot.
+The rule underneath is rote. If the selected elements can be given by a start and a regular stride per axis, a view works. A slice steps evenly. It can. A boolean mask picks scattered spots with no single step size, so it can't.
 
-That is why the list is not arbitrary and does not need memorising once you have the reason.
+That is why the list isn't any and doesn't need storing once you've the reason.
 
-Two entries carry an "usually". `reshape` returns a view when the result can be strided over the existing layout, and copies when it cannot &mdash; typically after a transpose. `ravel` is the same. Neither tells you which happened, which is why the check below matters.
+Two entries carry an "often". `reshape` returns a view when the result can be strided over the existing layout. Copies when it can't. Often after a transpose. `ravel` is the same. Neither tells you which happened. This Is why the check below matters.
 
 ## Checking
 
 `np.shares_memory(a, b)` is the honest answer, and the one to use.
 
-`b.base` points at the array a view derives from, or `None` for a copy. It is informative but can be a chain &mdash; a view of a view has a base that is itself a view &mdash; so it is not a reliable equality test.
+`b.base` points at the array a view derives from, or `None` for a copy. It's helpful but can be a chain. A view of a view has a base that is itself a view. So it isn't a solid equality test.
 
 `b.flags["OWNDATA"]` says whether the array owns its buffer.
 
-`np.may_share_memory` is a cheap conservative check: it can say True when it is merely unsure. That makes it right for a fast guard in library code and wrong for a definite answer.
+`np.may_share_memory` is a cheap conservative check: it can say True when it's merely unsure. That makes it right for a fast guard in library code and wrong for a definite answer.
 
 ## The bug
 
-The practical consequence is a function that modifies its caller's data without saying so.
+The hands-on result is a function that modifies its caller's data without saying so.
 
 ```python
 def normalise(data):
@@ -3655,103 +3655,103 @@ def normalise(data):
     return data
 ```
 
-`data[1:]` is a view. `-=` writes in place. The caller's array is now different, and nothing in the signature suggested it would be.
+`data[1:]` is a view. `-=` writes in place. The caller's array is now other. Nothing in the signature suggested it would be.
 
-This is easy to write by accident, because each step looks innocent, and hard to spot in review. Two defences:
+This is easy to write by accident. Each step looks innocent. Hard to spot in review. Two defences:
 
-**Copy at the boundary** when a function should not modify its input. `data = data.copy()` at the top is cheap insurance for small arrays and a deliberate decision for large ones.
+**Copy at the boundary** when a function shouldn't modify its input. `data = data.copy()` at the top is cheap insurance for small arrays and a deliberate choice for large ones.
 
-**Say so in the name** when a function does modify in place. NumPy's own convention is that in-place variants are explicit &mdash; `np.sort` returns a sorted copy, `a.sort()` sorts in place.
+**Say so in the name** when a function does modify in place. NumPy's own rule is that in-place variants are clear. `np.sort` returns a sorted copy, `a.sort()` sorts in place.
 
 ## Memory: a view keeps its base alive
 
-A view holds a reference to the array it came from, so the whole buffer stays in memory as long as any view of it exists.
+A view holds a link to the array it came from. The whole buffer stays in memory if any view of it exists.
 
-Slice one row out of an 8 MB array and keep it: you are keeping 8 MB, not 4 KB.
+Slice one row out of an 8 MB array and keep it: you're keeping 8 MB, not 4 KB.
 
-That matters when you are extracting a small piece of something large to hold on to &mdash; a filtered subset, a header, one channel. `copy()` releases the rest. It is exactly the same shape of problem as holding a slice of a huge Python string, and it shows up in long-running processes as memory that never comes back.
+That matters when you're extracting a small piece of a thing large to hold on to. A filtered subset, a header, one channel. `copy()` releases the rest. It's just the same shape of problem as holding a slice of a huge Python string. It shows up in long-running processes as memory that never comes back.
 
 ## When to copy deliberately
 
-**Crossing an API boundary** where the caller should not see your modifications, or you should not see theirs.
+**Crossing an API boundary** where the caller shouldn't see your changes, or you shouldn't see theirs.
 
-**Keeping something small from something large**, so the large thing can be freed.
+**Keeping a thing small from a thing large**. So The large thing can be freed.
 
-**Before an in-place loop** over data you did not create.
+**Before an in-place loop** over data you didn't create.
 
-**When you want a guarantee** rather than the "usually a view" behaviour of `reshape` and `ravel`.
+**When you want a promise** rather than the "often a view" action of `reshape` and `ravel`.
 
-Everywhere else, views are the point. They are why slicing a gigabyte array costs nothing and why NumPy code can pass windows around freely. The goal is not to avoid them but to know which one you are holding.
+all over else, views are the point. They're why slicing a gigabyte array costs nothing and why NumPy code can pass windows around freely. The goal isn't to avoid them but to know which one you're holding.
 
 ## The two "usually" cases
 
-Two operations in the view column carry a qualifier, and both are worth understanding rather than memorising.
+Two steps in the view column carry a qualifier. Both are worth understanding rather than storing.
 
-`reshape` returns a view when the new shape can be walked with a regular stride over the existing memory. On a freshly created contiguous array, that is always. After a transpose, it usually is not &mdash; the buffer is being read column-first, and flattening it row-first requires gathering scattered values.
+`reshape` returns a view when the new shape can be walked with a regular stride over the existing memory. On a freshly created contiguous array, that is always. After a transpose, it often isn't. The buffer is being read column-first. Flattening it row-first needs gathering scattered values.
 
-`ravel` is the same. `flatten` is the version that always copies, and its existence is really just a way of asking for the guarantee.
+`ravel` is the same. `flatten` is the version that always copies. Its existence is really just a way of asking for the promise.
 
-If you need the opposite guarantee &mdash; a view or an error, never a silent copy &mdash; assign to `.shape` directly. `a.shape = (3, 4)` raises if a view is impossible, which turns an invisible performance problem into a visible failure.
+If you need the opposite promise. A view or an error, never a silent copy. Assign to `.shape` right. `a.shape = (3, 4)` raises if a view is hopeless. This Turns an invisible speed problem into a visible failure.
 
 ## copy is shallow, in the way that matters
 
-`a.copy()` duplicates the buffer, and for a numeric array that is a complete, independent copy.
+`a.copy()` copies the buffer, and for a numeric array that is a full, split copy.
 
-For an **object** array it is not. The new array has its own array of pointers, but those pointers lead to the same Python objects. Modifying one of those objects is visible through both arrays.
+For an **object** array it isn't. The new array has its own array of pointers. Those pointers lead to the same Python objects. Modifying one of those objects is visible through both arrays.
 
-`copy.deepcopy(a)` from the standard library duplicates the objects too.
+`copy.deepcopy(a)` from the standard library copies the objects too.
 
-This only arises with `dtype=object`, which is uncommon and generally worth avoiding, but the failure is confusing when it happens because `copy()` did exactly what its name suggests at the level it operates on.
+This only arises with `dtype=object`. This Is uncommon and often worth avoiding. The failure is confusing when it happens because `copy()` did just what its name suggests at the level it operates on.
 
 ## In-place operations on a fancy index
 
-There is a subtle failure that is worth knowing before it costs you an afternoon.
+There's a subtle failure that is worth knowing before it costs you an afternoon.
 
 ```python
 a[[0, 0, 1]] += 1
 ```
 
-You might expect element 0 to be incremented twice. It is incremented **once**.
+You might expect element 0 to be incremented twice. It's incremented **once**.
 
-The reason is that this expands to a fetch, an add, and a store: `a[idx] = a[idx] + 1`. The fetch produces a copy containing element 0 twice, both copies get 1 added, and then both are written back to the same place &mdash; the second overwriting the first.
+this expands to a fetch, an add. A store: `a[idx] = a[idx] + 1`. The fetch makes a copy holding element 0 twice, both copies get 1 added. Then both are written back to the same place. The second overwriting the first.
 
-`np.add.at(a, [0, 0, 1], 1)` is the unbuffered version that does what the syntax suggests, incrementing element 0 twice. Every ufunc has an `.at` method for this.
+`np.add.at(a, [0, 0, 1], 1)` is the unbuffered version that does what the syntax suggests, incrementing element 0 twice. each ufunc has an `.at` method for this.
 
-This matters in any histogram-like accumulation where indices repeat, and the wrong version produces plausible undercounts rather than an error.
+This matters in any histogram-like build-up where indices repeat. The wrong version makes plausible undercounts rather than an error.
 
 ## Tracking down a mutation bug
 
 The symptom is always the same: an array changed and nothing in the visible code changed it.
 
-The diagnosis is mechanical.
+The diagnosis is rote.
 
-**Find every place the array was derived from something else.** A slice, a reshape, a transpose, a `ravel` &mdash; each is a candidate.
+**Find each place the array was derived from a thing else.** A slice, a reshape, a transpose, a `ravel`. Each is a pick.
 
-**Check with `np.shares_memory`.** Between the array that changed and every candidate source. This is definitive.
+**Check with `np.shares_memory`.** Between the array that changed and each pick source. This is definitive.
 
-**Look for in-place operators on the shared side.** `+=`, `-=`, `*=`, `sort()`, `fill()`, and assignment into a slice. Anything that modifies rather than rebinding.
+**Look for in-place ops on the shared side.** `+=`, `-=`, `*=`, `sort()`, `fill()`. Set into a slice. Anything that modifies rather than rebinding.
 
-**Check function boundaries.** A function that takes an array and slices it is the most common origin, because the mutation is one level away from where you are looking.
+**Check function boundaries.** A function that takes an array and slices it's the most common origin. The mutation is one level away from where you're looking.
 
-The fix is nearly always a `copy()` at the boundary, and the question of *which* boundary is answered by deciding who owns the data.
+The fix is nearly always a `copy()` at the boundary. The question of *which* boundary is answered by deciding who owns the data.
 
 ## An ownership convention
 
-Most of these problems disappear under a simple rule, applied consistently:
+Most of these problems disappear under a simple rule, applied always:
 
-**A function does not modify its arguments unless its name says so.**
+**A function doesn't modify its args unless its name says so.**
 
-NumPy follows this itself. `np.sort` returns a sorted copy; `a.sort()` sorts in place. `np.append` returns a new array. The function forms are safe, the method forms are not, and the distinction is reliable enough to lean on.
+NumPy follows this itself. `np.sort` returns a sorted copy. `a.sort()` sorts in place. `np.append` returns a new array. The function forms are safe, the method forms aren't. The gap is solid enough to lean on.
 
-For your own code, that means copying at the top of any function that will modify what it was given &mdash; or, better, not modifying it at all and returning a new array.
+For your own code, that means copying at the top of any function that will modify what it was given. Or, better, not modifying it at all and returning a new array.
 
-The exception is a deliberate in-place API for large data, where copying would defeat the purpose. Those functions should say so in the name, take the output array explicitly, or both. `out=` is NumPy's own answer to this, and it is a good pattern to copy: the caller supplies the destination, so nobody is surprised about what gets written.
+The exception is a deliberate in-place API for large data. Here Copying would defeat the purpose. Those functions should say so in the name, take the output array by name, or both. `out=` is NumPy's own answer to this. It's a good pattern to copy. The caller supplies the destination. No one is surprised about what gets written.
 
 ## When views are the point
 
-None of this is an argument against views. They are the reason NumPy can pass windows of large arrays around for free, and the reason slicing a gigabyte array costs nothing.
+None of this is an arg against views. They're the reason NumPy can pass windows of large arrays around for free. The reason slicing a gigabyte array costs nothing.
 
-The goal is not to copy defensively everywhere &mdash; that would discard the main benefit &mdash; but to know which one you are holding at the moments it matters: across a function boundary, before an in-place loop, and when keeping something small from something large.
+The goal isn't to copy defensively all over. That would discard the main gain. But to know which one you're holding at the moments it matters. Across a function boundary, before an in-place loop. When keeping a thing small from a thing large.
 
 ## A quick reference
 
@@ -3763,39 +3763,39 @@ The goal is not to copy defensively everywhere &mdash; that would discard the ma
 
 **Neither**: in-place operations, which return nothing and modify the buffer.
 
-The underlying rule makes the list predictable: if the selection can be described by a start, a shape and a stride per axis, it is a view. If the positions are scattered, it cannot be, so it copies.
+The underlying rule makes the list predictable: if the pick can be given by a start, a shape and a stride per axis, it's a view. If the spots are scattered, it can't be, so it copies.
 
 ## Why `astype` always copies
 
 Even `a.astype(np.float64)` on an array that is already `float64` returns a copy by default. That surprises people who expect it to be a no-op.
 
-`astype(dtype, copy=False)` returns the original when no conversion is needed. That is the form to use in a function that normalises its input, where copying every call is waste.
+`astype(dtype, copy=False)` returns the first when no conversion is needed. That is the form to use in a function that norms its input. Here Copying each call is waste.
 
-The default of copying is defensive: `astype` is usually called to produce something the caller will modify, and returning a shared array would make that dangerous.
+The default of copying is defensive: `astype` is often called to give a thing the caller will modify. Returning a shared array would make that dangerous.
 
 ## Checking, once more
 
 `np.shares_memory(a, b)` &mdash; definitive, and the one to use.
 
-`np.may_share_memory(a, b)` &mdash; conservative and cheap; can say True when unsure. Right for a guard, wrong for an answer.
+`np.may_share_memory(a, b)` &mdash; conservative and cheap. Can say True when unsure. Right for a guard, wrong for an answer.
 
-`a.base` &mdash; the array a view derives from, or None. Informative, but a view of a view has a base that is itself a view, so it is not an equality test.
+`a.base` &mdash; the array a view derives from, or None. Helpful. But A view of a view has a base that is itself a view. It isn't an equality test.
 
 `a.flags["OWNDATA"]` &mdash; whether the array owns its buffer.
 
-`a.flags` in full also reports contiguity, which is what determines whether the next `reshape` or `ravel` will copy.
+`a.flags` in full also reports contiguity. This Is what finds whether the next `reshape` or `ravel` will copy.
 
 ## The habits that prevent the bugs
 
-**Copy at the boundary** of any function that will modify what it was given, unless the name says otherwise.
+**Copy at the boundary** of any function that will modify what it was given, unless the name says else.
 
 **Follow NumPy's own convention**: functions return new arrays, methods modify in place. `np.sort` versus `a.sort()`. Making your own code follow the same rule means callers can predict it without reading the body.
 
-**Copy deliberately when keeping something small from something large**, so the base can be freed.
+**Copy on purpose when keeping a thing small from a thing large**. The base can be freed.
 
-**Check with `shares_memory`** whenever a mutation appears from nowhere. It is the fastest route from symptom to cause, and it gives a definite answer where reasoning about which operations copy gives a probable one.
+**Check with `shares_memory`** when a mutation appears from nowhere. It's the fastest route from symptom to cause. It gives a definite answer where thinking about which steps copy gives a probable one.
 
-None of this argues against views. They are why slicing a gigabyte array is free and why array code can pass windows around without thought. The goal is to know which one you are holding at the three moments it matters: across a function boundary, before modifying in place, and when keeping a fragment of something large.
+None of this argues against views. They're why slicing a gigabyte array is free and why array code can pass windows around without thought. The goal is to know which one you're holding at the three moments it matters. Across a function boundary, before modifying in place. When keeping a fragment of a thing large.
 ''',
     [
         {"q": "Which of these returns a copy rather than a view?",
@@ -3968,59 +3968,59 @@ print("Every concatenate allocates a new array and copies everything so far.")''
     ],
     '''
 title: Stacking and Splitting
-intro: Joining along an existing axis or a new one, and why those are different functions.
+intro: Joining along an existing axis or a new one. Why those are other functions.
 
 ## Two different questions
 
-You have several arrays and want one. There are two distinct things that could mean, and NumPy gives them separate functions rather than guessing.
+You've a few arrays and want one. There are two distinct things that could mean. NumPy gives them split functions rather than guessing.
 
-**`concatenate`** joins along an axis that already exists. Two `(2, 3)` arrays concatenated on axis 0 give `(4, 3)` &mdash; more rows, same number of dimensions.
+**`concatenate`** joins along an axis that already exists. Two `(2, 3)` arrays concatenated on axis 0 give `(4, 3)`. More rows, same number of dims.
 
-**`stack`** creates a new axis. The same two arrays stacked give `(2, 2, 3)` &mdash; a pile of two frames, one dimension more than the inputs.
+**`stack`** creates a new axis. The same two arrays stacked give `(2, 2, 3)`. A pile of two frames, one dim more than the inputs.
 
-Asking which you want is the first step, and the answer is usually obvious once phrased that way: appending records is concatenation; collecting frames or samples into a batch is stacking.
+Asking which you want is the first step. The answer is often obvious once phrased that way. Appending records is joining. Collecting frames or samples into a batch is stacking.
 
 ## What must match
 
-`concatenate` requires every axis **except the joining one** to agree. Joining on axis 0 needs matching column counts; joining on axis 1 needs matching row counts.
+`concatenate` needs each axis **except the joining one** to agree. Joining on axis 0 needs matching column counts. Joining on axis 1 needs matching row counts.
 
-`stack` is stricter: all inputs must have exactly the same shape, since they are becoming parallel slices of a new axis.
+`stack` is stricter: all inputs must have just the same shape. They're turning parallel slices of a new axis.
 
-The error messages name the mismatch, and reading them rather than guessing usually locates the problem immediately.
+The error messages name the mismatch. Reading them rather than guessing often locates the problem at once.
 
 ## The convenience functions
 
-`vstack` stacks vertically, `hstack` horizontally, `dstack` along the third axis. For 2-D input they are just `concatenate` with a fixed axis.
+`vstack` stacks vertically, `hstack` flatly, `dstack` along the third axis. For 2-D input they're just `concatenate` with a fixed axis.
 
 For **1-D input they diverge**, and this is where they cause trouble.
 
-`np.vstack([a, b])` on two length-3 arrays gives `(2, 3)` &mdash; it promotes each to a row.
+`np.vstack([a, b])` on two length-3 arrays gives `(2, 3)`. It promotes each to a row.
 
-`np.hstack([a, b])` gives `(6,)` &mdash; it joins them end to end, because axis 1 does not exist so it falls back to axis 0.
+`np.hstack([a, b])` gives `(6,)` &mdash; it joins them end to end. Axis 1 doesn't exist so it falls back to axis 0.
 
-People reaching for `hstack` to make two columns get one long array instead. `column_stack` is the function that does what they meant: it turns 1-D arrays into columns of a 2-D result.
+People reaching for `hstack` to make two columns get one long array instead. `column_stack` is the function that does what they meant. It turns 1-D arrays into columns of a 2-D result.
 
-The general advice: use `concatenate` or `stack` with an explicit `axis` when the dimensionality might vary. The convenience names are fine when you know exactly what shapes you have.
+The general advice: use `concatenate` or `stack` with an clear `axis` when the dimensionality might vary. The convenience names are fine when you know just what shapes you've.
 
 ## Splitting
 
-`np.split(a, n, axis=0)` divides into `n` equal parts and **raises** if the length does not divide exactly. That strictness is useful &mdash; an uneven split is usually a sign that something upstream is not the size you assumed.
+`np.split(a, n, axis=0)` cuts into `n` equal parts and **raises** if the length doesn't divide just. That strictness is handy. An uneven split is often a sign that a thing upstream isn't the size you assumed.
 
-`np.array_split` allows uneven parts, distributing the remainder across the first few. Use it when uneven is genuinely acceptable, such as chunking work for parallel processing.
+`np.array_split` allows uneven parts, distributing the remainder across the first few. Use it when uneven is truly acceptable, such as chunking work for parallel handling.
 
-`split` also accepts a list of positions rather than a count: `np.split(a, [3, 7])` cuts before index 3 and before index 7, giving three pieces. That is often more natural than computing a count.
+`split` also accepts a list of spots rather than a count: `np.split(a, [3, 7])` cuts before index 3 and before index 7, giving three pieces. That is often more natural than finding a count.
 
-The pieces are **views**, not copies, which is worth knowing: splitting a large array is free, and writing into a piece writes into the original.
+The pieces are **views**, not copies. This Is worth knowing. Splitting a large array is free. Writing into a piece writes into the first.
 
 ## Do not build in a loop
 
 The same rule as `np.append`, for the same reason.
 
-Concatenating inside a loop allocates a new array and copies everything accumulated so far, on every iteration. That is quadratic, and the last editor measures the difference.
+Concatenating inside a loop allocates a new array and copies all built up so far, on each loop. That is quadratic. The last editor measures the gap.
 
-Collect into a Python **list** and call `stack` or `concatenate` once at the end. Lists append cheaply; arrays do not append at all.
+Collect into a Python **list** and call `stack` or `concatenate` once at the end. Lists append cheaply. Arrays don't append at all.
 
-If you know the final size in advance, better still: allocate with `np.empty` and assign into slices. That avoids even the single large copy.
+If you know the final size in advance, better still. Allocate with `np.empty` and assign into slices. That avoids even the single large copy.
 
 ## Choosing
 
@@ -4028,45 +4028,45 @@ Appending records of the same width: `concatenate(axis=0)`.
 
 Adding columns to a table: `concatenate(axis=1)`, or `column_stack` for 1-D inputs.
 
-Collecting frames, samples or channels into a batch: `stack`, with an explicit axis.
+Collecting frames, samples or channels into a batch: `stack`, with an clear axis.
 
-Undoing any of those: `split` when the division is exact, `array_split` when it is not.
+Undoing any of those: `split` when the division is exact, `array_split` when it isn't.
 
-And in every case, if the joining is happening inside a loop, the answer is to move it outside.
+And in each case, if the joining is happening inside a loop, the answer is to move it outside.
 
 ## r_ and c_
 
-`np.r_` and `np.c_` are index-expression shortcuts, and they look strange because they use square brackets rather than parentheses.
+`np.r_` and `np.c_` are index-formula shortcuts. They look strange because they use square brackets rather than parentheses.
 
-`np.r_[a, b]` concatenates along the first axis. `np.c_[a, b]` stacks as columns, equivalent to `column_stack`.
+`np.r_[a, b]` concatenates along the first axis. `np.c_[a, b]` stacks as columns, equal to `column_stack`.
 
-They also accept slice syntax, so `np.r_[0:5, 10, 20:23]` builds an array from a mix of ranges and literals in one expression. That is genuinely convenient for constructing index arrays and test data.
+They also accept slice syntax. So `np.r_[0:5, 10, 20:23]` builds an array from a mix of ranges and literals in one formula. That is truly convenient for making index arrays and test data.
 
-They are compact rather than clear, and they show up more in older code and in interactive sessions than in libraries. Worth recognising; not worth preferring over the named functions in code others will read.
+They're compact rather than clear, and they show up more in older code and in interactive sessions than in libraries. Worth recognising. Not worth preferring over the named functions in code others will read.
 
 ## tile and repeat
 
-Both make an array bigger by duplication, and they differ in a way that is easy to state and easy to forget.
+Both make an array bigger by duplication. They differ in a way that is easy to state and easy to forget.
 
-`np.tile(a, n)` repeats the whole array n times: `[1, 2]` becomes `[1, 2, 1, 2]`.
+`np.tile(a, n)` repeats the whole array n times: `[1, 2]` turns `[1, 2, 1, 2]`.
 
-`np.repeat(a, n)` repeats each element n times: `[1, 2]` becomes `[1, 1, 2, 2]`.
+`np.repeat(a, n)` repeats each element n times: `[1, 2]` turns `[1, 1, 2, 2]`.
 
-`tile` accepts a tuple to repeat along several axes, which is how you build a checkerboard or replicate a small pattern across a grid.
+`tile` accepts a tuple to repeat along a few axes. This Is how you build a checkerboard or replicate a small pattern across a grid.
 
-`repeat` accepts an `axis` and a per-element count, so `np.repeat(rows, counts, axis=0)` expands a table according to a count column &mdash; the standard way to turn aggregated data back into one row per observation.
+`repeat` accepts an `axis` and a per-element count. `np.repeat(rows, counts, axis=0)` expands a table per to a count column. The standard way to turn aggregated data back into one row per finding.
 
-Neither is a substitute for broadcasting. If you are tiling an array purely so that its shape matches another one for an arithmetic operation, broadcasting will do it without allocating anything, and the tile is wasted memory.
+Neither is a substitute for broadcasting. If you're tiling an array purely so that its shape matches another one for an math step, broadcasting will do it without allocating anything. The tile is wasted memory.
 
 ## Padding
 
 `np.pad(a, width, mode)` adds elements around the edges.
 
-`width` can be a single number, a pair for before and after, or a pair per axis. The nesting gets confusing quickly, and it is worth checking the result's shape the first time on any new call.
+`width` can be a single number, a pair for before and after, or a pair per axis. The nesting gets confusing quickly. It's worth checking the result's shape the first time on any new call.
 
-The `mode` argument covers the cases that would otherwise be fiddly: `"constant"` with a `constant_values` argument, `"edge"` to repeat the border, `"reflect"` and `"symmetric"` to mirror, and `"wrap"` to tile.
+The `mode` arg covers the cases that would else be fiddly: `"constant"` with a `constant_values` arg, `"edge"` to repeat the border, `"reflect"` and `"even"` to mirror, and `"wrap"` to tile.
 
-This is how you implement boundary conditions for a convolution or a stencil without writing an index-clamping branch, and it is one of the functions that quietly removes a lot of code.
+This is how you run boundary rules for a conv or a stencil without writing an index-clamping branch. It's one of the functions that quietly drops a lot of code.
 
 ## block, for nested assembly
 
@@ -4077,19 +4077,19 @@ np.block([[A, B],
           [C, D]])
 ```
 
-produces the block matrix, provided the pieces have compatible shapes. It is far clearer than the equivalent chain of `hstack` inside `vstack`, and it is the right tool for assembling a matrix from named submatrices &mdash; a covariance built from blocks, a system of equations assembled from parts.
+makes the block mat, given the pieces have matching shapes. It's far clearer than the equal chain of `hstack` inside `vstack`. It's the right tool for assembling a mat from named submatrices. A co-var built from blocks, a system of equations assembled from parts.
 
 ## Choosing among the joins
 
-The functions overlap enough to be worth a summary.
+The functions share enough to be worth a summary.
 
-**`concatenate`** &mdash; the general form. Explicit axis, works on any dimensionality, no surprises. Reach for this when the dimensionality might vary or when clarity matters.
+**`concatenate`** &mdash; the general form. clear axis, works on any dimensionality, no surprises. Reach for this when the dimensionality might vary or when clarity matters.
 
 **`stack`** &mdash; when a new axis is what you want. Collecting frames, samples or repeated runs into a batch.
 
-**`vstack` / `hstack` / `dstack`** &mdash; conveniences with a fixed axis. Safe on 2-D, and divergent on 1-D in a way that catches people. Fine when you know the shapes exactly.
+**`vstack` / `hstack` / `dstack`**. Conveniences with a fixed axis. Safe on 2-D. Divergent on 1-D in a way that catches people. Fine when you know the shapes just.
 
-**`column_stack`** &mdash; turns 1-D arrays into columns, which is what people usually want from `hstack` and do not get.
+**`column_stack`** &mdash; turns 1-D arrays into columns. This Is what people often want from `hstack` and don't get.
 
 **`block`** &mdash; nested assembly from named pieces.
 
@@ -4099,25 +4099,25 @@ And the rule that applies to all of them: none belongs inside a loop. Collect in
 
 ## Splitting, in practice
 
-The pieces returned by `split` are **views**, so splitting a large array is free and writing into a piece writes into the original. That is usually convenient and occasionally surprising, and it follows the same rules as any other slice.
+The pieces returned by `split` are **views**. Splitting a large array is free and writing into a piece writes into the first. That is often convenient and at times surprising. It follows the same rules as any other slice.
 
-`array_split` distributes an uneven remainder across the first pieces, so splitting 10 into 3 gives lengths 4, 3, 3. That is deterministic, which matters if two processes split the same data independently and must agree.
+`array_split` distributes an uneven remainder across the first pieces. Splitting 10 into 3 gives lengths 4, 3, 3. That is fixed. This Matters if two processes split the same data on its own and must agree.
 
-For chunking work rather than dividing it evenly, computing the boundaries yourself and passing them as a list is often clearer than asking for a count &mdash; `np.split(a, range(0, len(a), chunk))` cuts at fixed intervals regardless of whether the total divides evenly.
+For chunking work rather than cutting it evenly, finding the boundaries yourself and passing them as a list is often clearer than asking for a count. `np.split(a, range(0, len(a), chunk))` cuts at fixed intervals even so of whether the total cuts evenly.
 
 ## Joining arrays of different dtypes
 
-Concatenating an integer array with a float array gives a float result, following the same promotion rules as arithmetic.
+Concatenating an int array with a float array gives a float result, following the same promotion rules as math.
 
-That is usually what you want, and occasionally not. Joining an `int64` array of identifiers with a `float64` array of measurements produces a float array in which large identifiers may no longer be exactly representable.
+That is often what you want. At times not. Joining an `int64` array of identifiers with a `float64` array of readings makes a float array in which large identifiers may no longer be just representable.
 
-`dtype=` on `concatenate` forces the result type explicitly, and `casting="no"` makes a mismatch an error rather than a silent promotion. In code where the dtype matters, being explicit costs one argument and removes a whole category of surprise.
+`dtype=` on `concatenate` forces the result type by name. `casting="no"` makes a mismatch an error rather than a silent promotion. In code where the dtype matters, being clear costs one arg and drops a whole group of surprise.
 
-Joining a fixed-width string array with a longer one widens to fit, which is the one place NumPy strings do the accommodating thing rather than truncating.
+Joining a fixed-width string array with a longer one widens to fit. This Is the one place NumPy strings do the accommodating thing rather than truncating.
 
 ## Building an output array up front
 
-When the final size is known, neither joining nor appending is necessary.
+When the final size is known, neither joining nor appending is needed.
 
 ```python
 out = np.empty((n_rows, n_cols))
@@ -4125,25 +4125,25 @@ for i, row in enumerate(source):
     out[i] = compute(row)
 ```
 
-One allocation, no copying, and the slices being assigned into are views. This is the fastest form when a loop is unavoidable, and it is clearer than accumulating pieces to join later.
+One allocation, no copying, and the slices being assigned into are views. This is the fastest form when a loop is unavoidable, and it's clearer than building up pieces to join later.
 
-`np.empty` is right here because every element is written. If some rows might be skipped, `np.zeros` or `np.full(shape, np.nan)` makes the unfilled entries visible rather than leaving whatever was in memory.
+`np.empty` is right here because each element is written. If some rows might be skipped, `np.zeros` or `np.full(shape, np.nan)` makes the unfilled entries visible rather than leaving what was in memory.
 
-Preallocating also forces you to state the output shape, which frequently surfaces an error in the reasoning before any code runs.
+Preallocating also forces you to state the output shape. This Often surfaces an error in the thinking before any code runs.
 
 ## Splitting for parallel work
 
-`np.array_split(a, n)` is the natural way to divide data among n workers. It handles the case where the length does not divide evenly, distributing the remainder across the first pieces deterministically.
+`np.array_split(a, n)` is the natural way to divide data among n workers. It handles the case where the length doesn't divide evenly, distributing the remainder across the first pieces deterministically.
 
-Because the pieces are views, splitting costs nothing &mdash; but views cannot cross a process boundary, so multiprocessing will copy them anyway when pickling. For thread-based parallelism the views are shared directly, which is one of the reasons threads are attractive for NumPy work.
+Because the pieces are views, splitting costs nothing. But views can't cross a process boundary. Multiprocessing will copy them anyway when pickling. For thread-based parallelism the views are shared right. This Is one of the reasons threads are attractive for NumPy work.
 
-For chunking rather than dividing &mdash; fixed-size pieces, however many that turns out to be &mdash; passing explicit boundaries is clearer:
+For chunking rather than cutting. Fixed-size pieces. Many that turns out to be &mdash; passing clear boundaries is clearer:
 
 ```python
 np.split(a, range(chunk, len(a), chunk))
 ```
 
-That cuts every `chunk` elements and leaves a shorter final piece, which is usually what "process in batches of 1000" means.
+That cuts each `chunk` elements and leaves a shorter final piece. This Is often what "process in batches of 1000" means.
 
 ## The summary
 
@@ -4161,13 +4161,13 @@ That cuts every `chunk` elements and leaves a shorter final piece, which is usua
 
 **Dividing**: `split` for exact division, `array_split` for uneven, explicit boundaries for fixed-size chunks.
 
-And the rule that overrides all of them: none of these belongs inside a loop that runs once per element. Collect into a Python list and join once, or preallocate and assign into slices.
+And the rule that replaces all of them. None of these belongs inside a loop that runs once per element. Collect into a Python list and join once, or preallocate and assign into slices.
 
 ## A closing note
 
-Joining arrays is one of the places where NumPy offers several functions for what feels like one job, and the abundance is more confusing than helpful at first.
+Joining arrays is one of the places where NumPy offers a few functions for what feels like one job. The abundance is more confusing than helpful at first.
 
-The way through it is the question at the top of this module: does the result have the same number of dimensions as the inputs, or one more? Everything else is a convenience wrapper over that decision, and `concatenate` and `stack` with an explicit `axis` will do any of it correctly if you would rather not remember the rest.
+The way through it's the question at the top of this module. Does the result have the same number of dims as the inputs, or one more? all else is a convenience wrapper over that choice. `concatenate` and `stack` with an clear `axis` will do any of it right if you'd rather not note the rest.
 ''',
     [
         {"q": "What is the difference between `concatenate` and `stack`?",
@@ -4323,29 +4323,29 @@ title: Transpose and Moving Axes
 intro: Reordering axes without moving a single byte.
 ## Strides again
 
-An array knows how many bytes to step for each axis. Transposing swaps those numbers along with the shape, and the underlying buffer is untouched.
+An array knows how many bytes to step for each axis. Transposing swaps those numbers along with the shape. The underlying buffer is untouched.
 
-That is why `a.T` on a gigabyte array returns instantly. It is a view, and `np.shares_memory(a, a.T)` confirms it.
+That is why `a.T` on a gigabyte array returns instantly. It's a view, and `np.shares_memory(a, a.T)` confirms it.
 
-Everything else in this module follows from that one fact.
+all else in this module follows from that one fact.
 
 ## The 1-D trap
 
 `v.T` where `v` has shape `(3,)` gives shape `(3,)`. Nothing happens.
 
-There is no second axis to swap, so the operation is meaningless and NumPy performs it silently rather than raising. People coming from MATLAB or from linear algebra notation expect a column vector and get their input back.
+There's no second axis to swap. The step is meaningless and NumPy performs it silently rather than raising. People coming from MATLAB or from linear algebra form expect a column vector and get their input back.
 
-The fix is to add an axis: `v[:, None]` gives `(3, 1)`, and `v[None, :]` gives `(1, 3)`. `reshape(-1, 1)` does the same job.
+The fix is to add an axis: `v[:, None]` gives `(3, 1)`. `v[None, :]` gives `(1, 3)`. `reshape(-1, 1)` does the same job.
 
-This is also why an outer-style operation is written `v[:, None] - v` rather than `v.T - v`. The first broadcasts `(3,1)` against `(3,)` to give `(3,3)`; the second subtracts an array from itself and gives zeros.
+This is also why an outer-style step is written `v[:, None] - v` rather than `v.T - v`. The first broadcasts `(3,1)` against `(3,)` to give `(3,3)`. The second subtracts an array from itself and gives zeros.
 
 ## More than two axes
 
 `.T` reverses **all** axes. On shape `(2, 3, 4)` it gives `(4, 3, 2)`.
 
-That is well defined but rarely what anyone wants, because with three or more axes the interesting operation is usually moving one specific axis somewhere.
+That is well defined but rarely what anyone wants. With three or more axes the notable step is often moving one exact axis one spot.
 
-`a.transpose(2, 0, 1)` names the new order in terms of old positions: old axis 2 first, then old axis 0, then old axis 1. Reading it in that direction &mdash; "where does each new axis come from" &mdash; is the way to keep it straight.
+`a.transpose(2, 0, 1)` names the new order by old spots. Old axis 2 first, then old axis 0, then old axis 1. Reading it in that direction. "where does each new axis come from". Is the way to keep it straight.
 
 ## swapaxes and moveaxis
 
@@ -4353,31 +4353,31 @@ Both are clearer than counting.
 
 `np.swapaxes(a, 0, 2)` exchanges two axes and leaves the rest alone.
 
-`np.moveaxis(a, 0, -1)` takes axis 0 and puts it at the end, sliding the others along. This is the canonical fix for image layout: deep learning frameworks want `(channels, height, width)`, image libraries want `(height, width, channels)`, and `moveaxis` converts between them for free.
+`np.moveaxis(a, 0, -1)` takes axis 0 and puts it at the end, sliding the others along. This is the canonical fix for image layout. Deep learning frameworks want `(channels, height, width)`, image libraries want `(height, width, channels)`. `moveaxis` converts between them for free.
 
 Both return views.
 
 ## Contiguity, and the copy you did not ask for
 
-An array created by `reshape` on fresh data is **C-contiguous**: the last axis varies fastest and the elements sit in memory in the order you would read them.
+An array created by `reshape` on fresh data is **C-contiguous**. The last axis varies fastest and the elements sit in memory in the order you'd read them.
 
-Transposing breaks that. The transposed view is F-contiguous instead &mdash; the same buffer, read column-first.
+Transposing breaks that. The transposed view is F-contiguous instead. The same buffer, read column-first.
 
-Most operations do not care. But anything that needs a flat contiguous buffer must copy:
+Most steps don't care. But anything that needs a flat contiguous buffer must copy:
 
-`ravel()` returns a view when it can and a copy when it cannot. On a transposed array, it cannot.
+`ravel()` returns a view when it can and a copy when it can't. On a transposed array, it can't.
 
-`reshape` has the same behaviour, which is why "reshape returns a view" carries a *usually*.
+`reshape` has the same action. This Is why "reshape returns a view" carries a *often*.
 
-Neither warns you. If it matters &mdash; because the array is large, or because you were relying on writing through the result &mdash; check with `np.shares_memory`, or force the issue with `np.ascontiguousarray` so the copy is explicit and happens where you can see it.
+Neither warns you. If it matters. Because the array is large, or because you were leaning on writing through the result. Check with `np.shares_memory`, or force the issue with `np.ascontiguousarray` so the copy is clear and happens where you can see it.
 
 ## Transpose is not rotation
 
 This trips people up on image data.
 
-Transpose reflects along the main diagonal. Rotating a quarter turn is `np.rot90`. Mirroring is `np.flipud` (up-down) and `np.fliplr` (left-right).
+Transpose reflects along the main main-line. Rotating a quarter turn is `np.rot90`. Mirroring is `np.flipud` (up-down) and `np.fliplr` (left-right).
 
-They are related &mdash; a rotation is a transpose followed by a flip &mdash; but they are different operations, and reaching for `.T` to turn an image gives a mirrored result that looks almost right and is not.
+They're related &mdash; a rotation is a transpose followed by a flip &mdash; but they're other steps. Reaching for `.T` to turn an image gives a mirrored result that looks almost right and isn't.
 
 ## C order and F order, stated plainly
 
@@ -4387,11 +4387,11 @@ C order &mdash; NumPy's default, named for the C language &mdash; means the **la
 
 Fortran order means the **first** axis varies fastest. Column by column.
 
-A transposed C-ordered array is F-contiguous, because reading the transpose row by row is reading the original column by column. Nothing moved; the same bytes are simply described differently.
+A transposed C-sorted array is F-contiguous. Reading the transpose row by row is reading the first column by column. Nothing moved. The same bytes are simply given differently.
 
-Both flags can be true at once for a 1-D array or an array with a length-1 axis, and both can be false for a strided slice like `a[::2]`. `a.flags` reports all of it.
+Both flags can be true at once for a 1-D array or an array with a length-1 axis. Both can be false for a strided slice like `a[::2]`. `a.flags` reports all of it.
 
-Where this becomes practical: some LAPACK routines want Fortran order and will copy internally if they do not get it, and interfacing with Fortran or MATLAB-derived code sometimes requires `np.asfortranarray`. For everything else, staying in C order and not thinking about it is right.
+Where this turns hands-on: some LAPACK routines want Fortran order and will copy inside if they don't get it. Interfacing with Fortran or MATLAB-derived code at times needs `np.asfortranarray`. For all else, staying in C order and not thinking about it's right.
 
 ## expand_dims and squeeze at boundaries
 
@@ -4399,107 +4399,107 @@ The length-1 axis is the currency of shape negotiation between libraries.
 
 A model trained on batches expects `(batch, features)` and gets a single sample of shape `(features,)`. `x[None]` or `np.expand_dims(x, 0)` adds the batch axis.
 
-A result comes back as `(n, 1)` and the next function wants `(n,)`. `squeeze` removes it.
+A result comes back as `(n, 1)` and the next function wants `(n,)`. `squeeze` drops it.
 
-`expand_dims(a, axis)` is the explicit form of `a[None]`, and reads better when the axis position is computed rather than literal.
+`expand_dims(a, axis)` is the clear form of `a[None]`. Reads better when the axis spot is found rather than literal.
 
-`squeeze` with no argument removes **every** length-1 axis, which is the source of a genuinely nasty intermittent bug: a batch of one sample loses its batch dimension, so the code works for every batch size except one. Always name the axis &mdash; `squeeze(axis=1)` &mdash; in code that handles variable batch sizes.
+`squeeze` with no arg drops **each** length-1 axis. This Is the source of a truly nasty intermittent bug. A batch of one sample loses its batch dim. The code works for each batch size except one. Always name the axis. `squeeze(axis=1)`. In code that handles var batch sizes.
 
 ## einsum as general axis manipulation
 
-Once an operation needs a transpose, two `newaxis` insertions and a sum over a particular axis, `np.einsum` usually expresses it more clearly.
+Once an step needs a transpose, two `newaxis` insertions and a sum over a given axis, `np.einsum` often expresses it more clearly.
 
-The subscript string names an index for each axis of each operand and says which survive:
+The subscript string names an index for each axis of each operand and says which live:
 
-`"ij->ji"` is a transpose. `"ii->i"` extracts a diagonal. `"ij->j"` sums over rows. `"ij,jk->ik"` is matrix multiplication. `"bij,bjk->bik"` is batched matrix multiplication.
+`"ij->ji"` is a transpose. `"ii->i"` extracts a main-line. `"ij->j"` sums over rows. `"ij,jk->ik"` is mat product. `"bij,bjk->bik"` is batched mat product.
 
-Indices that appear on the left but not the right are summed over. Indices repeated between operands are matched and multiplied.
+Indices that appear on the left but not the right are summed over. Indices repeated between operands are matched and times'd.
 
-It is not always fast &mdash; for plain matrix products, `@` dispatches to a tuned BLAS routine and einsum may not. Its advantage is legibility: the string states the operation, where a chain of transposes and broadcasts states only the mechanics.
+It isn't always fast &mdash; for plain mat products, `@` dispatches to a tuned BLAS routine and einsum may not. Its edge is legibility. The string states the step. Here A chain of transposes and broadcasts states only the mechanics.
 
-`np.einsum_path` can be used to inspect and optimise the contraction order for expressions with several operands, where the order genuinely matters.
+`np.einsum_path` can be used to inspect and optimise the contraction order for expressions with a few operands. Here The order truly matters.
 
 ## The batch-axis convention
 
-Most numerical code follows one convention: **the batch axis comes first, and the axes being operated on come last**.
+Most numeric code follows one rule: **the batch axis comes first. The axes being operated on come last**.
 
 `(batch, height, width, channels)` for images in TensorFlow. `(batch, channels, height, width)` in PyTorch. `(samples, features)` for tabular data.
 
-The reason the operated-on axes go last is broadcasting: trailing axes align automatically, so a per-channel or per-feature parameter of shape `(channels,)` combines with the data without any index juggling. Put the channel axis first and the same operation needs `[:, None, None]`.
+The reason the operated-on axes go last is broadcasting. Trailing axes align on its own. A per-channel or per-feature param of shape `(channels,)` mixes with the data without any index juggling. Put the channel axis first and the same step needs `[:, None, None]`.
 
-`matmul` follows the same convention: it treats the last two axes as the matrix and broadcasts everything before them, so a `(batch, n, k) @ (k, m)` works directly.
+`matmul` follows the same rule: it treats the last two axes as the mat and broadcasts all before them. A `(batch, n, k) @ (k, m)` works right.
 
-Following the convention in your own arrays means broadcasting and `matmul` cooperate with you rather than requiring a transpose at every boundary.
+Following the rule in your own arrays means broadcasting and `matmul` cooperate with you rather than needing a transpose at each boundary.
 
 ## In practice
 
 Use `.T` freely on 2-D and never on 1-D.
 
-Use `moveaxis` or `swapaxes` on higher dimensions, because they name what you meant and `.T` reverses everything.
+Use `moveaxis` or `swapaxes` on higher dims. They name what you meant and `.T` reverses all.
 
-Remember that all of them return views over the same bytes, so a later `ravel` or `reshape` may copy without telling you &mdash; check with `np.shares_memory` when it matters, or force it with `np.ascontiguousarray`.
+note that all of them return views over the same bytes. A later `ravel` or `reshape` may copy without telling you. Check with `np.shares_memory` when it matters, or force it with `np.ascontiguousarray`.
 
-And keep the batch axis first. Most of the shape gymnastics people write is the cost of having put it somewhere else.
+And keep the batch axis first. Most of the shape gymnastics people write is the cost of having put it one spot else.
 
 ## Diagonals and axis-aware helpers
 
-`np.diagonal(a)` extracts the main diagonal and returns a view in modern NumPy &mdash; read-only, because writing to it has no consistent meaning across the strides involved.
+`np.main-line(a)` extracts the main main-line and returns a view in modern NumPy. Read-only. Writing to it has no steady meaning across the strides involved.
 
-`np.trace(a)` sums the diagonal without materialising it.
+`np.trace(a)` sums the main-line without materialising it.
 
-`np.fill_diagonal(a, value)` writes to the diagonal in place, which is the supported way to modify it. It is the standard step when building an adjacency or distance matrix that should have zeros on the diagonal.
+`np.fill_diagonal(a, value)` writes to the main-line in place. This Is the supported way to modify it. It's the standard step when building an adjacency or distance mat that should have zeros on the main-line.
 
-`offset` on `diagonal` selects the super- or sub-diagonals, which is how you extract a band.
+`offset` on `main-line` selects the super- or sub-diags. This Is how you extract a band.
 
 ## rollaxis, and why not to use it
 
-Older code uses `np.rollaxis`, which moves an axis but with argument semantics that are genuinely hard to reason about &mdash; the destination is interpreted differently depending on direction.
+Older code uses `np.rollaxis`. This Moves an axis but with arg semantics that are truly hard to reason about. The destination is read differently based on direction.
 
-`np.moveaxis` was added specifically to replace it, with the obvious semantics: source and destination, both plain positions.
+`np.moveaxis` was added namely to replace it, with the obvious semantics: source and destination, both plain spots.
 
-If you meet `rollaxis` in existing code, translating it to `moveaxis` and checking the resulting shape is usually worth doing while you are there. If you are writing new code, there is no reason to use it.
+If you meet `rollaxis` in existing code, translating it to `moveaxis` and checking the resulting shape is often worth doing while you're there. If you're writing new code, there's no reason to use it.
 
 ## Checking that a transform did what you meant
 
-Axis manipulation is the easiest place in NumPy to produce a result that has the right shape and the wrong contents.
+Axis handling is the easiest place in NumPy to give a result that has the right shape and the wrong contents.
 
 Two checks catch nearly all of it.
 
-**Verify a known element.** After `moveaxis(a, 0, -1)`, confirm that `b[i, j, k] == a[k, i, j]`. One assertion documents the transform better than a comment does.
+**Verify a known element.** After `moveaxis(a, 0, -1)`, confirm that `b[i, j, k] == a[k, i, j]`. One assertion docs the transform better than a comment does.
 
-**Use distinguishable test data.** `np.arange(24).reshape(2, 3, 4)` has a unique value in every position, so any misplacement is visible. An array of ones or of random values hides exactly the errors you are looking for.
+**Use distinguishable test data.** `np.arange(24).reshape(2, 3, 4)` has a unique value in each spot. Any misplacement is visible. An array of ones or of random values hides just the errors you're looking for.
 
-This is worth doing because the failure mode &mdash; correct shape, permuted contents &mdash; produces no error and often no obviously wrong output, just results that are subtly worse than they should be.
+This is worth doing because the failure mode. Correct shape, permuted contents. Makes no error and often no obviously wrong output, just results that are subtly worse than they should be.
 
 ## The summary
 
-`.T` &mdash; reverses all axes. Right for 2-D, wrong for most higher-dimensional intent, and silently a no-op on 1-D.
+`.T` &mdash; reverses all axes. Right for 2-D, wrong for most higher-dimensional intent. Silently a no-op on 1-D.
 
-`transpose(order)` &mdash; explicit permutation, read as "where each new axis comes from".
+`transpose(order)` &mdash; clear permutation, read as "where each new axis comes from".
 
 `swapaxes(i, j)` &mdash; exchange two, leave the rest.
 
-`moveaxis(src, dst)` &mdash; relocate one, slide the rest. The clearest of the four, and the right default for anything above 2-D.
+`moveaxis(src, dst)` &mdash; relocate one, slide the rest. The clearest of the four. The right default for anything above 2-D.
 
-`expand_dims` / `squeeze` &mdash; add and remove length-1 axes, with `squeeze` needing an explicit axis in any code that handles variable batch sizes.
+`expand_dims` / `squeeze` &mdash; add and drop length-1 axes, with `squeeze` needing an clear axis in any code that handles var batch sizes.
 
-`einsum` &mdash; when the index bookkeeping has become the substance of the operation.
+`einsum` &mdash; when the index bookkeeping has become the substance of the step.
 
-All of them return views. That is what makes them free, and it is also why a later `ravel` or `reshape` may copy without saying so &mdash; `np.shares_memory` when it matters, `np.ascontiguousarray` when you want the copy to happen somewhere visible.
+All of them return views. That is what makes them free. It's also why a later `ravel` or `reshape` may copy without saying so. `np.shares_memory` when it matters, `np.ascontiguousarray` when you want the copy to happen one spot visible.
 
 ## A closing note on cost
 
-Every operation in this module is free, and that is worth stating once more because it changes how you write code.
+each step in this module is free. That is worth stating once more because it changes how you write code.
 
-There is no reason to avoid a transpose, a `moveaxis` or an `expand_dims` on performance grounds. They adjust a handful of integers describing the array and return immediately, whatever its size.
+There's no reason to avoid a transpose, a `moveaxis` or an `expand_dims` on speed grounds. They adjust a handful of ints showing the array and return at once, what its size.
 
-The cost, when it comes, arrives later &mdash; at the point something needs contiguous memory and quietly copies. That is where to look when a pipeline is slower than the operations in it suggest, and `a.flags` plus `np.shares_memory` will tell you within a minute.
+The cost, when it comes, arrives later. At the point a thing needs contiguous memory and quietly copies. That is where to look when a pipeline is slower than the steps in it suggest. `a.flags` plus `np.shares_memory` will tell you within a minute.
 
 ## Where axis work fits
 
 Reordering axes is almost always a translation step: between how data arrived and how the next function wants it.
 
-That means the right question is rarely "how do I transpose this" but "what layout does the thing I am calling expect". Answering that first usually reveals that one `moveaxis` at the boundary replaces several scattered ones inside, and that keeping a single convention throughout removes most of them entirely.
+That means the right question is rarely "how do I transpose this" but "what layout does the thing I am calling expect". Answering that first often reveals that one `moveaxis` at the boundary replaces a few scattered ones inside. That keeping a single rule throughout drops most of them fully.
 ''',
     [
         {"q": "What does `.T` do to a 1-D array of shape (3,)?",
@@ -4657,29 +4657,29 @@ print("   ", np.isin(np.array([1, 5, 9]), np.array([2, 5, 8])))'''),
     ],
     '''
 title: Sorting and Searching
-intro: sort, argsort and searchsorted, and why the argument version is usually the one you need.
+intro: sort, argsort and searchsorted, and why the arg version is often the one you need.
 
 ## Copy or in place
 
 `np.sort(a)` returns a new sorted array and leaves `a` alone. `a.sort()` sorts `a` itself and returns `None`.
 
-That is NumPy's general convention for operations that have both forms, and it is worth relying on: if you see a bare method call with no assignment, it is modifying something.
+That is NumPy's general rule for steps that have both forms. It's worth leaning on. If you see a bare method call with no set, it's modifying a thing.
 
-There is no `reverse=` argument. Sort ascending and reverse with `[::-1]`, which is a free view.
+There's no `reverse=` arg. Sort ascending and reverse with `[::-1]`. This Is a free view.
 
 ## The axis default
 
-On a 2-D array, `sort()` sorts along the **last axis** &mdash; each row independently.
+On a 2-D array, `sort()` sorts along the **last axis**. Each row on its own.
 
-This is a genuinely dangerous default when the array is a table. Sorting a `(rows, columns)` array of records scrambles every row internally: the name column gets sorted, the salary column gets sorted, and the correspondence between them is destroyed.
+This is a truly dangerous default when the array is a table. Sorting a `(rows, columns)` array of records scrambles each row inside. The name column gets sorted, the salary column gets sorted. The correspondence between them is destroyed.
 
-`sort(axis=None)` flattens and does one global sort. `sort(axis=0)` sorts each column independently, which has the same problem in the other direction.
+`sort(axis=None)` flattens and does one global sort. `sort(axis=0)` sorts each column on its own. This Has the same problem in the other direction.
 
 **None of these sort rows as units.** For that you need `argsort` on a key column and then fancy indexing.
 
 ## argsort is the useful one
 
-`np.argsort(x)` returns the positions that would sort `x`.
+`np.argsort(x)` returns the spots that would sort `x`.
 
 That indirection is the point. Apply the same index array to any number of parallel arrays and they stay aligned:
 
@@ -4688,65 +4688,65 @@ order = np.argsort(score)
 names[order], score[order], dates[order]
 ```
 
-This is how you sort a table by a column. It is also how you produce a ranking, take the top n, or reorder anything that travels alongside the sorted values.
+This is how you sort a table by a column. It's also how you give a ranking, take the top n, or reorder anything that travels alongside the sorted values.
 
 Descending is `np.argsort(x)[::-1]`.
 
-One subtlety: the default sort is **quicksort**, which is not stable. Equal elements can come out in any order. Pass `kind="stable"` when ties must preserve their original relative order &mdash; for instance when you are sorting by a second key after already sorting by a first.
+One subtlety: the default sort is **quicksort**. This Isn't stable. Equal elements can come out in any order. Pass `kind="stable"` when ties must preserve their first scaled order. say when you're sorting by a second key after already sorting by a first.
 
 ## Several keys
 
-`np.lexsort` sorts by multiple keys, and the argument order reads backwards: the **last** array is the primary key.
+`np.lexsort` sorts by multiple keys, and the arg order reads backwards: the **last** array is the main key.
 
 `np.lexsort((salary, dept))` sorts by department, breaking ties by salary.
 
-Everyone gets this wrong the first time. The mnemonic that helps: the keys are applied in order from last to first, like a stable sort chain where the final pass dominates.
+all gets this wrong the first time. The mnemonic that helps. The keys are applied in order from last to first, like a stable sort chain where the final pass dominates.
 
 ## Only the top k
 
 Sorting 200,000 values to look at 5 of them is wasteful.
 
-`np.argpartition(x, -5)` rearranges so that the 5 largest occupy the last 5 slots, in linear time. It does **not** order them, and it does not order anything else &mdash; it only guarantees the partition boundary.
+`np.argpartition(x, -5)` rearranges so that the 5 largest occupy the last 5 slots, in linear time. It does **not** order them. It doesn't order anything else. It only promises the split boundary.
 
 If you need those five in order, sort just those five. That is five elements instead of two hundred thousand.
 
-The same trick works for the smallest k with a positive index, and for medians, which is what `np.median` uses internally.
+The same trick works for the smallest k with a plus index. For medians. This Is what `np.median` uses inside.
 
 ## searchsorted
 
-Given a sorted array, `np.searchsorted(edges, values)` returns where each value would be inserted to keep it sorted. It is a binary search, so it is fast even on large arrays.
+Given a sorted array, `np.searchsorted(edges, values)` returns where each value would be inserted to keep it sorted. It's a binary search. It's fast even on large arrays.
 
 Two uses come up constantly.
 
-**Bucketing.** Given cut points, `searchsorted` gives the bucket index for each value directly, and indexing a label array with the result assigns categories in one line. `side="right"` versus `side="left"` decides which bucket an exact boundary value falls into &mdash; the only case where they differ.
+**Bucketing.** Given cut points, `searchsorted` gives the bucket index for each value right. Indexing a label array with the result assigns groups in one line. `side="right"` versus `side="left"` decides which bucket an exact boundary value falls into. The only case where they differ.
 
-**Lookup.** Finding many values in a large sorted array is `O(m log n)` this way, against `O(mn)` for repeated comparisons.
+**Lookup.** Finding many values in a large sorted array is `O(m log n)` this way, against `O(mn)` for repeated checks.
 
-For pure membership testing where order does not matter, `np.isin` is simpler and does not require sorted input.
+For pure membership testing where order doesn't matter, `np.isin` is simpler and doesn't need sorted input.
 
 ## The mistakes
 
 **Sorting a table with `sort()`** and destroying the row correspondence. Use `argsort` on a key column.
 
-**Assuming stability.** The default is not stable; pass `kind="stable"` when it matters.
+**given steadiness.** The default isn't stable. Pass `kind="stable"` when it matters.
 
-**Getting `lexsort` backwards.** The last key is primary.
+**Getting `lexsort` backwards.** The last key is main.
 
-**Full sorting for a top-n.** `argpartition` exists precisely for that.
+**Full sorting for a top-n.** `argpartition` exists just for that.
 
 ## The sort kinds
 
-`kind` selects the algorithm, and the choice occasionally matters.
+`kind` selects the method, and the choice at times matters.
 
-`"quicksort"` is the default, an introsort in practice. Fastest on average, not stable, and its worst case is handled by falling back to heapsort.
+`"quicksort"` is the default, an introsort . Fastest on average, not stable. Its worst case is handled by falling back to heapsort.
 
-`"stable"` guarantees that equal elements keep their original relative order. It is what you need when sorting by a second key after already sorting by a first, since an unstable sort would discard the first ordering.
+`"stable"` promises that equal elements keep their first scaled order. It's what you need when sorting by a second key after already sorting by a first. An unstable sort would discard the first sorting.
 
-`"heapsort"` has a guaranteed worst case and uses no extra memory, which is occasionally the deciding factor.
+`"heapsort"` has a sure worst case and uses no extra memory. This Is at times the deciding factor.
 
 `"mergesort"` is an alias for `"stable"`.
 
-The performance difference is modest for most data. Stability is not a performance question, and when you need it, you need it.
+The speed gap is modest for most data. Steadiness isn't a speed question. When you need it, you need it.
 
 ## Sorting records
 
@@ -4756,122 +4756,122 @@ Structured arrays &mdash; arrays with named fields &mdash; can be sorted by fiel
 a.sort(order=["dept", "salary"])
 ```
 
-This is the closest NumPy comes to sorting a table by columns, and it works because the structured dtype makes each row a single comparable item.
+This is the closest NumPy comes to sorting a table by columns. It works because the structured dtype makes each row a single close item.
 
-For plain 2-D numeric arrays, there is no `order` argument, and the answer is the `argsort` idiom: sort the key column, apply the resulting index to the whole array with fancy indexing. `a[np.argsort(a[:, 2])]` sorts rows by the third column.
+For plain 2-D numeric arrays, there's no `order` arg. The answer is the `argsort` idiom. Sort the key column, apply the resulting index to the whole array with fancy indexing. `a[np.argsort(a[:, 2])]` sorts rows by the third column.
 
-For more than one key, `lexsort` produces the index and the same fancy-index application follows.
+For more than one key, `lexsort` makes the index and the same fancy-index use follows.
 
 ## where, nonzero, and finding things
 
-`np.nonzero(mask)` returns the indices of True elements, as a tuple with one array per axis. `np.where(mask)` with a single argument is the same function.
+`np.nonzero(mask)` returns the indices of True elements, as a tuple with one array per axis. `np.where(mask)` with a single arg is the same function.
 
-The tuple form is designed to be used as an index: `a[np.nonzero(mask)]` selects the matching elements. Unpacking it with `rows, cols = np.nonzero(mask)` gives coordinates.
+The tuple form is designed to be used as an index: `a[np.nonzero(mask)]` selects the matching elements. Unpacking it with `rows, cols = np.nonzero(mask)` gives coords.
 
-`np.flatnonzero(mask)` is the flat-index version, and is usually what you want for a 1-D array &mdash; it returns a plain array rather than a one-element tuple.
+`np.flatnonzero(mask)` is the flat-index version, and is often what you want for a 1-D array. It returns a plain array rather than a one-element tuple.
 
-For "the first element matching a condition", `np.argmax(mask)` is the fast answer, because it stops at the first True. It returns 0 when nothing matches, which is indistinguishable from a match at position zero, so check `mask.any()` first. There is no built-in "find first" that handles the empty case, and this two-step is the idiom.
+For "the first element matching a rule", `np.argmax(mask)` is the fast answer. It stops at the first True. It returns 0 when nothing matches. This Is the same from a match at spot zero. Check `mask.any()` first. There's no built-in "find first" that handles the empty case. This two-step is the idiom.
 
 ## searchsorted in more detail
 
-`searchsorted` requires its first argument to be **sorted**, and does not check. Passing unsorted data gives wrong answers silently, which is the main way it goes wrong.
+`searchsorted` needs its first arg to be **sorted**. Doesn't check. Passing unsorted data gives wrong answers silently. This Is the main way it goes wrong.
 
-`side="left"` returns the first position where the value could be inserted; `side="right"` returns the last. They differ only for values that are already present, and the choice decides which bucket a boundary value falls into.
+`side="left"` returns the first spot where the value could be inserted. `side="right"` returns the last. They differ only for values that are already present. The choice decides which bucket a boundary value falls into.
 
-For bucketing, `side="right"` with cut points means a value exactly on a boundary goes into the upper bucket, which matches the usual convention for grade boundaries and histogram bins.
+For bucketing, `side="right"` with cut points means a value just on a boundary goes into the upper bucket. This Matches the usual rule for grade boundaries and histogram bins.
 
-`sorter` lets you pass an `argsort` result so the lookup can be done against an unsorted array without sorting it first &mdash; useful when the array must keep its original order for other reasons.
+`sorter` lets you pass an `argsort` result so the lookup can be done against an unsorted array without sorting it first. handy when the array must keep its first order for other reasons.
 
-`np.digitize` is a related function with a `right` argument whose meaning is the reverse of what the name suggests in one of its branches. `searchsorted` is easier to reason about, and does the same job.
+`np.digitize` is a related function with a `right` arg whose meaning is the reverse of what the name suggests in one of its branches. `searchsorted` is easier to reason about, and does the same job.
 
 ## Ranking
 
 A ranking is `argsort` applied twice.
 
-`np.argsort(x)` gives the positions in sorted order. `np.argsort(np.argsort(x))` gives, for each element, its rank.
+`np.argsort(x)` gives the spots in sorted order. `np.argsort(np.argsort(x))` gives, for each element, its rank.
 
-That double application is unintuitive the first time and worth the moment it takes to see: the first argsort answers "which element belongs at each rank", and inverting that mapping answers "which rank does each element get".
+That double use is unintuitive the first time and worth the moment it takes to see. The first argsort answers "which element belongs at each rank". Inverting that mapping answers "which rank does each element get".
 
-Ties get consecutive distinct ranks rather than being averaged, which is not what most statistical definitions of rank want. `scipy.stats.rankdata` handles tie-breaking properly, and is the right tool when the ranking is going into a statistic.
+Ties get in a row distinct ranks rather than being averaged. This Isn't what most statistical meanings of rank want. `scipy.stats.rankdata` handles tie-breaking properly. Is the right tool when the ranking is going into a statistic.
 
 ## The performance summary
 
-Sorting is `O(n log n)`, and `argsort` costs slightly more than `sort` because it moves indices alongside comparisons.
+Sorting is `O(n log n)`, and `argsort` costs slightly more than `sort` because it moves indices alongside checks.
 
-`argpartition` is `O(n)` and is the right choice for any top-k or bottom-k question. The saving is large: for the top 5 of 200,000 values it is roughly an order of magnitude.
+`argpartition` is `O(n)` and is the right choice for any top-k or bottom-k question. The saving is large. For the top 5 of 200,000 values it's roughly an order of magnitude.
 
-`searchsorted` is `O(log n)` per lookup against an already-sorted array, so `m` lookups cost `O(m log n)`. If you are searching the same array repeatedly, sorting it once and using `searchsorted` beats any linear scan.
+`searchsorted` is `O(log n)` per lookup against an already-sorted array. `m` lookups cost `O(m log n)`. If you're searching the same array again and again, sorting it once and using `searchsorted` beats any linear scan.
 
-`np.isin` builds a sorted structure internally, so it is `O((n+m) log(n+m))` &mdash; better than the naive comparison, and worth knowing that it is not free either.
+`np.isin` builds a sorted structure inside. It's `O((n+m) log(n+m))`. Better than the naive compare. Worth knowing that it isn't free either.
 
 ## Sorting along an axis of a higher-dimensional array
 
-`sort` takes an `axis` like every other operation, and the default is `-1` &mdash; the last one.
+`sort` takes an `axis` like every other step. The default is `-1` &mdash; the last one.
 
-On a 3-D array that means each 1-D line along the last axis is sorted independently. That is rarely wrong but frequently not what was intended, and passing `axis` explicitly makes the intent visible.
+On a 3-D array that means each 1-D line along the last axis is sorted on its own. That is rarely wrong but often not what was intended. Passing `axis` by name makes the intent visible.
 
-`argsort` on a multi-dimensional array returns indices **along that axis only**, not flat positions. Applying them requires `np.take_along_axis`:
+`argsort` on a multi-dimensional array returns indices **along that axis only**, not flat spots. Applying them needs `np.take_along_axis`:
 
 ```python
 idx = np.argsort(scores, axis=1)
 ordered = np.take_along_axis(values, idx, axis=1)
 ```
 
-That is the multi-dimensional version of the sort-by-key idiom, and it is the function people usually fail to find. `np.put_along_axis` is the assignment counterpart.
+That is the multi-dimensional version of the sort-by-key idiom. It's the function people often fail to find. `np.put_along_axis` is the set counterpart.
 
 ## Descending, and the sign trick
 
-There is no `reverse=` argument anywhere in NumPy's sorting.
+There's no `reverse=` arg anywhere in NumPy's sorting.
 
 `np.sort(a)[::-1]` reverses the result, and the slice is a free view.
 
-For `argpartition` and `argsort`, negating the values is often cleaner than reversing the result, because it keeps the index arithmetic straightforward: `np.argsort(-scores)` gives descending order directly.
+For `argpartition` and `argsort`, negating the values is often cleaner than reversing the result. It keeps the index math straightforward: `np.argsort(-scores)` gives descending order right.
 
-That works for numeric data. It does not work for unsigned integers, where negation wraps, and it is a subtle way to get a wrong answer on `uint8` image data.
+That works for numeric data. It doesn't work for unsigned ints. Here Negation wraps. It's a subtle way to get a wrong answer on `uint8` image data.
 
 ## Searching by value
 
-There is no `index()` method. Finding where a value occurs is a comparison followed by a search:
+There's no `index()` method. Finding where a value occurs is a compare followed by a search:
 
-`np.flatnonzero(a == value)` gives every position, as a plain array.
+`np.flatnonzero(a == value)` gives each spot, as a plain array.
 
 `np.argmax(a == value)` gives the first, in one pass, with the caveat that it returns 0 when nothing matches.
 
-For a sorted array, `np.searchsorted` finds the position in logarithmic time, which is the right choice when searching repeatedly.
+For a sorted array, `np.searchsorted` finds the spot in logarithmic time. This Is the right choice when searching again and again.
 
-For membership across two arrays, `np.isin` handles it in one call rather than a loop of comparisons.
+For membership across two arrays, `np.isin` handles it in one call rather than a loop of checks.
 
 ## The summary
 
-`np.sort` copies; `a.sort()` modifies. That distinction holds throughout NumPy.
+`np.sort` copies. `a.sort()` modifies. That gap holds throughout NumPy.
 
-`argsort` is the one to use whenever anything else must follow the ordering, which in practice is most of the time.
+`argsort` is the one to use when anything else must follow the sorting. This is most of the time.
 
-`kind="stable"` when ties must keep their original order, which includes any multi-pass sort by successive keys.
+`kind="stable"` when ties must keep their first order. This Includes any multi-pass sort by successive keys.
 
-`lexsort` for several keys, remembering that the **last** one is primary.
+`lexsort` for a few keys, remembering that the **last** one is main.
 
 `argpartition` for top-k, which is linear rather than `n log n`.
 
-`searchsorted` for insertion points and bucketing, on data that is genuinely sorted &mdash; it does not check.
+`searchsorted` for insertion points and bucketing, on data that is truly sorted &mdash; it doesn't check.
 
-`take_along_axis` when applying `argsort` results on more than one dimension.
+`take_along_axis` when applying `argsort` results on more than one dim.
 
-Between them those cover essentially every ordering question, and the two that get used most are `argsort` and `argpartition`.
+Between them those cover each sorting question. The two that get used most are `argsort` and `argpartition`.
 
 ## One more thing about stability
 
-Stability is not a performance setting, and it is worth one more paragraph because the cost of getting it wrong is invisible.
+Steadiness isn't a speed setting, and it's worth one more paragraph because the cost of getting it wrong is invisible.
 
-An unstable sort is free to reorder equal elements arbitrarily. That means two runs on the same data can produce different output, and the difference only appears when there are ties. Code that sorts by a secondary key and then by a primary key relies entirely on the second sort preserving the first ordering, and with the default `kind` it does not.
+An unstable sort is free to reorder equal elements arbitrarily. That means two runs on the same data can give other output. The gap only appears when there are ties. Code that sorts by a secondary key and then by a main key leans fully on the second sort preserving the first sorting. With the default `kind` it doesn't.
 
-Whenever a sort follows another sort, or whenever the output order of tied records is observable, pass `kind="stable"`. The cost is small and the alternative is a bug that reproduces intermittently.
+When a sort follows another sort, or when the output order of tied records is observable, pass `kind="stable"`. The cost is small and the option is a bug that copies intermittently.
 
 ## Where sorting fits
 
-Sorting is rarely the goal in itself. It is the step that makes something else possible: a ranking, a top-n, a binary search, a group-by on the boundaries where a key changes, a merge of two datasets.
+Sorting is rarely the goal in itself. It's the step that makes a thing else possible. A ranking, a top-n, a binary search, a group-by on the boundaries where a key changes, a merge of two datasets.
 
-That framing helps when choosing. If the sorted array itself is not needed, `argsort` or `argpartition` usually is &mdash; and if you only need the order to apply it elsewhere, sorting the values was wasted work.
+That framing helps when choosing. If the sorted array itself isn't needed, `argsort` or `argpartition` often is. And if you only need the order to apply it elsewhere, sorting the values was wasted work.
 ''',
     [
         {"q": "What does `a.sort()` do on a 2-D array by default?",
@@ -5020,68 +5020,68 @@ print("isin is the one to use when you need to filter rows by a key.")'''),
     ],
     '''
 title: Unique Values and Set Operations
-intro: Counting distinct values, comparing arrays, and rebuilding the original.
+intro: Counting distinct values, checking arrays, and rebuilding the first.
 
 ## unique
 
 `np.unique(a)` returns the distinct values, **sorted**, as a 1-D array.
 
-Two things about that are worth stating explicitly, because both catch people.
+Two things about that are worth stating by name, because both catch people.
 
-It is always sorted. If you wanted first-appearance order, `unique` alone does not give it &mdash; you need `return_index` and then a sort of those indices.
+It's always sorted. If you wanted first-appearance order, `unique` alone doesn't give it. You need `return_index` and then a sort of those indices.
 
-It always flattens, unless you pass `axis`. A 2-D input gives back a flat list of every distinct value in the whole array.
+It always flattens, unless you pass `axis`. A 2-D input gives back a flat list of each distinct value in the whole array.
 
 ## The optional returns
 
-Three flags turn `unique` from a de-duplicator into something considerably more useful.
+Three flags turn `unique` from a de-duplicator into a thing a lot more handy.
 
-**`return_counts`** gives how many times each value occurred, aligned with the values. This is a frequency table, and combined with `argmax` it gives the mode in two lines with no loop.
+**`return_counts`** gives how many times each value occurred, aligned with the values. This is a rate table. Mixed with `argmax` it gives the mode in two lines with no loop.
 
-**`return_index`** gives, for each unique value, the index in the input where it first appeared. Useful when you want the *first* record for each key rather than just the key.
+**`return_index`** gives, for each unique value, the index in the input where it first appeared. handy when you want the *first* record for each key rather than just the key.
 
-**`return_inverse`** gives, for each element of the input, which unique value it corresponds to. `vals[inv]` reconstructs the input exactly.
+**`return_inverse`** gives, for each element of the input. This Unique value it matches to. `vals[inv]` rebuilds the input just.
 
-That last one is worth dwelling on. It is label encoding: an array of categories becomes an array of small integers plus a lookup table. Machine learning pipelines do this constantly, and `np.unique(..., return_inverse=True)` is the whole implementation.
+That last one is worth dwelling on. It's label encoding. An array of groups turns an array of small ints plus a lookup table. Machine learning pipelines do this constantly. `np.unique(..., return_inverse=True)` is the whole setup.
 
-The returns come back in a fixed order &mdash; values, index, inverse, counts &mdash; regardless of which flags you set, so unpack carefully when you enable more than one.
+The returns come back in a fixed order. Values, index, inverse, counts. Even so of which flags you set. Unpack carefully when you enable more than one.
 
 ## Unique rows
 
-`np.unique(rows, axis=0)` treats each row as an item and removes duplicate rows.
+`np.unique(rows, axis=0)` treats each row as an item and drops copy rows.
 
-This is what you want for de-duplicating records, and it composes with `return_counts` to find how many times each distinct row appeared &mdash; a group-by, for the case where the whole row is the key.
+This is what you want for de-duplicating records. It composes with `return_counts` to find how many times each distinct row appeared. A group-by, for the case where the whole row is the key.
 
-Rows are compared elementwise, and the result is sorted lexicographically.
+Rows are checked elementwise, and the result is sorted lexicographically.
 
 ## Set operations
 
-Four functions, all following the same rules: they treat the inputs as sets, de-duplicate, and return sorted results.
+Four functions, all following the same rules: they treat the inputs as sets, de-copy, and return sorted results.
 
 `intersect1d` &mdash; in both.
 `union1d` &mdash; in either.
 `setdiff1d` &mdash; in the first only.
-`setxor1d` &mdash; in exactly one.
+`setxor1d` &mdash; in just one.
 
-The `1d` in the names is a warning: they flatten their inputs. If you pass 2-D arrays you get a flat answer.
+The `1d` in the names is a warning. They flatten their inputs. If you pass 2-D arrays you get a flat answer.
 
-`intersect1d` accepts `assume_unique=True`, which skips the internal de-duplication and is meaningfully faster on large arrays you already know are unique.
+`intersect1d` accepts `assume_unique=True`, which skips the inner de-duplication and is usefully faster on large arrays you already know are unique.
 
 ## isin is the different one
 
-The set functions **reduce**. They answer "what is in both?" and hand you a smaller array, with the original positions gone.
+The set functions **reduce**. They answer "what is in both?" and hand you a smaller array, with the first spots gone.
 
 `np.isin(a, b)` **preserves shape**. It returns a boolean mask the same shape as `a`, saying whether each element appears in `b`.
 
-That distinction decides which one you need. If the question is "which values do these two arrays share?", use `intersect1d`. If the question is "which rows of my table have an id in this list?", you need the mask, because you are going to index with it &mdash; and `intersect1d` has thrown away exactly the information you need.
+That gap decides which one you need. If the question is "which values do these two arrays share?", use `intersect1d`. If the question is "which rows of my table have an id in this list?", you need the mask. You're going to index with it. And `intersect1d` has thrown away just the data you need.
 
 `~mask` inverts it, which is how you exclude a list rather than include one.
 
 ## Performance
 
-These are all sort-based, so roughly `O(n log n)`. That is fast, but for repeated membership tests against the same fixed set, a Python `set` or a sorted array with `searchsorted` can beat rebuilding the comparison each time.
+These are all sort-based, so roughly `O(n log n)`. That is fast. For repeated membership tests against the same fixed set, a Python `set` or a sorted array with `searchsorted` can beat rebuilding the compare each time.
 
-For counting, `np.bincount` is faster than `unique(return_counts=True)` when the values are small non-negative integers, because it can index directly instead of sorting.
+For counting, `np.bincount` is faster than `unique(return_counts=True)` when the values are small non-minus ints. It can index right instead of sorting.
 
 ## The mistakes
 
@@ -5089,21 +5089,21 @@ For counting, `np.bincount` is faster than `unique(return_counts=True)` when the
 
 **Passing 2-D to a set function** and being surprised by a flat result. They all flatten.
 
-**Reaching for `intersect1d` when filtering.** It discards positions. `isin` keeps them.
+**Reaching for `intersect1d` when filtering.** It discards spots. `isin` keeps them.
 
-**Unpacking the returns in the wrong order.** Values, index, inverse, counts &mdash; always in that order, whichever subset you asked for.
+**Unpacking the returns in the wrong order.** Values, index, inverse, counts. Always in that order, whichever subset you asked for.
 
 ## bincount, the fast path for integers
 
-When the values are small non-negative integers, `np.bincount` counts them far faster than `unique(return_counts=True)`, because it indexes an output array directly instead of sorting.
+When the values are small non-minus ints, `np.bincount` counts them far faster than `unique(return_counts=True)`. It indexes an output array right instead of sorting.
 
-`np.bincount(a)` returns an array of length `a.max() + 1`, where position `i` holds the count of value `i`. Values that never appear get zero, which is either convenient or a nuisance depending on whether the value space is dense.
+`np.bincount(a)` returns an array of length `a.max() + 1`. Here Spot `i` holds the count of value `i`. Values that never appear get zero. This Is either convenient or a nuisance based on whether the value space is dense.
 
-`minlength` forces a minimum output size, which matters when you are counting class labels and a class might be absent from a particular batch &mdash; without it, the output length varies with the data and downstream code breaks.
+`minlength` forces a min output size. This Matters when you're counting class labels and a class might be absent from a given batch. Without it, the output length varies with the data and downstream code breaks.
 
-The `weights` argument turns it into a group-sum. `np.bincount(group_ids, weights=values)` sums the values belonging to each group in a single pass, which is the fastest group-by NumPy offers and a genuinely useful thing to know.
+The `weights` arg turns it into a group-sum. `np.bincount(group_ids, weights=values)` sums the values belonging to each group in a single pass. This Is the fastest group-by NumPy offers and a truly handy thing to know.
 
-The constraint is that the values must be non-negative integers, and memory is proportional to the largest one. Counting values around a million allocates a million-element array regardless of how few distinct values there are.
+The constraint is that the values must be non-minus ints. Memory is scaled to the largest one. Counting values around a million allocates a million-element array even so of how few distinct values there are.
 
 ## Grouping without pandas
 
@@ -5116,9 +5116,9 @@ counts = np.bincount(inverse)
 means = sums / counts
 ```
 
-`unique` maps arbitrary keys &mdash; strings included &mdash; to dense integers, and `bincount` aggregates over those integers. Four lines, no loop, and it handles any number of groups.
+`unique` maps any keys &mdash; strings included &mdash; to dense ints. `bincount` aggregates over those ints. Four lines, no loop. It handles any number of groups.
 
-For aggregations that are not sums, sorting by the key and using `np.split` at the boundaries where the key changes gives a list of per-group arrays:
+For aggregations that aren't sums, sorting by the key and using `np.split` at the boundaries where the key changes gives a list of per-group arrays:
 
 ```python
 order = np.argsort(keys)
@@ -5127,33 +5127,33 @@ cuts = np.flatnonzero(sorted_keys[1:] != sorted_keys[:-1]) + 1
 groups = np.split(values[order], cuts)
 ```
 
-That is more machinery than pandas' `groupby`, and it is the right amount when adding pandas to a project for one aggregation would be the larger cost.
+That is more machinery than pandas' `groupby`. It's the right amount when adding pandas to a project for one aggregation would be the larger cost.
 
 ## histogram, for continuous values
 
-`unique` is for discrete values. Its continuous counterpart is `np.histogram`, which counts how many values fall into each of a set of bins.
+`unique` is for discrete values. Its smooth counterpart is `np.histogram`. This Counts how many values fall into each of a set of bins.
 
-It returns counts and edges. The edges array is one longer than the counts, because n bins have n+1 boundaries &mdash; a small detail that causes a lot of off-by-one confusion when plotting.
+It returns counts and edges. The edges array is one longer than the counts. N bins have n+1 boundaries. A small detail that causes a lot of off-by-one confusion when plotting.
 
-`bins` accepts a count, an explicit array of edges, or one of several automatic rules like `"auto"` and `"fd"` that choose a bin width from the data.
+`bins` accepts a count, an clear array of edges, or one of a few auto rules like `"auto"` and `"fd"` that choose a bin width from the data.
 
-`np.histogram2d` and `np.histogramdd` handle two and more dimensions.
+`np.histogram2d` and `np.histogramdd` handle two and more dims.
 
-The bins are half-open &mdash; `[a, b)` &mdash; except the last, which includes its right edge so that the maximum value is counted somewhere. That asymmetry is deliberate and occasionally surprising.
+The bins are half-open &mdash; `[a, b)` &mdash; except the last. This Includes its right edge so that the max value is counted one spot. That skew is deliberate and at times surprising.
 
 ## assume_unique, and when to use it
 
 `intersect1d`, `setdiff1d` and `isin` accept `assume_unique=True`.
 
-Setting it skips the internal de-duplication, which is a real saving on large arrays. Setting it wrongly gives **wrong answers**, not an error &mdash; duplicates are handled as though they were not there, and results can come out with unexpected repeats.
+Setting it skips the inner de-duplication. This Is a real saving on large arrays. Setting it wrongly gives **wrong answers**, not an error. Copies are handled as though they weren't there. Results can come out with surprise repeats.
 
-Use it only when uniqueness is guaranteed structurally: the array came from `unique`, or it is a primary key, or you have just checked. "It should be unique" is not the same thing.
+Use it only when uniqueness is sure structurally. The array came from `unique`, or it's a main key, or you've just checked. "It should be unique" isn't the same thing.
 
-`isin` also has a `kind` argument that chooses between a sort-based and a table-based implementation. The table-based version is much faster for integers over a small range and uses memory proportional to that range, so the automatic choice is usually right and worth overriding only after measuring.
+`isin` also has a `kind` arg that chooses between a sort-based and a table-based setup. The table-based version is much faster for ints over a small range and uses memory scaled to that range. The auto choice is often right and worth replacing only after measuring.
 
 ## Ordering, and how to get first-appearance order
 
-Every one of these functions returns sorted output, and sometimes sorted is not what you want.
+each one of these functions returns sorted output. At times sorted isn't what you want.
 
 For first-appearance order, use `return_index` and sort the indices:
 
@@ -5162,9 +5162,9 @@ vals, idx = np.unique(a, return_index=True)
 first_seen_order = vals[np.argsort(idx)]
 ```
 
-The indices say where each unique value first appeared; sorting by them restores the original encounter order.
+The indices say where each unique value first appeared. Sorting by them restores the first meet order.
 
-This comes up more often than it looks &mdash; category codes that should follow the data's order, deduplication that should keep the first occurrence, log analysis where the sequence carries meaning.
+This comes up more often than it looks. Group codes that should follow the data's order, deduplication that should keep the first case, log analysis where the sequence carries meaning.
 
 ## Summary of the choices
 
@@ -5184,59 +5184,59 @@ This comes up more often than it looks &mdash; category codes that should follow
 
 ## Uniqueness on floats
 
-Applying `unique` to floating-point data usually disappoints, because values that are conceptually equal differ in the last bits.
+Applying `unique` to floating-point data often disappoints. Values that are conceptually equal differ in the last bits.
 
 `np.unique([0.1 + 0.2, 0.3])` returns two values, not one.
 
-There is no tolerance argument, and adding one would be ill-defined &mdash; "close enough" is not transitive, so a tolerant unique has no unambiguous answer.
+There's no handling arg, and adding one would be ill-defined. "close enough" isn't transitive. A tolerant unique has no unambiguous answer.
 
-The practical approaches are to round first, `np.unique(np.round(a, 6))`, which is exact and cheap but sensitive to values sitting near a rounding boundary; or to sort and group with an explicit tolerance if the semantics matter.
+The hands-on approaches are to round first, `np.unique(np.round(a, 6))`. This Is exact and cheap but sensitive to values sitting near a rounding boundary. Or to sort and group with an clear handling if the semantics matter.
 
-For anything more careful, this is a clustering problem rather than a uniqueness problem, and treating it as one avoids pretending the answer is exact.
+For anything more careful, this is a clustering problem rather than a uniqueness problem. Treating it as one avoids pretending the answer is exact.
 
 ## Set operations on rows
 
-The `1d` family flattens, so comparing two tables row-wise needs a different approach.
+The `1d` family flattens, so checking two tables row-wise needs a other approach.
 
-`np.unique(rows, axis=0)` handles de-duplication. For intersection and difference between two sets of rows, the usual trick is to view each row as a single opaque item &mdash; either through a structured dtype, or by converting rows to tuples and using Python sets when the arrays are small enough.
+`np.unique(rows, axis=0)` handles de-duplication. For intersection and gap between two sets of rows, the usual trick is to view each row as a single opaque item. Either through a structured dtype, or by converting rows to tuples and using Python sets when the arrays are small enough.
 
-For larger data this is the point where pandas' `merge` is the right tool, and reaching for it is not a defeat. NumPy is deliberately a numerical array library rather than a relational one.
+For larger data this is the point where pandas' `merge` is the right tool. Reaching for it isn't a defeat. NumPy is on purpose a numeric array library rather than a relational one.
 
 ## Performance notes
 
-`np.unique` sorts, so it is `O(n log n)` and allocates.
+`np.unique` sorts, so it's `O(n log n)` and allocates.
 
-`np.bincount` is `O(n)` for small non-negative integers, and allocates proportional to the largest value rather than the number of distinct ones. For values up to a few million that is a good trade; for sparse large values it is not.
+`np.bincount` is `O(n)` for small non-minus ints. Allocates scaled to the largest value rather than the number of distinct ones. For values up to a few million that is a good trade. For sparse large values it isn't.
 
-`np.isin` builds a sorted structure or a lookup table depending on `kind`, so it is not free either &mdash; but it is far better than a loop of comparisons, and better than repeatedly calling `intersect1d`.
+`np.isin` builds a sorted structure or a lookup table based on `kind`. It isn't free either. But it's far better than a loop of checks. Better than again and again calling `intersect1d`.
 
-For repeated membership tests against a fixed small set, a Python `set` can beat all of them, because the per-call overhead of NumPy dominates when the query is a single value.
+For repeated membership tests against a fixed small set, a Python `set` can beat all of them. The per-call cost of NumPy dominates when the query is a single value.
 
 ## The summary
 
-`np.unique` &mdash; sorted distinct values. `return_counts` for frequencies, `return_inverse` for label encoding, `return_index` for first occurrence, `axis=0` for rows.
+`np.unique` &mdash; sorted distinct values. `return_counts` for rates, `return_inverse` for label encoding, `return_index` for first case, `axis=0` for rows.
 
-`np.bincount` &mdash; fast counting for small non-negative integers, with `minlength` to fix the output size and `weights` to turn it into a group-sum.
+`np.bincount` &mdash; fast counting for small non-minus ints, with `minlength` to fix the output size and `weights` to turn it into a group-sum.
 
-`np.histogram` &mdash; the continuous analogue, returning counts and one more edge than counts.
+`np.histogram` &mdash; the smooth analogue, returning counts and one more edge than counts.
 
-`intersect1d` / `union1d` / `setdiff1d` / `setxor1d` &mdash; set comparisons, all sorting, de-duplicating and flattening.
+`intersect1d` / `union1d` / `setdiff1d` / `setxor1d`. Set checks, all sorting, de-duplicating and flattening.
 
-`np.isin` &mdash; membership as a mask of the original shape, which is the one to use for filtering.
+`np.isin` &mdash; membership as a mask of the first shape. This Is the one to use for filtering.
 
-The recurring decision is between the functions that **reduce** and the one that **preserves shape**. If the answer is going to index something, you want the mask.
+The recurring choice is between the functions that **reduce** and the one that **preserves shape**. If the answer is going to index a thing, you want the mask.
 
 ## A closing note
 
-The functions in this module are simple individually and powerful in combination. `unique` with `return_inverse` feeding `bincount` with `weights` is four lines that replace a loop, a dictionary and a fair amount of care about missing keys.
+The functions in this module are simple on their own and powerful in mix. `unique` with `return_inverse` feeding `bincount` with `weights` is four lines that replace a loop, a dict and a fair amount of care about missing keys.
 
-The one distinction worth carrying away is between reducing and preserving shape. Almost every mistake in this area is reaching for a set function &mdash; which discards positions &mdash; when the question was really about filtering, which needs them. When the answer is going to index something, `isin` is the function you want.
+The one gap worth carrying away is between reducing and preserving shape. Almost each mistake in this area is reaching for a set function. Which discards spots. When the question was really about filtering. This Needs them. When the answer is going to index a thing, `isin` is the function you want.
 
 ## Where this fits
 
-Counting distinct values is usually the first thing anyone does with a new dataset, and the last thing anyone remembers to do before trusting a result.
+Counting distinct values is often the first thing anyone does with a new dataset. The last thing anyone remembers to do before trusting a result.
 
-`np.unique(col, return_counts=True)` on every categorical column at load time takes seconds and routinely surfaces the problems that would otherwise appear much later: a category with a trailing space, an identifier that is not unique, a class that appears twice in the training set and never in the test set.
+`np.unique(col, return_counts=True)` on each cat column at load time takes seconds and routinely surfaces the problems that would else appear much later. A group with a trailing space, an identifier that isn't unique, a class that appears twice in the training set and never in the test set.
 ''',
     [
         {"q": "What order does `np.unique` return values in?",
@@ -5394,61 +5394,61 @@ print("which quietly inflates every score you measure afterwards.")'''),
     ],
     '''
 title: Random Numbers
-intro: The modern Generator API, and how to make results reproducible.
+intro: The modern gen API, and how to make results reproducible.
 
 ## Two APIs, one of them legacy
 
-You will see both in the wild.
+You'll see both in the wild.
 
-`np.random.rand`, `np.random.randint`, `np.random.seed` are the **legacy** interface. They all operate on a single hidden global generator.
+`np.random.rand`, `np.random.randint`, `np.random.seed` are the **legacy** interface. They all operate on a single hidden global gen.
 
-`np.random.default_rng()` returns a **Generator** object with its own state. Every method lives on that object.
+`np.random.default_rng()` returns a **gen** object with its own state. each method lives on that object.
 
-The new one is preferred, and the reason is not cosmetic. A global generator means any library you import can consume from the same stream, so your seeded results change when an unrelated dependency starts drawing numbers. It also cannot be used safely from more than one thread, and it makes tests interfere with each other in ways that are hard to trace.
+The new one is preferred, and the reason isn't cosmetic. A global gen means any library you import can consume from the same stream. Your seeded results change when an unrelated dependency starts drawing numbers. It also can't be used safely from more than one thread, and it makes tests interfere with each other in ways that are hard to trace.
 
-An explicit generator is passed where it is needed, and nothing else can touch it. Create it once, near the top, and thread it through.
+An clear gen is passed where it's needed. Nothing else can touch it. Create it once, near the top, and thread it through.
 
-The legacy functions are not deprecated and existing code does not need rewriting, but new code should use `default_rng`.
+The legacy functions aren't deprecated and existing code doesn't need rewriting. New code should use `default_rng`.
 
 ## Seeding
 
-`default_rng(42)` gives a generator whose sequence is fully determined. Two generators created with the same seed produce identical output.
+`default_rng(42)` gives a gen whose sequence is fully found. Two gens created with the same seed give same output.
 
-The generator is stateful: each call advances it, so consecutive draws from the same generator differ. That is the point &mdash; you seed once, not before every call.
+The gen is stateful: each call advances it. In a row draws from the same gen differ. That is the point. You seed once, not before each call.
 
-Seeding inside a loop is a common bug. It produces the same "random" value every iteration, and the symptom is data that looks suspiciously uniform.
+Seeding inside a loop is a common bug. It makes the same "random" value each loop. The symptom is data that looks oddly uniform.
 
-For genuinely unpredictable values, call `default_rng()` with no argument; it seeds from the operating system.
+For truly unpredictable values, call `default_rng()` with no arg. It seeds from the operating system.
 
 ## Shapes
 
-Every method takes `size`, and it accepts a tuple.
+each method takes `size`, and it accepts a tuple.
 
-`rng.random((3, 4))` gives a `(3, 4)` array in one call. There is never a reason to loop.
+`rng.random((3, 4))` gives a `(3, 4)` array in one call. There's never a reason to loop.
 
-`rng.integers(low, high)` is **half-open**, like `range` and like slicing: `high` is excluded. The legacy `randint` behaved the same way, but `random_integers`, now removed, did not &mdash; which is why the memory is unreliable and worth checking.
+`rng.ints(low, high)` is **half-open**, like `range` and like slicing: `high` is excluded. The legacy `randint` behaved the same way. `random_integers`, now removed, didn't. Which is why the memory is unreliable and worth checking.
 
 ## The distributions
 
-`random` for uniform `[0, 1)`. `integers` for uniform integers. `normal(loc, scale)` for Gaussian. `uniform(low, high)` for a uniform range other than the unit interval.
+`random` for uniform `[0, 1)`. `ints` for uniform ints. `normal(loc, scale)` for Gaussian. `uniform(low, high)` for a uniform range other than the unit interval.
 
-Beyond those there are dozens &mdash; `poisson`, `exponential`, `binomial`, `multivariate_normal` &mdash; all following the same `size` convention.
+Beyond those there are dozens. `poisson`, `steep`, `binomial`, `multivariate_normal` &mdash; all following the same `size` rule.
 
 ## choice
 
-`rng.choice(pool, size=n)` samples with replacement by default.
+`rng.choice(pool, size=n)` samples with swap by default.
 
-`replace=False` samples without, and raises if `size` exceeds the pool. That is the right behaviour: silently returning duplicates when you asked for distinct items would be worse.
+`replace=False` samples without, and raises if `size` exceeds the pool. That is the right action. Silently returning copies when you asked for distinct items would be worse.
 
 `p=weights` gives a weighted draw. The weights must sum to 1 and have one entry per element of the pool.
 
-`choice` also accepts an integer instead of an array, meaning "choose from `arange(n)`", which is often what you want when you are really choosing indices.
+`choice` also accepts an int instead of an array, meaning "choose from `arange(n)`". This Is often what you want when you're really choosing indices.
 
 ## Shuffling
 
 `rng.shuffle(a)` modifies in place and returns `None`. `rng.permutation(a)` returns a shuffled copy.
 
-On a 2-D array, both operate on the **first axis** &mdash; whole rows move, and their contents stay intact. That is almost always what you want for a table of records, and it is worth knowing rather than assuming it shuffles every element.
+On a 2-D array, both operate on the **first axis**. Whole rows move. Their contents stay intact. That is almost always what you want for a table of records. It's worth knowing rather than given it shuffles each element.
 
 ## Splitting data
 
@@ -5459,29 +5459,29 @@ idx = rng.permutation(n)
 train, test = idx[:cut], idx[cut:]
 ```
 
-The tempting alternative &mdash; drawing a training sample and then a test sample &mdash; allows the same row into both, because the two draws know nothing about each other. That leaks test data into training and inflates every score you measure afterwards, sometimes dramatically, and the code gives no sign anything is wrong.
+The tempting option &mdash; drawing a training sample and then a test sample &mdash; allows the same row into both. The two draws know nothing about each other. That leaks test data into training and inflates each score you measure later, at times sharply. The code gives no sign anything is wrong.
 
-Permuting once makes the disjointness structural rather than probabilistic. The same index array applied to `X` and `y` keeps them aligned.
+Permuting once makes the disjointness structural rather than random. The same index array applied to `X` and `y` keeps them aligned.
 
 ## Reproducibility in practice
 
-Seed at the entry point, not scattered through the code. Record the seed alongside results. Pass the generator explicitly into any function that needs randomness, so it can be tested with a fixed one.
+Seed at the entry point, not scattered through the code. Record the seed alongside results. Pass the gen by name into any function that needs noise. It can be tested with a fixed one.
 
-And be clear about what a seed guarantees: identical results for the same NumPy version and the same sequence of calls. Change the order of operations and the numbers change, even with the seed unchanged.
+And be clear about what a seed promises. Same results for the same NumPy version and the same sequence of calls. Change the order of steps and the numbers change, even with the seed unchanged.
 
 ## What is underneath a Generator
 
-`default_rng` returns a `Generator` wrapping a **bit generator**, which is the thing that actually produces random bits. The default is PCG64.
+`default_rng` returns a `gen` wrapping a **bit gen**. This Is the thing that really makes random bits. The default is PCG64.
 
-The split matters because the two layers have different jobs. The bit generator produces a stream of uniform bits; the Generator turns those into distributions. Swapping the bit generator &mdash; `default_rng(np.random.MT19937(seed))` for the old Mersenne Twister, or `Philox` for a counter-based one &mdash; changes the stream without changing the interface.
+The split matters because the two layers have other jobs. The bit gen makes a stream of uniform bits. The gen turns those into spreads. Swapping the bit gen. `default_rng(np.random.MT19937(seed))` for the old Mersenne Twister, or `Philox` for a counter-based one. Changes the stream without changing the interface.
 
-PCG64 was chosen as the default because it is fast, has good statistical properties, and supports cheap independent streams. Mersenne Twister, the legacy default, is slower and has a much larger state.
+PCG64 was chosen as the default because it's fast, has good statistical properties. Supports cheap split streams. Mersenne Twister, the legacy default, is slower and has a much larger state.
 
-None of these are cryptographically secure. For tokens, passwords or anything an adversary should not predict, use the `secrets` module, not NumPy.
+None of these are cryptographically secure. For tokens, passwords or anything an adversary shouldn't predict, use the `secrets` module, not NumPy.
 
 ## Independent streams
 
-Running the same simulation in parallel needs each worker to draw different numbers, and seeding each with a different arbitrary integer is not a reliable way to get that &mdash; nearby seeds can produce overlapping streams.
+Running the same modelling in parallel needs each worker to draw other numbers. Seeding each with a other any int isn't a solid way to get that. Nearby seeds can give shared streams.
 
 `SeedSequence` is the supported answer:
 
@@ -5491,39 +5491,39 @@ children = ss.spawn(4)
 rngs = [np.random.default_rng(c) for c in children]
 ```
 
-Each child produces a stream that is statistically independent of the others, and the whole set is reproducible from the single parent seed.
+Each child makes a stream that is statistically split of the others. The whole set is reproducible from the single parent seed.
 
-`rng.spawn(n)` on a Generator does the same thing more directly in recent NumPy versions.
+`rng.spawn(n)` on a gen does the same thing more right in recent NumPy versions.
 
-This is the right way to seed workers in a multiprocessing pool, and it means one recorded seed reproduces the entire parallel run.
+This is the right way to seed workers in a multiprocessing pool. It means one recorded seed copies the entire parallel run.
 
 ## The legacy interface, and when you need it
 
-`np.random.RandomState` is the old object-oriented interface, and the global functions like `np.random.rand` are methods on a hidden instance of it.
+`np.random.RandomState` is the old object-oriented interface. The global functions like `np.random.rand` are methods on a hidden instance of it.
 
-It is frozen for backwards compatibility: its stream is guaranteed never to change across NumPy versions. `Generator` carries no such guarantee, and its output can change between versions if an algorithm is improved.
+It's frozen for backwards match: its stream is sure never to change across NumPy versions. `gen` carries no such promise. Its output can change between versions if an method is better.
 
-That makes `RandomState` the correct choice in exactly one situation: reproducing results from older code or published work where the exact numbers matter.
+That makes `RandomState` the correct choice in just one situation. Copying results from older code or published work where the exact numbers matter.
 
-For everything else, `Generator` is faster, has better distributions, and does not share state with every other piece of code in the process.
+For all else, `gen` is faster, has better spreads. Doesn't share state with every other piece of code in the process.
 
 ## Choosing a distribution
 
 The ones that come up most, and what they model:
 
-`uniform(low, high)` &mdash; no information beyond a range.
+`uniform(low, high)` &mdash; no data beyond a range.
 
-`normal(loc, scale)` &mdash; measurements with symmetric error, sums of many small independent effects.
+`normal(loc, scale)` &mdash; readings with even error, sums of many small split effects.
 
-`lognormal` &mdash; quantities that cannot be negative and are multiplicative: incomes, file sizes, response times.
+`lognormal` &mdash; quantities that can't be minus and are scaling: incomes, file sizes, response times.
 
-`poisson(lam)` &mdash; counts of independent events in a fixed interval: arrivals, defects, requests per second.
+`poisson(lam)` &mdash; counts of split events in a fixed interval: arrivals, defects, requests per second.
 
-`exponential(scale)` &mdash; waiting times between Poisson events.
+`steep(scale)` &mdash; waiting times between Poisson events.
 
 `binomial(n, p)` &mdash; successes out of n trials.
 
-Using `normal` for a quantity that cannot be negative is a common modelling error, and it shows up as negative durations or negative counts in generated test data. `lognormal` or a truncated distribution is usually what was meant.
+Using `normal` for a quantity that can't be minus is a common modelling error. It shows up as minus durations or minus counts in made test data. `lognormal` or a truncated spread is often what was meant.
 
 ## Generating realistic test data
 
@@ -5539,80 +5539,80 @@ A few patterns worth having.
 
 ## Reproducibility, honestly
 
-A seed guarantees the same numbers for the same NumPy version, the same generator, and the **same sequence of calls**.
+A seed promises the same numbers for the same NumPy version, the same gen. The **same sequence of calls**.
 
-Change the order of operations and the numbers change. Add a draw in the middle and everything after it shifts. Parallelise differently and the assignment of numbers to workers changes.
+Change the order of steps and the numbers change. Add a draw in the middle and all after it shifts. Parallelise differently and the set of numbers to workers changes.
 
-This means a seed reproduces a run, not a result. Code that draws different amounts of randomness depending on the data will not reproduce across changes to that data, even with the seed fixed.
+This means a seed copies a run, not a result. Code that draws other amounts of noise based on the data won't copy across changes to that data, even with the seed fixed.
 
-The practical discipline: seed once at the entry point, record the seed alongside the output, pass the generator explicitly into anything that needs it, and use `SeedSequence` for parallel work. Those four habits cover almost every reproducibility problem people actually hit.
+The hands-on discipline: seed once at the entry point, record the seed alongside the output, pass the gen by name into anything that needs it. Use `SeedSequence` for parallel work. Those four habits cover almost each reproducibility problem people really hit.
 
 ## Passing the generator around
 
-The habit that makes randomness testable is to accept a generator as an argument rather than creating one inside a function.
+The habit that makes noise testable is to accept a gen as an arg rather than creating one inside a function.
 
 ```python
 def make_sample(n, rng):
     return rng.normal(size=n)
 ```
 
-The caller decides the seed, so the same function serves production &mdash; where the generator is seeded from the operating system &mdash; and tests, where a fixed seed makes assertions possible.
+The caller decides the seed. So The same function serves production. Where the gen is seeded from the operating system. And tests. Here A fixed seed makes assertions possible.
 
-A default of `rng=None` with `rng = np.random.default_rng(rng)` inside is a useful pattern: `default_rng` accepts a Generator, an integer seed, a SeedSequence or None, and returns a Generator in every case. That gives callers all four options with one line.
+A default of `rng=None` with `rng = np.random.default_rng(rng)` inside is a handy pattern: `default_rng` accepts a gen, an int seed, a SeedSequence or None. Returns a gen in each case. That gives callers all four options with one line.
 
-The alternative &mdash; calling `np.random.seed` somewhere and hoping &mdash; is what makes randomised code untestable and non-reproducible, because any other code drawing from the same global stream changes the results.
+The option &mdash; calling `np.random.seed` one spot and hoping &mdash; is what makes randomised code untestable and non-reproducible. Any other code drawing from the same global stream changes the results.
 
 ## Randomness in tests
 
-A test that uses random data and a fixed seed is testing one sample. That is usually fine, and it is better than a test with hard-coded magic numbers.
+A test that uses random data and a fixed seed is testing one sample. That is often fine. It's better than a test with hard-coded magic numbers.
 
-The failure mode to avoid is a test that passes for most seeds and fails for some. If a test is checking a statistical property &mdash; that a mean is near zero, that a split is roughly balanced &mdash; the tolerance has to be wide enough for the distribution, not tuned until the current seed passes.
+The failure mode to avoid is a test that passes for most seeds and fails for some. If a test is checking a statistical property. That a mean is near zero, that a split is roughly weighed. The handling has to be wide enough for the spread, not tuned until the current seed passes.
 
-`np.allclose` with an explicit tolerance expresses that far better than exact comparison, and stating the tolerance forces the question of how much variation is acceptable.
+`np.allclose` with an clear handling expresses that far better than exact compare. Stating the handling forces the question of how much variation is acceptable.
 
-For anything where the property should hold for all inputs rather than one sample, property-based testing with several seeds is the honest version.
+For anything where the property should hold for all inputs rather than one sample, property-based testing with a few seeds is the honest version.
 
 ## Common mistakes
 
-**Seeding inside a loop.** Produces the same value every iteration. The symptom is suspiciously uniform data.
+**Seeding inside a loop.** makes the same value each loop. The symptom is oddly uniform data.
 
-**Using `np.random.seed` in a library.** It mutates global state that belongs to the application, not to you.
+**Using `np.random.seed` in a library.** It mutates global state that belongs to the use, not to you.
 
-**Sampling twice for a train/test split.** The two draws are independent, so rows can appear in both. Permute once.
+**Sampling twice for a train/test split.** The two draws are split. Rows can appear in both. Permute once.
 
-**Using `normal` for a non-negative quantity.** Produces negative durations and negative counts. `lognormal` or a truncated distribution is usually what was meant.
+**Using `normal` for a non-minus quantity.** makes minus durations and minus counts. `lognormal` or a truncated spread is often what was meant.
 
-**Expecting `shuffle` to return something.** It modifies in place and returns None, so `a = rng.shuffle(a)` sets `a` to None. `permutation` is the returning version.
+**Expecting `shuffle` to return a thing.** It modifies in place and returns None. `a = rng.shuffle(a)` sets `a` to None. `permutation` is the returning version.
 
-**Assuming a seed reproduces a result rather than a run.** Change the order of draws and the numbers change, seed or no seed.
+**given a seed copies a result rather than a run.** Change the order of draws and the numbers change, seed or no seed.
 
 ## The summary
 
-Create one generator with `default_rng(seed)` at the entry point.
+Create one gen with `default_rng(seed)` at the entry point.
 
-Pass it explicitly to anything that needs randomness.
+Pass it by name to anything that needs noise.
 
-Use `SeedSequence` or `spawn` for parallel workers, never nearby integer seeds.
+Use `SeedSequence` or `spawn` for parallel workers, never nearby int seeds.
 
 Draw whole arrays with `size` rather than looping.
 
 Permute an index array once when splitting or shuffling aligned data.
 
-Record the seed with the results, and remember that it reproduces the sequence of calls, not the conclusion.
+Record the seed with the results. Note that it copies the sequence of calls, not the conclusion.
 
 ## A closing note
 
-Randomness is one of the few areas where the convenient API and the correct API differ, and where the convenient one has been the default for long enough that most examples still use it.
+Noise is one of the few areas where the convenient API and the correct API differ. Where the convenient one has been the default for long enough that most examples still use it.
 
-`np.random.seed` and its companions are not broken, and existing code using them does not need rewriting. But new code has a better option, and the reasons &mdash; isolation, thread safety, reproducible parallelism &mdash; are the kind that only matter once, catastrophically, at the point where results cannot be reproduced.
+`np.random.seed` and its companions aren't broken. Existing code using them doesn't need rewriting. But new code has a better option, and the reasons. Alone, thread safety, reproducible parallelism. Are the kind that only matter once, catastrophically, at the point where results can't be copied.
 
-One generator, created explicitly, passed where it is needed. That single habit covers almost everything.
+One gen, created by name, passed where it's needed. That single habit covers almost all.
 
 ## One last habit
 
 Record the seed with the output, not just in the code.
 
-A seed that lives only in a source file is lost the moment the file changes, and the results it produced become unreproducible without a git archaeology session. Writing it into the output &mdash; a filename, a metadata field, a log line &mdash; costs nothing and is the difference between results that can be regenerated and results that can only be trusted.
+A seed that lives only in a source file is lost the moment the file changes. The results it made become unreproducible without a git archaeology session. Writing it into the output. A filename, a metadata field, a log line. Costs nothing and is the gap between results that can be regenerated and results that can only be trusted.
 ''',
     [
         {"q": "Why is `default_rng` preferred over `np.random.seed`?",
@@ -5792,133 +5792,133 @@ print("   slope %.4f  intercept %.4f" % (sol[0], sol[1]))'''),
     ],
     '''
 title: Linear Algebra
-intro: Matrix multiplication, solving systems, and why you should almost never invert a matrix.
+intro: mat product, solving systems, and why you should almost never invert a mat.
 
 ## @ versus *
 
-`*` is elementwise. `@` is matrix multiplication.
+`*` is elementwise. `@` is mat product.
 
-Both are valid on two square matrices of the same size, and they give completely different answers. Nothing raises, nothing warns, and the result of the wrong one is a plausible-looking matrix of the right shape.
+Both are valid on two square mats of the same size. They give fully other answers. Nothing raises, nothing warns. The result of the wrong one is a plausible-looking mat of the right shape.
 
-This is the most common linear algebra bug in NumPy code, and it survives review easily because both lines look correct.
+This is the most common linear algebra bug in NumPy code. It lives review easily because both lines look correct.
 
-`np.matmul` is the function form of `@`, and `np.dot` agrees with it for 2-D. They diverge for higher dimensions &mdash; `matmul` broadcasts the leading axes and treats the last two as matrices, `dot` does something different and rarely what you want. Prefer `@` or `matmul`.
+`np.matmul` is the function form of `@`. `np.dot` agrees with it for 2-D. They diverge for higher dims. `matmul` broadcasts the leading axes and treats the last two as mats, `dot` does a thing other and rarely what you want. Prefer `@` or `matmul`.
 
 ## Shapes
 
-`(m, k) @ (k, n)` gives `(m, n)`. The inner dimensions must match and they cancel.
+`(m, k) @ (k, n)` gives `(m, n)`. The inner dims must match and they cancel.
 
-A 1-D array is special-cased: it is promoted to whichever orientation makes the multiplication valid, and then the added dimension is removed from the result. `(2,3) @ (3,)` gives `(2,)`, treating the vector as a column; `(3,) @ (3,4)` gives `(4,)`, treating it as a row.
+A 1-D array is special-cased: it's promoted to whichever orientation makes the product valid. Then the added dim is removed from the result. `(2,3) @ (3,)` gives `(2,)`, treating the vector as a column. `(3,) @ (3,4)` gives `(4,)`, treating it as a row.
 
-That convenience means you rarely need to reshape vectors, but it also means a shape error can come from a vector being the wrong length rather than the wrong orientation. The error message names both shapes, which is usually enough.
+That convenience means you rarely need to reshape vectors. It also means a shape error can come from a vector being the wrong length rather than the wrong orientation. The error message names both shapes. This Is often enough.
 
 ## Solving systems
 
 To solve `Ax = b`, use `np.linalg.solve(A, b)`.
 
-The obvious alternative, `np.linalg.inv(A) @ b`, gives the same answer on well-behaved problems and is wrong as a habit for two reasons.
+The obvious option, `np.linalg.inv(A) @ b`, gives the same answer on well-behaved problems and is wrong as a habit for two reasons.
 
-**Cost.** Computing an inverse is roughly the work of solving the system `n` times. `solve` factors the matrix once and does one back-substitution.
+**Cost.** finding an inverse is roughly the work of solving the system `n` times. `solve` factors the mat once and does one back-substitution.
 
-**Accuracy.** The inverse introduces rounding error, and then multiplying by it introduces more. `solve` avoids forming the inverse at all. On a well-conditioned matrix the difference is small; on an ill-conditioned one it is the difference between a usable answer and noise.
+**score.** The inverse adds rounding error. Then timesing by it adds more. `solve` avoids forming the inverse at all. On a well-conditioned mat the gap is small. On an ill-conditioned one it's the gap between a usable answer and noise.
 
-The rule is simple enough to apply without thinking: if you are about to write `inv(A) @ b`, write `solve(A, b)`.
+The rule is simple enough to apply without thinking: if you're about to write `inv(A) @ b`, write `solve(A, b)`.
 
-Genuine uses for `inv` exist &mdash; you need the inverse itself, for a covariance matrix or an analytical derivation &mdash; but they are rarer than the code you will see suggests.
+Genuine uses for `inv` exist. You need the inverse itself, for a co-var mat or an analytical derivation &mdash; but they're rarer than the code you'll see suggests.
 
 ## Is it solvable?
 
-A singular matrix has no unique solution, and `solve` raises `LinAlgError`.
+A singular mat has no unique answer, and `solve` raises `LinAlgError`.
 
-The instinct is to check `det(A) == 0` first. Do not. Determinants of floating-point matrices are almost never exactly zero, and the determinant scales badly &mdash; a well-conditioned matrix can have a tiny determinant simply because it is large.
+The instinct is to check `det(A) == 0` first. Don't. Determinants of floating-point mats are almost never just zero. The determinant scales badly. A well-conditioned mat can have a tiny determinant simply because it's large.
 
-`np.linalg.matrix_rank(A)` answers the question directly: full rank means solvable.
+`np.linalg.matrix_rank(A)` answers the question right: full rank means solvable.
 
-`np.linalg.cond(A)` measures how much the answer amplifies input error. A condition number near 1 is excellent; anything above roughly `1e10` means you should not trust the low-order digits of the result, whichever method produced it.
+`np.linalg.cond(A)` measures how much the answer amplifies input error. A rule number near 1 is great. Anything above roughly `1e10` means you shouldn't trust the low-order digits of the result, whichever method made it.
 
 ## Norms
 
-`np.linalg.norm(v)` gives the Euclidean length of a vector, and `norm(a - b)` the distance between two points.
+`np.linalg.norm(v)` gives the Euclidean length of a vector. `norm(a - b)` the distance between two points.
 
-It takes an `axis`, so `norm(X, axis=1)` gives the length of every row at once &mdash; the usual way to compute distances for a whole dataset without looping.
+It takes an `axis`, so `norm(X, axis=1)` gives the length of each row at once. The usual way to find distances for a whole dataset without looping.
 
-Other norms are available via `ord`: `ord=1` for the sum of absolute values, `ord=np.inf` for the maximum.
+Other norms are on hand via `ord`: `ord=1` for the sum of abs values, `ord=np.inf` for the max.
 
 ## Eigenvalues
 
-`np.linalg.eig` works on any square matrix and returns complex results in unspecified order.
+`np.linalg.eig` works on any square mat and returns complex results in unspecified order.
 
-For a **symmetric** matrix &mdash; which covers most cases that arise in practice, since covariance and Gram matrices are symmetric &mdash; use `eigh` or `eigvalsh`. They exploit the symmetry, are faster and more accurate, and return real eigenvalues in ascending order.
+For a **even** mat &mdash; which covers most cases that arise since co-var and Gram mats are even &mdash; use `eigh` or `eigvalsh`. They exploit the symmetry, are faster and more accurate. Return real eigen-vals in ascending order.
 
-That determinism matters: code that indexes into the output of `eig` and assumes an order is relying on something not guaranteed.
+That determinism matters: code that indexes into the output of `eig` and assumes an order is leaning on a thing not sure.
 
 ## Least squares
 
-`np.linalg.lstsq(M, y, rcond=None)` fits an overdetermined system &mdash; more equations than unknowns &mdash; by minimising squared error.
+`np.linalg.lstsq(M, y, rcond=None)` fits an overdetermined system. More equations than unknowns. By cutting squared error.
 
-Building the design matrix with `column_stack` is the whole setup. For a straight line, the columns are `x` and a column of ones; the solution is slope and intercept.
+Building the design mat with `column_stack` is the whole setup. For a straight line, the columns are `x` and a column of ones. The answer is slope and intercept.
 
-Pass `rcond=None` explicitly to get the current behaviour and silence the future-warning about the old default.
+Pass `rcond=None` by name to get the current action and silence the future-warning about the old default.
 
 ## Batched matrix multiplication
 
-`matmul` treats the **last two** axes as the matrix and broadcasts everything before them.
+`matmul` treats the **last two** axes as the mat and broadcasts all before them.
 
-That makes `(batch, n, k) @ (batch, k, m)` a batch of matrix products, computed in one call with no loop. `(batch, n, k) @ (k, m)` also works, applying the same matrix to every item in the batch.
+That makes `(batch, n, k) @ (batch, k, m)` a batch of mat products, found in one call with no loop. `(batch, n, k) @ (k, m)` also works, applying the same mat to each item in the batch.
 
-This is why the batch axis goes first by convention: it puts the matrix axes where `matmul` expects them, and the whole thing composes without transposes.
+This is why the batch axis goes first by rule. It puts the mat axes where `matmul` expects them. The whole thing composes without transposes.
 
-`np.dot` does not do this. On arrays with more than two dimensions it follows an older rule that is rarely what anyone wants. `@` and `matmul` are the ones to use.
+`np.dot` doesn't do this. On arrays with more than two dims it follows an older rule that is rarely what anyone wants. `@` and `matmul` are the ones to use.
 
-Most of `np.linalg` also broadcasts over leading axes: `solve`, `inv`, `det` and the decompositions all accept a stack of matrices and return a stack of results.
+Most of `np.linalg` also broadcasts over leading axes: `solve`, `inv`, `det` and the breakdowns all accept a stack of mats and return a stack of results.
 
 ## solve versus lstsq
 
-`solve` requires a square matrix and gives the exact solution when one exists. It raises on a singular matrix.
+`solve` needs a square mat and gives the exact answer when one exists. It raises on a singular mat.
 
-`lstsq` handles rectangular systems and finds the solution minimising squared error. It also handles rank-deficient systems by returning the minimum-norm solution rather than raising.
+`lstsq` handles rectangular systems and finds the answer cutting squared error. It also handles rank-deficient systems by returning the min-norm answer rather than raising.
 
-For an overdetermined system &mdash; more equations than unknowns, which is what fitting a model to data looks like &mdash; `lstsq` is the right tool.
+For an overdetermined system &mdash; more equations than unknowns. This Is what fitting a model to data looks like &mdash; `lstsq` is the right tool.
 
-The tempting alternative is the normal equations: `solve(A.T @ A, A.T @ b)`. It gives the same answer in exact arithmetic and is numerically worse, because forming `A.T @ A` squares the condition number. A problem that was marginally conditioned becomes badly conditioned. `lstsq` uses an SVD-based approach that avoids this.
+The tempting option is the normal equations: `solve(A.T @ A, A.T @ b)`. It gives the same answer in exact math and is by number worse. Forming `A.T @ A` squares the rule number. A problem that was marginally conditioned turns badly conditioned. `lstsq` uses an SVD-based approach that avoids this.
 
 ## SVD, and what it is for
 
-`np.linalg.svd` factors any matrix into `U @ diag(s) @ Vt`.
+`np.linalg.svd` factors any mat into `U @ diag(s) @ Vt`.
 
-The singular values `s` are the useful part for most practical purposes.
+The singular values `s` are the handy part for most hands-on purposes.
 
-**Rank.** The number of singular values meaningfully above zero. This is what `matrix_rank` computes internally, and it is why rank is a more reliable singularity test than a determinant.
+**Rank.** The number of singular values usefully above zero. This is what `matrix_rank` finds inside. It's why rank is a more solid singularity test than a determinant.
 
-**Conditioning.** The ratio of largest to smallest singular value is the condition number.
+**Conditioning.** The ratio of largest to smallest singular value is the rule number.
 
-**Dimensionality reduction.** Keeping the largest k singular values and their vectors gives the best rank-k approximation of the matrix. That is what PCA is, and truncated SVD is how it is computed.
+**Dimensionality reduction.** Keeping the largest k singular values and their vectors gives the best rank-k guess of the mat. That is what PCA is. Truncated SVD is how it's found.
 
-**Pseudo-inverse.** `np.linalg.pinv` uses SVD to invert what can be inverted and ignore what cannot, which is how least squares handles rank deficiency.
+**Pseudo-inverse.** `np.linalg.pinv` uses SVD to invert what can be inverted and skip what can't. This Is how least squares handles rank deficiency.
 
-`svd(a, full_matrices=False)` returns the economy version, which is smaller and usually what you want for a tall matrix.
+`svd(a, full_matrices=False)` returns the economy version. This Is smaller and often what you want for a tall mat.
 
 ## Other decompositions
 
-`np.linalg.qr` factors into an orthogonal and an upper-triangular matrix. It is the numerically sound way to solve least squares by hand, and it is what many algorithms use internally.
+`np.linalg.qr` factors into an perp and an upper-tri mat. It's the by number sound way to solve least squares by hand. It's what many methods use inside.
 
-`np.linalg.cholesky` factors a symmetric positive-definite matrix into a lower triangular factor times its transpose. It is roughly twice as fast as a general factorisation and is the standard tool for covariance matrices &mdash; sampling from a multivariate normal, or evaluating a Gaussian likelihood.
+`np.linalg.cholesky` factors a even plus-definite mat into a lower tri factor times its transpose. It's roughly twice as fast as a general split and is the standard tool for co-var mats. Sampling from a multivariate normal, or checking a Gaussian likelihood.
 
-Cholesky **raises** if the matrix is not positive definite, which is a useful diagnostic in itself: a covariance matrix that fails Cholesky is telling you something is wrong with how it was estimated.
+Cholesky **raises** if the mat isn't positive definite. This Is a handy diagnostic in itself. A co-var mat that fails Cholesky is telling you a thing is wrong with how it was guessed.
 
 ## Conditioning in practice
 
-The condition number is the amplification factor from input error to output error.
+The rule number is the amplification factor from input error to output error.
 
-A condition number of 10 means roughly one decimal digit lost. `1e8` means about eight, which on `float64`'s sixteen leaves eight. `1e16` means all of them, and the answer is noise regardless of the algorithm.
+A rule number of 10 means roughly one decimal digit lost. `1e8` means about eight. This On `float64`'s sixteen leaves eight. `1e16` means all of them. The answer is noise even so of the method.
 
 Two things follow.
 
-**Check `cond` before trusting a solution** from a matrix built out of measured data. Nothing warns you.
+**Check `cond` before trusting a answer** from a mat built out of measured data. Nothing warns you.
 
-**Ill-conditioning is a property of the problem, not the code.** No solver rescues a condition number of `1e16`. The fix is upstream: rescale variables so their magnitudes are comparable, remove collinear columns, or add regularisation &mdash; which is exactly what ridge regression does, and why it works.
+**Ill-conditioning is a property of the problem, not the code.** No solver rescues a rule number of `1e16`. The fix is upstream. Rescale vars so their magnitudes are close, drop collinear columns, or add fine. Which is just what ridge regression does, and why it works.
 
-Scaling is the most commonly overlooked of those. A design matrix with one column in metres and another in nanometres is badly conditioned for no reason other than units.
+Scaling is the most often overlooked of those. A design mat with one column in metres and another in nanometres is badly conditioned for no reason other than units.
 
 ## What to reach for
 
@@ -5928,55 +5928,55 @@ Scaling is the most commonly overlooked of those. A design matrix with one colum
 
 **`lstsq`** for fitting and overdetermined systems, never the normal equations.
 
-**`eigvalsh` / `eigh`** for symmetric matrices, because `eig` returns complex values in unspecified order.
+**`eigvalsh` / `eigh`** for even mats. `eig` returns complex values in unspecified order.
 
-**`cholesky`** for covariance matrices.
+**`cholesky`** for co-var mats.
 
-**`svd`** when you need rank, conditioning, or a low-rank approximation.
+**`svd`** when you need rank, conditioning, or a low-rank guess.
 
 **`cond` and `matrix_rank`** before believing any of it.
 
-And for anything beyond this &mdash; sparse matrices, iterative solvers, specialised decompositions &mdash; SciPy's `scipy.linalg` and `scipy.sparse` extend the same interface and are where the rest of the toolkit lives.
+And for anything beyond this. Sparse mats, iterative solvers, specialised breakdowns &mdash; SciPy's `scipy.linalg` and `scipy.sparse` extend the same interface and are where the rest of the toolkit lives.
 
 ## Common mistakes
 
-**Using `*` where `@` was meant.** Both are legal on square matrices and give different answers of the same shape. Nothing warns. This is the most frequent linear algebra bug in NumPy code.
+**Using `*` where `@` was meant.** Both are legal on square mats and give other answers of the same shape. Nothing warns. This is the most frequent linear algebra bug in NumPy code.
 
-**Writing `inv(A) @ b`.** Slower and less accurate than `solve(A, b)`, for no benefit.
+**Writing `inv(A) @ b`.** Slower and less accurate than `solve(A, b)`, for no gain.
 
-**Using the normal equations for least squares.** `solve(A.T @ A, A.T @ b)` squares the condition number. `lstsq` does not.
+**Using the normal equations for least squares.** `solve(A.T @ A, A.T @ b)` squares the rule number. `lstsq` doesn't.
 
-**Testing `det(A) == 0`.** Floating-point determinants are almost never exactly zero, and the determinant scales with the matrix. `matrix_rank` answers the question directly.
+**Testing `det(A) == 0`.** Floating-point determinants are almost never just zero. The determinant scales with the mat. `matrix_rank` answers the question right.
 
-**Indexing into `eig` output assuming an order.** There is none. `eigh` and `eigvalsh` return ascending real values for symmetric matrices, which is what most code actually needs.
+**Indexing into `eig` output given an order.** There's none. `eigh` and `eigvalsh` return ascending real values for even mats. This Is what most code really needs.
 
 **Expecting `.T` to make a column vector.** On a 1-D array it does nothing. `v[:, None]`.
 
-**Using `np.dot` on more than two dimensions.** It follows an older rule that is rarely what anyone wants. `@` or `matmul` broadcast the leading axes properly.
+**Using `np.dot` on more than two dims.** It follows an older rule that is rarely what anyone wants. `@` or `matmul` broadcast the leading axes properly.
 
 ## Reading the shapes in an error
 
-`matmul` errors name the "core dimensions", which are the last two axes.
+`matmul` errors name the "core dims". This Are the last two axes.
 
-"Input operand 1 has a mismatch in its core dimension 0" means the first of the last two axes of the second operand does not match what the first operand's last axis requires &mdash; the `k` in `(m,k) @ (k,n)`.
+"Input operand 1 has a mismatch in its core dim 0" means the first of the last two axes of the second operand doesn't match what the first operand's last axis needs. The `k` in `(m,k) @ (k,n)`.
 
-The diagnosis is to print both shapes and check which axis is supposed to be shared. Nearly always one of the two arrays is transposed relative to the intent, and the fix is a `.T` on the correct side rather than a reshape.
+The diagnosis is to print both shapes and check which axis is supposed to be shared. Nearly always one of the two arrays is transposed scaled to the intent. The fix is a `.T` on the correct side rather than a reshape.
 
-For a 1-D operand, remember it is promoted to whichever orientation makes the multiplication valid, so a shape error involving one usually means the wrong length rather than the wrong orientation.
+For a 1-D operand, note it's promoted to whichever orientation makes the product valid. A shape error involving one often means the wrong length rather than the wrong orientation.
 
 ## Where SciPy takes over
 
-`np.linalg` covers the dense, general cases well. Several things sit just outside it.
+`np.linalg` covers the dense, general cases well. a few things sit just outside it.
 
-**Sparse matrices.** `scipy.sparse` stores only nonzeros and has its own solvers. For a matrix that is mostly zeros &mdash; graphs, finite-element meshes, term-document matrices &mdash; the difference is not a constant factor but the difference between fitting in memory and not.
+**Sparse mats.** `scipy.sparse` stores only nonzeros and has its own solvers. For a mat that is mostly zeros. Graphs, finite-element meshes, term-doc mats. The gap isn't a constant factor but the gap between fitting in memory and not.
 
-**Iterative solvers.** For very large systems, `scipy.sparse.linalg` offers methods that approximate a solution without factoring the matrix.
+**Iterative solvers.** For very large systems, `scipy.sparse.linalg` offers methods that rough a answer without factoring the mat.
 
-**More decompositions.** `scipy.linalg` has LU, Schur, banded and triangular solvers, and generally more options on the ones NumPy also provides.
+**More breakdowns.** `scipy.linalg` has LU, Schur, banded and tri solvers. Often more options on the ones NumPy also gives.
 
-**Matrix functions.** `expm` for the matrix exponential and friends live in SciPy.
+**mat functions.** `expm` for the mat steep and friends live in SciPy.
 
-The interfaces are deliberately similar, so moving across is usually a change of import rather than a change of approach.
+The interfaces are on purpose similar. Moving across is often a change of import rather than a change of approach.
 ''',
     [
         {"q": "What is the difference between `a * b` and `a @ b` for two 2x2 arrays?",
@@ -6136,159 +6136,159 @@ print("   ", np.nan_to_num(r, nan=0.0, posinf=999.0, neginf=-999.0))'''),
     ],
     '''
 title: NaN and Missing Data
-intro: The value that is not equal to itself, and the functions that exist because of it.
+intro: The value that isn't equal to itself. The functions that exist because of it.
 
 ## Not equal to itself
 
-`np.nan` is a floating-point value defined by the IEEE 754 standard to represent "not a number". Its defining property is that **every comparison involving it is False**, including equality with itself.
+`np.nan` is a floating-point value defined by the IEEE 754 standard to represent "not a number". Its defining property is that **each compare involving it's False**, including equality with itself.
 
-`nan == nan` is False. `nan < 1` is False. `nan > 1` is False. The only comparison that returns True is `!=`, and only because it is the negation of a False.
+`nan == nan` is False. `nan < 1` is False. `nan > 1` is False. The only compare that returns True is `!=`. Only because it's the negation of a False.
 
-The immediate practical consequence: `arr == np.nan` gives an all-False mask, no matter how many NaNs the array contains. It fails silently, which is the worst way to fail.
+The direct hands-on result: `arr == np.nan` gives an all-False mask, no matter how many NaNs the array holds. It fails silently. This Is the worst way to fail.
 
 `np.isnan(arr)` is the correct test, and it returns a proper boolean mask.
 
-The rule is not a NumPy quirk. It falls out of NaN meaning "the result of an undefined operation" &mdash; two undefined results have no reason to be the same thing.
+The rule isn't a NumPy quirk. It falls out of NaN meaning "the result of an undefined step". Two undefined results have no reason to be the same thing.
 
 ## NaN is a float
 
-There is no integer NaN. The integer types have no bit pattern reserved for it.
+There's no int NaN. The int types have no bit pattern reserved for it.
 
-So assigning `np.nan` into an integer array raises, and any array literal containing `np.nan` comes out as float.
+So assigning `np.nan` into an int array raises. Any array literal holding `np.nan` comes out as float.
 
-This is why a table column with one missing value silently becomes float, and why identifiers end up displayed as `1001.0` instead of `1001`. There is no way around it within a plain NumPy integer array; the options are to accept float, to use a sentinel value like `-1` and document it, or to carry a separate boolean mask alongside the data.
+This is why a table column with one missing value silently turns float. Why identifiers end up displayed as `1001.0` instead of `1001`. There's no way around it within a plain NumPy int array. The options are to accept float, to use a sentinel value like `-1` and doc it, or to carry a split boolean mask alongside the data.
 
-Pandas addresses this with nullable integer types. Plain NumPy does not have them.
+Pandas handles this with nullable int types. Plain NumPy doesn't have them.
 
 ## One NaN poisons everything
 
-`a.sum()` on an array containing a single NaN returns NaN. So does `mean`, `max`, `min`, `std` and every other reduction.
+`a.sum()` on an array holding a single NaN returns NaN. So does `mean`, `max`, `min`, `std` and every other reduction.
 
-This is correct &mdash; the sum genuinely is unknown &mdash; but it is dangerous, because the result is still a number-shaped thing that flows onward through the pipeline and turns everything downstream into NaN too. By the time you notice, the origin can be far away.
+This is correct &mdash; the sum truly is unknown &mdash; but it's dangerous. The result is still a number-shaped thing that flows onward through the pipeline and turns all downstream into NaN too. By the time you notice, the origin can be far away.
 
-The `nan*` family exists for this: `nansum`, `nanmean`, `nanmax`, `nanmin`, `nanstd`, `nanmedian`, `nanpercentile`. Each ignores missing values rather than propagating them.
+The `nan*` family exists for this: `nansum`, `nanmean`, `nanmax`, `nanmin`, `nanstd`, `nanmedian`, `nanpercentile`. Each skips missing values rather than passing them.
 
-Note what `nanmean` does: it divides by the count of **real** values. On four elements with one NaN, it divides by three. That is usually right, and it is worth being explicit that it is a decision rather than a technicality &mdash; you are asserting that the missing value is missing at random.
+Note what `nanmean` does: it cuts by the count of **real** values. On four elements with one NaN, it cuts by three. That is often right. It's worth being clear that it's a choice rather than a detail. You're asserting that the missing value is missing at random.
 
-`nansum` of an all-NaN array returns 0, while `nanmean` of one returns NaN with a warning. Those are different and defensible choices, and both are worth knowing before you rely on either.
+`nansum` of an all-NaN array returns 0, while `nanmean` of one returns NaN with a warning. Those are other and defensible choices. Both are worth knowing before you lean on either.
 
 ## Finding them
 
-`np.isnan(a)` gives a mask, and everything from the masking module applies.
+`np.isnan(a)` gives a mask, and all from the masking module applies.
 
-`np.isnan(a).sum()` counts them. With `axis`, it counts per row or per column, which is the first thing to look at when data arrives.
+`np.isnan(a).sum()` counts them. With `axis`, it counts per row or per column. This Is the first thing to look at when data arrives.
 
-`np.isnan(a).any(axis=1)` flags rows containing any missing value, and `~` inverts it to keep the complete ones. That is listwise deletion in one line.
+`np.isnan(a).any(axis=1)` flags rows holding any missing value. `~` inverts it to keep the full ones. That is listwise deletion in one line.
 
-`np.where(np.isnan(a))` gives the coordinates, which is what you want when you need to know *where* rather than *how many*.
+`np.where(np.isnan(a))` gives the coords. This Is what you want when you need to know *where* rather than *how many*.
 
 ## Filling
 
-Three broad strategies, and the choice is a statistical decision rather than a coding one.
+Three broad plans, and the choice is a statistical choice rather than a coding one.
 
-**Drop.** `a[~np.isnan(a)]` for a vector, or the row-wise version above for a table. Simple and unbiased if the data really is missing at random; throws away potentially a lot if it is not.
+**Drop.** `a[~np.isnan(a)]` for a vector, or the row-wise version above for a table. Simple and unbiased if the data really is missing at random. Throws away maybe a lot if it isn't.
 
-**Constant.** `np.nan_to_num(a)` replaces with zero; `np.where(np.isnan(a), value, a)` with anything else. Filling with zero shifts the mean. Filling with the mean preserves the mean but shrinks the variance, which quietly misleads anything downstream that cares about spread.
+**Constant.** `np.nan_to_num(a)` replaces with zero. `np.where(np.isnan(a), value, a)` with anything else. Filling with zero shifts the mean. Filling with the mean preserves the mean but shrinks the variance. This Quietly misleads anything downstream that cares about spread.
 
-**Interpolate.** `np.interp` fills from neighbouring values, which is the right choice for ordered data like a time series where adjacency is meaningful.
+**Interpolate.** `np.interp` fills from neighbouring values. This Is the right choice for sorted data like a time series where adjacency is real.
 
-None of these is neutral. Every one of them puts numbers into your data that were not measured, and the honest thing is to record which you used.
+None of these is neutral. each one of them puts numbers into your data that weren't measured. The honest thing is to record which you used.
 
 ## inf is different
 
-Dividing by zero does not raise in NumPy. It produces `inf`, `-inf` or `nan`, and emits a RuntimeWarning.
+Cutting by zero doesn't raise in NumPy. It makes `inf`, `-inf` or `nan`, and emits a RuntimeWarning.
 
-`1/0` gives `inf`. `0/0` gives `nan`. They come from different failures and are worth distinguishing.
+`1/0` gives `inf`. `0/0` gives `nan`. They come from other failures and are worth distinguishing.
 
-`np.isnan` does not catch `inf`. `np.isinf` does not catch NaN. `np.isfinite` catches both, and is usually the check you actually want when validating data.
+`np.isnan` doesn't catch `inf`. `np.isinf` doesn't catch NaN. `np.isfinite` catches both. Is often the check you really want when checking data.
 
-`np.errstate` is the context manager for suppressing the warnings when the behaviour is intentional. `np.nan_to_num` replaces NaN and both infinities in one call, with separate arguments for each.
+`np.errstate` is the context manager for suppressing the warnings when the action is intentional. `np.nan_to_num` replaces NaN and both infinities in one call, with split args for each.
 
 ## Three ways to represent missing, and their costs
 
-**NaN.** Works only for floats. Propagates automatically through arithmetic, which is both the safety feature and the hazard. Supported by the whole `nan*` family and understood by every library.
+**NaN.** Works only for floats. Passes on its own through math. This Is both the safety feature and the hazard. Supported by the whole `nan*` family and understood by each library.
 
-**A sentinel value.** `-1` for a count, `-999` for a measurement. Works for integers, costs nothing, and is entirely a convention &mdash; nothing stops the sentinel being treated as data by code that does not know about it. Every such bug is silent and produces plausible numbers.
+**A sentinel value.** `-1` for a count, `-999` for a reading. Works for ints, costs nothing. Is fully a rule. Nothing stops the sentinel being treated as data by code that doesn't know about it. each such bug is silent and makes plausible numbers.
 
-**A separate boolean mask.** Explicit, works for any dtype, and never gets mistaken for data. Costs a byte per element and requires every operation to be written mask-aware, which is the reason it is not more common.
+**A split boolean mask.** clear, works for any dtype. Never gets mistaken for data. Costs a byte per element and needs each step to be written mask-aware. This Is the reason it isn't more common.
 
 `np.ma` packages the third option, and pandas' nullable dtypes package a version of it with better ergonomics.
 
-For plain NumPy, NaN is the default answer for floats, and a documented sentinel is the pragmatic answer for integers when converting to float is not acceptable. The important part is documenting it &mdash; a sentinel that is not written down anywhere is a bug waiting for a new maintainer.
+For plain NumPy, NaN is the default answer for floats. A documented sentinel is the pragmatic answer for ints when converting to float isn't acceptable. The key part is documenting it. A sentinel that isn't written down anywhere is a bug waiting for a new maintainer.
 
 ## Comparing arrays that contain NaN
 
-`np.array_equal(a, b)` returns False if either contains NaN, because NaN never equals anything &mdash; including the NaN in the same position of the other array.
+`np.array_equal(a, b)` returns False if either holds NaN. NaN never equals anything. Including the NaN in the same spot of the other array.
 
-That makes it useless for checking that a computation reproduced a result, which is exactly when you want it.
+That makes it useless for checking that a math copied a result. This Is just when you want it.
 
-`np.array_equal(a, b, equal_nan=True)` treats NaNs in matching positions as equal.
+`np.array_equal(a, b, equal_nan=True)` treats NaNs in matching spots as equal.
 
-`np.allclose(a, b, equal_nan=True)` does the same with a tolerance, and is what belongs in a test comparing floating-point results.
+`np.allclose(a, b, equal_nan=True)` does the same with a handling. Is what belongs in a test checking floating-point results.
 
-Both are worth reaching for by default in test code, because a NaN appearing in both arrays is usually the expected outcome rather than a failure.
+Both are worth reaching for by default in test code. A NaN appearing in both arrays is often the expected outcome rather than a failure.
 
 ## NaN in sorting and extremes
 
-`np.sort` places NaN at the **end**, on the grounds that it compares greater than everything. That is a convention rather than a consequence, since NaN comparisons are all False.
+`np.sort` places NaN at the **end**, on the grounds that it checks greater than all. That is a rule rather than a result. NaN checks are all False.
 
-`np.argmax` and `np.max` return NaN if any element is NaN, which is consistent with the reductions but means a single missing value hides the real maximum. `np.nanargmax` and `np.nanmax` skip them.
+`np.argmax` and `np.max` return NaN if any element is NaN. This Is steady with the reductions but means a single missing value hides the real max. `np.nanargmax` and `np.nanmax` skip them.
 
-`np.nanargmax` **raises** on an all-NaN slice rather than returning something meaningless, which is the right behaviour and worth catching in code that reduces over groups that might be entirely missing.
+`np.nanargmax` **raises** on an all-NaN slice rather than returning a thing meaningless. This Is the right action and worth catching in code that reduces over groups that might be fully missing.
 
-`np.median` propagates NaN; `np.nanmedian` does not.
+`np.median` passes NaN. `np.nanmedian` doesn't.
 
-The pattern is consistent: the plain function propagates, the `nan` version skips, and the `nan` version has an opinion about the all-missing case.
+The pattern is steady: the plain function passes, the `nan` version skips. The `nan` version has an view about the all-missing case.
 
 ## Tracking a NaN back to its source
 
 The hard part of NaN debugging is that the value flows a long way from where it was created.
 
-The single most effective tool is `np.errstate(all="raise")`, which converts the operation that *produces* an invalid result into an exception. The traceback then points at the division by zero or the square root of a negative number, rather than at the reduction three functions later that returned NaN.
+The single most good tool is `np.errstate(all="raise")`. This Converts the step that *makes* an invalid result into an exception. The traceback then points at the division by zero or the square root of a minus number, rather than at the reduction three functions later that returned NaN.
 
 Failing that, bisect: check `np.isfinite(x).all()` at a few points in the pipeline and narrow down where it first goes false.
 
-The usual origins are worth knowing, because one of them is almost always it: division by zero, `log` of zero or a negative, `sqrt` of a negative, `0 * inf`, `inf - inf`, and an out-of-domain trigonometric inverse where a value drifted just past 1 through rounding. That last one is a classic &mdash; a cosine similarity computed as 1.0000000002 and passed to `arccos` gives NaN, and `np.clip(x, -1, 1)` is the fix.
+The usual origins are worth knowing. One of them is almost always it. Division by zero, `log` of zero or a minus, `sqrt` of a minus, `0 * inf`, `inf - inf`. An out-of-domain trigonometric inverse where a value drifted just past 1 through rounding. That last one is a classic. A cosine likeness found as 1.0000000002 and passed to `arccos` gives NaN. `np.clip(x, -1, 1)` is the fix.
 
 ## Deciding what to do about missing data
 
-The code is easy; the decision is not, and it is a decision about the data rather than about NumPy.
+The code is easy. The choice isn't. It's a choice about the data rather than about NumPy.
 
-**Why is it missing?** Missing at random can be dropped or imputed without bias. Missing because of the value itself &mdash; a sensor that fails at extremes, a survey question people skip when the answer is embarrassing &mdash; cannot. Dropping those rows biases the result, and imputing them with a mean biases it differently.
+**Why is it missing?** Missing at random can be dropped or imputed without bias. Missing because of the value itself. A sensor that fails at extremes, a survey question people skip when the answer is embarrassing. Can't. Dropping those rows biases the result. Imputing them with a mean biases it differently.
 
-**How much is missing?** A handful of rows out of a hundred thousand can be dropped without much thought. Thirty percent cannot, and the choice of imputation becomes a modelling decision that should be stated.
+**How much is missing?** A handful of rows out of a hundred thousand can be dropped without much thought. Thirty percent can't. The choice of imputation turns a modelling choice that should be stated.
 
-**What does downstream care about?** A mean is robust to mean-imputation by construction. A variance is not &mdash; filling with the mean shrinks it, and anything relying on spread will be quietly wrong.
+**What does downstream care about?** A mean is robust to mean-imputation by build. A variance isn't. Filling with the mean shrinks it. Anything leaning on spread will be quietly wrong.
 
-**Is the missingness itself informative?** Often it is, and adding a boolean "was missing" column preserves that information rather than discarding it.
+**Is the missingness itself helpful?** Often it's. Adding a boolean "was missing" column preserves that data rather than discarding it.
 
-Whatever you choose, count them first and record what you did. `np.isnan(a).sum(axis=0)` at the point data arrives takes one line and prevents a surprising number of downstream mysteries.
+what you choose, count them first and record what you did. `np.isnan(a).sum(axis=0)` at the point data arrives takes one line and blocks a surprising number of downstream mysteries.
 
 ## Validating data as it arrives
 
-The cheapest defence against NaN problems is checking at the boundary, where the data enters the program.
+The cheapest defence against NaN problems is checking at the boundary. Here The data enters the program.
 
-`np.isfinite(a).all()` answers "is any of this NaN or infinite" in one call, and is the right single check because it catches both.
+`np.isfinite(a).all()` answers "is any of this NaN or infinite" in one call. Is the right single check because it catches both.
 
-`np.isnan(a).sum(axis=0)` gives the count per column, which turns "there is missing data somewhere" into "column 3 is 40% empty" &mdash; a far more actionable statement.
+`np.isnan(a).sum(axis=0)` gives the count per column. This Turns "there's missing data one spot" into "column 3 is 40% empty". A far more actionable statement.
 
-Doing this at load time, and failing or logging rather than proceeding silently, converts a class of mysterious downstream results into an immediate, located error. It costs one line.
+Doing this at load time, and failing or logging rather than proceeding silently, converts a class of mysterious downstream results into an direct, located error. It costs one line.
 
 ## NaN and boolean logic
 
-`np.isnan` requires a float dtype. Calling it on an integer or string array raises a TypeError rather than returning all-False, which surprises people writing generic code.
+`np.isnan` needs a float dtype. Calling it on an int or string array raises a TypeError rather than returning all-False. This Surprises people writing plain code.
 
-`np.isnan(a)` on an **object** array also fails, because the elements may not be numbers at all.
+`np.isnan(a)` on an **object** array also fails. The elements may not be numbers at all.
 
-For code that must handle any dtype, guard with `np.issubdtype(a.dtype, np.floating)` first, or use `pd.isna` from pandas, which handles every case including None and NaT.
+For code that must handle any dtype, guard with `np.issubdtype(a.dtype, np.floating)` first, or use `pd.isna` from pandas. This Handles each case including None and NaT.
 
 ## Comparisons involving NaN, in filtering
 
-Because every comparison with NaN is False, NaN values fail every condition &mdash; including the negation of a condition.
+Because each compare with NaN is False, NaN values fail each rule. Including the negation of a rule.
 
-`a[a > 0]` excludes them. `a[a <= 0]` also excludes them. Two filters that look like an exhaustive partition silently drop rows.
+`a[a > 0]` excludes them. `a[a <= 0]` also excludes them. Two filters that look like an exhaustive split silently drop rows.
 
-Any place where a dataset is split into groups by a numeric condition is a place to ask what happens to the missing values, and to add an explicit `np.isnan` branch if they should be handled rather than lost.
+Any place where a dataset is split into groups by a numeric rule is a place to ask what happens to the missing values. To add an clear `np.isnan` branch if they should be handled rather than lost.
 
 ## The summary
 
@@ -6296,15 +6296,15 @@ Any place where a dataset is split into groups by a numeric condition is a place
 
 `np.isfinite` to validate, because it catches infinities too.
 
-The `nan*` family to reduce over them, remembering that skipping is a decision about the data.
+The `nan*` family to reduce over them, remembering that skipping is a choice about the data.
 
-`np.errstate(all="raise")` to find where one was created, which is the single most effective debugging tool here.
+`np.errstate(all="raise")` to find where one was created. This Is the single most good debugging tool here.
 
-`equal_nan=True` on `allclose` and `array_equal` when comparing results that legitimately contain them.
+`equal_nan=True` on `allclose` and `array_equal` when checking results that legitimately hold them.
 
-`np.clip` before `arccos` and similar, to stop rounding drift producing NaN from valid data.
+`np.clip` before `arccos` and similar, to stop rounding drift making NaN from valid data.
 
-And at the start of everything: count them, record what you did about them, and prefer being explicit over letting a fill value pass silently into an analysis that assumes it was measured.
+And at the start of all: count them, record what you did about them. Prefer being clear over letting a fill value pass silently into an analysis that assumes it was measured.
 ''',
     [
         {"q": "Why does `arr == np.nan` never find anything?",
@@ -6487,62 +6487,62 @@ print("are measuring the machine, not the code.")'''),
     ],
     '''
 title: Performance and Memory
-intro: Where the time and the bytes actually go.
+intro: Where the time and the bytes really go.
 
 ## The order to try things
 
-Most NumPy performance work comes down to four questions, roughly in order of payoff:
+Most NumPy speed work comes down to four questions, roughly in order of payoff:
 
-1. Is there still a Python loop? Removing it is worth 10&ndash;100x.
-2. Is the dtype larger than it needs to be? Halving it is worth up to 2x, and halves memory.
-3. Are temporaries being allocated in a hot path? In-place operations remove them.
+1. Is there still a Python loop? Dropping it's worth 10&ndash;100x.
+2. Is the dtype larger than it needs to be? Halving it's worth up to 2x, and halves memory.
+3. Are temporaries being allocated in a hot path? In-place steps drop them.
 4. Is the memory access pattern fighting the cache? Layout changes can be worth 2&ndash;5x.
 
-The first is covered in the introductory module and dwarfs the rest. This module is about the other three, which matter once the obvious loop is gone.
+The first is covered in the introductory module and dwarfs the rest. This module is about the other three. This Matter once the obvious loop is gone.
 
 ## dtype
 
-`float64` is the default and is often more precision than the data justifies. Sensor readings good to three significant figures do not benefit from fifteen.
+`float64` is the default and is often more precision than the data justifies. Sensor readings good to three large figures don't gain from fifteen.
 
-`float32` keeps about seven significant digits, halves the memory, and typically runs faster &mdash; not because the arithmetic is cheaper, but because half as much data has to travel from memory to the processor, and memory bandwidth is usually the limit.
+`float32` keeps about seven large digits, halves the memory. Often runs faster. Not because the math is cheaper. Because half as much data has to travel from memory to the processor, and memory bandwidth is often the limit.
 
-The same applies to integers. An array of small counts does not need `int64`. An array of flags should be `bool_`, which is one byte, not `int64`, which is eight.
+The same applies to ints. An array of small counts doesn't need `int64`. An array of flags should be `bool_`. This Is one byte, not `int64`, which is eight.
 
-The caution from the dtypes module still applies: narrow integers overflow silently. Choose the smallest type that cannot overflow for your actual data, not the smallest that happens to fit today's sample.
+The caution from the dtypes module still applies. Narrow ints overflow silently. Choose the smallest type that can't overflow for your actual data, not the smallest that happens to fit today's sample.
 
 ## Temporaries
 
-`a * 2 + 1` on a million-element array does not do one pass. It allocates an 8 MB temporary for `a * 2`, then allocates another 8 MB for the final result, then frees the first.
+`a * 2 + 1` on a million-element array doesn't do one pass. It allocates an 8 MB temporary for `a * 2`, then allocates another 8 MB for the final result, then frees the first.
 
-You never see them, and for a single expression it rarely matters. In a loop, or in a chain of five operations on a large array, the allocation and the extra memory traffic dominate.
+You never see them, and for a single formula it rarely matters. In a loop, or in a chain of five steps on a large array, the allocation and the extra memory traffic dominate.
 
 Two ways to avoid it.
 
-**In-place operators.** `a *= 2` modifies the existing buffer and allocates nothing. Remember that it also modifies anything sharing that buffer, which is the views-versus-copies problem again.
+**In-place ops.** `a *= 2` modifies the existing buffer and allocates nothing. note that it also modifies anything sharing that buffer. This Is the views-versus-copies problem again.
 
-**`out=`.** Every ufunc accepts `out`, which names the destination explicitly. `np.multiply(a, 3, out=dest)` writes into `dest`, and `out` may be one of the inputs. This is the clearest form when you are accumulating into a buffer across iterations.
+**`out=`.** each ufunc accepts `out`. This Names the destination by name. `np.times(a, 3, out=dest)` writes into `dest`. `out` may be one of the inputs. This is the clearest form when you're building up into a buffer across loops.
 
-Neither is worth doing everywhere. `a * 2 + 1` is more readable than two statements, and readability wins until you have measured that this line matters.
+Neither is worth doing all over. `a * 2 + 1` is more readable than two statements. Readability wins until you've measured that this line matters.
 
 ## Layout and the cache
 
-A C-ordered array stores the **last** axis contiguously. Consecutive elements along that axis sit next to each other in memory.
+A C-sorted array stores the **last** axis contiguously. in a row elements along that axis sit next to each other in memory.
 
-Processors fetch memory in cache lines, so reading consecutive bytes is far cheaper than jumping a row at a time.
+Processors fetch memory in cache lines. Reading in a row bytes is far cheaper than jumping a row at a time.
 
-Reductions are a poor demonstration of this. NumPy blocks them internally, so `sum(axis=0)` and `sum(axis=1)` usually run at similar speed and sometimes in the order you would not predict. It is worth knowing that, because the "always reduce along the last axis" advice is repeated widely and does not survive measurement.
+Reductions are a poor demo of this. NumPy blocks them inside. `sum(axis=0)` and `sum(axis=1)` often run at similar speed and at times in the order you wouldn't predict. It's worth knowing that. The "always reduce along the last axis" advice is repeated widely and doesn't live reading.
 
-Where it shows clearly is when data is actually **moved**. Copying a `(1200, 1200)` array and copying its transpose move the same number of bytes and produce the same number of bytes, but the transpose reads one value from each row in turn, and runs several times slower.
+Where it shows clearly is when data is really **moved**. Copying a `(1200, 1200)` array and copying its transpose move the same number of bytes and give the same number of bytes. The transpose reads one value from each row in turn. Runs a few times slower.
 
-Two practical consequences. If you have a choice about which axis holds the thing you iterate over, put it last. And if you are about to make many strided passes over the same data, one `np.ascontiguousarray` up front can pay for itself &mdash; a single copy against many slow reads.
+Two hands-on results. If you've a choice about which axis holds the thing you iterate over, put it last. And if you're about to make many strided passes over the same data, one `np.ascontiguousarray` up front can pay for itself. A single copy against many slow reads.
 
 ## Preallocation
 
-`np.append` and `np.concatenate` do not append. They allocate a new array and copy everything. In a loop that is quadratic, and it is the single most common accidental slowdown in NumPy code after the plain Python loop.
+`np.append` and `np.concatenate` don't append. They allocate a new array and copy all. In a loop that is quadratic. It's the single most common accidental slowdown in NumPy code after the plain Python loop.
 
-If you know the final size, `np.empty(n)` and assignment by index is the direct answer. `np.empty` does not initialise, so it is faster than `np.zeros` when you are going to overwrite everything &mdash; and dangerous if you are not, because the contents are whatever was in that memory.
+If you know the final size, `np.empty(n)` and set by index is the direct answer. `np.empty` doesn't reset. It's faster than `np.zeros` when you're going to overwrite all. And dangerous if you aren't. The contents are what was in that memory.
 
-If you do not know the size, collect into a Python list and convert once at the end. Lists are designed for growth; arrays are not.
+If you don't know the size, collect into a Python list and convert once at the end. Lists are designed for growth. Arrays aren't.
 
 ## Measuring
 
@@ -6550,37 +6550,37 @@ Guessing is unreliable, and the intuitions transferred from pure Python are ofte
 
 `a.nbytes` gives the real size of the data. `a.itemsize` gives the per-element cost.
 
-For time, run the operation several times and take the **minimum**, not the mean. The slow runs are measuring interference from the rest of the machine; the fastest run is the closest estimate of the actual cost. A single timed run of a fast operation measures mostly noise.
+For time, run the step a few times and take the **min**, not the mean. The slow runs are measuring interference from the rest of the machine. The fastest run is the closest guess of the actual cost. A single timed run of a fast step measures mostly noise.
 
-And measure the thing you intend to change. Optimising an operation that accounts for 2% of the runtime is effort spent for a 2% ceiling, however satisfying the local speedup looks.
+And measure the thing you intend to change. Optimising an step that accounts for 2% of the runtime is effort spent for a 2% ceiling. Meeting the local speedup looks.
 
 ## Views and memory that will not go away
 
-A view holds a reference to the array it came from, so the entire base buffer stays alive as long as the view does.
+A view holds a link to the array it came from. The entire base buffer stays alive if the view does.
 
-Extract one row from an 8 MB array, keep it, and you are keeping 8 MB.
+Extract one row from an 8 MB array, keep it, and you're keeping 8 MB.
 
-This is the most common source of NumPy memory that never comes back, and it is invisible &mdash; `row.nbytes` reports four kilobytes while the process holds eight megabytes.
+This is the most common source of NumPy memory that never comes back. It's invisible. `row.nbytes` reports four kilobytes while the process holds eight megabytes.
 
-The fix is `copy()` at the point you decide to keep something small from something large. The cost is one small allocation; the saving is the whole base.
+The fix is `copy()` at the point you decide to keep a thing small from a thing large. The cost is one small allocation. The saving is the whole base.
 
-`a.base` shows what a view derives from, and `a.base.nbytes` shows what is actually being held. That is the diagnostic when memory in a long-running process grows without an obvious cause.
+`a.base` shows what a view derives from. `a.base.nbytes` shows what is really being held. That is the diagnostic when memory in a long-running process grows without an obvious cause.
 
 ## Threads and the GIL
 
-NumPy releases the GIL during most array operations, which means threads genuinely run in parallel inside a NumPy computation &mdash; unlike most pure Python code.
+NumPy releases the GIL during most array steps. This Means threads truly run in parallel inside a NumPy math. Unlike most pure Python code.
 
 That makes `concurrent.futures.ThreadPoolExecutor` a real option for parallelising array work, with none of the pickling and process-startup costs of multiprocessing.
 
-Two caveats. Operations that touch Python objects &mdash; object arrays, anything calling back into Python &mdash; do not release it. And BLAS routines are usually already multi-threaded internally, so adding your own threads on top can oversubscribe the machine and run slower. `OMP_NUM_THREADS` and `threadpoolctl` control that layer.
+Two caveats. steps that touch Python objects. Object arrays, anything calling back into Python. Don't release it. And BLAS routines are often already multi-threaded inside. Adding your own threads on top can oversubscribe the machine and run slower. `OMP_NUM_THREADS` and `threadpoolctl` control that layer.
 
-Measure before assuming threading helps. For large matrix operations it often does nothing, because BLAS was already using every core.
+Measure before given threading helps. For large mat steps it often does nothing. BLAS was already using each core.
 
 ## Chunking
 
-When an operation would allocate more than fits in memory, the answer is usually to do it in pieces.
+When an step would allocate more than fits in memory, the answer is often to do it in pieces.
 
-The classic case is a pairwise distance matrix. For 100,000 points, the intermediate is 10 billion entries and no machine will hold it. Processing 1,000 rows at a time keeps the intermediate at 100 million and gives the same answer.
+The classic case is a pairwise distance mat. For 100,000 points, the mid is 10 billion entries and no machine will hold it. handling 1,000 rows at a time keeps the mid at 100 million and gives the same answer.
 
 The general shape:
 
@@ -6590,23 +6590,23 @@ for start in range(0, n, chunk):
     out[start:start + chunk] = expensive(block)
 ```
 
-The slices are views, so the chunking itself allocates nothing, and the output is preallocated once.
+The slices are views, so the chunking itself allocates nothing. The output is preallocated once.
 
-This is one of the cases where a loop is correct. The loop runs `n / chunk` times, not `n` times, so the interpreter overhead is negligible and the memory ceiling is the thing being controlled.
+This is one of the cases where a loop is correct. The loop runs `n / chunk` times, not `n` times. The interpreter cost is negligible and the memory ceiling is the thing being controlled.
 
 ## When to reach past NumPy
 
 NumPy has a ceiling, and recognising it saves effort spent optimising against it.
 
-**Numba** compiles a Python function to machine code with a decorator. It is the right answer for genuinely sequential algorithms &mdash; the ones that cannot be vectorised &mdash; and often gets within range of C for a few lines of change.
+**Numba** compiles a Python function to machine code with a decorator. It's the right answer for truly sequential methods. The ones that can't be vectorised. And often gets within range of C for a few lines of change.
 
-**Cython** gives more control at the cost of a build step, and is what several scientific libraries use internally.
+**Cython** gives more control at the cost of a build step. Is what a few scientific libraries use inside.
 
-**SciPy** already contains a compiled implementation of a great many things people write by hand: distance matrices, sparse matrices, signal filters, optimisation, interpolation. Checking whether SciPy has it is cheaper than writing it.
+**SciPy** already holds a compiled setup of a great many things people write by hand. Distance mats, sparse mats, signal filters, tuning, blending. Checking whether SciPy has it's cheaper than writing it.
 
-**Dask** handles arrays larger than memory with a NumPy-like interface, splitting work into chunks automatically.
+**Dask** handles arrays larger than memory with a NumPy-like interface, splitting work into chunks on its own.
 
-**CuPy / PyTorch** move the work to a GPU, with an interface close enough to NumPy that porting is often mechanical. Worth it for large array workloads, not worth it for small ones where the transfer cost dominates.
+**CuPy / PyTorch** move the work to a GPU, with an interface close enough to NumPy that porting is often rote. Worth it for large array workloads, not worth it for small ones where the transfer cost dominates.
 
 The order to consider them: is it vectorisable in NumPy, is it in SciPy, is it sequential and worth Numba, is it too big for memory, is it big enough for a GPU.
 
@@ -6614,37 +6614,37 @@ The order to consider them: is it vectorisable in NumPy, is it in SciPy, is it s
 
 The instinct about where time goes is unreliable, and array code is no exception.
 
-`cProfile` gives function-level timings and finds the hot function. `line_profiler` gives per-line timings within it, which is what you actually need when one function contains the whole computation.
+`cProfile` gives function-level timings and finds the hot function. `line_profiler` gives per-line timings within it. This Is what you really need when one function holds the whole math.
 
-`memory_profiler` tracks allocation line by line, and `a.nbytes` summed over the arrays you are holding is a quick manual version.
+`memory_profiler` tracks allocation line by line. `a.nbytes` summed over the arrays you're holding is a quick manual version.
 
 Two rules make profiling worth the time.
 
-**Profile the real workload.** A toy input can have completely different characteristics &mdash; different cache behaviour, different branch of the algorithm, different memory pressure.
+**Profile the real workload.** A toy input can have fully other traits. Other cache action, other branch of the method, other memory pressure.
 
-**Fix the top item, then measure again.** The bottleneck moves. Optimising the second item on the original list is often wasted, because after the first fix it is no longer second.
+**Fix the top item, then measure again.** The bottleneck moves. Optimising the second item on the first list is often wasted. After the first fix it's no longer second.
 
-And keep the ceiling in view: a function taking 5% of runtime cannot give more than a 5% improvement however completely you optimise it.
+And keep the ceiling in view: a function taking 5% of runtime can't give more than a 5% gain but fully you optimise it.
 
 ## Where the wins actually are, in order
 
-**Remove the Python loop.** 10&ndash;100x, and it dominates everything else. If a loop over elements is still there, nothing below this line matters yet.
+**Drop the Python loop.** 10&ndash;100x, and it dominates all else. If a loop over elements is still there, nothing below this line matters yet.
 
 **Avoid quadratic growth.** `np.append` or `concatenate` in a loop turns a linear job into a quadratic one. The fix is preallocation or a list.
 
 **Right-size the dtype.** Up to 2x on bandwidth-bound work, and it halves memory.
 
-**Remove temporaries in hot paths.** In-place operators and `out=`. Worth doing where measurement says it matters, not everywhere.
+**Drop temporaries in hot paths.** In-place ops and `out=`. Worth doing where reading says it matters, not all over.
 
 **Fix access patterns.** Contiguity, and avoiding repeated strided gathers.
 
-**Reach past NumPy.** Numba, SciPy, a GPU &mdash; when the algorithm genuinely does not vectorise or the data genuinely does not fit.
+**Reach past NumPy.** Numba, SciPy, a GPU. When the method truly doesn't vectorise or the data truly doesn't fit.
 
-Working down that list in order means the large wins come first, and it avoids the common trap of micro-optimising an expression inside a loop that should not exist.
+Working down that list in order means the large wins come first. It avoids the common trap of micro-optimising an formula inside a loop that shouldn't exist.
 
 ## Things that look slow and are not
 
-**Slicing.** A view. Free, whatever the array size.
+**Slicing.** A view. Free, what the array size.
 
 **Transposing.** A view. Free.
 
@@ -6652,41 +6652,41 @@ Working down that list in order means the large wins come first, and it avoids t
 
 **Reversing with `[::-1]`.** A view. Free.
 
-**Broadcasting the inputs.** No allocation; the strides are set to zero. The *output* is allocated, which is a different thing.
+**Broadcasting the inputs.** No allocation. The strides are set to zero. The *output* is allocated. This Is a other thing.
 
-Rewriting any of these to "avoid the copy" is effort spent on a copy that was never happening. Confirm with `np.shares_memory` before optimising something that may already be free.
+Rewriting any of these to "avoid the copy" is effort spent on a copy that was never happening. Confirm with `np.shares_memory` before optimising a thing that may already be free.
 
 ## Things that look cheap and are not
 
-**Boolean masking and fancy indexing.** Both allocate, and both gather from scattered positions.
+**Boolean masking and fancy indexing.** Both allocate, and both gather from scattered spots.
 
 **`astype`.** Allocates a full second array, even when the dtype is unchanged, unless `copy=False`.
 
-**Chained expressions on large arrays.** Every intermediate is a full-size allocation.
+**Chained expressions on large arrays.** each mid is a full-size allocation.
 
-**`np.append`.** Not an append. A full copy, every call.
+**`np.append`.** Not an append. A full copy, each call.
 
 **Keeping a small view of a large array.** Holds the whole base alive.
 
 ## The discipline
 
-Measure before optimising, and profile the real workload rather than a small stand-in &mdash; cache behaviour and memory pressure do not scale down predictably.
+Measure before optimising, and profile the real workload rather than a small stand-in. Cache action and memory pressure don't scale down predictably.
 
-Take the minimum of several timed runs, not the mean.
+Take the min of a few timed runs, not the mean.
 
 Fix the top item and measure again, because the bottleneck moves.
 
-Keep the ceiling in view: an operation taking 5% of the runtime cannot yield more than 5%, however thoroughly it is optimised.
+Keep the ceiling in view: an step taking 5% of the runtime can't yield more than 5%. Thoroughly it's optimised.
 
-And weigh readability honestly. A vectorised one-liner that nobody can safely modify has a maintenance cost that does not show up in a benchmark, and the version a colleague can read is often the better engineering answer even when it is slower.
+And weigh readability honestly. A vectorised one-liner that no one can safely modify has a maintenance cost that doesn't show up in a benchmark. The version a colleague can read is often the better engineering answer even when it's slower.
 
 ## The lock behind two of these timings
 
-Some of the numbers above only make sense in the presence of the interpreter lock, and it deserves a sentence rather than a hand-wave. CPython holds one lock around bytecode execution, so two Python-level threads never execute Python at the same time &mdash; but a NumPy call that spends its time in C can *release* that lock while it works, which is why a large `dot` or a big elementwise operation overlaps across threads and a Python loop over the same array does not.
+Some of the numbers above only make sense in the presence of the interpreter lock. It deserves a sentence rather than a hand-wave. CPython holds one lock around bytecode run. Two Python-level threads never execute Python also. But a NumPy call that spends its time in C can *release* that lock while it works. This Is why a large `dot` or a big elementwise step shares across threads and a Python loop over the same array doesn't.
 
-So the vectorised version is not merely faster. It is differently parallel, and that is a property of where the time is spent rather than of NumPy's API.
+So the vectorised version isn't merely faster. It's differently parallel. That is a property of where the time is spent rather than of NumPy's API.
 
-<ul><li><a href="../concurrency/the_gil_and_what_it_locks.html">The GIL, and what it actually locks</a> &mdash; measured: threads overlap waiting and do not overlap computing, and what "releases the GIL" means at the C boundary.</li><li><a href="../concurrency/threads_or_processes.html">Threads or processes: what is and is not shared</a> &mdash; and the cost of moving an array across a process boundary, which for a large array can exceed the work you were trying to parallelise.</li><li><a href="../concurrency/choosing_threads_processes_or_async.html">Choosing threads, processes, or async</a> &mdash; the decision with the cases stated rather than implied.</li></ul>
+<ul><li><a href="../concurrency/the_gil_and_what_it_locks.html">The GIL, and what it really locks</a>. Measured. Threads share waiting and don't share finding, and what "releases the GIL" means at the C boundary.</li><li><a href="../concurrency/threads_or_processes.html">Threads or processes: what is and isn't shared</a>. And the cost of moving an array across a process boundary. This For a large array can exceed the work you were trying to parallelise.</li><li><a href="../concurrency/choosing_threads_processes_or_async.html">Choosing threads, processes, or async</a>. The choice with the cases stated rather than implied.</li></ul>
 ''',
     [
         {"q": "Why is `float32` often faster than `float64`, not just smaller?",
@@ -6856,31 +6856,31 @@ intro: npy, npz, text and bytes, and which one to reach for.
 
 ## The native format
 
-`np.save(path, a)` writes a `.npy` file: a short header describing dtype, shape and byte order, followed by the raw bytes.
+`np.save(path, a)` writes a `.npy` file: a short header showing dtype, shape and byte order, followed by the raw bytes.
 
-`np.load(path)` reads it back identically. Dtype and shape survive, `int16` comes back as `int16`, and there is no parsing cost because there is nothing to parse.
+`np.load(path)` reads it back the same way. Dtype and shape live, `int16` comes back as `int16`. There's no parsing cost because there's nothing to parse.
 
-It is the right default for anything that only needs to be read by NumPy. Files are compact, writing and reading are fast, and nothing is lost.
+It's the right default for anything that only needs to be read by NumPy. Files are compact, writing and reading are fast, and nothing is lost.
 
-The extension is added automatically if you omit it.
+The extension is added on its own if you omit it.
 
 ## Bundles
 
-`np.savez(path, train=X, labels=y)` writes an `.npz` &mdash; a zip archive of `.npy` files, one per keyword argument.
+`np.savez(path, train=X, labels=y)` writes an `.npz`. A zip archive of `.npy` files, one per keyword arg.
 
-Loading gives a dictionary-like object. Arrays are read **lazily**, only when you index a key, so opening a large bundle to read one array does not load the rest.
+Loading gives a dict-like object. Arrays are read **lazily**, only when you index a key. Opening a large bundle to read one array doesn't load the rest.
 
-It holds an open file handle, so use it as a context manager or call `close()`. Forgetting is a common source of file handles leaking in long-running code.
+It holds an open file handle. Use it as a context manager or call `close()`. Losing is a common source of file handles leaking in long-running code.
 
-`np.savez_compressed` applies deflate. Whether that helps depends entirely on the data: zeros and repeated structure compress dramatically, and floating-point measurement noise barely compresses at all. It costs CPU on both ends, so it is worth measuring on your own data rather than assuming.
+`np.savez_compressed` applies deflate. Whether that helps depends fully on the data. Zeros and repeated structure compress sharply. Floating-point reading noise barely compresses at all. It costs CPU on both ends. It's worth measuring on your own data rather than given.
 
 ## Text
 
 `np.savetxt` and `np.loadtxt` handle CSV and similar.
 
-They are the right choice when something other than NumPy must read the file &mdash; a spreadsheet, a colleague, a different language.
+They're the right choice when a thing other than NumPy must read the file. A spreadsheet, a colleague, a other language.
 
-They are the wrong choice otherwise, for three reasons. Files are several times larger. Parsing is far slower than reading raw bytes. And **the dtype is lost**: everything comes back as `float64`, whatever went in. An `int8` array round-trips into `float64`.
+They're the wrong choice else, for three reasons. Files are a few times larger. Parsing is far slower than reading raw bytes. And **the dtype is lost**. All comes back as `float64`, what went in. An `int8` array round-trips into `float64`.
 
 `fmt` controls precision on write, and `%.4f` will silently truncate values you cared about. `header` with `comments=""` writes a plain header line rather than a commented one.
 
@@ -6888,112 +6888,112 @@ They are the wrong choice otherwise, for three reasons. Files are several times 
 
 This is the security-relevant part.
 
-Object arrays &mdash; arrays with `dtype=object`, holding arbitrary Python objects &mdash; cannot be written as raw bytes. NumPy pickles them instead.
+Object arrays &mdash; arrays with `dtype=object`, holding any Python objects &mdash; can't be written as raw bytes. NumPy pickles them instead.
 
-Unpickling **executes code**. A malicious `.npy` file can run anything when loaded.
+Unpickling **runs code**. A malicious `.npy` file can run anything when loaded.
 
-So `np.load` has `allow_pickle=False` by default and raises rather than loading an object array. That default is a deliberate protection, added after the risk became a practical problem.
+So `np.load` has `allow_pickle=False` by default and raises rather than loading an object array. That default is a deliberate protection, added after the risk became a hands-on problem.
 
-Enable it only for files you created yourself, or received through a channel you trust as much as you would trust an executable. "It is just data" is exactly the assumption the attack relies on.
+Enable it only for files you created yourself, or received through a channel you trust as much as you'd trust an executable. "It's just data" is just the assumption the attack leans on.
 
-Better still, avoid object arrays in saved data. If a structure will not fit in a plain numeric array, a format designed for structured data &mdash; JSON, HDF5, Parquet &mdash; is a better answer than pickling.
+Better still, avoid object arrays in saved data. If a structure won't fit in a plain numeric array, a format designed for structured data. JSON, HDF5, Parquet. Is a better answer than pickling.
 
 ## Messy input
 
-`loadtxt` is strict and raises on a missing field. That strictness is a feature when the data should be complete.
+`loadtxt` is strict and raises on a missing field. That strictness is a feature when the data should be full.
 
-`genfromtxt` is the tolerant version. Missing values become `nan` by default, or whatever `filling_values` specifies. It also handles column names, per-column dtypes and skipping footers.
+`genfromtxt` is the tolerant version. Missing values become `nan` by default, or what `filling_values` gives. It also handles column names, per-column dtypes and skipping footers.
 
-It is slower, and for genuinely messy tabular data, pandas' `read_csv` is faster and more capable. `genfromtxt` fits the middle ground: mostly clean numeric data with occasional gaps, where adding pandas would be more dependency than the problem justifies.
+It's slower, and for truly messy tabular data, pandas' `read_csv` is faster and more capable. `genfromtxt` fits the middle ground. Mostly clean numeric data with occasional gaps. Here Adding pandas would be more dependency than the problem justifies.
 
 ## Memory mapping
 
 `np.load(path, mmap_mode="r")` returns an array backed by the file rather than by memory.
 
-Slicing it reads only the pages touched. You can work with a file larger than RAM, and the operating system handles caching.
+Slicing it reads only the pages touched. You can work with a file larger than RAM. The operating system handles caching.
 
 `"r"` is read-only. `"r+"` allows writing back into the file. `np.array(mm)` materialises the whole thing when you do want it in memory.
 
-The limitation is that it only helps for access patterns that touch part of the data. A full reduction reads everything anyway, and does so with more overhead than a straight load.
+The limitation is that it only helps for access patterns that touch part of the data. A full reduction reads all anyway. Does so with more cost than a straight load.
 
 ## Choosing
 
 NumPy-only, one array: `.npy`.
 
-NumPy-only, several arrays: `.npz`, compressed if the data has structure.
+NumPy-only, a few arrays: `.npz`, compressed if the data has structure.
 
 Anything else must read it: text, accepting the size and the dtype loss.
 
 Larger than memory, partial access: `mmap_mode`.
 
-Genuinely large or shared across languages and tools: reach past NumPy to HDF5 or Parquet, which handle chunking, compression and metadata properly.
+truly large or shared across languages and tools. Reach past NumPy to HDF5 or Parquet. This Handle chunking, packing and metadata properly.
 
-And whichever you choose, do not enable `allow_pickle` on input you did not produce.
+And whichever you choose, don't enable `allow_pickle` on input you didn't give.
 
 ## Byte order and portability
 
-A `.npy` file records the byte order of the data it holds, so a file written on a big-endian machine loads correctly on a little-endian one. NumPy handles the swap.
+A `.npy` file records the byte order of the data it holds. A file written on a big-endian machine loads right on a little-endian one. NumPy handles the swap.
 
-You will see this in dtype strings: `<i4` is little-endian 32-bit integer, `>i4` big-endian, `=i4` native.
+You'll see this in dtype strings: `<i4` is little-endian 32-bit int, `>i4` big-endian, `=i4` native.
 
-It matters when reading raw binary from an external source &mdash; a network protocol, an instrument, a file format defined elsewhere &mdash; where the byte order is part of the specification and NumPy has no header to tell it. Getting it wrong produces numbers that are wrong in a distinctive way: plausible magnitudes, nonsense values.
+It matters when reading raw binary from an external source. A network protocol, an instrument, a file format defined elsewhere. Where the byte order is part of the specification and NumPy has no header to tell it. Getting it wrong makes numbers that are wrong in a distinctive way: plausible magnitudes, nonsense values.
 
-`a.byteswap()` swaps the bytes in place; `a.astype(a.dtype.newbyteorder())` produces a converted copy.
+`a.byteswap()` swaps the bytes in place. `a.astype(a.dtype.newbyteorder())` makes a converted copy.
 
 ## tofile and fromfile, and why to avoid them
 
 `a.tofile(path)` writes the raw bytes with **no header at all**. `np.fromfile(path, dtype=...)` reads them back.
 
-That means the file records neither the shape nor the dtype. Reading it requires knowing both in advance, from somewhere outside the file. Get the dtype wrong and you get garbage rather than an error; get the shape wrong and you get a reshape failure or, worse, a plausible wrong shape.
+That means the file records neither the shape nor the dtype. Reading it needs knowing both in advance, from one spot outside the file. Get the dtype wrong and you get garbage rather than an error. Get the shape wrong and you get a reshape failure or, worse, a plausible wrong shape.
 
-They exist for interoperating with programs that expect raw binary, and for that they are correct. As a storage format for your own data they are strictly worse than `.npy`, which adds a hundred-odd bytes of header and removes the entire class of problem.
+They exist for interoperating with programs that expect raw binary. For that they're correct. As a storage format for your own data they're strictly worse than `.npy`. This Adds a hundred-odd bytes of header and drops the entire class of problem.
 
-If you meet a `tofile` in existing code, it is worth checking whether the shape and dtype are documented anywhere, because that documentation is the only thing making the file readable.
+If you meet a `tofile` in existing code, it's worth checking whether the shape and dtype are documented anywhere. That docs is the only thing making the file readable.
 
 ## Structured dtypes for records
 
-When the data is genuinely tabular &mdash; mixed types per column &mdash; a structured dtype keeps it in one array:
+When the data is truly tabular. Mixed types per column. A structured dtype keeps it in one array:
 
 ```python
 dt = np.dtype([("name", "U20"), ("age", "i4"), ("score", "f8")])
 people = np.array([("ana", 31, 8.5)], dtype=dt)
 ```
 
-Fields are accessed by name: `people["age"]`. The result is a view, so assigning into it modifies the original.
+Fields are accessed by name: `people["age"]`. The result is a view. Assigning into it modifies the first.
 
-Structured arrays save and load through `.npy` without pickling, which is their main advantage over an object array &mdash; the data stays plain bytes.
+Structured arrays save and load through `.npy` without pickling. This Is their main edge over an object array. The data stays plain bytes.
 
-They also sort by field name with `order=`, which is the closest NumPy comes to sorting a table by columns.
+They also sort by field name with `order=`. This Is the closest NumPy comes to sorting a table by columns.
 
-The honest caveat: for anything with more than a few columns or any real analysis, pandas does this better. Structured arrays are worth knowing for reading fixed-format binary files and for the cases where adding pandas is not justified.
+The honest caveat: for anything with more than a few columns or any real analysis, pandas does this better. Structured arrays are worth knowing for reading fixed-format binary files and for the cases where adding pandas isn't justified.
 
 ## Formats beyond NumPy
 
-`.npy` and `.npz` are excellent for NumPy-only data of moderate size. Past that, the ecosystem has better answers.
+`.npy` and `.npz` are great for NumPy-only data of moderate size. Past that, the ecosystem has better answers.
 
-**HDF5**, via `h5py`, handles very large arrays with chunking, compression and metadata, supports partial reads and writes, and is readable from most languages. It is the standard in scientific computing for a reason.
+**HDF5**, via `h5py`, handles very large arrays with chunking, packing and metadata, supports partial reads and writes. Is readable from most languages. It's the standard in scientific finding for a reason.
 
-**Zarr** is similar in spirit, designed for cloud object storage, and works well with Dask for parallel access.
+**Zarr** is similar in spirit, designed for cloud object storage. Works well with Dask for parallel access.
 
 **Parquet**, via `pyarrow`, is columnar and is the right choice for tabular data going anywhere near a data pipeline or a query engine.
 
-The signals that it is time to move: files over a few hundred megabytes, needing to read part of an array without loading it, needing to append over time, or needing anything other than Python to read it.
+The signals that it's time to move. Files over a few hundred megabytes, needing to read part of an array without loading it, needing to append over time, or needing anything other than Python to read it.
 
 ## A safety summary
 
-The security point deserves restating because it is the one thing in this module that can go beyond losing data.
+The security point deserves restating because it's the one thing in this module that can go beyond losing data.
 
-`np.load` runs arbitrary code when loading a pickled object array. `allow_pickle=False` is the default and it is protecting you.
+`np.load` runs any code when loading a pickled object array. `allow_pickle=False` is the default and it's protecting you.
 
-Enable it only for files you produced, or that arrived through a channel you would trust with an executable. A `.npy` file from an untrusted source should be treated the way you would treat a downloaded script, because in the object-array case that is what it is.
+Enable it only for files you made, or that arrived through a channel you'd trust with an executable. A `.npy` file from an untrusted source should be treated the way you'd treat a downloaded script. In the object-array case that is what it's.
 
-The safe alternatives, in order of preference: keep the data in plain numeric arrays so pickling never arises; use a structured dtype for records; use JSON or Parquet for anything genuinely heterogeneous.
+The safe options, in order of preference: keep the data in plain numeric arrays so pickling never arises. Use a structured dtype for records. Use JSON or Parquet for anything truly heterogeneous.
 
-"It is just a data file" is precisely the assumption the attack depends on.
+"It's just a data file" is just the assumption the attack depends on.
 
 ## Round-tripping reliably
 
-The habit worth forming is to verify a save-and-load cycle once when introducing a new format, rather than discovering the loss later.
+The habit worth forming is to verify a save-and-load cycle once when adding a new format, rather than discovering the loss later.
 
 ```python
 np.save(path, a)
@@ -7001,57 +7001,57 @@ b = np.load(path)
 assert np.array_equal(a, b) and a.dtype == b.dtype
 ```
 
-Checking the dtype alongside the values catches exactly the failure that text formats introduce silently, and it takes one line.
+Checking the dtype alongside the values catches just the failure that text formats add silently, and it takes one line.
 
-For floating-point data going through a text format, `np.allclose` rather than `array_equal` is the honest comparison, because `fmt` has almost certainly truncated something.
+For floating-point data going through a text format, `np.allclose` rather than `array_equal` is the honest compare. `fmt` has almost certainly truncated a thing.
 
 ## Paths, and a common annoyance
 
-`np.save` appends `.npy` if the filename does not already end in it. That is convenient until code computes a path, saves to it, and then fails to find the file &mdash; because the actual file has an extra extension the code does not know about.
+`np.save` appends `.npy` if the filename doesn't already end in it. That is convenient until code finds a path, saves to it. Then fails to find the file. Because the actual file has an extra extension the code doesn't know about.
 
-Passing an open file object instead of a path avoids the rewriting entirely, and is the reliable form when the filename is computed.
+Passing an open file object instead of a path avoids the rewriting fully. Is the solid form when the filename is found.
 
 `np.savez` behaves the same way with `.npz`.
 
 ## Compression, in practice
 
-`savez_compressed` costs CPU on write and on read, and saves space only if the data has structure to exploit.
+`savez_compressed` costs CPU on write and on read. Saves space only if the data has structure to exploit.
 
-Integer data with a small range, arrays with many repeated values, and anything sparse compress well &mdash; often by an order of magnitude.
+int data with a small range, arrays with many repeated values. Anything sparse compress well. Often by an order of magnitude.
 
-Floating-point measurement data compresses poorly, because the low-order bits are effectively random. A 10&ndash;20% saving for several times the CPU is rarely a good trade.
+Floating-point reading data compresses poorly. The low-order bits are in effect random. A 10&ndash;20% saving for a few times the CPU is rarely a good trade.
 
-The way to decide is to try both on a representative sample and compare, which takes a minute and settles it for that dataset.
+The way to decide is to try both on a representative sample and compare. This Takes a minute and settles it for that dataset.
 
 ## Writing for other people
 
 If a file will be read by someone other than you, or by you in two years, the format is only half of it.
 
-Record the shape and dtype expectations somewhere the reader will find them, particularly for `tofile` output, which carries neither.
+Record the shape and dtype expectations one spot the reader will find them, above all for `tofile` output, which carries neither.
 
-Prefer `.npz` with named arrays over several `.npy` files with meaningful filenames, because the names travel with the data.
+Prefer `.npz` with named arrays over a few `.npy` files with real filenames. The names travel with the data.
 
-For anything that is genuinely a dataset rather than an intermediate &mdash; something that will be reused, shared or archived &mdash; HDF5 or Parquet carry metadata properly and are readable outside Python. The extra dependency buys real portability.
+For anything that is truly a dataset rather than an mid. A thing that will be reused, shared or archived. HDF5 or Parquet carry metadata properly and are readable outside Python. The extra dependency buys real portability.
 
 ## The summary
 
 `.npy` for a single array, NumPy only. Lossless, compact, fast.
 
-`.npz` for several named arrays, compressed only if the data compresses.
+`.npz` for a few named arrays, compressed only if the data compresses.
 
-Text when something else must read it, accepting that the dtype is gone.
+Text when a thing else must read it, accepting that the dtype is gone.
 
-`mmap_mode` for partial access to something larger than memory.
+`mmap_mode` for partial access to a thing larger than memory.
 
 HDF5, Zarr or Parquet past a few hundred megabytes, or when other tools are involved.
 
-`allow_pickle=False` &mdash; the default &mdash; on anything you did not produce yourself. That one is not a performance preference; it is the difference between reading a file and running one.
+`allow_pickle=False` &mdash; the default &mdash; on anything you didn't give yourself. That one isn't a speed preference. It's the gap between reading a file and running one.
 
 ## A closing note
 
-Storage is where a project's decisions become permanent. A format chosen for convenience during a first experiment tends to survive into production, and by then there is data in it.
+Storage is where a project's choices become permanent. A format chosen for convenience during a first test tends to live into production. By then there's data in it.
 
-`.npy` and `.npz` are good enough for a great deal of work and cost nothing to adopt. The point to reconsider is when files grow past a few hundred megabytes, when something other than Python needs to read them, or when only part of an array is needed at a time &mdash; and recognising that point early is easier than migrating later.
+`.npy` and `.npz` are good enough for a great deal of work and cost nothing to adopt. The point to reconsider is when files grow past a few hundred megabytes, when a thing other than Python needs to read them, or when only part of an array is needed at a time. And recognising that point early is easier than migrating later.
 ''',
     [
         {"q": "What does `.npy` preserve that a CSV does not?",

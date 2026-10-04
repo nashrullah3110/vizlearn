@@ -103,142 +103,142 @@ topic(
     ],
     """
 title: Basis, Span and Orthogonality
-intro: What a set of vectors can reach, when it stops reaching everything, and why perpendicular is worth so much.
+intro: What a set of vectors can reach, when it stops reaching all. Why at right angles is worth so much.
 
 ## Span
 
-Given some vectors, the **span** is every point you can reach by scaling them
+Given some vectors, the **span** is each point you can reach by scaling them
 and adding the results. Nothing more exotic than that: pick a multiple of each,
 add them up, and see where you land.
 
-Two vectors in the plane usually span the whole plane. Any point you name can
+Two vectors in the plane often span the whole plane. Any point you name can
 be written as some amount of the first plus some amount of the second, and the
-visualisation shows the shaded parallelogram they generate.
+visualisation shows the shaded parallelogram they make.
 
-Usually &mdash; but not always. Drag one vector until it lines up with the
-other and the parallelogram flattens to nothing. Now every combination lands
+often &mdash; but not always. Drag one vector until it lines up with the
+other and the parallelogram flattens to nothing. Now each combination lands
 on a single line, and most of the plane has become unreachable. The vectors
 are **linearly dependent**: one is a multiple of the other, so the second adds
-no direction the first did not already have.
+no direction the first didn't already have.
 
 ## The determinant is the test
 
-You do not have to eyeball it. The readout gives the determinant, which is the
-signed area of that parallelogram, and it reaches zero exactly when the span
-collapses.
+You don't have to eyeball it. The readout gives the determinant, which is the
+signed area of that parallelogram, and it reaches zero just when the span
+merges.
 
 That is the same number the [determinant module](determinant.html) covers as an
-area scale factor, seen from another side. A matrix whose determinant is zero
-squashes the plane onto a line, which is precisely why it has no inverse:
-several inputs land on the same output, so nothing can undo it.
+area scale factor, seen from another side. A mat whose determinant is zero
+squashes the plane onto a line. This Is just why it has no inverse:
+a few inputs land on the same output. So Nothing can undo it.
 
 ## Basis
 
 A **basis** is a set of vectors that spans the space and is linearly
-independent &mdash; enough to reach everything, with nothing redundant.
+free &mdash; enough to reach all, with nothing redundant.
 
-Both halves matter. Too few vectors and you cannot reach everything. Too many
-and the representation stops being unique, because there is more than one way
+Both halves matter. Too few vectors and you can't reach all. Too many
+and the form stops being unique, because there's more than one way
 to write the same point. A basis is the exact amount.
 
-Once you have one, every point in the space has exactly one set of coordinates
-in it. That is the whole reason coordinates work at all, and it is why
-"[change of basis](matrix_as_transformation.html)" is a meaningful operation
+Once you've one, each point in the space has just one set of coords
+in it. That is the whole reason coords work at all, and it's why
+"[change of basis](matrix_as_transformation.html)" is a real op
 rather than a rearrangement.
 
-The plane needs exactly two vectors in any basis; three-dimensional space needs
-three. That count is the **dimension**, and it does not depend on which basis
+The plane needs just two vectors in any basis. Three-dimensional space needs
+three. That count is the **dim**, and it doesn't depend on which basis
 you choose.
 
 ## Orthogonality
 
-Two vectors are **orthogonal** when their [dot
+Two vectors are **perp** when their [dot
 product](vectors_and_dot_product.html) is zero &mdash; the algebraic way of
 saying they meet at a right angle. Drag until the readout says so.
 
-Orthogonality is not required for a basis. The default pair above is a
-perfectly good basis and is nowhere near perpendicular. But an orthogonal basis
-is worth reaching for, because finding the coordinates of a point becomes a
+Perpness isn't needed for a basis. The default pair above is a
+just right good basis and is nowhere near at right angles. But an perp basis
+is worth reaching for, because finding the coords of a point turns a
 matter of taking one dot product per axis instead of solving a system of
 equations.
 
-An **orthonormal** basis adds that every vector has length 1. Then the matrix
+An **unit-perp** basis adds that each vector has length 1. Then the mat
 whose columns are those vectors has a remarkable property: its inverse is its
-transpose. Undoing the transformation costs nothing at all, which is why
-orthonormal bases turn up wherever numerical stability matters.
+transpose. Undoing the change costs nothing at all, which is why
+unit-perp bases turn up wherever numeric steadiness matters.
 
-The standard basis &mdash; (1, 0) and (0, 1) &mdash; is orthonormal, which is
-why ordinary coordinates feel so natural.
+The standard basis &mdash; (1, 0) and (0, 1) &mdash; is unit-perp, which is
+why plain coords feel so natural.
 
 ## Where this shows up
 
-**PCA** finds an orthonormal basis aligned with the directions of greatest
-variance in the data. The orthogonality is the point: the components do not
-overlap, so each one describes something the others do not.
+**PCA** finds an unit-perp basis aligned with the directions of greatest
+variance in the data. The perpness is the point: the components don't
+share, so each one shows a thing the others don't.
 
-**[SVD](singular_value_decomposition.html)** produces two orthonormal bases,
+**[SVD](singular_value_decomposition.html)** makes two unit-perp bases,
 one for the input space and one for the output.
 
-**QR decomposition** exists to manufacture an orthonormal basis from an
-arbitrary one, and least-squares solvers use it because the resulting system is
+**QR breakdown** exists to manufacture an unit-perp basis from an
+any one, and least-squares solvers use it because the resulting system is
 far better conditioned than the direct approach.
 
-**Fourier and wavelet transforms** are changes into an orthogonal basis chosen
-so the interesting structure shows up in a few coordinates.
+**Fourier and wavelet transforms** are changes into an perp basis chosen
+so the notable structure shows up in a few coords.
 
 ## Coordinates, with and without orthogonality
 
-The payoff of an orthogonal basis is concrete: coordinates become dot products
+The payoff of an perp basis is concrete: coords become dot products
 instead of a system of equations. Take the point `p = (5, 5)` and two bases.
 
-In the ordinary basis `b1 = (2, 1)`, `b2 = (1, 3)`, finding coordinates
+In the plain basis `b1 = (2, 1)`, `b2 = (1, 3)`, finding coords
 `c1, c2` with `c1 b1 + c2 b2 = p` means solving
 
 `2c1 + c2 = 5` and `c1 + 3c2 = 5` &rarr; `c1 = 2, c2 = 1`.
 
-That is a `2&times;2` system; in `n` dimensions it is an `n&times;n` solve.
+That is a `2&times;2` system. In `n` dims it's an `n&times;n` solve.
 
-In the orthonormal basis `q1 = (1, 1)/&radic;2`, `q2 = (1, &minus;1)/&radic;2`,
-each coordinate is a single dot product:
+In the unit-perp basis `q1 = (1, 1)/&radic;2`, `q2 = (1, &minus;1)/&radic;2`,
+each coord is a single dot product:
 
 |coordinate|computation|value|
 |---|---|---|
 |c1|p &middot; q1 = (5+5)/&radic;2|&asymp; 7.07|
 |c2|p &middot; q2 = (5&minus;5)/&radic;2|0|
 
-No system to solve &mdash; one dot product per axis, because the axes do not
-interfere. This is why an orthonormal basis is worth manufacturing (that is what
-[QR](qr_decomposition.html) does): the matrix of its vectors has its transpose as
-its inverse, so projecting onto it and reconstructing from it both cost a single
-multiply, and that is the property numerical methods reach for whenever stability
+No system to solve &mdash; one dot product per axis, because the axes don't
+interfere. This is why an unit-perp basis is worth making (that is what
+[QR](qr_decomposition.html) does): the mat of its vectors has its transpose as
+its inverse, so projecting onto it and rebuilding from it both cost a single
+times, and that is the property numeric methods reach for when steadiness
 matters.
 
-The determinant is the warning the coordinates give before they fail. It is the
+The determinant is the warning the coords give before they fail. It's the
 signed area of the parallelogram the basis vectors span, and it reaches zero
-exactly when they line up and the span collapses to a line &mdash; at which point
-most of the plane becomes unreachable and no coordinates exist for it. A
+just when they line up and the span merges to a line &mdash; at which point
+most of the plane turns unreachable and no coords exist for it. A
 determinant of 0.001 is that same collapse nearly arrived: the basis still
-technically works, but reconstructing a point from its coordinates divides by that
-tiny number and amplifies every rounding error, which is the numerical face of the
-near-dependence an orthonormal basis is built to avoid.
+strictly works, but rebuilding a point from its coords cuts by that
+tiny number and amplifies each rounding error. This Is the numeric face of the
+near-dependence an unit-perp basis is built to avoid.
 
 ## Where it goes wrong
 
-**Nearly dependent vectors.** A determinant of exactly zero is easy to spot; a
+**Nearly dependent vectors.** A determinant of just zero is easy to spot. A
 determinant of 0.001 is the same problem wearing a disguise. The basis still
-technically works, and everything computed in it is numerically unstable. The
-[condition number](singular_value_decomposition.html) is how you measure it.
+strictly works, and all found in it's by number unstable. The
+[rule number](singular_value_decomposition.html) is how you measure it.
 
-**Assuming orthogonal means independent.** It does &mdash; orthogonal non-zero
-vectors are always independent. The converse fails, and that is the direction
+**given perp means free.** It does &mdash; perp non-zero
+vectors are always free. The converse fails, and that is the direction
 people assume.
 
-**Forgetting to normalise.** Orthogonal gives you the easy inverse only when
+**Losing to norm.** perp gives you the easy inverse only when
 the vectors also have length 1.
 
 ## Same vector, three different bases
 
-Coordinates only mean something relative to a basis. Here one fixed vector is written in three of them, and an orthonormal basis makes the arithmetic trivial.
+coords only mean a thing scaled to a basis. Here one fixed vector is written in three of them. An unit-perp basis makes the math trivial.
 
 ```python-run
 import numpy as np
@@ -341,109 +341,109 @@ topic(
     ],
     """
 title: Singular Value Decomposition
-intro: The factorisation that works on every matrix, and the one worth knowing if you only learn one.
+intro: The factorisation that works on each mat. The one worth knowing if you only learn one.
 
 ## What every matrix does
 
-Take the unit circle and apply any 2&times;2 matrix. The result is always an
-ellipse. Not sometimes &mdash; always, for every matrix there is.
+Take the unit circle and apply any 2&times;2 mat. The result is always an
+ellipse. Not at times &mdash; always, for each mat there's.
 
-That is a strong claim, and the SVD is the reason it holds. Every matrix can be
-written as three operations in sequence:
+That is a strong claim, and the SVD is the reason it holds. each mat can be
+written as three ops in sequence:
 
 ```
 A  =  U  Sigma  V'
 ```
 
-Read right to left, which is the order they apply:
+Read right to left. This Is the order they apply:
 
-**V'** rotates. A rotation does nothing to a circle, which is why stage 2 in the
-visualisation looks identical to stage 1 &mdash; but watch the two spokes, which
-do move. It is choosing which directions are about to be stretched.
+**V'** rotates. A rotation does nothing to a circle. This Is why stage 2 in the
+visualisation looks the same to stage 1. But watch the two spokes, which
+do move. It's choosing which directions are about to be stretched.
 
 **Sigma** stretches along the axes, by the **singular values**. This is where
-the circle becomes an ellipse.
+the circle turns an ellipse.
 
 **U** rotates the ellipse into its final orientation.
 
-Step through the four stages above and the claim stops being abstract. Whatever
-you set the four matrix entries to, the shape at stage 3 is an axis-aligned
-ellipse, every time.
+Step through the four stages above and the claim stops being abstract. What
+you set the four mat entries to, the shape at stage 3 is an axis-aligned
+ellipse, each time.
 
 ## The singular values
 
-They are the lengths of the ellipse's semi-axes, always non-negative, and
-conventionally listed largest first.
+They're the lengths of the ellipse's semi-axes, always non-minus, and
+usually listed largest first.
 
-**The largest** is how much the matrix can stretch any vector &mdash; its gain
+**The largest** is how much the mat can stretch any vector &mdash; its gain
 in the worst case.
 
 **The smallest** is how much it can squash one.
 
-**Their ratio** is the **condition number**, and it is the single most useful
-number in the readout. A condition number near 1 means the matrix treats all
+**Their ratio** is the **rule number**, and it's the single most handy
+number in the readout. A rule number near 1 means the mat treats all
 directions roughly alike. A large one means it nearly flattens some direction,
-and solving anything involving that matrix will amplify error along it. Drag the
+and solving any of it involving that mat will amplify error along it. Drag the
 entries until the two singular values are far apart and watch the ellipse become
 a sliver.
 
-**A zero singular value** means the matrix genuinely flattens a direction: the
-ellipse degenerates to a line segment, the matrix is singular, and it has no
+**A zero singular value** means the mat truly flattens a direction: the
+ellipse collapses to a line segment, the mat is singular, and it has no
 inverse.
 
 ## Why not eigenvectors
 
 The [eigendecomposition](eigenvalues_and_eigenvectors.html) is the more famous
-factorisation, and the SVD is the more useful one, for three reasons.
+factorisation, and the SVD is the more handy one, for three reasons.
 
-**It always exists.** Eigendecomposition requires a square matrix, and even
-then not every square matrix has one. The SVD exists for every matrix of every
+**It always exists.** Eigendecomposition needs a square mat, and even
+then not each square mat has one. The SVD exists for each mat of each
 shape, including a 1000&times;3.
 
-**Its bases are orthonormal.** Eigenvectors need not be perpendicular, and when
-they are nearly parallel the decomposition is numerically fragile. U and V are
-[orthonormal](basis_span_and_orthogonality.html) by construction.
+**Its bases are unit-perp.** Eigenvectors need not be at right angles, and when
+they're nearly parallel the breakdown is by number fragile. U and V are
+[unit-perp](basis_span_and_orthogonality.html) by build.
 
-**Its values are real and non-negative.** Eigenvalues of a real matrix can be
+**Its values are real and non-minus.** Eigenvals of a real mat can be
 complex. Singular values never are.
 
-For a symmetric positive-definite matrix the two coincide, which is why they
+For a even plus-definite mat the two coincide. This Is why they
 are so often confused.
 
 ## Low-rank approximation
 
 The property that makes the SVD indispensable: keep only the largest *k*
-singular values, set the rest to zero, and multiply back. The result is
-provably the best rank-*k* approximation of the original matrix, in the
+singular values, set the rest to zero, and times back. The result is
+provably the best rank-*k* guess of the first mat, in the
 least-squares sense. Not a good one &mdash; the best.
 
 That single fact underwrites a surprising amount:
 
-**PCA** is the SVD of the mean-centred data matrix. The principal components
-are the right singular vectors and the explained variances are the squared
-singular values, which is why any PCA implementation you look inside is calling
+**PCA** is the SVD of the mean-centred data mat. The principal components
+are the right singular vectors and the shown variances are the squared
+singular values, which is why any PCA setup you look inside is calling
 an SVD.
 
-**Image compression** keeps the top singular values of the pixel matrix.
+**Image compression** keeps the top singular values of the pixel mat.
 
-**Latent semantic analysis** factors a term-document matrix and reads the
-retained dimensions as topics.
+**Latent semantic analysis** factors a term-doc mat and reads the
+retained dims as topics.
 
-**Recommender systems** factor a sparse user-item matrix into a low-rank
+**Recommender systems** factor a sparse user-item mat into a low-rank
 product.
 
-**Noise reduction** works on the assumption that signal concentrates in the
+**Noise reduction** works on the assumption that signal focuses in the
 large singular values and noise spreads through the small ones.
 
 ## Singular values by hand, from A'A
 
-You rarely compute an SVD on paper, but seeing where the singular values come
-from removes the mystery. The singular values of `A` are the square roots of the
-eigenvalues of `A'A`. Take `A = [[3, 0], [4, 5]]`:
+You rarely find an SVD on paper. But Seeing where the singular values come
+from drops the mystery. The singular values of `A` are the square roots of the
+eigenvals of `A'A`. Take `A = [[3, 0], [4, 5]]`:
 
 `A'A = [[9 + 16,  20], [20,  25]] = [[25, 20], [20, 25]]`.
 
-A symmetric `2&times;2` `[[a, b], [b, a]]` has eigenvalues `a + b` and
+A even `2&times;2` `[[a, b], [b, a]]` has eigenvals `a + b` and
 `a &minus; b`, here `45` and `5`. So the singular values are:
 
 |singular value|from|
@@ -451,40 +451,40 @@ A symmetric `2&times;2` `[[a, b], [b, a]]` has eigenvalues `a + b` and
 |&sigma;&#8321; = &radic;45 &asymp; 6.708|the largest stretch A applies|
 |&sigma;&#8322; = &radic;5 &asymp; 2.236|the smallest|
 
-Their ratio, `&radic;(45/5) = 3`, is the condition number: `A` stretches its most
+Their ratio, `&radic;(45/5) = 3`, is the rule number: `A` stretches its most
 sensitive direction three times more than its least. That is why the unit circle
-becomes an ellipse with semi-axes 6.708 and 2.236, and why the singular values
-are always real and non-negative &mdash; they are square roots of eigenvalues of
-`A'A`, which is symmetric positive semi-definite for any `A`. Eigenvalues of `A`
-itself could be complex or negative; the SVD's numbers never are, which is half
-the reason it is the factorisation to reach for.
+turns an ellipse with semi-axes 6.708 and 2.236, and why the singular values
+are always real and non-minus. They're square roots of eigenvals of
+`A'A`, which is even positive semi-definite for any `A`. Eigenvals of `A`
+itself could be complex or minus. The SVD's numbers never are, which is half
+the reason it's the factorisation to reach for.
 
-This is the machinery under PCA, which is nothing more than the SVD of the
+This is the machinery under PCA. This Is nothing more than the SVD of the
 mean-centred data: the principal directions are the right singular vectors and the
-variance each explains is its singular value squared. Keeping only the largest few
-&mdash; setting the small singular values to zero and multiplying back &mdash;
-gives the provably best low-rank approximation of the data, which is the same
-operation behind image compression, latent-semantic analysis and recommender
-factorisations. The small singular values are where noise concentrates, so
+variance each shows is its singular value squared. Keeping only the largest few
+&mdash; setting the small singular values to zero and timesing back &mdash;
+gives the provably best low-rank guess of the data. This Is the same
+op behind image compression, latent-semantic analysis and recommender
+factorisations. The small singular values are where noise focuses, so
 dropping them often sharpens the signal rather than degrading it.
 
 ## Where it goes wrong
 
-**Forgetting to centre before PCA.** Without subtracting the mean, the first
+**Losing to centre before PCA.** Without subtracting the mean, the first
 component points at the mean rather than at the direction of greatest variance.
 
-**Reading a condition number as an error.** It is a sensitivity: it says how
+**Reading a rule number as an error.** It's a sensitivity: it says how
 much input error can be amplified, not how much has been.
 
-**Assuming singular values are eigenvalues.** They are the eigenvalues of A'A,
+**given singular values are eigenvals.** They're the eigenvals of A'A,
 square-rooted. Not the same object, and not equal except in special cases.
 
-**Computing the full SVD when you want the top few.** For a large sparse matrix
+**finding the full SVD when you want the top few.** For a large sparse mat
 a truncated solver is orders of magnitude cheaper.
 
 ## Rebuild a matrix from its biggest pieces
 
-SVD splits any matrix into a stack of rank-one layers ordered by importance. Keeping only the first few is what compression and PCA actually do.
+SVD splits any mat into a stack of rank-one layers sorted by importance. Keeping only the first few is what compression and PCA really do.
 
 ```python-run
 import numpy as np
@@ -580,108 +580,108 @@ topic(
     ],
     """
 title: The Jacobian and the Hessian
-intro: The two matrices of derivatives every optimiser is built on, and why one of them is almost never computed.
+intro: The two mats of derivs each tuner is built on. Why one of them is almost never found.
 
 ## From one derivative to a table of them
 
-For a function of one variable the derivative is one number: the slope. The
+For a function of one variable the deriv is one number: the slope. The
 [chain rule](the_chain_rule.html) and
-[partial derivatives](partial_derivatives_and_gradient.html) modules cover
+[partial derivs](partial_derivatives_and_gradient.html) modules cover
 that ground.
 
-Real functions have many inputs and often many outputs, and the derivatives
+Real functions have many inputs and often many outputs, and the derivs
 have to be organised.
 
-**The gradient** applies when there are many inputs and one output &mdash; a
-loss function. It is a vector holding one partial derivative per input, and it
-points in the direction of steepest increase.
+**The grad** applies when there are many inputs and one output &mdash; a
+loss function. It's a vector holding one partial deriv per input, and it
+points in the direction of steepest grow.
 
-**The Jacobian** applies when there are many outputs too. It is a matrix with
+**The Jacobian** applies when there are many outputs too. It's a mat with
 one row per output and one column per input, entry (i, j) being how much output
-*i* changes when input *j* moves. A gradient is a Jacobian with one row.
+*i* changes when input *j* moves. A grad is a Jacobian with one row.
 
-**The Hessian** is the matrix of second derivatives of a single-output
-function: entry (i, j) is the derivative of the *i*-th partial derivative with
-respect to input *j*. It describes how the gradient changes as you move.
+**The Hessian** is the mat of second derivs of a single-output
+function: entry (i, j) is the deriv of the *i*-th partial deriv with
+respect to input *j*. It shows how the grad changes as you move.
 
 ## What curvature buys you
 
-The visualisation is one-dimensional, where the gradient and the Hessian are
-each a single number, so the relationship is visible without any matrix
-notation.
+The visualisation is one-dimensional. Here The grad and the Hessian are
+each a single number, so the tie is visible without any mat
+form.
 
-The dashed line is the tangent &mdash; the first derivative. It says which way
+The dashed line is the tangent. The first deriv. It says which way
 is downhill and how steeply, and it says nothing at all about how long that
 remains true.
 
-The second derivative is the missing piece. Drag the curvature control:
+The second deriv is the missing piece. Drag the curvature control:
 
-**Large positive curvature** is a tight valley. The gradient changes quickly, so
+**Large plus curvature** is a tight valley. The grad changes quickly, so
 a big step overshoots and lands on the far wall.
 
-**Small positive curvature** is a shallow bowl. The gradient stays roughly
+**Small plus curvature** is a shallow bowl. The grad stays roughly
 constant, so a big step is safe and a small one wastes time.
 
-That is exactly the information a step size wants, and it is why an optimiser
+That is just the info a step size wants, and it's why an tuner
 that knows the curvature can choose its own step instead of being handed a
 learning rate.
 
-**Negative curvature** is a maximum in that direction. Descent will accelerate
-away from it, which is usually what you want and is why saddle points are less
-dangerous in practice than they sound.
+**Minus curvature** is a max in that direction. Descent will accelerate
+away from it, which is often what you want and is why saddle points are less
+dangerous than they sound.
 
-For a multivariable function the Hessian's eigenvalues carry the same
-information per direction: all positive is a minimum, all negative a maximum,
+For a multivariable function the Hessian's eigenvals carry the same
+info per direction: all plus is a min, all minus a max,
 mixed signs a saddle.
 
 ## Newton's method, and why nobody runs it on a network
 
 Knowing the curvature suggests an obvious improvement over gradient descent:
-step by the gradient scaled by the inverse Hessian rather than by a fixed
-learning rate. That is **Newton's method**, and near a minimum it converges
-quadratically &mdash; roughly doubling the correct digits each iteration, where
+step by the grad scaled by the inverse Hessian rather than by a fixed
+learning rate. That is **Newton's method**, and near a min it settles
+as n&sup2; &mdash; roughly doubling the correct digits each iteration, where
 gradient descent plods.
 
-It is not used for neural networks, for a reason that is pure arithmetic.
+It isn't used for neural networks, for a reason that is pure math.
 
-A model with *n* parameters has a Hessian with *n*&sup2; entries. At a million
-parameters that is 10&sup1;&sup2; numbers to store, and inverting it costs
-about *n*&sup3;. For a model with a billion parameters the Hessian does not fit
+A model with *n* params has a Hessian with *n*&sup2; entries. At a million
+params that is 10&sup1;&sup2; numbers to store, and inverting it costs
+about *n*&sup3;. For a model with a billion params the Hessian doesn't fit
 in the observable universe, let alone in memory.
 
-So the field uses approximations. **L-BFGS** keeps a low-rank estimate built
-from recent gradients. **Adam** and its relatives keep a diagonal estimate
-&mdash; one number per parameter rather than a full matrix &mdash; which is why
-they adapt a per-parameter step size and why they work at scale. Adam is
-sometimes described as a diagonal approximation to second-order optimisation,
+So the field uses guesses. **L-BFGS** keeps a low-rank guess built
+from recent grads. **Adam** and its relatives keep a main-line guess
+&mdash; one number per param rather than a full mat &mdash; which is why
+they adapt a per-param step size and why they work at scale. Adam is
+at times given as a main-line guess to second-order optimisation,
 and that is a fair reading of what it does.
 
 ## Backpropagation is Jacobians
 
-Every layer of a network is a function with many inputs and many outputs, so
-each has a Jacobian. The chain rule says the derivative of the whole network is
+each layer of a network is a function with many inputs and many outputs, so
+each has a Jacobian. The chain rule says the deriv of the whole network is
 the product of them all.
 
-The order of that multiplication is the whole trick. Multiplying left to right
-&mdash; forward mode &mdash; keeps a full matrix at every step. Multiplying
-right to left &mdash; reverse mode, which is backpropagation &mdash; starts
-from the scalar loss, so every intermediate stays a **vector**.
+The order of that times is the whole trick. Timesing left to right
+&mdash; forward mode &mdash; keeps a full mat at each step. Timesing
+right to left &mdash; reverse mode. This Is backpropagation &mdash; starts
+from the scalar loss, so each mid stays a **vector**.
 
 That is why training is affordable. The cost of a backward pass is a small
-multiple of a forward pass, regardless of how many parameters there are,
+multiple of a forward pass, even so of how many params there are,
 because no Jacobian is ever formed in full.
 
 ## The curvature test, on two functions
 
-In one dimension a positive second derivative means a minimum and a negative one
-a maximum. In many dimensions the Hessian's *eigenvalues* play that role, and two
+In one dim a plus second deriv means a min and a minus one
+a max. In many dims the Hessian's *eigenvals* play that role, and two
 small examples show the whole classification.
 
-`f = x&sup2; + xy + y&sup2;` has Hessian `[[2, 1], [1, 2]]`, whose eigenvalues are
-`2 + 1 = 3` and `2 &minus; 1 = 1` &mdash; both positive. Every direction curves
-upward, so the stationary point at the origin is a genuine minimum.
+`f = x&sup2; + xy + y&sup2;` has Hessian `[[2, 1], [1, 2]]`, whose eigenvals are
+`2 + 1 = 3` and `2 &minus; 1 = 1`. Both plus. each direction curves
+upward, so the stationary point at the origin is a genuine min.
 
-`f = x&sup2; &minus; y&sup2;` has Hessian `[[2, 0], [0, &minus;2]]`, eigenvalues
+`f = x&sup2; &minus; y&sup2;` has Hessian `[[2, 0], [0, &minus;2]]`, eigenvals
 `2` and `&minus;2`.
 
 |function|Hessian eigenvalues|the origin is|
@@ -689,33 +689,33 @@ upward, so the stationary point at the origin is a genuine minimum.
 |x&sup2; + xy + y&sup2;|3, 1 (all positive)|a minimum|
 |x&sup2; &minus; y&sup2;|2, &minus;2 (mixed sign)|a saddle|
 
-The mixed sign is the saddle: up along `x`, down along `y`, so the gradient is
-zero without it being any kind of extremum. This is exactly the test
+The mixed sign is the saddle: up along `x`, down along `y`, so the grad is
+zero without it being any kind of extremum. This is just the test
 [Cholesky](cholesky_and_positive_definiteness.html) performs cheaply &mdash; a
-successful factorisation means all eigenvalues are positive, confirming a minimum
-&mdash; and it is why, in the millions of dimensions of a network, stationary
-points are almost always saddles: needing *every* eigenvalue positive at once
-becomes vanishingly unlikely.
+good factorisation means all eigenvals are plus, confirming a min
+&mdash; and it's why, in the millions of dims of a network, stationary
+points are almost always saddles: needing *each* eigenval plus at once
+turns vanishingly unlikely.
 
 ## Where it goes wrong
 
-**Trying to compute a Hessian for a large model.** It does not fit. Use a
-diagonal or low-rank approximation.
+**Trying to find a Hessian for a large model.** It doesn't fit. Use a
+main-line or low-rank guess.
 
-**Assuming a zero gradient means a minimum.** It means a stationary point. The
-Hessian's eigenvalues tell you which kind.
+**given a zero grad means a min.** It means a stationary point. The
+Hessian's eigenvals tell you which kind.
 
-**Confusing the Jacobian with the gradient.** The gradient is the special case
-of one output. Frameworks expose `jacobian` and `grad` separately for exactly
+**Confusing the Jacobian with the grad.** The grad is the special case
+of one output. Frameworks expose `jacobian` and `grad` apart for just
 this reason.
 
 **Expecting second-order methods to be a drop-in win.** They shine on small,
-well-conditioned problems and on batch objectives, not on stochastic
+well-conditioned problems and on batch goals, not on stochastic
 mini-batch training where the curvature estimate is noise.
 
 ## First derivatives in a grid, second derivatives in another
 
-The Jacobian collects every first partial derivative of a vector function; the Hessian collects every second partial of a scalar one. Both are built here numerically and checked against the closed form.
+The Jacobian collects each first partial deriv of a vector function. The Hessian collects each second partial of a scalar one. Both are built here by number and checked against the closed form.
 
 ```python-run
 import numpy as np
@@ -833,7 +833,7 @@ topic(
     ],
     """
 title: Convexity and Optimisation Landscapes
-intro: The property that makes optimisation easy, what happens without it, and why deep learning works regardless.
+intro: The property that makes optimisation easy, what happens without it. Why deep learning works even so.
 
 ## The definition
 
@@ -841,86 +841,86 @@ A function is **convex** if, for any two points on it, the straight line
 joining them lies on or above the curve. A bowl is convex. A mountain range is
 not.
 
-The equivalent statement in calculus: the second derivative is non-negative
-everywhere. In many dimensions, the [Hessian](jacobian_and_hessian.html) is
-positive semi-definite &mdash; all its eigenvalues at least zero.
+The equal statement in calculus: the second deriv is non-minus
+all over. In many dims, the [Hessian](jacobian_and_hessian.html) is
+positive semi-definite &mdash; all its eigenvals at least zero.
 
 ## Why it matters so much
 
-One consequence carries the entire subject: **in a convex function, every local
-minimum is the global minimum.**
+One consequence carries the entire subject: **in a convex function, each local
+min is the global min.**
 
-If you find a point where the gradient is zero and the curvature is positive,
-you are done. Not "probably done" &mdash; done, with a proof.
+If you find a point where the grad is zero and the curvature is plus,
+you're done. Not "probably done" &mdash; done, with a proof.
 
-Set the bumpiness control to zero and try every starting point on the slider.
-Every one converges to the same place. The initialisation does not matter, the
-run is reproducible, and there is a guarantee at the end of it.
+Set the bumpiness control to zero and try each starting point on the slider.
+each one settles to the same place. The init doesn't matter, the
+run is reproducible, and there's a ensure at the end of it.
 
 Now raise bumpiness. The curve grows local minima, and the starting point
 starts deciding the answer. Move the start slider at a fixed bumpiness and
-watch the final position jump between basins &mdash; same function, same
-algorithm, same learning rate, different answer.
+watch the final spot jump between basins &mdash; same function, same
+method, same learning rate, different answer.
 
 ## What convexity buys, concretely
 
-**Guaranteed convergence** to the global optimum, with known rates.
+**Ensured settling** to the global optimum, with known rates.
 
-**Reproducibility.** No dependence on initialisation or on the order the data
+**Reproducibility.** No dependence on init or on the order the data
 arrived in.
 
-**Certificates.** You can prove a solution is optimal rather than hoping.
+**Certificates.** You can prove a answer is best rather than hoping.
 
-**Reliable stopping.** A small gradient really does mean you have arrived.
+**Solid stopping.** A small grad really does mean you've arrived.
 
 This is why linear regression, logistic regression, SVMs with convex loss,
-ridge and lasso are all so well behaved. Their objectives are convex, and the
+ridge and lasso are all so well behaved. Their goals are convex, and the
 solvers come with theory rather than folklore.
 
 ## And yet deep learning works
 
 Neural network losses are about as non-convex as functions get: millions of
-dimensions, vast numbers of stationary points, no guarantees at all. By the
-argument above, training should be a lottery.
+dims, vast numbers of stationary points, no ensures at all. By the
+arg above, training should be a lottery.
 
-It is not, and the explanation that emerged is worth knowing.
+It isn't, and the explanation that emerged is worth knowing.
 
-**Saddle points, not local minima, dominate.** In high dimensions, a stationary
-point needs *every* eigenvalue of the Hessian to be positive to be a local
-minimum. With millions of dimensions that is vanishingly unlikely; almost every
-stationary point has some negative direction, making it a saddle. Saddles are
-escapable &mdash; the gradient points away along the negative direction, and
+**Saddle points, not local minima, dominate.** In high dims, a stationary
+point needs *each* eigenval of the Hessian to be plus to be a local
+min. With millions of dims that is vanishingly unlikely. Almost each
+stationary point has some minus direction, making it a saddle. Saddles are
+escapable &mdash; the grad points away along the minus direction, and
 noise from mini-batching helps you find it.
 
 **The minima that exist are mostly similar.** Empirically, the many minima of a
-large network reach comparable loss. Which one you land in matters less than
-the fact that you landed.
+large network reach close loss. Which one you land in matters less than
+that you landed.
 
 **Overparameterisation flattens the landscape.** Wider networks have more paths
-down, and the loss surface becomes easier rather than harder as capacity grows
+down, and the loss surface turns easier rather than harder as room grows
 &mdash; which is the opposite of the intuition.
 
 ## The learning rate
 
-The third control demonstrates a separate failure that is often blamed on
+The third control shows a separate failure that is often blamed on
 non-convexity.
 
-Turn the learning rate up with bumpiness at zero &mdash; a perfectly convex
+Turn the learning rate up with bumpiness at zero. A just right convex
 bowl &mdash; and descent still misbehaves, bouncing between the walls or
-diverging entirely. Convexity guarantees a unique minimum exists; it does not
-guarantee your step size will find it.
+diverging fully. Convexity ensures a unique min exists. It doesn't
+ensure your step size will find it.
 
 The safe step depends on curvature, which is what
-[the Hessian](jacobian_and_hessian.html) measures and what adaptive optimisers
-estimate.
+[the Hessian](jacobian_and_hessian.html) measures and what adaptive tuners
+guess.
 
 ## The chord test, on numbers
 
-Convexity has a definition you can check by hand: the straight line between any
+Convexity has a meaning you can check by hand: the straight line between any
 two points on the curve must lie on or above it. Take `f(x) = x&sup2;` and the
 points at `x = &minus;2` and `x = 4`.
 
-The chord's height at the midpoint is the average of the endpoint values:
+The chord's height at the midpoint is the mean of the endpoint values:
 `(f(&minus;2) + f(4)) / 2 = (4 + 16)/2 = 10`. The curve's height at that same
 midpoint, `x = 1`, is `f(1) = 1`.
 
@@ -929,45 +929,45 @@ midpoint, `x = 1`, is `f(1) = 1`.
 |the chord|10|
 |the curve|1|
 
-The chord sits above the curve, by 9, and it does so for *every* pair of points
+The chord sits above the curve, by 9. It does so for *each* pair of points
 you pick &mdash; that is what makes `x&sup2;` convex, and why a single downhill
-walk finds its one minimum. Now try the same on `f(x) = 0.15x&sup2; + 3sin(2x)`:
+walk finds its one min. Now try the same on `f(x) = 0.15x&sup2; + 3sin(2x)`:
 between two well-chosen points the chord dips *below* the curve, because the
 ripples bulge upward past the straight line. One such dip is enough to disqualify
-convexity, and it is exactly the bulge a descent path can get stuck behind. The
-test is not a metaphor; it is an inequality you can evaluate at any two points.
+convexity, and it's just the bulge a descent path can get stuck behind. The
+test isn't a metaphor. It's an inequality you can test at any two points.
 
 The consequence is the one that separates the well-behaved models from the rest.
-Because `x&sup2;`-shaped objectives pass the chord test everywhere, linear
-regression, logistic regression and SVMs with convex loss have a single minimum
-that every downhill path reaches &mdash; the answer does not depend on where you
-start. The rippled function fails the test somewhere, and that single failure is
-enough to trap a descent path in a basin that depends entirely on its starting
-point, which is why a neural network gives a different answer on every restart.
+Because `x&sup2;`-shaped goals pass the chord test all over, linear
+regression, logistic regression and SVMs with convex loss have a single min
+that each downhill path reaches. The answer doesn't depend on where you
+start. The rippled function fails the test a place, and that single failure is
+enough to trap a descent path in a basin that depends fully on its starting
+point, which is why a neural network gives a different answer on each restart.
 
-And yet deep networks train anyway, because in millions of dimensions almost
-every stationary point is a saddle rather than a trap &mdash; a genuine minimum
-needs every Hessian eigenvalue positive at once, which is vanishingly unlikely
-&mdash; and mini-batch noise slides the optimiser off the saddles it meets.
+And yet deep networks train anyway, because in millions of dims almost
+each stationary point is a saddle rather than a trap &mdash; a genuine min
+needs each Hessian eigenval plus at once. This Is vanishingly unlikely
+&mdash; and mini-batch noise slides the tuner off the saddles it meets.
 
 ## Where it goes wrong
 
-**Assuming a convex loss makes the whole problem convex.** Squared error is
-convex in the predictions and non-convex in the weights of a network. What
-matters is convexity in the parameters being optimised.
+**given a convex loss makes the whole problem convex.** Squared error is
+convex in the guesses and non-convex in the weights of a network. What
+matters is convexity in the params being optimised.
 
 **Blaming non-convexity for a divergent run.** Check the learning rate first;
-it is usually that.
+it's often that.
 
-**Running once and trusting the result on a non-convex problem.** Several
-starts, or a schedule with restarts, is the minimum diligence.
+**Running once and trusting the result on a non-convex problem.** a few
+starts, or a schedule with restarts, is the min diligence.
 
-**Expecting convex theory to transfer.** Convergence rates for convex problems
+**Expecting convex theory to transfer.** Settling rates for convex problems
 say nothing about a deep network.
 
 ## One function gradient descent cannot fail on, and one it can
 
-The same optimiser, the same settings, run from many starting points on a convex function and then on a bumpy one. Convexity is the property that makes the starting point irrelevant.
+The same tuner, the same settings, run from many starting points on a convex function and then on a bumpy one. Convexity is the property that makes the starting point irrelevant.
 
 ```python-run
 import numpy as np
@@ -1086,101 +1086,101 @@ topic(
         "It is a local statement, always.",
     ],
     """title: Taylor Series
-intro: Replacing a hard function with a polynomial, and being precise about where that is allowed.
+intro: Replacing a hard function with a polynomial. Being precise about where that is allowed.
 
 ## The construction
 
 Pick a point. Build a polynomial that agrees with the function there, then also
-agrees with its slope, then its curvature, then the next derivative, and so on.
+agrees with its slope, then its curvature, then the next deriv, and so on.
 
 ```
 f(x)  ~  f(a) + f'(a)(x-a) + f''(a)(x-a)^2/2! + f'''(a)(x-a)^3/3! + ...
 ```
 
-Each term pins down one more derivative at `a`. The factorials are there
-because differentiating `(x-a)^k` repeatedly produces `k!`, and dividing by it
-cancels exactly.
+Each term pins down one more deriv at `a`. The factorials are there
+because differentiating `(x-a)^k` again and again makes `k!`, and cutting by it
+cancels just.
 
-Set the terms control to 0 and step it upward. At 0 you have a horizontal line
+Set the terms control to 0 and step it upward. At 0 you've a flat line
 at the right height. At 1, the tangent. At 2, a parabola that also has the
 right bend. Each step hugs the curve a little further out.
 
 ## Local, and only local
 
-The readout gives how far the approximation stays within 0.1 of the truth, and
+The readout gives how far the guess stays within 0.1 of the truth, and
 this is the number worth watching.
 
-More terms extend the range. They do not make it infinite, and the extension
-gets slower. The polynomial agrees perfectly at the expansion point and gets
-worse with distance, always &mdash; the whole construction is built from
-information at a single point, so it cannot know anything about elsewhere.
+More terms extend the range. They don't make it infinite, and the extension
+gets slower. The polynomial agrees just right at the expansion point and gets
+worse with distance, always &mdash; the whole build is built from
+info at a single point. So It can't know any of it about elsewhere.
 
-Move the expansion point and the region of agreement moves with it. That is the
-right mental model: a Taylor series is a statement about a neighbourhood.
+Move the expansion point and the region of match moves with it. That is the
+right mental model: a Taylor series is a statement about a zone.
 
 ## Where it earns its keep
 
-**Second-order optimisation.** Newton's method is exactly the two-term
-expansion of the loss: approximate it as a quadratic near the current point,
-jump to that quadratic's minimum, repeat. Everything in
+**Second-order optimisation.** Newton's method is just the two-term
+expansion of the loss: rough it as a quadratic near the current point,
+jump to that quadratic's min, repeat. All in
 [the Hessian module](jacobian_and_hessian.html) is this idea.
 
-**Small-angle approximations.** `sin(x) ~ x` for small `x` is the one-term
-expansion, and it is why pendulum equations are solvable at all.
+**Small-angle guesses.** `sin(x) ~ x` for small `x` is the one-term
+expansion, and it's why pendulum equations are solvable at all.
 
-**Backpropagation's justification.** The chain rule is exact, but the argument
-that a small weight change produces a proportional loss change is a first-order
+**Backpropagation's justification.** The chain rule is exact, but the arg
+that a small weight change makes a proportional loss change is a first-order
 expansion.
 
-**Numerical methods.** Finite differences, Runge-Kutta integrators and most
+**numeric methods.** Finite differences, Runge-Kutta integrators and most
 error bounds are derived by expanding and discarding.
 
-**exp, log, sin in a standard library.** Not looked up in a table; evaluated
+**exp, log, sin in a standard library.** Not looked up in a table. Tested
 from a truncated series with a range reduction in front of it.
 
 ## Where it fails
 
 Switch the function control to `1 / (1 + x squared)`.
 
-This function is smooth everywhere on the real line &mdash; no kinks, no
+This function is smooth all over on the real line &mdash; no kinks, no
 asymptotes, differentiable as many times as you like. Yet expand it about 0 and
-add terms, and beyond about x = 1 the approximation does not merely fail to
-improve; it gets **worse** with every term added.
+add terms, and beyond about x = 1 the guess doesn't merely fail to
+improve. It gets **worse** with each term added.
 
 The reason is invisible from the real line. Viewed over the complex numbers the
 function has poles at *i* and *&minus;i*, distance 1 from the origin, and the
-radius of convergence is the distance to the nearest singularity wherever it
+radius of settling is the distance to the nearest singularity wherever it
 sits. That radius is 1, and no number of real terms escapes it.
 
-This is the Runge phenomenon, and its lesson is practical: **smooth on the reals
-does not mean a Taylor series converges everywhere.** Adding terms is not
+This is the Runge effect, and its lesson is hands-on: **smooth on the reals
+doesn't mean a Taylor series settles all over.** Adding terms isn't
 always progress.
 
 ## Where it goes wrong
 
 **Extrapolating far from the expansion point.** The error grows with distance,
-and past the radius of convergence it grows without bound.
+and past the radius of settling it grows without bound.
 
-**Assuming more terms is always better.** Not past the radius, and not
-numerically &mdash; high-order terms involve large factorials and cancelling
+**given more terms is always better.** Not past the radius, and not
+by number &mdash; high-order terms involve large factorials and cancelling
 quantities, which loses precision in floating point.
 
-**Expanding about the wrong point.** Expand about where you will evaluate. A
-series about 0 is the wrong tool for estimating at x = 5.
+**Expanding about the wrong point.** Expand about where you'll test. A
+series about 0 is the wrong tool for guessing at x = 5.
 
-**Forgetting smoothness is required.** The function needs derivatives of every
-order at the expansion point. `|x|` has none at 0, so there is no series there.
+**Losing smoothness is needed.** The function needs derivs of each
+order at the expansion point. `|x|` has none at 0. There's no series there.
 
 ## e to the x, worked by hand
 
-Expand `e^x` about `a = 0`. Every derivative of `e^x` is `e^x`, and `e^0 = 1`,
-so every coefficient is `1/k!` and the series is as clean as they come:
+Expand `e^x` about `a = 0`. each deriv of `e^x` is `e^x`, and `e^0 = 1`,
+so each coeff is `1/k!` and the series is as clean as they come:
 
 ```
 e^x  ~  1 + x + x^2/2 + x^3/6 + x^4/24 + ...
 ```
 
-Evaluate it at `x = 1`, where the true value is 2.718282, adding one term at a
+Test it at `x = 1`. Here The true value is 2.718282, adding one term at a
 time:
 
 |terms|value|error|
@@ -1205,53 +1205,53 @@ at `x = 3`, where the truth is 20.0855:
 |6|18.400|1.69|
 
 Still 8% out. The reason is visible in the term itself: the `k`-th term is
-`x^k / k!`, so the numerator grows like `3^k` while the factorial does not
+`x^k / k!`, so the numerator grows like `3^k` while the factorial doesn't
 overtake it until `k` passes 3. Near the expansion point the terms shrink from
-the start; far from it they **grow first and shrink later**, and you have to
+the start. Far from it they **grow first and shrink later**, and you've to
 push through that bulge before the series is any use. Matching at `x = 3` the
-accuracy six terms gave at `x = 1` takes eleven.
+fit six terms gave at `x = 1` takes eleven.
 
 That is the whole "local, and only local" claim, in numbers: the same
-polynomial, unchanged, is excellent at one distance and unusable at three times
-it. It is also why real implementations do **range reduction** first &mdash;
-`e^3` is computed as `e^0.25` raised to a power, not by expanding at 3.
+polynomial, unchanged, is great at one distance and unusable at three times
+it. It's also why real setups do **range reduction** first &mdash;
+`e^3` is found as `e^0.25` raised to a power, not by expanding at 3.
 
 ## Questions people ask
 
 **Taylor or Maclaurin?** A Maclaurin series is a Taylor series with the
-expansion point at zero. That is the entire difference, and it is why the two
-words are used almost interchangeably.
+expansion point at zero. That is the entire difference, and it's why the two
+words are used almost alike.
 
-**How many terms do I need?** Whatever makes the first term you dropped small
+**How many terms do I need?** What makes the first term you dropped small
 enough. For a well-behaved alternating series the remainder is bounded by the
-size of that next term, which makes it a genuinely practical stopping rule.
-Otherwise use the Lagrange remainder, which bounds the error by the largest
-`(n+1)`-th derivative anywhere between the expansion point and where you are
-evaluating &mdash; and that bound is why the error grows with distance.
+size of that next term. This Makes it a truly hands-on stopping rule.
+Or else use the Lagrange remainder. This Bounds the error by the largest
+`(n+1)`-th deriv anywhere between the expansion point and where you're
+testing &mdash; and that bound is why the error grows with distance.
 
-**Why does 1/(1 + x&sup2;) break at x = 1 when it is smooth everywhere?**
+**Why does 1/(1 + x&sup2;) break at x = 1 when it's smooth all over?**
 Because the real line is the wrong place to look. Allow complex numbers and the
 function blows up at `x = i` and `x = -i`, both at distance 1 from the origin.
-A power series converges inside a *disc* reaching the nearest singularity in the
-complex plane, so the radius here is 1 regardless of how well behaved the
-function looks on the reals. The failure is real; the cause is elsewhere.
+A power series settles inside a *disc* reaching the nearest singularity in the
+complex plane, so the radius here is 1 even so of how well behaved the
+function looks on the reals. The failure is real. The cause is elsewhere.
 
-**Is the Taylor polynomial the best polynomial approximation?** No, and this
-surprises people. It is the best one *at the expansion point*, where it matches
-as many derivatives as it has terms. Across an interval it is usually beaten
-comfortably by a minimax or Chebyshev fit, which spreads the error evenly
-instead of concentrating accuracy at one spot. Numerical libraries use those,
-not Taylor, for precisely this reason.
+**Is the Taylor polynomial the best polynomial guess?** No, and this
+surprises people. It's the best one *at the expansion point*, where it matches
+as many derivs as it has terms. Across an interval it's often beaten
+comfortably by a minimax or Chebyshev fit. This Spreads the error evenly
+instead of concentrating fit at one spot. numeric libraries use those,
+not Taylor, for just this reason.
 
-**Does a Taylor series always converge to the function?** Not necessarily. The
-standard counterexample is `e^(-1/x^2)` extended by zero at the origin: every
-derivative there is 0, so its series is identically 0, which agrees with the
-function at exactly one point. Smooth is not enough; the property that makes the
+**Does a Taylor series always settle to the function?** Not always. The
+standard counterexample is `e^(-1/x^2)` extended by zero at the origin: each
+deriv there's 0, so its series is the same way 0. This Agrees with the
+function at just one point. Smooth isn't enough. The property that makes the
 series work is called being *analytic*.
 
 ## Rebuild a function from its derivatives
 
-Terms added one at a time, with the error after each. The approximation is excellent near the expansion point and hopeless far from it.
+Terms added one at a time, with the error after each. The guess is great near the expansion point and hopeless far from it.
 
 ```python-run
 import numpy as np
@@ -1344,7 +1344,7 @@ topic(
         "<em>independent</em> variables &mdash; a distinction that matters constantly.",
     ],
     """title: Expectation and Variance
-intro: The two numbers that summarise a random quantity, and the rules for combining them.
+intro: The two numbers that summarise a random quantity, and the rules for mixing them.
 
 ## Expectation
 
@@ -1356,15 +1356,15 @@ E[X]  =  sum over x of  x * P(X = x)
 ```
 
 The [mean, mode and median module](mean_mode_and_median.html) covers the mean
-of a dataset you have. This is the mean of a distribution you have not sampled
-&mdash; what the average would settle to given enough draws.
+of a dataset you've. This is the mean of a spread you haven't sampled
+&mdash; what the mean would settle to given enough draws.
 
-Load the die above and watch E[X] move. Put all the weight on 6 and it becomes
-6. Spread it evenly and it becomes 3.5.
+Load the die above and watch E[X] move. Put all the weight on 6 and it turns
+6. Spread it evenly and it turns 3.5.
 
 3.5 is the case worth pausing on: a fair die has expectation 3.5, and no die
 has ever rolled a 3.5. **The expectation is a balance point, not a
-prediction.** The distribution would balance on a pin at that value, and that
+guess.** The spread would balance on a pin at that value, and that
 is all the word means.
 
 ## Variance
@@ -1377,23 +1377,23 @@ Var(X)  =  E[(X - mu)^2]
 ```
 
 The expected squared distance from the mean. Squaring is what stops the
-positive and negative deviations cancelling, and it is why the units come out
+plus and minus deviations cancelling, and it's why the units come out
 squared &mdash; variance of a height in metres is in metres squared, which is
 meaningless as a length. Taking the square root gives the **standard
-deviation**, back in the original units, which is why that is the number
-usually reported.
+deviation**, back in the first units. This Is why that is the number
+often reported.
 
-The identity worth memorising is:
+The identity worth storing is:
 
 ```
 Var(X)  =  E[X^2] - (E[X])^2
 ```
 
-The mean of the squares minus the square of the mean. It is how variance is
-computed in one pass over data, and it is also the source of a classic
-numerical bug: with large values and small variance, the two terms are nearly
-equal and subtracting them destroys precision. Welford's algorithm exists to
-avoid exactly this.
+The mean of the squares minus the square of the mean. It's how variance is
+found in one pass over data, and it's also the source of a classic
+numeric bug: with large values and small variance, the two terms are nearly
+equal and subtracting them destroys precision. Welford's method exists to
+avoid just this.
 
 ## Combining them
 
@@ -1404,9 +1404,9 @@ E[aX + b]   = a E[X] + b
 E[X + Y]    = E[X] + E[Y]        always
 ```
 
-That second line holds **whether or not X and Y are independent**. Linearity of
-expectation is unconditional, and it is the reason a surprising number of
-counting arguments are one line long.
+That second line holds **whether or not X and Y are free**. Linearity of
+expectation is plain, and it's the reason a surprising number of
+counting args are one line long.
 
 Variance is stricter:
 
@@ -1415,11 +1415,11 @@ Var(aX + b)  = a^2 Var(X)          note: b vanishes, a is squared
 Var(X + Y)   = Var(X) + Var(Y)     only if X and Y are independent
 ```
 
-Shifting a distribution does not change its spread, which is why `b` disappears.
+Shifting a spread doesn't change its spread. This Is why `b` disappears.
 Scaling by `a` scales the variance by `a`&sup2;, because variance is in squared
 units.
 
-The independence condition on the sum is where mistakes live. If X and Y move
+The freedom rule on the sum is where mistakes live. If X and Y move
 together, the covariance term reappears:
 
 ```
@@ -1430,38 +1430,38 @@ The [covariance module](covariance_and_correlation.html) covers that term.
 
 ## Where it shows up
 
-**The standard error.** The mean of *n* independent draws has variance
+**The standard error.** The mean of *n* free draws has variance
 &sigma;&sup2;/n, straight from the rules above. Its square root is
 &sigma;/&radic;n, which is the whole content of
-[the sampling distribution](sampling_distributions.html).
+[the sampling spread](sampling_distributions.html).
 
-**Bias-variance decomposition.** Expected squared error splits into bias
+**Bias-variance breakdown.** Expected squared error splits into bias
 squared plus variance plus irreducible noise, using the identity above.
 
-**Portfolio diversification.** Combining assets reduces variance only when they
-are not perfectly correlated &mdash; the covariance term again.
+**Portfolio diversification.** Mixing assets reduces variance only when they
+aren't just right linked &mdash; the covariance term again.
 
-**Bagging.** Averaging *n* models reduces variance by *n* only if their errors
-are independent, which is why random forests work to decorrelate their trees.
+**Bagging.** Blending *n* models reduces variance by *n* only if their errors
+are free, which is why random forests work to decorrelate their trees.
 
 ## Where it goes wrong
 
 **Treating the expectation as a likely value.** It need not be attainable at
 all.
 
-**Adding variances of correlated variables.** The commonest error in this
+**Adding variances of linked variables.** The commonest error in this
 material.
 
-**Forgetting the square on the scale factor.** Doubling a variable quadruples
+**Losing the square on the scale factor.** Doubling a variable quadruples
 its variance.
 
-**Assuming a variance exists.** Some distributions have none &mdash; the Cauchy
-has neither a finite variance nor a finite mean, and sample averages of Cauchy
+**given a variance exists.** Some spreads have none &mdash; the Cauchy
+has neither a finite variance nor a finite mean, and sample means of Cauchy
 draws never settle.
 
 ## Both numbers, worked by hand
 
-Five cards, drawn one at a time with every card equally likely. They are marked
+Five cards, drawn one at a time with each card equally likely. They're marked
 1, 1, 2, 5 and 11.
 
 Build the table. `P(x)` is how often that value appears out of five, and the
@@ -1483,7 +1483,7 @@ gives the variance straight away:
 Var(X)  =  E[X^2] - (E[X])^2  =  30.4 - 16  =  14.4
 ```
 
-Now the same number from the definition, `E[(X - mu)^2]`, squaring each
+Now the same number from the meaning, `E[(X - mu)^2]`, squaring each
 distance from 4 and weighting it:
 
 ```
@@ -1497,48 +1497,48 @@ distance from 4 and weighting it:
 
 The same 14.4, by a different route. The standard deviation is
 &radic;14.4 = **3.79** &mdash; almost as large as the mean itself, which is the
-honest summary of this deck: the average is 4, and the single 11 does most of
+honest summary of this deck: the mean is 4. The single 11 does most of
 the work.
 
-The two routes cost differently. The definition needs the mean before it can
-start, so it is two passes over the data. The identity needs only running totals
-of `x` and `x`&sup2;, so it is one &mdash; which is why it is the one that gets
-implemented, and why the precision trap above is worth knowing about.
+The two routes cost differently. The meaning needs the mean before it can
+start, so it's two passes over the data. The identity needs only running totals
+of `x` and `x`&sup2;, so it's one. Which is why it's the one that gets
+built, and why the precision trap above is worth knowing about.
 
 ## Questions people ask
 
-**Why square the deviations instead of taking absolute values?** You can, and
-that gives the mean absolute deviation, which is a perfectly good measure of
-spread. Squaring wins on grounds of convenience rather than truth: it is
-differentiable everywhere, it makes the variance of a sum decompose into a sum
-of variances, and it produces the identity above. Absolute values give none of
-those, which is why almost every result in this material is stated for variance.
+**Why square the deviations instead of taking abs values?** You can, and
+that gives the mean abs deviation. This Is a just right good measure of
+spread. Squaring wins on grounds of convenience rather than truth: it's
+differentiable all over, it makes the variance of a sum break down into a sum
+of variances, and it makes the identity above. abs values give none of
+those, which is why almost each result in this material is stated for variance.
 
 **Does the expectation have to be a value the variable can take?** No, and
-usually it is not. A fair die averages 3.5; the deck above averages 4 without
-containing a 4. Expectation is a balance point of the distribution, not a
+often it isn't. A fair die means 3.5. The deck above means 4 without
+holding a 4. Expectation is a balance point of the spread, not a
 forecast of any single draw.
 
 **Why does sample variance divide by n &minus; 1?** Because the sample mean is
-itself estimated from the same data, and it sits closer to the data than the
-true mean does &mdash; it is the value that *minimises* the sum of squared
+itself guessed from the same data, and it sits closer to the data than the
+true mean does &mdash; it's the value that *cuts* the sum of squared
 deviations, so squared distances measured from it are systematically too small.
-Dividing by `n - 1` instead of `n` corrects that bias exactly. With the true
+Cutting by `n - 1` instead of `n` corrects that bias just. With the true
 mean known, `n` would be right.
 
-**When can I add variances?** Only when the variables are independent, or at
-least uncorrelated. Otherwise the covariance term is genuinely there and
+**When can I add variances?** Only when the variables are free, or at
+least unlinked. Or else the covariance term is truly there and
 dropping it will mislead you, almost always in the direction of thinking you
 have less risk than you do.
 
 **Variance or standard deviation in a report?** Standard deviation, nearly
-always, because it is in the same units as the data and can be compared to the
-mean. Variance is the quantity the algebra is easier in, which is why it appears
+always, because it's in the same units as the data and can be checked to the
+mean. Variance is the quantity the algebra is easier in. This Is why it appears
 in the derivations and rarely in the conclusions.
 
 ## A bet worth taking that usually loses
 
-Expectation and variance computed from the definition, then measured over 400,000 plays. The two numbers say different things, and both matter.
+Expectation and variance found from the meaning, then measured over 400,000 plays. The two numbers say different things, and both matter.
 
 ```python-run
 import numpy as np
@@ -1632,105 +1632,105 @@ topic(
     ],
     """
 title: Bernoulli, Binomial and Poisson
-intro: The three distributions behind every count, and how each is built from the one before it.
+intro: The three spreads behind each count. How each is built from the one before it.
 
 ## Bernoulli: the atom
 
-One trial, two outcomes, one parameter. Success with probability `p`, failure
-with probability `1 - p`.
+One trial, two outcomes, one param. Success with chance `p`, failure
+with chance `1 - p`.
 
-Mean `p`, variance `p(1-p)`. That variance is worth a moment: it is largest at
-`p = 0.5` and falls to zero at either end, which says something obvious once
-stated &mdash; an event that always happens, or never does, is not random at
+Mean `p`, variance `p(1-p)`. That variance is worth a moment: it's largest at
+`p = 0.5` and falls to zero at either end. This Says a thing obvious once
+stated &mdash; an event that always happens, or never does, isn't random at
 all. Drag `p` to 0.02 with Bernoulli selected and watch the variance in the
 readout collapse.
 
-Every coin flip, click-or-not, churn-or-not and pass-or-fail is a Bernoulli
-trial, and it is the atom the other two are assembled from.
+each coin flip, click-or-not, churn-or-not and pass-or-fail is a Bernoulli
+trial, and it's the atom the other two are assembled from.
 
 ## Binomial: counting the successes
 
-Run `n` independent Bernoulli trials with the same `p` and count the successes.
+Run `n` free Bernoulli trials with the same `p` and count the successes.
 That count is **binomial**.
 
 ```
 P(k successes)  =  C(n, k) * p^k * (1-p)^(n-k)
 ```
 
-The three factors read directly: `p^k` for the successes, `(1-p)^(n-k)` for the
+The three factors read right: `p^k` for the successes, `(1-p)^(n-k)` for the
 failures, and `C(n, k)` for the number of orders they could have arrived in.
 
 Mean `np`, variance `np(1-p)` &mdash; both straight from
-[the rules for combining](expectation_and_variance.html) `n` independent
+[the rules for mixing](expectation_and_variance.html) `n` free
 Bernoulli variables.
 
-Drag `n` upward and the shape becomes recognisably bell-like. That is
+Drag `n` upward and the shape turns recognisably bell-like. That is
 [the central limit theorem](central_limit_theorem.html) arriving: a binomial is
-a sum of independent variables, so it must tend to normal. It is why the normal
-approximation to the binomial exists, and why it needs `np` and `n(1-p)` both
+a sum of free variables. So It must tend to normal. It's why the normal
+guess to the binomial exists, and why it needs `np` and `n(1-p)` both
 comfortably above about 10 &mdash; near the edges the binomial is skewed and the
-symmetric normal fits badly.
+even normal fits badly.
 
-**The independence and constant-`p` assumptions are load-bearing.** Ten coin
-flips are binomial. Ten cards drawn without replacement are not, because `p`
-changes as the deck depletes; that is the hypergeometric distribution.
+**The freedom and constant-`p` assumptions are load-bearing.** Ten coin
+flips are binomial. Ten cards drawn without swap aren't, because `p`
+changes as the deck depletes. That is the hypergeometric spread.
 
 ## Poisson: the limit
 
 Now let `n` grow and `p` shrink together, keeping `np = lambda` fixed. Many
 trials, each very unlikely, with a stable expected count.
 
-The binomial converges to the **Poisson**:
+The binomial settles to the **Poisson**:
 
 ```
 P(k)  =  e^(-lambda) * lambda^k / k!
 ```
 
-`n` and `p` have vanished; only their product survives. That is what makes it
-useful. You rarely know how many opportunities there were for an event to occur
+`n` and `p` have vanished. Only their product lives. That is what makes it
+handy. You rarely know how many opportunities there were for an event to occur
 &mdash; how many people *could* have visited the site this minute &mdash; but
 you can measure the rate.
 
 So Poisson models counts in a fixed window: arrivals per minute, defects per
 batch, mutations per genome, goals per match.
 
-Set the distribution to Poisson and compare against a binomial with `n = 60`
-and `p = 0.05`. Both have mean 3, and the shapes are nearly identical. That is
+Set the spread to Poisson and compare against a binomial with `n = 60`
+and `p = 0.05`. Both have mean 3. The shapes are nearly the same. That is
 the limit at work.
 
 ## The Poisson's signature, and its trap
 
-A Poisson has **mean and variance both equal to lambda**. One parameter fixes
-both, and there is no way to have a Poisson with mean 3 and variance 10.
+A Poisson has **mean and variance both equal to lambda**. One param fixes
+both, and there's no way to have a Poisson with mean 3 and variance 10.
 
 Real count data very often has variance well above its mean &mdash;
 **overdispersion**. Website visits cluster, defects come in bad batches,
-accidents cluster around conditions. The Poisson assumes events are independent
+accidents cluster around rules. The Poisson assumes events are free
 and the rate is constant, and clustering violates both.
 
-Overdispersion is a finding, not an annoyance: it says something is varying that
-the model treats as fixed. The usual response is a **negative binomial**, which
-adds a second parameter and lets the rate itself be random.
+Overdispersion is a finding, not an annoyance: it says a thing is varying that
+the model treats as fixed. The usual response is a **minus binomial**, which
+adds a second param and lets the rate itself be random.
 
 ## Where they show up
 
-**A/B testing.** Conversions are binomial; the test is about two `p` values.
+**A/B testing.** Conversions are binomial. The test is about two `p` values.
 
 **Queueing.** Poisson arrivals are the standard assumption behind almost all
 queueing theory.
 
 **Rare-event modelling.** Failures, fraud, defects.
 
-**Naive Bayes for text.** Multinomial and Bernoulli variants correspond exactly
-to counting words and to noting presence or absence.
+**Naive Bayes for text.** Multinomial and Bernoulli variants match just
+to counting words and to noting presence or lack.
 
 **Class imbalance.** A rare positive class is a small `p`, and the variance of
-your estimate of it is `p(1-p)/n` &mdash; which is why rare classes need so
-much more data before a rate estimate settles.
+your guess of it's `p(1-p)/n`. Which is why rare classes need so
+much more data before a rate guess settles.
 
 ## The binomial formula, worked
 
-The formula is best trusted by evaluating it. Five trials, success probability
+The formula is best trusted by testing it. Five trials, success chance
 0.3, `P(k) = C(5, k) &middot; 0.3^k &middot; 0.7^(5&minus;k)`:
 
 |k|C(5, k)|P(k)|
@@ -1743,38 +1743,38 @@ The formula is best trusted by evaluating it. Five trials, success probability
 |5|1|0.0024|
 
 The most likely single outcome is one success, not the mean of 1.5, because the
-distribution is skewed at `p = 0.3`. The probabilities sum to exactly 1 &mdash;
+spread is skewed at `p = 0.3`. The chances sum to just 1 &mdash;
 they must, since some number of successes between 0 and 5 always happens &mdash;
 and the mean `&Sigma; k&middot;P(k)` works out to `np = 1.5`. The three factors
 each do one job: `0.3^k` for the successes, `0.7^(5&minus;k)` for the failures,
 and `C(5, k)` for the number of orders in which those successes could have
-arrived. Drop the `C(5, k)` and you would have the probability of one *specific*
-sequence; it is there because you asked how many successes, not which trials.
+arrived. Drop the `C(5, k)` and you'd have the chance of one *exact*
+sequence. It's there because you asked how many successes, not which trials.
 
 Push `n` up and `p` down together, holding `np` fixed, and this same formula
-slides into the Poisson: the individual `n` and `p` vanish and only their product
-survives, which is why Poisson models counts when you know the rate but not the
+slides into the Poisson: the single `n` and `p` vanish and only their product
+lives, which is why Poisson models counts when you know the rate but not the
 number of chances &mdash; arrivals per minute, defects per batch. The signature to
-check is that a Poisson forces mean and variance equal; real counts often have
+check is that a Poisson forces mean and variance equal. Real counts often have
 variance well above the mean (overdispersion), and that gap is a finding, not
-noise &mdash; it says something the model treats as fixed is actually varying.
+noise &mdash; it says a thing the model treats as fixed is really varying.
 
-When overdispersion is real, the usual fix is a negative binomial, which adds a
-second parameter and lets the rate itself vary rather than forcing mean and
-variance to be equal &mdash; the Poisson's rigidity is exactly what it relaxes.
+When overdispersion is real, the usual fix is a minus binomial, which adds a
+second param and lets the rate itself vary rather than forcing mean and
+variance to be equal &mdash; the Poisson's rigidity is just what it relaxes.
 
 ## Where it goes wrong
 
-**Applying a binomial to sampling without replacement.** `p` changes; use the
+**Applying a binomial to sampling without swap.** `p` changes. Use the
 hypergeometric.
 
-**Assuming Poisson without checking dispersion.** Compare the sample variance
-against the sample mean before anything else.
+**given Poisson without checking dispersion.** Compare the sample variance
+against the sample mean before any of it else.
 
-**Using the normal approximation near p = 0 or 1.** The binomial is skewed
-there; the approximation is not.
+**Using the normal guess near p = 0 or 1.** The binomial is skewed
+there. The guess isn't.
 
-**Forgetting the fixed window.** A Poisson rate is per unit of something. Double
+**Losing the fixed window.** A Poisson rate is per unit of a thing. Double
 the window and lambda doubles.
 
 ## The three, side by side
@@ -1872,56 +1872,56 @@ topic(
     ],
     """
 title: The Central Limit Theorem
-intro: Why the normal distribution turns up everywhere, stated precisely enough to know when it does not.
+intro: Why the normal spread turns up all over, stated just enough to know when it doesn't.
 
 ## What the theorem says
 
-Take repeated samples of size `n` from any population with a finite mean and
-variance. Compute each sample's mean. Those means have a distribution of their
-own, and as `n` grows it approaches a normal distribution &mdash; with mean
-equal to the population mean and standard deviation `sigma / sqrt(n)`.
+Take repeated samples of size `n` from any group with a finite mean and
+variance. Find each sample's mean. Those means have a distribution of their
+own, and as `n` grows it approaches a normal spread &mdash; with mean
+equal to the group mean and standard deviation `sigma / sqrt(n)`.
 
-The population's own shape does not appear in that statement anywhere. It can
+The group's own shape doesn't appear in that statement anywhere. It can
 be skewed, bimodal, discrete, or wildly irregular.
 
-The population above is deliberately unpleasant: two separate humps and a long
-tail. Nothing about it is bell-shaped. Set `n` to 1 and the right-hand panel is
-that same shape, because a sample of one *is* a draw from the population.
+The group above is on purpose unpleasant: two separate humps and a long
+tail. Nothing about it's bell-shaped. Set `n` to 1 and the right-hand panel is
+that same shape, because a sample of one *is* a draw from the group.
 
 Now drag `n` upward. By 5 the two humps have merged. By 30 the right-hand panel
 is a clean bell, and the fitted normal curve sits on top of the resampled
-histogram. Nothing about the population changed.
+histogram. Nothing about the group changed.
 
 ## Three things it is not
 
-**Not "large samples are normally distributed."** The sample is not normal; it
-looks like the population, because that is what it is drawn from. It is the
+**Not "large samples are most times spread."** The sample isn't normal. It
+looks like the group, because that is what it's drawn from. It's the
 *mean* that goes normal.
 
-**Not "everything is normal."** Heights are roughly normal because they are the
-sum of many small independent influences. Incomes are not normal and no amount
+**Not "all is normal."** Heights are roughly normal because they're the
+sum of many small free sways. Incomes aren't normal and no amount
 of data makes them so.
 
-**Not a licence to ignore the population.** It describes the sampling
+**Not a licence to skip the group.** It shows the sampling
 distribution of a statistic, not the data.
 
 ## The square root
 
-The standard deviation of the sample mean &mdash; the **standard error** &mdash;
-is `sigma / sqrt(n)`. The square root is the practical heart of the theorem.
+The standard deviation of the sample mean. The **standard error** &mdash;
+is `sigma / sqrt(n)`. The square root is the hands-on heart of the theorem.
 
 To halve your uncertainty you must **quadruple** your sample. To divide it by
-ten you need a hundred times the data. Precision gets expensive fast, and this
+ten you need a hundred times the data. Precision gets costly fast, and this
 single fact governs how large a survey has to be, how long an A/B test must run
 and why polls stubbornly report margins of around three percent.
 
-[The sampling distribution module](sampling_distributions.html) plots that decay
-directly.
+[The sampling spread module](sampling_distributions.html) plots that decay
+right.
 
 ## How large is large enough
 
-The usual rule of thumb is `n = 30`, and like all such rules it is a summary of
-something more specific.
+The usual rule of thumb is `n = 30`. Like all such rules it's a summary of
+a thing more exact.
 
 **Near-symmetric population**: convergence is fast, and 10 may do.
 
@@ -1930,64 +1930,64 @@ hundreds before the mean is convincingly normal.
 
 **Heavy tails**: worse still, and there is a limit case below.
 
-The honest procedure is the one on this page: resample and look. Drag `n` and
-find where the histogram stops looking lumpy for *your* population.
+The honest method is the one on this page: resample and look. Drag `n` and
+find where the histogram stops looking lumpy for *your* group.
 
 ## When it fails outright
 
-The theorem requires a **finite variance**, and that condition is not decorative.
+The theorem needs a **finite variance**, and that rule isn't decorative.
 
-The Cauchy distribution has none &mdash; nor a finite mean. Average `n` Cauchy
-draws and you get another Cauchy, with exactly the same spread as one draw. No
-amount of averaging concentrates anything. The sample mean of a million draws is
+The Cauchy spread has none. Nor a finite mean. Mean `n` Cauchy
+draws and you get another Cauchy, with just the same spread as one draw. No
+amount of blending focuses any of it. The sample mean of a million draws is
 no better than the first.
 
-Heavy-tailed distributions that do have a finite variance still converge, but
-slowly enough to matter. Financial returns are the standard cautionary example:
-methods that assume normality of averages understate the chance of extreme
-outcomes, because convergence has not really happened at the sample sizes in
+Heavy-tailed spreads that do have a finite variance still settle, but
+slowly enough to matter. Money returns are the standard cautionary example:
+methods that assume normality of means understate the chance of extreme
+outcomes, because settling hasn't really happened at the sample sizes in
 use.
 
 ## Where it shows up
 
-**Confidence intervals and t-tests** assume the sampling distribution of the
+**trust intervals and t-tests** assume the sampling distribution of the
 mean is normal. That assumption is this theorem.
 
 **A/B testing**: a conversion rate is a mean of Bernoulli draws.
 
-**Bootstrapping** exists partly to avoid needing it when it does not hold.
+**Bootstrapping** exists partly to avoid needing it when it doesn't hold.
 
-**Measurement error** is often modelled as normal because it is the sum of many
-small independent errors.
+**reading error** is often modelled as normal because it's the sum of many
+small free errors.
 
 ## Standardising a sample mean
 
-The theorem is used, in practice, to turn an observed sample mean into a
-probability, and the arithmetic is short. Suppose a population has mean 50 and
+The theorem is used, to turn an seen sample mean into a
+chance, and the math is short. Suppose a group has mean 50 and
 standard deviation 8, and you take a sample of `n = 16`. By the theorem the sample
-mean is approximately normal, centred at 50, with standard error
+mean is about normal, centred at 50, with standard error
 `8 / &radic;16 = 2`.
 
-Now you observe a sample mean of 54. How surprising is that?
+Now you see a sample mean of 54. How surprising is that?
 
 `z = (54 &minus; 50) / 2 = 2.0`
 
-The observed mean is two standard errors above the population mean, and for a
-normal distribution about 2.3% of samples fall that far above by chance alone.
-That single `z` is the engine under a one-sample z-test and a confidence interval
+The seen mean is two standard errors above the group mean, and for a
+normal spread about 2.3% of samples fall that far above by chance alone.
+That single `z` is the engine under a one-sample z-test and a trust interval
 alike: the interval `54 &plusmn; 1.96 &times; 2` is `[50.08, 57.92]`, which
 &mdash; just barely &mdash; excludes 50. Note which quantity did the work: the
-standard error, not the population's own spread. The raw data has sd 8, but the
-*mean* of sixteen draws has spread 2, and it is that shrinkage by `&radic;n` that
-makes an observed difference of 4 look like a lot rather than a little.
+standard error, not the group's own spread. The raw data has sd 8, but the
+*mean* of sixteen draws has spread 2, and it's that shrinkage by `&radic;n` that
+makes an seen difference of 4 look like a lot rather than a little.
 
-Increasing the sample sharpens that verdict fast, through the same square root.
-At `n = 64` the standard error falls to `8 / 8 = 1`, so the same observed mean of
-54 now sits `z = 4` standard errors out &mdash; a result that was mildly
-surprising at sixteen samples becomes overwhelming at sixty-four. Nothing about
-the population changed; the larger sample simply pins the mean down four times
+Growing the sample sharpens that verdict fast, through the same square root.
+At `n = 64` the standard error falls to `8 / 8 = 1`. The same seen mean of
+54 now sits `z = 4` standard errors out. A result that was mildly
+surprising at sixteen samples turns overwhelming at sixty-four. Nothing about
+the group changed. The larger sample simply pins the mean down four times
 more tightly than the raw data's spread of 8 would suggest, and that shrinkage is
-the entire practical content of the theorem.
+the entire hands-on content of the theorem.
 
 ## Where it goes wrong
 
@@ -1995,17 +1995,17 @@ the entire practical content of the theorem.
 
 **Trusting n = 30 on skewed data.** Check.
 
-**Assuming it applies to the maximum or the variance.** It is about sums and
+**given it applies to the max or the variance.** It's about sums and
 means. Extreme values have their own limit theory, and a different family of
-limiting distributions.
+limiting spreads.
 
-**Ignoring dependence.** The classical version needs independent draws. Time
-series data usually is not independent, and the effective sample size is
+**Skipping dependence.** The classical version needs free draws. Time
+series data often isn't free, and the effective sample size is
 smaller than the count.
 
 ## Watch it happen
 
-A deliberately lopsided population, and the means of samples drawn from it. The spread of those means shrinks like one over the square root of the sample size.
+A on purpose lopsided group, and the means of samples drawn from it. The spread of those means shrinks like one over the square root of the sample size.
 
 ```python-run
 import numpy as np
@@ -2087,7 +2087,7 @@ topic(
     ],
     """
 title: Quantiles and Percentiles
-intro: Describing a distribution by where its values sit rather than by averaging them.
+intro: showing a spread by where its values sit rather than by blending them.
 
 ## The definition
 
@@ -2096,87 +2096,87 @@ The 0.5 quantile is the median: half below, half above. The 0.9 quantile is the
 value 90% of the data sits below.
 
 **Percentiles** are the same idea on a 0&ndash;100 scale &mdash; the 90th
-percentile is the 0.9 quantile. **Quartiles** cut at 25, 50 and 75, dividing the
+percentile is the 0.9 quantile. **Quartiles** cut at 25, 50 and 75, cutting the
 data into four equal groups. **Deciles** cut into ten.
 
 ## Why not just use the mean
 
-A mean is a balance point, and it moves when anything moves. A quantile depends
+A mean is a balance point. It moves when any of it moves. A quantile depends
 only on **order**, and that makes it robust.
 
-Add a single enormous value to a dataset and the mean shifts, possibly a lot.
-The median barely moves at all &mdash; the new value is simply "one more above
-the middle", regardless of how far above.
+Add a single huge value to a dataset and the mean shifts, possibly a lot.
+The median barely moves at all. The new value is simply "one more above
+the middle", even so of how far above.
 
 That is why median income is reported rather than mean income, why latency is
 reported at percentiles, and why the [box plot](#) below exists.
 
 The **IQR** &mdash; Q3 minus Q1 &mdash; is the spread measure that follows from
-the same idea. It covers the middle half of the data, and it is unaffected by
-anything in the tails. Standard deviation, being built from squared distances
-from the mean, is the opposite: one extreme value moves it substantially.
+the same idea. It covers the middle half of the data, and it's unaffected by
+any of it in the tails. Standard deviation, being built from squared distances
+from the mean, is the opposite: one extreme value moves it a lot.
 
 ## Reading the box plot
 
-The second panel is assembled from the quartiles in the first, and every part
-of it has a definition:
+The second panel is assembled from the quartiles in the first, and each part
+of it has a meaning:
 
-**The box** spans Q1 to Q3, so it contains the middle 50% of the data.
+**The box** spans Q1 to Q3. So It holds the middle 50% of the data.
 
-**The line inside** is the median. Its position within the box shows skew: off
-centre means the distribution leans.
+**The line inside** is the median. Its spot within the box shows skew: off
+centre means the spread leans.
 
 **The whiskers** reach the furthest data points still within 1.5 &times; IQR of
 the box edge.
 
-**The dots** are everything beyond that.
+**The dots** are all beyond that.
 
-The 1.5 is a **convention**, not a test. It comes from Tukey, and for a normal
-distribution it flags about 0.7% of points. Points beyond it are worth
-inspecting, and calling them "outliers" makes a claim the rule cannot support
-&mdash; a skewed distribution produces them by construction rather than by
+The 1.5 is a **rule**, not a test. It comes from Tukey, and for a normal
+spread it flags about 0.7% of points. Points beyond it are worth
+inspecting, and calling them "outliers" makes a claim the rule can't support
+&mdash; a skewed spread makes them by build rather than by
 error.
 
-Increase the sample size and the number of flagged points grows roughly in
+Grow the sample size and the number of flagged points grows roughly in
 proportion. That alone shows the rule is descriptive.
 
 ## Percentiles in practice
 
-**Latency.** Nobody reports mean response time, because one slow request buried
-in a million is invisible in a mean and obvious at p99. Services are specified
-at p50, p95, p99 and p999 precisely because the tail is what users notice.
+**Latency.** No one reports mean response time, because one slow request buried
+in a million is invisible in a mean and obvious at p99. Services are given
+at p50, p95, p99 and p999 just because the tail is what users notice.
 
-A trap follows immediately: **percentiles do not average.** The p99 of two
-servers is not the mean of their p99s. Aggregating percentiles requires the
-underlying distributions or a structure like a t-digest.
+A trap follows right away: **percentiles don't mean.** The p99 of two
+servers isn't the mean of their p99s. Aggregating percentiles needs the
+underlying spreads or a structure like a t-digest.
 
-**Quantile regression** predicts a chosen quantile rather than the mean. Useful
-when the cost of over- and under-prediction differ, or when you want a
-prediction interval directly.
+**Quantile regression** predicts a chosen quantile rather than the mean. handy
+when the cost of over- and under-guess differ, or when you want a
+guess interval right.
 
-**Quantile binning** turns a continuous feature into equal-sized buckets, which
-is robust to skew in a way that equal-width binning is not.
+**Quantile binning** turns a smooth feature into equal-sized buckets, which
+is robust to skew in a way that equal-width binning isn't.
 
 **Feature scaling.** `QuantileTransformer` maps a feature to a uniform or normal
-distribution through its quantiles, and is unaffected by outliers in a way
-standardisation is not.
+spread through its quantiles, and is unaffected by outliers in a way
+standardisation isn't.
 
 ## A wrinkle worth knowing
 
-There is no single agreed definition of a sample quantile. With 10 data points,
-"the value below which 25% falls" does not land on an observation, and there are
-several defensible interpolations. NumPy offers nine methods; R offers the same
-nine; the defaults differ between languages, and between `numpy.percentile` and
+There's no single agreed meaning of a sample quantile. With 10 data points,
+"the value below which 25% falls" doesn't land on an reading, and there are
+a few defensible interpolations. NumPy offers nine methods. R offers the same
+nine. The defaults differ between languages, and between `numpy.percentile` and
 some SQL engines.
 
-For large samples the differences are negligible. For small ones they are not,
-and two tools can legitimately report different quartiles for identical data.
+For large samples the differences are negligible. For small ones they aren't,
+and two tools can legitimately report different quartiles for the same data.
 
 ## The definition ambiguity, on ten numbers
 
-The wrinkle deserves numbers, because it is where two tools disagree on identical
+The wrinkle deserves numbers, because it's where two tools disagree on the same
 data. Take the ten values `1, 2, 3, &hellip;, 10` and ask for the 25th
-percentile. "The value below which 25% falls" does not land on an observation, and
+percentile. "The value below which 25% falls" doesn't land on an reading, and
 the defensible answers differ:
 
 |method|25th percentile|how|
@@ -2184,43 +2184,43 @@ the defensible answers differ:
 |linear interpolation|3.25|position `(n&minus;1)&middot;0.25 = 2.25`, so a quarter of the way from the 3rd value to the 4th|
 |nearest-rank|3|the smallest value with at least 25% at or below it|
 
-Both are correct; they answer slightly different questions about what a
+Both are correct. They answer slightly different questions about what a
 "percentile" of a finite sample means. NumPy's default is the linear method, and
-it offers nine in total; other tools default differently, which is why
+it offers nine in total. Other tools default differently, which is why
 `numpy.percentile` and a SQL engine can report different quartiles for the same
-column. For a thousand points the gap between methods is negligible; for ten it is
-0.25 out of a range of 9, which is enough to change a decision. State the method
+column. For a thousand points the gap between methods is negligible. For ten it's
+0.25 out of a range of 9. This Is enough to change a choice. State the method
 when the sample is small and the number matters.
 
 The reason to care sits in the tail. A service's latency is reported at p95 and
-p99 precisely because one slow request in a thousand is invisible in a mean and
-obvious in a high percentile &mdash; and those percentiles cannot be averaged
-across servers, because the p99 of two machines is not the mean of their p99s.
-Aggregating them needs the underlying distributions or a structure like a
-t-digest; averaging them understates the tail every time, which is the one error
+p99 just because one slow request in a thousand is invisible in a mean and
+obvious in a high percentile. And those percentiles can't be averaged
+across servers, because the p99 of two machines isn't the mean of their p99s.
+Aggregating them needs the underlying spreads or a structure like a
+t-digest. Blending them understates the tail each time. This Is the one error
 this whole topic exists to prevent.
 
-There is also no single agreed definition of a sample quantile: on ten points the
+There's also no single agreed meaning of a sample quantile: on ten points the
 "value below which 25% falls" is a matter of interpolation, and NumPy alone offers
-nine methods. On large samples the choice is negligible; on small ones two honest
-tools can report different quartiles for identical data.
+nine methods. On large samples the choice is negligible. On small ones two honest
+tools can report different quartiles for the same data.
 
 ## Where it goes wrong
 
-**Averaging percentiles.** The single most common error, and it always
+**Blending percentiles.** The single most common error, and it always
 understates the tail.
 
-**Reading whisker points as errors.** The rule is a drawing convention.
+**Reading whisker points as errors.** The rule is a drawing rule.
 
-**Comparing box plots of very different sample sizes.** More data means more
+**Checking box plots of very different sample sizes.** More data means more
 flagged points, mechanically.
 
-**Assuming your language's default matches another's.** State the method when it
+**given your language's default matches another's.** State the method when it
 matters.
 
 ## Nobody experiences the mean
 
-Ten thousand response times with a long tail. The mean and the median tell one story; p95 and p99 tell the one your users live in.
+Ten thousand response times with a long tail. The mean and the median tell one story. P95 and p99 tell the one your users live in.
 
 ```python-run
 import numpy as np
@@ -2308,106 +2308,106 @@ topic(
     ],
     """
 title: Sampling Distributions and Standard Error
-intro: The idea that makes every confidence interval and every p-value mean something.
+intro: The idea that makes each trust interval and each p-value mean a thing.
 
 ## The statistic is random too
 
-You draw a sample and compute its mean. Draw a different sample and you get a
+You draw a sample and find its mean. Draw a different sample and you get a
 different mean. The statistic is itself a random quantity, and it has a
-distribution: the **sampling distribution**.
+spread: the **sampling spread**.
 
-This is the conceptual step everything in inference rests on. It is also the one
-that is easy to skip, because in practice you only ever draw one sample and
-never see the distribution at all &mdash; you reason about what *would* happen
-across the samples you did not take.
+This is the conceptual step all in inference rests on. It's also the one
+that is easy to skip, because you only ever draw one sample and
+never see the spread at all. You reason about what *would* happen
+across the samples you didn't take.
 
-The left panel makes it visible by actually doing it: 800 samples drawn, each
-mean plotted. That histogram is the sampling distribution of the mean, and it is
-the object confidence intervals describe.
+The left panel makes it visible by really doing it: 800 samples drawn, each
+mean plotted. That histogram is the sampling distribution of the mean, and it's
+the object trust intervals show.
 
 ## Standard error
 
-The standard deviation of a sampling distribution is the **standard error**. For
+The standard deviation of a sampling spread is the **standard error**. For
 a sample mean:
 
 ```
 SE  =  sigma / sqrt(n)
 ```
 
-This follows directly from the [rules for
+This follows right from the [rules for
 variance](expectation_and_variance.html): the variance of a sum of `n`
-independent draws is `n * sigma^2`, dividing by `n` to make the mean scales
+free draws is `n * sigma^2`, cutting by `n` to make the mean scales
 variance by `1/n^2`, leaving `sigma^2 / n`, and the square root gives the
 formula.
 
-Watch the readout as you drag `n`: the observed spread of the 800 means tracks
-the predicted `sigma / sqrt(n)` closely. That is not a coincidence being
-illustrated &mdash; it is an identity being checked.
+Watch the readout as you drag `n`: the seen spread of the 800 means tracks
+the predicted `sigma / sqrt(n)` closely. That isn't a coincidence being
+illustrated &mdash; it's an identity being checked.
 
 ## Standard deviation is not standard error
 
-These get confused constantly, and the distinction is not subtle.
+These get confused constantly, and the gap isn't subtle.
 
-**Standard deviation** describes the spread of the **data**. It is a property of
-the population, and collecting more data does not reduce it &mdash; more careful
-measurement might, but more measurements will not.
+**Standard deviation** shows the spread of the **data**. It's a property of
+the group, and collecting more data doesn't reduce it &mdash; more careful
+reading might, but more readings won't.
 
-**Standard error** describes the spread of an **estimate**. It shrinks as `n`
-grows, because a larger sample pins the estimate down better.
+**Standard error** shows the spread of an **guess**. It shrinks as `n`
+grows, because a larger sample pins the guess down better.
 
-A useful test: if the number would change when you collect more data *of the
-same kind*, it is a standard error. If it would not, it is a standard deviation.
+A handy test: if the number would change when you collect more data *of the
+same kind*, it's a standard error. If it wouldn't, it's a standard deviation.
 
-An error bar on a chart could be either, and the two say completely different
-things. Charts that do not label which are unreadable.
+An error bar on a chart could be either, and the two say fully different
+things. Charts that don't label which are unreadable.
 
 ## The square root, again
 
 The right-hand panel plots `sigma / sqrt(n)` against `n`, and its shape is the
-practical content of this page.
+hands-on content of this page.
 
-It falls steeply at first &mdash; going from 4 samples to 16 halves the error.
+It falls steeply at first. Going from 4 samples to 16 halves the error.
 Then it flattens. Going from 100 to 400 halves it again, at the cost of three
-hundred more observations.
+hundred more readings.
 
-**Every halving of uncertainty costs four times the data.** That is why national
+**each halving of uncertainty costs four times the data.** That is why national
 polls settle around 1,000 respondents: the marginal precision per person
-collapses past that point, and the remaining error is dominated by sampling bias
+merges past that point, and the left error is dominated by sampling bias
 rather than sampling noise anyway.
 
-More data cannot fix a biased sample. A poll of 100,000 people who all answer
-the same badly-worded question is precisely wrong.
+More data can't fix a biased sample. A poll of 100,000 people who all answer
+the same badly-worded question is just wrong.
 
 ## Beyond the mean
 
-Every statistic has a sampling distribution, not only the mean. Medians,
-variances, correlations and regression coefficients all have one, and the
-formulas are usually harder or unavailable.
+each statistic has a sampling spread, not only the mean. Medians,
+variances, links and regression coeffs all have one, and the
+formulas are often harder or down.
 
-**The bootstrap** exists for exactly this. Resample your data with replacement,
+**The bootstrap** exists for just this. Resample your data with swap,
 recompute the statistic, repeat thousands of times, and the spread of the
-results estimates the sampling distribution &mdash; with no formula and almost
-no assumptions. It is the same operation this page performs, run on your own
-sample instead of on a known population.
+results guesses the sampling spread &mdash; with no formula and almost
+no assumptions. It's the same op this page performs, run on your own
+sample instead of on a known group.
 
 ## Where it shows up
 
-**Confidence intervals** are built directly from the standard error.
+**trust intervals** are built right from the standard error.
 
-**t-tests and z-tests** compare an observed difference against the standard
+**t-tests and z-tests** compare an seen difference against the standard
 error of that difference.
 
-**Cross-validation** variance is the sampling distribution of a performance
-estimate, which is why a single fold's accuracy is a point with error bars
+**Cross-validation** variance is the sampling distribution of a speed
+guess, which is why a single fold's fit is a point with error bars
 around it.
 
-**A/B test duration** is a standard error calculation before it is anything
+**A/B test duration** is a standard error math before it's any of it
 else.
 
 ## The cost of precision, tabulated
 
 The `sigma / &radic;n` formula has a consequence worth seeing as a table, because
-it governs how big every survey and every A/B test has to be. With a population
+it governs how big each survey and each A/B test has to be. With a group
 standard deviation of 10:
 
 |sample size n|standard error|
@@ -2418,37 +2418,37 @@ standard deviation of 10:
 |256|0.625|
 
 Each row quadruples `n` and the standard error halves &mdash; the `&radic;n` in
-the denominator made literal. Going from 4 to 16 buys a lot; going from 64 to 256
-buys the same *factor* of improvement for four times the absolute cost. Precision
+the denominator made literal. Going from 4 to 16 buys a lot. Going from 64 to 256
+buys the same *factor* of improvement for four times the abs cost. Precision
 has diminishing returns, and they diminish predictably: to add one more decimal
-place of accuracy you need a hundred times the data. This is the whole reason
+place of fit you need a hundred times the data. This is the whole reason
 national polls settle near a thousand respondents rather than ten thousand
 &mdash; past that point each extra person shrinks the error by too little to be
-worth collecting, and any remaining error is bias, which more data cannot touch.
+worth collecting, and any left error is bias. This More data can't touch.
 
 The table also draws the line between the two quantities people confuse. The
-population's own spread &mdash; its standard deviation &mdash; is 10 in every row;
+group's own spread &mdash; its standard deviation &mdash; is 10 in each row;
 collecting more data never moves it. The standard error is the column that shrinks,
-because it describes the *estimate*, not the data. A useful test: if a number would
-change when you collect more observations of the same kind, it is a standard error;
-if it would not, it is a standard deviation. An error bar that does not say which
-it is could mean either, and the two tell completely different stories.
+because it shows the *guess*, not the data. A handy test: if a number would
+change when you collect more readings of the same kind, it's a standard error;
+if it wouldn't, it's a standard deviation. An error bar that doesn't say which
+it's could mean either, and the two tell fully different stories.
 
 ## Where it goes wrong
 
 **Reporting SD when you mean SE, or the reverse.** Label your error bars.
 
-**Assuming independence.** The `sqrt(n)` assumes independent draws. Clustered or
+**given freedom.** The `sqrt(n)` assumes free draws. Clustered or
 time-series data has a smaller effective `n`.
 
-**Treating a large sample as accurate.** It is precise. Accuracy is a separate
-question, and bias does not shrink with `n`.
+**Treating a large sample as accurate.** It's precise. Fit is a separate
+question, and bias doesn't shrink with `n`.
 
-**Using the formula for statistics that do not have one.** Bootstrap instead.
+**Using the formula for statistics that don't have one.** Bootstrap instead.
 
 ## The distribution of a statistic, not of the data
 
-Draw a sample, compute its mean, write it down, repeat ten thousand times. What you get is a different distribution from the one you sampled.
+Draw a sample, find its mean, write it down, repeat ten thousand times. What you get is a different spread from the one you sampled.
 
 ```python-run
 import numpy as np
@@ -2542,51 +2542,51 @@ topic(
     ],
     """
 title: Confidence Intervals
-intro: What the ninety-five percent actually refers to, demonstrated by drawing a thousand of them.
+intro: What the ninety-five percent really refers to, shown by drawing a thousand of them.
 
 ## The construction
 
-Take a sample, compute its mean, and put an interval around it:
+Take a sample, find its mean, and put an interval around it:
 
 ```
 mean  +/-  z * (sample SD / sqrt(n))
 ```
 
-The `z` depends on the confidence level &mdash; 1.96 for 95%. The rest is the
+The `z` depends on the trust level. 1.96 for 95%. The rest is the
 [standard error](sampling_distributions.html).
 
 ## What the confidence refers to
 
-Here is the statement people usually give: *there is a 95% probability the true
+Here is the statement people often give: *there's a 95% chance the true
 mean lies in this interval.*
 
-That is wrong, and the visualisation shows why. The population mean is fixed at
-10 &mdash; the dashed line. It is not random. Your interval is either side of it
-or it is not; there is no probability left once both are determined.
+That is wrong, and the visualisation shows why. The group mean is fixed at
+10 &mdash; the dashed line. It isn't random. Your interval is either side of it
+or it isn't. There's no chance left once both are found.
 
-What is random is the **interval**, because it is computed from a random sample.
-Draw again and you get a different one. The 95% describes how often that
-procedure lands on the truth.
+What is random is the **interval**, because it's found from a random sample.
+Draw again and you get a different one. The 95% shows how often that
+method lands on the truth.
 
-The panel draws forty intervals, from a thousand generated. Most cross the
-dashed line; the highlighted few do not. Nothing distinguishes a missing
+The panel draws forty intervals, from a thousand made. Most cross the
+dashed line. The highlighted few don't. Nothing sets apart a missing
 interval from a covering one when you can only see it from the inside &mdash;
-and in practice you have exactly one, and no idea which kind you have.
+and you've just one, and no idea which kind you've.
 
 ## The count is real
 
 The readout gives the actual coverage of all thousand. At n = 30 with a 95%
-level it lands near 94%, and every part of that gap is instructive.
+level it lands near 94%, and each part of that gap is instructive.
 
-Drag `n` down to 5 and coverage falls to about 89%. That is not sampling noise.
-This page uses a `z` critical value with the sample's *estimated* standard
+Drag `n` down to 5 and coverage falls to about 89%. That isn't sampling noise.
+This page uses a `z` key value with the sample's *guessed* standard
 deviation, and at small `n` that estimate is unreliable enough that the interval
 comes out too narrow.
 
-**That is exactly why the t-distribution exists.** Gosset's correction widens
-the interval to account for having estimated the SD, and the correction is large
+**That is just why the t-spread exists.** Gosset's correction widens
+the interval to account for having guessed the SD, and the correction is large
 at small `n` and negligible past about 30. The multiplier it puts in place of
-1.96 is worth seeing, because it explains both halves of that sentence:
+1.96 is worth seeing, because it shows both halves of that sentence:
 
 |n|t multiplier|wider than z by|
 |---|---|---|
@@ -2597,47 +2597,47 @@ at small `n` and negligible past about 30. The multiplier it puts in place of
 
 At n = 5 the honest interval is nearly half as wide again as the one this page
 draws, which is where the missing coverage went. By n = 30 the correction is 4%
-and the distinction stops mattering, which is where the rule of thumb comes
+and the gap stops mattering. This Is where the rule of thumb comes
 from. Drag `n` upward and watch the gap
-close on its own &mdash; the page is demonstrating the problem the t-distribution
+close on its own &mdash; the page is showing the problem the t-spread
 solves, rather than quietly using t and hiding it.
 
 ## Width and what buys it
 
 Two things set the width.
 
-**The confidence level.** Switch from 95% to 99% and the intervals lengthen
-noticeably. A higher level does not locate the parameter better; it hedges more.
-A 100% interval would be "somewhere between minus infinity and infinity" &mdash;
-perfectly reliable and perfectly useless.
+**The trust level.** Switch from 95% to 99% and the intervals lengthen
+noticeably. A higher level doesn't locate the param better. It hedges more.
+A 100% interval would be "a place between minus infinity and infinity" &mdash;
+just right solid and just right useless.
 
 **The sample size**, through `sqrt(n)`. Quadrupling the sample halves the width.
 
 ## Reading one properly
 
-**"Between 42% and 48%"** means the procedure that produced it covers the truth
+**"Between 42% and 48%"** means the method that made it covers the truth
 95% of the time.
 
-**A wide interval is a result.** It says the data does not pin the answer down,
-which is genuine information rather than a failed experiment.
+**A wide interval is a result.** It says the data doesn't pin the answer down,
+which is genuine info rather than a failed test.
 
-**Overlapping intervals do not imply no difference.** Two 95% intervals can
-overlap while a direct test of their difference is significant. Test the
-difference; do not eyeball the bars.
+**shared intervals don't imply no difference.** Two 95% intervals can
+share while a direct test of their difference is major. Test the
+difference. Don't eyeball the bars.
 
-**An interval containing zero** corresponds to a two-sided test not rejecting at
-that level. That correspondence is exact, and it is why many people prefer
+**An interval holding zero** matches to a two-sided test not rejecting at
+that level. That correspondence is exact, and it's why many people prefer
 reporting intervals to reporting
 [p-values](hypothesis_testing_and_p_values.html): the interval carries the
-effect size and the uncertainty together, where a p-value carries neither.
+effect size and the uncertainty together. Here A p-value carries neither.
 
 ## Two intervals that overlap, and a difference that is real
 
-The rule above &mdash; do not eyeball the bars &mdash; is worth doing rather than
-taking on trust, because the arithmetic is short and the result is genuinely
-counter-intuitive.
+The rule above &mdash; don't eyeball the bars &mdash; is worth doing rather than
+taking on trust, because the math is short and the result is truly
+counter-natural.
 
-An experiment with 100 observations in each arm and a standard deviation of 10,
+An test with 100 readings in each arm and a standard deviation of 10,
 so the standard error in each arm is 10 / &radic;100 = **1**.
 
 |arm|mean|95% interval|
@@ -2645,28 +2645,28 @@ so the standard error in each arm is 10 / &radic;100 = **1**.
 |A|10.0|[8.04, 11.96]|
 |B|13.2|[11.24, 15.16]|
 
-Those intervals overlap, between 11.24 and 11.96. Draw them as error bars and
-every instinct says the arms are indistinguishable.
+Those intervals share, between 11.24 and 11.96. Draw them as error bars and
+each instinct says the arms are the same.
 
-Now test the difference directly. The difference is 3.2, and its standard error
+Now test the difference right. The difference is 3.2, and its standard error
 is **not** the two standard errors added:
 
 SE<sub>diff</sub> = &radic;(1&sup2; + 1&sup2;) = &radic;2 = **1.414**, not 2
 
 which gives a 95% interval for the difference of 3.2 &plusmn; 1.96 &times; 1.414
-= **[0.43, 5.97]**. That excludes zero, and the corresponding two-tailed p is
-**0.024**. The difference is significant while the individual intervals overlap.
+= **[0.43, 5.97]**. That excludes zero, and the matching two-tailed p is
+**0.024**. The difference is major while the single intervals share.
 
-The reason is in that square root. Two independent errors do not both go the
-wrong way at once as often as they each go wrong, so they partly cancel, and the
+The reason is in that square root. Two free errors don't both go the
+wrong way at once as often as they each go wrong. They partly cancel, and the
 difference is pinned down more tightly than either mean is. Adding the errors
-assumes the worst case every time.
+assumes the worst case each time.
 
-The consequence is a whole band where the eye and the arithmetic disagree. With
-equal standard errors, a difference becomes significant once it exceeds
+The consequence is a whole band where the eye and the math disagree. With
+equal standard errors, a difference turns major once it exceeds
 1.96&radic;2 = **2.77** standard errors, but the two intervals keep touching
 until it exceeds 2 &times; 1.96 = **3.92**. Any gap between those two numbers
-overlaps *and* is significant.
+shares *and* is major.
 
 |gap between the means|bars overlap?|significant?|
 |---|---|---|
@@ -2674,27 +2674,27 @@ overlaps *and* is significant.
 |3.2 SE|yes|**yes**|
 |4.5 SE|no|yes|
 
-The middle row is the one that catches people, and it is why the comparison you
+The middle row is the one that catches people, and it's why the check you
 report has to be a test of the difference rather than a picture of two intervals
-side by side. The picture is answering a question nobody asked.
+side by side. The picture is answering a question no one asked.
 
 ## Where it goes wrong
 
-**Saying "95% chance the mean is in here."** The parameter is fixed; the
+**Saying "95% chance the mean is in here."** The param is fixed. The
 interval is random.
 
-**Using z at small n.** Use t, and this page shows you the cost of not.
+**Using z at small n.** Use t. This page shows you the cost of not.
 
-**Assuming independence.** Clustered or time-series data has a smaller effective
+**given freedom.** Clustered or time-series data has a smaller effective
 sample size, and the interval will be too narrow.
 
 **Reporting an interval for a biased estimator.** Coverage is about sampling
-variability. A systematically wrong measurement produces a tight interval around
+variability. A systematically wrong reading makes a tight interval around
 the wrong answer.
 
 ## What "95% confident" actually counts
 
-Build a confidence interval a thousand times from a known population and count how often it contains the true mean. The number the interval describes is the procedure, not your one result.
+Build a trust interval a thousand times from a known group and count how often it holds the true mean. The number the interval shows is the method, not your one result.
 
 ```python-run
 import numpy as np
@@ -2808,32 +2808,32 @@ topic(
     ],
     """
 title: Hypothesis Testing and p-values
-intro: The most used and most misread number in statistics, defined precisely enough to stop misreading it.
+intro: The most used and most misread number in statistics, defined just enough to stop misreading it.
 
 ## The machinery
 
-**The null hypothesis** is a specific, boring claim: no effect, no difference,
-nothing happening. It is specific on purpose, because a specific claim implies a
-distribution for the test statistic.
+**The null hypothesis** is a exact, boring claim: no effect, no difference,
+nothing happening. It's exact on purpose, because a exact claim implies a
+spread for the test statistic.
 
-That distribution is the curve. It is what the statistic would look like across
-repeated samples **if the null were true**. Every use of a p-value inherits that
-conditional.
+That spread is the curve. It's what the statistic would look like across
+repeated samples **if the null were true**. each use of a p-value inherits that
+if-based.
 
-**The p-value** is the shaded tail: the probability of a statistic at least as
-extreme as the one observed, under the null.
+**The p-value** is the shaded tail: the chance of a statistic at least as
+extreme as the one seen, under the null.
 
-Drag the observed statistic and watch the area shrink as it moves outward. A
-large statistic is unusual under the null, so its tail is small &mdash; and a
+Drag the seen statistic and watch the area shrink as it moves outward. A
+large statistic is unusual under the null. So Its tail is small &mdash; and a
 small tail is what "unlikely, if the null were true" means.
 
 ## One test, worked by hand
 
-The simulation below computes a p-value by brute force. It is worth doing one
-the ordinary way first, on numbers small enough to check, so the quantity stops
-being whatever the library returned.
+The modelling below finds a p-value by brute force. It's worth doing one
+the plain way first, on numbers small enough to check, so the quantity stops
+being what the library returned.
 
-Five measurements per group:
+Five readings per group:
 
 |group|values|mean|
 |---|---|---|
@@ -2841,8 +2841,8 @@ Five measurements per group:
 |variant|15, 17, 14, 16, 18|16|
 
 The deviations from the mean are the same five numbers in both groups
-&mdash; &minus;1, 1, &minus;2, 0, 2 &mdash; so each group's sum of squared
-deviations is 10, and each sample variance is 10 / 4 = **2.5**. Dividing by
+&mdash; &minus;1, 1, &minus;2, 0, 2. So each group's sum of squared
+deviations is 10, and each sample variance is 10 / 4 = **2.5**. Cutting by
 n &minus; 1 rather than n is the correction covered in
 [expectation and variance](expectation_and_variance.html).
 
@@ -2854,49 +2854,49 @@ SE = &radic;(2.5/5 + 2.5/5) = &radic;1 = **1**
 t = 3 / 1 = **3**, on 5 + 5 &minus; 2 = **8** degrees of freedom, which gives a
 two-tailed **p = 0.0171**.
 
-Read that last number as the definition demands: *if the two groups were really
+Read that last number as the meaning demands: *if the two groups were really
 the same*, a gap of 3 or more in either direction would turn up in about one
-sample in 59. It says nothing about how likely it is that they are the same, and
+sample in 59. It says nothing about how likely it's that they're the same, and
 nothing about whether a gap of 3 matters to anyone.
 
 Notice which quantity did the work. The difference of 3 was never enough on its
-own &mdash; it had to be measured against the SE, and the SE fell as the spread
+own &mdash; it had to be measured against the SE. The SE fell as the spread
 fell and as the sample grew. Quadruple the sample and the SE halves, because it
-divides by &radic;n rather than n. That single square root is why the fourth
-hundred observations buy so much less than the first hundred.
+cuts by &radic;n rather than n. That single square root is why the fourth
+hundred readings buy so much less than the first hundred.
 
 ## What it is not
 
 Three misreadings, all common enough to have names.
 
-**Not the probability that the null is true.** The p-value is computed *assuming*
-the null. It cannot then tell you how likely the assumption was. Getting from
+**Not the chance that the null is true.** The p-value is found *given*
+the null. It can't then tell you how likely the assumption was. Getting from
 `P(data | null)` to `P(null | data)` needs [Bayes'
 theorem](bayes_theorem.html) and a prior, and the two quantities can differ by
 orders of magnitude.
 
-**Not the probability the result was chance.** Same error, differently worded.
+**Not the chance the result was chance.** Same error, differently worded.
 
-**Not a measure of effect size.** With enough data, a difference of no practical
-consequence produces a tiny p-value. The p-value answers "is there evidence of
+**Not a measure of effect size.** With enough data, a difference of no hands-on
+consequence makes a tiny p-value. The p-value answers "is there evidence of
 *any* effect", never "is the effect large enough to matter". This is why
-[confidence intervals](confidence_intervals.html) are increasingly preferred:
+[trust intervals](confidence_intervals.html) are increasingly preferred:
 they carry the size and the uncertainty in one object.
 
 ## Failing to reject is not accepting
 
-Set the observed statistic near zero. The p-value is large, and the conclusion is
-that the data is consistent with the null.
+Set the seen statistic near zero. The p-value is large, and the conclusion is
+that the data is steady with the null.
 
-It is **not** that the null is true. A large p-value is produced both by a real
-absence of effect and by a study too small to detect one. Distinguishing those
-requires [power](type_i_and_type_ii_errors.html), and it is why "no significant
+It's **not** that the null is true. A large p-value is made both by a real
+lack of effect and by a study too small to detect one. Distinguishing those
+needs [power](type_i_and_type_ii_errors.html), and it's why "no major
 difference" in an underpowered study means almost nothing.
 
 ## One tail or two
 
-Switch the alternative. The two-tailed p-value is exactly double the one-tailed
-one for the same statistic, because the same area is being counted on both sides.
+Switch the option. The two-tailed p-value is just double the one-tailed
+one for the same statistic. The same area is being counted on both sides.
 
 The choice must be made **before** seeing the data. Deciding afterwards that you
 only cared about one direction halves your p-value for free, and that is a
@@ -2904,16 +2904,16 @@ recognised form of cheating rather than a modelling choice.
 
 ## Why one in twenty, exactly
 
-The claim that a 0.05 threshold lets one test in twenty through is not a rough
-estimate. It is exact, and the reason is a fact about p-values that is rarely
-stated: **when the null is true, the p-value is uniformly distributed between 0
-and 1.** Every value is equally likely. A p of 0.03 is exactly as probable as a
+The claim that a 0.05 threshold lets one test in twenty through isn't a rough
+guess. It's exact, and the reason is a fact about p-values that is rarely
+stated: **when the null is true, the p-value is uniformly spread between 0
+and 1.** each value is equally likely. A p of 0.03 is just as probable as a
 p of 0.87.
 
-Once that is granted, everything else follows arithmetically. The probability
+Once that is granted, all else follows arithmetically. The chance
 that a uniform value falls below &alpha; is &alpha;. So a 0.05 cutoff admits 5%
-of true nulls by construction &mdash; not as a regrettable side effect, but as
-the definition of what the cutoff is doing. Twenty thousand tests with no effect
+of true nulls by build. Not as a regrettable side effect, but as
+the meaning of what the cutoff is doing. Twenty thousand tests with no effect
 in them at all:
 
 |threshold|fraction of nulls below it|uniform predicts|
@@ -2926,12 +2926,12 @@ in them at all:
 |p &lt; 0.90|0.8968|0.90|
 
 The deciles come out 0.10, 0.20, 0.30, 0.40, 0.50, 0.61, 0.71, 0.81, 0.90 &mdash;
-the identity line, which is what a flat distribution looks like from the inside.
+the identity line, which is what a flat spread looks like from the inside.
 
 This is also the mechanism behind p-hacking, and it makes the size of the problem
-computable rather than vague. Running k independent tests on nothing means
+computable rather than vague. Running k free tests on nothing means
 drawing k uniforms and keeping the smallest, and the smallest of k uniforms has
-an average of 1/(k + 1):
+an mean of 1/(k + 1):
 
 |tests run|average smallest p|chance at least one clears 0.05|
 |---|---|---|
@@ -2939,47 +2939,47 @@ an average of 1/(k + 1):
 |20|0.048|1 &minus; 0.95&#178;&#8304; = 64.2%|
 |100|0.010|1 &minus; 0.95&#185;&#8304;&#8304; = 99.4%|
 
-Twenty metrics on an experiment that changed nothing, and the odds are roughly
-two in three that one of them looks significant. At a hundred it is a near
-certainty. Nobody has to be dishonest for this to happen &mdash; it is what the
-arithmetic does on its own, which is why the correction has to be decided before
+Twenty metrics on an test that changed nothing, and the odds are roughly
+two in three that one of them looks major. At a hundred it's a near
+certainty. No one has to be dishonest for this to happen &mdash; it's what the
+math does on its own. This Is why the correction has to be decided before
 the tests are run.
 
 ## Why 0.05 is under attack
 
-The threshold is a convention. Fisher suggested it as a rough guide and
-explicitly did not intend it as a decision rule.
+The threshold is a rule. Fisher suggested it as a rough guide and
+by name didn't intend it as a choice rule.
 
 The problems are structural.
 
-**p-hacking.** Test enough hypotheses and something crosses 0.05 by chance. At
+**p-hacking.** Test enough hypotheses and a thing crosses 0.05 by chance. At
 0.05, one test in twenty does so with no effect present at all.
 
-**Publication bias.** Significant results get published, so the literature
-over-represents them, and the effect sizes it reports are inflated.
+**Publication bias.** Major results get published, so the literature
+over-shows them, and the effect sizes it reports are inflated.
 
-**The cliff.** p = 0.049 and p = 0.051 are indistinguishable as evidence and are
+**The cliff.** p = 0.049 and p = 0.051 are the same as evidence and are
 treated as opposites.
 
 The responses in circulation: report exact p-values rather than thresholds,
 report effect sizes and intervals alongside, pre-register the analysis, and
-correct for multiple comparisons. Some fields have moved the threshold to 0.005;
-others argue for abandoning the dichotomy entirely.
+correct for multiple checks. Some fields have moved the threshold to 0.005;
+others argue for abandoning the dichotomy fully.
 
 ## Where it goes wrong
 
-**Reading p as the probability the null is true.** The central error.
+**Reading p as the chance the null is true.** The central error.
 
-**Treating "not significant" as "no effect."** Check the power.
+**Treating "not major" as "no effect."** Check the power.
 
 **Choosing the tail after seeing the data.**
 
 **Running many tests without correction.** Bonferroni is crude and better than
-nothing; false discovery rate control is usually the better tool.
+nothing. False find rate control is often the better tool.
 
 ## Where p-values come from, and what breaks them
 
-A p-value computed by simulation rather than looked up in a table, then the same test run two hundred times on data with no effect in it at all.
+A p-value found by modelling rather than looked up in a table, then the same test run two hundred times on data with no effect in it at all.
 
 ```python-run
 import numpy as np
@@ -3099,24 +3099,24 @@ topic(
     ],
     """
 title: Type I and Type II Errors
-intro: The two ways a test can be wrong, why you cannot minimise both, and what power actually buys.
+intro: The two ways a test can be wrong, why you can't cut both, and what power really buys.
 
 ## Two curves, one line
 
 The grey curve is the test statistic when the null is true. The orange curve is
-the same statistic when the effect is real. They overlap, and the overlap is the
+the same statistic when the effect is real. They share, and the share is the
 entire problem.
 
 The dashed line is the threshold: above it you reject the null, below it you do
 not.
 
 **Type I error** &mdash; the grey area to the right of the line. The null was
-true and you rejected it. A false positive.
+true and you rejected it. A false plus.
 
 **Type II error** &mdash; the orange area to the left. The effect was real and
-you missed it. A false negative.
+you missed it. A false minus.
 
-**Power** is what is left of the orange curve: `1 - beta`, the probability of
+**Power** is what is left of the orange curve: `1 - beta`, the chance of
 catching a real effect.
 
 ## The trade
@@ -3126,9 +3126,9 @@ shrinks &mdash; and the orange tail grows. Beta rises, power falls.
 
 Move it the other way and the reverse happens.
 
-**You cannot reduce both by moving the line.** That is not a limitation of the
-method; it is what "the distributions overlap" means. Any threshold is a
-statement about which error you would rather make.
+**You can't reduce both by moving the line.** That isn't a limitation of the
+method. It's what "the spreads share" means. Any threshold is a
+statement about which error you'd rather make.
 
 ## What actually helps
 
@@ -3136,26 +3136,26 @@ Two things, and only two.
 
 **More data.** Drag `n` upward. Both curves narrow, because their spread is the
 [standard error](sampling_distributions.html) and that falls like `sqrt(n)`. The
-overlap shrinks, and both error rates can fall at once. This is the only lever
-that improves both without assuming anything.
+share shrinks, and both error rates can fall at once. This is the only lever
+that raises both without given any of it.
 
 **A larger true effect.** Drag the effect control. The curves separate. You do
-not usually control this, but it is why detecting a large effect needs so much
+not often control this, but it's why detecting a large effect needs so much
 less data than detecting a small one.
 
 ## Choosing alpha honestly
 
-The convention is 0.05, and treating it as fixed is the mistake. The right value
+The rule is 0.05, and treating it as fixed is the mistake. The right value
 depends on which error costs more.
 
-**A screening test for a treatable disease.** A false negative means missing a
-case; a false positive means an unnecessary follow-up. Loosen alpha, gain power.
+**A screening test for a treatable disease.** A false minus means missing a
+case. A false plus means an unneeded follow-up. Loosen alpha, gain power.
 
-**A criminal conviction.** The system explicitly prefers false negatives, which
-is what "beyond reasonable doubt" encodes.
+**A criminal conviction.** The system by name prefers false negatives, which
+is what "beyond reasonable doubt" codes.
 
 **Particle physics.** The five-sigma standard is alpha near 3 in 10 million,
-because the field has been burned by fluctuations and there is enough data to
+because the field has been burned by fluctuations and there's enough data to
 afford it.
 
 **A/B testing a button colour.** A wrong call is cheap. Standard thresholds are
@@ -3163,44 +3163,44 @@ generous, and the real risk is running many tests and picking winners.
 
 ## Power, before the experiment
 
-Power analysis is the calculation nobody enjoys and everybody should do: given a
-target power &mdash; usually 80% &mdash; an alpha, and the smallest effect worth
-detecting, how large a sample is required?
+Power analysis is the math no one enjoys and everybody should do: given a
+target power &mdash; often 80% &mdash; an alpha, and the smallest effect worth
+detecting, how large a sample is needed?
 
 Set the effect to 0.2 and watch what `n` has to be before power reaches 80%. The
-required sample grows roughly with the inverse square of the effect size, which
-is why detecting small effects is so expensive and why so much published work is
+needed sample grows roughly with the inverse square of the effect size, which
+is why detecting small effects is so costly and why so much published work is
 underpowered.
 
-An underpowered study is worse than no study. It usually fails to find a real
+An underpowered study is worse than no study. It often fails to find a real
 effect &mdash; and when it does find one, the estimate is inflated, because only
 an unusually large sample fluctuation could have crossed the threshold at that
-sample size. That is the **winner's curse**, and it is a substantial part of why
+sample size. That is the **winner's curse**, and it's a substantial part of why
 published effects shrink on replication.
 
 ## The question alpha and power cannot answer alone
 
-Alpha is the chance of a false positive **given that the null is true**, and
-power is the chance of a true positive **given that it is false**. Neither of
-them answers the question anyone actually has after a significant result: how
+Alpha is the chance of a false plus **given that the null is true**, and
+power is the chance of a true plus **given that it's false**. Neither of
+them answers the question anyone really has after a major result: how
 likely is it that *this* finding is real?
 
-That question needs one more number, and it is the one nobody reports &mdash; the
+That question needs one more number, and it's the one no one reports &mdash; the
 proportion of the hypotheses being tested that were true to begin with. Work it
-through on a thousand tests, everything done correctly, alpha at 0.05 and power
-at a respectable 80%, in a field where one hypothesis in ten is true:
+through on a thousand tests, all done right, alpha at 0.05 and power
+at a fair 80%, in a field where one hypothesis in ten is true:
 
 |  |true (100)|false (900)|
 |---|---|---|
 |**significant**|80|45|
 |**not significant**|20|855|
 
-There are 125 significant results and 45 of them are false. **Thirty-six per cent
+There are 125 major results and 45 of them are false. **Thirty-six per cent
 of the findings are wrong**, with no p-hacking, no bad faith and no methodological
-error &mdash; only 5% of a large number of false hypotheses being larger than 80%
+error &mdash; only 5% of many false hypotheses being larger than 80%
 of a small number of true ones.
 
-Everything follows from the ratio of those two counts:
+All follows from the ratio of those two counts:
 
 |true hypotheses|alpha|power|share of significant results that are real|
 |---|---|---|---|
@@ -3212,35 +3212,35 @@ Everything follows from the ratio of those two counts:
 
 Read the third row. In exploratory work where one hypothesis in a hundred is
 true &mdash; screening compounds, scanning the genome, trying features &mdash;
-about six of every seven significant results are false, and the study was
-run perfectly. Read the second: halving the power does not halve the errors, it
-raises the false share from 36% to 56%, which is the concrete cost of the
-underpowered study described above.
+about six of each seven major results are false, and the study was
+run just right. Read the second: halving the power doesn't halve the errors, it
+raises the false share from 36% to 56%. This Is the concrete cost of the
+underpowered study given above.
 
-Then read the last two rows, because they are the levers. Tightening alpha
-tenfold takes the false share from 36% to 5%, which is the actual argument
+Then read the last two rows, because they're the levers. Tightening alpha
+tenfold takes the false share from 36% to 5%. This Is the actual arg
 behind moving the threshold to 0.005. Testing better hypotheses does the same
 thing &mdash; a field where half the ideas are right barely has the problem.
-Neither lever is inside the statistics; they are choices about how hard you are
+Neither lever is inside the statistics. They're choices about how hard you're
 willing to make it to publish, and about what you bother to test.
 
 ## Where it goes wrong
 
-**Interpreting a non-significant result as no effect.** Report the power, or the
+**Reading a non-major result as no effect.** Report the power, or the
 interval.
 
-**Running the power analysis afterwards.** Post-hoc power computed from the
-observed effect is a restatement of the p-value and carries no new information.
+**Running the power analysis afterwards.** Post-hoc power found from the
+seen effect is a restatement of the p-value and carries no new info.
 
-**Fixing alpha at 0.05 regardless of costs.** It is a convention.
+**Fixing alpha at 0.05 even so of costs.** It's a rule.
 
-**Peeking at results and stopping when significant.** This inflates the true
+**Peeking at results and stopping when major.** This inflates the true
 Type I rate far above the nominal one. Sequential testing methods exist and
 correct for it.
 
 ## Both errors, counted
 
-Lower your threshold and you catch more real effects while raising more false alarms. Here both rates are measured across a sweep, so the trade is visible rather than described.
+Lower your threshold and you catch more real effects while raising more false alarms. Here both rates are measured across a sweep. The trade is visible rather than given.
 
 ```python-run
 import numpy as np
@@ -3342,61 +3342,61 @@ topic(
     ],
     """
 title: QR Decomposition and Gram-Schmidt
-intro: Manufacturing an orthonormal basis, and the factorisation that makes least squares numerically respectable.
+intro: Making an unit-perp basis, and the factorisation that makes least squares by number fair.
 
 ## The procedure
 
-Start with vectors that span what you want but are not perpendicular. Gram-
-Schmidt makes them perpendicular without changing what they span.
+Start with vectors that span what you want but aren't at right angles. Gram-
+Schmidt makes them at right angles without changing what they span.
 
 **First vector**: divide by its length. That is `q1` &mdash; same direction,
 length 1.
 
 **Second vector**: it points partly along `q1` and partly perpendicular to it.
-[Project](projections.html) it onto `q1`, subtract that projection, and what is
-left is perpendicular by construction. Normalise it to get `q2`.
+[Project](maps.html) it onto `q1`, subtract that map, and what is
+left is at right angles by build. Norm it to get `q2`.
 
 The visualisation draws each step. The dashed grey lines are the originals. The
-solid orange segment is the projection being removed, and the short dashed line
-is the remainder that becomes `q2`. The readout gives `q1 . q2` &mdash; zero to
-six decimal places, because it cannot be anything else.
+solid orange segment is the map being removed, and the short dashed line
+is the remainder that turns `q2`. The readout gives `q1 . q2` &mdash; zero to
+six decimal places, because it can't be any of it else.
 
-For more vectors the pattern repeats: subtract the components along everything
-already fixed, normalise what survives.
+For more vectors the pattern repeats: subtract the components along all
+already fixed, norm what lives.
 
 ## Where R comes from
 
-The projections you subtract are not discarded. Collect them and you have `R`,
+The maps you subtract aren't discarded. Collect them and you've `R`,
 and together:
 
 ```
 A  =  Q R
 ```
 
-`Q` has the orthonormal vectors as columns; `R` is upper triangular.
+`Q` has the unit-perp vectors as columns. `R` is upper tri.
 
-`R` is triangular for a structural reason worth seeing: the first original
+`R` is tri for a structural reason worth seeing: the first first
 vector is built from `q1` alone, the second from `q1` and `q2`, the third from
 the first three. Nothing is ever built from a `q` that comes later, so
-everything below the diagonal is zero.
+all below the main-line is zero.
 
 Drag until the two input vectors nearly align. The remainder shrinks toward zero
-and `R` becomes nearly singular &mdash; which is the same near-dependence
+and `R` turns nearly singular &mdash; which is the same near-dependence
 [the basis module](basis_span_and_orthogonality.html) warns about, showing up as
-a small number on the diagonal.
+a small number on the main-line.
 
 ## Why least squares uses it
 
-The textbook solution to least squares is the normal equations:
+The textbook answer to least squares is the normal equations:
 
 ```
 x  =  (A'A)^-1 A' b
 ```
 
-Correct, and numerically poor. Forming `A'A` **squares the condition number**.
-A matrix with condition number 10&#8310; &mdash; unremarkable for real data
-&mdash; becomes 10&#185;&#178;, and in double precision that has consumed most
-of the available accuracy before the solve begins.
+Correct, and by number poor. Forming `A'A` **squares the rule number**.
+A mat with rule number 10&#8310. &mdash; plain for real data
+&mdash; turns 10&#185;&#178;, and in double precision that has consumed most
+of the available fit before the solve begins.
 
 QR avoids it. Substituting `A = QR` and using `Q'Q = I`:
 
@@ -3404,54 +3404,54 @@ QR avoids it. Substituting `A = QR` and using `Q'Q = I`:
 R x  =  Q' b
 ```
 
-`R` is triangular, so this is solved by back-substitution in one pass, and the
-condition number is never squared. That is why `numpy.linalg.lstsq`, R's `lm`
-and essentially every serious least-squares routine uses QR or an
+`R` is tri, so this is solved by back-substitution in one pass, and the
+rule number is never squared. That is why `numpy.linalg.lstsq`, R's `lm`
+and each serious least-squares routine uses QR or an
 [SVD](singular_value_decomposition.html) rather than the formula in the
 textbook.
 
 ## Classical against modified Gram-Schmidt
 
-The version described above is *classical* Gram-Schmidt, and it is unstable in
+The version given above is *classical* Gram-Schmidt, and it's unstable in
 floating point: rounding errors mean the later vectors drift away from
-orthogonality.
+perpness.
 
-*Modified* Gram-Schmidt subtracts each projection immediately rather than all at
-once at the end. Algebraically identical, numerically much better behaved.
+*Modified* Gram-Schmidt subtracts each map right away rather than all at
+once at the end. Algebraically the same, by number much better behaved.
 
-Serious implementations use neither, preferring **Householder reflections**,
-which build `Q` from a sequence of reflections and are stable regardless of the
-input. Gram-Schmidt survives because it is the version you can see, which is why
-it is the version on this page.
+Serious setups use neither, preferring **Householder reflections**,
+which build `Q` from a sequence of reflections and are stable even so of the
+input. Gram-Schmidt lives because it's the version you can see, which is why
+it's the version on this page.
 
 ## Where else it turns up
 
-**The QR algorithm** for eigenvalues repeatedly factors and re-multiplies in the
-other order, and the result converges to a triangular matrix whose diagonal
-holds the eigenvalues. It is one of the most important numerical algorithms
-there is, and it is this decomposition in a loop.
+**The QR method** for eigenvals again and again factors and re-times in the
+other order, and the result settles to a tri mat whose main-line
+holds the eigenvals. It's one of the most key numeric methods
+there's, and it's this breakdown in a loop.
 
-**Orthogonalising features** before regression, to remove collinearity.
+**Orthogonalising features** before regression, to drop collinearity.
 
 **Kalman filters** in square-root form, for the same conditioning reason as
 least squares.
 
 ## Gram-Schmidt by hand, on two vectors
 
-The editor below runs the full factorisation; the mechanism is clearest on two
+The editor below runs the full factorisation. The mechanism is clearest on two
 vectors small enough to finish on paper. Take `a1 = (1, 1)` and `a2 = (2, 0)`,
 which span the plane but meet at 45&deg;, not a right angle.
 
-**q1** is `a1` normalised: its length is &radic;2, so `q1 = (1, 1)/&radic;2`.
+**q1** is `a1` normed: its length is &radic;2. So `q1 = (1, 1)/&radic;2`.
 
-**q2** removes from `a2` its component along `q1`. The projection length is
-`a2 &middot; q1 = 2/&radic;2 = &radic;2`, so the projection is `&radic;2 &middot;
+**q2** drops from `a2` its component along `q1`. The map length is
+`a2 &middot; q1 = 2/&radic;2 = &radic;2`. So The map is `&radic;2 &middot;
 q1 = (1, 1)`. Subtract it: `a2 &minus; (1, 1) = (1, &minus;1)`. That remainder is
-perpendicular to `q1` by construction, and normalising it (length &radic;2 again)
+at right angles to `q1` by build, and norming it (length &radic;2 again)
 gives `q2 = (1, &minus;1)/&radic;2`.
 
-Check: `q1 &middot; q2 = (1&minus;1)/2 = 0`, exactly, as it must be. And the
-projections you subtracted are `R`:
+Check: `q1 &middot; q2 = (1&minus;1)/2 = 0`, just, as it must be. And the
+maps you subtracted are `R`:
 
 |R|value|
 |---|---|
@@ -3459,29 +3459,29 @@ projections you subtracted are `R`:
 |R&#8321;&#8322; = a2 &middot; q1|&radic;2|
 |R&#8322;&#8322; = &#124;remainder&#124;|&radic;2|
 
-`R` is upper triangular because `a1` was built from `q1` alone and only `a2` ever
-used `q2` &mdash; nothing is ever built from a later `q`, so everything below the
-diagonal is zero. That is the whole factorisation, and every larger case is this
+`R` is upper tri because `a1` was built from `q1` alone and only `a2` ever
+used `q2` &mdash; nothing is ever built from a later `q`, so all below the
+main-line is zero. That is the whole factorisation, and each larger case is this
 one repeated.
 
 The reason least squares reaches for this rather than the textbook normal
 equations is visible in the same small picture. Solving `Rx = Q'b` uses the
-triangular `R` directly and never forms `A'A`, which would square the condition
-number &mdash; a matrix conditioned at 10&#8310; becomes 10&#185;&#178;, and in
+tri `R` right and never forms `A'A`. This Would square the rule
+number &mdash; a mat conditioned at 10&#8310. Turns 10&#185;&#178;, and in
 double precision that discards most of the available digits before the solve even
-starts. The orthonormal columns are what make `Q'Q` disappear to the identity, so
+starts. The unit-perp columns are what make `Q'Q` disappear to the identity, so
 the substitution costs nothing and the conditioning is left untouched.
 
-The version shown here, subtracting every projection at the end, is *classical*
-Gram-Schmidt and drifts out of orthogonality in floating point; the *modified*
-form subtracts each projection immediately and behaves far better, though serious
-libraries use Householder reflections instead. Gram-Schmidt survives as the
-version you can watch happen, which is why it is the one worth working by hand.
+The version shown here, subtracting each map at the end, is *classical*
+Gram-Schmidt and drifts out of perpness in floating point. The *modified*
+form subtracts each map right away and behaves far better, though serious
+libraries use Householder reflections instead. Gram-Schmidt lives as the
+version you can watch happen. This Is why it's the one worth working by hand.
 
-The same decomposition, run in a loop that factors and re-multiplies in the
-opposite order, is the QR algorithm for eigenvalues &mdash; one of the most
-important numerical methods there is, and at heart just this factorisation
-repeated until the matrix goes triangular.
+The same breakdown, run in a loop that factors and re-times in the
+opposite order, is the QR method for eigenvals. One of the most
+key numeric methods there's, and at heart just this factorisation
+repeated until the mat goes tri.
 
 ## Where it goes wrong
 
@@ -3490,12 +3490,12 @@ or a library.
 
 **Forming A'A because the formula is shorter.** It squares the conditioning.
 
-**Assuming Q is square.** For a tall thin `A`, the economy QR gives a `Q` with
-the same shape as `A`, not a full orthogonal matrix.
+**given Q is square.** For a tall thin `A`, the economy QR gives a `Q` with
+the same shape as `A`, not a full perp mat.
 
 ## Orthogonalise a basis, then solve with it
 
-QR turns any set of columns into an orthonormal set plus the bookkeeping needed to get back. It is how least squares is solved in practice.
+QR turns any set of columns into an unit-perp set plus the bookkeeping needed to get back. It's how least squares is solved .
 
 ```python-run
 import numpy as np
@@ -3598,19 +3598,19 @@ topic(
     ],
     """
 title: Cholesky and Positive-Definiteness
-intro: A matrix square root, what it needs to exist, and why its failure is more useful than its success.
+intro: A mat square root, what it needs to exist. Why its failure is more handy than its success.
 
 ## The factorisation
 
-For a symmetric positive-definite matrix `C` there is a lower triangular `L`
+For a even plus-definite mat `C` there's a lower tri `L`
 with:
 
 ```
 C  =  L L'
 ```
 
-`L` is unique if its diagonal is taken positive, and it is the nearest thing a
-matrix has to a square root. For a 2&times;2 it is short enough to write out
+`L` is unique if its main-line is taken plus, and it's the nearest thing a
+mat has to a square root. For a 2&times;2 it's short enough to write out
 whole:
 
 ```
@@ -3619,135 +3619,135 @@ L21 = C21 / L11
 L22 = sqrt(C22 - L21^2)
 ```
 
-That last line carries the whole story. If `C22 - L21^2` is negative there is no
-real square root, and the algorithm stops.
+That last line carries the whole story. If `C22 - L21^2` is minus there's no
+real square root, and the method stops.
 
 ## Positive-definite
 
-A symmetric matrix is **positive definite** when `x' C x > 0` for every non-zero
-`x`, which is equivalent to all its eigenvalues being strictly positive.
+A even mat is **positive definite** when `x' C x > 0` for each non-zero
+`x`, which is equal to all its eigenvals being strictly plus.
 
-For a covariance matrix this is not a technicality. `x' C x` is the variance of
-the combination `x` of your variables, and a variance cannot be negative. A
-matrix that fails the test is not describing any distribution that exists.
+For a covariance mat this isn't a detail. `x' C x` is the variance of
+the combination `x` of your variables, and a variance can't be minus. A
+mat that fails the test isn't showing any spread that exists.
 
-Drag the correlation control toward &plusmn;1. Past the boundary the readout
-reports failure, and the reason is that a correlation of 1.2 is not a thing: no
-pair of random variables can be more than perfectly correlated.
+Drag the link control toward &plusmn;1. Past the boundary the readout
+reports failure, and a link of 1.2 isn't a thing: no
+pair of random variables can be more than just right linked.
 
 **The factorisation failing is the test.** Cholesky costs about `n^3 / 3`
-operations, roughly half a general LU factorisation, and about a tenth of what
-computing the eigenvalues costs. When a routine needs to know whether a matrix
-is positive definite, it attempts a Cholesky and watches for the negative square
+ops, roughly half a general LU factorisation, and about a tenth of what
+finding the eigenvals costs. When a routine needs to know whether a mat
+is positive definite, it attempts a Cholesky and watches for the minus square
 root.
 
 ## Generating correlated randomness
 
-This is where the factor earns its keep. Take independent standard normals `z`
-and compute `L z`. The result has covariance:
+This is where the factor earns its keep. Take free standard normals `z`
+and find `L z`. The result has covariance:
 
 ```
 Cov(Lz)  =  L Cov(z) L'  =  L I L'  =  L L'  =  C
 ```
 
-Exactly the covariance you asked for. The scatter in the visualisation is
-generated this way, and the two orange segments are the columns of `L` &mdash;
-the axes the independent noise gets mapped onto.
+just the covariance you asked for. The scatter in the visualisation is
+made this way, and the two orange segments are the columns of `L` &mdash;
+the axes the free noise gets mapped onto.
 
-That single trick underlies Monte Carlo simulation of correlated risk factors,
+That single trick underlies Monte Carlo modelling of linked risk factors,
 sampling from a multivariate normal, and the reparameterisation trick in
 variational autoencoders.
 
 ## Where else it appears
 
-**Gaussian processes.** Fitting one requires solving a system with the kernel
-matrix and computing its log-determinant. Cholesky gives both: the solve by
-triangular substitution, and the log-determinant as twice the sum of the logs of
-`L`'s diagonal. It is the computational core of GP regression.
+**Gaussian processes.** Fitting one needs solving a system with the kernel
+mat and finding its log-determinant. Cholesky gives both: the solve by
+tri substitution, and the log-determinant as twice the sum of the logs of
+`L`'s main-line. It's the math-heavy core of GP regression.
 
-**Linear systems** with a symmetric positive-definite matrix &mdash; twice as
-fast as LU and numerically stable without pivoting.
+**Linear systems** with a even plus-definite mat &mdash; twice as
+fast as LU and by number stable without pivoting.
 
 **Optimisation.** Newton steps need to solve with the
-[Hessian](jacobian_and_hessian.html), and a successful Cholesky confirms the
-Hessian is positive definite, which confirms the step direction is a descent
+[Hessian](jacobian_and_hessian.html), and a good Cholesky confirms the
+Hessian is positive definite. This Confirms the step direction is a descent
 direction. A failure signals a saddle, and modified Newton methods react to
-exactly that signal.
+just that signal.
 
-**Whitening.** `L^-1 x` transforms correlated data into uncorrelated data with
+**Whitening.** `L^-1 x` transforms linked data into unlinked data with
 unit variance.
 
 ## When it fails on data that should be fine
 
-An estimated covariance matrix can come out not-quite-positive-definite for
-reasons that are arithmetic rather than conceptual.
+An guessed covariance mat can come out not-quite-plus-definite for
+reasons that are math rather than conceptual.
 
-**More variables than observations.** The estimate is singular by construction:
-with 100 variables and 50 samples the matrix has rank at most 50.
+**More variables than readings.** The estimate is singular by build:
+with 100 variables and 50 samples the mat has rank at most 50.
 
-**Perfectly collinear columns.** One variable is a combination of others, so
-some direction has genuinely zero variance.
+**just right collinear columns.** One variable is a combination of others, so
+some direction has truly zero variance.
 
-**Floating point.** A matrix that is positive definite in exact arithmetic can
-have a tiny negative eigenvalue after rounding.
+**Floating point.** A mat that is positive definite in exact math can
+have a tiny minus eigenval after rounding.
 
-The standard repairs: add a small multiple of the identity to the diagonal
+The standard repairs: add a small multiple of the identity to the main-line
 &mdash; *jitter*, or *ridge*, and the same idea as
-[ridge regression](../machine_learning/ridge_and_lasso_regression.html); use a shrinkage estimator
-such as Ledoit-Wolf; or clip the negative eigenvalues to zero and reassemble.
+[ridge regression](../machine_learning/ridge_and_lasso_regression.html). Use a shrinkage estimator
+such as Ledoit-Wolf. Or clip the minus eigenvals to zero and reassemble.
 
 ## Cholesky by hand, and the failure
 
 The three formulas are short enough to run on a 2&times;2. Take
 `C = [[4, 2], [2, 5]]`:
 
-`L&#8321;&#8321; = &radic;4 = 2`. `L&#8322;&#8321; = 2 / L&#8321;&#8321; = 1`.
-`L&#8322;&#8322; = &radic;(5 &minus; 1&sup2;) = &radic;4 = 2`.
+`L&#8321;&#8321. = &radic;4 = 2`. `L&#8322;&#8321. = 2 / L&#8321;&#8321. = 1`.
+`L&#8322;&#8322. = &radic;(5 &minus; 1&sup2;) = &radic;4 = 2`.
 
-So `L = [[2, 0], [1, 2]]`, and multiplying back, `L L' = [[4, 2], [2, 5]]` &mdash;
-the original. The whole story is in that last square root: `C&#8322;&#8322;`
-minus what the first column already accounts for must be non-negative for a real
+So `L = [[2, 0], [1, 2]]`. Timesing back, `L L' = [[4, 2], [2, 5]]` &mdash;
+the first. The whole story is in that last square root: `C&#8322;&#8322;`
+minus what the first column already accounts for must be non-minus for a real
 `L` to exist.
 
-Now feed it a matrix that is symmetric but not positive definite,
+Now feed it a mat that is even but not positive definite,
 `B = [[1, 2], [2, 1]]`. The last step asks for `&radic;(1 &minus; 2&sup2;) =
 &radic;(&minus;3)`, which has no real value, and the factorisation stops. That is
-not a bug &mdash; it is the test. `B` fails because `x = (1, &minus;1)` gives
-`x' B x = 1 &minus; 4 + 1 = &minus;2 < 0`, so `B` is not a covariance of anything:
-no set of variables has a negative variance. The cheap `n&sup3;/3` factorisation
-is how a routine decides positive-definiteness, precisely because it breaks
-exactly when the property fails.
+not a bug &mdash; it's the test. `B` fails because `x = (1, &minus;1)` gives
+`x' B x = 1 &minus; 4 + 1 = &minus;2 < 0`. `B` isn't a covariance of any of it:
+no set of variables has a minus variance. The cheap `n&sup3;/3` factorisation
+is how a routine decides plus-definiteness, just because it breaks
+just when the property fails.
 
-That is also why an estimated covariance matrix sometimes fails the factorisation
-when it "should" work: with more variables than observations the estimate is
-singular by construction, and a genuinely collinear pair gives some direction zero
+That is also why an guessed covariance mat at times fails the factorisation
+when it "should" work: with more variables than readings the estimate is
+singular by build, and a truly collinear pair gives some direction zero
 variance, so the last square root reaches zero or below. The standard repair
 &mdash; adding a small multiple of the identity, the same idea as ridge
-regression &mdash; nudges every eigenvalue up just enough to make the square roots
+regression &mdash; nudges each eigenval up just enough to make the square roots
 real again, at the cost of admitting you changed the model.
 
-It is worth stressing why the factorisation is the test of choice: at about
-`n&sup3;/3` operations it is half the cost of a general LU decomposition and a
-fraction of computing the eigenvalues, so a routine that needs to know whether a
-matrix is positive definite simply attempts the Cholesky and watches for the
-negative square root.
+It's worth stressing why the factorisation is the test of choice: at about
+`n&sup3;/3` ops it's half the cost of a general LU breakdown and a
+fraction of finding the eigenvals. So A routine that needs to know whether a
+mat is positive definite simply attempts the Cholesky and watches for the
+minus square root.
 
 ## Where it goes wrong
 
-**Passing a non-symmetric matrix.** Most implementations read only one triangle
+**Passing a non-even mat.** Most setups read only one triangle
 and will silently return nonsense.
 
-**Treating failure as a bug.** It is usually the data telling you something.
+**Treating failure as a bug.** It's often the data telling you a thing.
 
-**Adding jitter without recording it.** You have changed the model. Say by how
+**Adding jitter without recording it.** You've changed the model. Say by how
 much.
 
-**Using it on a matrix that is only positive semi-definite.** A zero eigenvalue
-gives a zero on `L`'s diagonal, and anything that then divides by it fails.
+**Using it on a mat that is only positive semi-definite.** A zero eigenval
+gives a zero on `L`'s main-line. Any of it that then cuts by it fails.
 
 ## Half a matrix, and what it costs to have one
 
-Cholesky finds a triangular L with L @ L.T equal to your matrix -- but only if the matrix is positive definite. Here is what that condition rules out.
+Cholesky finds a tri L with L @ L.T equal to your mat -- but only if the mat is positive definite. Here is what that rule rules out.
 
 ```python-run
 import numpy as np
@@ -3859,91 +3859,91 @@ intro: Optimising under a constraint, and the multiplier that turns out to be wo
 
 ## Why the usual rule stops working
 
-Unconstrained: find where the gradient is zero.
+Unconstrained: find where the grad is zero.
 
-Constrained: that rule fails immediately, because the unconstrained optimum is
-usually somewhere the constraint forbids. On the circle above, the objective
-increases forever in one direction and its gradient is never zero anywhere.
+Constrained: that rule fails right away, because the unconstrained optimum is
+often a place the constraint forbids. On the circle above, the goal
+grows forever in one direction and its grad is never zero anywhere.
 
 ## The condition
 
 Look at where the level lines meet the circle.
 
 At most points they **cross**. Crossing means you can slide along the circle and
-move to a better level line, so you are not at the optimum.
+move to a better level line. So You aren't at the optimum.
 
-At the optimum they are **tangent** &mdash; touching without crossing. Sliding
+At the optimum they're **tangent** &mdash; touching without crossing. Sliding
 either way makes things worse.
 
-Tangency means the two gradients are parallel:
+Tangency means the two grads are parallel:
 
 ```
 grad f  =  lambda * grad g
 ```
 
 That is the method entire. Solve it together with the constraint itself and you
-have the candidate points.
+have the pick points.
 
-Drag the objective weights and watch the marked point travel around the circle,
-staying exactly where the family of parallel lines grazes it.
+Drag the goal weights and watch the marked point travel around the circle,
+staying just where the family of parallel lines grazes it.
 
 ## The multiplier is the interesting part
 
-`lambda` looks like bookkeeping. It is not: it is the **shadow price** of the
-constraint &mdash; the rate at which the optimal value improves as the
+`lambda` looks like bookkeeping. It isn't: it's the **shadow price** of the
+constraint &mdash; the rate at which the best value raises as the
 constraint is relaxed.
 
 Drag the radius control. The optimum's value rises, and the readout's `lambda`
 says how fast per unit of radius.
 
-In economics that is literally a price: how much more profit one more unit of
-capacity is worth, and therefore what you should be willing to pay for it. In
-machine learning it is the same quantity under different names &mdash; the
-regularisation strength in ridge regression, and the dual variables in an SVM
-that identify exactly which points are support vectors.
+In economics that is truly a price: how much more profit one more unit of
+room is worth, and so what you should be willing to pay for it. In
+machine learning it's the same quantity under different names &mdash; the
+smoothing strength in ridge regression, and the dual variables in an SVM
+that spot just which points are support vectors.
 
-A `lambda` of zero says the constraint is not binding: you would have chosen
+A `lambda` of zero says the constraint isn't binding: you'd have chosen
 that point anyway, and loosening it buys nothing.
 
 ## Where it shows up
 
-**Ridge regression.** "Minimise error subject to the coefficients being small"
-is a constrained problem; the penalised form everyone actually writes is its
-Lagrangian, and the penalty weight is `lambda`.
+**Ridge regression.** "Cut error subject to the coeffs being small"
+is a constrained problem. The penalised form everyone really writes is its
+Lagrangian, and the fine weight is `lambda`.
 
 **Support vector machines.** The dual formulation is Lagrangian, the multipliers
 are per-training-point, and the ones that come out non-zero *are* the support
 vectors.
 
-**Maximum entropy.** Finding the distribution with the most entropy subject to
-matching known moments produces the exponential family, and the multipliers
-become its natural parameters.
+**max entropy.** Finding the spread with the most entropy subject to
+matching known moments makes the exponential family, and the multipliers
+become its natural params.
 
-**PCA.** Maximising variance subject to unit-length direction gives
+**PCA.** Raising variance subject to unit-length direction gives
 `Cv = lambda v` &mdash; the multiplier turns out to be the
-[eigenvalue](eigenvalues_and_eigenvectors.html).
+[eigenval](eigenvalues_and_eigenvectors.html).
 
-**Physics and economics** throughout, wherever something is optimised under a
+**Physics and economics** throughout, wherever a thing is optimised under a
 budget.
 
 ## Inequalities
 
 Real constraints are often `g(x) <= c` rather than `g(x) = c`, and the extension
-is the **KKT conditions**. The addition worth remembering is *complementary
-slackness*: for each constraint, either it is tight and its multiplier may be
-non-zero, or it is slack and its multiplier is zero.
+is the **KKT rules**. The addition worth remembering is *complementary
+slackness*: for each constraint, either it's tight and its multiplier may be
+non-zero, or it's slack and its multiplier is zero.
 
 That is what makes SVMs sparse. Points comfortably on the correct side of the
 margin have slack constraints, so their multipliers are zero, so they contribute
-nothing to the solution. Only the points pressed against the margin survive.
+nothing to the answer. Only the points pressed against the margin live.
 
 ## The shadow price, worked
 
 The claim that `lambda` is a price is easiest to trust on a case you can check by
-hand. Minimise `x&sup2; + y&sup2;` &mdash; distance-squared from the origin
+hand. Cut `x&sup2; + y&sup2;` &mdash; distance-squared from the origin
 &mdash; subject to `3x + 4y = c`. The constraint is a line, and the closest point
 on a line `3x + 4y = c` to the origin is at distance `c/5` (because
-&radic;(3&sup2;+4&sup2;) = 5), so the minimum value is `(c/5)&sup2;`.
+&radic;(3&sup2;+4&sup2;) = 5), so the min value is `(c/5)&sup2;`.
 
 Now watch what one unit of `c` buys:
 
@@ -3955,49 +3955,49 @@ Now watch what one unit of `c` buys:
 
 The optimum rises by about 2 per unit of `c`, and the multiplier the method
 returns is `lambda = 2c/25 = 2` at `c = 25`. The two agree: `lambda` *is* the
-rate at which the optimal value changes as the constraint moves &mdash; the price
+rate at which the best value changes as the constraint moves &mdash; the price
 of one more unit of the resource. The small gap between 1.96 and 2.04 is the
-curvature of that price across the step; in the limit of an infinitesimal change
-it is exactly `lambda`. This is why, in a real problem, the multiplier is often
+curvature of that price across the step. In the limit of an infinitesimal change
+it's just `lambda`. This is why, in a real problem, the multiplier is often
 worth more than the optimum: it tells you what relaxing the constraint is worth
 before you pay to relax it.
 
 This is why the multiplier reappears under other names across machine learning:
-it is the regularisation strength in ridge regression (the price of the
-coefficient-size budget), and it is the per-point dual variable in an SVM, where
-the points whose multiplier comes out non-zero are exactly the support vectors.
-In every case `lambda` answers the question the optimum cannot: not "what is the
-best value" but "what is the constraint costing me", which is usually the number a
-decision actually turns on.
+it's the smoothing strength in ridge regression (the price of the
+coeff-size budget), and it's the per-point dual variable in an SVM, where
+the points whose multiplier comes out non-zero are just the support vectors.
+In each case `lambda` answers the question the optimum can't: not "what is the
+best value" but "what is the constraint costing me". This Is often the number a
+choice really turns on.
 
-A multiplier of zero carries its own message: the constraint is not binding, you
+A multiplier of zero carries its own message: the constraint isn't binding, you
 would have chosen that point anyway, and relaxing it buys nothing &mdash; which is
-as useful to know as a large multiplier that says the constraint is expensive and
+as handy to know as a large multiplier that says the constraint is costly and
 worth paying to loosen.
 
-For inequality constraints the same idea extends to the KKT conditions, whose
+For inequality constraints the same idea extends to the KKT rules, whose
 complementary slackness says each constraint is either tight with a possibly
-non-zero multiplier or slack with a zero one &mdash; which is precisely what makes
+non-zero multiplier or slack with a zero one. Which is just what makes
 an SVM sparse, since points comfortably inside the margin contribute nothing.
 
 ## Where it goes wrong
 
-**Forgetting it finds stationary points, not maxima.** The condition holds at
-constrained minima and saddles too. Check which you have.
+**Losing it finds stationary points, not maxima.** The rule holds at
+constrained minima and saddles too. Check which you've.
 
-**Assuming a solution exists.** An unbounded objective on an unbounded
+**given a answer exists.** An unbounded goal on an unbounded
 constraint set has none.
 
 **Reading lambda's sign carelessly.** It depends on how the Lagrangian was
-written, and the sign convention differs between texts.
+written, and the sign rule differs between texts.
 
 **Skipping the constraint qualification.** The method assumes the constraint
-gradients are well behaved at the solution; at a cusp or where constraints are
-degenerate it can fail.
+grads are well behaved at the answer. At a cusp or where constraints are
+collapse it can fail.
 
 ## Optimise with a rule you are not allowed to break
 
-The closest point on a line to the origin, found three ways: by brute force, by substitution, and by the multiplier condition. All three agree, and the multiplier turns out to mean something.
+The closest point on a line to the origin, found three ways. By brute force, by substitution. By the multiplier rule. All three agree. The multiplier turns out to mean a thing.
 
 ```python-run
 import numpy as np
@@ -4113,7 +4113,7 @@ topic(
         "the reason EM and variational inference work at all.",
     ],
     """title: Jensen's Inequality
-intro: Why averaging before and after a curve gives different answers, and what that difference is used for.
+intro: Why blending before and after a curve gives different answers. What that difference is used for.
 
 ## The statement
 
@@ -4123,43 +4123,43 @@ For a convex function `f` and a random variable `X`:
 E[f(X)]  >=  f(E[X])
 ```
 
-Transform first and average, and you get at least as much as averaging first
+Transform first and mean, and you get at least as much as blending first
 and transforming. For a concave function the inequality reverses.
 
 ## Why it is obvious once seen
 
-Take a distribution that puts half its weight at each of two points &mdash; the
+Take a spread that puts half its weight at each of two points &mdash; the
 two grey dots in the visualisation.
 
-`f(E[X])` is the curve evaluated at the midpoint: the orange dot **on** the
+`f(E[X])` is the curve tested at the midpoint: the orange dot **on** the
 curve.
 
-`E[f(X)]` is the average of the two heights: the midpoint of the **chord**, the
+`E[f(X)]` is the mean of the two heights: the midpoint of the **chord**, the
 lighter dot above.
 
 Convex means the chord lies above the curve. So the chord's midpoint is above
 the curve's point, which is the inequality, drawn.
 
 Two controls change the gap. **Curvature**: flatten the function toward a
-straight line and the chord lies on the curve, so the gap vanishes &mdash; for a
+straight line and the chord lies on the curve. The gap vanishes &mdash; for a
 linear `f`, expectation passes straight through. **Spread**: shrink the
-distribution to a point and the two dots merge, and the gap vanishes again.
+spread to a point and the two dots merge, and the gap vanishes again.
 
-The gap is zero exactly when the function is linear or the variable is constant,
+The gap is zero just when the function is linear or the variable is constant,
 and grows with both.
 
 ## Consequences worth having
 
-**The mean of ratios is not the ratio of means.** `1/x` is convex on the
-positives, so `E[1/X] >= 1/E[X]`. Averaging speeds in miles per hour to get
-average pace is wrong in a specific, predictable direction, and the same trap
-appears in averaging rates, ratios and per-unit costs throughout applied work.
+**The mean of ratios isn't the ratio of means.** `1/x` is convex on the
+positives, so `E[1/X] >= 1/E[X]`. Blending speeds in miles per hour to get
+mean pace is wrong in a exact, predictable direction, and the same trap
+appears in blending rates, ratios and per-unit costs throughout applied work.
 
-**AM-GM.** Applying Jensen to the concave logarithm gives that the arithmetic
-mean is at least the geometric mean, immediately.
+**AM-GM.** Applying Jensen to the concave logarithm gives that the math
+mean is at least the geometric mean, right away.
 
-**Log-loss and calibration.** `-log` is convex, so averaging log-losses
-penalises confident mistakes far more than the raw error rate does. That is a
+**Log-loss and calibration.** `-log` is convex, so blending log-losses
+punishes confident mistakes far more than the raw error rate does. That is a
 design choice, and Jensen is why it works.
 
 **Portfolio returns.** Compounding is multiplicative, so the geometric mean is
@@ -4170,9 +4170,9 @@ is Jensen's gap.
 
 Jensen is why **EM** and **variational inference** exist.
 
-Both want to maximise a log-likelihood containing a sum inside a logarithm
-&mdash; `log sum_z p(x, z)` &mdash; which does not decompose and cannot be
-optimised directly.
+Both want to raise a log-likelihood holding a sum inside a logarithm
+&mdash; `log sum_z p(x, z)`. Which doesn't break down and can't be
+optimised right.
 
 The move is to write that sum as an expectation, then use Jensen on the concave
 `log` in the other direction:
@@ -4181,37 +4181,37 @@ The move is to write that sum as an expectation, then use Jensen on the concave
 log E[ ... ]  >=  E[ log ... ]
 ```
 
-The right-hand side is a **lower bound** on the thing you wanted, it decomposes
-into terms you can differentiate, and maximising it cannot decrease the true
-objective.
+The right-hand side is a **lower bound** on the thing you wanted, it breaks down
+into terms you can differentiate, and raising it can't fall the true
+goal.
 
-That bound is the ELBO &mdash; the evidence lower bound &mdash; and it is the
-objective a variational autoencoder trains on. EM alternates between tightening
-the bound and maximising it, which is exactly the two steps in
+That bound is the ELBO. The evidence lower bound &mdash; and it's the
+goal a variational autoencoder trains on. EM alternates between tightening
+the bound and raising it. This Is just the two steps in
 [the Gaussian mixture module](../machine_learning/gaussian_mixture_models.html).
 
 The gap between the bound and the truth is the KL divergence between the
-approximate posterior and the real one, which ties Jensen directly to
+rough posterior and the real one. This Ties Jensen right to
 [cross-entropy and KL](cross_entropy_and_kl_divergence.html): non-negativity of
 KL *is* Jensen applied to the log.
 
 ## Where it goes wrong
 
-**Averaging a transformed quantity and reporting it as the transform of the
-average.** Log-scale averages, rates and ratios all bite here.
+**Blending a transformed quantity and reporting it as the transform of the
+mean.** Log-scale means, rates and ratios all bite here.
 
 **Getting the direction wrong.** Convex up, concave down. `log` and `sqrt` are
-concave; `exp`, `x^2` and `1/x` (on positives) are convex.
+concave. `exp`, `x^2` and `1/x` (on positives) are convex.
 
-**Assuming the bound is tight.** The ELBO can sit far below the true likelihood,
-and a rising ELBO does not prove the likelihood rose by as much.
+**given the bound is tight.** The ELBO can sit far below the true likelihood,
+and a rising ELBO doesn't prove the likelihood rose by as much.
 
-**Forgetting that equality needs linearity or a constant.** Nothing else gives
+**Losing that equality needs linearity or a constant.** Nothing else gives
 it.
 
 ## The average speed trap, worked
 
-Drive 60 km at 30 km/h, then another 60 km at 60 km/h. What was the average
+Drive 60 km at 30 km/h, then another 60 km at 60 km/h. What was the mean
 speed?
 
 Almost everyone answers 45. Work it out instead:
@@ -4224,7 +4224,7 @@ second leg  60 km at 60 km/h  ->  1 hour
 ```
 
 **40, not 45.** The answer is dragged toward the slower speed, because you spend
-twice as long travelling at it. The correct average here is the harmonic mean,
+twice as long travelling at it. The correct mean here is the harmonic mean,
 `2 / (1/30 + 1/60) = 40`.
 
 Jensen says this had to happen, and says which direction. Time per kilometre is
@@ -4237,29 +4237,29 @@ E[1/X]  = (1/30 + 1/60)/2 = 0.02500 hours per km
 1/E[X]  = 1/45            = 0.02222 hours per km
 ```
 
-The time you actually spend is governed by the left-hand side, and it is
+The time you really spend is governed by the left-hand side, and it's
 **bigger**. Over 120 km: 3.00 hours actual against 2.67 predicted by the naive
-average. The trip is always at least as slow as the arithmetic mean suggests,
-and exactly as slow only when both speeds are equal &mdash; the equality case,
-where the distribution collapses to a point.
+mean. The trip is always at least as slow as the arithmetic mean suggests,
+and just as slow only when both speeds are equal &mdash; the equality case,
+where the spread merges to a point.
 
 The same shape appears wherever a rate is averaged: cost per unit, latency per
-request, price-to-earnings across a portfolio. **Averaging a ratio and taking
-the ratio of averages are different operations**, and Jensen tells you in
-advance which one comes out larger, without computing either.
+request, price-to-earnings across a portfolio. **Blending a ratio and taking
+the ratio of means are different ops**, and Jensen tells you in
+advance which one comes out larger, without finding either.
 
 ## Questions people ask
 
-**How do I remember which way it points?** Picture the chord. Convex means the
-curve bends upward and every chord lies above it, so the average of the heights
-(the chord) beats the height of the average (the curve): `E[f(X)] >= f(E[X])`.
+**How do I note which way it points?** Picture the chord. Convex means the
+curve bends upward and each chord lies above it. So The mean of the heights
+(the chord) beats the height of the mean (the curve): `E[f(X)] >= f(E[X])`.
 Concave flips the picture and the inequality. If you can recall that `x`&sup2;
-is convex, one example settles it &mdash; the mean of squares exceeds the square
-of the mean, which is just the variance being non-negative.
+is convex, one example settles it. The mean of squares exceeds the square
+of the mean, which is just the variance being non-minus.
 
-**When is it an equality?** In exactly two cases: `f` is linear over the range
-the variable actually reaches, or the variable is a constant. Anything else and
-the gap is strictly positive. This is why linear transformations pass cleanly
+**When is it an equality?** In just two cases: `f` is linear over the range
+the variable really reaches, or the variable is a constant. any of it else and
+the gap is strictly plus. This is why linear changes pass cleanly
 through an expectation and nothing else does.
 
 **Is AM-GM really the same statement?** Yes. Apply Jensen to `log`, which is
@@ -4269,18 +4269,18 @@ inequality you may have proved by induction at school is one substitution away.
 
 **Does it apply to medians too?** No. Jensen is a statement about expectations,
 and the median passes through any *monotone* function untouched &mdash;
-`median(f(X)) = f(median(X))` for increasing `f`, convex or not. That difference
-is one practical reason to report a median when a quantity has been through a
-nonlinear transformation.
+`median(f(X)) = f(median(X))` for growing `f`, convex or not. That difference
+is one hands-on reason to report a median when a quantity has been through a
+nonlinear change.
 
-**Where will this actually bite me?** Wherever you average something that was
-already a rate or a log. Averaging log-probabilities and exponentiating gives
-the geometric mean, not the arithmetic one &mdash; which is what perplexity is,
-and why it is not the average probability.
+**Where will this really bite me?** Wherever you mean a thing that was
+already a rate or a log. Blending log-chances and exponentiating gives
+the geometric mean, not the math one. Which is what perplexity is,
+and why it isn't the mean chance.
 
 ## The average of the function is not the function of the average
 
-Three concrete cases where swapping those two operations changes the answer, including the one that quietly costs money.
+Three concrete cases where swapping those two ops changes the answer, including the one that quietly costs money.
 
 ```python-run
 import numpy as np
@@ -4383,7 +4383,7 @@ topic(
     ],
     """
 title: Markov Chains
-intro: Memoryless processes, the distribution they settle into, and why so many algorithms are one.
+intro: Memoryless processes, the spread they settle into, and why so many methods are one.
 
 ## The property
 
@@ -4391,48 +4391,48 @@ A process is **Markov** when the next state depends only on the current state,
 not on the path that led there. The present screens off the past.
 
 That is a strong assumption and a liberating one. Instead of a history of
-arbitrary length you carry one thing &mdash; where you are &mdash; and
-everything about the future follows from it.
+any length you carry one thing &mdash; where you're &mdash; and
+all about the future follows from it.
 
 ## The transition matrix
 
-Collect the probabilities into a matrix `P`, where `P[i][j]` is the chance of
-moving from state `i` to state `j`. Every row sums to 1, because from any state
-you go somewhere, possibly back to where you were.
+Collect the chances into a mat `P`. Here `P[i][j]` is the chance of
+moving from state `i` to state `j`. each row sums to 1, because from any state
+you go a place, possibly back to where you were.
 
-If the current distribution over states is a row vector `d`, then after one step
-it is `d P`. After `k` steps, `d P^k`. That is all the arithmetic there is, and
-the visualisation is doing exactly it, forty steps at a time.
+If the current spread over states is a row vector `d`, then after one step
+it's `d P`. After `k` steps, `d P^k`. That is all the math there's, and
+the visualisation is doing just it, forty steps at a time.
 
 ## Convergence
 
-Watch the three curves. They start apart &mdash; all the probability on one
+Watch the three curves. They start apart. All the chance on one
 state &mdash; and within a few steps they flatten out and stop moving. The
 readout shows the last step changing things by around 10&#8315;&#185;&#8304;.
 
-Now change the starting state. The curves begin somewhere completely different
+Now change the starting state. The curves begin a place fully different
 and **arrive at the same values**.
 
-That limit is the **stationary distribution**: the `pi` with `pi P = pi`. Read
-as an eigenvector problem, it is the left eigenvector of `P` with eigenvalue 1,
-and the [eigenvalue module](eigenvalues_and_eigenvectors.html) is the same
+That limit is the **stationary spread**: the `pi` with `pi P = pi`. Read
+as an eigenvector problem, it's the left eigenvector of `P` with eigenval 1,
+and the [eigenval module](eigenvalues_and_eigenvectors.html) is the same
 mathematics in another costume.
 
-The convergence is not automatic. It needs the chain to be **irreducible** &mdash;
-every state reachable from every other &mdash; and **aperiodic**, not trapped in
-a fixed cycle. Drag a transition probability to its minimum and convergence
-slows visibly; a chain that could not leave a state at all would never mix.
+The settling isn't auto. It needs the chain to be **irreducible** &mdash;
+each state reachable from every other. And **aperiodic**, not trapped in
+a fixed cycle. Drag a transition chance to its min and settling
+slows visibly. A chain that couldn't leave a state at all would never mix.
 
-The speed is governed by the second-largest eigenvalue: the closer it is to 1,
-the slower the mixing. That number has a name, the *spectral gap*, and it is
+The speed is governed by the second-largest eigenval: the closer it's to 1,
+the slower the mixing. That number has a name, the *spectral gap*, and it's
 what people mean by a chain mixing slowly.
 
 ## The whole thing on two states
 
-Everything above fits on a chain with two states, small enough to do on paper and
+All above fits on a chain with two states, small enough to do on paper and
 still large enough to show all three claims.
 
-Weather, where a sunny day is usually followed by another and rain clears half
+Weather, where a sunny day is often followed by another and rain clears half
 the time:
 
 |from \ to|sunny|rainy|
@@ -4440,15 +4440,15 @@ the time:
 |**sunny**|0.9|0.1|
 |**rainy**|0.5|0.5|
 
-**The stationary distribution, solved exactly.** &pi;P = &pi; on two states is
+**The stationary spread, solved just.** &pi;P = &pi; on two states is
 just &pi;<sub>s</sub> = 0.9&pi;<sub>s</sub> + 0.5&pi;<sub>r</sub>, which
 rearranges to 0.1&pi;<sub>s</sub> = 0.5&pi;<sub>r</sub>, so
 &pi;<sub>s</sub> = 5&pi;<sub>r</sub>. With the two summing to 1 that gives
-**&pi; = (5/6, 1/6)**, or (0.8333, 0.1667). No iteration, no eigenvalue routine
+**&pi; = (5/6, 1/6)**, or (0.8333, 0.1667). No iteration, no eigenval routine
 &mdash; two lines of algebra.
 
-**The same answer by iterating.** Start with certainty and multiply by P
-repeatedly:
+**The same answer by iterating.** Start with certainty and times by P
+again and again:
 
 |step|from sunny|from rainy|
 |---|---|---|
@@ -4459,72 +4459,72 @@ repeatedly:
 |4|(0.838, 0.162)|(0.812, 0.188)|
 |5|(0.835, 0.165)|(0.825, 0.175)|
 
-Two starting points that could not be further apart, converging on the same
-(0.8333, 0.1667). The chain forgets where it began, which is the whole content of
-the claim that the limit does not depend on the start.
+Two starting points that couldn't be further apart, settling on the same
+(0.8333, 0.1667). The chain forgets where it began. This Is the whole content of
+the claim that the limit doesn't depend on the start.
 
-**And the mixing speed, which is not a metaphor.** The eigenvalues of a 2&times;2
-stochastic matrix are 1 and (trace &minus; 1), so here the second eigenvalue is
+**And the mixing speed. This Isn't a metaphor.** The eigenvals of a 2&times;2
+stochastic mat are 1 and (trace &minus; 1). So Here the second eigenval is
 0.9 + 0.5 &minus; 1 = **0.4**. Now measure how far the sunny column is from
 0.8333 at each step:
 
 0.1667, 0.0667, 0.0267, 0.0107, 0.0043, 0.0017
 
-Each is exactly 0.4 times the one before it. The second eigenvalue is not merely
-*related* to the mixing rate; it **is** the factor by which the remaining error
-shrinks per step. A chain with a second eigenvalue of 0.99 needs 365
-steps to shrink the error as far as this one does in four, which is why the spectral gap is the
+Each is just 0.4 times the one before it. The second eigenval isn't merely
+*related* to the mixing rate. It **is** the factor by which the left error
+shrinks per step. A chain with a second eigenval of 0.99 needs 365
+steps to shrink the error as far as this one does in four. This Is why the spectral gap is the
 number MCMC practitioners worry about.
 
-One more reading falls out of &pi; for free, and it is the one that makes the
+One more reading falls out of &pi; for free. It's the one that makes the
 numbers concrete. The expected time to return to a state is
-**1 / &pi;<sub>i</sub>**, so rain recurs every 1 / (1/6) = **6 days** on average
-and sun every 1 / (5/6) = **1.2 days**. The stationary distribution is not only
-the long-run share of time spent in each state; it is the reciprocal of how long
+**1 / &pi;<sub>i</sub>**, so rain recurs each 1 / (1/6) = **6 days** on average
+and sun each 1 / (5/6) = **1.2 days**. The stationary spread isn't only
+the long-run share of time spent in each state. It's the reciprocal of how long
 you wait to come back to it.
 
 ## Where they appear
 
 **PageRank** is the stationary distribution of a random surfer following links.
-The damping factor exists to make the chain irreducible, so a page with no
-outbound links cannot swallow all the probability.
+The damping factor exists to make the chain irreducible. So A page with no
+outbound links can't swallow all the chance.
 
 **MCMC** &mdash; Metropolis-Hastings, Gibbs sampling, Hamiltonian Monte Carlo
-&mdash; runs the idea backwards: construct a chain whose stationary distribution
+&mdash; runs the idea backwards: make a chain whose stationary spread
 *is* the posterior you want, run it, and treat the states it visits as samples.
-Nearly all Bayesian computation is this.
+Nearly all Bayesian work is this.
 
-**Hidden Markov models** put a Markov chain behind observations you can see, and
-were the backbone of speech recognition for decades.
+**Hidden Markov models** put a Markov chain behind readings you can see, and
+were the backbone of speech spotting for decades.
 
-**Reinforcement learning.** A Markov decision process is a Markov chain with
-actions and rewards attached. The "Markov" in MDP is this property, and it is
-what makes value functions of the state alone sufficient.
+**Reinforcement learning.** A Markov choice process is a Markov chain with
+actions and rewards attached. The "Markov" in MDP is this property, and it's
+what makes value functions of the state alone enough.
 
 **n-gram language models** are Markov chains over words &mdash; and their
-limitation is precisely the property: a bigram model cannot remember anything
-beyond the previous word, which is why long-range coherence needed something
+limitation is just the property: a bigram model can't note any of it
+beyond the previous word. This Is why long-range coherence needed a thing
 else.
 
 ## Where it goes wrong
 
-**Assuming the property holds.** Most real processes have memory. Widening the
+**given the property holds.** Most real processes have memory. Widening the
 state to include recent history restores the property at the cost of a much
 larger state space.
 
-**Assuming convergence.** Check irreducibility and aperiodicity.
+**given settling.** Check irreducibility and aperiodicity.
 
 **Stopping an MCMC run too early.** Samples before the chain has mixed reflect
-where you started, which is what burn-in discards and why convergence
+where you started, which is what burn-in discards and why settling
 diagnostics exist.
 
-**Confusing the stationary distribution with the most likely state.** It is the
-long-run fraction of time spent in each state, not a prediction of where the
+**Confusing the stationary spread with the most likely state.** It's the
+long-run fraction of time spent in each state, not a guess of where the
 chain is now.
 
 ## Walk the chain to its steady state
 
-A three-state weather chain, stepped forward until the distribution stops moving, then checked against the eigenvector that predicts it.
+A three-state weather chain, stepped forward until the spread stops moving, then checked against the eigenvector that predicts it.
 
 ```python-run
 import numpy as np
@@ -4626,46 +4626,46 @@ topic(
     ],
     """
 title: Matrix Calculus
-intro: The short list of identities behind every gradient you will write, and the dimension check that makes them safe.
+intro: The short list of identities behind each grad you'll write. The dim check that makes them safe.
 
 ## Why it needs its own name
 
 Nothing here is new calculus. Differentiating `x'Ax` is the
 [product rule](the_chain_rule.html) and
-[partial derivatives](partial_derivatives_and_gradient.html) applied to a sum,
+[partial derivs](partial_derivatives_and_gradient.html) applied to a sum,
 and you could always expand into indices and grind it out.
 
-What matrix calculus adds is **notation that stays compact** as the objects grow,
-plus a small collection of identities worth memorising so you never expand
-anything.
+What mat calculus adds is **form that stays compact** as the objects grow,
+plus a small collection of identities worth storing so you never expand
+any of it.
 
-The demonstration on this page is deliberately one-dimensional. The calculus
-underneath is the same in any number of dimensions; it is only the shapes that
-change, and the shapes are the part you have to be careful about.
+The demo on this page is on purpose one-dimensional. The calculus
+underneath is the same in any number of dims. It's only the shapes that
+change, and the shapes are the part you've to be careful about.
 
 ## The shape rule
 
-The single most useful fact, and the one that catches almost every mistake:
+The single most handy fact, and the one that catches almost each mistake:
 
-**The gradient of a scalar with respect to something has the same shape as that
-something.**
+**The grad of a scalar for a thing has the same shape as that
+a thing.**
 
-A loss is a scalar. Differentiate it by a 784&times;128 weight matrix and the
-result is 784&times;128. By a length-128 bias vector, and it is length 128.
+A loss is a scalar. Differentiate it by a 784&times;128 weight mat and the
+result is 784&times;128. By a length-128 bias vector, and it's length 128.
 
 This is why gradient descent can write `W -= lr * dW` at all: the update has to
-have the same shape as the thing it updates. It is also the fastest debugging
-tool available. If a hand-derived gradient comes out the wrong shape, the
-derivation is wrong, and you know before running anything.
+have the same shape as the thing it updates. It's also the fastest debugging
+tool available. If a hand-derived grad comes out the wrong shape, the
+derivation is wrong, and you know before running any of it.
 
-Two conventions exist for laying out derivatives &mdash; numerator layout and
+Two rules exist for laying out derivs &mdash; numerator layout and
 denominator layout &mdash; and they differ by a transpose. Papers rarely say
-which they use. The shape rule resolves it every time: whichever orientation
-matches the parameter is the one meant.
+which they use. The shape rule resolves it each time: whichever orientation
+matches the param is the one meant.
 
 ## The identities
 
-Almost everything reduces to these:
+Almost all reduces to these:
 
 | Expression | Derivative with respect to x |
 |---|---|
@@ -4675,17 +4675,17 @@ Almost everything reduces to these:
 | `x'Ax` | `(A + A')x`, which is `2Ax` when A is symmetric |
 | `Ax` (Jacobian) | `A` |
 
-And two more, with respect to a matrix:
+And two more, for a mat:
 
 | Expression | Derivative with respect to W |
 |---|---|
 | `a'Wb` | `ab'` |
 | `tr(W'A)` | `A` |
 
-The pattern in the first table is worth noticing: they are the matrix versions
+The pattern in the first table is worth noticing: they're the mat versions
 of `d(ax)/dx = a` and `d(ax^2)/dx = 2ax`. The `(A + A')` appears because both
-copies of `x` in `x'Ax` contribute, and when `A` is symmetric they contribute
-identically.
+copies of `x` in `x'Ax` contribute, and when `A` is even they contribute
+the same way.
 
 ## Working an example
 
@@ -4697,16 +4697,16 @@ L = ||Ax - b||^2 = (Ax - b)'(Ax - b)
 ```
 
 Differentiate term by term. The first is `x'Mx` with `M = A'A`, which is
-symmetric, giving `2A'Ax`. The second is linear in `x`, giving `-2A'b`. The
+even, giving `2A'Ax`. The second is linear in `x`, giving `-2A'b`. The
 third has no `x`.
 
 ```
 dL/dx = 2A'Ax - 2A'b
 ```
 
-Set it to zero and you have the normal equations, `A'Ax = A'b` &mdash; the
-formula [the QR module](qr_decomposition.html) then explains why you should not
-solve directly.
+Set it to zero and you've the normal equations, `A'Ax = A'b` &mdash; the
+formula [the QR module](qr_decomposition.html) then shows why you shouldn't
+solve right.
 
 ## The layer everyone needs
 
@@ -4718,72 +4718,72 @@ dL/db  =  dL/dy
 dL/dx  =  W' (dL/dy)        passed back to the previous layer
 ```
 
-Three lines, and they are the whole of backpropagation through a dense layer.
+Three lines, and they're the whole of backpropagation through a dense layer.
 
 Check them against the shape rule. If `dL/dy` is `m`-long and `x` is `n`-long,
-the outer product is `m`&times;`n` &mdash; the shape of `W`. And `W'` is
-`n`&times;`m`, so `W'(dL/dy)` is `n`-long, matching `x`. Every term lands where
-it should, and if it does not, something is transposed.
+the outer product is `m`&times;`n`. The shape of `W`. And `W'` is
+`n`&times;`m`, so `W'(dL/dy)` is `n`-long, matching `x`. each term lands where
+it should, and if it doesn't, a thing is transposed.
 
-The transpose in that last line is why the backward pass is sometimes described
+The transpose in that last line is why the backward pass is at times given
 as running the network in reverse: the same weights, applied the other way
 round.
 
 ## One gradient, worked and checked
 
 The identities are worth exercising on numbers. Take `f(x) = x'Ax` with
-`A = [[2, 1], [1, 3]]` (symmetric) at `x = (1, 2)`. The rule says the gradient is
+`A = [[2, 1], [1, 3]]` (even) at `x = (1, 2)`. The rule says the grad is
 `(A + A')x = 2Ax`:
 
 `2Ax = 2 &middot; (2&middot;1 + 1&middot;2,  1&middot;1 + 3&middot;2) =
 2 &middot; (4, 7) = (8, 14)`.
 
-Check it against the definition by nudging each input. `f(1, 2) =
-2 + 2&middot;2 + 3&middot;4 = 18`. Increase `x&#8321;` by a small `h`: the change
-in `f` divided by `h` approaches 8. Increase `x&#8322;`: it approaches 14. The
-partial derivatives are the gradient's components, and they match the identity
+Check it against the meaning by nudging each input. `f(1, 2) =
+2 + 2&middot;2 + 3&middot;4 = 18`. Grow `x&#8321;` by a small `h`: the change
+in `f` cut by `h` approaches 8. Grow `x&#8322;`: it approaches 14. The
+partial derivs are the grad's components, and they match the identity
 term for term.
 
-The shape rule catches the error you are most likely to make. `f` is a scalar and
-`x` is length 2, so `df/dx` must be length 2 &mdash; which `(8, 14)` is. Had a
-derivation produced a 2&times;2 or a scalar, it would be wrong before any
-arithmetic was checked. That single check &mdash; does the gradient have the shape
+The shape rule catches the error you're most likely to make. `f` is a scalar and
+`x` is length 2, so `df/dx` must be length 2. Which `(8, 14)` is. Had a
+derivation made a 2&times;2 or a scalar, it would be wrong before any
+math was checked. That single check. Does the grad have the shape
 of the thing it differentiates &mdash; resolves the numerator-versus-denominator
-layout ambiguity every time, because only one orientation matches the parameter.
+layout ambiguity each time, because only one orientation matches the param.
 
 The same check scales straight to a network layer. For `y = Wx + b`, the weight
-gradient is the outer product `(dL/dy) x'`: if the outgoing error is `m`-long and
-the input `n`-long, that product is `m&times;n` &mdash; the shape of `W` &mdash;
-so the update `W -= lr &middot; dW` type-checks by construction. Get a transpose
-wrong and the shapes stop matching before any number is computed, which is why the
+grad is the outer product `(dL/dy) x'`: if the outgoing error is `m`-long and
+the input `n`-long, that product is `m&times;n`. The shape of `W` &mdash;
+so the update `W -= lr &middot; dW` type-checks by build. Get a transpose
+wrong and the shapes stop matching before any number is found. This Is why the
 shape rule is the fastest debugging tool a backward pass has.
 
-That transpose in the input gradient, `W'(dL/dy)`, is why the backward pass is
-described as running the network in reverse: the same weights, applied the other
+That transpose in the input grad, `W'(dL/dy)`, is why the backward pass is
+given as running the network in reverse: the same weights, applied the other
 way round, carrying the error back to the layer before.
 
-None of this is new calculus &mdash; differentiating `x'Ax` is the product rule
-applied to a sum &mdash; but the compact notation and the handful of memorised
-identities are what let you write a gradient down without expanding into indices
-every time.
+None of this is new calculus. Differentiating `x'Ax` is the product rule
+applied to a sum &mdash; but the compact form and the handful of stored
+identities are what let you write a grad down without expanding into indices
+each time.
 
 ## Where it goes wrong
 
-**Mixing layout conventions mid-derivation.** Pick one, and use the shape rule
+**Mixing layout rules mid-derivation.** Pick one, and use the shape rule
 to check.
 
-**Forgetting that `x'Ax` gives `(A + A')x`.** The shortcut `2Ax` is only valid
-for symmetric `A`.
+**Losing that `x'Ax` gives `(A + A')x`.** The shortcut `2Ax` is only valid
+for even `A`.
 
 **Deriving without checking shapes.** It costs seconds and catches most errors.
 
-**Trusting a hand derivative without a numerical check.** Compare against a
-finite difference on a small random input. Every framework ships a gradient
-checker for this, and it is worth using when writing a custom operation.
+**Trusting a hand deriv without a numeric check.** Compare against a
+finite difference on a small random input. each framework ships a grad
+checker for this, and it's worth using when writing a custom op.
 
 ## The four gradients you keep meeting
 
-Every rule here is checked numerically rather than quoted. These four cover most of what a backward pass computes.
+each rule here is checked by number rather than quoted. These four cover most of what a backward pass finds.
 
 ```python-run
 import numpy as np
@@ -4890,20 +4890,20 @@ topic(
         "keep is choosing n&minus;k to leave.",
     ],
     """title: Combinatorics: Permutations and Combinations
-intro: The counting that probability is built on, and the one question that decides which formula to use.
+intro: The counting that chance is built on. The one question that decides which formula to use.
 
 ## The question to ask first
 
 **Does order matter?**
 
 Three medals from eight runners: gold, silver and bronze are different outcomes
-depending on who gets which, so order matters. That is a **permutation**.
+based on who gets which. So Order matters. That is a **permutation**.
 
 Three people for a committee from eight: the same three people are the same
-committee however you list them. Order does not matter. That is a
+committee but you list them. Order doesn't matter. That is a
 **combination**.
 
-Everything else follows from answering that.
+All else follows from answering that.
 
 ## The formulas
 
@@ -4913,8 +4913,8 @@ Everything else follows from answering that.
 P(n, k)  =  n! / (n - k)!
 ```
 
-There are `n` choices for the first position, `n - 1` for the second, and so on
-for `k` positions. The factorial ratio is just that product written compactly.
+There are `n` choices for the first spot, `n - 1` for the second, and so on
+for `k` spots. The factorial ratio is just that product written compactly.
 
 **Combinations** of `k` from `n`:
 
@@ -4922,35 +4922,35 @@ for `k` positions. The factorial ratio is just that product written compactly.
 C(n, k)  =  n! / ( k! (n - k)! )
 ```
 
-Count the ordered arrangements, then divide by `k!` because each unordered
-selection was counted once for every order its members could have appeared in.
+Count the sorted setups, then divide by `k!` because each unordered
+pick was counted once for each order its members could have appeared in.
 
-The readout makes the relationship concrete: at n = 12, k = 5 the ordered count
-is 95,040 and the unordered is 792, and 95,040 / 792 is exactly 120 = 5!.
+The readout makes the tie concrete: at n = 12, k = 5 the sorted count
+is 95,040 and the unordered is 792. 95,040 / 792 is just 120 = 5!.
 
 ## Reading the shape
 
-The bars are `C(n, k)` for every `k` from 0 to n.
+The bars are `C(n, k)` for each `k` from 0 to n.
 
-**Symmetric.** `C(n, k) = C(n, n-k)`, because choosing which `k` to keep is the
+**Even.** `C(n, k) = C(n, n-k)`. Choosing which `k` to keep is the
 same act as choosing which `n - k` to leave.
 
-**Largest in the middle.** There are far more ways to pick half of something
+**Largest in the middle.** There are far more ways to pick half of a thing
 than to pick almost none or almost all.
 
-**Enormous quickly.** Drag `n` to 24 and the middle bar passes two and a half
+**Huge quickly.** Drag `n` to 24 and the middle bar passes two and a half
 million. This growth is why brute force over subsets is hopeless past small `n`,
-and why the readout switches to scientific notation.
+and why the readout switches to scientific form.
 
 That row of numbers is a row of Pascal's triangle, and the recurrence
-`C(n,k) = C(n-1,k-1) + C(n-1,k)` &mdash; either the last item is in your
-selection or it is not &mdash; is the standard dynamic-programming way to
-compute them without factorials.
+`C(n,k) = C(n-1,k-1) + C(n-1,k)`. Either the last item is in your
+pick or it isn't &mdash; is the standard dynamic-programming way to
+find them without factorials.
 
 ## With repetition
 
 A third case, easy to miss. If the same item can be chosen more than once and
-order matters &mdash; a 4-digit PIN, where digits may repeat &mdash; the count
+order matters &mdash; a 4-digit PIN. Here Digits may repeat &mdash; the count
 is simply `n^k`. The readout gives this alongside.
 
 At n = 10, k = 4 that is 10,000 PINs, against `P(10, 4) = 5,040` if no digit
@@ -4958,60 +4958,60 @@ could repeat.
 
 ## Why it matters here
 
-**Binomial probabilities.** The `C(n, k)` in
-[the binomial](bernoulli_binomial_poisson.html) is exactly this count &mdash;
+**Binomial chances.** The `C(n, k)` in
+[the binomial](bernoulli_binomial_poisson.html) is just this count &mdash;
 the number of orders in which `k` successes could have arrived.
 
-**Hypothesis testing.** Permutation tests build a null distribution by
+**Hypothesis testing.** Permutation tests build a null spread by
 enumerating or sampling rearrangements of the labels, and the count above says
 whether enumeration is feasible.
 
 **Cross-validation.** The number of ways to split data into folds.
 
-**Feature selection.** Choosing `k` features from `n` is `C(n, k)`, which is why
-exhaustive search is abandoned almost immediately and greedy or regularised
+**Feature pick.** Choosing `k` features from `n` is `C(n, k)`, which is why
+exhaustive search is abandoned almost right away and greedy or smoothed
 methods are used instead.
 
-**Complexity arguments.** A great deal of "this is exponential" is this table
+**cost args.** A great deal of "this is exponential" is this table
 growing.
 
 ## Where it goes wrong
 
-**Not asking whether order matters.** The commonest error, and it is a factor of
+**Not asking whether order matters.** The commonest error, and it's a factor of
 `k!`.
 
-**Computing factorials directly.** `21!` overflows a 64-bit integer, and
-`C(n, k)` is usually far smaller than the factorials used to define it. Work in
-logarithms, or use the multiplicative recurrence, which is what this page does.
+**finding factorials right.** `21!` overflows a 64-bit int, and
+`C(n, k)` is often far smaller than the factorials used to define it. Work in
+logarithms, or use the multiplicative recurrence. This Is what this page does.
 
-**Forgetting repetition is allowed.** Passwords, dice and sampling with
-replacement all permit it.
+**Losing repetition is allowed.** Passwords, dice and sampling with
+swap all permit it.
 
-**Double counting.** When the objects are not all distinguishable the plain
+**Double counting.** When the objects aren't all distinguishable the plain
 formulas over-count, and the multiset versions are needed instead.
 
 ## A worked example: the birthday problem
 
 In a room of 23 people, the chance that two share a birthday is just over half.
 That number is famous for feeling wrong, and working it out teaches the single
-most useful counting trick there is.
+most handy counting trick there's.
 
-Counting "at least one shared birthday" directly is miserable: one pair, two
-pairs, a triple, a triple and a pair, and so on, all overlapping. So count the
+Counting "at least one shared birthday" right is miserable: one pair, two
+pairs, a triple, a triple and a pair. So on, all shared. So count the
 opposite &mdash; **all birthdays different** &mdash; which is one clean product,
-and subtract from 1. This is **complementary counting**, and reaching for it is
-often the whole difficulty of a counting problem.
+and subtract from 1. This is **complementary counting**, and reaching for it's
+often the whole trouble of a counting problem.
 
 With 365 equally likely days and `k` people, the total number of ways to assign
 birthdays is `365^k`. The number of ways with no repeat is `P(365, k)`, the
-ordered count from above. So:
+sorted count from above. So:
 
 ```
 P(all different)  =  P(365, k) / 365^k
                   =  (365/365)(364/365)(363/365) ... ((366-k)/365)
 ```
 
-Each new person must dodge every birthday already taken, so each factor is
+Each new person must dodge each birthday already taken, so each factor is
 slightly smaller than the last:
 
 |people|P(all different)|P(a shared birthday)|
@@ -5025,17 +5025,17 @@ slightly smaller than the last:
 
 The reason 23 feels far too small is that people picture *their own* birthday
 being matched, which needs 253 people to reach even odds. The question is
-not about you. It is about **pairs**, and 23 people make
-`C(23, 2) = 253` of them &mdash; each a separate chance to collide.
+not about you. It's about **pairs**, and 23 people make
+`C(23, 2) = 253` of them. Each a separate chance to collide.
 
 That gap between "people" and "pairs" is a quadratic hiding behind a linear
-intuition, and it is exactly why hash collisions arrive far sooner than the
+intuition, and it's just why hash collisions arrive far sooner than the
 table size suggests. The birthday bound is the reason a 64-bit hash starts
 colliding after around 2&sup3;&sup2; items rather than 2&sup4;.
 
 ## Questions people ask
 
-**Which of the three formulas do I want?** Two questions settle it every time
+**Which of the three formulas do I want?** Two questions settle it each time
 &mdash; can an item repeat, and does order matter:
 
 |repeats?|order matters?|count|example|
@@ -5045,30 +5045,30 @@ colliding after around 2&sup3;&sup2; items rather than 2&sup4;.
 |no|no|`C(n, k)`|a committee of three|
 |yes|no|`C(n+k-1, k)`|scoops of ice cream|
 
-**How do I compute C(n, k) without overflowing?** Never build the factorials.
-Multiply and divide alternately &mdash; `C(n,k) = C(n,k-1) * (n-k+1) / k` &mdash;
-which keeps every intermediate an exact integer and roughly the size of the
+**How do I find C(n, k) without overflowing?** Never build the factorials.
+Times and divide alternately &mdash; `C(n,k) = C(n,k-1) * (n-k+1) / k` &mdash;
+which keeps each mid an exact int and roughly the size of the
 answer. For very large `n`, work with `lgamma` in log space and exponentiate at
 the end. Python's `math.comb` already does the safe thing.
 
-**Why is C(n, 0) equal to 1?** There is exactly one way to choose nothing: take
-nothing. It is not a special case bolted on &mdash; it is what makes the
+**Why is C(n, 0) equal to 1?** There's just one way to choose nothing: take
+nothing. It isn't a special case bolted on. It's what makes the
 symmetry `C(n,k) = C(n,n-k)` and Pascal's recurrence hold at the edges without
 exceptions.
 
-**What if some items are identical?** The plain formulas assume every item is
-distinguishable. Arranging the letters of *BANANA* is not `6!`, because swapping
-the two Ns changes nothing; divide by the factorial of each repeat count,
+**What if some items are the same?** The plain formulas assume each item is
+distinguishable. Arranging the letters of *BANANA* isn't `6!`, because swapping
+the two Ns changes nothing. Divide by the factorial of each repeat count,
 `6!/(3! 2! 1!) = 60`.
 
-**Is C(n, k) the same as "n choose k"?** Yes &mdash; and the same as the
-binomial coefficient, and the same as a row entry of Pascal's triangle. Three
+**Is C(n, k) the same as "n choose k"?** Yes. And the same as the
+binomial coeff, and the same as a row entry of Pascal's triangle. Three
 names, one number, which is a large part of why this topic reads as harder than
-it is.
+it's.
 
 ## List them, then count them
 
-Small enough to print every arrangement, so the formulas are checkable rather than memorised.
+Small enough to print each setup. So The formulas are checkable rather than stored.
 
 ```python-run
 import math

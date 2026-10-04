@@ -337,7 +337,7 @@ window.VIZLEARN_MODULES = [
   "category": "Async Python",
   "topic": "async_python",
   "icon": "code",
-  "desc": ""
+  "desc": "Learn why calling an async function returns a coroutine, not a result, and how create_task turns sequential awaits into real overlap."
  },
  {
   "title": "Queues, Producers and Backpressure",
@@ -345,7 +345,7 @@ window.VIZLEARN_MODULES = [
   "category": "Async Python",
   "topic": "async_python",
   "icon": "code",
-  "desc": ""
+  "desc": "Connect a fast producer to a slow consumer with an asyncio queue and watch one maxsize parameter prevent memory from growing without bound."
  },
  {
   "title": "Running Work Concurrently: gather and TaskGroup",
@@ -353,7 +353,7 @@ window.VIZLEARN_MODULES = [
   "category": "Async Python",
   "topic": "async_python",
   "icon": "code",
-  "desc": ""
+  "desc": "Fan out many awaits at once with gather and TaskGroup, collect every result in order, and control what happens when one task fails."
  },
  {
   "title": "The Blocking Call That Freezes the Loop",
@@ -361,7 +361,7 @@ window.VIZLEARN_MODULES = [
   "category": "Async Python",
   "topic": "async_python",
   "icon": "code",
-  "desc": ""
+  "desc": "See how one synchronous call inside a coroutine freezes every other task, then learn the two ways to move blocking work off the loop."
  },
  {
   "title": "The Event Loop, Stepped Through",
@@ -369,7 +369,7 @@ window.VIZLEARN_MODULES = [
   "category": "Async Python",
   "topic": "async_python",
   "icon": "code",
-  "desc": ""
+  "desc": "Step through Python's event loop tick by tick. See how one thread, one ready queue and cooperative yields run thousands of coroutines."
  },
  {
   "title": "1x1 Convolutions",
@@ -377,7 +377,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "See how a 1x1 convolution mixes channels without touching spatial dimensions, and why it appears in Inception, ResNet and every bottleneck."
  },
  {
   "title": "Affine Transforms",
@@ -385,7 +385,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Build a 2x3 affine matrix from rotation, scale, shear and translation, apply it to an image, and see every pixel land in its new position."
  },
  {
   "title": "Anchor Boxes",
@@ -393,7 +393,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "See how anchor boxes turn object detection into a small regression, and follow the IoU-based rule that assigns each ground truth to a box."
  },
  {
   "title": "Blur: Gaussian, Median and Bilateral",
@@ -401,7 +401,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Apply Gaussian, median and bilateral blur to one noisy image side by side and see which filter removes noise while preserving edges."
  },
  {
   "title": "CNN Architecture",
@@ -425,7 +425,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Convert the same pixel between RGB and HSV, then see how a colour range that needs six RGB inequalities becomes a single HSV threshold."
  },
  {
   "title": "Convolution Kernels by Hand",
@@ -433,7 +433,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Slide a 3x3 kernel across an image by hand, multiply and sum at each position, and watch edge detection and blur fall out of nine numbers."
  },
  {
   "title": "Convolutional Layer",
@@ -457,7 +457,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Split a standard convolution into depthwise and pointwise steps, count the multiply-adds saved, and see why mobile models rely on them."
  },
  {
   "title": "Dilated Convolutions",
@@ -465,7 +465,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Expand a kernel's field of view without adding parameters or pooling, and spot the gridding artefact that appears when rates are wrong."
  },
  {
   "title": "Erosion and Dilation",
@@ -473,7 +473,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Apply erosion and dilation to a binary mask, then combine them into opening, closing, gradient and top-hat to clean segmentation output."
  },
  {
   "title": "Fully Connected Layer in CNN",
@@ -489,7 +489,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Replace a flatten layer with global average pooling, count the parameters removed, and see why modern CNNs skip the large dense head."
  },
  {
   "title": "Grad-CAM",
@@ -497,7 +497,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Compute a Grad-CAM heatmap from gradients flowing into the last convolutional layer, then overlay it to see which regions drove the prediction."
  },
  {
   "title": "Grayscale Image Processing",
@@ -521,7 +521,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Compute the Harris corner response at every pixel, threshold the result, and see why corners survive rotation and small shifts."
  },
  {
   "title": "Histograms and Equalisation",
@@ -529,7 +529,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Plot an image histogram, apply equalisation, and watch a low-contrast photograph spread across the full intensity range in one pass."
  },
  {
   "title": "How Neural Networks Process Images",
@@ -577,7 +577,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Sort detections by confidence, compute precision and recall at each step, and watch the area under that curve collapse into one mAP number."
  },
  {
   "title": "Object Detection with Bounding Boxes",
@@ -641,7 +641,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Trace one unit's receptive field back through conv and pooling layers and see how depth, stride and dilation decide what it can observe."
  },
  {
   "title": "ResNet",
@@ -665,7 +665,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Resize an image with nearest, bilinear and bicubic interpolation side by side and see exactly where each method invents or drops detail."
  },
  {
   "title": "Semantic Segmentation and U-Net",
@@ -681,7 +681,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Compare semantic, instance and panoptic segmentation on the same scene and see the two questions that separate each task from the others."
  },
  {
   "title": "Strides in CNN",
@@ -697,7 +697,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Slide a template across an image, compute the match score at every position, and see why changes in scale and rotation break the method."
  },
  {
   "title": "Thresholding",
@@ -705,7 +705,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Turn a greyscale image into a binary mask with global and adaptive thresholds, and see where uniform lighting stops being enough."
  },
  {
   "title": "Transfer Learning with CNN",
@@ -737,7 +737,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": ""
+  "desc": "Split an image into fixed-size patches, project each into a token, and follow the sequence through a transformer to see its quadratic cost."
  },
  {
   "title": "YOLO v8",
@@ -753,7 +753,7 @@ window.VIZLEARN_MODULES = [
   "category": "Concurrency",
   "topic": "concurrency",
   "icon": "code",
-  "desc": ""
+  "desc": "Choose between threads, processes, or async based on your I/O pattern and GIL constraints."
  },
  {
   "title": "Handing Work Between Threads with a Queue",
@@ -761,7 +761,7 @@ window.VIZLEARN_MODULES = [
   "category": "Concurrency",
   "topic": "concurrency",
   "icon": "code",
-  "desc": ""
+  "desc": "Pass work between threads with a queue that already wraps a lock and a condition, and see why it replaces most hand-rolled coordination."
  },
  {
   "title": "Locks, and the Four Ways They Go Wrong",
@@ -769,7 +769,7 @@ window.VIZLEARN_MODULES = [
   "category": "Concurrency",
   "topic": "concurrency",
   "icon": "code",
-  "desc": ""
+  "desc": "Understand deadlocks, livelocks, race conditions and how to avoid them in concurrent code."
  },
  {
   "title": "Race Conditions: Why x += 1 Is Three Operations",
@@ -777,7 +777,7 @@ window.VIZLEARN_MODULES = [
   "category": "Concurrency",
   "topic": "concurrency",
   "icon": "code",
-  "desc": ""
+  "desc": "Run x += 1 from two threads, watch the count drift, and trace the three bytecodes that open the gap where a value goes missing."
  },
  {
   "title": "The GIL, and What It Actually Locks",
@@ -785,7 +785,7 @@ window.VIZLEARN_MODULES = [
   "category": "Concurrency",
   "topic": "concurrency",
   "icon": "code",
-  "desc": ""
+  "desc": "See what Python's GIL actually protects, why threads still speed up I/O-bound programs, and why they do nothing for CPU-bound code."
  },
  {
   "title": "Threads or Processes: What Is and Is Not Shared",
@@ -793,7 +793,7 @@ window.VIZLEARN_MODULES = [
   "category": "Concurrency",
   "topic": "concurrency",
   "icon": "code",
-  "desc": ""
+  "desc": "Compare threads and processes side by side: shared memory versus isolation, the GIL constraint, and the real cost of sending data between workers."
  },
  {
   "title": "concurrent.futures: One Interface for Both",
@@ -801,7 +801,7 @@ window.VIZLEARN_MODULES = [
   "category": "Concurrency",
   "topic": "concurrency",
   "icon": "code",
-  "desc": ""
+  "desc": "Submit work to a ThreadPoolExecutor and ProcessPoolExecutor through the same API, then inspect a Future's state transitions step by step."
  },
  {
   "title": "Aggregate Functions and the NULL Trap",
@@ -809,7 +809,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Run COUNT, SUM, AVG, MIN and MAX on real rows, see how each one handles NULLs, and fix the silent mistake that changes your totals."
  },
  {
   "title": "CASE and Views in SQL",
@@ -833,7 +833,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Build a composite index, reorder the columns, and watch the query plan switch between an index scan and a full table scan on the same query."
  },
  {
   "title": "Constraints: UNIQUE, CHECK and NOT NULL",
@@ -841,7 +841,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Add UNIQUE, CHECK and NOT NULL constraints to a table and watch the database reject every row that violates a rule you wrote once."
  },
  {
   "title": "DDL in SQL",
@@ -873,7 +873,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Set up two transactions that lock rows in opposite order, watch the deadlock form, and see the one change in lock order that prevents it."
  },
  {
   "title": "EXISTS, IN and JOIN",
@@ -881,7 +881,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Write the same question with EXISTS, IN and JOIN, compare the execution plans, and find the version that quietly returns wrong rows."
  },
  {
   "title": "EXPLAIN and Query Plans",
@@ -889,7 +889,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Run EXPLAIN on a slow query, read the plan node by node, and spot the sequential scan or nested loop that accounts for the missing time."
  },
  {
   "title": "HAVING in SQL",
@@ -913,7 +913,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Step through read uncommitted, read committed, repeatable read and serializable with two concurrent transactions to see what each one allows."
  },
  {
   "title": "Key-Value and Graph Models",
@@ -921,7 +921,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Compare key-value and graph models against relational tables, see the queries each answers in one hop, and learn when leaving SQL pays off."
  },
  {
   "title": "Limit and Offset in SQL",
@@ -937,7 +937,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Watch MVCC serve a reader an older row version while a writer updates the same row, and see why neither transaction has to wait for the other."
  },
  {
   "title": "NULL Handling and COALESCE in SQL",
@@ -961,7 +961,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Compare row storage and columnar storage on the same table, run an analytical query on each, and see why dashboards need a different engine."
  },
  {
   "title": "ORDER BY in SQL",
@@ -977,7 +977,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Partition a table by range and by hash, run the same query on each layout, and see how the planner skips every partition it does not need."
  },
  {
   "title": "Primary and Foreign Keys",
@@ -985,7 +985,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Define a primary key and a foreign key, attempt an insert that violates each, and watch the database enforce referential integrity for you."
  },
  {
   "title": "Query Execution Order in SQL",
@@ -1001,7 +1001,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Write a recursive CTE that walks an org chart row by row, follow each iteration of the loop, and see how SQL follows a chain of unknown length."
  },
  {
   "title": "Regular Expressions in SQL",
@@ -1017,7 +1017,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Set up a primary and a read replica, write to one and read from the other, and measure the lag window where a query returns stale data."
  },
  {
   "title": "SQL GroupBy Visualizer",
@@ -1033,7 +1033,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Build a query with string concatenation, inject a payload that drops a table, then switch to a parameterised query that blocks it completely."
  },
  {
   "title": "SQL Joins Visualizer",
@@ -1057,7 +1057,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Join a table to itself, match employees to managers in the same rows, and walk through the three query patterns that need a self-join."
  },
  {
   "title": "Sharding",
@@ -1065,7 +1065,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Shard a table by a key, route a query to the right partition, and see the four capabilities you lose when data lives on separate machines."
  },
  {
   "title": "Star Schema: Facts and Dimensions",
@@ -1073,7 +1073,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Build a star schema with one fact table and three dimensions, run an analytical query, and see why columnar engines prefer this layout."
  },
  {
   "title": "Subqueries in SQL",
@@ -1089,7 +1089,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Walk through the CAP theorem with a two-node example, see which two guarantees you keep, and learn what the theorem does not actually say."
  },
  {
   "title": "The Document Model against Rows",
@@ -1097,7 +1097,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": ""
+  "desc": "Store the same order as a nested document and as normalised rows, then run the queries each shape handles well and the ones it does not."
  },
  {
   "title": "Transactions and ACID in SQL",
@@ -1153,7 +1153,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": ""
+  "desc": "Train an autoencoder to compress and reconstruct its input, examine the bottleneck, and see why a network that copies is still worth building."
  },
  {
   "title": "Autoencoders in Depth",
@@ -1201,7 +1201,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": ""
+  "desc": "Train a model to pull matching pairs together and push non-matches apart without labels, and see a useful representation emerge from raw data."
  },
  {
   "title": "Data Sparsity",
@@ -1225,7 +1225,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": ""
+  "desc": "Add noise to an image step by step, train a network to reverse each step, then sample a new image by running the learned reverse chain."
  },
  {
   "title": "Dropout Regularization",
@@ -1249,7 +1249,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": ""
+  "desc": "Replace a one-hot vector with a learned embedding lookup, compare the memory and compute saved, and see why every NLP pipeline starts here."
  },
  {
   "title": "Feature Scaling & Weight Bias",
@@ -1273,7 +1273,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": ""
+  "desc": "Train a generator against a discriminator, watch the adversarial loss curves, and see the mode collapse and instability that make GANs hard."
  },
  {
   "title": "Gradient Accumulation",
@@ -1281,7 +1281,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": ""
+  "desc": "Accumulate gradients over several small forward passes before one optimiser step and get large-batch training on a device that cannot hold one."
  },
  {
   "title": "Gradient Clipping",
@@ -1329,7 +1329,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": ""
+  "desc": "Change the target from a hard one-hot to a soft distribution, watch the loss curve shift, and measure the calibration improvement it produces."
  },
  {
   "title": "Layer Normalization",
@@ -1361,7 +1361,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": ""
+  "desc": "Train in float16, see the underflow that zeros out small gradients, then fix it with a loss scale that fits in one extra line of code."
  },
  {
   "title": "Model Reproducibility",
@@ -1465,7 +1465,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": ""
+  "desc": "Feed a sequence into an encoder, decode one token at a time, and compare greedy search with beam search to see how wider beams change output."
  },
  {
   "title": "Softmax and Cross-Entropy",
@@ -1489,7 +1489,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": ""
+  "desc": "Add a KL divergence term to an autoencoder loss, sample from the latent space, and see how two competing objectives produce a generative model."
  },
  {
   "title": "Weight Initialization Methods",
@@ -1513,7 +1513,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Move endpoints into an APIRouter, mount it with a prefix, and see how a growing FastAPI app stays organised without circular imports."
  },
  {
   "title": "Background Tasks",
@@ -1521,7 +1521,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Add a BackgroundTasks parameter, schedule work after the response leaves, and see the point where this runner needs replacing with a task queue."
  },
  {
   "title": "Class Dependencies",
@@ -1529,7 +1529,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Turn a class with __init__ parameters into a FastAPI dependency and see how any callable with the right signature becomes injectable config."
  },
  {
   "title": "Dependencies with yield",
@@ -1537,7 +1537,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Write a dependency that yields a database session, watch FastAPI run setup before the handler and teardown after it, then see the pattern."
  },
  {
   "title": "Dependency Injection",
@@ -1545,7 +1545,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Declare what an endpoint needs with Depends, let FastAPI resolve and inject it, and see how testing and swapping implementations get simpler."
  },
  {
   "title": "Dependency Overrides",
@@ -1553,7 +1553,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Swap a real dependency for a test double with dependency_overrides, run the test, and see why the pattern makes FastAPI simple to test."
  },
  {
   "title": "Error Handling",
@@ -1561,7 +1561,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Raise an HTTPException, register a custom exception handler, and keep HTTP status codes out of the business logic that does the real work."
  },
  {
   "title": "Form Data and File Uploads",
@@ -1569,7 +1569,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Accept form fields and file uploads in a FastAPI endpoint, inspect the multipart body, and see why form data is not JSON or a query string."
  },
  {
   "title": "HTTP Methods and Routing",
@@ -1577,7 +1577,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Map GET, POST, PUT and DELETE to handler functions, follow the matching logic, and see what each HTTP method promises to the caller."
  },
  {
   "title": "Headers and Cookies",
@@ -1585,7 +1585,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Read a request header and a cookie inside a FastAPI endpoint, set a cookie on the response, and see what each transport is properly for."
  },
  {
   "title": "Lifespan Events",
@@ -1593,7 +1593,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Write a lifespan context manager that opens a connection pool at startup and closes it on shutdown, and see why per-request setup is wasteful."
  },
  {
   "title": "OpenAPI and the Docs",
@@ -1601,7 +1601,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Open the auto-generated Swagger UI, trace every field back to your type annotations, and see how much of an API's usability the schema decides."
  },
  {
   "title": "Path Parameters",
@@ -1609,7 +1609,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Add a path parameter with a type annotation, send a request with a wrong type, and watch FastAPI extract, convert and validate in one step."
  },
  {
   "title": "Project Structure",
@@ -1617,7 +1617,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Organise a FastAPI project into routers, models and dependencies across files and see a layout that scales without causing circular imports."
  },
  {
   "title": "Query Parameters",
@@ -1625,7 +1625,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Add query parameters with defaults and type hints, send a request, and watch FastAPI validate and document them from a single annotation."
  },
  {
   "title": "Reading a 422",
@@ -1633,7 +1633,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Read a 422 validation error field by field, trace it back to the Pydantic model, and reshape the response into something callers can use."
  },
  {
   "title": "Request Bodies",
@@ -1641,7 +1641,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Define a Pydantic model and use it as a request body. One class gives you parsing, validation and OpenAPI documentation in a single declaration."
  },
  {
   "title": "Response Models",
@@ -1649,7 +1649,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Set a response_model on an endpoint, return a full ORM object, and watch FastAPI strip every field the model does not declare before sending."
  },
  {
   "title": "Router and Global Dependencies",
@@ -1657,7 +1657,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Attach a dependency to a router so every endpoint under it runs the same check, and spot the unprotected endpoint the pattern catches."
  },
  {
   "title": "Security Basics",
@@ -1665,7 +1665,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Add OAuth2PasswordBearer as a dependency, extract and verify a token, and see how authentication fits into FastAPI's dependency injection."
  },
  {
   "title": "Status Codes",
@@ -1673,7 +1673,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Return the right HTTP status code for each outcome, compare it with 200-for-everything, and see the information the wrong choice discards."
  },
  {
   "title": "Sub-dependencies",
@@ -1681,7 +1681,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Chain dependencies that depend on other dependencies, follow the resolution order, and see FastAPI call each one correctly before your handler."
  },
  {
   "title": "Testing",
@@ -1689,7 +1689,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Write tests with TestClient, call endpoints without a running server, override dependencies for isolation, and see what good tests assert."
  },
  {
   "title": "What FastAPI Is",
@@ -1697,7 +1697,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "See what FastAPI actually is: a thin layer over Starlette and Pydantic. Learn the two ideas that explain almost every feature it offers."
  },
  {
   "title": "Your First Endpoint",
@@ -1705,7 +1705,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Write a GET handler, run the app, call the endpoint, and see how the decorator, the return value and the route ordering rule fit together."
  },
  {
   "title": "async def or def",
@@ -1713,7 +1713,7 @@ window.VIZLEARN_MODULES = [
   "category": "FastAPI",
   "topic": "fastapi",
   "icon": "code",
-  "desc": ""
+  "desc": "Compare async def and plain def endpoints in FastAPI, see where each one runs, and spot the mistake that turns a fast framework into a slow one."
  },
  {
   "title": "ANN indexing: HNSW and IVF",
@@ -1721,7 +1721,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn ANN indexing: HNSW and IVF | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Build an HNSW graph and an IVF index from the same vectors, run a nearest-neighbour query on each, and compare the recall-speed tradeoff."
  },
  {
   "title": "Annoy",
@@ -1729,7 +1729,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Annoy | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Build a forest of random projection trees, query a point, and see how Annoy trades tree count for recall when finding nearest neighbours."
  },
  {
   "title": "BM25 and Sparse Lexical Retrieval",
@@ -1769,7 +1769,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Completeness in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Score a model answer for completeness against a reference, see why a correct response can still miss required points, and measure the gap."
  },
  {
   "title": "Context Windows and the KV Cache",
@@ -1785,7 +1785,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Context-aware chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Chunk a document by headings and semantic boundaries instead of fixed token counts and see the retrieval accuracy gained by preserving context."
  },
  {
   "title": "Corrective RAG (CRAG)",
@@ -1793,7 +1793,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Corrective RAG (CRAG) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Add a relevance filter between retrieval and generation, discard off-topic documents, and see how Corrective RAG stops answers built on noise."
  },
  {
   "title": "Correctness in LLM evaluation",
@@ -1801,7 +1801,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Correctness in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Evaluate a model answer for factual correctness against a reference, compare automated and human scoring, and see why this dimension costs most."
  },
  {
   "title": "DiskANN",
@@ -1809,7 +1809,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn DiskANN | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Build a DiskANN graph on a billion vectors, serve queries from SSD with a small memory footprint, and see how the alpha parameter controls recall."
  },
  {
   "title": "Distributed retrieval and sharding",
@@ -1817,7 +1817,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Distributed retrieval and sharding | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Scale vector search across machines. Compare sharding strategies, see how routing works, and spot the latency-throughput trade-off at every split."
  },
  {
   "title": "Dot Product vs Cosine Similarity for Retrieval",
@@ -1849,7 +1849,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Flat Index | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Walk through a brute-force flat index, measure its exact-match guarantee, and learn when exhaustive search still beats every approximate method."
  },
  {
   "title": "Groundedness in LLM evaluation",
@@ -1857,7 +1857,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Groundedness in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Measure whether an LLM answer stays within the retrieved context. Compare groundedness to correctness and see how evaluators score each claim."
  },
  {
   "title": "HNSW",
@@ -1865,7 +1865,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn HNSW | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Build an HNSW graph layer by layer, trace a search from the top level down, and see how ef and M shape the speed-vs-recall trade-off."
  },
  {
   "title": "Hallucination and Grounding",
@@ -1905,7 +1905,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn IVF-Flat | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Cluster vectors into Voronoi cells, search only the nearest few, and watch nprobe trade recall for speed inside an inverted file index."
  },
  {
   "title": "IVF-PQ",
@@ -1913,7 +1913,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn IVF-PQ | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Combine inverted file partitioning with product quantization, trace a query through both stages, and see why IVF-PQ scales to a billion vectors."
  },
  {
   "title": "Indexing in vector databases",
@@ -1921,7 +1921,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Indexing in vector databases | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "See why brute-force comparison breaks at scale, survey the index families vector databases use, and understand what each one trades for speed."
  },
  {
   "title": "Knowledge Distillation in LLMs",
@@ -1969,7 +1969,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Permission filtering in RAG retrieval | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Stop a RAG system from surfacing documents the user cannot see. Compare pre-filter and post-filter approaches and weigh speed against safety."
  },
  {
   "title": "Product Quantization",
@@ -1977,7 +1977,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Product Quantization | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Split a high-dimensional vector into subvectors, quantize each one separately, and watch product quantization shrink a billion vectors into RAM."
  },
  {
   "title": "Quantization in LLMs",
@@ -2001,7 +2001,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Query, embedding and prompt caching | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Add query, embedding and prompt caches to a RAG pipeline, measure the latency and cost each one removes, and see where staleness matters."
  },
  {
   "title": "Re-ranking: Bi-Encoders vs Cross-Encoders",
@@ -2017,7 +2017,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Recursive chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Split a document with recursive character chunking, watch it try each separator in turn, and see why this simple strategy is the default splitter."
  },
  {
   "title": "Relevance in LLM evaluation",
@@ -2025,7 +2025,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Relevance in LLM evaluation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Score whether an LLM answer actually addresses the question asked. Compare answer relevance to context relevance and see how evaluators separate them."
  },
  {
   "title": "Retrieval Evaluation Metrics",
@@ -2049,7 +2049,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn ScaNN | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "See how anisotropic vector quantization preserves inner-product rankings better than standard methods, and why ScaNN wins on large-scale benchmarks."
  },
  {
   "title": "Self-Query Retriever",
@@ -2065,7 +2065,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Semantic chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Split text where the meaning shifts instead of where a character count runs out. Compare semantic chunking to fixed-size splits on real paragraphs."
  },
  {
   "title": "Structure-aware chunking",
@@ -2073,7 +2073,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn Structure-aware chunking | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Parse headings, lists and tables before splitting. See how structure-aware chunking keeps logical sections intact and beats character-based splitters."
  },
  {
   "title": "TF-IDF",
@@ -2081,7 +2081,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn TF-IDF | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Compute TF-IDF scores by hand, watch common words shrink and rare words rise, and see how a simple formula still powers keyword-based search."
  },
  {
   "title": "What are Queries, Keys and Values in an LLM?",
@@ -2089,7 +2089,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn What are Queries, Keys and Values in an LLM? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Trace a single attention step: see how a query matches a key, why the dot products are scaled, and what the weighted sum of values produces."
  },
  {
   "title": "What is Hit Rate@k?",
@@ -2097,7 +2097,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn What is Hit Rate@k? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Calculate Hit Rate at k step by step, compare it to Recall at k, and see when a binary hit-or-miss metric is the right choice for retrieval."
  },
  {
   "title": "What is MRR (Mean Reciprocal Rank)?",
@@ -2105,7 +2105,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn What is MRR (Mean Reciprocal Rank)? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Compute MRR by hand on ranked lists, compare it to Precision at k, and see why the rank of the first correct result is often the right metric."
  },
  {
   "title": "What is Masked Language Modeling?",
@@ -2121,7 +2121,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn What is Precision@k? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Calculate Precision at k for a ranked result list, compare it to Recall at k, and see why the fraction of relevant hits matters more in RAG."
  },
  {
   "title": "What is Recall@k?",
@@ -2129,7 +2129,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Learn What is Recall@k? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Calculate Recall at k for a retriever, compare it to Precision at k, and understand why recall is usually the metric that gates RAG quality."
  },
  {
   "title": "3Sum",
@@ -2137,7 +2137,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn 3Sum | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Find every unique triple that sums to zero. Sort the array, fix one element, and sweep two pointers inward while skipping duplicates at each step."
  },
  {
   "title": "Are two strings anagrams?",
@@ -2145,7 +2145,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Are two strings anagrams? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Check whether two strings are anagrams by counting every character in a dictionary. Compare the sorted approach to the counted one and time both."
  },
  {
   "title": "Binary search on the answer, not the array",
@@ -2153,7 +2153,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Binary search on the answer, not the array | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Binary-search the answer space instead of an array. Solve the ship-capacity problem step by step and learn the template that fits dozens of variants."
  },
  {
   "title": "Check whether a string is a palindrome",
@@ -2161,7 +2161,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Check whether a string is a palindrome | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Check whether a string is a palindrome after stripping punctuation and lowering case. Walk two pointers inward and compare characters one by one."
  },
  {
   "title": "Climbing stairs: the DP that is Fibonacci",
@@ -2169,7 +2169,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Climbing stairs: the DP that is Fibonacci | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Count the ways to climb n stairs taking 1 or 2 steps at a time. Build the recurrence, spot the Fibonacci pattern, and reduce space to O(1)."
  },
  {
   "title": "Coin change, and why greedy is wrong",
@@ -2177,7 +2177,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Coin change, and why greedy is wrong | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Find the fewest coins that make a target amount. See why greedy fails on certain denominations, build the DP table cell by cell, and trace back."
  },
  {
   "title": "Count things with a dictionary",
@@ -2185,7 +2185,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Count things with a dictionary | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Count item frequencies with a plain dict, then with Counter. Find the k most common elements and see how the data structure choice changes the cost."
  },
  {
   "title": "Daily temperatures, and the monotonic stack",
@@ -2193,7 +2193,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Daily temperatures, and the monotonic stack | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Solve daily temperatures with a monotonic stack. Watch the stack shrink as each warmer day resolves earlier entries, and see why one pass is enough."
  },
  {
   "title": "Design a stack that reports its minimum in O(1)",
@@ -2201,7 +2201,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Design a stack that reports its minimum in O(1) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Design a stack that reports its minimum in O(1). Track the minimum at every push and see why a single extra variable is not enough."
  },
  {
   "title": "Design an LRU cache",
@@ -2209,7 +2209,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Design an LRU cache | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Build an LRU cache with O(1) get and put using a hash map and a doubly linked list. Step through insertions, lookups and evictions one by one."
  },
  {
   "title": "Does len() count characters or bytes?",
@@ -2217,7 +2217,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Does len() count characters or bytes? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Test len() on str, bytes and emoji. See when it counts characters, when it counts bytes, and why a single emoji can give you more than one."
  },
  {
   "title": "Edit distance (Levenshtein)",
@@ -2225,7 +2225,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Edit distance (Levenshtein) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Fill in the edit-distance table for two strings. Watch insertions, deletions and substitutions compete, and trace back the cheapest transformation."
  },
  {
   "title": "Evaluate reverse Polish notation",
@@ -2233,7 +2233,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Evaluate reverse Polish notation | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Evaluate a postfix expression with a stack. Push operands, pop for each operator, and trace through examples like 4 13 5 / + step by step."
  },
  {
   "title": "Find the duplicate number",
@@ -2241,7 +2241,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Find the duplicate number | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Find the one duplicate in an array of n+1 integers from 1 to n without extra space. Apply Floyd's cycle detection and see why it works here."
  },
  {
   "title": "Find the median of a data stream",
@@ -2249,7 +2249,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Find the median of a data stream | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Keep two heaps as numbers arrive: a max-heap for the lower half and a min-heap for the upper. Report the median after every insertion in O(log n)."
  },
  {
   "title": "First and last position of a target",
@@ -2257,7 +2257,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn First and last position of a target | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Find the first and last index of a target in a sorted array with duplicates. Run two binary searches and see how each boundary is located."
  },
  {
   "title": "First non-repeating character",
@@ -2265,7 +2265,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn First non-repeating character | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Find the first character in a string that appears only once. Compare a two-pass dictionary approach to an ordered-dict single-pass solution."
  },
  {
   "title": "Group anagrams together",
@@ -2273,7 +2273,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Group anagrams together | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Group words that are anagrams of each other. Sort each word into a canonical key, collect matches in a dictionary, and see the cost of each step."
  },
  {
   "title": "Group records and invert a dictionary",
@@ -2281,7 +2281,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Group records and invert a dictionary | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Group records by a shared field and invert a dictionary so values become keys. See both operations in plain Python and with defaultdict."
  },
  {
   "title": "House robber: the 0-1 choice",
@@ -2289,7 +2289,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn House robber: the 0-1 choice | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Pick houses to rob without choosing two in a row. Build the DP recurrence, compare rob-or-skip at every step, and read off the maximum take."
  },
  {
   "title": "How does a Python dict work?",
@@ -2297,7 +2297,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn How does a Python dict work? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Look inside CPython's dict: a hash table with open addressing. See the probe sequence, the compact layout, and why average-case lookup costs O(1)."
  },
  {
   "title": "Implement a hash map from scratch",
@@ -2305,7 +2305,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Implement a hash map from scratch | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Build a hash map from scratch with put, get and remove. Choose a hash function, handle collisions with chaining, and test it against edge cases."
  },
  {
   "title": "Implement a queue using two stacks",
@@ -2313,7 +2313,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Implement a queue using two stacks | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Build a FIFO queue from two stacks. Push onto one, pop from the other, and see why every element moves at most twice for amortized O(1) cost."
  },
  {
   "title": "Implement substring search (strStr)",
@@ -2321,7 +2321,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Implement substring search (strStr) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Implement strStr without the built-in. Slide a window across the text, compare character by character, and measure the brute-force cost."
  },
  {
   "title": "Isomorphic strings",
@@ -2329,7 +2329,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Isomorphic strings | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Check whether two strings share the same character-to-character pattern. Map characters in both directions, catch conflicts, and handle edge cases."
  },
  {
   "title": "Kth largest element",
@@ -2337,7 +2337,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Kth largest element | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Find the kth largest element with a min-heap and with quickselect. Compare both approaches and see when each one wins on time and space."
  },
  {
   "title": "Longest common prefix",
@@ -2345,7 +2345,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Longest common prefix | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Find the longest common prefix shared by a list of strings. Compare vertical scanning to sorting-based approaches and see which finishes first."
  },
  {
   "title": "Longest consecutive sequence",
@@ -2353,7 +2353,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Longest consecutive sequence | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Find the longest run of consecutive integers in an unsorted array in O(n). Use a set to start only at sequence beginnings and skip the rest."
  },
  {
   "title": "Longest increasing subsequence, twice",
@@ -2361,7 +2361,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Longest increasing subsequence, twice | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Find the longest increasing subsequence with O(n squared) DP, then speed it up to O(n log n) with patience sorting and binary search."
  },
  {
   "title": "Longest palindromic substring",
@@ -2369,7 +2369,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Longest palindromic substring | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Expand around every centre to find the longest palindromic substring. Handle both odd and even lengths and see why this beats brute-force checking."
  },
  {
   "title": "Longest substring without repeating characters",
@@ -2377,7 +2377,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Longest substring without repeating characters | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Slide a window across the string, tracking seen characters in a set. Shrink on repeats, grow on new ones, and record the longest span found."
  },
  {
   "title": "Maximum subarray sum (Kadane)",
@@ -2385,7 +2385,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Maximum subarray sum (Kadane) | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Run Kadane's algorithm step by step. Decide at each element whether to extend or restart, and watch the maximum subarray sum update in real time."
  },
  {
   "title": "Memoisation: caching with a dictionary",
@@ -2393,7 +2393,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Memoisation: caching with a dictionary | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Cache recursive results in a dictionary to kill recomputation. Watch the call tree shrink from exponential to linear, then switch to lru_cache."
  },
  {
   "title": "Merge k sorted sequences",
@@ -2401,7 +2401,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Merge k sorted sequences | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Merge k sorted lists with a min-heap. Push one element per list, pop the smallest, refill, and see why the total cost is O(n log k)."
  },
  {
   "title": "Merge overlapping intervals",
@@ -2409,7 +2409,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Merge overlapping intervals | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Sort intervals by start time, then merge overlaps in one pass. Trace through examples and see why sorting first makes the rest straightforward."
  },
  {
   "title": "Minimum window substring",
@@ -2417,7 +2417,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Minimum window substring | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Shrink and expand a sliding window until it holds every character of t. Track character counts in a dictionary and record the smallest valid span."
  },
  {
   "title": "Product of array except self",
@@ -2425,7 +2425,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Product of array except self | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Build prefix and suffix products in two passes to get the product of every other element, with no division and O(1) extra space."
  },
  {
   "title": "Remove duplicates from a sorted array in place",
@@ -2433,7 +2433,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Remove duplicates from a sorted array in place | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Walk a slow and fast pointer through a sorted array, overwriting duplicates in place. Return the new length and handle every edge case."
  },
  {
   "title": "Reverse a string",
@@ -2441,7 +2441,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Reverse a string | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Reverse a string with slicing, then do it in place on a character list with O(1) extra memory. Compare both approaches step by step."
  },
  {
   "title": "Rotate an array by k",
@@ -2449,7 +2449,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Rotate an array by k | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Rotate an array right by k positions in place using three reverses. Trace each reverse and see why the trick works without extra memory."
  },
  {
   "title": "Run-length string compression",
@@ -2457,7 +2457,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Run-length string compression | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Compress aabcccccaaa into a2b1c5a3 with a single scan. Count consecutive runs, build the result, and return the original when compression is longer."
  },
  {
   "title": "Search in a rotated sorted array",
@@ -2465,7 +2465,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Search in a rotated sorted array | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Search a rotated sorted array in O(log n). Identify which half is sorted at each step, decide where the target can hide, and narrow the window."
  },
  {
   "title": "Shallow copy vs deep copy",
@@ -2473,7 +2473,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Shallow copy vs deep copy | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Copy a nested list with list(), copy() and deepcopy(). Mutate an inner list and see which copies notice the change and which stay independent."
  },
  {
   "title": "Sliding window maximum",
@@ -2481,7 +2481,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Sliding window maximum | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Track the maximum in a sliding window using a monotonic deque. Watch old and small values drop as the window advances, keeping every lookup O(1)."
  },
  {
   "title": "Sort an array of 0s, 1s and 2s",
@@ -2489,7 +2489,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Sort an array of 0s, 1s and 2s | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Partition an array of 0s, 1s and 2s in one pass using three pointers. Watch low, mid and high converge until the array is sorted in place."
  },
  {
   "title": "Subarray sum equals k",
@@ -2497,7 +2497,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Subarray sum equals k | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Count subarrays that sum to k using a running prefix sum and a hash map. See why brute force costs O(n squared) and the hash approach costs O(n)."
  },
  {
   "title": "Top k frequent elements",
@@ -2505,7 +2505,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Top k frequent elements | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Find the k most frequent elements using a heap and using bucket sort. Compare both approaches and see when each one gives a better time bound."
  },
  {
   "title": "Trapping rain water",
@@ -2513,7 +2513,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Trapping rain water | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Calculate trapped water bar by bar. Precompute left and right maxima in two passes, then shrink to O(1) space with two converging pointers."
  },
  {
   "title": "Two Sum",
@@ -2521,7 +2521,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Two Sum | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Solve Two Sum in one pass with a hash map. Store each number's index, check for its complement, and return the pair the moment it appears."
  },
  {
   "title": "Valid parentheses",
@@ -2529,7 +2529,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Valid parentheses | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Push openers onto a stack and pop when a closer arrives. Walk through balanced and unbalanced bracket strings to see every edge case handled."
  },
  {
   "title": "What does `with` guarantee when the body raises?",
@@ -2537,7 +2537,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn What does `with` guarantee when the body raises? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Trace a with block that raises an exception. See the __enter__ and __exit__ calls, check whether the error propagates, and know what is guaranteed."
  },
  {
   "title": "What does `yield` actually do?",
@@ -2545,7 +2545,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn What does `yield` actually do? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Step through a generator function one yield at a time. See the suspended frame, compare memory use to a list, and chain generators with yield from."
  },
  {
   "title": "What does a decorator actually replace?",
@@ -2553,7 +2553,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn What does a decorator actually replace? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "See what the @ line does to a function object. Trace the replacement, add functools.wraps, and understand why the original name disappears without it."
  },
  {
   "title": "What does slicing a string cost?",
@@ -2561,7 +2561,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn What does slicing a string cost? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Slice a Python string and measure the cost. See that slicing copies the data every time, count the bytes moved, and spot when it hides an O(n) hit."
  },
  {
   "title": "What happens if you modify a collection while looping over it?",
@@ -2569,7 +2569,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn What happens if you modify a collection while looping over it? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "See what breaks when you delete from a list or dict mid-loop. Trace the iterator state, watch the error, and learn the safe alternatives."
  },
  {
   "title": "What is a Python list underneath?",
@@ -2577,7 +2577,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn What is a Python list underneath? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Look inside CPython's list: a resizable array of pointers. See why append is amortized O(1), insert(0, x) is O(n), and indexing is constant-time."
  },
  {
   "title": "What is the complexity of this code?",
@@ -2585,7 +2585,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn What is the complexity of this code? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Spot the hidden quadratic cost in four common loop patterns. Step through each one, count the real operations, and learn to catch the trap fast."
  },
  {
   "title": "What is the difference between str and bytes?",
@@ -2593,7 +2593,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn What is the difference between str and bytes? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Compare str and bytes objects side by side. Encode a string to bytes, decode it back, and see where the boundary between text and binary sits."
  },
  {
   "title": "When should you use a set instead of a list?",
@@ -2601,7 +2601,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn When should you use a set instead of a list? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Switch from a list to a set and watch membership checks drop from O(n) to O(1). Deduplicate a sequence while preserving order with dict.fromkeys."
  },
  {
   "title": "Why are Python strings immutable?",
@@ -2609,7 +2609,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Why are Python strings immutable? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "See why Python strings cannot change in place. Trace what happens when you concatenate, check the object id, and understand the hashing guarantee."
  },
  {
   "title": "Why do all these functions return the same value?",
@@ -2617,7 +2617,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Why do all these functions return the same value? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Run the classic closure trap: a list of lambdas that all return the same value. See why Python binds late and three clean ways to fix it."
  },
  {
   "title": "Why does [[0]*3]*3 break?",
@@ -2625,7 +2625,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Why does [[0]*3]*3 break? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Create [[0]*3]*3, write to one cell, and watch every row change. See the shared-reference diagram and build the grid the safe way instead."
  },
  {
   "title": "Why does `is` sometimes work on strings?",
@@ -2633,7 +2633,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Why does `is` sometimes work on strings? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "See which strings Python interns and which it does not. Test is on literals and computed strings, and learn why the result is unpredictable."
  },
  {
   "title": "Why does this default argument remember?",
@@ -2641,7 +2641,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Why does this default argument remember? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Call a function with a default list twice and watch the list remember. See why Python evaluates defaults once, and three clean ways to fix it."
  },
  {
   "title": "Why is `in` slow on a list but fast on a set?",
@@ -2649,7 +2649,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Why is `in` slow on a list but fast on a set? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Time x in my_list versus x in my_set as the collection grows. See the O(n) scan, the O(1) hash lookup, and know when to switch to a set."
  },
  {
   "title": "Why is a comprehension faster than the same loop?",
@@ -2657,7 +2657,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Why is a comprehension faster than the same loop? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Time a list comprehension against the equivalent for-loop. Read the bytecode, count the attribute lookups saved, and see where the speedup lives."
  },
  {
   "title": "Why must dictionary keys be hashable?",
@@ -2665,7 +2665,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Why must dictionary keys be hashable? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Try a list as a dictionary key and watch it fail. See why hash consistency matters for lookups, what makes tuples work, and which objects qualify."
  },
  {
   "title": "Write binary search without an off-by-one",
@@ -2673,7 +2673,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn Write binary search without an off-by-one | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Write binary search that terminates correctly every time. Trace the loop invariant, see where off-by-one errors hide, and fix them before they bite."
  },
  {
   "title": "`is` vs `==`, and why 257 is not 257",
@@ -2681,7 +2681,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn `is` vs `==`, and why 257 is not 257 | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Test is vs == on integers, strings and lists. See the object id behind each, learn the small-integer cache rule, and know when identity matters."
  },
  {
   "title": "find() vs index() vs `in` — which one?",
@@ -2689,7 +2689,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn find() vs index() vs `in` — which one? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Compare str.find, str.index and the in operator side by side. See which raises, which returns -1, and pick the right one for each situation."
  },
  {
   "title": "list vs tuple vs deque vs array — which and why?",
@@ -2697,7 +2697,7 @@ window.VIZLEARN_MODULES = [
   "category": "Interview",
   "topic": "interview",
   "icon": "interview",
-  "desc": "Learn list vs tuple vs deque vs array — which and why? | VizLearn with a beginner-friendly interactive visualization on VizLearn."
+  "desc": "Compare list, tuple, deque and array side by side. See the memory layout, the time cost of each operation, and when to reach for which one."
  },
  {
   "title": "Bias vs Variance",
@@ -2713,7 +2713,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Run the Elbow method and the Silhouette score on the same dataset. See what each one measures, where they disagree, and how to pick k when they do."
  },
  {
   "title": "Confusion Matrix Analysis",
@@ -2737,7 +2737,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Set epsilon and minPts, then watch DBSCAN grow clusters by density. See how it finds arbitrary shapes, labels noise, and never asks you to choose k."
  },
  {
   "title": "Data Leakage",
@@ -2745,7 +2745,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Spot data leakage in a pipeline before it inflates your metrics. See train-test contamination, target leakage, and preprocessing leaks with examples."
  },
  {
   "title": "Decision Tree Analysis",
@@ -2769,7 +2769,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Apply min-max and standard scaling to raw features. See which models need scaled inputs, which ignore them, and what happens when one column dominates."
  },
  {
   "title": "Feature and Permutation Importance",
@@ -2777,7 +2777,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Shuffle one feature at a time and measure the drop in accuracy. See why correlated features split the importance and how to handle it."
  },
  {
   "title": "Gaussian Mixture Models",
@@ -2785,7 +2785,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Fit a Gaussian mixture and watch each point split its membership across clusters. Step through EM iteration by iteration and compare to hard k-means."
  },
  {
   "title": "Gradient Boosting",
@@ -2801,7 +2801,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Compare grid and random hyperparameter search side by side. See how random sampling covers more of the space with the same trial budget."
  },
  {
   "title": "Handling Missing Values",
@@ -2809,7 +2809,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Learn four strategies for handling missing data. Watch each method change predictions on the same dataset and pick the one that fits."
  },
  {
   "title": "Hard vs Soft Labelling",
@@ -2825,7 +2825,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Build a clustering tree from pairwise distances and read a dendrogram to choose the number of clusters after the algorithm finishes."
  },
  {
   "title": "Isolation Forest",
@@ -2833,7 +2833,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Watch isolation forest flag anomalies by counting how few random splits isolate a point. Fewer splits means the data point is stranger."
  },
  {
   "title": "K-Fold Cross Validation",
@@ -2881,7 +2881,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Plot training and validation error against dataset size. Read the gap to decide whether more data or more model capacity will help."
  },
  {
   "title": "Linear Regression with OLS",
@@ -2929,7 +2929,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Move one data point and watch the regression line follow it. Use Cook's distance and hat values to find the rows that control your model."
  },
  {
   "title": "Partial Dependence, ICE and SHAP",
@@ -2937,7 +2937,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Plot partial dependence, ICE curves and SHAP values for one feature. See where partial dependence hides interactions the others reveal."
  },
  {
   "title": "Pipelines",
@@ -2945,7 +2945,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Chain preprocessing and modelling into one pipeline object that prevents data leakage and locks every step into the correct order."
  },
  {
   "title": "Precision, Recall and F1",
@@ -2953,7 +2953,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Build a confusion matrix, then adjust the threshold and watch precision trade against recall while F1 tries to balance them both."
  },
  {
   "title": "Precision-Recall against ROC",
@@ -2961,7 +2961,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Draw ROC and precision-recall curves from the same predictions. See why a model that looks strong on ROC can fail on imbalanced classes."
  },
  {
   "title": "Principal Component Analysis",
@@ -2977,7 +2977,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Check whether predicted probabilities match observed frequencies. Apply Platt scaling and isotonic regression to close the gap."
  },
  {
   "title": "ROC Curve and AUC",
@@ -3017,7 +3017,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Combine trees, linear models and neighbours into one ensemble. Compare hard voting, soft voting and stacking on the same scored data."
  },
  {
   "title": "Support Vector Machines",
@@ -3033,7 +3033,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Slide the classification threshold from zero to one and watch precision, recall and cost shift. Find the cutoff that fits your problem."
  },
  {
   "title": "Train-Test Split Method",
@@ -3057,7 +3057,7 @@ window.VIZLEARN_MODULES = [
   "category": "Machine Learning",
   "topic": "ml",
   "icon": "brain",
-  "desc": ""
+  "desc": "Project high-dimensional data with PCA, t-SNE and UMAP side by side. Learn which visual patterns are real structure and which are artifacts."
  },
  {
   "title": "A Matrix is a Transformation",
@@ -3073,7 +3073,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Add vectors to a set and watch the span grow. See why orthogonal bases make projections simple and what happens when vectors depend."
  },
  {
   "title": "Bayes' Theorem",
@@ -3089,7 +3089,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Start from a single coin flip and build the binomial and Poisson distributions step by step. See the limit that connects each to the next."
  },
  {
   "title": "Cholesky and Positive-Definiteness",
@@ -3097,7 +3097,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Factor a positive-definite matrix into a lower triangle times its transpose. Watch the decomposition break when definiteness fails."
  },
  {
   "title": "Combinatorics: Permutations and Combinations",
@@ -3105,7 +3105,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Count arrangements with and without order, with and without replacement. One decision tree picks the right formula every time."
  },
  {
   "title": "Conditional Probability",
@@ -3121,7 +3121,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Draw a thousand confidence intervals and count how many capture the true mean. See what the ninety-five percent actually refers to."
  },
  {
   "title": "Convexity and Optimisation Landscapes",
@@ -3129,7 +3129,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "See why a convex loss surface has one minimum and gradient descent always finds it. Then watch what happens when convexity disappears."
  },
  {
   "title": "Covariance and Correlation",
@@ -3201,7 +3201,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Calculate expected value and variance from a probability distribution. Apply the linearity and independence rules that simplify real problems."
  },
  {
   "title": "Exponentials",
@@ -3217,7 +3217,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Run a hypothesis test step by step. See what the p-value actually measures and why a small one does not mean the effect is large."
  },
  {
   "title": "Identity, Inverse and Transpose",
@@ -3241,7 +3241,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Apply a convex function before and after averaging and see why the results differ. Trace how this gap appears in KL divergence and the ELBO."
  },
  {
   "title": "Lagrange Multipliers",
@@ -3249,7 +3249,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Optimise a function under a constraint by introducing a multiplier. See how the multiplier itself tells you the cost of the constraint."
  },
  {
   "title": "Logarithms",
@@ -3265,7 +3265,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Step through a Markov chain and watch the state distribution converge to steady state. See why MCMC sampling and PageRank are both examples."
  },
  {
   "title": "Matrix Calculus",
@@ -3273,7 +3273,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Work through the matrix derivative identities used in backpropagation. Use dimension analysis to verify each gradient before coding it."
  },
  {
   "title": "Matrix Multiplication",
@@ -3337,7 +3337,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Orthogonalise a set of vectors with Gram-Schmidt and factor the matrix into Q times R. See why this makes least squares numerically stable."
  },
  {
   "title": "Quantiles and Percentiles",
@@ -3345,7 +3345,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Compute quantiles, percentiles and the interquartile range. See why rank-based summaries describe skewed data better than the mean."
  },
  {
   "title": "Rank and Linear Independence",
@@ -3361,7 +3361,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Simulate thousands of samples and plot the distribution of the sample mean. Watch the standard error shrink as the sample size grows."
  },
  {
   "title": "Singular Value Decomposition",
@@ -3369,7 +3369,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Factor any matrix into U, Sigma and V-transpose. Truncate to k components and watch the low-rank reconstruction improve as k increases."
  },
  {
   "title": "Taylor Series",
@@ -3377,7 +3377,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Expand a function into a polynomial term by term. Watch the approximation improve near the centre and fail past the radius of convergence."
  },
  {
   "title": "The Central Limit Theorem",
@@ -3385,7 +3385,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Sample from skewed, uniform and bimodal distributions. Watch the sample mean become normal as the sample size grows, and see where it fails."
  },
  {
   "title": "The Chain Rule",
@@ -3401,7 +3401,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Compute the Jacobian and Hessian for small functions. See how optimisers use first and second derivatives to choose direction and step size."
  },
  {
   "title": "The Normal Distribution",
@@ -3417,7 +3417,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Adjust significance level and sample size and watch Type I and Type II error rates trade off. See what statistical power actually measures."
  },
  {
   "title": "Vector Norms",
@@ -3769,7 +3769,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Run sum, mean and max on a NumPy array and change the axis argument. See how one parameter decides whether the result is a row, column or scalar."
  },
  {
   "title": "Boolean Masking",
@@ -3777,7 +3777,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Write a comparison on a NumPy array and use the resulting boolean array as an index. Filter, count and replace elements without any loop."
  },
  {
   "title": "Broadcasting",
@@ -3785,7 +3785,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Add a row vector to a column vector and watch NumPy expand the shapes automatically. Learn the two rules that decide when broadcasting works."
  },
  {
   "title": "Creating Arrays",
@@ -3793,7 +3793,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Create NumPy arrays with array, zeros, arange, linspace and random. See which constructor fits each situation and what dtype each one picks."
  },
  {
   "title": "Dtypes",
@@ -3801,7 +3801,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Set and inspect the dtype of a NumPy array. See how integer overflow, float precision and type promotion affect calculations without warning."
  },
  {
   "title": "Fancy Indexing",
@@ -3809,7 +3809,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Index a NumPy array with a list of positions to reorder, repeat or select scattered elements. See how the index shape decides the output shape."
  },
  {
   "title": "Indexing and Slicing",
@@ -3817,7 +3817,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Slice rows, columns and blocks from a NumPy array. Learn the one slicing behaviour that differs from Python lists and why it matters."
  },
  {
   "title": "Linear Algebra",
@@ -3825,7 +3825,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Multiply matrices, solve linear systems and compute eigenvalues with NumPy. See why you should call solve instead of computing the inverse."
  },
  {
   "title": "NaN and Missing Data",
@@ -3833,7 +3833,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Work with NaN values in NumPy. Learn why NaN breaks comparisons and aggregations, and switch to nanmean and nansum to handle it correctly."
  },
  {
   "title": "Performance and Memory",
@@ -3841,7 +3841,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Profile a NumPy workflow to find where time and memory go. Replace Python loops, cut unnecessary copies and pick smaller dtypes."
  },
  {
   "title": "Random Numbers",
@@ -3849,7 +3849,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Generate random integers, floats and samples with NumPy's Generator API. Set a seed for reproducible results and avoid the legacy functions."
  },
  {
   "title": "Saving and Loading Arrays",
@@ -3857,7 +3857,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Save and load NumPy arrays with npy, npz and text formats. Compare speed, file size and portability to choose the right format for your data."
  },
  {
   "title": "Shape and Reshape",
@@ -3865,7 +3865,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Reshape a NumPy array without copying data. Use reshape, ravel and newaxis to rearrange dimensions while the underlying memory stays put."
  },
  {
   "title": "Sorting and Searching",
@@ -3873,7 +3873,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Sort a NumPy array, get sorted indices with argsort and find insertion points with searchsorted. See why argsort is usually the more useful call."
  },
  {
   "title": "Stacking and Splitting",
@@ -3881,7 +3881,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Join NumPy arrays with vstack, hstack and concatenate. Split them with array_split and see when to stack along a new axis instead."
  },
  {
   "title": "Transpose and Moving Axes",
@@ -3889,7 +3889,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Transpose a NumPy array and reorder its axes with swapaxes and moveaxis. See how the operation changes strides without copying any data."
  },
  {
   "title": "Unique Values and Set Operations",
@@ -3897,7 +3897,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Find unique values, counts and set intersections in a NumPy array. Rebuild the original from the unique values and an inverse index."
  },
  {
   "title": "Vectorised Arithmetic",
@@ -3905,7 +3905,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Replace Python loops with NumPy element-wise operations. See the speedup on arrays of every size and avoid the two patterns that lose it."
  },
  {
   "title": "Views versus Copies",
@@ -3913,7 +3913,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Learn which NumPy operations return a view and which return a copy. Modify a slice and see the change appear, or not, in the original array."
  },
  {
   "title": "What NumPy Is For",
@@ -3921,7 +3921,7 @@ window.VIZLEARN_MODULES = [
   "category": "NumPy",
   "topic": "numpy",
   "icon": "sigma",
-  "desc": ""
+  "desc": "See why NumPy stores numbers in one contiguous block of typed memory and how that layout makes array operations orders of magnitude faster."
  },
  {
   "title": "Aliases",
@@ -3929,7 +3929,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Map camelCase payloads, reserved Python names and legacy fields to clean attribute names using aliases and AliasPath."
  },
  {
   "title": "Annotated and Custom Types",
@@ -3937,7 +3937,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Define a validation rule once with Annotated and reuse it across models instead of copying the same constraint into every field."
  },
  {
   "title": "Collections of Models",
@@ -3945,7 +3945,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Validate lists, dicts, sets and tuples of models, and get error messages that point to the exact index or key that failed."
  },
  {
   "title": "Computed Fields",
@@ -3953,7 +3953,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Add read-only fields that compute their value from other attributes and appear in serialized output without being part of input."
  },
  {
   "title": "Custom Serializers",
@@ -3961,7 +3961,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Control how individual fields or entire models serialize, and understand when leaving the default alone is the better choice."
  },
  {
   "title": "Dates, UUIDs and Decimals",
@@ -3969,7 +3969,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Parse ISO dates, UUIDs and Decimals from raw strings, and avoid the two conversion traps that silently produce wrong numbers."
  },
  {
   "title": "Enums and Literals",
@@ -3977,7 +3977,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Restrict a field to a fixed set of values using Enum or Literal, and see when each approach fits your data model best."
  },
  {
   "title": "Field Constraints",
@@ -3985,7 +3985,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Use Field to set min, max, regex and other constraints that close the gap between what a type allows and what your domain accepts."
  },
  {
   "title": "Generic Models",
@@ -3993,7 +3993,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Build one generic model for paginated responses, wrapped results or envelopes, then reuse it across every resource type."
  },
  {
   "title": "JSON Schema",
@@ -4001,7 +4001,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Generate a JSON Schema from any Pydantic model and see why that automatic document powers OpenAPI, FastAPI and every tool that reads your API."
  },
  {
   "title": "Migrating v1 to v2",
@@ -4009,7 +4009,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Walk through the renames, the silent behaviour changes and the patterns that break when moving a Pydantic v1 codebase to v2."
  },
  {
   "title": "Nested Models",
@@ -4017,7 +4017,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Compose models inside models so nested JSON validates recursively, with error paths that name the exact field at every depth."
  },
  {
   "title": "Parsing JSON",
@@ -4025,7 +4025,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Parse JSON directly into a model with model_validate_json and see why it is faster and stricter than json.loads plus model_validate."
  },
  {
   "title": "Performance and pydantic-core",
@@ -4033,7 +4033,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "See why Pydantic v2 validates at Rust speed, where the time goes, and which three habits make the biggest performance difference."
  },
  {
   "title": "Pydantic vs Dataclasses",
@@ -4041,7 +4041,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Compare Pydantic BaseModel with Python dataclasses side by side and see that validation at creation time is the deciding factor."
  },
  {
   "title": "Pydantic with FastAPI",
@@ -4049,7 +4049,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "See how FastAPI turns Pydantic models into request validation, response shaping and automatic API documentation with no extra code."
  },
  {
   "title": "Reading a ValidationError",
@@ -4057,7 +4057,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Read a Pydantic ValidationError line by line, understand loc, msg and type, and turn the report into a message your caller can use."
  },
  {
   "title": "Required, Optional and Defaults",
@@ -4065,7 +4065,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Learn why Optional does not mean optional in Pydantic, and how to distinguish required, defaulted and nullable fields correctly."
  },
  {
   "title": "Settings Management",
@@ -4073,7 +4073,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Load configuration from environment variables into a typed Pydantic model that validates every value before your application starts."
  },
  {
   "title": "Strict vs Lax Mode",
@@ -4081,7 +4081,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Choose between strict and lax validation per field or per model, and learn where coercion helps at the edge and hides bugs inside."
  },
  {
   "title": "TypeAdapter",
@@ -4089,7 +4089,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Validate any type annotation without building a model, using TypeAdapter for standalone checks on lists, dicts and primitives."
  },
  {
   "title": "Types and Coercion",
@@ -4097,7 +4097,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "See exactly what Pydantic will and will not convert: the coercion rules for strings, ints, floats and booleans, one example at a time."
  },
  {
   "title": "Unions and Discriminated Unions",
@@ -4105,7 +4105,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Handle fields that accept multiple shapes with Union, and add a discriminator so Pydantic picks the right branch without guessing."
  },
  {
   "title": "Validator Modes",
@@ -4113,7 +4113,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Compare before, after, plain and wrap validator modes, and see how each one interacts with Pydantic's coercion step."
  },
  {
   "title": "What Pydantic Is For",
@@ -4121,7 +4121,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "See how Pydantic turns Python type annotations into runtime checks that reject bad data the moment it arrives."
  },
  {
   "title": "Your First BaseModel",
@@ -4129,7 +4129,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Define a Pydantic BaseModel, create an instance from raw data, trigger a validation error on purpose, and export the result as a dict."
  },
  {
   "title": "field_validator",
@@ -4137,7 +4137,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Write custom validation and normalisation logic with field_validator, and see exactly where each mode runs in the pipeline."
  },
  {
   "title": "model_config",
@@ -4145,7 +4145,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Set model-wide behaviour with model_config: extra keys, frozen instances, strict mode and assignment validation in one place."
  },
  {
   "title": "model_dump and model_dump_json",
@@ -4153,7 +4153,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Export a model with model_dump and model_dump_json, apply include and exclude filters, and avoid the TypeError most people hit first."
  },
  {
   "title": "model_validator",
@@ -4161,7 +4161,7 @@ window.VIZLEARN_MODULES = [
   "category": "Pydantic",
   "topic": "pydantic",
   "icon": "code",
-  "desc": ""
+  "desc": "Write validators that compare multiple fields at once using model_validator, and choose between before and after modes."
  },
  {
   "title": "*args and **kwargs",
@@ -4169,7 +4169,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Collect any number of positional arguments with *args and keyword arguments with **kwargs, and see how both work inside a function."
  },
  {
   "title": "Booleans and Comparisons",
@@ -4185,7 +4185,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Build a class that bundles data with methods, create instances from it, and see how self connects each object to its own attributes."
  },
  {
   "title": "Conditional Comprehensions",
@@ -4193,7 +4193,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Add an if clause to a list comprehension in two positions and see how filtering differs from choosing between two values."
  },
  {
   "title": "Conditional Expressions",
@@ -4201,7 +4201,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Write a conditional expression that picks one of two values in a single line and see where it fits better than a full if/else block."
  },
  {
   "title": "Dict and Set Comprehensions",
@@ -4209,7 +4209,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Build dictionaries and sets with comprehension syntax, and see how the same loop-in-an-expression pattern works beyond lists."
  },
  {
   "title": "Dictionaries",
@@ -4225,7 +4225,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Use get, setdefault, update and items to handle dictionaries without the repeated key checks most people write by hand."
  },
  {
   "title": "Files and with",
@@ -4233,7 +4233,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Open, read and write files using the with statement so Python closes them even when your code raises an exception."
  },
  {
   "title": "For Loops and range()",
@@ -4249,7 +4249,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Pass arguments by position or by name, set defaults, and see how Python matches each call to the parameters a function expects."
  },
  {
   "title": "Functions and Return Values",
@@ -4265,7 +4265,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Write a generator that yields values one at a time instead of building a full list, and see how pausing a function saves memory."
  },
  {
   "title": "Hello, Python!",
@@ -4289,7 +4289,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Build a child class that inherits methods and attributes from a parent, override what differs, and call super() to extend behaviour."
  },
  {
   "title": "List Comprehensions",
@@ -4297,7 +4297,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Build a list in one expression using a comprehension, and compare it with the loop-and-append pattern it replaces."
  },
  {
   "title": "Lists and Indexing",
@@ -4313,7 +4313,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Import a module, understand what Python runs when you do, and organise your own code into files that other scripts can reuse."
  },
  {
   "title": "Mutability and Aliasing",
@@ -4321,7 +4321,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "See why assigning a list to a second name does not copy it, and how mutability makes two variables change the same object at once."
  },
  {
   "title": "Nested Conditionals",
@@ -4329,7 +4329,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Read and write nested if statements, then refactor the ones that grew too deep into flat guard clauses that are easier to follow."
  },
  {
   "title": "Nested Data Structures",
@@ -4337,7 +4337,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Work with lists of dictionaries, nested records and mixed structures, and write the loops and lookups that reach any value inside them."
  },
  {
   "title": "Nested For Loops",
@@ -4345,7 +4345,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Run a loop inside a loop, trace the execution order step by step, and learn when a product of two ranges is the right structure."
  },
  {
   "title": "None and Truthiness",
@@ -4353,7 +4353,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Learn which values Python treats as false in a condition, how None differs from zero and empty, and why is None beats == None."
  },
  {
   "title": "Numbers and Operators",
@@ -4377,7 +4377,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Create sets, remove duplicates, and use union, intersection and difference to compare collections without writing nested loops."
  },
  {
   "title": "Shallow vs Deep Copying",
@@ -4385,7 +4385,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Copy a list with slicing or copy(), see that the inner objects stay shared, and use deepcopy when you need a fully independent clone."
  },
  {
   "title": "Slicing with Step",
@@ -4393,7 +4393,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Slice sequences with start, stop and step, reverse them with [::-1], and see how negative indices count from the end."
  },
  {
   "title": "String Methods",
@@ -4401,7 +4401,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Split, join, strip and test strings with Python's built-in methods, and see how each one returns a new string instead of changing the original."
  },
  {
   "title": "Strings and Slicing",
@@ -4417,7 +4417,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Create tuples, unpack them into separate variables, and learn where an immutable sequence fits better than a list."
  },
  {
   "title": "Type Conversion",
@@ -4425,7 +4425,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Convert between strings, integers and floats with int(), float() and str(), and see the errors Python raises when a conversion is impossible."
  },
  {
   "title": "Variable Scope",
@@ -4433,7 +4433,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Trace how Python resolves a name through local, enclosing, global and built-in scopes, and see why assigning inside a function creates a new local."
  },
  {
   "title": "Variables and Types",
@@ -4457,7 +4457,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Loop through a sequence with enumerate to get the index and item together, and stop tracking positions with a counter variable."
  },
  {
   "title": "f-strings and Formatting",
@@ -4465,7 +4465,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Place expressions inside f-strings, apply format specs for alignment and precision, and see how Python turns values into readable text."
  },
  {
   "title": "for/else and while/else",
@@ -4473,7 +4473,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Attach an else clause to a for or while loop so a block of code runs only when the loop finishes without hitting break."
  },
  {
   "title": "input() and Output",
@@ -4481,7 +4481,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Read user input with input(), print output with print(), and handle the string-to-number conversion that trips up most beginners."
  },
  {
   "title": "lambda, map and filter",
@@ -4489,7 +4489,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Write small throwaway functions with lambda, apply them across sequences with map and filter, and see where a comprehension is clearer."
  },
  {
   "title": "match and case",
@@ -4497,7 +4497,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Use match/case to test a value against patterns instead of chains of if/elif, and see how destructuring pulls values out of the match."
  },
  {
   "title": "range() with step",
@@ -4505,7 +4505,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Generate number sequences with range using start, stop and step, and see why range produces values lazily instead of building a list."
  },
  {
   "title": "sorted() with key=",
@@ -4513,7 +4513,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Sort any iterable with sorted(), pass a key function to control the comparison, and see how reverse and stable ordering interact."
  },
  {
   "title": "try and except",
@@ -4521,7 +4521,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Catch specific exceptions with try/except, handle them without crashing, and see why bare except clauses hide the bugs you need to find."
  },
  {
   "title": "zip()",
@@ -4529,7 +4529,7 @@ window.VIZLEARN_MODULES = [
   "category": "Python",
   "topic": "python",
   "icon": "code",
-  "desc": ""
+  "desc": "Pair items from two or more sequences with zip, iterate them in lockstep, and see what happens when the sequences have different lengths."
  },
  {
   "title": "Annotating a Plot",
@@ -4537,7 +4537,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Add text labels, arrows and reference lines to a matplotlib chart. Turn a bare plot into one that tells the reader what to notice."
  },
  {
   "title": "Bar Charts",
@@ -4545,7 +4545,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Build vertical, horizontal, grouped and stacked bar charts in matplotlib. See why the y-axis must start at zero and when to reorder bars."
  },
  {
   "title": "Box and Violin Plots",
@@ -4553,7 +4553,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Draw box plots and violin plots side by side in matplotlib. Compare what each summary shows and what each one hides about the distribution."
  },
  {
   "title": "Choosing a Chart",
@@ -4561,7 +4561,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Match your data question to the right chart type. Walk through a decision tree that picks between bar, line, scatter and histogram."
  },
  {
   "title": "Colour and Colormaps",
@@ -4569,7 +4569,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Pick colours by name, hex or RGB in matplotlib. Choose a colormap that is perceptually uniform and still readable in greyscale."
  },
  {
   "title": "Common Mistakes",
@@ -4577,7 +4577,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Spot the matplotlib mistakes that produce a chart which looks correct but misrepresents the data. Fix truncated axes and dual-axis traps."
  },
  {
   "title": "Dates on an Axis",
@@ -4585,7 +4585,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Plot time series in matplotlib with proper date axes. Set locators and formatters so that date labels stay readable without overlapping."
  },
  {
   "title": "Error Bars and Bands",
@@ -4593,7 +4593,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Add error bars and shaded confidence bands to a matplotlib plot. Label whether you are showing standard deviation, standard error or a CI."
  },
  {
   "title": "Figure and Axes",
@@ -4601,7 +4601,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Learn the difference between Figure and Axes in matplotlib. Understand the two APIs, pyplot and object-oriented, and when to use each one."
  },
  {
   "title": "Histograms and Distributions",
@@ -4609,7 +4609,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Plot a histogram in matplotlib and change the bin count. Watch the same data appear to tell a different story depending on the bins chosen."
  },
  {
   "title": "Images and Heatmaps",
@@ -4617,7 +4617,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Display images and heatmaps with imshow and pcolormesh in matplotlib. Fix the upside-down origin and choose a colormap that reads correctly."
  },
  {
   "title": "Labels, Titles and Legends",
@@ -4625,7 +4625,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Add axis labels, a title and a legend to a matplotlib figure. Make a chart that someone else can read without asking what it shows."
  },
  {
   "title": "Layout and Spacing",
@@ -4633,7 +4633,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Set figure size, margins and subplot spacing in matplotlib. Use constrained_layout to stop labels and titles from overlapping automatically."
  },
  {
   "title": "Limits, Ticks and Scales",
@@ -4641,7 +4641,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Set axis limits, tick positions, tick labels and log scales in matplotlib. Control exactly what the axis shows and how it reads."
  },
  {
   "title": "Line Plots",
@@ -4649,7 +4649,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Draw single and multiple-line plots with matplotlib's plot function. Set colours, markers, line styles and labels with the arguments that matter."
  },
  {
   "title": "Performance and Large Data",
@@ -4657,7 +4657,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Speed up slow matplotlib figures that render too many points. Use rasterisation, line simplification and collections to stay responsive."
  },
  {
   "title": "Plotting from pandas",
@@ -4665,7 +4665,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Create charts from a pandas DataFrame in one line with df.plot. See when the shortcut works and when to fall back to raw matplotlib calls."
  },
  {
   "title": "Saving Figures",
@@ -4673,7 +4673,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Save matplotlib figures with savefig. Set the DPI, file format and bounding box so the saved image matches what you see on screen."
  },
  {
   "title": "Scatter Plots",
@@ -4681,7 +4681,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Build scatter plots with matplotlib's scatter function. Map colour and size to data columns and encode four dimensions in one chart."
  },
  {
   "title": "Styles and rcParams",
@@ -4689,7 +4689,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Apply built-in styles and set rcParams to restyle every matplotlib chart at once. Create a consistent look without repeating style code."
  },
  {
   "title": "Subplots",
@@ -4697,7 +4697,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Create grids of subplots with plt.subplots and GridSpec in matplotlib. Place multiple axes on one figure with controlled sizes and spacing."
  },
  {
   "title": "Twin and Secondary Axes",
@@ -4705,7 +4705,7 @@ window.VIZLEARN_MODULES = [
   "category": "matplotlib",
   "topic": "matplotlib",
   "icon": "chart",
-  "desc": ""
+  "desc": "Add a second y-axis to a matplotlib plot with twinx. See why dual axes can mislead readers and learn the safer alternatives for two scales."
  },
  {
   "title": "Adding and Removing Columns",
@@ -4713,7 +4713,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Add, rename and drop columns in a pandas DataFrame with assign and drop. See how index alignment decides what a new column contains."
  },
  {
   "title": "Counting and Binning",
@@ -4721,7 +4721,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Count category frequencies with value_counts, bin continuous data with cut and qcut, and build cross-tabulations with crosstab in pandas."
  },
  {
   "title": "Creating DataFrames",
@@ -4729,7 +4729,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Build pandas DataFrames from dictionaries, lists of records, NumPy arrays and CSV files. See which constructor fits each data shape."
  },
  {
   "title": "Dates and Times",
@@ -4737,7 +4737,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Parse date strings into pandas datetime, use the dt accessor for components and resample time series. Fix the text dates that break analysis."
  },
  {
   "title": "Dtypes and Memory",
@@ -4745,7 +4745,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Inspect and convert column dtypes in a pandas DataFrame. Switch object columns to category or nullable types and measure the memory saved."
  },
  {
   "title": "Duplicates",
@@ -4753,7 +4753,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Find, count and remove duplicate rows in a pandas DataFrame. Choose which copy to keep and verify the cleaned result matches expectations."
  },
  {
   "title": "Filtering Rows",
@@ -4761,7 +4761,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Filter pandas rows with boolean masks, isin, between and query. Learn the parenthesis rule for combining conditions that trips every beginner."
  },
  {
   "title": "Looking at Data",
@@ -4769,7 +4769,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Run shape, dtypes, describe, info, head and value_counts on a new dataset. Build the six-call habit that catches problems before analysis."
  },
  {
   "title": "Method Chaining",
@@ -4777,7 +4777,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Write a pandas analysis as one chained expression. Compare chained and step-by-step styles and see when pipe and assign keep the chain clean."
  },
  {
   "title": "Missing Data",
@@ -4785,7 +4785,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Find, count and handle missing values in a pandas DataFrame with isna, dropna and fillna. Pick a strategy based on why the data is missing."
  },
  {
   "title": "Performance",
@@ -4793,7 +4793,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Profile a slow pandas workflow and fix the top bottlenecks. Replace row-level loops, shrink memory with better dtypes and go vectorised."
  },
  {
   "title": "Reading and Writing Files",
@@ -4801,7 +4801,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Read CSV files into DataFrames with the right arguments and avoid the silent bugs that wrong defaults let through."
  },
  {
   "title": "Reshaping: pivot and melt",
@@ -4809,7 +4809,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Reshape a pandas DataFrame from long to wide with pivot_table and back again with melt. See when each shape is the right one for your task."
  },
  {
   "title": "Sorting and Ranking",
@@ -4817,7 +4817,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Sort rows by one column or several, find the top N values with nlargest, and see where NaN lands in each method."
  },
  {
   "title": "Stacking Frames with concat",
@@ -4825,7 +4825,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Stack DataFrames vertically or horizontally with pandas concat. Control index alignment, handle mismatched columns and reset the index."
  },
  {
   "title": "Text Columns",
@@ -4833,7 +4833,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Use the .str accessor to split, replace and test text columns, and learn how each method handles missing values."
  },
  {
   "title": "The Copy Warning",
@@ -4841,7 +4841,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Understand why chained indexing makes assignments silently fail, and how to write the line that actually changes the DataFrame."
  },
  {
   "title": "The Index",
@@ -4849,7 +4849,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "See how the pandas Index labels rows, aligns data during joins and arithmetic, and changes the result of almost every operation."
  },
  {
   "title": "The MultiIndex",
@@ -4857,7 +4857,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Build and slice a pandas MultiIndex on rows or columns. Use xs and IndexSlice for clean lookups and see when to call reset_index instead."
  },
  {
   "title": "Time Series",
@@ -4865,7 +4865,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Resample timestamps into intervals, compute rolling averages, and shift rows forward or back to compare periods side by side."
  },
  {
   "title": "What pandas Is For",
@@ -4873,7 +4873,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Learn what pandas adds to NumPy: named columns, typed data, a row index and the operations that make tabular analysis fast."
  },
  {
   "title": "apply, map and Vectorising",
@@ -4881,7 +4881,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Use apply, map and applymap on a pandas DataFrame. Measure the speed cost and see the vectorised alternatives that usually replace them."
  },
  {
   "title": "groupby",
@@ -4889,7 +4889,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Split a DataFrame by one or more columns, apply aggregations and combine the results. See the split-apply-combine pattern that defines groupby."
  },
  {
   "title": "loc and iloc",
@@ -4897,7 +4897,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Select rows and columns by label with loc and by position with iloc. See the endpoint rule that differs between them and why it matters."
  },
  {
   "title": "merge and join",
@@ -4905,7 +4905,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Join two DataFrames with pandas merge using inner, left, right and outer joins. Spot the duplicate key that silently multiplies your rows."
  },
  {
   "title": "transform and filter",
@@ -4913,7 +4913,7 @@ window.VIZLEARN_MODULES = [
   "category": "pandas",
   "topic": "pandas",
   "icon": "table",
-  "desc": ""
+  "desc": "Use transform to broadcast group statistics back to every row and filter to keep only groups that pass a test. Compare both to plain groupby."
  },
  {
   "title": "A Complete Workflow",
@@ -4921,7 +4921,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Follow one dataset through loading, splitting, scaling, encoding, fitting and scoring to see every scikit-learn step in context."
  },
  {
   "title": "Class Imbalance",
@@ -4929,7 +4929,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Handle datasets where the interesting class is rare, compare four remedies and measure each one with the metric that actually fits."
  },
  {
   "title": "Classification Metrics",
@@ -4937,7 +4937,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Choose between accuracy, precision, recall and F1 by asking which mistakes matter most, and see why 99 percent accuracy can mean nothing."
  },
  {
   "title": "Cross-Validation",
@@ -4945,7 +4945,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Replace a single train/test split with cross-validation to see the variance behind every score and pick a model you can trust."
  },
  {
   "title": "Decision Trees",
@@ -4953,7 +4953,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Fit a decision tree, read its splits as plain rules, and see why a single tree overfits and how pruning brings it back."
  },
  {
   "title": "Different Columns, Different Treatment",
@@ -4961,7 +4961,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Apply different preprocessing to different columns using ColumnTransformer, so numeric features scale while categoricals encode."
  },
  {
   "title": "Encoding Categories",
@@ -4969,7 +4969,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Turn categorical columns into numbers with OrdinalEncoder and OneHotEncoder, and learn which choice invents a fact and which does not."
  },
  {
   "title": "Hyperparameter Search",
@@ -4977,7 +4977,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Search for the best hyperparameters with GridSearchCV and RandomizedSearchCV, and measure each combination fairly with cross-validation."
  },
  {
   "title": "Leakage in a scikit-learn Workflow",
@@ -4985,7 +4985,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Spot data leakage before it inflates your score: learn the patterns that let test information leak into training and how pipelines prevent them."
  },
  {
   "title": "Linear Regression",
@@ -4993,7 +4993,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Fit a linear regression, read its coefficients and intercept, and learn why the numbers are misread more often than any other model's."
  },
  {
   "title": "Loading and Shaping Data",
@@ -5001,7 +5001,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Load a dataset into a feature matrix and target vector with the exact shapes scikit-learn expects before any model can be fitted."
  },
  {
   "title": "Logistic Regression",
@@ -5009,7 +5009,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Train a logistic regression classifier, interpret its coefficients as log-odds, and see why it is the model to try first on any problem."
  },
  {
   "title": "Missing Values",
@@ -5017,7 +5017,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Fill gaps in your data with SimpleImputer, understand when the gap itself carries information, and keep imputation inside a pipeline."
  },
  {
   "title": "Overfitting and Underfitting",
@@ -5025,7 +5025,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Spot overfitting and underfitting from training and test scores, and apply the opposite fix each failure needs to close the gap."
  },
  {
   "title": "Pipelines in scikit-learn",
@@ -5033,7 +5033,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Chain preprocessing and a model into one Pipeline so every transformation fits on training data only and every score stays honest."
  },
  {
   "title": "Probabilities and Thresholds",
@@ -5041,7 +5041,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Move the classification threshold away from 0.5, plot a precision-recall curve, and decide the cut-off that matches your cost trade-off."
  },
  {
   "title": "Random Forests",
@@ -5049,7 +5049,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Combine hundreds of decision trees into a random forest that averages out each tree's instability and resists overfitting."
  },
  {
   "title": "Regression Metrics",
@@ -5057,7 +5057,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Compare MAE, MSE, RMSE and R-squared on the same predictions, and see why R-squared alone rarely tells you whether a model is good enough."
  },
  {
   "title": "Scaling Features",
@@ -5065,7 +5065,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Scale features with StandardScaler and MinMaxScaler, and learn which models break without scaling and which ignore it entirely."
  },
  {
   "title": "Splitting Train and Test",
@@ -5073,7 +5073,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Split data into training and test sets with train_test_split, and see why scoring a model on the data it memorised tells you nothing."
  },
  {
   "title": "The Confusion Matrix",
@@ -5081,7 +5081,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Build a confusion matrix from predictions, name each of the four cells, and compute precision, recall and F1 from them by hand."
  },
  {
   "title": "fit, predict, transform",
@@ -5089,7 +5089,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Learn the fit/predict/transform interface that every scikit-learn estimator shares, and see why one API covers two hundred algorithms."
  },
  {
   "title": "k-Means Clustering",
@@ -5097,7 +5097,7 @@ window.VIZLEARN_MODULES = [
   "category": "scikit-learn",
   "topic": "sklearn",
   "icon": "sigma",
-  "desc": ""
+  "desc": "Group data points into clusters with k-means, measure fit with inertia and silhouette score, and see how the algorithm converges."
  }
 ];
 

@@ -100,44 +100,44 @@ topic(
     ],
     """
 title: Autoencoders
-intro: A network trained to reproduce its input, and why that pointless-sounding task is useful.
+intro: A network trained to copy its input, and why that odd task is handy.
 
 ## The apparently useless task
 
 An autoencoder has two halves. The **encoder** maps an input to a smaller
-representation; the **decoder** maps it back. The loss is the difference between
+form. The **decoder** maps it back. The loss is the difference between
 the output and the input.
 
 Copy the input to the output. Stated like that it sounds like a null task &mdash;
-the identity function scores perfectly.
+the identity function scores just right.
 
-Except it cannot, because the representation in the middle is smaller than the
-input. The network has to throw information away, and the training objective
-forces it to throw away the least costly information. **What survives the
+Except it can't, because the form in the middle is smaller than the
+input. The network has to throw info away, and the training goal
+forces it to throw away the least costly info. **What lives the
 bottleneck is what the data was mostly made of.**
 
 ## Watch the squeeze
 
-The grey line is the input; the orange line is what comes back out.
+The grey line is the input. The orange line is what comes back out.
 
-At a latent size of 1 the reconstruction keeps only the largest structure and
-misses everything else. Raise it and the copy tightens. Past a certain point
-extra dimensions buy almost nothing, because the remaining detail is noise
+At a latent size of 1 the rebuild keeps only the largest structure and
+misses all else. Raise it and the copy tightens. Past a certain point
+extra dims buy almost nothing, because the left detail is noise
 rather than signal.
 
-That flattening is the useful observation: it says roughly how many numbers the
-data really needs, which is its **intrinsic dimensionality**.
+That flattening is the handy reading: it says roughly how many numbers the
+data really needs, which is its **true dimensionality**.
 
 ## The relationship to PCA
 
 A linear autoencoder trained with squared error finds the same subspace as
-[PCA](../machine_learning/pca.html). Not something similar &mdash; provably the
-same span, though the individual directions need not be the principal
+[PCA](../machine_learning/pca.html). Not a thing similar &mdash; provably the
+same span, though the single directions need not be the principal
 components in order.
 
 So a linear autoencoder is PCA with extra steps. What makes them worth having is
 **non-linearity**: with non-linear activations the encoder can learn a curved
-manifold, which no linear projection can follow. An image dataset lives on a
+manifold, which no linear map can follow. An image dataset lives on a
 wildly curved surface in pixel space, and that is the case where an autoencoder
 earns its keep.
 
@@ -146,39 +146,39 @@ earns its keep.
 Raise the noise control. Now the input is corrupted and the target is still the
 clean signal.
 
-The reconstruction error against the *noisy* input goes up, and against the
+The rebuild error against the *noisy* input goes up, and against the
 *clean* signal it goes down. The readout gives both.
 
-The reason is the bottleneck again. Noise is, by construction, the part of the
-signal with no structure to compress, so a narrow code cannot afford to store
-it. Forcing the network to reconstruct through the bottleneck forces it to
-discard exactly what noise is.
+The reason is the bottleneck again. Noise is, by build, the part of the
+signal with no structure to compress. So A narrow code can't afford to store
+it. Forcing the network to rebuild through the bottleneck forces it to
+discard just what noise is.
 
-**Denoising autoencoders** make this the training procedure: corrupt the input
-deliberately, ask for the clean version. It also prevents the degenerate
-solution where a wide code just learns the identity, which is why the trick
-appears even when denoising is not the goal.
+**Denoising autoencoders** make this the training method: corrupt the input
+on purpose, ask for the clean version. It also blocks the collapse
+answer where a wide code just learns the identity. This Is why the trick
+appears even when denoising isn't the goal.
 
 ## What they are used for
 
 **Dimensionality reduction** where the structure is non-linear.
 
-**Anomaly detection.** Train on normal data; anything that reconstructs badly is
+**Outlier spotting.** Train on normal data. Any of it that rebuilds badly is
 unlike what was seen. It works because the model has only learned to compress
 one kind of thing.
 
-**Pretraining.** Historically the standard way to initialise deep networks
-before better initialisation and normalisation made it unnecessary.
+**Pretraining.** Once the standard way to reset deep networks
+before better init and norming made it unneeded.
 
-**Generation** &mdash; but not directly. A plain autoencoder's latent space has
-gaps, so a random code usually decodes to nothing meaningful. Fixing that is
+**Generation** &mdash; but not right. A plain autoencoder's latent space has
+gaps, so a random code often decodes to nothing real. Fixing that is
 what [the VAE](variational_autoencoders.html) is for.
 
 ## The elbow that reveals intrinsic dimension
 
-The useful thing an autoencoder measures is *how many numbers the data really
-needs*, and it shows up as an elbow in reconstruction error against latent size.
-On data that genuinely lives in `d` dimensions with a little noise on top,
+The handy thing an autoencoder measures is *how many numbers the data really
+needs*, and it shows up as an elbow in rebuild error against latent size.
+On data that truly lives in `d` dims with a little noise on top,
 widening the bottleneck past `d` buys almost nothing:
 
 |latent size|reconstruction error|
@@ -187,52 +187,52 @@ widening the bottleneck past `d` buys almost nothing:
 |up to the true d|falling steeply, each dimension earns its place|
 |beyond d|flat &mdash; the remaining detail is noise|
 
-The point where the curve flattens is the data's intrinsic dimensionality, and it
+The point where the curve flattens is the data's true dimensionality, and it
 is the same number [PCA](../machine_learning/pca.html) would find &mdash; a linear
 autoencoder with squared-error loss provably recovers the PCA subspace. The
 reason to reach for an autoencoder instead is the non-linear case: real data (an
 image dataset, say) lies on a curved manifold in a high-dimensional space, and a
-straight projection cannot follow the curve where a non-linear encoder can. That
-is also why the reconstruction error reads as pixel agreement rather than
-perceptual quality, and why autoencoder outputs look softened: the bottleneck
-keeps what is common to the data and spends nothing on the specific sharp detail
-that distinguishes one example from its neighbours.
+straight map can't follow the curve where a non-linear encoder can. That
+is also why the rebuild error reads as pixel match rather than
+visual quality, and why autoencoder outputs look softened: the bottleneck
+keeps what is common to the data and spends nothing on the exact sharp detail
+that sets apart one example from its neighbours.
 
-The denoising variant turns the same bottleneck into a training procedure: corrupt
-the input deliberately and ask for the clean version back. Because noise is by
-construction the part of a signal with no structure to compress, a narrow code
-cannot afford to store it, so reconstructing through the bottleneck forces the
-network to discard exactly what noise is. That also removes the degenerate escape
-where a too-wide code simply learns the identity, which is why the trick shows up
-even when denoising is not the goal &mdash; and it is the same instinct behind
-using an autoencoder for anomaly detection, where a model trained only on normal
-data reconstructs anything unfamiliar badly, and the reconstruction error becomes
-the anomaly score.
+The denoising variant turns the same bottleneck into a training method: corrupt
+the input on purpose and ask for the clean version back. Because noise is by
+build the part of a signal with no structure to compress, a narrow code
+can't afford to store it. So Rebuilding through the bottleneck forces the
+network to discard just what noise is. That also drops the collapse escape
+where a too-wide code simply learns the identity. This Is why the trick shows up
+even when denoising isn't the goal. And it's the same instinct behind
+using an autoencoder for outlier spotting. Here A model trained only on normal
+data rebuilds any of it unseen badly, and the rebuild error turns
+the outlier score.
 
-None of the latent dimensions mean anything individually, either: they are not
-ordered or disentangled unless something in the training made them so, which is a
+None of the latent dims mean any of it on their own, either: they aren't
+sorted or disentangled unless a thing in the training made them so, which is a
 large part of what separates a plain autoencoder from the variational and
-beta-weighted variants built to encourage exactly that structure.
+beta-weighted variants built to push just that structure.
 
 ## Where it goes wrong
 
-**A bottleneck that is too wide.** With enough capacity the network learns the
-identity and nothing is discovered. Constrain it, or use denoising, or add a
-sparsity penalty.
+**A bottleneck that is too wide.** With enough room the network learns the
+identity and nothing is found. Constrain it, or use denoising, or add a
+sparsity fine.
 
 **Expecting a usable generative model.** Sample from a plain autoencoder's
-latent space and you will mostly get nonsense.
+latent space and you'll mostly get nonsense.
 
-**Reading the reconstruction error as a quality score.** It measures pixel
-agreement, not perceptual similarity, which is why autoencoder outputs look
+**Reading the rebuild error as a quality score.** It measures pixel
+match, not visual likeness. This Is why autoencoder outputs look
 blurred.
 
-**Assuming the latent dimensions mean anything individually.** They are not
-ordered or disentangled unless something in the training made them so.
+**given the latent dims mean any of it on their own.** They aren't
+sorted or disentangled unless a thing in the training made them so.
 
 ## Train one, then look at what the bottleneck kept
 
-An autoencoder learns to reproduce its own input through a narrow layer. Training one on data with a known hidden structure shows what a bottleneck forces it to discover -- and where PCA does the job better.
+An autoencoder learns to copy its own input through a narrow layer. Training one on data with a known hidden structure shows what a bottleneck forces it to discover -- and where PCA does the job better.
 
 ```python-run
 import numpy as np
@@ -428,7 +428,7 @@ topic(
     ],
     """
 title: Variational Autoencoders
-intro: Turning an autoencoder into something you can sample from, and the two forces that have to be balanced to do it.
+intro: Turning an autoencoder into a thing you can sample from. The two forces that have to be weighed to do it.
 
 ## The problem with a plain autoencoder
 
@@ -436,43 +436,43 @@ An [autoencoder](autoencoders.html) maps each input to a single point in the
 latent space, and nothing organises those points. Nearby codes need not decode
 to similar things, and the space between clusters is undefined territory.
 
-So you cannot generate. Pick a random latent vector and decode it, and you
-almost certainly land somewhere the decoder was never trained, and the output is
+So you can't make. Pick a random latent vector and decode it, and you
+almost certainly land a place the decoder was never trained, and the output is
 noise.
 
-A VAE fixes this by making the latent space **continuous and bounded** &mdash;
-by construction, not by hope.
+A VAE fixes this by making the latent space **smooth and bounded** &mdash;
+by build, not by hope.
 
 ## Encoding to a distribution
 
 The encoder outputs a mean and a standard deviation rather than a point, and the
-code is *sampled* from that distribution during training.
+code is *sampled* from that spread during training.
 
-That single change does the work. Because the same input produces different
-codes on different passes, the decoder must handle a whole neighbourhood, not a
-point. Neighbourhoods overlap and the space fills in.
+That single change does the work. Because the same input makes different
+codes on different passes, the decoder must handle a whole zone, not a
+point. Zones share and the space fills in.
 
-Drag the sigma control and watch the clusters spread. At small sigma you have a
+Drag the sigma control and watch the clusters spread. At small sigma you've a
 plain autoencoder again, with tight clumps and gaps between them. At large sigma
-the neighbourhoods swallow each other.
+the zones swallow each other.
 
 ## The reparameterisation trick
 
-There is an obstacle: you cannot backpropagate through a sampling operation.
-Sampling is not a differentiable function of the parameters that produced the
-distribution.
+There's an obstacle: you can't backprop through a sampling op.
+Sampling isn't a differentiable function of the params that made the
+spread.
 
-The trick is to move the randomness out of the path:
+The trick is to move the noise out of the path:
 
 ```
 z  =  mu  +  sigma * epsilon        with epsilon ~ N(0, 1)
 ```
 
-Now the random part, `epsilon`, is an input rather than an operation. The
-gradient flows to `mu` and `sigma` normally, because with `epsilon` fixed the
-expression is an ordinary differentiable function of them.
+Now the random part, `epsilon`, is an input rather than an op. The
+gradient flows to `mu` and `sigma` most times, because with `epsilon` fixed the
+formula is an plain differentiable function of them.
 
-That is the whole trick, it is two lines of code, and VAEs were not trainable
+That is the whole trick, it's two lines of code, and VAEs weren't trainable
 without it. It reappears in other places where a sample must be differentiated
 through &mdash; the Gumbel-softmax does the same job for discrete variables.
 
@@ -482,53 +482,53 @@ through &mdash; the Gumbel-softmax does the same job for discrete variables.
 loss  =  reconstruction error  +  KL( encoder distribution || prior )
 ```
 
-The **reconstruction** term wants tight, well-separated codes: the easiest thing
+The **rebuild** term wants tight, well-separated codes: the easiest thing
 to decode accurately.
 
-The **KL** term wants every encoded distribution to look like the prior &mdash;
-the dashed circle. It is what makes the space samplable, because if every code
+The **KL** term wants each coded spread to look like the prior &mdash;
+the dashed circle. It's what makes the space samplable, because if each code
 looks like a draw from the prior then a draw from the prior looks like a code.
 
 They pull against each other, and the readout names which is winning.
 
-**KL winning** is *posterior collapse*: the encoder outputs the prior regardless
-of input, the clusters merge, and the decoder ignores the latent entirely.
-Raise sigma or lower the separation to see it.
+**KL winning** is *posterior collapse*: the encoder outputs the prior even so
+of input, the clusters merge, and the decoder skips the latent fully.
+Raise sigma or lower the gap to see it.
 
-**Reconstruction winning** gives tight clusters with empty space between them
-&mdash; excellent reconstruction, and sampling lands in the gaps.
+**Rebuild winning** gives tight clusters with empty space between them
+&mdash; great rebuild, and sampling lands in the gaps.
 
-The usual control is **beta-VAE**, which weights the KL term explicitly. High
-beta pushes towards disentangled but blurry; low beta towards sharp but not
-samplable. Many implementations also *anneal* beta from zero, letting
-reconstruction establish itself before the KL pressure arrives.
+The usual control is **beta-VAE**. This Weights the KL term by name. High
+beta pushes towards disentangled but blurry. Low beta towards sharp but not
+samplable. Many setups also *anneal* beta from zero, letting
+rebuild establish itself before the KL pressure arrives.
 
 ## Jensen, and where the loss comes from
 
-That loss is not arbitrary. The quantity you actually want to maximise is
-`log p(x)`, which contains an intractable integral over the latent.
+That loss isn't any. The quantity you really want to raise is
+`log p(x)`, which holds an unsolvable integral over the latent.
 
 [Jensen's inequality](../maths/jensens_inequality.html) converts it into a lower
-bound &mdash; the **ELBO** &mdash; which decomposes into exactly the two terms
-above. Maximising the bound cannot decrease the true likelihood, and the gap
+bound &mdash; the **ELBO** &mdash; which breaks down into just the two terms
+above. Raising the bound can't fall the true likelihood, and the gap
 between them is a KL divergence.
 
 ## Against GANs
 
-VAEs give a principled objective, a meaningful latent space, stable training and
+VAEs give a principled goal, a real latent space, stable training and
 a likelihood bound. Their samples are **blurry**, because the pixel-wise
-reconstruction term rewards hedging: when uncertain, the average of the
+rebuild term rewards hedging: when uncertain, the mean of the
 possibilities scores better than any single one.
 
-[GANs](generative_adversarial_networks.html) produce sharp samples and are far
+[GANs](generative_adversarial_networks.html) give sharp samples and are far
 harder to train. Diffusion models have largely displaced both for image
-generation, and the VAE survives inside them &mdash; latent diffusion runs the
+generation, and the VAE lives inside them. Latent diffusion runs the
 diffusion process in a VAE's latent space rather than in pixels.
 
 ## The KL term, computed
 
-A VAE's loss is reconstruction error plus a KL divergence pulling each encoded
-distribution toward the unit-Gaussian prior, and for Gaussians that KL has a
+A VAE's loss is rebuild error plus a KL divergence pulling each coded
+spread toward the unit-Gaussian prior, and for Gaussians that KL has a
 closed form worth seeing:
 
 `KL(N(mu, sigma) || N(0, 1)) = &frac12;(mu&sup2; + sigma&sup2; &minus; ln sigma&sup2; &minus; 1)`
@@ -539,46 +539,46 @@ closed form worth seeing:
 |mu = 2, sigma = 1 (shifted away)|2.00|
 |mu = 0, sigma = 0.1 (too confident)|1.81|
 
-The term is zero exactly when the code looks like a draw from the prior, and it
-punishes both a mean pushed away from the origin and a variance collapsed toward
+The term is zero just when the code looks like a draw from the prior, and it
+punishes both a mean pushed away from the origin and a variance merged toward
 a point &mdash; the tight, confident code a plain autoencoder loves. That is the
-tension: reconstruction wants tight, well-separated codes it can decode exactly,
-while the KL wants every code to look prior-like so that a draw from the prior
+tension: rebuild wants tight, well-separated codes it can decode just,
+while the KL wants each code to look prior-like so that a draw from the prior
 looks like a code and sampling works. When the KL wins you get *posterior
-collapse* &mdash; the encoder outputs the prior regardless of input and the
-decoder ignores the latent &mdash; and when reconstruction wins you get sharp
+collapse* &mdash; the encoder outputs the prior even so of input and the
+decoder skips the latent &mdash; and when rebuild wins you get sharp
 clusters with unsamplable gaps between them. beta-VAE weights the KL to sit the
-balance where you want it, and the loss itself is not arbitrary: it is the ELBO,
+balance where you want it, and the loss itself isn't any: it's the ELBO,
 the [Jensen's-inequality](../maths/jensens_inequality.html) lower bound on the
-intractable `log p(x)`.
+unsolvable `log p(x)`.
 
-The reparameterisation trick is what makes all of this trainable, and it is worth
-stating on its own: you cannot backpropagate through a sampling step, so the code
+The reparameterisation trick is what makes all of this trainable, and it's worth
+stating on its own: you can't backprop through a sampling step, so the code
 is written as `z = mu + sigma &middot; epsilon` with `epsilon` drawn from a fixed
-standard normal. The randomness is now an input rather than an operation, so with
-`epsilon` held fixed the expression is an ordinary differentiable function of `mu`
-and `sigma` and the gradient flows to the encoder normally. It is two lines of
-code and VAEs did not train without it, and the same device reappears wherever a
-sample must be differentiated through &mdash; the Gumbel-softmax does the identical
+standard normal. The noise is now an input rather than an op, so with
+`epsilon` held fixed the formula is an plain differentiable function of `mu`
+and `sigma` and the gradient flows to the encoder most times. It's two lines of
+code and VAEs didn't train without it, and the same device reappears wherever a
+sample must be differentiated through. The Gumbel-softmax does the the same
 job for discrete latents. The blur in VAE samples, by contrast, is structural: the
-pixel-wise reconstruction term rewards hedging, so an uncertain decoder averages
+pixel-wise rebuild term rewards hedging, so an uncertain decoder means
 the possibilities rather than committing to one.
 
 ## Where it goes wrong
 
-**Posterior collapse**, especially with a powerful decoder that can do well
+**Posterior collapse**, above all with a powerful decoder that can do well
 without the latent. Anneal the KL, or weaken the decoder.
 
 **Expecting sharp samples.** The blur is structural.
 
-**Forgetting the reparameterisation trick.** Without it there is no gradient.
+**Losing the reparameterisation trick.** Without it there's no grad.
 
-**Reading latent dimensions as meaningful.** A plain VAE is not disentangled;
-beta-VAE encourages it and does not guarantee it.
+**Reading latent dims as real.** A plain VAE isn't disentangled;
+beta-VAE pushes it and doesn't ensure it.
 
 ## The two terms in the loss, and what each one buys
 
-A VAE is an autoencoder whose code is a distribution rather than a point. That one change adds a second loss term, and the balance between the two is the whole behaviour.
+A VAE is an autoencoder whose code is a spread rather than a point. That one change adds a second loss term. The balance between the two is the whole action.
 
 ```python-run
 import numpy as np
@@ -732,131 +732,131 @@ topic(
     ],
     """
 title: Generative Adversarial Networks
-intro: A generator and a critic pushed against each other, and the specific way that arrangement fails.
+intro: A gen and a critic pushed against each other. The exact way that setup fails.
 
 ## The setup
 
 Two networks, one loss.
 
-The **generator** maps random noise to samples, trying to make them
-indistinguishable from real data. The **discriminator** takes a sample and
-estimates whether it is real, trying to be right.
+The **gen** maps random noise to samples, trying to make them
+the same from real data. The **critic** takes a sample and
+guesses whether it's real, trying to be right.
 
-They optimise the same objective in opposite directions. That makes it a
-**minimax game**, and it is why GAN training is unlike anything else: there is
-no loss that decreases, and a falling generator loss might mean the generator is
-improving or the discriminator is losing.
+They optimise the same goal in opposite directions. That makes it a
+**minimax game**, and it's why GAN training is unlike any of it else: there's
+no loss that falls, and a falling gen loss might mean the gen is
+raising or the critic is losing.
 
 ## The second panel is not learned
 
-For fixed real and generated distributions, the optimal discriminator has a
+For fixed real and made spreads, the best critic has a
 closed form:
 
 ```
 D*(x)  =  p_real(x) / ( p_real(x) + p_fake(x) )
 ```
 
-The lower panel plots exactly that. It is not a trained network; it is what
+The lower panel plots just that. It isn't a trained network. It's what
 training drives towards, and its shape is what makes the failure mode legible.
 
 ## Where the gradient goes
 
-Drag the generator's mean far from the real distribution. The overlap in the
-readout collapses toward zero, and the discriminator's curve becomes flat
+Drag the gen's mean far from the real spread. The share in the
+readout merges toward zero, and the critic's curve turns flat
 &mdash; near 1 where the real data lives, near 0 where the fakes are, with a
 steep cliff between.
 
-**Flat means no gradient.** The generator improves by following the slope of the
-discriminator's opinion, and if that opinion is constant everywhere the fakes
-live, there is nothing to follow. The better the discriminator, the worse this
-gets, which is a genuinely awkward property: your generator's learning signal
-degrades as its opponent improves.
+**Flat means no grad.** The gen raises by following the slope of the
+critic's view, and if that view is constant all over the fakes
+live, there's nothing to follow. The better the critic, the worse this
+gets, which is a truly awkward property: your gen's learning signal
+degrades as its opponent raises.
 
-Now bring the mean back. Where the distributions overlap the curve slopes, and
-that slope is the generator's gradient.
+Now bring the mean back. Where the spreads share the curve slopes, and
+that slope is the gen's grad.
 
-At full overlap the discriminator sits at 0.5 everywhere &mdash; it cannot tell
-them apart, which is the equilibrium the whole arrangement targets.
+At full share the critic sits at 0.5 all over &mdash; it can't tell
+them apart, which is the balance the whole setup targets.
 
 ## The failures
 
-**Vanishing gradients**, as above. The non-saturating loss helps; the deeper fix
-was **Wasserstein GAN**, which replaces the classifier with a critic estimating
-earth-mover distance. That distance is informative even for disjoint
-distributions, so the gradient survives.
+**Vanishing grads**, as above. The non-saturating loss helps. The deeper fix
+was **Wasserstein GAN**, which replaces the classifier with a critic guessing
+earth-mover distance. That distance is helpful even for disjoint
+spreads, so the grad lives.
 
-**Mode collapse.** The generator finds a narrow region that fools the
-discriminator and stays there. Shrink the generator's spread until it is a
-spike inside the real distribution: it is fooling the discriminator locally
-while representing almost none of the data. Nothing in the objective directly
-punishes this, because the discriminator judges samples one at a time and never
-sees the lack of variety.
+**Mode collapse.** The gen finds a narrow region that fools the
+critic and stays there. Shrink the gen's spread until it's a
+spike inside the real spread: it's fooling the critic locally
+while showing almost none of the data. Nothing in the goal right
+punishes this, because the critic judges samples one at a time and never
+sees the lack of range.
 
-**Non-convergence.** The two can cycle indefinitely, each undoing the other.
-Two-timescale learning rates, spectral normalisation and gradient penalties are
+**Non-settling.** The two can cycle indefinitely, each undoing the other.
+Two-timescale learning rates, spectral norming and grad fines are
 all responses to it.
 
-**No usable progress metric.** The loss does not say whether samples are
-improving. FID and Inception Score exist because of this, and both are proxies.
+**No usable progress metric.** The loss doesn't say whether samples are
+raising. FID and Inception Score exist because of this, and both are proxies.
 
 ## Against the alternatives
 
-**Sharp samples.** GANs produce them where
-[VAEs](variational_autoencoders.html) blur, because nothing rewards averaging
-&mdash; a hedged sample is exactly what the discriminator catches.
+**Sharp samples.** GANs give them where
+[VAEs](variational_autoencoders.html) blur, because nothing rewards blending
+&mdash; a hedged sample is just what the critic catches.
 
-**No likelihood.** A GAN cannot say how probable a given sample is, which rules
-out several uses.
+**No likelihood.** A GAN can't say how probable a given sample is, which rules
+out a few uses.
 
 **Hard to train**, as above.
 
 [Diffusion models](diffusion_models.html) have largely displaced GANs for image
-generation, trading sampling speed for training stability. GANs remain
-competitive where inference must be a single forward pass, and the adversarial
-idea itself survives everywhere &mdash; in domain adaptation, in perceptual
-losses, in super-resolution.
+generation, trading sampling speed for training steadiness. GANs remain
+competitive where inference must be a single forward pass, and the rival
+idea itself lives all over &mdash; in domain fitting, in visual
+losses, in super-detail.
 
 ## Why a winning discriminator kills training
 
-The vanishing-gradient failure is not vague; it falls straight out of the
-optimal discriminator `D*(x) = p_real(x) / (p_real(x) + p_fake(x))`. Put the real
-and fake distributions as unit Gaussians and slide them apart:
+The vanishing-grad failure isn't vague. It falls straight out of the
+best critic `D*(x) = p_real(x) / (p_real(x) + p_fake(x))`. Put the real
+and fake spreads as unit Gaussians and slide them apart:
 
 |separation of the means|D* at the fake's centre|D* at the real's centre|
 |---|---|---|
 |0.5 (heavy overlap)|0.47|0.53|
 |4.0 (barely overlapping)|0.0003|0.9997|
 
-When the two overlap, D* sits near 0.5 everywhere and its curve *slopes* through
-the region the fakes occupy &mdash; and that slope is the generator's entire
+When the two share, D* sits near 0.5 all over and its curve *slopes* through
+the region the fakes occupy. And that slope is the gen's entire
 learning signal. When they separate, D* saturates to 0.0003 where the fakes live:
-almost perfectly correct, and almost perfectly flat. A flat discriminator has no
-slope to follow, so the generator gets no gradient exactly when it is doing
-worst. This is the awkward heart of the original GAN &mdash; the better the
-discriminator, the less the generator can learn &mdash; and it is why Wasserstein
-GAN replaced the classifier with a critic estimating earth-mover distance, which
-stays informative even for distributions that do not overlap at all.
+almost just right correct, and almost just right flat. A flat critic has no
+slope to follow, so the gen gets no grad just when it's doing
+worst. This is the awkward heart of the first GAN &mdash; the better the
+critic, the less the gen can learn. And it's why Wasserstein
+GAN replaced the classifier with a critic guessing earth-mover distance, which
+stays helpful even for spreads that don't share at all.
 
 This is also why a GAN has no usable progress metric and why mode collapse goes
-unpunished. There is no single loss that decreases &mdash; a falling generator
-loss can mean the generator improved or the discriminator weakened &mdash; so FID
+unpunished. There's no single loss that falls &mdash; a falling gen
+loss can mean the gen raised or the critic weakened &mdash; so FID
 and Inception Score exist as external proxies for sample quality. And because the
-discriminator judges samples one at a time, a generator that finds one convincing
-region and abandons the rest of the distribution is never penalised for the lack
-of variety; nothing in the objective ever sees more than a single sample at once,
+critic judges samples one at a time, a gen that finds one lifelike
+region and abandons the rest of the spread is never penalised for the lack
+of range. Nothing in the goal ever sees more than a single sample at once,
 so the fix has to come from outside it, in minibatch discrimination or in the
 Wasserstein reformulation.
 
 None of this makes GANs obsolete. They still win where inference must be a single
-forward pass, and the adversarial idea itself is everywhere &mdash; in domain
-adaptation, in perceptual losses, in super-resolution &mdash; even though
+forward pass, and the rival idea itself is all over &mdash; in domain
+fitting, in visual losses, in super-detail &mdash; though
 diffusion models have taken over image generation by trading sampling speed for
-the training stability a minimax game can never quite offer.
+the training steadiness a minimax game can never quite offer.
 
-The practical upshot for anyone training one: watch the samples, not the loss;
-keep the discriminator from winning outright, since a perfect discriminator gives
-no gradient; and check the variety of what the generator produces rather than the
-quality of any single sample, because individually convincing outputs are exactly
+The hands-on upshot for anyone training one: watch the samples, not the loss;
+keep the critic from winning outright, since a perfect critic gives
+no grad. And check the range of what the gen makes rather than the
+quality of any single sample, because on their own lifelike outputs are just
 what mode collapse leaves you with.
 
 ## Where it goes wrong
@@ -864,16 +864,16 @@ what mode collapse leaves you with.
 **Reading the loss curves.** They mostly say who is winning, not whether the
 samples are good. Look at samples.
 
-**Letting the discriminator win.** A perfect discriminator gives no gradient.
+**Letting the critic win.** A perfect critic gives no grad.
 
-**Ignoring mode collapse** because the samples look fine individually. Check the
-variety, not the quality.
+**Skipping mode collapse** because the samples look fine on their own. Check the
+range, not the quality.
 
-**Expecting a likelihood.** There is not one.
+**Expecting a likelihood.** There isn't one.
 
 ## Two networks, one moving target
 
-A GAN trains a generator against a discriminator that is itself learning. This runs that loop on 1-D data, then shows the two failure modes that make GANs hard.
+A GAN trains a gen against a critic that is itself learning. This runs that loop on 1-D data, then shows the two failure modes that make GANs hard.
 
 ```python-run
 import numpy as np
@@ -1065,28 +1065,28 @@ topic(
     ],
     """
 title: Diffusion Models
-intro: Learning to reverse a process that is trivial to run forwards, and why that turned out to work so much better than the alternatives.
+intro: Learning to reverse a process that is trivial to run forwards. Why that turned out to work so much better than the options.
 
 ## Forwards is free
 
 Take data and add a little Gaussian noise. Repeat. After enough steps nothing of
-the original remains and you have pure noise.
+the first remains and you've pure noise.
 
-This **forward process** has no parameters and nothing to learn. Better still, it
-has a closed form: you can jump straight to any step without simulating the ones
+This **forward process** has no params and nothing to learn. Better still, it
+has a closed form: you can jump straight to any step without modelling the ones
 before it.
 
 ```
 x_t  =  sqrt(abar_t) * x_0  +  sqrt(1 - abar_t) * epsilon
 ```
 
-`abar_t` is the fraction of the original signal still present, and it decreases
+`abar_t` is the fraction of the first signal still present, and it falls
 along a fixed **schedule**. The second panel plots the cosine schedule used
-here, and the readout gives the signal and noise proportions at whatever step
+here, and the readout gives the signal and noise proportions at what step
 you select.
 
 That closed form is why training is cheap: pick a random `t`, jump there
-directly, and train on that one step. No simulation.
+right, and train on that one step. No modelling.
 
 ## Backwards is the model
 
@@ -1096,46 +1096,46 @@ step at a time until an image appears.
 Each reverse step needs to know what noise was added, and that is the entire
 learned component. The network takes `x_t` and `t` and predicts `epsilon`.
 
-Given the noise, recovering the original is rearranging the equation above:
+Given the noise, getting back the first is rearranging the equation above:
 
 ```
 x_0  =  ( x_t  -  sqrt(1 - abar_t) * epsilon )  /  sqrt(abar_t)
 ```
 
-The demonstration does exactly this with the *true* noise &mdash; the target the
-model is trained on &mdash; and the readout gives the recovery error, which is
-essentially zero at every step. **The forward process is exactly invertible if
-you know the noise.** Predicting it is the whole job, and it is why the loss is
-a plain squared error on a noise vector rather than anything adversarial.
+The demo does just this with the *true* noise &mdash; the target the
+model is trained on &mdash; and the readout gives the getting back error, which is
+zero at each step. **The forward process is just invertible if
+you know the noise.** Predicting it's the whole job, and it's why the loss is
+a plain squared error on a noise vector rather than any of it rival.
 
 ## Why this beats what came before
 
-**A stable objective.** Predicting noise is ordinary supervised regression. No
-minimax game, no [discriminator to balance](generative_adversarial_networks.html),
+**A stable goal.** Predicting noise is plain guided regression. No
+minimax game, no [critic to balance](generative_adversarial_networks.html),
 no mode collapse. Training a diffusion model is boring in a way GAN training
 never was, and that is the point.
 
-**Coverage.** GANs can ignore parts of the distribution. A diffusion model is
-trained to denoise every example, so it cannot quietly drop a mode.
+**Coverage.** GANs can skip parts of the spread. A diffusion model is
+trained to denoise each example. So It can't quietly drop a mode.
 
-**Sharpness.** Unlike a [VAE](variational_autoencoders.html), there is no
-pixel-averaging term rewarding a blurred hedge.
+**Sharpness.** Unlike a [VAE](variational_autoencoders.html), there's no
+pixel-blending term rewarding a blurred hedge.
 
 The cost is **sampling speed**. Generation is many sequential passes &mdash;
-originally a thousand, now often ten to fifty with a better sampler &mdash;
+at first a thousand, now often ten to fifty with a better sampler &mdash;
 where a GAN needs one. DDIM and distillation methods have shortened this
-considerably, and it remains the main disadvantage.
+a lot, and it remains the main disadvantage.
 
 ## The schedule matters
 
-Drag `t` from 0 to 60 and watch how quickly the signal disappears. The original
-DDPM used a linear schedule, which destroys the signal too fast at the end
+Drag `t` from 0 to 60 and watch how quickly the signal disappears. The first
+DDPM used a linear schedule. This Destroys the signal too fast at the end
 &mdash; the last steps are all noise and contribute nothing to learning. The
 cosine schedule shown here keeps more signal for longer and trains better.
 
-Schedule design is a real part of the field, and so is the choice of what the
-model predicts: the noise, the original, or a mixture called `v`, all of which
-are algebraically equivalent and behave differently in practice.
+Schedule design is a real part of the field. So is the choice of what the
+model predicts: the noise, the first, or a mixture called `v`, all of which
+are algebraically equal and behave differently .
 
 ## In practice
 
@@ -1144,19 +1144,19 @@ are algebraically equivalent and behave differently in practice.
 cutting the cost enormously. Stable Diffusion is this.
 
 **Classifier-free guidance** trains the model both with and without a text
-condition, then extrapolates away from the unconditioned prediction at sampling
-time. It is what makes prompts actually steer the output, and turning it up
-trades diversity for prompt adherence.
+rule, then extrapolates away from the unconditioned guess at sampling
+time. It's what makes prompts really steer the output, and turning it up
+trades range for prompt adherence.
 
 ## The closed form that makes training cheap
 
 The reason diffusion training is cheap is one equation: the forward process has a
-closed form, so you can jump to any noise level without simulating the steps
+closed form, so you can jump to any noise level without modelling the steps
 before it.
 
 `x_t = sqrt(abar_t) &middot; x_0 + sqrt(1 - abar_t) &middot; epsilon`
 
-`abar_t` is the fraction of the original signal still present, falling along a
+`abar_t` is the fraction of the first signal still present, falling along a
 fixed schedule. On the cosine schedule over 60 steps:
 
 |step t|signal kept, sqrt(abar)|noise, sqrt(1-abar)|
@@ -1169,46 +1169,46 @@ fixed schedule. On the cosine schedule over 60 steps:
 
 Training picks a random `t`, jumps straight there with one draw of `epsilon`, and
 asks the network to predict that `epsilon` &mdash; a plain squared-error
-regression, no simulation, no adversary. And the forward step is exactly
+regression, no modelling, no adversary. And the forward step is just
 invertible if you know the noise: rearranging the equation recovers `x_0` from
-`x_t` and `epsilon` with essentially zero error, so predicting the noise is the
-whole job. The cosine schedule above is chosen over the original linear one
-precisely because linear destroys the signal too fast &mdash; its final steps are
+`x_t` and `epsilon` with zero error. So Predicting the noise is the
+whole job. The cosine schedule above is chosen over the first linear one
+just because linear destroys the signal too fast. Its final steps are
 nearly pure noise and teach almost nothing, while the cosine keeps signal alive
 longer and trains better.
 
-Everything that made diffusion win over GANs follows from that squared-error
-objective. Predicting noise is ordinary supervised regression, so there is no
-minimax game to balance and no mode collapse &mdash; the model is trained to
-denoise *every* example, so it cannot quietly drop part of the distribution the
+All that made diffusion win over GANs follows from that squared-error
+goal. Predicting noise is plain guided regression, so there's no
+minimax game to balance and no mode collapse. The model is trained to
+denoise *each* example, so it can't quietly drop part of the spread the
 way a GAN can. The price is sampling speed: generation is many sequential denoise
-steps, originally a thousand and now often ten to fifty with a better sampler,
+steps, at first a thousand and now often ten to fifty with a better sampler,
 where a GAN needs one forward pass. Latent diffusion cuts the cost by running the
-whole process in a VAE's latent space rather than in pixels, which is what Stable
-Diffusion is, and classifier-free guidance is what lets a text prompt actually
+whole process in a VAE's latent space rather than in pixels. This Is what Stable
+Diffusion is, and classifier-free guidance is what lets a text prompt really
 steer the result.
 
 One last point of confusion worth heading off: most diffusion models predict the
-*noise*, not the image, and some predict the original or a mixture called `v`. The
-three are algebraically equivalent but behave differently in training, and
-assuming the network outputs the picture rather than the noise makes the sampling
+*noise*, not the image, and some predict the first or a mixture called `v`. The
+three are algebraically equal but behave differently in training, and
+given the network outputs the picture rather than the noise makes the sampling
 code nonsense.
 
 ## Where it goes wrong
 
-**Expecting fast sampling.** It is the known weakness.
+**Expecting fast sampling.** It's the known weakness.
 
 **A schedule that destroys the signal too early.** Wasted steps.
 
-**Guidance turned up too high.** Saturated, oversimplified images and collapsed
-diversity.
+**Guidance turned up too high.** Saturated, oversimplified images and merged
+range.
 
-**Assuming the model predicts the image.** Most predict the noise, and confusing
+**given the model predicts the image.** Most predict the noise, and confusing
 the two makes the sampling code nonsense.
 
 ## Destroy the data, then learn to undo it one step at a time
 
-Diffusion adds noise on a schedule until nothing is left, then trains a model to remove a little of it. Both directions are run here on 1-D data, including the closed form that makes training cheap.
+Diffusion adds noise on a schedule until nothing is left, then trains a model to drop a little of it. Both directions are run here on 1-D data, including the closed form that makes training cheap.
 
 ```python-run
 import numpy as np
@@ -1401,105 +1401,105 @@ topic(
     ],
     """
 title: Contrastive and Self-Supervised Learning
-intro: Getting a useful representation out of unlabelled data by turning the data into its own supervision.
+intro: Getting a handy form out of untagged data by turning the data into its own oversight.
 
 ## The pretext
 
-Labels are expensive and unlabelled data is not. Self-supervised learning
-invents a task from the data itself, so that solving it requires understanding
+Labels are costly and untagged data isn't. Self-taught learning
+invents a task from the data itself. So That solving it needs understanding
 the content.
 
-The contrastive version is stark: take an image, produce two augmented views,
-and require their representations to be close. Require every other image's views
+The contrastive version is stark: take an image, give two boosted views,
+and need their forms to be close. Need every other image's views
 to be far away.
 
 If a model can recognise that a crop and a colour-jittered version of the same
-photograph belong together, while distinguishing them from a thousand other
-photographs, it has had to learn what the photograph is *of*.
+photo belong together, while distinguishing them from a thousand other
+photos, it has had to learn what the photo is *of*.
 
 ## InfoNCE
 
-The loss is a softmax over similarities:
+The loss is a softmax over likenesses:
 
 ```
 loss  =  -log[  exp(sim(a, p) / tau)
               / ( exp(sim(a, p) / tau) + sum over negatives exp(sim(a, n) / tau) ) ]
 ```
 
-It is exactly cross-entropy, where the classes are "which of these candidates is
-the match" and the correct answer is the positive. That framing is worth
-keeping: everything you know about cross-entropy applies here.
+It's just cross-entropy, where the classes are "which of these picks is
+the match" and the correct answer is the plus. That framing is worth
+keeping: all you know about cross-entropy applies here.
 
-The visualisation puts the anchor and its positive on the unit circle with the
-negatives scattered around, and computes the real loss. Move the jitter control
-and the positive drifts from the anchor &mdash; more aggressive augmentation
+The visualisation puts the anchor and its plus on the unit circle with the
+negatives scattered around, and finds the real loss. Move the jitter control
+and the plus drifts from the anchor &mdash; more aggressive boost
 makes the task harder, and the loss rises.
 
 ## Temperature
 
-`tau` is small and it matters more than anything else in the loss.
+`tau` is small and it matters more than any of it else in the loss.
 
-**Low temperature** sharpens the softmax, so the sum is dominated by the single
-most similar negative. The gradient concentrates on the hardest case, which
+**Low temperature** sharpens the softmax. So The sum is dominated by the single
+most similar minus. The grad focuses on the hardest case, which
 learns fine distinctions quickly and is unstable.
 
-**High temperature** flattens everything until all negatives count about the
-same, and the loss stops discriminating.
+**High temperature** flattens all until all negatives count about the
+same, and the loss stops telling apart.
 
 Drag it across its range and watch the loss move by an order of magnitude with
 no change to the geometry at all.
 
 ## Negatives, and doing without them
 
-More negatives generally means better representations &mdash; the task is
-harder, so the answer is more informative. The readout shows the loss rising
-with the count for exactly that reason.
+More negatives often means better forms &mdash; the task is
+harder, so the answer is more helpful. The readout shows the loss rising
+with the count for just that reason.
 
-That created an engineering problem, since negatives usually come from the
+That created an engineering problem, since negatives often come from the
 batch and batches have limits. **SimCLR** used very large batches. **MoCo** kept
-a queue of representations from previous batches with a slowly-updated encoder.
+a queue of forms from previous batches with a slowly-updated encoder.
 
-Then a second family showed negatives were not required at all. **BYOL** and
-**SimSiam** use only positive pairs, avoiding the collapse everyone expected
-&mdash; where the encoder maps everything to one point and scores perfectly
-&mdash; through an asymmetry: a predictor head on one branch and a stop-gradient
+Then a second family showed negatives weren't needed at all. **BYOL** and
+**SimSiam** use only plus pairs, avoiding the collapse everyone expected
+&mdash; where the encoder maps all to one point and scores just right
+&mdash; through an skew: a predictor head on one branch and a stop-grad
 on the other. **Barlow Twins** and **VICReg** instead add a term that decorrelates
-the representation's dimensions.
+the form's dims.
 
 That negatives turned out to be optional was a genuine surprise, and why it
 works is still argued over.
 
 ## Augmentation is the design
 
-The augmentations decide what the model learns to ignore, and therefore what it
+The boosts decide what the model learns to skip, and so what it
 learns.
 
-Colour jitter teaches colour invariance &mdash; excellent for object recognition
+Colour jitter teaches colour steadiness &mdash; great for object spotting
 and wrong for a task where colour is the label. Random cropping teaches that
-parts imply the whole, which is most of what makes contrastive learning work on
+parts imply the whole. This Is most of what makes contrastive learning work on
 images and is also why it can learn to match textures rather than objects.
 
-SimCLR's ablations found the augmentation choice mattered more than the
+SimCLR's drop-tests found the boost choice mattered more than the
 architecture, which is an unusual finding and a durable one.
 
 ## Where it is used
 
-**Pretraining** on unlabelled data, then fine-tuning on a small labelled set.
-This is the main use, and it is why the field cared.
+**Pretraining** on untagged data, then fine-tuning on a small labelled set.
+This is the main use, and it's why the field cared.
 
 **CLIP** contrasts images against their captions rather than against other
-views, which is what produced a model that can be prompted in language.
+views, which is what made a model that can be prompted in language.
 
 **Sentence embeddings.** SimCSE contrasts a sentence against itself under
 dropout.
 
-**Recommendation and retrieval**, where "these two things go together" is the
+**Recommendation and lookup**, where "these two things go together" is the
 native form of the data.
 
 ## InfoNCE by hand, and why temperature dominates
 
-The contrastive loss is ordinary cross-entropy over "which candidate is the
-match", so it is worth evaluating once. Anchor similarity to its positive 0.9,
+The contrastive loss is plain cross-entropy over "which pick is the
+match", so it's worth testing once. Anchor likeness to its plus 0.9,
 to four negatives 0.85 (one hard), 0.2, 0.1, 0.3, loss
 `-log[ exp(0.9/tau) / (exp(0.9/tau) + &Sigma; exp(neg/tau)) ]`:
 
@@ -1509,45 +1509,45 @@ to four negatives 0.85 (one hard), 0.2, 0.1, 0.3, loss
 |0.10|0.48|0.62|
 |0.50|0.98|0.38|
 
-Same geometry, same similarities &mdash; only `tau` changed &mdash; and the loss
+Same geometry, same likenesses &mdash; only `tau` changed &mdash; and the loss
 moves by a factor of three. Low temperature sharpens the softmax so the hard
-negative at 0.85 dominates the denominator and the gradient concentrates on the
+minus at 0.85 dominates the denominator and the grad focuses on the
 single most confusable case: fast, fine distinctions, and unstable. High
-temperature flattens the candidates until they count about equally and the loss
-stops discriminating. That is why temperature is tuned before anything
-architectural, and why SimCLR's ablations found it and the augmentation choice
+temperature flattens the picks until they count about equally and the loss
+stops telling apart. That is why temperature is tuned before any of it
+architectural, and why SimCLR's drop-tests found it and the boost choice
 mattered more than the encoder. More negatives raise the loss for the right
-reason &mdash; a harder task is more informative &mdash; which is what pushed the
+reason &mdash; a harder task is more helpful &mdash; which is what pushed the
 field to large batches and memory queues, before BYOL and SimSiam showed the
-negatives could be dropped entirely given the right asymmetry.
+negatives could be dropped fully given the right skew.
 
-The augmentations are not a preprocessing detail; they *are* the design, because
+The boosts aren't a prep detail. They *are* the design, because
 they decide what the model learns to treat as irrelevant. Colour jitter teaches
-colour invariance, which is exactly right for object recognition and exactly wrong
+colour steadiness, which is just right for object spotting and just wrong
 for a task where colour is the label. Random cropping teaches that a part implies
 the whole, which is most of why contrastive learning works on images. The other
 standing risk is false negatives: two different photos of the same class are
 pushed apart by a loss that has no labels to know they belong together, a real
-cost that supervised contrastive learning removes when labels happen to be
+cost that guided contrastive learning drops when labels happen to be
 available. CLIP is the variant that contrasts images against their captions
-instead of against other views, which is what produced a model steerable by
+instead of against other views. This Is what made a model steerable by
 language.
 
 ## Where it goes wrong
 
-**Augmentations that destroy the label.** Colour jitter on a task about colour.
+**Boosts that destroy the label.** Colour jitter on a task about colour.
 
-**Temperature left at a default.** Tune it; it does more than the architecture.
+**Temperature left at a default.** Tune it. It does more than the architecture.
 
 **Too few negatives** without one of the methods designed to work that way.
 
 **False negatives.** Two different images of the same class are pushed apart by
-the loss, which is a real cost of not having labels, and what supervised
+the loss, which is a real cost of not having labels, and what guided
 contrastive learning fixes when labels are available.
 
 ## Learn what is similar without a single label
 
-Contrastive learning pulls two views of the same thing together and pushes everything else apart. Here is the InfoNCE loss computed by hand, then trained -- and the class structure that appears without any class labels.
+Contrastive learning pulls two views of the same thing together and pushes all else apart. Here is the InfoNCE loss found by hand, then trained -- and the class structure that appears without any class labels.
 
 ```python-run
 import numpy as np
@@ -1799,84 +1799,84 @@ topic(
     ],
     """
 title: Seq2seq and Beam Search
-intro: How a model that emits one token at a time chooses a whole sequence, and why the obvious method is not the best one.
+intro: How a model that emits one token at a time chooses a whole sequence. Why the obvious method isn't the best one.
 
 ## The architecture
 
 Encoder-decoder handles the case where input and output are both sequences and
 their lengths differ &mdash; translation, summarisation, speech to text.
 
-The **encoder** reads the input and produces a representation. The **decoder**
-emits output tokens one at a time, each conditioned on the representation and on
-everything it has emitted so far.
+The **encoder** reads the input and makes a form. The **decoder**
+emits output tokens one at a time, each conditioned on the form and on
+all it has emitted so far.
 
-The original version compressed the whole input into a single fixed vector,
+The first version compressed the whole input into a single fixed vector,
 which became the bottleneck that motivated
-[attention](../natural_language_processing/attention_mechanism.html): let the
-decoder look back at every input position rather than at one summary. That is
+[focus](../natural_language_processing/attention_mechanism.html): let the
+decoder look back at each input spot rather than at one summary. That is
 the change the field turned on, and the transformer is its conclusion.
 
-Autoregressive decoding is not specific to that architecture. Any model that
-emits one token at a time faces the same question: at each step you have a
-probability over the vocabulary, and you have to choose.
+Autoregressive decoding isn't exact to that architecture. Any model that
+emits one token at a time faces the same question: at each step you've a
+chance over the vocab, and you've to choose.
 
 ## Greedy decoding, and its regret
 
 Take the most probable token each time.
 
 Fast, simple, and it optimises the wrong thing. You want the most probable
-*sequence*, and the highest-probability first token can lead into a region where
-everything that follows is bad.
+*sequence*, and the highest-chance first token can lead into a region where
+all that follows is bad.
 
-The chart shows the cumulative log probability of the beam's paths. With the
-width at 1 you get greedy decoding, and the readout compares it against the best
-sequence a wider beam found. It is frequently worse, and the reason is always
-the same: it committed early to something that looked good and did not pay off.
+The chart shows the cumulative log chance of the beam's paths. With the
+width at 1 you get greedy decoding, and the readout checks it against the best
+sequence a wider beam found. It's often worse, and the reason is always
+the same: it committed early to a thing that looked good and didn't pay off.
 
 ## Beam search
 
 Keep the `k` best partial sequences. At each step, expand all of them, score
-every continuation, keep the best `k` overall, and continue. At the end, take
+each continuation, keep the best `k` total, and continue. At the end, take
 the best complete sequence.
 
 Drag the width from 1 upward and watch the best score improve.
 
-It is still a heuristic. It does **not** find the globally best sequence &mdash;
-that would require searching an exponentially large tree &mdash; and a path
+It's still a heuristic. It does **not** find the globally best sequence &mdash;
+that would need searching an exponentially large tree &mdash; and a path
 discarded early because it looked weak can never come back, even if it led
-somewhere excellent. Beam search only reduces how often that happens.
+a place great. Beam search only reduces how often that happens.
 
 ## The length problem
 
-Sequence probability is a product of per-token probabilities, so every extra
-token multiplies by something less than 1. Longer sequences have lower
-probability, always, and unnormalised beam search therefore has a systematic
+Sequence chance is a product of per-token chances, so each extra
+token times by a thing less than 1. Longer sequences have lower
+chance, always, and unnormalised beam search so has a systematic
 bias toward stopping early.
 
-The standard fix divides the log probability by the length, sometimes raised to
-a tunable power. It is a correction with no principled derivation, it is
-necessary, and every production decoder has one.
+The standard fix cuts the log chance by the length, at times raised to
+a tunable power. It's a correction with no principled derivation, it's
+needed, and each production decoder has one.
 
 ## Wider is not always better
 
 Raise the width past about 5 and translation quality often *falls*. This is
-called the **beam search curse**, and it is well documented.
+called the **beam search curse**, and it's well documented.
 
-The explanation is that a wider beam finds sequences the model genuinely
-considers more probable, and the model's notion of probable is not the same as
-good. Very high-probability text is bland: it is the safe, generic continuation.
-A wider search is a more faithful search of a flawed objective.
+The explanation is that a wider beam finds sequences the model truly
+considers more probable, and the model's notion of probable isn't the same as
+good. Very high-chance text is bland: it's the safe, plain continuation.
+A wider search is a more faithful search of a flawed goal.
 
-That is also why open-ended generation abandons beam search entirely. Sampling
-methods &mdash; temperature, top-k, nucleus &mdash; deliberately do not take the
+That is also why open-ended generation abandons beam search fully. Sampling
+methods &mdash; temperature, top-k, nucleus &mdash; on purpose don't take the
 most probable path, because for creative text the most probable path is the
-boring one. Beam search survives where there is a right answer: translation,
-speech recognition, constrained generation.
+boring one. Beam search lives where there's a right answer: translation,
+speech spotting, constrained generation.
 
 ## Where greedy loses, on a tree you can check
 
 The claim that greedy decoding optimises the wrong thing is a two-step example
-away. Suppose the first token is A with probability 0.6 or B with 0.4, and the
+away. Suppose the first token is A with chance 0.6 or B with 0.4, and the
 best continuation after each is:
 
 |first token|P(first)|best P(second)|sequence probability|
@@ -1884,51 +1884,51 @@ best continuation after each is:
 |A|0.6|0.5|0.30|
 |B|0.4|0.9|**0.36**|
 
-Greedy takes A, because 0.6 beats 0.4, and lands on a sequence of probability
+Greedy takes A, because 0.6 beats 0.4, and lands on a sequence of chance
 0.30. Beam search with width 2 keeps both A and B alive, discovers that B leads
 to a 0.9 continuation, and returns the 0.36 sequence &mdash; the more probable
 *sequence*, which the greedy first choice ruled out at step one. That is the
-entire argument for beam search: the highest-probability first token can open
-into a region where everything after it is worse.
+entire arg for beam search: the highest-chance first token can open
+into a region where all after it's worse.
 
-It is still a heuristic, not a global search, and it has its own trap. Sequence
-probability is a product of per-token terms, so every extra token multiplies by
-something below 1 and longer sequences score lower automatically &mdash; which is
-why unnormalised beam search truncates, and why every production decoder divides
-the log-probability by length. Widen the beam too far and quality can even fall,
-because a more faithful search of the model's probability finds the blandest,
-safest text; that is the beam-search curse, and it is why open-ended generation
+It's still a heuristic, not a global search, and it has its own trap. Sequence
+chance is a product of per-token terms. So Each extra token times by
+a thing below 1 and longer sequences score lower automatically &mdash; which is
+why unnormalised beam search truncates, and why each production decoder cuts
+the log-chance by length. Widen the beam too far and quality can even fall,
+because a more faithful search of the model's chance finds the blandest,
+safest text. That is the beam-search curse, and it's why open-ended generation
 samples instead.
 
 The deeper reason open-ended generation abandons beam search is that the model's
-notion of probable is not the same as good. A more faithful search of the
-probability surface converges on the safe, generic continuation &mdash; the blandest
-text is often the most probable &mdash; so past a beam width of about five,
+notion of probable isn't the same as good. A more faithful search of the
+chance surface settles on the safe, plain continuation &mdash; the blandest
+text is often the most probable. So past a beam width of about five,
 translation and summarisation quality can fall rather than rise. Beam search earns
-its place only where there is a genuinely correct answer to find: translation,
-speech recognition, constrained decoding. For creative text, temperature, top-k
-and nucleus sampling deliberately avoid the most probable path, because that path
-is exactly the one worth leaving.
+its place only where there's a truly correct answer to find: translation,
+speech spotting, constrained decoding. For creative text, temperature, top-k
+and nucleus sampling on purpose avoid the most probable path, because that path
+is just the one worth leaving.
 
-And the cost is not free: a beam of width `k` multiplies both computation and
-memory by `k`, which for a large model is usually the binding constraint long
+And the cost isn't free: a beam of width `k` times both work and
+memory by `k`, which for a large model is often the binding constraint long
 before quality is, so the width is chosen against a hardware budget as much as
 against the translation it buys.
 
 ## Where it goes wrong
 
-**No length normalisation.** Everything comes out truncated.
+**No length norming.** All comes out truncated.
 
 **A very wide beam on open-ended text.** Blander, not better.
 
 **Using beam search for creative generation.** Use sampling.
 
-**Forgetting the cost.** Width `k` multiplies both computation and memory by
+**Losing the cost.** Width `k` times both work and memory by
 `k`, and for a large model that is the binding constraint.
 
 ## Greedy decoding, and the sentence it cannot find
 
-At each step a decoder picks a token. Taking the most likely one every time is not the same as finding the most likely sentence -- here is a case where it demonstrably is not.
+At each step a decoder picks a token. Taking the most likely one each time isn't the same as finding the most likely sentence -- here is a case where it demonstrably isn't.
 
 ```python-run
 import numpy as np
@@ -2111,140 +2111,140 @@ topic(
     ],
     """
 title: Embedding Layers
-intro: The layer that turns discrete symbols into vectors, and the optimisation that makes it practical.
+intro: The layer that turns discrete symbols into vectors. The optimisation that makes it hands-on.
 
 ## The problem
 
 Neural networks consume numbers. A word, a user id or a product code is a
-symbol, and there is no meaningful number to assign it &mdash; encoding "cat" as
-7 and "dog" as 8 would tell the network they are adjacent, which is a claim
-nobody made.
+symbol, and there's no real number to assign it &mdash; encoding "cat" as
+7 and "dog" as 8 would tell the network they're adjacent. This Is a claim
+no one made.
 
 **One-hot encoding** avoids that: a vector of zeros with a single 1 at the
-token's index. No false ordering, and no useful structure either. Every pair of
-tokens is equally distant, and the vector is as long as the vocabulary.
+token's index. No false sorting, and no handy structure either. each pair of
+tokens is equally distant, and the vector is if the vocab.
 
 An **embedding layer** maps each token to a dense learned vector instead. The
-vector has a few hundred dimensions rather than fifty thousand, and its contents
-are parameters, so training can put similar tokens near each other.
+vector has a few hundred dims rather than fifty thousand, and its contents
+are params, so training can put similar tokens near each other.
 
 ## The matmul that is a lookup
 
-The formal definition is a one-hot vector multiplied by a weight matrix. Write it
-out and the reason nobody does it becomes obvious: multiplying a vector that is
-all zeros except one position by a matrix selects a single row and multiplies
-everything else by zero.
+The formal meaning is a one-hot vector times'd by a weight mat. Write it
+out and the reason no one does it turns obvious: timesing a vector that is
+all zeros except one spot by a mat selects a single row and times
+all else by zero.
 
-The readout does the arithmetic. At a 50,000-token vocabulary and 512
-dimensions, the honest matmul touches **25.6 million** numbers to retrieve
+The readout does the math. At a 50,000-token vocab and 512
+dims, the honest matmul touches **25.6 million** numbers to pull
 **512** of them.
 
-So every framework implements the layer as an indexing operation. `nn.Embedding`
+So each framework runs the layer as an indexing op. `nn.Embedding`
 in PyTorch and `tf.keras.layers.Embedding` are table lookups with a backward
-pass that scatters gradients to the rows that were used.
+pass that scatters grads to the rows that were used.
 
-That is also why only the rows appearing in a batch receive a gradient. An
-embedding table is a very large parameter tensor that is almost entirely idle on
-any given step, which has consequences for optimisers keeping per-parameter
-state and for anyone writing distributed training.
+That is also why only the rows appearing in a batch receive a grad. An
+embedding table is a very large param tensor that is almost fully idle on
+any given step, which has consequences for tuners keeping per-param
+state and for anyone writing spread training.
 
 ## The table is the model, mostly
 
-Drag the vocabulary and dimension controls and watch the count. The table alone
-is `vocab * dim` parameters, and for large vocabularies that is a substantial
-fraction of the entire model &mdash; often more than any other single layer.
+Drag the vocab and dim controls and watch the count. The table alone
+is `vocab * dim` params, and for large vocab lists that is a substantial
+fraction of the entire model. Often more than any other single layer.
 
 Two standard responses:
 
 **Weight tying.** In a language model the output layer also has one row per
-token. Sharing it with the input embedding halves the cost and usually improves
+token. Sharing it with the input embedding halves the cost and often raises
 quality, since both are learning what tokens mean.
 
 **Subword tokenisation.** [Byte-pair
-encoding](../gen_ai/byte_pair_encoding_tokenizer.html) keeps the vocabulary in
-the tens of thousands rather than the millions a word-level vocabulary would
-need, and removes the out-of-vocabulary problem entirely.
+encoding](../gen_ai/byte_pair_encoding_tokenizer.html) keeps the vocab in
+the tens of thousands rather than the millions a word-level vocab would
+need, and drops the out-of-vocab problem fully.
 
 ## What the vectors learn
 
-Nothing is imposed on the geometry. The rows start random and become whatever
-minimises the loss, and the useful structure is a consequence rather than a
+Nothing is imposed on the geometry. The rows start random and become what
+cuts the loss, and the handy structure is a consequence rather than a
 design.
 
-Word2vec's famous arithmetic &mdash; king minus man plus woman &mdash; is that
-consequence showing. Nobody built the analogy in; it fell out of a training
-objective about predicting neighbouring words.
+Word2vec's famous math &mdash; king minus man plus woman &mdash; is that
+consequence showing. No one built the word puzzle in. It fell out of a training
+goal about predicting neighbouring words.
 
 Which also means the structure reflects the training data, including its biases.
-Embeddings trained on a corpus inherit that corpus's associations, and a great
+Embeddings trained on a corpus inherit that corpus's links, and a great
 deal of fairness work in NLP is about that fact.
 
 ## Beyond words
 
-**Categorical features** in tabular models. A user id, a postcode, a product
+**cat features** in tabular models. A user id, a postcode, a product
 category &mdash; all embed, and this is why neural networks became competitive on
 tabular data with high-cardinality categories.
 
-**Positional embeddings** in transformers, which embed a position rather than a
+**Spot-based embeddings** in transformers. This Embed a spot rather than a
 symbol.
 
 **Recommendation.** Users and items each get a table, and their dot product is a
-predicted affinity. Matrix factorisation is exactly this.
+predicted bond. mat factorisation is just this.
 
 ## Why the lookup replaces the matmul
 
-The formal definition of an embedding layer is a one-hot vector times a weight
-matrix, and writing out the sizes shows why nobody computes it that way. At a
-50,000-token vocabulary and 512 dimensions:
+The formal meaning of an embedding layer is a one-hot vector times a weight
+mat, and writing out the sizes shows why no one finds it that way. At a
+50,000-token vocab and 512 dims:
 
 |operation|numbers touched|
 |---|---|
 |one-hot vector &times; weight matrix|50,000 &times; 512 = **25.6 million**|
 |the row it actually selects|**512**|
 
-The one-hot is all zeros but one, so the multiply reads 25.6 million values to
-return 512 and multiplies everything else by zero. Every framework therefore
-implements the layer as an indexed table lookup, with a backward pass that
-scatters gradients only to the rows a batch actually used &mdash; which means the
-table is a huge parameter tensor that sits almost entirely idle on any given step.
-The table itself is `vocab &times; dim = 25.6 million` parameters, often the
+The one-hot is all zeros but one. So The times reads 25.6 million values to
+return 512 and times all else by zero. each framework so
+runs the layer as an indexed table lookup, with a backward pass that
+scatters grads only to the rows a batch really used &mdash; which means the
+table is a huge param tensor that sits almost fully idle on any given step.
+The table itself is `vocab &times; dim = 25.6 million` params, often the
 largest single component of a model, and the two standard economies both attack
 that: weight tying reuses the input table as the output layer (halving the token
-parameters and usually improving quality, since both are learning what tokens
-mean), and subword tokenisation keeps the vocabulary in the tens of thousands
+params and often raising quality, since both are learning what tokens
+mean), and subword tokenisation keeps the vocab in the tens of thousands
 rather than the millions a word-level scheme would need. The geometry the rows
 end up with &mdash; king &minus; man + woman landing near queen &mdash; is never
-imposed; it falls out of the training objective, which also means it inherits the
+imposed. It falls out of the training goal. This Also means it inherits the
 training corpus's biases.
 
-Because only the rows appearing in a batch receive a gradient, an embedding table
-is a large parameter tensor that is almost entirely idle on any given step, which
-complicates optimisers that keep per-parameter state and anyone sharding a model
+Because only the rows appearing in a batch receive a grad, an embedding table
+is a large param tensor that is almost fully idle on any given step, which
+complicates tuners that keep per-param state and anyone sharding a model
 across devices. The same lookup mechanism generalises well beyond words: a user
-id, a postcode or a product category embeds the same way, which is what made
-neural networks competitive on tabular data with high-cardinality categories; a
-transformer embeds positions as well as tokens; and a recommender gives users and
-items each a table whose dot product is a predicted affinity, which is matrix
-factorisation wearing a different name. The proximity of two rows should be read
-as co-occurrence in the training data, not as meaning &mdash; a distinction that
-matters wherever those associations encode bias.
+id, a postcode or a product category embeds the same way. This Is what made
+neural networks competitive on tabular data with high-cardinality categories. A
+transformer embeds spots and tokens. And a recommender gives users and
+items each a table whose dot product is a predicted bond, which is mat
+factorisation wearing a different name. The nearness of two rows should be read
+as co-hit in the training data, not as meaning &mdash; a gap that
+matters wherever those links encode bias.
 
 ## Where it goes wrong
 
-**Implementing the one-hot matmul literally.** Correct, and enormously wasteful.
+**Building the one-hot matmul truly.** Correct, and enormously wasteful.
 
-**Choosing the dimension by feel.** A rule of thumb is the fourth root of the
-vocabulary size, and it is worth tuning.
+**Choosing the dim by feel.** A rule of thumb is the fourth root of the
+vocab size, and it's worth tuning.
 
-**Forgetting an out-of-vocabulary row.** Something has to handle unseen tokens;
+**Losing an out-of-vocab row.** a thing has to handle unseen tokens;
 subword tokenisation avoids the question.
 
-**Reading similarity as meaning.** Embedding proximity reflects co-occurrence in
-the training data, which is not the same thing.
+**Reading likeness as meaning.** Embedding nearness reflects co-hit in
+the training data, which isn't the same thing.
 
 ## A lookup table that learns what things mean
 
-An embedding layer is one-hot encoding times a weight matrix, with the multiplication skipped. This shows the equivalence, the cost saving, and what the learned vectors end up encoding.
+An embedding layer is one-hot encoding times a weight mat, with the times skipped. This shows the equivalence, the cost saving. What the learned vectors end up encoding.
 
 ```python-run
 import numpy as np
@@ -2400,122 +2400,122 @@ topic(
     ],
     """
 title: Mixed Precision and Loss Scaling
-intro: Training in half the bits, the failure that causes, and the one-line trick that removes it.
+intro: Training in half the bits, the failure that causes. The one-line trick that drops it.
 
 ## Why bother
 
-Modern accelerators run half-precision matrix multiplies several times faster
+Modern accelerators run half-precision mat times a few times faster
 than single-precision ones, and half-precision tensors take half the memory.
 That means bigger batches, bigger models, and a real speed-up on the same
 hardware.
 
 The catch is the format. **fp32** has 8 exponent bits and 23 mantissa bits.
 **fp16** has 5 and 10, giving a smallest normal value around
-10&#8315;&#8309; and a maximum of 65,504.
+10&#8315;&#8309. And a max of 65,504.
 
-Both ends of that range are a problem, and the small end is the one that bites.
+Both ends of that range are a problem. The small end is the one that bites.
 
 ## Watch the gradients disappear
 
-The histogram is gradient magnitudes spread over several orders of magnitude,
-which is what a real network produces. The two marked lines are fp16's floor and
+The histogram is grad magnitudes spread over a few orders of magnitude,
+which is what a real network makes. The two marked lines are fp16's floor and
 ceiling.
 
-With the loss scale at 2&#8304; &mdash; that is, no scaling &mdash; the readout
-reports how many of the 3,000 gradients round to **zero**. Those parameters
-receive no update at all. Not a small update; none.
+With the loss scale at 2&#8304.. That is, no scaling &mdash; the readout
+reports how many of the 3,000 grads round to **zero**. Those params
+receive no update at all. Not a small update. None.
 
 This is the failure that made early fp16 training unreliable. The model trains,
 the loss goes down, and a fraction of the network is silently frozen.
 
 ## Loss scaling
 
-The fix is almost embarrassingly simple. Multiply the loss by a large constant
-before the backward pass. By the chain rule every gradient is multiplied by the
-same constant, so the whole distribution shifts up into the representable range.
-Then divide by that constant before the optimiser steps.
+The fix is almost embarrassingly simple. Times the loss by a large constant
+before the backward pass. By the chain rule each grad is times'd by the
+same constant, so the whole spread shifts up into the representable range.
+Then divide by that constant before the tuner steps.
 
 Drag the loss scale upward and watch the underflow count fall to zero.
 
-The update is mathematically unchanged. The scaling exists purely so the numbers
-survive the trip through fp16 &mdash; it is a change of units, not a change of
-algorithm.
+The update is in math unchanged. The scaling exists purely so the numbers
+live the trip through fp16. It's a change of units, not a change of
+method.
 
-Push it too far and the readout starts reporting **overflow**: gradients that
-have become infinite. That is a failure too, and it is where the automatic
+Push it too far and the readout starts reporting **overflow**: grads that
+have become infinite. That is a failure too, and it's where the auto
 version comes from.
 
 ## Dynamic loss scaling
 
-Nobody tunes the constant by hand. The standard algorithm starts high,
-multiplies by two whenever a stretch of steps completes without overflow, and
-halves it and **skips the step** whenever an infinity or NaN appears.
+No one tunes the constant by hand. The standard method starts high,
+times by two when a stretch of steps ends without overflow, and
+halves it and **skips the step** when an infinity or NaN appears.
 
-Skipping is the important part: an overflowed gradient is not clipped or
-repaired, it is discarded, because there is no way to recover what it should
+Skipping is the key part: an overflowed grad isn't clipped or
+repaired, it's discarded, because there's no way to recover what it should
 have been. A few skipped steps early in training cost nothing.
 
-This is what `torch.cuda.amp.GradScaler` does, and it is why mixed precision is
+This is what `torch.cuda.amp.GradScaler` does, and it's why mixed precision is
 now a decorator rather than a project.
 
 ## What stays in fp32
 
 "Mixed" is the operative word. In a standard setup:
 
-**Weights** are kept in an fp32 master copy. Updates are frequently far smaller
+**Weights** are kept in an fp32 master copy. Updates are often far smaller
 than the weights themselves, and adding a tiny number to a large one in fp16
 rounds to no change at all.
 
-**Matrix multiplies and convolutions** run in fp16, where the speed is.
+**mat times and convolutions** run in fp16. Here The speed is.
 
-**Reductions** &mdash; sums, means, softmax, normalisation statistics &mdash;
-accumulate in fp32, because adding many small numbers is exactly where limited
+**Reductions** &mdash; sums, means, softmax, norming statistics &mdash;
+build up in fp32, because adding many small numbers is just where limited
 mantissa bits go wrong.
 
-**Loss** is computed in fp32.
+**Loss** is found in fp32.
 
 ## bfloat16
 
-The newer alternative has 8 exponent bits and 7 mantissa bits &mdash; the same
+The newer option has 8 exponent bits and 7 mantissa bits &mdash; the same
 range as fp32, with less precision.
 
-That trade removes this entire page. Range was the problem; precision, for
-gradients, mostly was not. **bfloat16 needs no loss scaling**, which is why it
+That trade drops this entire page. Range was the problem. Precision, for
+grads, mostly wasn't. **bfloat16 needs no loss scaling**. This Is why it
 is the default on hardware that supports it, and why large-model training
 largely stopped talking about GradScaler.
 
 ## The range that makes loss scaling necessary
 
-The failure is entirely about fp16's floor. fp16 carries 5 exponent bits, giving
-a smallest normal value around `2^-14 &asymp; 6.1 &times; 10^-5` and a maximum of
-65,504. Real gradients routinely sit *below* that floor:
+The failure is fully about fp16's floor. fp16 carries 5 exponent bits, giving
+a smallest normal value around `2^-14 &asymp; 6.1 &times; 10^-5` and a max of
+65,504. Real grads routinely sit *below* that floor:
 
 |quantity|magnitude|in fp16|
 |---|---|---|
 |a typical small gradient|~1 &times; 10^-7|rounds to **zero**|
 |the same, times a loss scale of 4096|~4 &times; 10^-4|represented fine|
 
-A gradient that rounds to zero is not a small update, it is *no* update &mdash;
-the parameter freezes, silently, while the loss still falls and the run looks
-healthy. Loss scaling fixes it in one line: multiply the loss by a constant before
-the backward pass, so by the chain rule every gradient is multiplied too and the
-whole distribution shifts up into the representable range; divide it back out
-before the optimiser steps. The update is mathematically unchanged &mdash; it is a
-change of units, not of algorithm. Push the constant too high and gradients
-overflow to infinity instead, which is why the standard scaler is *dynamic*:
+A grad that rounds to zero isn't a small update, it's *no* update &mdash;
+the param freezes, silently, while the loss still falls and the run looks
+healthy. Loss scaling fixes it in one line: times the loss by a constant before
+the backward pass, so by the chain rule each grad is times'd too and the
+whole spread shifts up into the representable range. Divide it back out
+before the tuner steps. The update is in math unchanged &mdash; it's a
+change of units, not of method. Push the constant too high and grads
+overflow to infinity instead. This Is why the standard scaler is *dynamic*:
 start high, double it after stretches without overflow, and halve it and skip the
 step when an infinity appears. bfloat16 sidesteps the whole page by keeping fp32's
 8 exponent bits &mdash; same range, less precision &mdash; so it needs no scaling
 at all.
 
-The other half of "mixed" is what deliberately stays in fp32. Weights keep an
+The other half of "mixed" is what on purpose stays in fp32. Weights keep an
 fp32 master copy, because an update is often far smaller than the weight it
 adjusts and adding a tiny number to a large one in fp16 rounds to no change at
-all. Reductions &mdash; sums, means, softmax, normalisation statistics &mdash;
-accumulate in fp32, because adding many small numbers is exactly where ten mantissa
-bits go wrong and produce the mysterious NaNs that half-precision softmax is known
-for. The fp16 lives where the speed is: the matrix multiplies and convolutions the
-tensor cores accelerate. Layers that are memory-bound rather than compute-bound
+all. Reductions &mdash; sums, means, softmax, norming statistics &mdash;
+build up in fp32, because adding many small numbers is just where ten mantissa
+bits go wrong and give the mysterious NaNs that half-precision softmax is known
+for. The fp16 lives where the speed is: the mat times and convolutions the
+tensor cores accelerate. Layers that are memory-bound rather than find-bound
 gain little, which is why the speed-up is real but never uniform across a model.
 
 ## Where it goes wrong
@@ -2524,15 +2524,15 @@ gain little, which is why the speed-up is real but never uniform across a model.
 
 **A fixed scale.** Use the dynamic version.
 
-**Reductions in fp16.** Softmax and layer norm in half precision produce
+**Reductions in fp16.** Softmax and layer norm in half precision give
 mysterious NaNs.
 
-**Assuming a speed-up.** It comes from the tensor cores. Layers that are
-memory-bound rather than compute-bound gain little.
+**given a speed-up.** It comes from the tensor cores. Layers that are
+memory-bound rather than find-bound gain little.
 
 ## Half the bits, and the two things that break
 
-float16 halves memory and doubles throughput on tensor cores. It also has a much narrower range than float32, and gradients live near the bottom of that range -- which is the entire reason loss scaling exists.
+float16 halves memory and doubles throughput on tensor cores. It also has a much narrower range than float32. Grads live near the bottom of that range -- which is the entire reason loss scaling exists.
 
 ```python-run
 import numpy as np
@@ -2701,21 +2701,21 @@ topic(
     ],
     """
 title: Gradient Accumulation
-intro: Getting the effect of a large batch out of a device that cannot hold one.
+intro: Getting the effect of a large batch out of a device that can't hold one.
 
 ## Why it works
 
 The loss over a batch is the mean of the per-example losses, and differentiation
-is linear. So the gradient of the batch is the mean of the per-example
-gradients.
+is linear. So the grad of the batch is the mean of the per-example
+grads.
 
 That means the sum can be built in pieces. Run a forward and backward pass on 16
-examples, keep the gradients, run another 16, add to them, and after 16 rounds
-you have exactly the gradient of a 256-example batch. Step the optimiser once.
+examples, keep the grads, run another 16, add to them, and after 16 rounds
+you've just the grad of a 256-example batch. Step the tuner once.
 
-**The resulting update is identical** &mdash; not similar, identical up to
-floating-point ordering &mdash; to what a single 256-example batch would have
-produced.
+**The resulting update is the same**. Not similar, the same up to
+floating-point sorting &mdash; to what a single 256-example batch would have
+made.
 
 ## What actually consumes the memory
 
@@ -2723,74 +2723,74 @@ The bars separate the two cases at the memory budget you choose.
 
 Training memory is roughly:
 
-**Fixed costs.** Weights, their gradients, and the optimiser state. Adam keeps
-two extra tensors per parameter, so this is around four times the model size,
-and it does not depend on the batch at all.
+**Fixed costs.** Weights, their grads, and the tuner state. Adam keeps
+two extra tensors per param. So This is around four times the model size,
+and it doesn't depend on the batch at all.
 
-**Activations.** Every intermediate value from the forward pass has to be kept
+**Activations.** each mid value from the forward pass has to be kept
 for the backward pass. This scales linearly with the batch size, and for a deep
 model it dominates.
 
-Accumulation attacks only the second, which is why it works. Drag the
+Buildup attacks only the second. This Is why it works. Drag the
 micro-batch down and watch the second bar fall while the fixed part stays put.
 
 The dashed line is the budget. When the full batch crosses it and the micro-batch
-does not, that gap is the entire reason the technique exists.
+doesn't, that gap is the entire reason the technique exists.
 
 ## What it costs
 
-**Time.** Sixteen sequential passes take about as long as sixteen passes.
-Accumulation does not make anything faster; it makes something possible.
+**Time.** Sixteen sequential passes take about if sixteen passes.
+Buildup doesn't make any of it faster. It makes a thing possible.
 
-There is a small efficiency loss too, since very small micro-batches use the
-accelerator less well. A micro-batch of 1 is usually much less than a sixteenth
-as efficient as a micro-batch of 16.
+There's a small speed loss too, since very small micro-batches use the
+accelerator less well. A micro-batch of 1 is often much less than a sixteenth
+as fast as a micro-batch of 16.
 
 ## The one thing that is not identical
 
-**Batch normalisation.** Its statistics are computed over whatever is in the
-forward pass, which is the micro-batch, not the accumulated total.
+**Batch norming.** Its statistics are found over what is in the
+forward pass, which is the micro-batch, not the built up total.
 
 So a model with batch norm trained with a micro-batch of 4 behaves like one
-trained with a batch of 4, however many accumulation steps follow. The
-normalisation is noisier, and at very small micro-batches it degrades badly.
+trained with a batch of 4, but many buildup steps follow. The
+norming is noisier, and at very small micro-batches it degrades badly.
 
 This is a real reason to prefer
-[layer normalisation](layer_normalization.html) or group normalisation, both of
-which normalise per example and are indifferent to the batch. It is not a
+[layer norming](layer_normalization.html) or group norming, both of
+which norm per example and are indifferent to the batch. It isn't a
 coincidence that transformers use layer norm and are the architectures trained
-with the most aggressive accumulation.
+with the most aggressive buildup.
 
 ## Getting it right
 
 Two details cause most of the bugs.
 
-**Divide the loss by the number of accumulation steps** before the backward
-pass, or the accumulated gradient is a sum where the optimiser expects a mean,
-and your effective learning rate is multiplied by the step count.
+**Divide the loss by the number of buildup steps** before the backward
+pass, or the built up grad is a sum where the tuner expects a mean,
+and your effective learning rate is times'd by the step count.
 
-**Zero the gradients at the right time** &mdash; after the optimiser step, not
-after every backward pass. Zeroing every pass defeats the whole thing, and it
+**Zero the grads at the right time**. After the tuner step, not
+after each backward pass. Zeroing each pass defeats the whole thing, and it
 fails silently: training still runs, just with the small batch you were trying
 to avoid.
 
 ## Alongside
 
-**Activation checkpointing** trades compute for memory in the other direction:
+**Activation checkpointing** trades find for memory in the other direction:
 discard activations during the forward pass and recompute them in the backward
 pass, for roughly 30% more time and a large memory saving. The two combine.
 
-**Mixed precision** halves activation memory outright, and combines with both.
+**Mixed precision** halves activation memory outright, and mixes with both.
 
-**Model parallelism and ZeRO** attack the fixed costs, which accumulation cannot
-touch. When the weights alone do not fit, accumulation is not the answer.
+**Model parallelism and ZeRO** attack the fixed costs, which buildup can't
+touch. When the weights alone don't fit, buildup isn't the answer.
 
 ## Where the memory actually goes
 
-Accumulation works because it attacks the one cost that scales with the batch.
-Training memory splits in two: a fixed part &mdash; weights, their gradients, and
-the optimiser state, which for Adam is about four times the model size &mdash;
-and activations, every intermediate value kept for the backward pass, which grows
+Buildup works because it attacks the one cost that scales with the batch.
+Training memory splits in two: a fixed part. Weights, their grads, and
+the tuner state, which for Adam is about four times the model size &mdash;
+and activations, each mid value kept for the backward pass, which grows
 linearly with the batch. Take a 1&nbsp;GB model on an 8&nbsp;GB budget:
 
 |batch|fixed (Adam ~4&times;)|activations|total|
@@ -2798,33 +2798,33 @@ linearly with the batch. Take a 1&nbsp;GB model on an 8&nbsp;GB budget:
 |256 (wanted)|4.0 GB|~5.1 GB|9.1 GB &mdash; **over budget**|
 |16 (micro-batch)|4.0 GB|~0.3 GB|4.3 GB &mdash; fits|
 
-Run the micro-batch of 16 sixteen times, summing the gradients, and step once:
-the update is *identical* to the 256-batch, because the batch gradient is the mean
-of the per-example gradients and a mean can be built in pieces. The fixed 4&nbsp;GB
-never moves &mdash; accumulation cannot touch it, which is why it is no help when
-the weights alone do not fit &mdash; but the activation term, the part that broke
+Run the micro-batch of 16 sixteen times, summing the grads, and step once:
+the update is *the same* to the 256-batch. The batch grad is the mean
+of the per-example grads and a mean can be built in pieces. The fixed 4&nbsp;GB
+never moves &mdash; buildup can't touch it. This Is why it's no help when
+the weights alone don't fit. But the activation term, the part that broke
 the budget, is now a sixteenth of its size. The cost is time: sixteen sequential
-passes take about as long as sixteen passes. It buys capability, not throughput,
-and the one thing it does *not* reproduce is batch-norm statistics, which are
-computed over the micro-batch and so behave like the small batch however many
-steps you accumulate.
+passes take about if sixteen passes. It buys capability, not throughput,
+and the one thing it does *not* copy is batch-norm statistics, which are
+found over the micro-batch and so behave like the small batch but many
+steps you build up.
 
-Two implementation details cause most accumulation bugs, and both fail quietly.
-The loss must be divided by the number of accumulation steps before the backward
-pass, or the accumulated gradient is a sum where the optimiser expects a mean and
-the effective learning rate is silently multiplied by the step count. And the
-gradients must be zeroed after the optimiser step, not after every backward pass
+Two setup details cause most buildup bugs, and both fail quietly.
+The loss must be cut by the number of buildup steps before the backward
+pass, or the built up grad is a sum where the tuner expects a mean and
+the effective learning rate is silently times'd by the step count. And the
+grads must be zeroed after the tuner step, not after each backward pass
 &mdash; zero them each pass and the technique is defeated with no error at all,
-training proceeding with exactly the small batch it was meant to escape.
+training proceeding with just the small batch it was meant to escape.
 Activation checkpointing and mixed precision attack the same activation memory
-from other angles and combine with it; model parallelism attacks the fixed part
-that accumulation cannot.
+from other angles and combine with it. Model parallelism attacks the fixed part
+that buildup can't.
 
 ## Where it goes wrong
 
-**Forgetting to divide the loss.** Silently multiplies the learning rate.
+**Losing to divide the loss.** Silently times the learning rate.
 
-**Zeroing gradients every pass.** Silently defeats the technique.
+**Zeroing grads each pass.** Silently defeats the technique.
 
 **Using it with batch norm at a tiny micro-batch.** Real quality loss.
 
@@ -2832,7 +2832,7 @@ that accumulation cannot.
 
 ## A large batch on a small GPU
 
-Accumulating gradients over several small batches before stepping is arithmetically identical to one large batch. This proves the identity, then shows the two things that are not identical.
+Building up grads over a few small batches before stepping is arithmetically the same to one large batch. This proves the identity, then shows the two things that aren't the same.
 
 ```python-run
 import numpy as np
@@ -2981,79 +2981,79 @@ topic(
     ],
     """
 title: Label Smoothing
-intro: A one-line change to the target that improves calibration, and the reason the loss no longer reaches zero.
+intro: A one-line change to the target that raises calibration. The reason the loss no longer reaches zero.
 
 ## The problem with a hard target
 
-Cross-entropy with a one-hot target asks the model to put probability 1 on the
-correct class and 0 on everything else.
+Cross-entropy with a one-hot target asks the model to put chance 1 on the
+correct class and 0 on all else.
 
-Softmax cannot produce exactly 1. It approaches it as the correct logit runs
+Softmax can't give just 1. It approaches it as the correct logit runs
 away from the others, and reaches it only in the limit. So the target is
-unattainable, the gradient never vanishes, and training keeps pushing the logit
-gap wider for as long as you let it.
+unattainable, the grad never vanishes, and training keeps pushing the logit
+gap wider for if you let it.
 
-The consequences are familiar. The model becomes **overconfident**, reporting
+The consequences are familiar. The model turns **too sure**, reporting
 0.99 on cases it gets wrong. It **overfits**, because widening logits on training
-examples is always an available way to reduce the loss. And it is **badly
-calibrated**, in exactly the way
+examples is always an available way to reduce the loss. And it's **badly
+calibrated**, in just the way
 [the calibration module](../machine_learning/probability_calibration.html)
 measures.
 
 ## The change
 
-Move a little probability off the correct class and spread it over the others:
+Move a little chance off the correct class and spread it over the others:
 
 ```
 target[correct]  =  1 - eps + eps/K
 target[others]   =  eps/K
 ```
 
-Drag epsilon and watch the bars. At 0 you have the one-hot target. At 0.1 the
+Drag epsilon and watch the bars. At 0 you've the one-hot target. At 0.1 the
 true class asks for 0.91 and each of nine others asks for about 0.011.
 
 That is the entire technique.
 
 ## Why it fixes the problem
 
-The readout gives the **optimal logit gap**: how far apart the logits have to be
-to match the target exactly.
+The readout gives the **best logit gap**: how far apart the logits have to be
+to match the target just.
 
-At epsilon 0 it is infinite, which is the problem restated. At epsilon 0.1 it is
-a specific finite number, and once the model reaches it the gradient is zero.
+At epsilon 0 it's infinite. This Is the problem restated. At epsilon 0.1 it's
+a exact finite number, and once the model reaches it the grad is zero.
 The model now has a reason to *stop*.
 
-That is the mechanism. Not noise, not regularisation in the weight-decay sense
+That is the mechanism. Not noise, not smoothing in the weight-decay sense
 &mdash; a reachable target where before there was none.
 
 ## The loss will not reach zero
 
-The readout also gives the minimum achievable loss, which is the entropy of the
+The readout also gives the min achievable loss. This Is the entropy of the
 smoothed target.
 
-A model matching the smoothed target perfectly still reports a loss around 0.5
-at typical settings. This surprises people who expect training loss to approach
-zero, and it is not a bug: you changed what perfect means.
+A model matching the smoothed target just right still reports a loss around 0.5
+at common settings. This surprises people who expect training loss to approach
+zero, and it isn't a bug: you changed what perfect means.
 
-It also means training and validation losses are no longer comparable with runs
-that did not use smoothing. Compare accuracy, or compare like with like.
+It also means training and validation losses are no longer close with runs
+that didn't use smoothing. Compare fit, or compare like with like.
 
 ## What it buys, and what it costs
 
-**Better calibration.** The headline benefit. Confidences become closer to
-observed accuracies.
+**Better calibration.** The headline gain. Confidences become closer to
+seen accuracies.
 
-**Better generalisation.** Consistent small gains across image classification
-and translation. It was in the Inception-v3 paper and in the original
+**Better generalisation.** Steady small gains across image classification
+and translation. It was in the Inception-v3 paper and in the first
 Transformer, at 0.1 in both, and 0.1 has been the default ever since.
 
-**Tighter class clusters.** Representations of a class group more tightly, with
+**Tighter class clusters.** Forms of a class group more tightly, with
 more even distances between classes.
 
 That last one has a cost. **Label smoothing hurts distillation.** A student
-learns from the teacher's full output distribution, and the informative part is
-the relative sizes of the *wrong* classes &mdash; that this dog was slightly cat
-and not at all lorry. Smoothing deliberately flattens exactly that, erasing what
+learns from the teacher's full output spread, and the helpful part is
+the scaled sizes of the *wrong* classes. That this dog was slightly cat
+and not at all lorry. Smoothing on purpose flattens just that, erasing what
 the student was supposed to learn. If a model is going to be a distillation
 teacher, train it without.
 
@@ -3062,7 +3062,7 @@ teacher, train it without.
 Two numbers make label smoothing concrete. With `epsilon = 0.1` and `K = 10`
 classes, the target puts `1 - 0.1 + 0.1/10 = 0.91` on the correct class and
 `0.1/10 = 0.011` on each of the other nine. A model that matches that target
-*exactly* still records a cross-entropy equal to the target's own entropy:
+*just* still records a cross-entropy equal to the target's own entropy:
 
 `-(0.91 &middot; ln 0.91 + 9 &middot; 0.011 &middot; ln 0.011) &asymp; 0.50`
 
@@ -3071,54 +3071,54 @@ classes, the target puts `1 - 0.1 + 0.1/10 = 0.91` on the correct class and
 |one-hot|0 (but never reached &mdash; needs an infinite logit gap)|
 |smoothed, eps = 0.1|~0.50|
 
-That is the whole mechanism, stated as arithmetic. The one-hot target has a floor
+That is the whole mechanism, stated as math. The one-hot target has a floor
 of zero that softmax can only approach by driving the correct logit infinitely
-far from the rest &mdash; so the gradient never vanishes and training keeps
-inflating confidence. The smoothed target has a floor of 0.50 reached at a
+far from the rest &mdash; so the grad never vanishes and training keeps
+inflating trust. The smoothed target has a floor of 0.50 reached at a
 *finite* logit gap, so the model has a reason to stop, and it stops before it
-becomes overconfident. It also means a smoothed run's training loss is not
-comparable with an unsmoothed one: 0.50 is the new zero, and comparing the raw
-numbers across the two is comparing against different floors.
+turns too sure. It also means a smoothed run's training loss isn't
+close with an unsmoothed one: 0.50 is the new zero, and checking the raw
+numbers across the two is checking against different floors.
 
 The one place smoothing actively hurts is distillation. A student learns from the
-teacher's full output distribution, and the informative part is the relative sizes
-of the *wrong* classes &mdash; that a particular dog photo is a little cat-like and
-not at all lorry-like. That structure is exactly what smoothing flattens, by
-design, pushing every wrong class toward the same small value. So a model destined
-to be a distillation teacher should be trained without it, even though 0.1 is the
-right default almost everywhere else &mdash; it was in the Inception-v3 paper and
-the original Transformer, and it has stayed the default because the calibration
-and generalisation gains are consistent across classification and translation
+teacher's full output spread, and the helpful part is the scaled sizes
+of the *wrong* classes &mdash; that a given dog photo is a little cat-like and
+not at all lorry-like. That structure is just what smoothing flattens, by
+design, pushing each wrong class toward the same small value. So a model destined
+to be a distillation teacher should be trained without it, though 0.1 is the
+right default almost all over else. It was in the Inception-v3 paper and
+the first Transformer, and it has stayed the default because the calibration
+and generalisation gains are steady across classification and translation
 alike.
 
-It is also worth remembering what smoothing is not: it is a change to a
-categorical target, so it has no meaning for regression, and it is not a
-substitute for explicit calibration. Temperature scaling on a validation set
-corrects confidence more directly, and the two compose &mdash; smoothing during
+It's also worth remembering what smoothing isn't: it's a change to a
+cat target, so it has no meaning for regression, and it isn't a
+substitute for clear calibration. Temperature scaling on a validation set
+corrects trust more right, and the two compose &mdash; smoothing during
 training, scaling afterwards.
 
 ## Where it goes wrong
 
-**Epsilon too large.** Past about 0.2 you are actively teaching the model that
-wrong answers are plausible, and accuracy falls. Drag it up and watch the target
+**Epsilon too large.** Past about 0.2 you're actively teaching the model that
+wrong answers are plausible, and fit falls. Drag it up and watch the target
 flatten.
 
-**Comparing losses across runs.** The floor moved.
+**Checking losses across runs.** The floor moved.
 
-**Using it on a teacher model.** It removes the dark knowledge distillation
+**Using it on a teacher model.** It drops the dark knowledge distillation
 depends on.
 
-**Applying it to regression.** It is a change to a categorical target and has no
+**Applying it to regression.** It's a change to a cat target and has no
 meaning without one.
 
-**Expecting it to fix a badly calibrated model on its own.** It helps; explicit
+**Expecting it to fix a badly calibrated model on its own.** It helps. Clear
 [temperature
 scaling](../machine_learning/probability_calibration.html) on a validation set
 helps more, and the two combine.
 
 ## Tell the model it might be wrong
 
-Replacing a target of 1.0 with 0.9 changes what the loss is minimised by. This computes that optimum exactly, then shows the effect on confidence and on the logits themselves.
+Replacing a target of 1.0 with 0.9 changes what the loss is minimised by. This finds that optimum just, then shows the effect on trust and on the logits themselves.
 
 ```python-run
 import numpy as np

@@ -99,7 +99,7 @@ intro: Why a column measured in pounds drowns out a column measured in years, an
 ## The problem is the units
 
 The data here has two columns: age, spanning roughly 25 to 55, and income,
-spanning roughly 20,000 to 70,000. They describe a person about equally well.
+spanning roughly 20,000 to 70,000. They show a person about equally well.
 
 Set the scaler to None and look at the readout. The income range is around a
 thousand times the age range. Now consider what k-NN does &mdash; it finds the
@@ -109,27 +109,27 @@ nearest points by Euclidean distance:
 distance^2 = (age1 - age2)^2 + (income1 - income2)^2
 ```
 
-A ten-year age difference contributes 100 to that sum. A ten-pound income
-difference contributes 100 as well. A five-thousand-pound difference contributes
+A ten-year age difference adds 100 to that sum. A ten-pound income
+difference adds 100 as well. A five-thousand-pound difference adds
 twenty-five million.
 
-The age term is not merely less important. It is numerically irrelevant: any
+The age term isn't merely less key. It's by number irrelevant: any
 plausible age difference is lost in the rounding of the income term. The model
-is effectively one-dimensional, and nobody asked for that.
+is in effect one-dimensional, and no one asked for that.
 
 ## What the scalers do
 
-Switch to **StandardScaler**. Each column has its mean subtracted and is divided
+Switch to **StandardScaler**. Each column has its mean subtracted and is cut
 by its standard deviation, so both end up centred on 0 with a spread of about 1.
-The scatter becomes roughly circular, both columns contribute comparably, and
-the accuracy in the readout moves.
+The scatter turns roughly circular, both columns contribute comparably, and
+the fit in the readout moves.
 
 ```
 z = (x - mean) / std
 ```
 
-Switch to **MinMaxScaler**. Each column is mapped onto [0, 1] using its minimum
-and maximum:
+Switch to **MinMaxScaler**. Each column is mapped onto [0, 1] using its min
+and max:
 
 ```
 x' = (x - min) / (max - min)
@@ -147,30 +147,30 @@ the basis for choosing.
 
 MinMax's weakness is worth stating plainly. Both statistics it uses are the most
 outlier-sensitive numbers available. One salary of ten million maps to 1.0 and
-crushes every real salary into the bottom half of a per cent of the range.
+crushes each real salary into the bottom half of a per cent of the range.
 
 ## Which models care
 
 **Sensitive**, because they measure distance or magnitude:
 
-- k-NN and k-means &mdash; distance is the entire algorithm
-- SVM with an RBF or polynomial kernel &mdash; the kernel is a distance
-- PCA &mdash; it finds directions of maximum variance, and unscaled variance is
+- k-NN and k-means &mdash; distance is the entire method
+- SVM with an RBF or polynomial kernel. The kernel is a distance
+- PCA &mdash; it finds directions of max variance, and unscaled variance is
   dominated by whichever column has the biggest units
-- Neural networks &mdash; not for correctness, but gradients on wildly different
+- Neural networks &mdash; not for correctness. But Grads on wildly different
   scales make optimisation slow and unstable
-- Ridge and Lasso &mdash; the penalty is on coefficient size, and coefficient
+- Ridge and Lasso &mdash; the fine is on coeff size, and coeff
   size depends on the units of its column
 
 **Not sensitive:**
 
-- Decision trees, random forests, gradient boosting
+- choice trees, random forests, grad boosting
 
 That last group surprises people, and the reason is worth having. A tree split
-asks `is income > 45000`. Rescale the column and the question becomes
-`is income' > 0.53`, which partitions the rows into exactly the same two groups.
-Any monotonic transformation leaves every possible split unchanged, so the tree
-is identical. Scaling before a random forest is not wrong; it is simply a
+asks `is income > 45000`. Rescale the column and the question turns
+`is income' > 0.53`. This Splits the rows into just the same two groups.
+Any monotonic change leaves each possible split unchanged, so the tree
+is the same. Scaling before a random forest isn't wrong. It's simply a
 no-op.
 
 ## The rule that matters more than the choice
@@ -178,17 +178,17 @@ no-op.
 Fit the scaler on the **training data only**, then apply it to the test data
 without refitting.
 
-The mean and standard deviation are learned parameters. Computing them from the
-whole dataset lets information about the test set reach the model before it is
-evaluated, and the reported score stops being an estimate of anything. That is
-[data leakage](data_leakage.html), it is the most common serious mistake in
-applied machine learning, and it is why scalers belong inside a
+The mean and standard deviation are learned params. finding them from the
+whole dataset lets info about the test set reach the model before it's
+tested, and the reported score stops being an guess of any of it. That is
+[data leakage](data_leakage.html), it's the most common serious mistake in
+applied machine learning, and it's why scalers belong inside a
 [pipeline](ml_pipelines.html) rather than being applied by hand.
 
 ## Standardising, and why trees do not care
 
 The fix is one formula applied per column, `z = (x - mean) / std`, and working it
-shows why some models transform completely and others not at all. Age spanning
+shows why some models transform fully and others not at all. Age spanning
 25-55 and income spanning 20,000-70,000, standardised:
 
 |raw|z-score|
@@ -198,49 +198,49 @@ shows why some models transform completely and others not at all. Age spanning
 |income 25,000 (mean 45k, sd 15k)|&minus;1.3|
 |income 70,000|+1.7|
 
-Both columns now live on the same &minus;3-to-3 scale, so a year of age and a
+Both columns now live on the same &minus;3-to-3 scale. A year of age and a
 standard-deviation of income count comparably in a Euclidean distance &mdash; where
 before, the income term's raw spread of 50,000 against age's 30 made age
-numerically invisible to k-NN, k-means, SVM-RBF and PCA. A decision tree, by
-contrast, is completely unmoved: its split asks `is income > 45000`, which after
-scaling becomes `is income' > 0.53`, and that partitions the rows into exactly the
-same two groups. Any monotonic rescaling leaves every possible split unchanged, so
-scaling before a random forest is a genuine no-op &mdash; not wrong, just wasted
-effort &mdash; while for the distance-based models it is the difference between a
+by number invisible to k-NN, k-means, SVM-RBF and PCA. A choice tree, by
+contrast, is fully unmoved: its split asks `is income > 45000`, which after
+scaling turns `is income' > 0.53`, and that splits the rows into just the
+same two groups. Any monotonic rescaling leaves each possible split unchanged, so
+scaling before a random forest is a genuine no-op. Not wrong, just wasted
+effort &mdash; while for the distance-based models it's the difference between a
 usable model and a one-dimensional one.
 
 The choice between the two common scalers comes down to outliers. StandardScaler
-uses the mean and standard deviation, so one extreme value shifts the centre only a
-little; MinMaxScaler uses the minimum and maximum, the two most outlier-sensitive
-numbers there are, so a single salary of ten million maps to 1.0 and crushes every
+uses the mean and standard deviation. So One extreme value shifts the centre only a
+little. MinMaxScaler uses the min and max, the two most outlier-sensitive
+numbers there are, so a single salary of ten million maps to 1.0 and crushes each
 real salary into the bottom fraction of a per cent of the range. StandardScaler is
-the safer default for most data, MinMax suits genuinely bounded inputs like image
-pixels. One thing neither should touch is a one-hot column: it is already 0 and 1,
-and standardising it turns two meaningful values into two arbitrary ones for no
+the safer default for most data, MinMax suits truly bounded inputs like image
+pixels. One thing neither should touch is a one-hot column: it's already 0 and 1,
+and standardising it turns two real values into two any ones for no
 gain.
 
-And if you scale the target as well as the features, remember to invert the
-transform on the predictions, or the error metric comes back in scaled units and
+And if you scale the target and the features, note to invert the
+transform on the guesses, or the error metric comes back in scaled units and
 means nothing &mdash; a small bookkeeping step that is easy to forget and quietly
-corrupts every reported number.
+corrupts each reported number.
 
 ## Where it goes wrong
 
-**Fitting the scaler on everything.** The number you report goes up and the
-model does not get better.
+**Fitting the scaler on all.** The number you report goes up and the
+model doesn't get better.
 
-**Scaling the target variable and forgetting to invert it.** Predictions come
+**Scaling the target variable and losing to invert it.** guesses come
 back in scaled units and the error metric is meaningless.
 
 **MinMax on data with outliers.** The real data ends up in a sliver of the
 range.
 
-**Scaling one-hot columns.** They are already 0 and 1. StandardScaler turns them
-into two arbitrary values and makes the model harder to read for no gain.
+**Scaling one-hot columns.** They're already 0 and 1. StandardScaler turns them
+into two any values and makes the model harder to read for no gain.
 
 ## Which models care, and which do not
 
-One dataset, one column rescaled by 10,000, five models. Two collapse, two do not move at all, and the fifth is the interesting case.
+One dataset, one column rescaled by 10,000, five models. Two collapse, two don't move at all. The fifth is the notable case.
 
 ```python-run
 import numpy as np
@@ -378,33 +378,33 @@ intro: The mistake that makes your model look better and your results worthless.
 
 ## What it is
 
-Leakage is any route by which information about the data you are evaluating on
-reaches the model before the evaluation. The model then answers a question it
+Leakage is any route by which info about the data you're testing on
+reaches the model before the test. The model then answers a question it
 was quietly shown the answer to, and the score you report measures nothing you
 can act on.
 
 It has no error message. Nothing crashes, nothing warns, and the only symptom is
-that the number is better than you expected &mdash; which is not a symptom
+that the number is better than you expected. Which isn't a symptom
 anyone investigates.
 
 ## Watch it happen, on data with nothing in it
 
-The dataset behind the chart is 300 rows and several hundred columns of pure
-noise. The labels are assigned independently of every column. There is no signal
+The dataset behind the chart is 300 rows and a few hundred columns of pure
+noise. The labels are assigned on its own of each column. There's no signal
 whatsoever, and the only honest score is 50%.
 
-Set the control to **Once, on the whole dataset**. Five columns are picked by
+Set the control to **Once, dataset**. Five columns are picked by
 correlating each one with the label across all 300 rows, and only then is the
-data cross-validated. The reported accuracy is well above 50%, on data that
-contains nothing.
+data cross-validated. The reported fit is well above 50%, on data that
+holds nothing.
 
-Now set it to **Inside each fold**. The selection is redone within each fold's
-training rows, and the reported accuracy falls back to chance &mdash; in fact
+Now set it to **Inside each fold**. The pick is redone within each fold's
+training rows, and the reported fit falls back to chance &mdash; 
 slightly below it, which is worth a sentence of its own further down.
 
-Drag the number of columns up. The inflation grows: 40 candidate columns buy a
-few points, 600 buy considerably more. With more columns to search there is
-always some that correlate with the labels by chance, and the selection was
+Drag the number of columns up. The inflation grows: 40 pick columns buy a
+few points, 600 buy a lot more. With more columns to search there's
+always some that correlate with the labels by chance, and the pick was
 allowed to see the labels of the rows it was later tested on.
 
 Nothing about the model changed between those two settings. The only difference
@@ -412,52 +412,52 @@ is whether the rows being scored had a say in which columns were used.
 
 ## Why the honest number lands below 50%
 
-The correct setting reports something like 45%, not 50%, and that is not a bug
-in the demonstration.
+The correct setting reports a thing like 45%, not 50%, and that isn't a bug
+in the demo.
 
 A column is chosen inside a fold because it happened to separate the classes in
-those training rows. On pure noise that separation is entirely accidental, and
+those training rows. On pure noise that gap is fully accidental, and
 an accident large enough to win a search over hundreds of columns is an extreme
 one. Extremes regress: on the held-out rows, that column is as likely to lean
 the other way as this way, and the centroid built from the training rows then
 points slightly the wrong direction.
 
-So selecting features on noise does not merely fail to help. It can actively
+So selecting features on noise doesn't merely fail to help. It can actively
 mislead, and a model built on selected noise can score worse than one that
-ignores the data entirely. That is worth knowing on its own, and it is the
-strongest available argument for checking whether a feature-selection step is
+skips the data fully. That is worth knowing on its own, and it's the
+strongest available arg for checking whether a feature-pick step is
 earning its place.
 
 ## Why a scaler counts as a model
 
 The instinct that makes this feel harmless is that scaling is "just
-preprocessing". But `StandardScaler` has parameters &mdash; a mean and a
-standard deviation &mdash; and it *learns* them from data. Anything that learns
-parameters from data must learn them from training data only.
+prep". But `StandardScaler` has params &mdash; a mean and a
+standard deviation &mdash; and it *learns* them from data. any of it that learns
+params from data must learn them from training data only.
 
-The same argument applies to every step that looks at the data as a whole:
+The same arg applies to each step that looks at the data as a whole:
 
 - imputing missing values with a column mean
-- selecting the top *k* features by correlation with the target
+- selecting the top *k* features by link with the target
 - fitting a PCA rotation
-- learning target encodings for categorical columns
-- computing TF-IDF weights
+- learning target encodings for cat columns
+- finding TF-IDF weights
 - resampling to balance classes
 
-Every one of those is fitted, and every one leaks if fitted before the split.
+each one of those is fitted, and each one leaks if fitted before the split.
 
-They do not leak equally, and it is worth being straight about that. A scaler
+They don't leak equally, and it's worth being straight about that. A scaler
 fitted on a few hundred well-behaved rows leaks a real but tiny amount: the mean
 barely moves when you add the validation rows to it, and the reported score may
-shift by a fraction of a per cent. Feature selection leaks enormously, which is
-why it is the demonstration above. The scaler case still matters, because a
+shift by a fraction of a per cent. Feature pick leaks enormously, which is
+why it's the demo above. The scaler case still matters, because a
 fraction of a per cent is enough to change which of two models you ship, and
-because the habit that prevents one prevents the other.
+because the habit that blocks one blocks the other.
 
 ## The other kind
 
-The second family has nothing to do with order of operations. It is a feature
-that could not exist at prediction time.
+The second family has nothing to do with order of ops. It's a feature
+that couldn't exist at guess time.
 
 A model predicting whether a customer will churn, trained on a table that
 includes `cancellation_reason`. A model predicting loan default with a column
@@ -466,10 +466,10 @@ a diagnosis has been made.
 
 These are obvious when written out and very hard to spot in a warehouse table
 with three hundred columns, most of them undocumented. The diagnostic question
-is not "is this related to the target" but **"would this value be present, and
-correct, at the moment I need a prediction?"**
+isn't "is this related to the target" but **"would this value be present, and
+correct, at the moment I need a guess?"**
 
-A near-perfect score is the strongest evidence of leakage there is. If a model
+A near-perfect score is the strongest evidence of leakage there's. If a model
 reports 99% on a problem people find hard, the correct first response is
 suspicion, not celebration.
 
@@ -478,37 +478,37 @@ suspicion, not celebration.
 Two subtler cases are worth naming.
 
 **Time.** A random split of time-series data puts future rows in the training
-set and past rows in the test set, so the model is asked to predict backwards
+set and past rows in the test set. The model is asked to predict backwards
 after being shown what happened. Split by time, always.
 
-**Groups.** If one patient contributes ten scans, a random split scatters them
+**Groups.** If one patient adds ten scans, a random split scatters them
 across train and test. The model can recognise the patient rather than the
-condition, and the score reflects that. Split by group.
+rule, and the score reflects that. Split by group.
 
 ## The fix
 
-Put every fitted step inside a [pipeline](ml_pipelines.html) and cross-validate
+Put each fitted step inside a [pipeline](ml_pipelines.html) and cross-validate
 the pipeline, not the model. Then each fold fits its own scaler, its own imputer
-and its own feature selection on that fold's training portion, which is exactly
-what you would have to do in production.
+and its own feature pick on that fold's training portion, which is just
+what you'd have to do in production.
 
-This is not a stylistic preference. It is the only arrangement in which the
-order of operations cannot be got wrong by accident.
+This isn't a stylistic preference. It's the only setup in which the
+order of ops can't be got wrong by accident.
 
 ## Where it goes wrong
 
 **Scaling or imputing before `train_test_split`.** The commonest form.
 
-**Selecting features on the full dataset.** Produces plausible scores from noise.
+**Selecting features on the full dataset.** makes plausible scores from noise.
 
 **Random splits on time series or grouped data.**
 
-**Believing a suspiciously good result.** It is nearly always leakage, and
-finding out later is much more expensive than checking now.
+**Believing a oddly good result.** It's nearly always leakage, and
+finding out later is much more costly than checking now.
 
 ## A model that scores well and knows nothing
 
-Select features using the whole dataset, then cross-validate. The score is excellent and completely fake, because the data is pure noise.
+Select features using the whole dataset, then cross-validate. The score is great and fully fake. The data is pure noise.
 
 ```python-run
 import numpy as np
@@ -622,73 +622,73 @@ intro: Four strategies, and why choosing between them starts with a question abo
 
 ## Why, before what
 
-Every tutorial answers "what do I do about NaN". The question that decides the
+each tutorial answers "what do I do about NaN". The question that decides the
 answer is **why the value is absent**, and there are three cases with three
 different consequences.
 
-**Missing completely at random.** The absence has nothing to do with anything.
-A form field lost to a transmission error. This is the harmless case, and it is
+**Missing fully at random.** The lack has nothing to do with any of it.
+A form field lost to a transmission error. This is the harmless case, and it's
 rare.
 
-**Missing at random.** The absence depends on other columns you have. Younger
-respondents skip the income question more often, and you have their age. This is
-recoverable, because the information needed to model the absence is present.
+**Missing at random.** The lack depends on other columns you've. Younger
+respondents skip the income question more often, and you've their age. This is
+recoverable, because the info needed to model the lack is present.
 
-**Missing not at random.** The absence depends on the missing value itself.
-High earners decline to state their income. This is the hard case, and it is
+**Missing not at random.** The lack depends on the missing value itself.
+High earners decline to state their income. This is the hard case, and it's
 also the common one.
 
-The data in the visualisation is deliberately the third kind: the largest values
-are the ones that failed. Look at the two histograms. The grey distribution is
-what existed; the orange one is what each strategy leaves you with.
+The data in the visualisation is on purpose the third kind: the largest values
+are the ones that failed. Look at the two histograms. The grey spread is
+what existed. The orange one is what each strategy leaves you with.
 
 ## Drop the rows
 
 Select **Drop**. The right tail is gone, and the mean in the readout has fallen
 well below the true mean.
 
-Nothing about dropping is wrong in principle. It is unbiased when the values are
-missing completely at random, and with a handful of affected rows out of many it
-is a perfectly reasonable choice.
+Nothing about dropping is wrong in principle. It's unbiased when the values are
+missing fully at random, and with a handful of affected rows out of many it
+is a just right reasonable choice.
 
-Here it is a disaster, because the rows removed are not a random sample &mdash;
-they are the large ones. Every statistic computed afterwards describes a
-population that excludes them.
+Here it's a disaster, because the rows removed aren't a random sample &mdash;
+they're the large ones. each statistic found afterwards shows a
+group that excludes them.
 
-The other cost is arithmetic. Dropping any row with any missing value across ten
-columns each 5% missing removes about 40% of the data, even though 95% of every
-individual column is present.
+The other cost is math. Dropping any row with any missing value across ten
+columns each 5% missing drops about 40% of the data, though 95% of each
+single column is present.
 
 ## Fill with the mean, or the median
 
 Select **Mean**, then **Median**. Both put a spike at a single value in the
-middle of the distribution, and both leave the mean below the truth.
+middle of the spread, and both leave the mean below the truth.
 
-They differ in robustness. The mean is dragged by extreme values; the median is
-not. For a skewed column &mdash; income, house prices, time-to-event &mdash; the
-median is the better default, and for a roughly symmetric column the two are
+They differ in robustness. The mean is dragged by extreme values. The median is
+not. For a skewed column. Income, house prices, time-to-event &mdash; the
+median is the better default, and for a roughly even column the two are
 close enough that it rarely matters.
 
-What neither can do is invent information. Imputation makes the dataset
-rectangular so the model will accept it. It does not restore what was lost, and
-it introduces two distortions worth knowing:
+What neither can do is invent info. Imputation makes the dataset
+rectangular so the model will accept it. It doesn't restore what was lost, and
+it adds two distortions worth knowing:
 
-- **Variance shrinks.** A pile of identical values has none.
-- **Correlations weaken.** The imputed rows carry no relationship to any other
-  column, so they dilute every relationship the column really had.
+- **Variance shrinks.** A pile of the same values has none.
+- **Links weaken.** The imputed rows carry no tie to any other
+  column, so they dilute each tie the column really had.
 
 ## Keep the fact that it was missing
 
-Select **Median + indicator**. The imputation is the same; what changes is that
-a second column is added, holding 1 where the value was missing and 0 otherwise.
+Select **Median + indicator**. The imputation is the same. What changes is that
+a second column is added, holding 1 where the value was missing and 0 or else.
 
-This is usually the best simple answer, because in the third case &mdash;
-missing not at random &mdash; **the absence is itself informative**. If high
+This is often the best simple answer, because in the third case &mdash;
+missing not at random &mdash; **the lack is itself helpful**. If high
 earners decline to answer, then "declined to answer" predicts high earnings, and
 plain imputation throws that signal away while an indicator preserves it.
 
-It costs one column and no assumptions. It is hard to do worse than the
-alternatives with it.
+It costs one column and no assumptions. It's hard to do worse than the
+options with it.
 
 | Strategy | Keeps rows | Keeps distribution | Keeps the signal in absence |
 |---|---|---|---|
@@ -701,21 +701,21 @@ alternatives with it.
 ## More sophisticated options
 
 **k-NN imputation** fills a value from similar rows. **MICE** models each column
-from the others, iteratively. Both preserve relationships better than a constant
-and both cost far more computation, and both must be fitted on training data
-only &mdash; they are models, so imputing before the split is
+from the others, iteratively. Both preserve ties better than a constant
+and both cost far more work, and both must be fitted on training data
+only &mdash; they're models, so imputing before the split is
 [leakage](data_leakage.html).
 
 Also worth knowing: some models handle missing values natively. LightGBM and
 XGBoost learn a default direction at each split for rows whose value is absent,
-which is frequently better than anything you would impute by hand.
+which is often better than any of it you'd impute by hand.
 
 ## Why "why" changes the answer
 
 The strategy matters far less than the reason the value is absent, and the same
 30%-missing column shows it. When the missing values are the *largest* ones
-(missing not at random &mdash; high earners decline to state income), every method
-that ignores the absence inherits the bias:
+(missing not at random &mdash; high earners decline to state income), each method
+that skips the lack inherits the bias:
 
 |values 1-100, top 30 missing|resulting mean|
 |---|---|
@@ -724,33 +724,33 @@ that ignores the absence inherits the bias:
 |after mean/median imputation|~35.5 (a spike at the low centre)|
 
 Dropping or filling both land near 35.5, understating the truth by fifteen, because
-the rows removed or flattened are exactly the high ones &mdash; no arithmetic on the
+the rows removed or flattened are just the high ones. No math on the
 values that remain can recover values that were never seen. The one strategy that
 helps adds a *missingness indicator*: a second column marking which rows were
-absent. In the not-at-random case the absence is itself the signal &mdash; "declined
-to answer" predicts high income &mdash; so keeping that flag lets the model use what
+absent. In the not-at-random case the lack is itself the signal &mdash; "declined
+to answer" predicts high income. So keeping that flag lets the model use what
 plain imputation throws away. It costs one column and no assumptions. And dropping
-carries a second, arithmetic cost: with ten columns each 5% missing,
-`1 - 0.95^10 = 40%` of rows have *some* gap, so row-dropping discards 40% of the
-data even though 95% of every column is present.
+carries a second, math cost: with ten columns each 5% missing,
+`1 - 0.95^10 = 40%` of rows have *some* gap. Row-dropping discards 40% of the
+data though 95% of each column is present.
 
 ## Where it goes wrong
 
-**Imputing before the split.** The column mean is computed from the test rows
+**Imputing before the split.** The column mean is found from the test rows
 too.
 
 **Filling with zero without thinking.** Zero is a real value in most columns. A
-temperature of zero is not a missing temperature.
+temperature of zero isn't a missing temperature.
 
-**Dropping rows across many columns at once.** A little missingness everywhere
-removes a lot of data.
+**Dropping rows across many columns at once.** A little missingness all over
+drops a lot of data.
 
 **Never checking why.** Ten minutes finding out what caused the gap is worth
 more than any choice of strategy.
 
 ## Dropping, filling, and the flag that saves you
 
-Whether a gap can be safely filled depends entirely on WHY it is missing. Two datasets with the same 30% hole rate, and only one of them is fixable by imputation.
+Whether a gap can be safely filled depends fully on WHY it's missing. Two datasets with the same 30% hole rate. Only one of them is fixable by imputation.
 
 ```python-run
 import numpy as np
@@ -885,97 +885,97 @@ intro: One row out of twenty-five, and the reason it can decide your answer.
 
 The chart holds twenty-four points along a clear upward line, plus one
 highlighted point you can move. The dashed line is the least-squares fit without
-it; the solid line is the fit with it.
+it. The solid line is the fit with it.
 
 Drag the point straight up. The solid line rotates. Drag it to the far right and
 up, and the line follows it much further. The readout reports both slopes and
-the percentage difference between them, and it does not take much to change the
+the percentage difference between them, and it doesn't take much to change the
 answer by tens of per cent.
 
 Twenty-four rows are saying one thing. The twenty-fifth overrules them.
 
 ## Why squaring does this
 
-Least squares chooses the line minimising the **sum of squared** residuals.
+Least squares chooses the line cutting the **sum of squared** residuals.
 Squaring is what makes a single point so powerful: a point twice as far from the
-line contributes four times the penalty, and one ten times as far contributes a
+line adds four times the fine, and one ten times as far adds a
 hundred times.
 
-The fit is therefore willing to move a long way to reduce one large residual,
-even at the cost of small increases across every other point. That is not a bug
-in the implementation; it is what the objective function asks for.
+The fit is so willing to move a long way to reduce one large residual,
+even at the cost of small grows across every other point. That isn't a bug
+in the setup. It's what the goal function asks for.
 
 ## Leverage: where it sits matters as much as how far off it is
 
 Drag the point up while keeping it near the middle of the x range, then drag it
-up while keeping it at the far right. The second position moves the line much
+up while keeping it at the far right. The second spot moves the line much
 more.
 
 That difference is **leverage**. A regression line pivots roughly about the mean
 of x, so a point near that mean is close to the pivot and has little turning
-effect no matter how far off it is vertically. A point at the extreme of x sits
+effect no matter how far off it's vertically. A point at the extreme of x sits
 at the end of a long lever.
 
-The distinction is worth having in three words:
+The gap is worth having in three words:
 
 - **Outlier** &mdash; unusual in y, a large residual.
 - **High leverage** &mdash; unusual in x, far from the pivot.
-- **Influential** &mdash; both, so removing it changes the model. This is the
+- **Influential** &mdash; both, so dropping it changes the model. This is the
   one that matters, and Cook's distance is the standard way to measure it.
 
 A high-leverage point that happens to lie on the trend is harmless. A moderate
-outlier in the middle is harmless. The combination is not.
+outlier in the middle is harmless. The combination isn't.
 
 ## Before you remove anything
 
 The temptation is to delete the point. Resist it long enough to ask which of
-three things it is.
+three things it's.
 
 **An error.** A misplaced decimal, a sensor fault, a unit mix-up, a placeholder
-like 999 or &minus;1 meaning "unknown". Fix it or remove it, and record that you
+like 999 or &minus;1 meaning "unknown". Fix it or drop it, and record that you
 did.
 
-**A different population.** The row is correct but does not belong to the
+**A different group.** The row is correct but doesn't belong to the
 question &mdash; a wholesale order in a table of retail purchases. Exclude it and
-say so, or model the groups separately.
+say so, or model the groups apart.
 
-**A real, extreme member of the population.** The row is correct and belongs.
-This one you keep. Removing genuine extremes because they are inconvenient is
-how a result stops describing the world, and it is much more common than
+**A real, extreme member of the group.** The row is correct and belongs.
+This one you keep. Dropping genuine extremes because they're inconvenient is
+how a result stops showing the world, and it's much more common than
 deliberate fraud.
 
-If you cannot tell which, report the analysis both ways. A conclusion that
-survives the point and a conclusion that depends on it are different findings,
-and the reader is entitled to know which they have.
+If you can't tell which, report the analysis both ways. A conclusion that
+lives the point and a conclusion that depends on it are different findings,
+and the reader is entitled to know which they've.
 
 ## Ways to be less fragile
 
 **Robust loss.** Huber loss is squared for small residuals and linear for large
-ones, so a distant point pulls hard but not quadratically hard. RANSAC fits on
+ones, so a distant point pulls hard but not as n&sup2; hard. RANSAC fits on
 random subsets and keeps the consensus.
 
 **Quantile regression.** Models the median rather than the mean, and the median
-does not move when one point is dragged to infinity.
+doesn't move when one point is dragged to infinity.
 
 **Winsorising.** Clip values at, say, the 1st and 99th percentiles. Keeps the
-row, caps its influence.
+row, caps its sway.
 
-**Use a model that does not care.** Trees split on order, not on distance, so
+**Use a model that doesn't care.** Trees split on order, not on distance, so
 a value of a million and a value of a thousand are the same split if nothing
 lies between them.
 
-**Transform.** A log transform on a skewed positive column often turns
-"outliers" into ordinary members of a normal-shaped distribution, which is
-usually a sign the column was on the wrong scale.
+**Transform.** A log transform on a skewed plus column often turns
+"outliers" into plain members of a normal-shaped spread, which is
+often a sign the column was on the wrong scale.
 
 ## Why position matters as much as distance
 
 The reason one far-off point wrecks a fit and another leaves it alone is leverage,
-and squared error is what makes it bite. Least squares minimises the *sum of
-squared* residuals, so a point twice as far off contributes four times the penalty
-and one ten times as far contributes a hundred times &mdash; the line will travel a
+and squared error is what makes it bite. Least squares cuts the *sum of
+squared* residuals, so a point twice as far off adds four times the fine
+and one ten times as far adds a hundred times. The line will travel a
 long way to reduce a single large residual. But a regression line pivots roughly
-about the mean of x, so how far a point sits along x decides how much turning force
+about the mean of x. So How far a point sits along x decides how much turning force
 its vertical error applies:
 
 |the odd point|effect on the slope|
@@ -985,10 +985,10 @@ its vertical error applies:
 
 That gives three distinct things worth separating: an **outlier** is unusual in y,
 **high leverage** is unusual in x, and only their combination &mdash;
-**influential** &mdash; actually moves the model, which is what Cook's distance
-measures. A high-leverage point sitting on the trend is harmless; a mid-range
-outlier is harmless; the far-right outlier is the one that quietly rewrites the
-answer. Which is also why "delete anything beyond three standard deviations" is
+**influential** &mdash; really moves the model. This Is what Cook's distance
+measures. A high-leverage point sitting on the trend is harmless. A mid-range
+outlier is harmless. The far-right outlier is the one that quietly rewrites the
+answer. Which is also why "delete any of it beyond three standard deviations" is
 self-defeating: the outlier has already inflated the standard deviation the rule
 depends on.
 
@@ -998,17 +998,17 @@ depends on.
 deviation, which the outlier itself has already inflated.
 
 **Treating placeholders as data.** 999 for unknown age, &minus;1 for missing.
-These are not outliers; they are missing values wearing a number.
+These aren't outliers. They're missing values wearing a number.
 
-**Removing points until the model fits.** At that stage the model describes the
-selection, not the phenomenon.
+**Dropping points until the model fits.** At that stage the model shows the
+pick, not the effect.
 
-**Checking only y.** High-leverage points can be unremarkable in y and still
+**Checking only y.** High-leverage points can be plain in y and still
 dominate the fit.
 
 ## An outlier and an influential point are not the same thing
 
-One far-out row can leave a fit untouched while another moves it completely. The difference is leverage, and it is computable.
+One far-out row can leave a fit untouched while another moves it fully. The difference is leverage, and it's computable.
 
 ```python-run
 import numpy as np
@@ -1170,20 +1170,20 @@ topic(
     ],
     """
 title: Pipelines
-intro: Not a convenience wrapper. The arrangement in which the order of operations cannot be got wrong.
+intro: Not a convenience wrapper. The setup in which the order of ops can't be got wrong.
 
 ## The same demonstration, one level up
 
 The chart is the one from the [leakage](data_leakage.html) module, relabelled:
-300 rows of pure noise, five columns chosen by their correlation with the label,
+300 rows of pure noise, five columns chosen by their link with the label,
 and a choice about *when* that choice is made.
 
-By hand, before cross-validation, the reported accuracy sits well above the 50%
-the data deserves. Inside a pipeline, where every fold selects its own columns
+By hand, before cross-validation, the reported fit sits well above the 50%
+the data deserves. Inside a pipeline. Here Each fold selects its own columns
 from its own training rows, it falls to the truth.
 
-The model is identical in both. What changed is which object owns the fitting,
-and that is the entire argument for pipelines. It is not about tidiness.
+The model is the same in both. What changed is which object owns the fitting,
+and that is the entire arg for pipelines. It isn't about tidiness.
 
 ## What goes wrong by hand
 
@@ -1196,14 +1196,14 @@ X = select_features(X, y)
 scores = cross_val_score(model, X, y, cv=5)
 ```
 
-Every one of those three steps has been fitted on all the data, and
+each one of those three steps has been fitted on all the data, and
 `cross_val_score` then splits data that has already been contaminated. Each fold
 was scaled using a mean that included its own validation rows, imputed using a
 median that included them, and reduced to features chosen partly because they
-correlated with their labels.
+linked with their labels.
 
 Nothing errors. The score is simply too high, by an amount that depends on the
-data and cannot be estimated after the fact.
+data and can't be guessed after the fact.
 
 ## What a pipeline changes
 
@@ -1219,16 +1219,16 @@ scores = cross_val_score(pipe, X, y, cv=5)
 
 `cross_val_score` now receives one estimator. On each fold it calls `fit` on the
 pipeline with that fold's training rows, and the pipeline fits the imputer, then
-the scaler, then the feature selector, then the model &mdash; all on those rows
-only. Scoring calls `transform` on the validation rows using the parameters just
+the scaler, then the feature selector, then the model. All on those rows
+only. Scoring calls `transform` on the validation rows using the params just
 learned.
 
-The correct order is not something you remembered to do. It is the only thing
+The correct order isn't a thing you remembered to do. It's the only thing
 the object can do.
 
 ## The three other things it buys
 
-**Hyperparameter search over preprocessing.** Because the steps are part of one
+**Setting search over prep.** Because the steps are part of one
 estimator, a grid can range over them:
 
 ```
@@ -1237,36 +1237,36 @@ estimator, a grid can range over them:
  "model__n_neighbors": [3, 5, 11]}
 ```
 
-Whether the median beats the mean becomes a question the search answers, on the
-same footing as the model's own parameters. Doing this by hand correctly is
-possible and nobody does it.
+Whether the median beats the mean turns a question the search answers, on the
+same footing as the model's own params. Doing this by hand right is
+possible and no one does it.
 
 **No train/serve gap.** The fitted pipeline is one object. Save it, load it in
-the service, call `predict` on raw input. There is no second implementation of
-the preprocessing to drift out of step with the first &mdash; which is a real
+the service, call `predict` on raw input. There's no second setup of
+the prep to drift out of step with the first. Which is a real
 and common production failure, and a silent one.
 
 **Different columns, different treatment.** `ColumnTransformer` routes numeric
-columns to an imputer and scaler, categorical ones to a different imputer and a
-one-hot encoder, and text to a vectoriser, then hands the combined result to the
+columns to an imputer and scaler, cat ones to a different imputer and a
+one-hot encoder, and text to a vectoriser, then hands the mixed result to the
 model. That is what an actual table needs, and it stays one object.
 
 ## Cross-validation still needs care
 
-A pipeline stops leakage between preprocessing and evaluation. It does not fix
+A pipeline stops leakage between prep and test. It doesn't fix
 splits that were wrong to begin with.
 
-If rows are grouped &mdash; several scans per patient &mdash; use `GroupKFold`
-so a patient cannot appear on both sides. If the data is a time series, use
+If rows are grouped &mdash; a few scans per patient &mdash; use `GroupKFold`
+so a patient can't appear on both sides. If the data is a time series, use
 `TimeSeriesSplit` so training always precedes validation. And if you tune
-hyperparameters on the same folds you report, that number is optimistic too;
+settings on the same folds you report, that number is optimistic too;
 nested cross-validation is the honest version.
 
 ## The size of the leak, in accuracy points
 
 The reason to insist on a pipeline is that the leak is large and silent. Take 300
-rows of pure noise &mdash; features with no relationship to the label at all
-&mdash; and select the 20 columns most correlated with the label, then
+rows of pure noise &mdash; features with no tie to the label at all
+&mdash; and select the 20 columns most linked with the label, then
 cross-validate:
 
 |when the columns are chosen|reported accuracy|truth|
@@ -1274,53 +1274,53 @@ cross-validate:
 |once, on all the data, before CV|~65%|50%|
 |inside each fold, on its training rows only|~50%|50%|
 
-The data cannot support better than chance, and the honest pipeline says so. The
-by-hand version reports 65% because the feature selection has already seen every
+The data can't support better than chance, and the honest pipeline says so. The
+by-hand version reports 65% because the feature pick has already seen each
 fold's validation rows: it picked the columns that happened to correlate with
 those labels too, so each fold is scored on features chosen partly *because* they
 match its answers. Nothing errors, and the inflation &mdash; fifteen points here,
-more with more candidate features &mdash; cannot be estimated after the fact,
+more with more pick features. Can't be guessed after the fact,
 because it depends on data the leak already consumed. The pipeline makes the
 correct order the only order the object can execute: each fold fits the selector,
 the scaler and the model on its own training rows and merely transforms the
-validation rows, so the number it reports is an estimate of something real.
+validation rows, so the number it reports is an guess of a thing real.
 
 Beyond stopping the leak, the pipeline buys three things that are awkward by hand.
-Hyperparameter search can range over the preprocessing &mdash; whether the median
-beats the mean becomes a tuned choice on the same footing as the model's own
-settings. There is no train/serve gap, because the fitted pipeline is one object
-saved and loaded whole, so there is no second copy of the preprocessing to drift
+Setting search can range over the prep &mdash; whether the median
+beats the mean turns a tuned choice on the same footing as the model's own
+settings. There's no train/serve gap, because the fitted pipeline is one object
+saved and loaded whole, so there's no second copy of the prep to drift
 out of step. And `ColumnTransformer` routes numeric columns to a scaler,
-categoricals to an encoder, and text to a vectoriser, all inside the same object.
-What a pipeline cannot do is validate the splits themselves: if rows are grouped by
-patient or ordered in time, it still needs `GroupKFold` or `TimeSeriesSplit` to
+cats to an encoder, and text to a vectoriser, all inside the same object.
+What a pipeline can't do is validate the splits themselves: if rows are grouped by
+patient or sorted in time, it still needs `GroupKFold` or `TimeSeriesSplit` to
 keep the folds honest.
 
 One special case catches people: resampling. SMOTE and other over-samplers must
-run on the training fold only, and scikit-learn's own `Pipeline` does not enforce
+run on the training fold only, and scikit-learn's own `Pipeline` doesn't enforce
 that &mdash; `imblearn`'s pipeline does. A log transform, by contrast, has no
-fitted parameters and cannot leak, so it need not live in the pipeline at all,
-though keeping it there is still worth the tidiness of one place for the
-preprocessing.
+fitted params and can't leak. So It need not live in the pipeline at all,
+though keeping it there's still worth the tidiness of one place for the
+prep.
 
 ## Where it goes wrong
 
 **Calling `fit` on the test data.** Use `transform`. `fit_transform` on the test
-set refits everything and undoes the whole point.
+set refits all and undoes the whole point.
 
-**Steps that are not fitted.** A log transform has no parameters and cannot
-leak, so it does not have to be in the pipeline &mdash; but putting it there
-keeps the preprocessing in one place, which is worth more than the exemption.
+**Steps that aren't fitted.** A log transform has no params and can't
+leak, so it doesn't have to be in the pipeline. But putting it there
+keeps the prep in one place. This Is worth more than the exemption.
 
 **Resampling inside a plain pipeline.** SMOTE and friends must run on the
-training fold only. `imblearn`'s pipeline handles this; scikit-learn's does not.
+training fold only. `imblearn`'s pipeline handles this. Scikit-learn's doesn't.
 
-**Assuming a pipeline validates your splits.** It fits each fold correctly. It
-cannot know that your folds mix one patient across both sides.
+**given a pipeline validates your splits.** It fits each fold right. It
+can't know that your folds mix one patient across both sides.
 
 ## The same workflow, wrong then right
 
-Preprocessing outside the pipeline scores higher and is a lie. Here are both versions side by side, on identical data.
+prep outside the pipeline scores higher and is a lie. Here are both versions side by side, on the same data.
 
 ```python-run
 import numpy as np
@@ -1454,21 +1454,21 @@ topic(
     ],
     """
 title: Precision, Recall and F1
-intro: Four counts in a table, three ratios drawn from them, and one slider that moves all of it.
+intro: Four counts in a table, three ratios drawn from them. One slider that moves all of it.
 
 ## One model, many scores
 
-A classifier does not output a class. It outputs a **score** &mdash; how
-positive it thinks each case is &mdash; and a class only appears once you compare
+A classifier doesn't output a class. It outputs a **score** &mdash; how
+plus it thinks each case is. And a class only appears once you compare
 that score against a threshold.
 
-The histogram shows both distributions: actual negatives in grey, actual
-positives in orange, overlapping in the middle because the model is good and not
+The histogram shows both spreads: actual negatives in grey, actual
+positives in orange, shared in the middle because the model is good and not
 perfect. The dashed line is the threshold.
 
-Move it. Every number below the chart changes, and the model has not been
+Move it. each number below the chart changes, and the model hasn't been
 retrained. The scores are properties of the threshold as much as of the model,
-which is the single most useful thing to understand here.
+which is the single most handy thing to understand here.
 
 ## The four counts
 
@@ -1477,35 +1477,35 @@ which is the single most useful thing to understand here.
 | **Actually positive** | True positive | False negative |
 | **Actually negative** | False positive | True negative |
 
-Everything else is a ratio of these. The two that matter most divide by
-different denominators, which is exactly why they disagree.
+All else is a ratio of these. The two that matter most divide by
+different denominators, which is just why they disagree.
 
-**Precision** = TP / (TP + FP) &mdash; of everything you flagged, what fraction
-was right. The denominator is what *you* predicted, so precision is damaged by
+**Precision** = TP / (TP + FP). Of all you flagged, what fraction
+was right. The denominator is what *you* predicted. So Precision is damaged by
 false alarms.
 
-**Recall** = TP / (TP + FN) &mdash; of everything that was actually there, what
-fraction you caught. The denominator is what *reality* contained, so recall is
+**Recall** = TP / (TP + FN). Of all that was really there, what
+fraction you caught. The denominator is what *reality* held, so recall is
 damaged by misses.
 
 ## Why they trade off
 
-Drag the threshold to 0.10. Almost everything is flagged, so almost every real
-positive is caught and recall approaches 100%. But the flagged set is now full of
-negatives, and precision collapses.
+Drag the threshold to 0.10. Almost all is flagged, so almost each real
+plus is caught and recall approaches 100%. But the flagged set is now full of
+negatives, and precision merges.
 
 Drag it to 0.90. Only the most confident cases are flagged, nearly all of them
 correct, and precision approaches 100%. But most real positives are below the
-line, and recall collapses.
+line, and recall merges.
 
-You cannot maximise both by moving the threshold. The threshold only chooses
-where on the trade-off you sit. Improving both at once requires a better model
-&mdash; one whose two distributions overlap less.
+You can't raise both by moving the threshold. The threshold only chooses
+where on the trade-off you sit. Raising both at once needs a better model
+&mdash; one whose two spreads share less.
 
 ## Which one you want depends on the cost
 
-The question is never "which metric is best". It is **which mistake is more
-expensive**.
+The question is never "which metric is best". It's **which mistake is more
+costly**.
 
 **Recall matters more** when a miss is costly: screening for a serious disease,
 detecting fraud, finding safety defects. A false alarm costs a second look. A
@@ -1513,42 +1513,42 @@ miss costs the thing you were trying to prevent.
 
 **Precision matters more** when a false alarm is costly: flagging accounts for
 suspension, recommending content, sending an alert that wakes someone. Missing
-one is a shame. Being wrong repeatedly destroys trust in the system.
+one is a shame. Being wrong again and again destroys trust in the system.
 
 ## F1, and why it is a harmonic mean
 
-F1 combines them:
+F1 mixes them:
 
 ```
 F1 = 2 * precision * recall / (precision + recall)
 ```
 
 That is the harmonic mean, and the choice of mean is the point. Take precision
-of 1.0 and recall of 0.01 &mdash; a model that flags exactly one case and gets
-it right. The arithmetic mean is 0.505, which sounds respectable. F1 is 0.0198.
+of 1.0 and recall of 0.01. A model that flags just one case and gets
+it right. The arithmetic mean is 0.505. This Sounds fair. F1 is 0.0198.
 
-The harmonic mean is pulled toward the smaller number, so it stays low unless
-both are high. That makes it hard to game with a degenerate model, which is
-precisely what a single summary number needs to be.
+The harmonic mean is pulled toward the smaller number. So It stays low unless
+both are high. That makes it hard to game with a collapse model, which is
+just what a single summary number needs to be.
 
-F1 weights the two equally, which is a decision and often the wrong one. F-beta
-lets you weight recall &beta; times as much as precision; F2 favours recall, F0.5
-favours precision. If you have a reason to prefer one, use it.
+F1 weights the two equally. This Is a choice and often the wrong one. F-beta
+lets you weight recall &beta; times as much as precision. F2 favours recall, F0.5
+favours precision. If you've a reason to prefer one, use it.
 
 ## Why accuracy is on the readout and not in the headline
 
-Accuracy is (TP + TN) / everything. It is the most intuitive metric and it is
+Fit is (TP + TN) / all. It's the most natural metric and it's
 close to useless when the classes are unbalanced.
 
 If 1% of transactions are fraudulent, predicting "never fraud" scores 99%
-accuracy while catching nothing at all. Precision and recall are both zero, which
+fit while catching nothing at all. Precision and recall are both zero, which
 is the honest description. [Imbalanced
 data](precision_recall_vs_roc.html) is where this matters most.
 
 ## The same model at two thresholds
 
 Precision and recall are properties of the threshold as much as the model, which a
-worked confusion matrix makes concrete. The same classifier, the same scores, two
+worked confusion mat makes concrete. The same classifier, the same scores, two
 cuts:
 
 |threshold|caught (of 100 real)|false alarms|precision|recall|
@@ -1556,43 +1556,43 @@ cuts:
 |0.10 (permissive)|98|300|0.246|0.98|
 |0.90 (strict)|40|4|0.909|0.40|
 
-Drop the threshold and recall climbs toward 100% as almost everything is flagged,
-but the flagged set fills with negatives and precision collapses; raise it and
-precision climbs as only confident cases survive, but most real positives fall
-below the line and recall collapses. The threshold only chooses *where on the
-trade-off you sit* &mdash; improving both at once needs a better model, one whose
-positive and negative score distributions overlap less. F1 summarises a single
+Drop the threshold and recall climbs toward 100% as almost all is flagged,
+but the flagged set fills with negatives and precision merges. Raise it and
+precision climbs as only confident cases live. But Most real positives fall
+below the line and recall merges. The threshold only chooses *where on the
+trade-off you sit* &mdash; raising both at once needs a better model, one whose
+plus and minus score spreads share less. F1 summarises a single
 point as the harmonic mean, `2PR/(P+R)`, and the choice of *harmonic* is the
-point: precision 1.0 with recall 0.01 averages to a respectable-looking 0.505
-arithmetically but an F1 of just 0.0198, because the harmonic mean is dragged to
+point: precision 1.0 with recall 0.01 means to a fair-looking 0.505
+arithmetically but an F1 of just 0.0198. The harmonic mean is dragged to
 the smaller number and refuses to reward a model that flags one case and hides.
 
-Which error to minimise is a question about costs, never about which metric is
-"best". Recall matters more when a miss is expensive &mdash; screening for a serious
+Which error to cut is a question about costs, never about which metric is
+"best". Recall matters more when a miss is costly. Screening for a serious
 disease, catching fraud &mdash; where a false alarm costs only a second look.
-Precision matters more when a false alarm is expensive &mdash; suspending an
-account, paging a human at 3am &mdash; where a miss is merely dealt with later. And
-accuracy, the most intuitive metric, is close to useless under imbalance: if 1% of
+Precision matters more when a false alarm is costly &mdash; suspending an
+account, paging a human at 3am. Where a miss is merely dealt with later. And
+fit, the most natural metric, is close to useless under imbalance: if 1% of
 transactions are fraud, predicting "never fraud" scores 99% while catching nothing,
-with precision and recall both zero telling the honest story the single accuracy
+with precision and recall both zero telling the honest story the single fit
 number hides.
 
 ## Where it goes wrong
 
 **Reporting one number without the threshold.** "Precision 0.9" is
-uninterpretable alone; at some threshold nearly every model achieves it.
+uninterpretable alone. At some threshold nearly each model reaches it.
 
-**Optimising F1 when the costs are not equal.** F1 assumes they are.
+**Optimising F1 when the costs aren't equal.** F1 assumes they're.
 
-**Comparing models at 0.5.** Two models can rank cases equally well and differ
+**Checking models at 0.5.** Two models can rank cases equally well and differ
 only in calibration. Compare across thresholds, or tune each one.
 
-**Accuracy on imbalanced data.** It measures the class balance more than the
+**Fit on imbalanced data.** It measures the class balance more than the
 model.
 
 ## The trade you cannot avoid
 
-Precision and recall pull in opposite directions. Sweeping the decision threshold shows exactly how much of one each unit of the other costs.
+Precision and recall pull in opposite directions. Sweeping the choice threshold shows just how much of one each unit of the other costs.
 
 ```python-run
 import numpy as np
@@ -1694,23 +1694,23 @@ topic(
     ],
     """
 title: Precision-Recall against ROC
-intro: Two curves over identical scores, and the reason one of them flatters a model that cannot be deployed.
+intro: Two curves over the same scores. The reason one of them flatters a model that can't be deployed.
 
 ## Start balanced
 
-Leave the slider at 0.5. Half the rows are positive, and the two curves broadly
+Leave the slider at 0.5. Half the rows are plus, and the two curves broadly
 agree: ROC bows toward the top left, PR bows toward the top right, and both say
 the model is decent.
 
-Now drag the slider down toward 0.02, which is a realistic rate for fraud,
+Now drag the slider down toward 0.02. This Is a realistic rate for fraud,
 disease screening or ad clicks. Watch the two charts diverge.
 
 **ROC barely moves.** The AUC in the readout stays high.
 
-**PR collapses.** The precision that was achievable at any useful recall falls
+**PR merges.** The precision that was achievable at any handy recall falls
 away, and the best F1 falls with it.
 
-The scores did not change. The model did not change. Only the proportion of
+The scores didn't change. The model didn't change. Only the proportion of
 positives changed, and the two curves disagree about whether that matters.
 
 ## Why ROC does not notice
@@ -1722,13 +1722,13 @@ TPR = TP / (TP + FN)     denominator: all actual positives
 FPR = FP / (FP + TN)     denominator: all actual negatives
 ```
 
-Each is computed entirely within one class. TPR asks what fraction of positives
-were caught; FPR asks what fraction of negatives were wrongly flagged. Adding a
+Each is found fully within one class. TPR asks what fraction of positives
+were caught. FPR asks what fraction of negatives were wrongly flagged. Adding a
 million more negatives leaves TPR untouched and changes FPR only through its own
 denominator, which grows in proportion.
 
-That class-independence is often described as a virtue, and for some purposes it
-is. It also means ROC cannot see the thing that makes rare-positive problems
+That class-freedom is often given as a virtue, and for some purposes it
+is. It also means ROC can't see the thing that makes rare-plus problems
 hard.
 
 ## Why PR does notice
@@ -1740,28 +1740,28 @@ precision = TP / (TP + FP)     denominator: everything you flagged
 ```
 
 The denominator mixes both classes. When negatives outnumber positives a hundred
-to one, even a small false positive *rate* produces a large *number* of false
+to one, even a small false plus *rate* makes a large *number* of false
 positives, and those go straight into precision's denominator.
 
-Concretely: 10,000 rows, 100 positive. A model at 90% recall and 5% FPR catches
-90 real positives and flags 495 negatives. FPR of 5% sounds excellent and ROC
+Concretely: 10,000 rows, 100 plus. A model at 90% recall and 5% FPR catches
+90 real positives and flags 495 negatives. FPR of 5% sounds great and ROC
 records it as such. Precision is 90 / 585 = **15%**. Five out of six flagged
-cases are wrong, and every one costs somebody an investigation.
+cases are wrong, and each one costs somebody an investigation.
 
 ## Reading the baselines
 
 Each chart has a dashed no-skill line, and they differ.
 
-For **ROC** it is the diagonal, always. A random classifier gets AUC 0.5
-regardless of balance.
+For **ROC** it's the main-line, always. A random classifier gets AUC 0.5
+even so of balance.
 
-For **PR** it is a horizontal line at the **positive rate**. At 50% positives,
+For **PR** it's a flat line at the **positive rate**. At 50% positives,
 random scores 0.5 precision. At 2%, random scores 0.02. Drag the slider and
 watch it drop.
 
-This is what makes PR honest and slightly harder to read: there is no fixed
-scale. A PR AUC of 0.4 is poor on balanced data and outstanding at a 2% base
-rate. The number must always be compared against the baseline, never quoted
+This is what makes PR honest and slightly harder to read: there's no fixed
+scale. A PR AUC of 0.4 is poor on weighed data and outstanding at a 2% base
+rate. The number must always be checked against the baseline, never quoted
 alone.
 
 ## Which to use
@@ -1774,13 +1774,13 @@ alone.
 | Someone acts on each flag | **PR** | precision is that person's experience |
 | Comparing across datasets | ROC, carefully | PR baselines differ by base rate |
 
-The practical rule: if a human or a process has to act on every positive
-prediction, precision is the thing they experience, and the PR curve is the one
+The hands-on rule: if a human or a process has to act on each plus
+guess, precision is the thing they run into, and the PR curve is the one
 to look at.
 
 ## Add a million negatives, and watch only one curve move
 
-The divergence is arithmetic. Hold the model's rates fixed &mdash; 90% recall, 5%
+The divergence is math. Hold the model's rates fixed &mdash; 90% recall, 5%
 false-positive rate &mdash; and change only the class balance in 10,000 rows:
 
 |positives|TP|FP|precision|TPR / FPR|
@@ -1788,53 +1788,53 @@ false-positive rate &mdash; and change only the class balance in 10,000 rows:
 |5,000 (balanced)|4,500|250|0.95|0.90 / 0.05|
 |100 (1%)|90|495|**0.15**|0.90 / 0.05|
 
-The ROC coordinates are identical in both rows, because TPR divides by actual
-positives and FPR by actual negatives &mdash; each lives inside one class, so the
-balance cannot touch them. Precision divides by everything flagged, which mixes
+The ROC coords are the same in both rows. TPR cuts by actual
+positives and FPR by actual negatives. Each lives inside one class, so the
+balance can't touch them. Precision cuts by all flagged, which mixes
 the classes, so when negatives outnumber positives a 5% false-positive rate turns
 into 495 false alarms drowning 90 real ones and precision falls to 0.15. Same
-model, same scores, and ROC records it as excellent while five of every six
-flagged cases are wrong. That is why ROC AUC alone on rare-positive data is the
+model, same scores, and ROC records it as great while five of each six
+flagged cases are wrong. That is why ROC AUC alone on rare-plus data is the
 standard way to make an undeployable model look ready, and why the PR curve
 &mdash; whose no-skill baseline is the positive rate itself, 0.01 here, not a
 fixed 0.5 &mdash; is the honest one to quote.
 
-The practical rule follows from who acts on the output. If a human or a process
-has to deal with every positive prediction &mdash; an analyst investigating each
-flag, a queue of cases to review &mdash; then precision is the experience that
-person actually has, and the PR curve is the one to read. ROC still has its place:
-it is the right tool when you care about ranking quality overall, and it is more
-comparable across datasets because its baseline is a fixed 0.5 rather than a
+The hands-on rule follows from who acts on the output. If a human or a process
+has to deal with each plus guess. An analyst investigating each
+flag, a queue of cases to review. Then precision is the run into that
+person really has, and the PR curve is the one to read. ROC still has its place:
+it's the right tool when you care about ranking quality total, and it's more
+close across datasets because its baseline is a fixed 0.5 rather than a
 base-rate that shifts. Neither curve, though, tells you which threshold to deploy;
-that is a separate decision driven by [costs](threshold_tuning.html).
+that is a separate choice driven by [costs](threshold_tuning.html).
 
-One more asymmetry is worth stating: because the PR baseline is the positive rate,
-a PR AUC has no fixed scale. A PR AUC of 0.4 is poor on balanced data and
-outstanding at a 2% base rate, so the number means nothing quoted alone &mdash; it
-has to be read against the baseline for that dataset, which is exactly why it
-cannot be compared across datasets with different balances the way ROC can.
+One more skew is worth stating: because the PR baseline is the positive rate,
+a PR AUC has no fixed scale. A PR AUC of 0.4 is poor on weighed data and
+outstanding at a 2% base rate. So The number means nothing quoted alone &mdash; it
+has to be read against the baseline for that dataset. This Is just why it
+can't be checked across datasets with different weighs the way ROC can.
 
-A last comparison point: the two curves also treat the negatives differently. ROC
-rewards a model for correctly ranking the vast pool of easy negatives, which is
-where its optimism on rare-positive data comes from; PR ignores true negatives
-entirely &mdash; they appear in neither precision nor recall &mdash; so it reports
+A last check point: the two curves also treat the negatives differently. ROC
+rewards a model for right ranking the vast pool of easy negatives, which is
+where its optimism on rare-plus data comes from. PR skips true negatives
+fully &mdash; they appear in neither precision nor recall &mdash; so it reports
 only on the positives you care about and the false alarms among them.
 
 ## Where it goes wrong
 
-**Reporting ROC AUC alone on imbalanced data.** It is the standard way to make a
+**Reporting ROC AUC alone on imbalanced data.** It's the standard way to make a
 model that will drown a team in false positives look ready to ship.
 
-**Comparing PR AUC across datasets with different base rates.** The baselines are
-different, so the numbers are not comparable.
+**Checking PR AUC across datasets with different base rates.** The baselines are
+different, so the numbers aren't close.
 
-**Forgetting that both curves span all thresholds.** Neither tells you which
-threshold to deploy &mdash; that is a separate decision, made with
+**Losing that both curves span all thresholds.** Neither tells you which
+threshold to deploy &mdash; that is a separate choice, made with
 [costs](threshold_tuning.html).
 
 ## The same model, two curves, two different stories
 
-ROC and precision-recall are computed from the same predictions. On balanced data they agree; on imbalanced data one of them is misleading, and it is always the same one.
+ROC and precision-recall are found from the same guesses. On weighed data they agree. On imbalanced data one of them is misleading. It's always the same one.
 
 ```python-run
 import numpy as np
@@ -1964,41 +1964,41 @@ topic(
     ],
     """
 title: Threshold Tuning
-intro: Where 0.5 came from, why it is almost never right, and how to find the number that is.
+intro: Where 0.5 came from, why it's almost never right. How to find the number that is.
 
 ## Where 0.5 comes from
 
 It comes from the library. `predict()` calls `predict_proba()` and cuts at 0.5,
-because a default has to be something and 0.5 is the least arbitrary-looking
+because a default has to be a thing and 0.5 is the least any-looking
 choice available.
 
-It is optimal under two assumptions that are rarely true together: the classes
-are balanced, and the two kinds of mistake cost the same. Change either and 0.5
+It's best under two assumptions that are rarely true together: the classes
+are weighed, and the two kinds of mistake cost the same. Change either and 0.5
 stops being the right cut.
 
 ## Put a price on each mistake
 
-The two sliders set what a false negative and a false positive cost. The curve
-is the **total cost** across every threshold, computed over 1,500 cases with 20%
-positives. The grey line marks 0.5; the orange line marks the cheapest
+The two sliders set what a false minus and a false plus cost. The curve
+is the **total cost** across each threshold, found over 1,500 cases with 20%
+positives. The grey line marks 0.5. The orange line marks the cheapest
 threshold.
 
 Start with a miss costing 20 and a false alarm costing 1 &mdash; a screening
 problem, where investigating a healthy person is cheap and letting a sick one
-through is not. The minimum sits well below 0.5. The model should flag
-generously, because the flags are cheap and the misses are not.
+through isn't. The min sits well below 0.5. The model should flag
+generously, because the flags are cheap and the misses aren't.
 
 Now reverse them: a miss at 1 and a false alarm at 50 &mdash; an automated
-account suspension, where a wrong suspension is expensive and a missed offender
-is dealt with later. The minimum moves above 0.5.
+account suspension, where a wrong suspension is costly and a missed offender
+is dealt with later. The min moves above 0.5.
 
-Set them equal and, with these class proportions, the minimum lands near 0.5 but
-not exactly on it, because the balance is 20/80 rather than 50/50.
+Set them equal and, with these class proportions, the min lands near 0.5 but
+not just on it, because the balance is 20/80 rather than 50/50.
 
 ## The arithmetic
 
-The expected cost of predicting positive on a case with predicted probability
-*p* is `(1 - p) x cost_FP`. Predicting negative costs `p x cost_FN`. Flagging is
+The expected cost of predicting plus on a case with predicted chance
+*p* is `(1 - p) x cost_FP`. Predicting minus costs `p x cost_FN`. Flagging is
 worth it when
 
 ```
@@ -2011,50 +2011,50 @@ which rearranges to
 p  >  cost_FP / (cost_FP + cost_FN)
 ```
 
-With equal costs that is 0.5, which is where the default comes from. With a miss
-ten times as expensive as a false alarm it is 1/11, about 0.09 &mdash; and a
+With equal costs that is 0.5. This Is where the default comes from. With a miss
+ten times as costly as a false alarm it's 1/11, about 0.09 &mdash; and a
 default of 0.5 is then five times too strict.
 
 That formula is worth carrying around. It gives a defensible starting threshold
-from two numbers a domain expert can usually supply, without any tuning at all.
+from two numbers a domain expert can often supply, without any tuning at all.
 
 ## When you cannot price the errors
 
-Often nobody can put a number on a miss. Three usable fallbacks:
+Often no one can put a number on a miss. Three usable fallbacks:
 
-**Maximise F1**, or F-beta if one error matters more. This is the least
-opinionated option and it is what most people do.
+**Raise F1**, or F-beta if one error matters more. This is the least
+opinionated option and it's what most people do.
 
 **Fix an operating constraint.** "The team can investigate 200 cases a day" sets
-the threshold directly: take the top 200 scores. "Precision must be at least
+the threshold right: take the top 200 scores. "Precision must be at least
 80%" does the same from the other side. These are often more honest than a
-metric, because they describe what will actually happen.
+metric, because they show what will really happen.
 
 **Choose from the curve.** Plot precision and recall against threshold and pick
-the point where the trade-off turns. It is a judgement, but an informed one.
+the point where the trade-off turns. It's a judgement, but an informed one.
 
 ## Two things that must be right
 
 **Tune on validation data.** Choosing the threshold on the test set and then
-reporting test performance is the same category of error as tuning
-hyperparameters there &mdash; the reported number includes the choice you made
-to maximise it.
+reporting test speed is the same category of error as tuning
+settings there &mdash; the reported number includes the choice you made
+to raise it.
 
-**Do not confuse this with calibration.** Threshold tuning takes the scores as
+**Don't confuse this with calibration.** Threshold tuning takes the scores as
 given and picks a cut. Calibration changes the scores so that a score of 0.8
-really means 80% of such cases are positive.
+really means 80% of such cases are plus.
 
-They are independent. A badly calibrated model can rank perfectly, and if the
+They're free. A badly calibrated model can rank just right, and if the
 ranking is right, a tuned threshold works fine. But if the threshold is being
 derived from the cost formula above, the *p* in it must mean an actual
-probability &mdash; and then calibration matters. Platt scaling and isotonic
+chance &mdash; and then calibration matters. Platt scaling and isotonic
 regression are the usual tools.
 
 ## The threshold the costs imply
 
-The optimal cut is not a matter of taste; it drops out of the two error costs.
-Flagging a case with predicted probability p is worth it when
-`(1 - p) &middot; cost_FP < p &middot; cost_FN`, which rearranges to a threshold of
+The best cut isn't a matter of taste. It drops out of the two error costs.
+Flagging a case with predicted chance p is worth it when
+`(1 - p) &middot; cost_FP < p &middot; cost_FN`. This Rearranges to a threshold of
 `cost_FP / (cost_FP + cost_FN)`:
 
 |a miss costs|a false alarm costs|optimal threshold|
@@ -2063,42 +2063,42 @@ Flagging a case with predicted probability p is worth it when
 |1|1 (symmetric)|0.500|
 |1|50 (auto-suspension)|0.980|
 
-The familiar 0.5 is just the middle row &mdash; the special case where the two
-mistakes cost the same. Move to a screening problem, where missing a sick patient
+The familiar 0.5 is just the middle row. The special case where the two
+mistakes cost the same. Move to a screening problem. Here Missing a sick patient
 is twenty times worse than a needless second look, and the right cut falls to
-0.048: flag almost anything, because flags are cheap and misses are not, and the
+0.048: flag almost any of it. Flags are cheap and misses aren't, and the
 default of 0.5 is then more than ten times too strict. Reverse the costs and it
-climbs to 0.98. The formula needs only two numbers a domain expert can usually
+climbs to 0.98. The formula needs only two numbers a domain expert can often
 supply, and it gives a defensible threshold with no tuning at all &mdash; but the
-p in it must be an actual probability, which is why a cost-derived threshold is
-exactly the case where [calibration](probability_calibration.html) stops being
+p in it must be an actual chance. This Is why a cost-derived threshold is
+just the case where [calibration](probability_calibration.html) stops being
 optional.
 
-When nobody can price the errors, three fallbacks are honest. Maximise F1 (or
-F-beta if one error matters more), which is the least opinionated option. Fix an
+When no one can price the errors, three fallbacks are honest. Raise F1 (or
+F-beta if one error matters more). This Is the least opinionated option. Fix an
 operating constraint &mdash; "the team can investigate 200 cases a day" sets the
-threshold directly as the top 200 scores, and often describes reality better than
+threshold right as the top 200 scores, and often shows reality better than
 any metric. Or read the precision-recall trade-off off the curve and pick the knee.
 Whichever you use, tune it on validation data, never the test set: choosing the
-threshold to maximise a number and then reporting that number folds the choice into
-the result, exactly as tuning hyperparameters on the test set does.
+threshold to raise a number and then reporting that number folds the choice into
+the result, just as tuning settings on the test set does.
 
 ## Where it goes wrong
 
-**Reporting metrics at 0.5 and stopping.** The most common evaluation mistake
-after using accuracy.
+**Reporting metrics at 0.5 and stopping.** The most common test mistake
+after using fit.
 
-**Tuning on the test set.** Optimistic by exactly the amount you gained.
+**Tuning on the test set.** Optimistic by just the amount you gained.
 
-**Retuning per fold and averaging.** The thresholds are not comparable across
+**Retuning per fold and blending.** The thresholds aren't close across
 folds. Tune once on a held-out validation set.
 
-**Forgetting it drifts.** The optimal threshold depends on the class balance,
+**Losing it drifts.** The best threshold depends on the class balance,
 and that moves in production. It needs rechecking, not setting once.
 
 ## 0.5 is a default, not a decision
 
-The threshold is the one hyperparameter you can change after training, in production, in a config file. Here is what it costs and what it buys.
+The threshold is the one setting you can change after training, in production, in a config file. Here is what it costs and what it buys.
 
 ```python-run
 import numpy as np
@@ -2227,39 +2227,39 @@ intro: Why the same number of trials finds a better answer when you stop being s
 
 ## The setup
 
-The background shading is the true score surface, and it is deliberately
-lopsided. The horizontal axis is a hyperparameter that matters a great deal
-&mdash; a learning rate, a regularisation strength &mdash; and the vertical axis
+The background shading is the true score surface, and it's on purpose
+lopsided. The flat axis is a setting that matters a great deal
+&mdash; a learning rate, a smoothing strength. And the vertical axis
 is one that barely does. The optimum is a narrow vertical band.
 
 This lopsidedness is the normal case, not a contrived one. In most models one or
-two hyperparameters dominate and the rest are close to noise, and you usually do
+two settings dominate and the rest are close to noise, and you often do
 not know in advance which is which.
 
 ## Count the distinct values
 
 Set the method to **Grid** with 16 trials. Sixteen points appear in a 4&times;4
 lattice. Read the line under the chart: 16 trials, **4** distinct values of the
-parameter that matters.
+param that matters.
 
-Every point in a column shares an x. The other three trials in that column tell
-you nothing new about the axis you care about, because they only vary the axis
-you do not.
+each point in a column shares an x. The other three trials in that column tell
+you nothing new about the axis you care about. They only vary the axis
+you don't.
 
 Now switch to **Random**, same 16 trials. Sixteen points scattered, and
-**16** distinct values of the parameter that matters. Same cost, four times the
-resolution where resolution counts.
+**16** distinct values of the param that matters. Same cost, four times the
+detail where detail counts.
 
-Push the budget to 64. Grid gives 8 distinct values from 64 trials; random gives
-64. The gap widens as the budget grows, and it widens much faster as dimensions
-are added &mdash; a grid over five parameters at four values each is 1,024
+Push the budget to 64. Grid gives 8 distinct values from 64 trials. Random gives
+64. The gap widens as the budget grows, and it widens much faster as dims
+are added &mdash; a grid over five params at four values each is 1,024
 trials and still only four values of each.
 
 ## The argument in one line
 
 A grid of *n* points per axis over *d* axes costs *n^d* trials and buys *n*
-distinct values of each parameter. Random search of the same *n^d* trials buys
-*n^d* distinct values of every parameter.
+distinct values of each param. Random search of the same *n^d* trials buys
+*n^d* distinct values of each param.
 
 If only one axis matters, grid search has wasted all but *n* of its trials on
 that axis. This is Bergstra and Bengio's 2012 result, and it changed default
@@ -2268,47 +2268,47 @@ practice.
 ## Watch the luck
 
 Move the **seed** slider with random selected. The best point found moves, and
-the best score wobbles. Random search is random; a single run can be unlucky.
+the best score wobbles. Random search is random. A single run can be unlucky.
 
 That is a real cost and a smaller one than it looks. Because the surface is
-broad along the unimportant axis, most draws land somewhere reasonable, and the
-distribution of outcomes is much better than grid's guaranteed coarseness. But
-it does mean a single random run is not a strong claim, and comparisons should
+broad along the unimportant axis, most draws land a place reasonable, and the
+distribution of outcomes is much better than grid's ensured coarseness. But
+it does mean a single random run isn't a strong claim, and checks should
 allow for the variation.
 
 ## When grid search is still right
 
-**Few parameters, genuinely discrete.** Three kernels, four values of *k*: a
+**Few params, truly discrete.** Three kernels, four values of *k*: a
 grid is exhaustive and the exhaustiveness is worth having.
 
-**Reproducibility matters more than efficiency.** A grid is deterministic and
-easy to describe in a paper.
+**Reproducibility matters more than speed.** A grid is deterministic and
+easy to show in a paper.
 
-**You are refining.** Random search to find the region, a small grid to comb it.
+**You're refining.** Random search to find the region, a small grid to comb it.
 This combination is better than either alone.
 
 ## What replaced both
 
 **Bayesian optimisation** builds a model of the score surface from the trials so
 far and proposes the point most likely to improve. Optuna and Hyperopt do this,
-and on expensive objectives &mdash; where one trial takes an hour &mdash; it is
+and on costly goals &mdash; where one trial takes an hour &mdash; it's
 clearly better than either method here.
 
 **Successive halving** and **Hyperband** attack the cost differently: start many
 configurations cheaply, kill the worst, give the survivors more budget. When a
-trial's early performance predicts its final performance, this is dramatically
-more efficient.
+trial's early speed predicts its final speed, this is sharply
+more fast.
 
-For anything cheap, random search remains an excellent default. It has no
-hyperparameters of its own, it parallelises perfectly, and it is very hard to
+For any of it cheap, random search remains an great default. It has no
+settings of its own, it parallelises just right, and it's very hard to
 use wrongly.
 
 ## Why random search reaches the good region
 
-Random search's advantage over a grid is that it does not spend trials
-re-measuring the axis that does not matter, and its chance of landing in the good
+Random search's edge over a grid is that it doesn't spend trials
+re-measuring the axis that doesn't matter, and its chance of landing in the good
 region follows a simple curve. If the top 5% of the space is what you want, `n`
-independent random draws miss it only if *all* of them do:
+free random draws miss it only if *all* of them do:
 
 |random trials|P(at least one lands in the top 5%)|
 |---|---|
@@ -2317,42 +2317,42 @@ independent random draws miss it only if *all* of them do:
 |60|0.95|
 
 Sixty trials find the good region 95% of the time, with no assumption about which
-hyperparameter matters. A grid of the same 60 trials over two axes gives about 8
+setting matters. A grid of the same 60 trials over two axes gives about 8
 distinct values of each, so if only one axis matters it has spent all but 8 of its
-trials varying the one that does not &mdash; and over five axes at four values
-each, a grid is 1,024 trials and still only four values per parameter. That is
-Bergstra and Bengio's result, and it is why random beat grid as the default. The
+trials varying the one that doesn't. And over five axes at four values
+each, a grid is 1,024 trials and still only four values per param. That is
+Bergstra and Bengio's result, and it's why random beat grid as the default. The
 one place it needs care is the sampling scale: a learning rate must be drawn
 log-uniformly, because a uniform draw between 0.0001 and 0.1 puts 90% of its
 samples above 0.01 and starves the small values that often matter most.
 
-What replaced both methods for expensive objectives is Bayesian optimisation
+What replaced both methods for costly goals is Bayesian optimisation
 &mdash; Optuna, Hyperopt &mdash; which builds a model of the score surface from the
 trials so far and proposes the point most likely to improve, clearly better when a
 single trial takes an hour. Successive halving and Hyperband attack the cost from
 another angle, starting many configurations cheaply and killing the worst, which
-wins when early performance predicts final performance. For anything cheap, random
-search remains an excellent default: it has no hyperparameters of its own, it
-parallelises perfectly, and the one way to misuse it &mdash; a linear scale on a
-parameter that should be logarithmic &mdash; is the same trap noted above.
+wins when early speed predicts final speed. For any of it cheap, random
+search remains an great default: it has no settings of its own, it
+parallelises just right, and the one way to misuse it. A linear scale on a
+param that should be logarithmic. Is the same trap noted above.
 
 ## Where it goes wrong
 
 **Sampling scale.** A learning rate should be sampled log-uniformly. Uniform
 between 0.0001 and 0.1 puts 90% of the draws above 0.01.
 
-**Tuning on the test set.** Same error as everywhere else. Tune on validation.
+**Tuning on the test set.** Same error as all over else. Tune on validation.
 
 **Searching a range that excludes the answer.** No search finds what is outside
-its bounds. Check whether the best value sits at the edge of the range; if it
+its bounds. Check whether the best value sits at the edge of the range. If it
 does, widen it and search again.
 
-**Not searching preprocessing.** Put the whole [pipeline](ml_pipelines.html) in
+**Not searching prep.** Put the whole [pipeline](ml_pipelines.html) in
 the search, so imputation and scaling choices are tuned alongside the model.
 
 ## Why random search finds more with fewer fits
 
-Grid search spends its budget evenly across every parameter, including the ones that do not matter. Random search does not, and on the same budget it usually wins.
+Grid search spends its budget evenly across each param, including the ones that don't matter. Random search doesn't. On the same budget it often wins.
 
 ```python-run
 import numpy as np
@@ -2498,7 +2498,7 @@ topic(
     ],
     """
 title: Learning Curves
-intro: The plot that answers whether to collect more data, and saves you from collecting it pointlessly.
+intro: The plot that answers whether to collect more data. Saves you from collecting it pointlessly.
 
 ## What is plotted
 
@@ -2507,44 +2507,44 @@ held-out validation set. Repeat with 80, 120, and so on. Plot both against
 training-set size.
 
 Grey is training error, orange is validation error. The **shape** of the pair is
-the diagnosis, and the diagnosis is more useful than either number alone.
+the diagnosis, and the diagnosis is more handy than either number alone.
 
 ## Underfitting
 
-Set capacity to 1 or 2. Both curves rise quickly to a plateau, sit close
+Set room to 1 or 2. Both curves rise quickly to a plateau, sit close
 together, and stay high.
 
-Training error is high, which is the tell. The model cannot fit the data it has
+Training error is high. This Is the tell. The model can't fit the data it has
 already seen, so nothing about unseen data is the problem. This is **bias**: the
 model is too simple for the structure present.
 
-The important consequence is negative. **More data will not help.** The curves
-have already converged; adding examples moves neither. Money spent on collection
+The key consequence is minus. **More data won't help.** The curves
+have already settled. Adding examples moves neither. Money spent on collection
 here is wasted, and this plot is the cheapest way to find that out before
 spending it.
 
-What helps instead: more capacity, better features, less regularisation, a
+What helps instead: more room, better features, less smoothing, a
 different model class.
 
 ## Overfitting
 
-Set capacity to 8 or 9. Training error drops close to zero, validation error
+Set room to 8 or 9. Training error drops close to zero, validation error
 stays well above it, and a wide gap opens between them.
 
-The model fits its training data nearly perfectly and generalises poorly. This is
+The model fits its training data nearly just right and generalises poorly. This is
 **variance**: capacity is being spent memorising noise.
 
-Here more data *does* help, and the curve says so &mdash; the validation line is
-still falling at the right-hand edge. Every additional example makes the noise
-harder to memorise. Other options: reduce capacity, add regularisation,
-augment the data, or ensemble.
+Here more data *does* help, and the curve says so. The validation line is
+still falling at the right-hand edge. each extra example makes the noise
+harder to store. Other options: reduce room, add smoothing,
+boost the data, or ensemble.
 
 ## About right
 
-Set capacity to 4 or 5. The curves converge to a small gap at a low error, and
+Set room to 4 or 5. The curves settle to a small gap at a low error, and
 both have flattened.
 
-The readout says as much. There is no obvious bias and no obvious variance, and
+The readout says as much. There's no obvious bias and no obvious variance, and
 the flattening is the answer to "should we collect more data": no, not for this
 model. Improvement would have to come from features or from a different model
 class, not from volume.
@@ -2558,10 +2558,10 @@ class, not from volume.
 | Low | Small | Fine | features or a different model |
 | High | Large | Something is wrong | check the split and the labels |
 
-That last row is worth keeping. High training error *and* a large gap should not
-happen from bias or variance alone, and usually means a bug &mdash; leakage in
+That last row is worth keeping. High training error *and* a large gap shouldn't
+happen from bias or variance alone, and often means a bug &mdash; leakage in
 reverse, mislabelled data, or a validation set drawn from a different
-distribution.
+spread.
 
 ## Where the curve is still falling
 
@@ -2573,26 +2573,26 @@ collecting more will improve the model, and the slope gives a rough sense of how
 much. If it has been flat for the last few points, more data buys nothing, and
 the effort belongs elsewhere.
 
-That question is otherwise answered by intuition, and it usually involves real
+That question is or else answered by intuition, and it often involves real
 money.
 
 ## Practical notes
 
-The curves are noisy at small sizes, because a model trained on 40 examples
-depends heavily on which 40. Average over several splits, and plot the spread if
+The curves are noisy at small sizes. A model trained on 40 examples
+depends heavily on which 40. Mean over a few splits, and plot the spread if
 you can.
 
-Use the same validation set at every size. Growing it alongside the training set
+Use the same validation set at each size. Growing it alongside the training set
 confounds two changes.
 
-And do not confuse this with a **validation curve**, which plots error against a
-hyperparameter at fixed data size. Both are useful and they answer different
+And don't confuse this with a **validation curve**. This Plots error against a
+setting at fixed data size. Both are handy and they answer different
 questions: learning curves ask about data, validation curves ask about a setting.
 
 ## Reading the four shapes
 
 The diagnosis is the *pair* of curves, not either number, and four combinations
-cover every case:
+cover each case:
 
 |training error|gap to validation|diagnosis|what helps|
 |---|---|---|---|
@@ -2602,39 +2602,39 @@ cover every case:
 |high|large|a bug|check the split, the labels, for leakage|
 
 The one that saves real money is the top row against the second. Both look like a
-model that could be better, but they answer "should we collect more data" in
+model that could be better. But They answer "should we collect more data" in
 opposite directions. In the bias case both curves have already flattened and sit
-close together and high &mdash; the model cannot even fit what it has, so more of
+close together and high &mdash; the model can't even fit what it has, so more of
 the same data moves nothing, and the plot is the cheapest way to learn that before
 paying for collection. In the variance case the validation curve is still falling
-at the right-hand edge, so every extra example makes the noise harder to memorise
-and the gap narrows. The rule is precise: a *converged* gap is variance you cannot
-buy your way out of; a still-descending validation curve is the one that justifies
+at the right-hand edge, so each extra example makes the noise harder to store
+and the gap narrows. The rule is precise: a *settled* gap is variance you can't
+buy your way out of. A still-descending validation curve is the one that justifies
 the data budget.
 
-Two practical cautions keep the diagnosis honest. The curves are noisy at small
+Two hands-on cautions keep the diagnosis honest. The curves are noisy at small
 training sizes, because a model fitted on 40 examples depends heavily on *which*
-40, so average over several splits before reading a shape into them. And use the
-same validation set at every training size &mdash; growing it alongside the
-training set confounds two changes and muddies the very gap you are trying to read.
+40, so mean over a few splits before reading a shape into them. And use the
+same validation set at each training size. Growing it alongside the
+training set confounds two changes and muddies the very gap you're trying to read.
 The learning curve, which varies the amount of data, is also not to be confused
-with a validation curve, which varies a hyperparameter at fixed data size: both are
-useful and they answer different questions, one about collection and one about a
+with a validation curve. This Varies a setting at fixed data size: both are
+handy and they answer different questions, one about collection and one about a
 setting.
 
 ## Where it goes wrong
 
 **Reading a single run.** Small-sample noise looks like structure.
 
-**Plotting accuracy on imbalanced data.** The curves will be flat and
-uninformative. Plot the metric you actually care about.
+**Plotting fit on imbalanced data.** The curves will be flat and
+uninformative. Plot the metric you really care about.
 
 **Concluding 'more data' from a gap alone.** Check the validation curve is still
-falling. A converged gap means variance you cannot fix with volume.
+falling. A settled gap means variance you can't fix with volume.
 
 ## The chart that tells you whether more data will help
 
-Two models on the same problem, scored as the training set grows. One curve says collect more data; the other says do not bother. Reading the difference is the whole skill.
+Two models on the same problem, scored as the training set grows. One curve says collect more data. The other says don't bother. Reading the difference is the whole skill.
 
 ```python-run
 import numpy as np
@@ -2755,94 +2755,94 @@ topic(
     ],
     """
 title: DBSCAN: Density-Based Clustering
-intro: Clustering by crowding rather than by distance to a centre, and the two parameters that decide everything.
+intro: Clustering by crowding rather than by distance to a centre. The two params that decide all.
 
 ## What k-means cannot do
 
 Set the data control above to **Two crescents**. K-means, which assigns each
-point to the nearest of *k* centres, cannot separate these: the boundary it
+point to the nearest of *k* centres, can't separate these: the boundary it
 draws is always a straight line between two centroids, and no straight line
 separates two interleaved crescents.
 
-DBSCAN separates them immediately, and does it without being told there are two.
+DBSCAN separates them right away, and does it without being told there are two.
 
 ## The definitions
 
-Everything follows from two parameters &mdash; `eps`, a radius, and `minPts`, a
-count &mdash; and three definitions:
+All follows from two params. `eps`, a radius, and `minPts`, a
+count &mdash; and three meanings:
 
 **Core point.** Has at least `minPts` points within `eps` of it, including
 itself. It sits in a crowded place.
 
-**Border point.** Within `eps` of a core point, but not crowded enough to be one
-itself. It is on the edge of a cluster.
+**Border point.** Within `eps` of a core point. But Not crowded enough to be one
+itself. It's on the edge of a cluster.
 
 **Noise.** Neither. It belongs to no cluster, and DBSCAN says so rather than
-forcing it somewhere.
+forcing it a place.
 
 A cluster is then a maximal set of points connected through core points. Start at
-a core point, take everything within `eps`, and for each of those that is also a
-core point, take *its* neighbourhood too, repeating until nothing new arrives.
+a core point, take all within `eps`. For each of those that is also a
+core point, take *its* zone too, repeating until nothing new arrives.
 
 This is why clusters can be any shape. The cluster spreads wherever the data is
-dense, following the crescent around its curve, because at no point does it ask
-how far anything is from a centre.
+dense, following the crescent around its curve. At no point does it ask
+how far any of it's from a centre.
 
 ## The two parameters
 
 Drag `eps` in the visualisation and watch the count.
 
-**Too small**, and no point has `minPts` neighbours. Everything is noise, or the
+**Too small**, and no point has `minPts` neighbours. All is noise, or the
 data shatters into many small clusters.
 
-**Too large**, and everything is within reach of everything else. The two
-crescents merge into one cluster, which happens just above 0.25 on this data.
+**Too large**, and all is within reach of all else. The two
+crescents merge into one cluster. This Happens just above 0.25 on this data.
 
-The band in between is where DBSCAN works, and on the crescents it is genuinely
+The band in between is where DBSCAN works, and on the crescents it's truly
 narrow. That sensitivity is the honest weakness of the method.
 
-`minPts` is less delicate. Larger values demand denser cores, producing fewer,
+`minPts` is less delicate. Larger values demand denser cores, making fewer,
 tighter clusters and more noise. A common starting rule is `minPts = 2 * number
-of dimensions`, and at least 3.
+of dims`, and at least 3.
 
-For `eps`, the standard technique is a **k-distance plot**: for every point,
+For `eps`, the standard technique is a **k-distance plot**: for each point,
 measure the distance to its `minPts`-th nearest neighbour, sort those distances
 and plot them. The curve has a knee where distances start rising sharply, and
-that knee is a reasonable `eps` &mdash; it is the point at which you leave the
+that knee is a reasonable `eps`. It's the point at which you leave the
 dense region and start crossing gaps.
 
 ## What it gives you that k-means does not
 
-**No k.** The number of clusters is discovered, not supplied.
+**No k.** The number of clusters is found, not supplied.
 
-**Arbitrary shapes.** Crescents, rings, spirals, anything connected and dense.
+**Any shapes.** Crescents, rings, spirals, any of it connected and dense.
 
-**An explicit noise label.** K-means assigns every point to some cluster, so an
+**An clear noise label.** K-means assigns each point to some cluster, so an
 outlier is silently absorbed and drags a centroid with it. DBSCAN sets it aside.
 Switch the data to blobs and the scattered points stay hollow.
 
 ## Where it fails
 
-**Varying density.** This is the real limitation. One `eps` applies everywhere,
-so a dataset with one dense cluster and one sparse cluster cannot be handled: the
+**Varying density.** This is the real limitation. One `eps` applies all over,
+so a dataset with one dense cluster and one sparse cluster can't be handled: the
 `eps` that finds the sparse one merges the dense one into its surroundings.
-**HDBSCAN** exists precisely for this, building a hierarchy over `eps` values and
+**HDBSCAN** exists just for this, building a hierarchy over `eps` values and
 selecting per cluster.
 
-**High dimensions.** Distances concentrate as dimensionality grows, so
-"neighbourhood" stops meaning much. Reduce dimensions first.
+**High dims.** Distances focus as dimensionality grows, so
+"zone" stops meaning much. Reduce dims first.
 
-**Scale sensitivity.** `eps` is an absolute distance, so a feature measured in
+**Scale sensitivity.** `eps` is an abs distance. So A feature measured in
 thousands dominates one measured in units. [Scale
-first](feature_scaling.html) &mdash; this is not optional.
+first](feature_scaling.html) &mdash; this isn't optional.
 
-**Cost.** Naively O(n&sup2;) because of the neighbourhood queries. A spatial
-index brings it to about O(n log n) in low dimensions.
+**Cost.** Naively O(n&sup2;) because of the zone queries. A spatial
+index brings it to about O(n log n) in low dims.
 
 ## Core, border and noise, counted
 
-The three definitions become concrete the moment you apply them. Take eps = 1.5,
-minPts = 3, and a point whose 1.5-radius neighbourhood is being examined:
+The three meanings become concrete the moment you apply them. Take eps = 1.5,
+minPts = 3, and a point whose 1.5-radius zone is being checked:
 
 |point|neighbours within eps (incl. itself)|type|
 |---|---|---|
@@ -2850,32 +2850,32 @@ minPts = 3, and a point whose 1.5-radius neighbourhood is being examined:
 |on a cluster edge|2, but one is a core point|**border**|
 |off on its own|1|**noise**|
 
-A cluster is then everything reachable through core points: start at a core point,
-absorb its neighbourhood, and for every neighbour that is *also* core, absorb its
-neighbourhood too, until nothing new arrives. That chain-through-cores rule is why
-DBSCAN follows a crescent around its curve &mdash; it never measures distance to a
+A cluster is then all reachable through core points: start at a core point,
+absorb its zone, and for each neighbour that is *also* core, absorb its
+zone too, until nothing new arrives. That chain-through-cores rule is why
+DBSCAN follows a crescent around its curve. It never measures distance to a
 centre, only local crowding &mdash; and why it labels the lone point noise instead
 of forcing it into a cluster and dragging a centroid toward it, as k-means must.
-The cost is that one eps applies everywhere: raise it past the gap between two
+The cost is that one eps applies all over: raise it past the gap between two
 groups and they merge, drop it below the spacing of a sparse cluster and that
-whole cluster becomes noise. On data with one dense and one sparse cluster no
-single eps works, which is exactly what HDBSCAN was built to fix.
+whole cluster turns noise. On data with one dense and one sparse cluster no
+single eps works, which is just what HDBSCAN was built to fix.
 
-Choosing eps is not guesswork either: the standard technique is a k-distance plot,
-where you measure every point's distance to its minPts-th nearest neighbour, sort
-those distances and look for the knee &mdash; the point where they start rising
+Choosing eps isn't guesswork either: the standard technique is a k-distance plot,
+where you measure each point's distance to its minPts-th nearest neighbour, sort
+those distances and look for the knee. The point where they start rising
 sharply is where you leave the dense region and begin crossing gaps, and it makes a
 defensible eps. minPts is the less delicate of the two, with a common starting rule
-of twice the number of dimensions. The method's real ceiling is high dimensionality:
-distances concentrate as dimensions grow until "neighbourhood" stops meaning much,
-so reducing dimensions first is not optional, and neither is scaling, since eps is a
-single absolute distance applied to every feature at once.
+of twice the number of dims. The method's real ceiling is high dimensionality:
+distances focus as dims grow until "zone" stops meaning much,
+so reducing dims first isn't optional, and neither is scaling, since eps is a
+single abs distance applied to each feature at once.
 
 ## Where it goes wrong
 
-**Not scaling the features.** `eps` becomes meaningless.
+**Not scaling the features.** `eps` turns meaningless.
 
-**Tuning eps by trying numbers.** Use a k-distance plot; it takes a minute and
+**Tuning eps by trying numbers.** Use a k-distance plot. It takes a minute and
 gives a defensible value.
 
 **Expecting it to work on varying density.** Reach for HDBSCAN instead.
@@ -2884,7 +2884,7 @@ gives a defensible value.
 
 ## Clusters by density, and the points left over
 
-DBSCAN finds shapes k-means cannot, decides the number of clusters itself, and labels outliers as noise instead of forcing them somewhere.
+DBSCAN finds shapes k-means can't, decides the number of clusters itself. Labels outliers as noise instead of forcing them a place.
 
 ```python-run
 import numpy as np
@@ -3018,56 +3018,56 @@ topic(
     ],
     """
 title: Hierarchical Clustering and Dendrograms
-intro: Building the whole tree once, and choosing how many clusters you want after seeing it.
+intro: Building the whole tree once. Choosing how many clusters you want after seeing it.
 
 ## The algorithm
 
 Agglomerative clustering is almost trivially simple:
 
-1. Every point starts as its own cluster.
+1. each point starts as its own cluster.
 2. Find the two closest clusters and merge them.
 3. Repeat until one cluster remains.
 
 Recording the distance at each merge gives a **dendrogram** &mdash; the chart
-above plots exactly that: merge number against the distance at which it
+above plots just that: merge number against the distance at which it
 happened.
 
 ## The point: k comes last
 
-K-means and DBSCAN both need a decision before they run &mdash; how many
+K-means and DBSCAN both need a choice before they run &mdash; how many
 clusters, or how dense. Hierarchical clustering needs neither. It builds one
-tree, and a horizontal cut through it produces a clustering.
+tree, and a flat cut through it makes a clustering.
 
 Drag the cut height and watch the count change. A cut low down leaves many small
 clusters, a cut high up leaves few, and the tree itself never changed. That is
-genuinely useful when you do not know what structure to expect, because you can
+truly handy when you don't know what structure to expect, because you can
 look at the merge distances before committing.
 
-Large jumps in the curve are informative: a merge that costs much more than the
-one before it joined two things that were not really close. Cutting just below a
-big jump is the dendrogram equivalent of the [elbow](choosing_k.html).
+Large jumps in the curve are helpful: a merge that costs much more than the
+one before it joined two things that weren't really close. Cutting just below a
+big jump is the dendrogram equal of the [elbow](choosing_k.html).
 
 ## Linkage changes everything
 
-The algorithm needs a distance between two *clusters*, not two points, and there
+The method needs a distance between two *clusters*, not two points, and there
 is no single right answer. Switch the control and the shape of the curve changes
-substantially.
+a lot.
 
 **Single linkage** &mdash; distance between the nearest pair. Merges cheaply
-whenever any two members are close, so it can follow elongated shapes. Its
+when any two members are close. So It can follow elongated shapes. Its
 failure mode is **chaining**: two well-separated blobs joined by a thin bridge of
-points merge into one, because the bridge provides a short hop at every step.
+points merge into one, because the bridge gives a short hop at each step.
 
 **Complete linkage** &mdash; distance between the furthest pair. A merge is only
-cheap if *every* member of one cluster is close to every member of the other, so
+cheap if *each* member of one cluster is close to each member of the other, so
 clusters come out compact and roughly equal in diameter. It breaks up elongated
-structures that genuinely belong together, and is sensitive to outliers, since
+structures that truly belong together, and is sensitive to outliers, since
 one distant member sets the whole distance.
 
-**Average linkage** &mdash; the mean over all cross-pairs. Between the two, and
+**Mean linkage** &mdash; the mean over all cross-pairs. Between the two, and
 the usual default.
 
-**Ward linkage**, not offered here, merges the pair that increases within-cluster
+**Ward linkage**, not offered here, merges the pair that grows within-cluster
 variance least. It behaves much like k-means and is the most common choice for
 roughly spherical clusters.
 
@@ -3083,27 +3083,27 @@ roughly spherical clusters.
 A conventional dendrogram draws each merge as a bracket at its height, with the
 leaves at the bottom. Two things are worth knowing about reading one.
 
-**Height is meaningful; horizontal position is not.** The left-to-right order is
-chosen to keep the drawing untangled and carries no information. Two adjacent
-leaves are not necessarily similar.
+**Height is real. Flat spot isn't.** The left-to-right order is
+chosen to keep the drawing untangled and carries no info. Two adjacent
+leaves aren't always similar.
 
 **The tree is greedy and permanent.** Once two clusters merge they never
-separate, so an early mistake &mdash; two points joined because of noise &mdash;
-propagates all the way up. Hierarchical clustering does not revisit decisions.
+separate, so an early mistake. Two points joined because of noise &mdash;
+passes all the way up. Hierarchical clustering doesn't revisit choices.
 
 ## Cost
 
-The naive algorithm is O(n&sup3;), and careful implementations reach O(n&sup2;
-log n) with O(n&sup2;) memory for the distance matrix. That memory is usually the
-binding constraint: 100,000 points is a matrix of ten billion distances.
+The naive method is O(n&sup3;), and careful setups reach O(n&sup2;
+log n) with O(n&sup2;) memory for the distance mat. That memory is often the
+binding constraint: 100,000 points is a mat of ten billion distances.
 
 This is why hierarchical clustering is a small-to-medium-data method. Above a few
-tens of thousands of points, k-means or a sampled variant is the practical
+tens of thousands of points, k-means or a sampled variant is the hands-on
 choice.
 
 ## Linkage, on two little clusters
 
-"There is no single right answer" for the distance between two clusters is easiest
+"There's no single right answer" for the distance between two clusters is easiest
 to see on numbers. Cluster A = {0, 1}, cluster B = {5, 9}. The four cross-pair
 distances are 5, 9, 4, 8, and each linkage reads a different one:
 
@@ -3113,47 +3113,47 @@ distances are 5, 9, 4, 8, and each linkage reads a different one:
 |complete (furthest pair)|9|0 to 9|
 |average (mean of all four)|6.5|(5+9+4+8)/4|
 
-Single linkage merges as soon as *any* two members are close, which lets it follow
+Single linkage merges as soon as *any* two members are close. This Lets it follow
 an elongated shape but also lets a thin bridge of points chain two separate blobs
-into one. Complete linkage merges only when *every* member is close, giving compact
-clusters but breaking genuinely stretched ones and taking its distance from a
-single furthest outlier. Average sits between them and is the usual default. The
-same three points would cut the tree at three different heights, which is why the
-dendrogram's shape &mdash; and any k read off it &mdash; changes completely with
+into one. Complete linkage merges only when *each* member is close, giving compact
+clusters but breaking truly stretched ones and taking its distance from a
+single furthest outlier. Mean sits between them and is the usual default. The
+same three points would cut the tree at three different heights. This Is why the
+dendrogram's shape &mdash; and any k read off it &mdash; changes fully with
 the linkage rule, before the data has changed at all. And the whole thing carries
-an O(n&sup2;) distance matrix: 100,000 points is ten billion distances, which is
+an O(n&sup2;) distance mat: 100,000 points is ten billion distances, which is
 the memory wall that keeps this a small-to-medium-data method.
 
 Two more properties are worth carrying. The tree is *greedy and permanent*: once
-two clusters merge they never separate, so a mistake made early &mdash; two points
+two clusters merge they never separate. So A mistake made early &mdash; two points
 joined because of noise &mdash; rides all the way up the dendrogram, because the
-algorithm never revisits a decision. And the left-to-right order of the leaves
-carries no information; it is chosen only to keep the drawing untangled, so two
-adjacent leaves are not necessarily similar. Height in the diagram is meaningful
-&mdash; it is the distance at which a merge happened, and a large vertical jump
-means two things that were not really close were forced together &mdash; but
-horizontal position is decoration.
+method never revisits a choice. And the left-to-right order of the leaves
+carries no info. It's chosen only to keep the drawing untangled, so two
+adjacent leaves aren't always similar. Height in the diagram is real
+&mdash; it's the distance at which a merge happened, and a large vertical jump
+means two things that weren't really close were forced together &mdash; but
+flat spot is decoration.
 
-Ward linkage, not among the three above, merges the pair that increases
-within-cluster variance least; it behaves much like k-means and is the usual choice
-for roughly spherical clusters, which rounds out the rule of thumb &mdash; single
-for elongated shapes, complete for compact ones, average as a safe middle, Ward
+Ward linkage, not among the three above, merges the pair that grows
+within-cluster variance least. It behaves much like k-means and is the usual choice
+for roughly spherical clusters. This Rounds out the rule of thumb &mdash; single
+for elongated shapes, complete for compact ones, mean as a safe middle, Ward
 when the clusters are blobs.
 
 ## Where it goes wrong
 
-**Not scaling the features.** As with every distance-based method.
+**Not scaling the features.** As with each distance-based method.
 
 **Using single linkage on data with any bridge between clusters.** Chaining will
 merge them.
 
-**Reading meaning into leaf order.** It is a drawing convention.
+**Reading meaning into leaf order.** It's a drawing rule.
 
-**Trying it on a large dataset.** The distance matrix will not fit.
+**Trying it on a large dataset.** The distance mat won't fit.
 
 ## Cluster without choosing k first
 
-Agglomerative clustering merges the two closest groups over and over, so you get every k at once. The linkage rule decides what "closest" means, and it changes the answer completely.
+Agglomerative clustering merges the two closest groups over and over. You get each k at once. The linkage rule decides what "closest" means. It changes the answer fully.
 
 ```python-run
 import numpy as np
@@ -3289,16 +3289,16 @@ topic(
     ],
     """
 title: Choosing k: Elbow and Silhouette
-intro: Two ways of picking the number of clusters, what each actually measures, and why they disagree.
+intro: Two ways of picking the number of clusters, what each really measures, and why they disagree.
 
 ## Why inertia cannot answer the question
 
-**Inertia** is the sum of squared distances from every point to the centroid of
-its cluster. K-means minimises it directly, so it is the obvious thing to look at.
+**Inertia** is the sum of squared distances from each point to the centroid of
+its cluster. K-means cuts it right. So It's the obvious thing to look at.
 
-It is also useless on its own, and the reason is structural: inertia falls at
-every increase in k, always. With k equal to the number of points, every point is
-its own centroid and inertia is exactly zero. Watch the left chart as the spread
+It's also useless on its own, and the reason is structural: inertia falls at
+each grow in k, always. With k equal to the number of points, each point is
+its own centroid and inertia is just zero. Watch the left chart as the spread
 control moves &mdash; the curve descends monotonically no matter what the data
 looks like.
 
@@ -3309,23 +3309,23 @@ grouping is any good.
 ## The elbow
 
 The elbow method looks for the k where the curve stops falling steeply &mdash;
-where extra clusters stop buying much. On well-separated blobs there is a genuine
-bend at the true number, because up to that point each new cluster splits a real
+where extra clusters stop buying much. On well-separated blobs there's a genuine
+bend at the true number. Up to that point each new cluster splits a real
 group, and after it each new cluster splits a group that was already coherent.
 
-The problems are practical. The bend is judged by eye and different people pick
+The problems are hands-on. The bend is judged by eye and different people pick
 different points. Very often, on real data, there simply is no bend &mdash; the
-curve is smooth, and reading an elbow into it is wishful. Raise the spread
-control until the blobs overlap and the bend disappears in front of you.
+curve is smooth, and reading an elbow into it's wishful. Raise the spread
+control until the blobs share and the bend disappears in front of you.
 
-There is a formalisation, the **kneedle** algorithm, which finds the point of
-maximum curvature. It is better than eyeballing, and it still assumes a knee
+There's a formalisation, the **kneedle** method. This Finds the point of
+max curvature. It's better than eyeballing, and it still assumes a knee
 exists.
 
 ## The silhouette
 
-The silhouette measures something different: not tightness, but **separation
-relative to tightness**.
+The silhouette measures a thing different: not tightness, but **gap
+scaled to tightness**.
 
 For each point, let *a* be its mean distance to the other members of its own
 cluster, and *b* its mean distance to the members of the nearest other cluster.
@@ -3336,53 +3336,53 @@ s = (b - a) / max(a, b)
 ```
 
 Near **+1** the point is much closer to its own cluster than to any other. Near
-**0** it sits on a boundary. **Negative** means it is closer to a different
-cluster than to its own &mdash; it is probably misassigned.
+**0** it sits on a boundary. **Minus** means it's closer to a different
+cluster than to its own &mdash; it's probably misassigned.
 
-Averaging over all points gives one number per k, and unlike inertia it does not
+Blending over all points gives one number per k, and unlike inertia it doesn't
 improve automatically as k grows. Adding clusters eventually forces points close
-to a neighbouring cluster, which drives *b* down and the score with it. So the
-silhouette has a real maximum, and that maximum is a defensible choice.
+to a neighbouring cluster. This Drives *b* down and the score with it. So the
+silhouette has a real max, and that max is a defensible choice.
 
 The right-hand chart shows this. The peak is at the true number of blobs, and it
 is a peak rather than a slope.
 
-The cost is computation: it needs pairwise distances, so O(n&sup2;), against
+The cost is work: it needs pairwise distances, so O(n&sup2;), against
 inertia's O(n).
 
 ## When they disagree
 
-They frequently do, and the disagreement is informative rather than a problem to
+They often do, and the disagreement is helpful rather than a problem to
 resolve.
 
 Inertia asks *are the clusters tight*. The silhouette asks *are they separated*.
 A dataset can have tight clusters that sit right next to each other, and the two
 metrics will point in different directions.
 
-Switch the data to **Two crescents** and watch both. The silhouette does not
-recover the two crescents either &mdash; because it is still built on distances
-to cluster members, and k-means has not produced the crescents in the first
-place. That is the honest limit of both metrics: they evaluate the clustering
-you gave them, and cannot tell you the algorithm was wrong.
+Switch the data to **Two crescents** and watch both. The silhouette doesn't
+recover the two crescents either. Because it's still built on distances
+to cluster members, and k-means hasn't made the crescents in the first
+place. That is the honest limit of both metrics: they test the clustering
+you gave them, and can't tell you the method was wrong.
 
 ## The answer that is usually right
 
 Neither metric knows what the clusters are for.
 
-If you are segmenting customers so a marketing team can write one message per
-segment, k is roughly how many messages they can write. If you are compressing
+If you're segmenting customers so a marketing team can write one message per
+segment, k is roughly how many messages they can write. If you're compressing
 colours, k is the palette size you can afford. If clusters feed a downstream
 model, the number that makes that model best is the number.
 
-Both metrics are worth computing, and the application usually decides.
+Both metrics are worth finding, and the use often decides.
 
 ## The silhouette of one point
 
-Where inertia only ever falls as k grows &mdash; reaching zero when every point is
-its own cluster &mdash; the silhouette has a real maximum, because it measures
-separation against tightness rather than tightness alone. For one point, let a be
+Where inertia only ever falls as k grows. Reaching zero when each point is
+its own cluster &mdash; the silhouette has a real max, because it measures
+gap against tightness rather than tightness alone. For one point, let a be
 its mean distance to its own cluster and b its mean distance to the nearest other
-cluster; `s = (b - a) / max(a, b)`:
+cluster. `s = (b - a) / max(a, b)`:
 
 |a (own)|b (nearest other)|silhouette|reading|
 |---|---|---|---|
@@ -3390,41 +3390,41 @@ cluster; `s = (b - a) / max(a, b)`:
 |2.5|3.0|0.17|near the boundary|
 |3.0|1.0|&minus;0.67|closer to another cluster &mdash; misassigned|
 
-Averaging s over all points gives one number per k, and unlike inertia it does not
+Blending s over all points gives one number per k, and unlike inertia it doesn't
 improve automatically: add too many clusters and points are forced close to a
 neighbouring cluster, which drives b down and the score with it, so the curve peaks
 at a defensible k rather than sliding forever toward "more". The cost is O(n&sup2;)
-pairwise distances against inertia's O(n). Both still evaluate only the clustering
+pairwise distances against inertia's O(n). Both still test only the clustering
 they were handed, though &mdash; on two interleaved crescents that k-means never
-separated, the silhouette cannot recover them either, which is the honest shared
-limit: these scores judge a partition, they do not know the algorithm was the
+separated, the silhouette can't recover them either. This Is the honest shared
+limit: these scores judge a split, they don't know the method was the
 wrong one.
 
 The honest last word is that neither metric knows what the clusters are *for*. If
-you are segmenting customers so a team can write one message per segment, k is
-roughly how many messages they can write; if you are quantising colours, k is the
-palette you can afford; if the clusters feed a downstream model, the k that makes
+you're segmenting customers so a team can write one message per segment, k is
+roughly how many messages they can write. If you're quantising colours, k is the
+palette you can afford. If the clusters feed a downstream model, the k that makes
 that model best is the answer. The elbow and the silhouette are both worth
-computing &mdash; the elbow reads tightness, the silhouette reads separation, and
-their disagreement is informative rather than a problem to resolve &mdash; but the
-application usually decides, and a formalisation like the kneedle algorithm only
-helps once you have accepted that a knee exists at all.
+finding &mdash; the elbow reads tightness, the silhouette reads gap, and
+their disagreement is helpful rather than a problem to resolve &mdash; but the
+use often decides, and a formalisation like the kneedle method only
+helps once you've accepted that a knee exists at all.
 
 ## Where it goes wrong
 
 **Choosing k by inertia alone.** It will always say "more".
 
-**Seeing an elbow in a smooth curve.** Check whether the bend survives a change
+**Seeing an elbow in a smooth curve.** Check whether the bend lives a change
 of scale on the axis.
 
-**Trusting a silhouette on non-spherical clusters.** It is distance-based and
+**Trusting a silhouette on non-spherical clusters.** It's distance-based and
 inherits the same assumption k-means makes.
 
-**Forgetting to scale.** Both metrics are distances.
+**Losing to scale.** Both metrics are distances.
 
 ## Four ways to pick k, on data where you know the answer
 
-The same four selection scores run twice: once on clean, well-separated blobs where they all agree, and once on overlapping ones where they do not. The disagreement is the useful part.
+The same four pick scores run twice: once on clean, well-separated blobs where they all agree. Once on shared ones where they don't. The disagreement is the handy part.
 
 ```python-run
 import numpy as np
@@ -3569,77 +3569,77 @@ intro: What clustering looks like when a point is allowed to belong partly to tw
 
 ## Hard labels throw information away
 
-K-means gives every point exactly one cluster. For a point sitting squarely
-inside a group that is fine. For a point in the overlap between two groups it is
-a fabrication: the algorithm had almost no reason to prefer one over the other,
+K-means gives each point just one cluster. For a point sitting squarely
+inside a group that is fine. For a point in the share between two groups it's
+a fabrication: the method had almost no reason to prefer one over the other,
 and the output records none of that doubt.
 
 A Gaussian mixture keeps the doubt. It models the data as having come from
-several Gaussian distributions mixed together, and reports, for each point, the
-probability that it came from each one.
+a few Gaussian spreads mixed together, and reports, for each point, the
+chance that it came from each one.
 
-Raise the overlap control above and watch the readout. As the two groups merge,
-the number of points assigned with less than 90% confidence climbs &mdash; and
-every one of those is a point k-means would have labelled without hesitation.
+Raise the share control above and watch the readout. As the two groups merge,
+the number of points assigned with less than 90% trust climbs &mdash; and
+each one of those is a point k-means would have labelled without hesitation.
 
 ## The model
 
-Three parameters per component: a mean, a width, and a **mixing weight** saying
+Three params per component: a mean, a width, and a **mixing weight** saying
 what fraction of the data that component accounts for. The density is their
 weighted sum, and the two curves in the chart are the fitted components.
 
 Fitting is a chicken-and-egg problem. Knowing which points belong to which
-component would make estimating the parameters easy, and knowing the parameters
+component would make guessing the params easy, and knowing the params
 would make assigning points easy. Neither is known.
 
 ## Expectation-Maximisation
 
 EM resolves it by alternating, starting from a guess:
 
-**E step.** With the current parameters, compute each point's
-**responsibility** &mdash; the probability that each component produced it.
+**E step.** With the current params, find each point's
+**job** &mdash; the chance that each component made it.
 
-**M step.** With those responsibilities, re-estimate each component's mean, width
-and weight, weighting every point by how much it belongs.
+**M step.** With those jobs, re-guess each component's mean, width
+and weight, weighting each point by how much it belongs.
 
-Repeat. Each iteration provably does not decrease the likelihood, so the process
-converges.
+Repeat. Each iteration provably doesn't fall the likelihood, so the process
+settles.
 
 Drag the iterations control from 1 upward and watch the curves settle. The early
-steps move a great deal; the last twenty barely move at all, which is what
-convergence looks like.
+steps move a great deal. The last twenty barely move at all, which is what
+settling looks like.
 
-The guarantee is only about *local* optima. EM converges to a local maximum that
-depends on the starting point, which is why implementations run it several times
+The ensure is only about *local* optima. EM settles to a local max that
+depends on the starting point. This Is why setups run it a few times
 from different initialisations and keep the best. Scikit-learn's `n_init` exists
 for this.
 
 ## Why it beats k-means, when it does
 
-**Elliptical clusters.** With a full covariance matrix per component, a GMM fits
-stretched and tilted clusters. K-means implicitly assumes spheres, so an
+**Elliptical clusters.** With a full covariance mat per component, a GMM fits
+stretched and tilted clusters. K-means silently assumes spheres, so an
 elongated cluster gets cut in half.
 
 **Different sizes.** Mixing weights let one component account for 80% of the data
 and another for 20%. K-means has no such notion and tends toward equal-sized
 clusters.
 
-**Soft assignment.** Useful in itself when the output feeds something downstream
-that can use a probability.
+**Soft set.** handy in itself when the output feeds a thing downstream
+that can use a chance.
 
 **A likelihood.** Being a proper probabilistic model, a GMM can score how well it
-explains the data, which makes **BIC** and **AIC** available for choosing the
-number of components &mdash; a principled alternative to
+shows the data, which makes **BIC** and **AIC** available for choosing the
+number of components &mdash; a principled option to
 [the elbow](choosing_k.html).
 
-K-means is exactly the limiting case: spherical components of equal weight, with
-responsibilities forced to 0 or 1.
+K-means is just the limiting case: spherical components of equal weight, with
+jobs forced to 0 or 1.
 
 ## The E-step, worked
 
-The soft assignment the whole method turns on is one calculation. Two components,
+The soft set the whole method turns on is one math. Two components,
 N(0,1) with weight 0.6 and N(3,1) with weight 0.4, and a point to assign: its
-responsibility to each is the weighted density there, normalised so the two sum
+job to each is the weighted density there, normed so the two sum
 to 1.
 
 |point|r(component 1)|r(component 2)|
@@ -3648,53 +3648,53 @@ to 1.
 |x = 1.5|0.600|0.400|
 
 At x = 0.5 the point sits deep in the first component and is assigned to it with
-97% confidence &mdash; but k-means would have recorded the same hard label with no
-hint of the 3% doubt. At x = 1.5, halfway between the means, the responsibilities
+97% trust &mdash; but k-means would have recorded the same hard label with no
+hint of the 3% doubt. At x = 1.5, halfway between the means, the jobs
 fall back to the mixing weights themselves: the data gives almost no reason to
 prefer either component, and the GMM says so where k-means would still pick one.
-That preserved doubt is the whole point, and it is why the number of low-confidence
-assignments climbs as the components overlap. The M-step then re-estimates each
-mean, width and weight using every point weighted by its responsibility, and
-alternating the two provably never decreases the likelihood &mdash; which is also
+That preserved doubt is the whole point, and it's why the number of low-trust
+sets climbs as the components share. The M-step then re-guesses each
+mean, width and weight using each point weighted by its job, and
+alternating the two provably never falls the likelihood &mdash; which is also
 why a GMM can report one, through BIC, and choose its own number of components
-where k-means cannot.
+where k-means can't.
 
 What a GMM buys over k-means, when the data suits it, is three things at once:
 elliptical clusters, because a full covariance per component fits stretched and
-tilted shapes k-means cuts in half; unequal sizes, because the mixing weights let
-one component own 80% of the data; and the soft assignment itself, useful whenever
-something downstream can act on a probability. K-means is exactly the limiting
-case &mdash; spherical components of equal weight with responsibilities forced to
-0 or 1 &mdash; which is why it fabricates the confidence a GMM keeps. The costs are
-the assumption of Gaussian components (crescents defeat it) and convergence only to
-a local optimum, which is why libraries run several initialisations and keep the
+tilted shapes k-means cuts in half. Unequal sizes, because the mixing weights let
+one component own 80% of the data. And the soft set itself, handy when
+a thing downstream can act on a chance. K-means is just the limiting
+case &mdash; spherical components of equal weight with jobs forced to
+0 or 1 &mdash; which is why it fabricates the trust a GMM keeps. The costs are
+the assumption of Gaussian components (crescents defeat it) and settling only to
+a local optimum, which is why libraries run a few initialisations and keep the
 best.
 
 The other failure to watch is a singularity: a component can collapse onto a
 single point, driving its width toward zero and the likelihood toward infinity.
-A small constant added to each covariance &mdash; on by default in most libraries
-&mdash; prevents it, and it is the same regularisation instinct that stops too many
-components fitting the noise, which is what BIC's penalty on parameter count guards
+A small constant added to each covariance. On by default in most libraries
+&mdash; blocks it, and it's the same smoothing instinct that stops too many
+components fitting the noise. This Is what BIC's fine on param count guards
 against when choosing how many components to keep.
 
 ## Where it goes wrong
 
-**Assuming Gaussian.** If the clusters are crescents, a mixture of Gaussians is
+**given Gaussian.** If the clusters are crescents, a mixture of Gaussians is
 the wrong model, and it will fit two Gaussians to them anyway.
 
 **Singularities.** A component can collapse onto a single point, driving its
-width to zero and the likelihood to infinity. Regularisation &mdash; a small
-constant added to the covariance &mdash; prevents it, and is on by default in
+width to zero and the likelihood to infinity. Smoothing &mdash; a small
+constant added to the covariance. Blocks it, and is on by default in
 most libraries.
 
-**One run from one start.** Local optima are real. Use several initialisations.
+**One run from one start.** Local optima are real. Use a few initialisations.
 
-**Too many components.** With enough Gaussians you can fit anything, including
-the noise. BIC penalises parameter count for this reason.
+**Too many components.** With enough Gaussians you can fit any of it, including
+the noise. BIC punishes param count for this reason.
 
 ## Soft clusters, and shapes k-means cannot fit
 
-A GMM gives every point a probability of belonging to each cluster, and fits ellipses rather than spheres. Both differences show up on the same data.
+A GMM gives each point a chance of belonging to each cluster. Fits ellipses rather than spheres. Both differences show up on the same data.
 
 ```python-run
 import numpy as np
@@ -3843,50 +3843,50 @@ topic(
     ],
     """
 title: t-SNE and UMAP beside PCA
-intro: Why neighbour-preserving plots look so much better than PCA, and which parts of them you are not allowed to read.
+intro: Why neighbour-preserving plots look so much better than PCA. Which parts of them you aren't allowed to read.
 
 ## A note on what this page runs
 
 The layout here is a **simplified neighbour-preserving optimisation** &mdash;
-attract each point toward its nearest neighbours in the original space, repel
-everything else. It is not t-SNE: there is no perplexity, no
+attract each point toward its nearest neighbours in the first space, repel
+all else. It isn't t-SNE: there's no perplexity, no
 Student-t kernel, no KL divergence being minimised.
 
-What it reproduces faithfully is the behaviour that matters: local structure is
-preserved, and the distances between groups stop meaning anything. The
+What it copies faithfully is the action that matters: local structure is
+preserved, and the distances between groups stop meaning any of it. The
 [PCA module](pca.html) covers the linear method properly.
 
 ## Two different jobs
 
 **PCA** finds the directions along which the data varies most and projects onto
-them. It is linear, deterministic, invertible, and fast &mdash; and because it is
-a projection, distances survive it in a predictable way. Points far apart in the
-original space are far apart in the plot, up to the variance the discarded
-dimensions held.
+them. It's linear, deterministic, invertible, and fast &mdash; and because it's
+a map, distances live it in a predictable way. Points far apart in the
+first space are far apart in the plot, up to the variance the discarded
+dims held.
 
-**t-SNE and UMAP** do something else entirely. They ask which points are near
-each other in the original space, and then *construct* a two-dimensional
-arrangement in which those same points are near each other. There is no
-projection and no formula mapping one space to the other &mdash; the coordinates
+**t-SNE and UMAP** do a thing else fully. They ask which points are near
+each other in the first space, and then *make* a two-dimensional
+setup in which those same points are near each other. There's no
+map and no formula mapping one space to the other &mdash; the coords
 are the output of an optimisation.
 
 ## What the readout is checking
 
 The data behind this page has three clusters arranged on a line, with the third
-exactly twice as far from the first as the second is. A ratio of 2.00, by
-construction.
+just twice as far from the first as the second is. A ratio of 2.00, by
+build.
 
 Switch between the methods and watch the measured ratio.
 
-**PCA** reproduces it closely. It is a linear projection, so the global
-arrangement is preserved.
+**PCA** copies it closely. It's a linear map, so the global
+setup is preserved.
 
-**The neighbour-preserving layout** does not, and the number wanders as you
+**The neighbour-preserving layout** doesn't, and the number wanders as you
 change the attraction strength. The three groups are cleanly separated &mdash;
 visibly better than PCA &mdash; and the distances between them are an artefact of
 the optimisation.
 
-That is the whole lesson, and it is the thing most often got wrong when reading
+That is the whole lesson, and it's the thing most often got wrong when reading
 these plots.
 
 ## What you may not read from a t-SNE plot
@@ -3900,49 +3900,49 @@ out they were.
 
 **Density within a cluster.** Same reason.
 
-**Anything from one run.** t-SNE is stochastic and its result depends on the
+**any of it from one run.** t-SNE is stochastic and its result depends on the
 random seed and on perplexity. Run it three times and you get three pictures.
-Structure that survives all three is real; structure that does not, is not.
+Structure that lives all three is real. Structure that doesn't, isn't.
 
 ## Perplexity and n_neighbors
 
-Both algorithms have a parameter controlling how much neighbourhood to consider
+Both methods have a param controlling how much zone to consider
 &mdash; **perplexity** in t-SNE, **n_neighbors** in UMAP. Low values emphasise
 very local structure and can shatter a genuine cluster into fragments. High
 values emphasise broader structure and can merge distinct clusters.
 
-There is no correct value, and the standard advice is to look at several. A
-finding that only appears at one setting is a finding about the parameter.
+There's no correct value, and the standard advice is to look at a few. A
+finding that only appears at one setting is a finding about the param.
 
 ## t-SNE against UMAP
 
-**Speed.** UMAP is substantially faster and scales to larger datasets.
+**Speed.** UMAP is a lot faster and scales to larger datasets.
 
-**Global structure.** UMAP claims to preserve more of it, and generally does,
-though the caution above still applies &mdash; less meaningless is not
-meaningful.
+**Global structure.** UMAP claims to preserve more of it, and often does,
+though the caution above still applies &mdash; less meaningless isn't
+real.
 
-**New points.** UMAP can transform data it did not see during fitting. t-SNE
-cannot: adding a point means re-running everything. This matters if the embedding
+**New points.** UMAP can transform data it didn't see during fitting. t-SNE
+can't: adding a point means re-running all. This matters if the embedding
 is part of a pipeline rather than a picture.
 
-**Reproducibility.** Both are stochastic; both take a seed.
+**Reproducibility.** Both are stochastic. Both take a seed.
 
 ## What they are for
 
-Looking. These are visualisation tools, and they are very good at answering "does
-my data separate at all", "are my labels consistent", "is there a group I did not
+Looking. These are visualisation tools, and they're very good at answering "does
+my data separate at all", "are my labels steady", "is there a group I didn't
 expect".
 
-They are a poor choice as a preprocessing step for a model. The output
-coordinates have no meaning outside the plot, the mapping is not stable, and for
-t-SNE it cannot be applied to new data at all. If you want dimensionality
+They're a poor choice as a prep step for a model. The output
+coords have no meaning outside the plot, the mapping isn't stable, and for
+t-SNE it can't be applied to new data at all. If you want dimensionality
 reduction inside a pipeline, PCA is the safe default.
 
 ## The distance you are not allowed to read
 
 The one number that makes the caution concrete: place three clusters on a line so
-the third is exactly twice as far from the first as the second is &mdash; a true
+the third is just twice as far from the first as the second is &mdash; a true
 ratio of 2.00 &mdash; and measure it back off each layout:
 
 |method|recovered distance ratio|
@@ -3950,26 +3950,26 @@ ratio of 2.00 &mdash; and measure it back off each layout:
 |PCA|~2.00|
 |neighbour-preserving (t-SNE-like)|arbitrary, and it wanders with the settings|
 
-PCA is a linear projection, so global arrangement survives it and the 2.00 comes
-back. t-SNE and UMAP never project &mdash; they *construct* a layout that keeps
-each point near its original neighbours and nothing else &mdash; so between-cluster
+PCA is a linear map. So Global setup lives it and the 2.00 comes
+back. t-SNE and UMAP never project. They *make* a layout that keeps
+each point near its first neighbours and nothing else &mdash; so between-cluster
 distance is an output of the optimisation, not a property of the data, and it
 changes with the seed and the perplexity. That is why three things on such a plot
 are unreadable: the distance between clusters, the size of a cluster (dense regions
 are expanded and sparse ones contracted), and within-cluster density. What the plot
-*is* good for is the local question &mdash; does the data separate at all, are the
-labels consistent, is there an unexpected group &mdash; and the discipline that
-keeps it honest is to run it two or three times: structure that survives every seed
+*is* good for is the local question. Does the data separate at all, are the
+labels steady, is there an unexpected group. And the discipline that
+keeps it honest is to run it two or three times: structure that lives each seed
 is real, structure that moves is an artefact.
 
-On choosing between the two neighbour-preserving methods: UMAP is substantially
-faster, scales to larger data, and can transform points it did not see during
-fitting, which t-SNE cannot &mdash; adding a point to a t-SNE means re-running
-everything, so it can never sit inside a pipeline that scores new data. UMAP also
-claims to preserve more global structure and generally does, though the caution
-stands: less meaningless is not meaningful. Both are stochastic and both take a
-seed. And both are the wrong choice as a preprocessing step for a model, because
-the coordinates mean nothing outside the plot and the mapping is not stable; when
+On choosing between the two neighbour-preserving methods: UMAP is a lot
+faster, scales to larger data, and can transform points it didn't see during
+fitting, which t-SNE can't &mdash; adding a point to a t-SNE means re-running
+all, so it can never sit inside a pipeline that scores new data. UMAP also
+claims to preserve more global structure and often does, though the caution
+stands: less meaningless isn't real. Both are stochastic and both take a
+seed. And both are the wrong choice as a prep step for a model, because
+the coords mean nothing outside the plot and the mapping isn't stable. When
 you want dimensionality reduction inside a pipeline, PCA is the safe default.
 
 ## Where it goes wrong
@@ -3980,12 +3980,12 @@ you want dimensionality reduction inside a pipeline, PCA is the safe default.
 
 **Running once and believing it.** Vary the seed and the perplexity.
 
-**Feeding t-SNE coordinates into a classifier.** No stable mapping; no way to
+**Feeding t-SNE coords into a classifier.** No stable mapping. No way to
 transform new data.
 
 ## A map you can look at, and must not measure
 
-t-SNE turns high-dimensional data into a picture. The picture is useful and several things about it are not true, which this makes concrete.
+t-SNE turns high-dimensional data into a picture. The picture is handy and a few things about it aren't true. This This makes concrete.
 
 ```python-run
 import numpy as np
@@ -4140,26 +4140,26 @@ topic(
     ],
     """
 title: Feature and Permutation Importance
-intro: The most useful model-agnostic importance measure, and the specific way it lies to you.
+intro: The most handy model-agnostic importance measure, and the exact way it lies to you.
 
 ## The idea
 
-If a feature matters, destroying the information in it should hurt the model. So:
+If a feature matters, destroying the info in it should hurt the model. So:
 
 1. Score the model on a dataset.
-2. Shuffle one column, breaking its relationship with the target while leaving
-   its distribution untouched.
+2. Shuffle one column, breaking its tie with the target while leaving
+   its spread untouched.
 3. Score again.
 4. The drop is that feature's importance.
-5. Repeat for every column.
+5. Repeat for each column.
 
-Shuffling rather than deleting is the important detail. Deleting a column means
+Shuffling rather than deleting is the key detail. Deleting a column means
 retraining, which gives a different model and answers a different question.
 Shuffling keeps the same fitted model and the same input shape, so the only thing
 that changed is whether that column carries signal.
 
-Because it needs nothing but predictions, it works on any model at all &mdash;
-linear, forest, gradient-boosted, neural network.
+Because it needs nothing but guesses, it works on any model at all &mdash;
+linear, forest, grad-boosted, neural network.
 
 ## Reading the chart
 
@@ -4168,75 +4168,75 @@ noise, and a **near-duplicate copy of the strong signal**.
 
 `noise` scores about zero, which is correct and reassuring.
 
-Now compare `signal` with `copy of signal`. They carry the same information
+Now compare `signal` with `copy of signal`. They carry the same info
 &mdash; either would serve the model about equally well on its own &mdash; and
 `copy of signal` scores roughly half what `signal` does, landing at about the
-level of `weak`, a feature that is genuinely much less informative.
+level of `weak`, a feature that is truly much less helpful.
 
 ## Why: correlated features hide each other
 
-The reason is exactly the procedure. The model here is a small random forest,
-and each split considers a random subset of the features, so some trees split on
+The reason is just the method. The model here is a small random forest,
+and each split considers a random subset of the features. So Some trees split on
 `signal` and others on its copy. Shuffling the copy leaves all the trees that
-used `signal` working perfectly, so the measured drop is much smaller than the
+used `signal` working just right. So The measured drop is much smaller than the
 column's actual worth.
 
-The metric is measured **one column at a time**, and with correlated features
-that is the wrong unit of analysis. The honest reading is not "the copy does not
-matter" but "either one largely substitutes for the other, and this method cannot
+The metric is measured **one column at a time**, and with linked features
+that is the wrong unit of analysis. The honest reading isn't "the copy doesn't
+matter" but "either one largely substitutes for the other, and this method can't
 say that".
 
 The size of the effect depends on the model. A linear model given two duplicate
-columns splits its weight between them, so shuffling one still destroys half the
-contribution and both score moderately high. A forest can substitute one for the
+columns splits its weight between them. So Shuffling one still destroys half the
+part and both score moderately high. A forest can substitute one for the
 other outright, which is why the discount is so visible here &mdash; and why the
-trap is worst on exactly the tree models where importance charts are most often
+trap is worst on just the tree models where importance charts are most often
 drawn.
 
-This is the single most important thing to know about permutation importance,
-because the failure is silent and the chart looks perfectly reasonable.
+This is the single most key thing to know about permutation importance,
+because the failure is silent and the chart looks just right reasonable.
 
 What to do about it:
 
-**Cluster correlated features first** and permute whole groups together. The
-group's importance is then meaningful even though its members' are not.
+**Cluster linked features first** and permute whole groups together. The
+group's importance is then real though its members' aren't.
 
-**Check the correlation matrix** before reading any importance chart.
+**Check the link mat** before reading any importance chart.
 
-**Use conditional permutation**, which shuffles within strata of the correlated
+**Use if-based permutation**, which shuffles within strata of the linked
 features rather than globally.
 
 ## Held-out data, not training data
 
-Permutation importance computed on the training set measures what the model
-*used to fit*, including what it memorised. A feature the model overfitted to
-will look highly important because shuffling it destroys memorised training
-performance.
+Permutation importance found on the training set measures what the model
+*used to fit*, including what it stored. A feature the model overfitted to
+will look highly key because shuffling it destroys stored training
+speed.
 
-On held-out data the same procedure measures what the feature contributes to
-performance that generalises. That is almost always the question, and it is why
-scikit-learn's documentation is emphatic about it.
+On held-out data the same method measures what the feature adds to
+speed that generalises. That is almost always the question, and it's why
+scikit-learn's docs is emphatic about it.
 
-Comparing the two is diagnostic in itself: a feature that is very important on
+Checking the two is diagnostic in itself: a feature that is very key on
 training data and unimportant on validation data is one the model overfitted.
 
 ## Against a tree's built-in importance
 
-Random forests and gradient-boosted trees expose `feature_importances_`, usually
-mean decrease in impurity. It is free, since it is accumulated during training,
+Random forests and grad-boosted trees expose `feature_importances_`, often
+mean fall in impurity. It's free, since it's built up during training,
 and it has a known bias: it **favours high-cardinality features**. A column with
-many distinct values offers more possible split points, so it is chosen more
-often and accumulates more credit &mdash; even a random ID column will score
-above a useful binary flag.
+many distinct values offers more possible split points, so it's chosen more
+often and builds up more credit. Even a random ID column will score
+above a handy binary flag.
 
-Permutation importance does not have that bias, costs a re-scoring pass per
+Permutation importance doesn't have that bias, costs a re-scoring pass per
 feature, and applies to models that have no built-in measure at all.
 
 ## Repeats
 
-Shuffling is random, so a single shuffle is a noisy estimate. The repeats control
-above averages several, and the wobble as you change the seed at one repeat
-shrinks visibly as you raise it. Five to ten is typical.
+Shuffling is random, so a single shuffle is a noisy guess. The repeats control
+above means a few, and the wobble as you change the seed at one repeat
+shrinks visibly as you raise it. Five to ten is common.
 
 ## Two copies of one signal, and the discount
 
@@ -4252,34 +4252,34 @@ read the permutation importances:
 |noise|~0|
 
 `noise` scoring zero is correct and reassuring. But `copy of signal` carries the
-same information as `signal` &mdash; either alone would serve the model &mdash; and
-it scores about half, down at the level of a genuinely weak feature. The cause is
-the procedure: importance is measured one column at a time, so when the copy is
-shuffled every tree that split on the original still works, and the measured drop is
-small. The honest reading is not "the copy does not matter" but "either substitutes
-for the other, and this method cannot say so" &mdash; and the effect is worst on the
-tree models where these charts are drawn most, because a forest can swap one
-correlated column for the other outright. The fixes are to cluster correlated
-features and permute the group, or to check the correlation matrix before trusting
-any importance bar. Compute it on held-out data, too: on training data it rewards
-whatever the model memorised.
+same info as `signal` &mdash; either alone would serve the model &mdash; and
+it scores about half, down at the level of a truly weak feature. The cause is
+the method: importance is measured one column at a time. So When the copy is
+shuffled each tree that split on the first still works, and the measured drop is
+small. The honest reading isn't "the copy doesn't matter" but "either substitutes
+for the other, and this method can't say so". And the effect is worst on the
+tree models where these charts are drawn most. A forest can swap one
+linked column for the other outright. The fixes are to cluster linked
+features and permute the group, or to check the link mat before trusting
+any importance bar. Find it on held-out data, too: on training data it rewards
+what the model stored.
 
 ## Where it goes wrong
 
-**Reading it on correlated features.** The central trap.
+**Reading it on linked features.** The central trap.
 
-**Computing it on training data.** Measures memorisation.
+**finding it on training data.** Measures memorisation.
 
 **Treating it as causal.** It says the model used a feature, not that the feature
 causes the outcome.
 
-**Comparing across models.** Importance is relative to one fitted model. A
+**Checking across models.** Importance is scaled to one fitted model. A
 different model can rank the same features differently and both be right about
 themselves.
 
 ## Break one column and see what it costs
 
-Permutation importance shuffles a column and measures the damage. It works on any fitted model, and it disagrees with a tree's built-in importances in ways worth understanding.
+Permutation importance shuffles a column and measures the damage. It works on any fitted model. It disagrees with a tree's built-in importances in ways worth understanding.
 
 ```python-run
 import numpy as np
@@ -4426,88 +4426,88 @@ topic(
     ],
     """
 title: Partial Dependence, ICE and SHAP
-intro: Three ways to ask what a model is doing, and the trap in the most popular one.
+intro: Three ways to ask what a model is doing. The trap in the most common one.
 
 ## Partial dependence
 
 A partial dependence plot answers: as this feature moves across its range, what
-happens to the prediction on average?
+happens to the guess on average?
 
-The procedure is mechanical. Take the dataset. Set the feature to some value for
-*every* row, leaving all other columns untouched. Predict, and average. Repeat
+The method is mechanical. Take the dataset. Set the feature to some value for
+*each* row, leaving all other columns untouched. Predict, and mean. Repeat
 across the feature's range, and plot.
 
-It is model-agnostic and easy to read, which is why it is everywhere.
+It's model-agnostic and easy to read. This Is why it's all over.
 
 ## The trap
 
-Leave the interaction control **on** and look at the thick line. It is nearly
+Leave the interplay control **on** and look at the thick line. It's nearly
 flat, and the readout gives its slope as close to zero. Read on its own, it says
-this feature does not matter.
+this feature doesn't matter.
 
-Now the ICE curves underneath tell a completely different story. Every individual
-curve has a steep slope &mdash; the feature matters enormously to every single
-row. It is just that it slopes **up** for one group and **down** for the other,
-and averaging them cancels.
+Now the ICE curves underneath tell a fully different story. each single
+curve has a steep slope. The feature matters enormously to each single
+row. It's just that it slopes **up** for one group and **down** for the other,
+and blending them cancels.
 
-This is not a contrived case. Any feature whose effect reverses by subgroup
-behaves like this: a treatment that helps one population and harms another, a
+This isn't a contrived case. Any feature whose effect reverses by subgroup
+behaves like this: a treatment that helps one group and harms another, a
 price change that attracts some customers and repels others.
 
-**A flat partial dependence curve does not mean the feature is unimportant.** It
-means the average effect is zero, which is a much weaker statement.
+**A flat partial dependence curve doesn't mean the feature is unimportant.** It
+means the mean effect is zero. This Is a much weaker statement.
 
-Switch the interaction off and the curves stack into a single shape. Now the
-average describes each individual well, and the partial dependence line is
+Switch the interplay off and the curves stack into a single shape. Now the
+mean shows each single well, and the partial dependence line is
 trustworthy.
 
 ## ICE curves
 
-**Individual Conditional Expectation** curves are partial dependence without the
-averaging: one line per row, showing what the model predicts for *that* row as
+**Single if-based Expectation** curves are partial dependence without the
+blending: one line per row, showing what the model predicts for *that* row as
 the feature sweeps.
 
-They cost nothing extra, since partial dependence computes them and then throws
+They cost nothing extra, since partial dependence finds them and then throws
 them away. Plotting them is the standard defence against the trap above, and the
 diagnostic is simple: if the ICE curves are parallel, the partial dependence line
-is a fair summary. If they fan out or cross, it is not, and there is an
-interaction worth finding.
+is a fair summary. If they fan out or cross, it isn't, and there's an
+interplay worth finding.
 
 ## The other assumption
 
-Partial dependence sets a feature to a value for every row regardless of whether
+Partial dependence sets a feature to a value for each row even so of whether
 that combination is possible. Sweeping `age` from 18 to 80 across a dataset
-creates rows with age 18 and forty years of work experience.
+creates rows with age 18 and forty years of work run into.
 
 The model is asked to predict for combinations that never occur, and its answer
-there is extrapolation with nothing to anchor it. When features are strongly
-correlated, part of a partial dependence curve is describing regions of input
+there's extrapolation with nothing to anchor it. When features are strongly
+linked, part of a partial dependence curve is showing regions of input
 space the model has never seen.
 
-**Accumulated Local Effects** plots address this by only varying a feature within
-the range of values that actually co-occur with the other features' values.
+**Built up Local Effects** plots address this by only varying a feature within
+the range of values that really co-occur with the other features' values.
 
 ## SHAP
 
-SHAP answers a different question. Partial dependence and ICE describe the model
-across a range; SHAP explains **one prediction**.
+SHAP answers a different question. Partial dependence and ICE show the model
+across a range. SHAP shows **one guess**.
 
 For a given row, it assigns each feature a number saying how much that feature
-pushed the prediction away from the base value &mdash; the average prediction
-over the dataset. The numbers sum exactly to the difference:
+pushed the guess away from the base value &mdash; the mean guess
+over the dataset. The numbers sum just to the difference:
 
 ```
 prediction  =  base value  +  sum of every feature's SHAP value
 ```
 
-That additivity is what makes it useful for an individual explanation: it
-accounts for the whole prediction, with nothing unattributed.
+That additivity is what makes it handy for an single explanation: it
+accounts for the whole guess, with nothing unattributed.
 
 The values come from Shapley values in cooperative game theory, which distribute
-credit for a joint outcome fairly among contributors. Computing them exactly
-requires evaluating every subset of features, which is exponential, so
-implementations approximate &mdash; `TreeSHAP` exactly and quickly for trees,
-`KernelSHAP` by sampling for anything else.
+credit for a joint outcome fairly among contributors. finding them just
+needs testing each subset of features. This Is exponential, so
+setups rough &mdash; `TreeSHAP` just and quickly for trees,
+`KernelSHAP` by sampling for any of it else.
 
 | | Answers | Scope |
 |---|---|---|
@@ -4518,10 +4518,10 @@ implementations approximate &mdash; `TreeSHAP` exactly and quickly for trees,
 
 ## SHAP adds up, exactly
 
-What makes a SHAP explanation trustworthy for one prediction is that the parts sum
-to the whole. Each feature gets a value saying how far it pushed this prediction
-from the base value &mdash; the average prediction over the dataset &mdash; and
-those pushes reconstruct the prediction exactly:
+What makes a SHAP explanation trustworthy for one guess is that the parts sum
+to the whole. Each feature gets a value saying how far it pushed this guess
+from the base value &mdash; the mean guess over the dataset &mdash; and
+those pushes rebuild the guess just:
 
 |term|value|
 |---|---|
@@ -4532,43 +4532,43 @@ those pushes reconstruct the prediction exactly:
 |**prediction**|**0.50**|
 
 `0.30 + 0.15 + 0.10 - 0.05 = 0.50`, with nothing unattributed &mdash; that
-additivity is the property partial dependence and ICE do not have, and it is what
-lets SHAP explain a single row rather than the model's average behaviour. The
+additivity is the property partial dependence and ICE don't have, and it's what
+lets SHAP explain a single row rather than the model's mean action. The
 values come from Shapley values in cooperative game theory, which distribute credit
-for a joint outcome fairly, and computing them exactly means evaluating every
-subset of features &mdash; exponential, which is why TreeSHAP (exact, fast, for
-trees) and KernelSHAP (sampled, for anything) exist. The caution is that additivity
-is not causality: a model using postcode as a proxy for income will show postcode
-contributing, which is a true statement about the model and not about the world.
+for a joint outcome fairly, and finding them just means testing each
+subset of features &mdash; exponential. This Is why TreeSHAP (exact, fast, for
+trees) and KernelSHAP (sampled, for any of it) exist. The caution is that additivity
+isn't causality: a model using postcode as a proxy for income will show postcode
+adding, which is a true statement about the model and not about the world.
 
-The flat-curve trap is worth restating because it is silent: a partial dependence
-line near zero can hide individual effects that are large but cancel &mdash; a
-feature that slopes up for one subgroup and down for another averages to nothing,
-while mattering enormously to every row. Plotting the ICE curves underneath is the
-standard defence: parallel curves mean the average is a fair summary, curves that
-fan out or cross mean there is an interaction and the average is lying. Partial
-dependence also quietly assumes the feature can be swept independently of the
-others, so with strongly correlated features part of the curve is the model
-extrapolating into combinations that never occur &mdash; which is what Accumulated
+The flat-curve trap is worth restating because it's silent: a partial dependence
+line near zero can hide single effects that are large but cancel &mdash; a
+feature that slopes up for one subgroup and down for another means to nothing,
+while mattering enormously to each row. Plotting the ICE curves underneath is the
+standard defence: parallel curves mean the mean is a fair summary, curves that
+fan out or cross mean there's an interplay and the mean is lying. Partial
+dependence also quietly assumes the feature can be swept on its own of the
+others, so with strongly linked features part of the curve is the model
+extrapolating into combinations that never occur &mdash; which is what Built up
 Local Effects plots were designed to avoid.
 
 ## Where it goes wrong
 
 **Reading a flat PD curve as "unimportant".** Plot the ICE curves.
 
-**Ignoring correlated features.** Part of the curve may be extrapolation.
+**Skipping linked features.** Part of the curve may be extrapolation.
 
-**Treating SHAP as causal.** It attributes a prediction, not an outcome. A model
-that uses postcode as a proxy for income will show postcode contributing, and
+**Treating SHAP as causal.** It fields a guess, not an outcome. A model
+that uses postcode as a proxy for income will show postcode adding, and
 that is a fact about the model.
 
-**Averaging SHAP values into a global importance and stopping there.** The mean
-absolute SHAP value is a reasonable global summary, and it discards the direction
-and the interactions that made SHAP worth computing.
+**Blending SHAP values into a global importance and stopping there.** The mean
+abs SHAP value is a reasonable global summary, and it discards the direction
+and the interplays that made SHAP worth finding.
 
 ## One chart for the model, one number per row
 
-Partial dependence describes the model's average behaviour; a Shapley value explains a single prediction. Both are computed from scratch here, so neither is a black box.
+Partial dependence shows the model's mean action. A Shapley value shows a single guess. Both are found from scratch here. Neither is a black box.
 
 ```python-run
 import numpy as np
@@ -4756,7 +4756,7 @@ topic(
     ],
     """
 title: Probability Calibration
-intro: Whether a model's confidence means anything, and why every ranking metric is blind to it.
+intro: Whether a model's trust means any of it. Why each ranking metric is blind to it.
 
 ## Two different questions
 
@@ -4764,31 +4764,31 @@ intro: Whether a model's confidence means anything, and why every ranking metric
 and [ROC](precision_recall_vs_roc.html) measure this.
 
 **Calibration** asks whether the numbers mean what they say. Of all the cases
-where the model said 0.8, were about 80% actually positive?
+where the model said 0.8, were about 80% really plus?
 
-A model can be excellent at one and terrible at the other, and this is not an
-edge case &mdash; it is the normal situation.
+A model can be great at one and terrible at the other, and this isn't an
+edge case &mdash; it's the normal situation.
 
 ## The slider proves it
 
 Drag the temperature control and watch the curve deform. That control performs
 **temperature scaling**: it divides the logit by a constant before the sigmoid.
-Dividing by a number less than one sharpens every score toward 0 or 1; dividing
+Cutting by a number less than one sharpens each score toward 0 or 1. Cutting
 by a number greater than one flattens them toward 0.5.
 
-Crucially, this is a **monotonic** transformation. It never changes the order of
-any two predictions. Every ranking metric &mdash; AUC, average precision,
-anything based on ordering &mdash; is **identical at every setting of that
-slider**, while the reliability curve swings from badly over-confident to badly
-under-confident.
+Crucially, this is a **monotonic** change. It never changes the order of
+any two guesses. each ranking metric &mdash; AUC, mean precision,
+any of it based on sorting. Is **the same at each setting of that
+slider**, while the trust curve swings from badly too sure to badly
+too shy.
 
-Which is the point. If you only ever look at AUC, you have no information about
+Which is the point. If you only ever look at AUC, you've no info about
 calibration at all.
 
 ## Reading the diagram
 
-Predictions are binned by confidence, and each bin plots mean confidence against
-observed frequency.
+guesses are binned by trust, and each bin plots mean trust against
+seen rate.
 
 **On the diagonal**: calibrated.
 
@@ -4797,69 +4797,69 @@ the time. This is the common failure, and the damaging one.
 
 **Above the diagonal**: under-confident. The model hedges when it should not.
 
-**ECE** &mdash; expected calibration error &mdash; is the average vertical
-distance, weighted by how many points fall in each bin. It is the number in the
-readout, and it is a summary that can hide compensating errors: a curve that is
-above the diagonal in one region and below in another can report a small ECE.
+**ECE** &mdash; expected calibration error &mdash; is the mean vertical
+distance, weighted by how many points fall in each bin. It's the number in the
+readout, and it's a summary that can hide compensating errors: a curve that is
+above the main-line in one region and below in another can report a small ECE.
 Look at the curve, not only the number.
 
 ## Why models come out miscalibrated
 
-**Modern neural networks are over-confident**, and increasingly so as they get
-larger. Training to minimise cross-entropy on data it can fit perfectly pushes
-outputs toward 0 and 1 long after the accuracy has stopped improving.
+**Modern neural networks are too sure**, and increasingly so as they get
+larger. Training to cut cross-entropy on data it can fit just right pushes
+outputs toward 0 and 1 long after the fit has stopped raising.
 
-**Support vector machines** produce distances from a hyperplane, not
-probabilities, and passing them through a sigmoid does not make them
-probabilities.
+**Support vector machines** give distances from a hyperplane, not
+chances, and passing them through a sigmoid doesn't make them
+chances.
 
-**Naive Bayes** is famously over-confident because its independence assumption
-multiplies correlated evidence as though it were independent.
+**Naive Bayes** is famously too sure because its freedom assumption
+times linked evidence as though it were free.
 
-**Random forests** tend to be under-confident at the extremes, because averaging
-many trees pulls predictions toward the middle.
+**Random forests** tend to be too shy at the extremes, because blending
+many trees pulls guesses toward the middle.
 
-Logistic regression, fitted on well-specified features, is usually close to
-calibrated &mdash; it optimises exactly this.
+Logistic regression, fitted on well-given features, is often close to
+calibrated &mdash; it optimises just this.
 
 ## Fixing it
 
 All three methods fit a correction on a **held-out** set, never on the training
 data.
 
-**Platt scaling.** Fit a logistic regression to map scores to probabilities. One
-or two parameters, works on small validation sets, assumes the distortion is
+**Platt scaling.** Fit a logistic regression to map scores to chances. One
+or two params, works on small validation sets, assumes the distortion is
 sigmoid-shaped.
 
-**Temperature scaling.** The single-parameter version, and the standard for
-neural networks. Because it changes no rankings, accuracy and AUC are guaranteed
+**Temperature scaling.** The single-param version, and the standard for
+neural networks. Because it changes no rankings, fit and AUC are ensured
 untouched &mdash; a rare free lunch.
 
 **Isotonic regression.** Fits any monotonic mapping. More flexible, and needs
-considerably more data or it overfits the validation set.
+a lot more data or it overfits the validation set.
 
 ## When it matters
 
-**Whenever a probability feeds a decision with costs.** Expected value is
-probability times payoff, so a wrong probability is a wrong decision even when
+**When a chance feeds a choice with costs.** Expected value is
+chance times payoff, so a wrong chance is a wrong choice even when
 the ranking is perfect.
 
-**Medical and risk contexts**, where "30% chance" is communicated to a person.
+**Medical and risk contexts**. Here "30% chance" is communicated to a person.
 
-**When scores are combined** across models or over time.
+**When scores are mixed** across models or over time.
 
 **When a threshold is set from a target rate.** [Choosing a
-threshold](threshold_tuning.html) from calibrated probabilities gives the rate
-you asked for; from uncalibrated scores it does not.
+threshold](threshold_tuning.html) from calibrated chances gives the rate
+you asked for. From uncalibrated scores it doesn't.
 
-If all you do is rank &mdash; show the top 100 results &mdash; calibration is
+If all you do is rank. Show the top 100 results &mdash; calibration is
 irrelevant.
 
 ## Expected calibration error, worked
 
-ECE puts a single number on "do the confidences mean anything". Bin the
-predictions by stated confidence, and in each bin compare the average confidence
-against the fraction actually positive; ECE is the average gap, weighted by bin
+ECE puts a single number on "do the confidences mean any of it". Bin the
+guesses by stated trust, and in each bin compare the mean trust
+against the fraction really plus. ECE is the mean gap, weighted by bin
 size:
 
 |bin|mean confidence|observed accuracy|gap|
@@ -4869,26 +4869,26 @@ size:
 |low|0.55|0.55|0.00|
 
 With 100 points in each bin the ECE is `(0.20 + 0.05 + 0.00)/3 = 0.083` &mdash;
-the model is eight points miscalibrated on average, driven almost entirely by the
-top bin, where it says 0.90 and is right 70% of the time. That over-confidence is
-the common and damaging failure, and note what it does *not* touch: every one of
-those predictions could still rank correctly, so AUC and average precision are
-unchanged. Temperature scaling &mdash; dividing the logit by a constant fitted on
-held-out data &mdash; pulls the top bin down toward its true accuracy without
-reordering anything, which is why it can fix calibration for free while leaving
-every ranking metric identical. The one caution is that ECE is an average and can
-hide compensating errors, so a curve above the diagonal in one region and below in
-another can post a small ECE; read the reliability curve, not only the number.
+the model is eight points miscalibrated on average, driven almost fully by the
+top bin, where it says 0.90 and is right 70% of the time. That over-trust is
+the common and damaging failure, and note what it does *not* touch: each one of
+those guesses could still rank right. So AUC and mean precision are
+unchanged. Temperature scaling &mdash; cutting the logit by a constant fitted on
+held-out data &mdash; pulls the top bin down toward its true fit without
+reordering any of it. This Is why it can fix calibration for free while leaving
+each ranking metric the same. The one caution is that ECE is an mean and can
+hide compensating errors, so a curve above the main-line in one region and below in
+another can post a small ECE. Read the trust curve, not only the number.
 
 Why models miscalibrate is worth knowing, because it predicts which fix to reach
-for. Modern neural networks are over-confident and increasingly so as they grow,
-because minimising cross-entropy on data they can fit perfectly keeps pushing
-outputs toward 0 and 1 long after accuracy has stopped improving; temperature
-scaling is the standard remedy. Naive Bayes is over-confident because its
-independence assumption multiplies correlated evidence as if it were independent.
-Random forests are usually *under*-confident at the extremes, because averaging many
-trees pulls predictions toward the middle. Logistic regression on well-specified
-features tends to come out close to calibrated, because that is exactly what it
+for. Modern neural networks are too sure and increasingly so as they grow,
+because cutting cross-entropy on data they can fit just right keeps pushing
+outputs toward 0 and 1 long after fit has stopped raising. Temperature
+scaling is the standard remedy. Naive Bayes is too sure because its
+freedom assumption times linked evidence as if it were free.
+Random forests are often *under*-confident at the extremes, because blending many
+trees pulls guesses toward the middle. Logistic regression on well-given
+features tends to come out close to calibrated. That is just what it
 optimises.
 
 ## Where it goes wrong
@@ -4898,15 +4898,15 @@ nothing.
 
 **Isotonic regression on a small validation set.** It overfits.
 
-**Assuming a good AUC implies good probabilities.** The slider on this page
-exists to disprove exactly that.
+**given a good AUC implies good chances.** The slider on this page
+exists to disprove just that.
 
 **Recalibrating without re-checking after data drift.** A calibration fitted last
-year describes last year's distribution.
+year shows last year's spread.
 
 ## When 0.9 does not mean 90%
 
-A model can rank perfectly and still lie about its confidence. This measures the gap, then closes it two different ways.
+A model can rank just right and still lie about its trust. This measures the gap, then closes it two different ways.
 
 ```python-run
 import numpy as np
@@ -5062,100 +5062,100 @@ topic(
     ],
     """
 title: Isolation Forest
-intro: Anomaly detection that looks for what is easy to cut off, rather than modelling what is normal.
+intro: Outlier spotting that looks for what is easy to cut off, rather than modelling what is normal.
 
 ## Inverting the usual approach
 
-Most anomaly detection builds a model of normal &mdash; fit a distribution,
-estimate a density, learn a boundary &mdash; and flags whatever falls outside.
-That is hard work, and in high dimensions density estimation is very hard work.
+Most outlier spotting builds a model of normal &mdash; fit a spread,
+guess a density, learn a boundary. And flags what falls outside.
+That is hard work, and in high dims density estimation is very hard work.
 
-Isolation Forest asks a different question: **how much effort does it take to
-separate this point from everything else?**
+Alone Forest asks a different question: **how much effort does it take to
+separate this point from all else?**
 
-Pick a random feature, pick a random split value between its minimum and maximum,
-and divide the data. Repeat on each half until every point sits alone.
+Pick a random feature, pick a random split value between its min and max,
+and divide the data. Repeat on each half until each point sits alone.
 
-A point far from the rest gets cut off almost immediately &mdash; a single random
+A point far from the rest gets cut off almost right away &mdash; a single random
 split has a good chance of landing between it and the crowd. A point in the
-middle of a dense cluster survives many splits, because every cut has to be
+middle of a dense cluster lives many splits. Each cut has to be
 placed among tightly packed neighbours.
 
-**Path length is the anomaly measure**, and no model of normality was ever built.
+**Path length is the outlier measure**, and no model of normality was ever built.
 
 ## The score
 
-The raw quantity is the average path length across the forest. It is normalised
+The raw quantity is the mean path length across the forest. It's normed
 against the expected path length in a random binary tree of the same size,
-because deeper trees naturally have longer paths:
+because deeper trees on its own have longer paths:
 
 ```
 score = 2 ^ ( -avg_path / c(n) )
 ```
 
 The direction catches people out. A **short** path means easy to isolate, which
-means **anomalous**, which means a **high** score. Around 0.5 is unremarkable;
+means **anomalous**, which means a **high** score. Around 0.5 is plain;
 above about 0.6 on this page is worth a look.
 
 Drag the threshold and watch the count. The readout gives the range of scores
-present, so you can see where the population actually sits rather than guessing.
+present, so you can see where the group really sits rather than guessing.
 
 ## Subsampling, and why it helps
 
-Each tree is built from a small random subsample &mdash; 256 points by default in
-most libraries &mdash; and this is not only for speed.
+Each tree is built from a small random subsample. 256 points by default in
+most libraries &mdash; and this isn't only for speed.
 
-With the full dataset, a cluster of anomalies can be dense enough to look normal
-locally: its members shield each other and need several splits to separate. Take
-a small sample and those anomalies are usually alone in it, so they are isolated
-immediately. Subsampling reduces *swamping* (normal points looking anomalous
-because the data is crowded) and *masking* (anomalies hiding one another).
+With the full dataset, a cluster of outliers can be dense enough to look normal
+locally: its members shield each other and need a few splits to separate. Take
+a small sample and those outliers are often alone in it, so they're isolated
+right away. Subsampling reduces *swamping* (normal points looking anomalous
+because the data is crowded) and *masking* (outliers hiding one another).
 
 The trees control shows the other half of the picture. At five trees the flagged
-set jitters as you change the seed; at sixty it is stable. Path length from one
-random tree is nearly meaningless, and the average over many is not.
+set jitters as you change the seed. At sixty it's stable. Path length from one
+random tree is nearly meaningless, and the mean over many isn't.
 
-**Each tree is built from a sample and then used to score every point.** Building
+**Each tree is built from a sample and then used to score each point.** Building
 and scoring on the same subsample is a mistake worth naming: a point missing from
-a tree contributes nothing that round, its average path comes out short, and it
-looks like an outlier. Everything ends up flagged.
+a tree adds nothing that round, its mean path comes out short, and it
+looks like an outlier. All ends up flagged.
 
 ## What it is good at
 
-**Speed.** Linear in the number of points, and the trees are shallow. It is one
-of the few anomaly detectors that is genuinely cheap on large data.
+**Speed.** Linear in the number of points, and the trees are shallow. It's one
+of the few outlier finders that is truly cheap on large data.
 
-**High dimensions.** No distance metric, so it avoids the concentration problem
+**High dims.** No distance metric, so it avoids the concentration problem
 that undoes k-nearest-neighbour approaches.
 
-**No labels.** Entirely unsupervised.
+**No labels.** fully unsupervised.
 
-**No distributional assumption.** Unlike a Gaussian-based detector, it does not
+**No distributional assumption.** Unlike a Gaussian-based finder, it doesn't
 care what shape normal is.
 
 ## What it is bad at
 
-**Local anomalies.** It finds points that are globally easy to separate. A point
-sitting in a *low-density gap between two dense clusters* may be perfectly normal
-globally and clearly anomalous locally. **Local Outlier Factor** compares each
+**Local outliers.** It finds points that are globally easy to separate. A point
+sitting in a *low-density gap between two dense clusters* may be just right normal
+globally and clearly anomalous locally. **Local Outlier Factor** checks each
 point's density to its neighbours' and catches these.
 
-**Axis-aligned splits.** Cuts are perpendicular to the axes, which produces
-artefacts along diagonals in correlated data. **Extended Isolation Forest** uses
+**Axis-aligned splits.** Cuts are at right angles to the axes, which makes
+artefacts along main-lines in linked data. **Extended Alone Forest** uses
 random hyperplanes instead.
 
-**Irrelevant features.** Random feature selection wastes splits on columns that
+**Irrelevant features.** Random feature pick wastes splits on columns that
 carry nothing.
 
-**The contamination parameter.** Libraries ask what fraction of the data is
-anomalous in order to place a threshold, and if you knew that you would be much
-further along. Prefer to look at the score distribution and choose a cut, which
+**The contamination param.** Libraries ask what fraction of the data is
+anomalous to place a threshold, and if you knew that you'd be much
+further along. Prefer to look at the score spread and choose a cut, which
 is what the slider here makes you do.
 
 ## The path-length score, worked
 
-The score turns an average path length into a number between 0 and 1, and working
-it shows why the direction is what it is. With a 256-point subsample the expected
+The score turns an mean path length into a number between 0 and 1, and working
+it shows why the direction is what it's. With a 256-point subsample the expected
 path in a random tree is `c(256) &asymp; 10.24`, and `score = 2^(-avg_path / c(n))`:
 
 |average path to isolate the point|score|reading|
@@ -5165,41 +5165,41 @@ path in a random tree is `c(256) &asymp; 10.24`, and `score = 2^(-avg_path / c(n
 
 A point far from the crowd is separated by one or two random splits &mdash; a
 single cut has a good chance of landing in the empty space around it &mdash; so its
-path is short, its score high, and it is flagged. A point buried in a dense cluster
-needs many splits to peel away from its neighbours, so its path is long and its
-score low. Short path, high score, anomalous: the relationship that catches people
+path is short, its score high. It's flagged. A point buried in a dense cluster
+needs many splits to peel away from its neighbours. Its path is long and its
+score low. Short path, high score, anomalous: the tie that catches people
 because it runs opposite to the intuition that a bigger number is safer. The
-256-point subsample is not only for speed &mdash; a small sample usually contains a
-would-be anomaly alone, so it isolates immediately, where in the full data a tight
-clump of anomalies can shield each other and survive several cuts (masking). And
-the average is over many trees for a reason: one tree's path length is nearly
-meaningless, and the flagged set only stabilises across dozens.
+256-point subsample isn't only for speed. A small sample often holds a
+would-be outlier alone, so it isolates right away. Here In the full data a tight
+clump of outliers can shield each other and live a few cuts (masking). And
+the mean is over many trees for a reason: one tree's path length is nearly
+meaningless, and the flagged set only settles across dozens.
 
-What Isolation Forest is good and bad at both follow from that random-split
-mechanism. It is fast &mdash; linear in the points, with shallow trees &mdash; and
+What Alone Forest is good and bad at both follow from that random-split
+mechanism. It's fast &mdash; linear in the points, with shallow trees &mdash; and
 indifferent to dimensionality, since it uses no distance metric and so escapes the
-concentration that undoes k-nearest-neighbour detectors, and it assumes nothing
+concentration that undoes k-nearest-neighbour finders, and it assumes nothing
 about the shape of "normal". But it finds only *globally* easy-to-separate points:
-a point sitting in a low-density gap between two dense clusters can be perfectly
-ordinary globally and clearly anomalous locally, which is what Local Outlier Factor
-catches by comparing each point's density to its neighbours'. And its
-`contamination` parameter, which asks what fraction of the data is anomalous, is a
-guess presented as a setting &mdash; better to read the score distribution and cut
+a point sitting in a low-density gap between two dense clusters can be just right
+plain globally and clearly anomalous locally. This Is what Local Outlier Factor
+catches by checking each point's density to its neighbours'. And its
+`contamination` param, which asks what fraction of the data is anomalous, is a
+guess presented as a setting. Better to read the score spread and cut
 it yourself.
 
 ## Where it goes wrong
 
 **Reading the score backwards.** High means anomalous.
 
-**Too few trees.** The estimate is noisy; check by changing the seed.
+**Too few trees.** The estimate is noisy. Check by changing the seed.
 
-**Trusting `contamination`.** It is a guess presented as a parameter.
+**Trusting `contamination`.** It's a guess presented as a param.
 
-**Expecting it to find local anomalies.** Use LOF for those.
+**Expecting it to find local outliers.** Use LOF for those.
 
 ## Finding outliers by how easy they are to separate
 
-Isolation Forest splits at random and counts how few cuts it takes to isolate a point. Anomalies fall out early, and that path length is the entire score.
+Alone Forest splits at random and counts how few cuts it takes to isolate a point. Outliers fall out early. That path length is the entire score.
 
 ```python-run
 import numpy as np
@@ -5339,53 +5339,53 @@ topic(
     ],
     """
 title: Stacking and Voting Ensembles
-intro: Combining unlike models, when it helps, and a live demonstration of it hurting.
+intro: Mixing unlike models, when it helps, and a live demo of it hurting.
 
 ## Different from bagging and boosting
 
 [Bagging](random_forest.html) and [boosting](gradient_boosting.html) build many
-copies of one kind of model &mdash; hundreds of trees &mdash; and combine them.
+copies of one kind of model. Hundreds of trees &mdash; and combine them.
 
 Voting and stacking combine models of *different* kinds: a logistic regression, a
-gradient-boosted tree and a neural network, say. The hope is that models with
-different inductive biases fail on different rows, so their errors partly cancel.
+grad-boosted tree and a neural network, say. The hope is that models with
+different inductive biases fail on different rows. So Their errors partly cancel.
 
-That hope is a condition, not a guarantee, and this page is largely about the
-condition failing.
+That hope is a rule, not a ensure, and this page is largely about the
+rule failing.
 
 ## Voting
 
-**Hard voting** takes the majority label. **Soft voting** averages predicted
-probabilities and thresholds the mean, which is generally better because it uses
-confidence rather than discarding it &mdash; and which requires
-[calibrated](probability_calibration.html) probabilities to be meaningful.
+**Hard voting** takes the majority label. **Soft voting** means predicted
+chances and thresholds the mean. This Is often better because it uses
+trust rather than discarding it &mdash; and which needs
+[calibrated](probability_calibration.html) chances to be real.
 
-Every member counts equally. That is the strength when the members are comparable
-and the weakness when they are not.
+each member counts equally. That is the strength when the members are close
+and the weakness when they aren't.
 
 Look at the readout with the default settings. Three learners score roughly
 62%, 66% and 90%, and the **majority vote scores about 77% &mdash; worse than the
-best member alone.** Two weak learners outvote a strong one whenever they agree,
+best member alone.** Two weak learners outvote a strong one when they agree,
 and they agree often enough to drag the result down.
 
-This is not a contrived arrangement. It is what happens whenever an ensemble is
-assembled without checking whether the members are of comparable quality, and it
+This isn't a contrived setup. It's what happens when an ensemble is
+assembled without checking whether the members are of close quality, and it
 is the reason "just ensemble it" is bad advice.
 
 ## Stacking
 
 Stacking replaces the fixed rule with a learned one. Train the base models, take
-their predictions as features, and fit a second model &mdash; the **meta-learner**
+their guesses as features, and fit a second model &mdash; the **meta-learner**
 &mdash; on those.
 
-The meta-learner discovers what a vote cannot: which model to trust, and when.
+The meta-learner discovers what a vote can't: which model to trust, and when.
 The learned weights are in the readout, and the strong learner attracts most of
-the weight while a weak one can go slightly negative &mdash; meaning the
+the weight while a weak one can go slightly minus &mdash; meaning the
 meta-learner has found that model to be worse than uninformative in some regions.
 
 With the defaults, stacking matches the best single learner rather than beating
-it. That is an honest and common outcome, and it is still a gain over the vote:
-stacking recovered the best model automatically, where voting destroyed it.
+it. That is an honest and common outcome. It's still a gain over the vote:
+stacking got back the best model automatically. Here Voting destroyed it.
 
 Move the thresholds so that the three learners are closer in quality, and the
 picture changes &mdash; the vote catches up, because its assumption is finally
@@ -5393,40 +5393,40 @@ true.
 
 ## Getting stacking right
 
-The essential detail is how the meta-learner's training data is produced.
+The essential detail is how the meta-learner's training data is made.
 
-Training the base models and then feeding their predictions **on the same data**
-to the meta-learner leaks badly. A model that overfits its training set produces
-suspiciously good predictions there, so the meta-learner learns to trust the most
+Training the base models and then feeding their guesses **on the same data**
+to the meta-learner leaks badly. A model that overfits its training set makes
+oddly good guesses there, so the meta-learner learns to trust the most
 overfitted member.
 
-The fix is **cross-validated predictions**: split the data into folds, and for
-each fold predict with base models trained on the other folds. Every prediction
+The fix is **cross-validated guesses**: split the data into folds, and for
+each fold predict with base models trained on the other folds. each guess
 the meta-learner sees is then out-of-sample. This is what scikit-learn's
-`StackingClassifier` does, and it is why stacking costs roughly *k* times the
+`StackingClassifier` does, and it's why stacking costs roughly *k* times the
 training of its members.
 
-A second convention: keep the meta-learner **simple**. Logistic regression is the
-standard choice. It has few base predictions to work with, and a flexible
+A second rule: keep the meta-learner **simple**. Logistic regression is the
+standard choice. It has few base guesses to work with, and a flexible
 meta-learner overfits them readily.
 
 ## When an ensemble is worth it
 
-**Members must be comparable in quality.** Otherwise voting hurts, as above.
+**Members must be close in quality.** Or else voting hurts, as above.
 
 **Members must make different mistakes.** Three models that fail on the same rows
-combine into one model that fails on those rows. Checking the correlation of
-their errors is the diagnostic, and it is worth doing before building anything.
+combine into one model that fails on those rows. Checking the link of
+their errors is the diagnostic, and it's worth doing before building any of it.
 
-**The gain must justify the cost.** An ensemble multiplies training time,
+**The gain must justify the cost.** An ensemble times training time,
 inference time, memory and the number of things that can break in production. A
-one-point gain on a leaderboard is worth it; a one-point gain in a service
-usually is not.
+one-point gain on a leaderboard is worth it. A one-point gain in a service
+often isn't.
 
 ## When the majority is wrong, in numbers
 
-Majority voting only helps when the members are comparable, and the arithmetic
-shows why. For three independent classifiers the vote is correct when at least two
+Majority voting only helps when the members are close, and the math
+shows why. For three free classifiers the vote is correct when at least two
 are, `P = &Sigma;` over the majority outcomes:
 
 |three members|majority-vote accuracy|
@@ -5434,44 +5434,44 @@ are, `P = &Sigma;` over the majority outcomes:
 |0.62, 0.66, 0.90|0.83 &mdash; **below the 0.90 member**|
 |0.80, 0.80, 0.80|0.90 &mdash; above any member|
 
-Three equal 80% models vote to 90%, which is the ensemble win everyone hopes for:
-independent errors partly cancel. But bolt a 90% model to two mediocre ones and
-the vote drops it to 83%, because whenever the two weak members happen to agree
+Three equal 80% models vote to 90%. This Is the ensemble win everyone hopes for:
+free errors partly cancel. But bolt a 90% model to two mediocre ones and
+the vote drops it to 83%. When the two weak members happen to agree
 they outvote the strong one, and two coin-ish models agree wrongly often enough to
 matter. That is voting's built-in assumption &mdash; equal competence &mdash;
-failing out loud, and it is why "just ensemble it" is bad advice without checking
-the members are comparable. Stacking fixes exactly this by learning the weights
+failing out loud, and it's why "just ensemble it" is bad advice without checking
+the members are close. Stacking fixes just this by learning the weights
 instead of fixing them: the meta-learner hands most of the weight to the strong
-member and can drive a weak one negative, recovering the best model where the vote
-destroyed it. (Real classifiers are not independent, so the true numbers shift
-with error correlation &mdash; which is itself the thing to measure before
-combining anything.)
+member and can drive a weak one minus, getting back the best model where the vote
+destroyed it. (Real classifiers aren't free, so the true numbers shift
+with error link &mdash; which is itself the thing to measure before
+mixing any of it.)
 
 Getting stacking right turns on one detail: the meta-learner must be trained on
-*out-of-sample* base predictions. Feed it predictions the base models made on their
+*out-of-sample* base guesses. Feed it guesses the base models made on their
 own training data and it learns to trust whichever member overfitted most, because
-an overfitted model looks suspiciously accurate there. The fix is cross-validated
-predictions &mdash; for each fold, predict with base models trained on the other
+an overfitted model looks oddly accurate there. The fix is cross-validated
+guesses &mdash; for each fold, predict with base models trained on the other
 folds &mdash; which is why stacking costs roughly k times the training of its
-members. Keep the meta-learner simple, too; logistic regression is the standard
-choice, because it has few base predictions to work from and a flexible meta-learner
+members. Keep the meta-learner simple, too. Logistic regression is the standard
+choice, because it has few base guesses to work from and a flexible meta-learner
 overfits them readily.
 
 ## Where it goes wrong
 
-**Ensembling a strong model with weak ones by vote.** Demonstrated above.
+**Ensembling a strong model with weak ones by vote.** Shown above.
 
-**Fitting the meta-learner on in-sample predictions.** It learns to trust the
+**Fitting the meta-learner on in-sample guesses.** It learns to trust the
 most overfitted base model.
 
 **A complex meta-learner.** Few features, plenty of opportunity to overfit.
 
-**Assuming diversity.** Two gradient-boosted models with different seeds are not
-diverse; check whether their errors actually differ.
+**given range.** Two grad-boosted models with different seeds aren't
+diverse. Check whether their errors really differ.
 
 ## Ensembling models that make different mistakes
 
-Combining models only helps when they are wrong about different rows. This measures that disagreement first, then shows what voting and stacking do with it.
+Mixing models only helps when they're wrong about different rows. This measures that disagreement first, then shows what voting and stacking do with it.
 
 ```python-run
 import numpy as np
