@@ -3,7 +3,7 @@ intro: Three tasks, one scene, and the two questions that separate them.
 
 ## Two questions
 
-Every segmentation task colours in pixels. What differs is the answer to two
+each segmentation task colours in pixels. What differs is the answer to two
 questions:
 
 1. Do two objects of the same class get **separate identities**?
@@ -18,26 +18,24 @@ background. That is the entire taxonomy, visible in one scene.
 | Instance | yes | no |
 | Panoptic | yes | yes |
 
-**Semantic** segmentation labels every pixel with a class but does not distinguish individual objects &mdash; two overlapping cars are one "car" region. It is the right choice when area matters more than count: how much of a field is diseased, which pixels are road. **Instance** segmentation gives each object its own mask and identity but ignores the background entirely, so it cannot say anything about uncountable regions like sky or grass. **Panoptic** segmentation does both &mdash; countable objects get instance ids and uncountable regions get class labels &mdash; which is why it needed a name of its own. The standard architectures split along the same line: fully convolutional networks (U-Net, DeepLab) for semantic, detection-based models ([Mask R-CNN](mask_rcnn.html)) for instance, and hybrid architectures (Panoptic FPN, MaskFormer) that unify both heads. This page shows all three on the same scene and covers the metrics (mean IoU, AP, PQ) that go with each task.
-
 ## Things and stuff
 
-The vocabulary that makes this coherent is **things** against **stuff**.
+The vocab that makes this coherent is **things** against **stuff**.
 
 **Things** are countable: people, cars, dogs, bottles. Asking "how many" makes
 sense, so instances make sense.
 
-**Stuff** is uncountable: sky, road, grass, water. "How many skies" is not a
+**Stuff** is uncountable: sky, road, grass, water. "How many skies" isn't a
 question. Stuff has extent but not instances.
 
-Semantic segmentation treats everything as stuff &mdash; it only ever assigns
-classes. Instance segmentation only handles things &mdash; it needs something to
-count. Panoptic segmentation covers both, which is why it needed a name of its
+Semantic segmentation treats all as stuff &mdash; it only ever assigns
+classes. Instance segmentation only handles things. It needs a thing to
+count. Panoptic segmentation covers both. This Is why it needed a name of its
 own.
 
 ## Semantic
 
-Every pixel gets a class label. Two overlapping cars are one connected region
+each pixel gets a class label. Two shared cars are one connected region
 labelled "car", and nothing in the output says there were two.
 
 The standard architectures are fully convolutional: U-Net, DeepLab, SegFormer.
@@ -47,11 +45,11 @@ are road, what fraction of the scan is tumour.
 
 ## Instance
 
-Every object gets its own mask and identity, and pixels belonging to no object
-are left unlabelled.
+each object gets its own mask and identity, and pixels belonging to no object
+are left untagged.
 
 Mask R-CNN is the canonical approach: detect boxes first, then predict a mask
-inside each. That ordering has a consequence &mdash; masks can overlap, and a
+inside each. That sorting has a consequence. Masks can share, and a
 pixel can belong to two instances, because nothing forces a single answer per
 pixel.
 
@@ -60,22 +58,22 @@ which pallet is which.
 
 ## Panoptic
 
-Every pixel gets exactly one class, and pixels belonging to things also get an
+each pixel gets just one class, and pixels belonging to things also get an
 instance id. Stuff regions get a class and no id.
 
-The word means "everything visible", and the point of the 2018 paper that named
+The word means "all visible", and the point of the 2018 paper that named
 it was that the semantic and instance communities had been solving halves of the
 same problem with different metrics and different architectures.
 
-The constraint that makes it harder than running both is **exactly one label per
-pixel**. Instance methods produce overlapping masks and semantic methods ignore
-instances, so combining them requires resolving conflicts. Panoptic FPN and
+The constraint that makes it harder than running both is **just one label per
+pixel**. Instance methods give shared masks and semantic methods skip
+instances, so mixing them needs resolving conflicts. Panoptic FPN and
 Mask2Former do it in one model instead.
 
-Its metric, **PQ**, multiplies a segmentation quality term (mean IoU over matched
-segments) by a recognition quality term (an F1 over whether segments were matched
-at all). That prevents a method from scoring well by getting the pixels roughly
-right while missing objects entirely.
+Its metric, **PQ**, times a segmentation quality term (mean IoU over matched
+segments) by a spotting quality term (an F1 over whether segments were matched
+at all), which blocks a method from scoring well by getting the pixels roughly
+right while missing objects fully.
 
 ## Choosing
 
@@ -89,18 +87,18 @@ stock, people in a queue.
 
 **A complete scene description** &mdash; panoptic. Autonomous driving needs both
 "where is the road" (stuff) and "which car is which" (things), and needs them
-consistent.
+steady.
 
 ## PQ, worked
 
-Panoptic quality is the one metric that spans both halves, and seeing it computed
+Panoptic quality is the one metric that spans both halves, and seeing it found
 shows why it resists the easy failures. It factors into segmentation quality times
-recognition quality: SQ is the mean IoU over *matched* segments, RQ is an F1 over
+spotting quality: SQ is the mean IoU over *matched* segments, RQ is an F1 over
 whether segments were matched at all, `TP / (TP + &frac12;FP + &frac12;FN)`.
 
-Take a scene where 8 predicted segments matched ground truth at mean IoU 0.80. One
-prediction matched nothing (a false positive), and 2 ground-truth objects were
-missed (false negatives).
+Take a scene where 8 predicted segments matched ground truth at mean IoU 0.80, 1
+guess matched nothing (a false plus), and 2 ground-truth objects were
+missed (false negatives):
 
 |term|value|
 |---|---|
@@ -110,48 +108,48 @@ missed (false negatives).
 
 The two factors guard different failures. A method that segments the pixels it
 finds beautifully but misses half the objects has a high SQ and a low RQ, so PQ
-falls; one that finds every object but traces them sloppily has the reverse. Only
-getting both right &mdash; the pixels *and* the object count &mdash; scores well.
-That is exactly the point of a metric built to end the split between the semantic
+falls. One that finds each object but traces them sloppily has the reverse. Only
+getting both right &mdash; the pixels *and* the object count &mdash; scores well,
+which is just the point of a metric built to end the split between the semantic
 community, who measured pixels with mIoU, and the instance community, who measured
-objects. It is also why a semantic mIoU and a panoptic PQ are not comparable: they
+objects. It's also why a semantic mIoU and a panoptic PQ aren't close: they
 are answering different questions, and only one of them can tell two touching cars
 apart.
 
 The taxonomy behind the metrics is two yes/no questions: do two objects of the same
 class get separate identities, and does the background get labelled. Semantic says
-no and yes &mdash; every pixel gets a class, two overlapping cars are one "car"
-region &mdash; so it is right when area matters and counting does not: tumour extent,
-drivable surface, land cover. Instance says yes and no &mdash; each object gets its
-own mask, background is left unlabelled &mdash; which is what counting needs, and
-because Mask R-CNN predicts a mask per detected box, its masks can overlap. Panoptic
-demands exactly one label per pixel *and* an instance id for the countable things.
-That constraint is what makes it harder than running the other two and merging
+no and yes &mdash; each pixel gets a class, two shared cars are one "car"
+region &mdash; so it's right when area matters and counting doesn't: tumour extent,
+drivable surface, land cover. Instance says yes and no. Each object gets its
+own mask, background is left untagged. Which is what counting needs, and
+because Mask R-CNN predicts a mask per detected box, its masks can share. Panoptic
+demands just one label per pixel *and* an instance id for the countable things,
+which is the constraint that makes it harder than running the other two and merging
 their outputs, since that merge needs a conflict rule.
 
-The vocabulary that makes the split coherent is things against stuff: things are
+The vocab that makes the split coherent is things against stuff: things are
 countable &mdash; people, cars &mdash; so instances make sense, while stuff is
 uncountable &mdash; sky, road &mdash; and has extent but no instances. Semantic
-treats everything as stuff, instance handles only things, and panoptic covers both,
-which is exactly why it needed a name of its own.
+treats all as stuff, instance handles only things, and panoptic covers both,
+which is just why it needed a name of its own.
 
 ## Where it goes wrong
 
 **Using semantic segmentation to count.** Two touching objects are one region.
 Post-hoc connected components will merge them.
 
-**Expecting instance segmentation to label the background.** It does not; that
-is not an oversight.
+**Expecting instance segmentation to label the background.** It doesn't. That
+isn't an oversight.
 
-**Comparing mIoU with PQ.** Different metrics on different tasks.
+**Checking mIoU with PQ.** Different metrics on different tasks.
 
-**Ignoring the one-label constraint.** Merging separate semantic and instance
-outputs into a panoptic one requires a conflict rule, and the rule affects the
+**Skipping the one-label constraint.** Merging separate semantic and instance
+outputs into a panoptic one needs a conflict rule, and the rule affects the
 score.
 
 ## Three tasks that all look like colouring in
 
-Semantic, instance and panoptic segmentation produce pictures that look alike and answer different questions. This builds the same scene under all three, computes their metrics, and shows the specific query each one cannot answer.
+Semantic, instance and panoptic segmentation give pictures that look alike and answer different questions. This builds the same scene under all three, finds their metrics. Shows the exact query each one can't answer.
 
 ```python-run
 import numpy as np

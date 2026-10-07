@@ -1,26 +1,15 @@
 title: Testing
-intro: A client that calls the app directly, and what a good FastAPI test suite actually asserts.
+intro: A client that calls the app right. What a good FastAPI test suite really asserts.
 ## No server involved
 
-`TestClient` does not start anything. It builds the ASGI scope a server would build, calls your application, and turns the response messages back into an object with `.status_code` and `.json()`.
+`TestClient` doesn't start anything. It builds the ASGI scope a server would build, calls your use. Turns the response messages back into an object with `.status_code` and `.json()`.
 
-That is why FastAPI tests are fast: no socket, no port, no process, no waiting for something to come up. A test suite of several hundred endpoint tests runs in seconds.
+That is why FastAPI tests are fast: no socket, no port, no process, no waiting for a thing to come up. A test suite of a few hundred endpoint tests runs in seconds.
 
-It is also why the editors on these pages work at all &mdash; they use the same idea.
+It's also why the editors on these pages work at all. They use the same idea.
 
-In real code the import is `from fastapi.testclient import TestClient`, and it wraps httpx. It needs `httpx` installed, which is the usual reason a first test fails on a fresh environment.
+In real code the import is `from fastapi.testclient import TestClient`. It wraps httpx. It needs `httpx` installed. This Is the usual reason a first test fails on a fresh setting.
 
-A test creates a `TestClient(app)`, calls methods like `.get("/path")`, `.post("/path", json={...})`, and asserts on the response. `.status_code` checks the HTTP status. `.json()` returns the parsed body. `.headers` gives the response headers. These are the same attributes httpx and requests expose, so the syntax is familiar.
-
-Testing a POST with a JSON body passes the data as `json={"title": "Test", "minutes": 30}`. Testing a POST with form data passes it as `data={"username": "ada"}`. Testing a file upload passes it as `files={"file": ("name.txt", b"content", "text/plain")}`. Each mirrors what the real client would send.
-
-Dependency overrides are how you swap a real database or external service for a test double. `app.dependency_overrides[get_db] = lambda: test_db` replaces the `get_db` dependency with one that returns a test database. The override applies to all routes that depend on `get_db`, and you clear it after the test with `app.dependency_overrides.clear()`.
-
-A good test suite asserts on status codes, response shapes, and error messages. It tests the happy path (valid input returns the right data), validation errors (invalid input returns 422 with a useful message), not-found cases (missing resources return 404), and authentication (unauthenticated requests return 401 or 403).
-
-For async endpoints, use `AsyncClient` from httpx with `pytest-asyncio`. The pattern is the same: create the client, call methods, assert on the response. The difference is that the test function is `async def` and the client uses `async with AsyncClient(transport=ASGITransport(app=app))`.
-
-Fixtures manage shared state. A pytest fixture that creates a `TestClient` and seeds the database runs once per test function (or once per session with `scope="session"`), keeping tests isolated without duplicating setup code.
 
 ## The client calls the app, not a server
 
@@ -198,19 +187,19 @@ print("no leak          :", "internal" not in r.json())
 ```
 ## What to assert
 
-**Status first.** It is the contract, and it is what every client branches on. A test that checks only the body will keep passing when a 200 quietly becomes a 500 with an error body that happens to contain the key you looked for.
+**Status first.** It's the contract, and it's what each client branches on. A test that checks only the body will keep passing when a 200 quietly turns a 500 with an error body that happens to hold the key you looked for.
 
-**Then the body**, on the fields that matter. Asserting the whole payload makes a test that fails every time an unrelated field is added &mdash; brittle in a way that teaches people to update tests without reading them.
+**Then the body**, on the fields that matter. Asserting the whole payload makes a test that fails each time an unrelated field is added. Brittle in a way that teaches people to update tests without reading them.
 
-**For validation failures**, assert on `loc` and `type`. Never on `msg`: it is prose, it gets reworded between releases, and a suite that fails on wording is one people learn to ignore.
+**For check failures**, assert on `loc` and `type`. Never on `msg`. It's prose, it gets reworded between releases. A suite that fails on wording is one people learn to skip.
 
 ## Overrides are the point
 
-Everything the dependencies tier argued for pays off here.
+all the dependencies tier argued for pays off here.
 
-An endpoint declaring `Depends(get_db)` and `Depends(current_user)` is tested with neither a database nor a token, because both are replaced at the app level. The handler is unchanged; only what it depends on moves.
+An endpoint declaring `Depends(get_db)` and `Depends(current_user)` is tested with neither a DB nor a token. Both are replaced at the app level. The handler is unchanged. Only what it depends on moves.
 
-Two rules from that module apply directly. Fake at the **edges** &mdash; the database, the clock, the token decoder &mdash; so the real logic above them still runs. And **clear between tests**, or one test silently changes the next and the failure appears somewhere unrelated.
+Two rules from that module apply right. Fake at the **edges**. The DB, the clock, the token decoder. So the real logic above them still runs. And **clear between tests**, or one test silently changes the next and the failure appears one spot unrelated.
 
 In pytest the shape is a fixture that sets, yields and clears.
 
@@ -224,132 +213,132 @@ app.include_router(modules.router)
 client = TestClient(app)
 ```
 
-That test exercises one resource, with no other routers, no startup work and no unrelated dependencies. It is the quiet benefit of splitting an application up, and it is the difference between "the tests need a database, Redis and three environment variables" and "the tests need the module under test".
+That test exercises one resource, with no other routers, no startup work and no unrelated dependencies. It's the quiet gain of splitting an use up. It's the gap between "the tests need a DB, Redis and three setting vars" and "the tests need the module under test".
 
 ## Lifespan in tests
 
-`TestClient` does not run the lifespan unless you ask. Used as a context manager it does:
+`TestClient` doesn't run the lifespan unless you ask. Used as a context manager it does:
 
 ```python
 with TestClient(app) as client:
     ...
 ```
 
-Which you want depends on the test. For a unit test of one endpoint with everything overridden, skipping startup is faster and more isolated. For an integration test that should exercise the real wiring, the context-manager form is correct.
+Which you want depends on the test. For a unit test of one endpoint with all overridden, skipping startup is faster and more isolated. For an integration test that should exercise the real wiring, the context-manager form is correct.
 
-Knowing the difference explains a common confusion: a test that fails with `app.state.pool` missing is a test that never ran startup.
+Knowing the gap shows a common confusion: a test that fails with `app.state.pool` missing is a test that never ran startup.
 
 ## What functional tests miss
 
-Two things worth asserting separately.
+Two things worth asserting apart.
 
-**The schema.** Removing a `response_model`, renaming a field, or loosening a type is a breaking change for consumers, and a functional test that checks `r.json()["id"]` will not notice. Asserting on `app.openapi()` &mdash; that a model has the fields it should, that an endpoint documents its 404 &mdash; catches contract changes.
+**The schema.** Dropping a `response_model`, renaming a field, or loosening a type is a breaking change for consumers. A functional test that checks `r.json()["id"]` won't notice. Asserting on `app.openapi()`. That a model has the fields it should, that an endpoint docs its 404 &mdash; catches contract changes.
 
-**What is not in the response.** A test that the payload contains `id` and `title` passes just as happily when it also contains `password_hash`. If an endpoint filters something out, assert that it is absent, not merely that the wanted fields are present.
+**What isn't in the response.** A test that the payload holds `id` and `title` passes just as happily when it also holds `password_hash`. If an endpoint filters a thing out, assert that it's absent, not merely that the wanted fields are present.
 
 ## A suite worth having
 
-For each endpoint: the success case with the values you expect, one validation failure asserting `loc` and `type`, and one domain failure &mdash; the 404 or the 409.
+For each endpoint: the success case with the values you expect, one check failure asserting `loc` and `type`. One domain failure. The 404 or the 409.
 
-Beyond that: one test per dependency that can reject, so the 401 and 403 paths are covered; and a small number of tests that assert on the schema for endpoints with consumers.
+Beyond that: one test per dependency that can reject. The 401 and 403 paths are covered. And a small number of tests that assert on the schema for endpoints with consumers.
 
-That is a few short functions per endpoint, and between them they cover the branches most likely to be wrong. The parts people skip &mdash; the error paths &mdash; are the parts that get exercised most in production.
+That is a few short functions per endpoint. Between them they cover the branches most likely to be wrong. The parts people skip. The error paths. Are the parts that get exercised most in production.
 
 
 ## Mistakes people make
 
-**Asserting only on the body.** A 200 that becomes a 500 carrying a similar key keeps the test green. Status first.
+**Asserting only on the body.** A 200 that turns a 500 carrying a similar key keeps the test green. Status first.
 
-**Asserting on `msg`.** It is prose, it gets reworded, and a suite that fails on wording is one people stop reading. Use `loc` and `type`.
+**Asserting on `msg`.** It's prose, it gets reworded. A suite that fails on wording is one people stop reading. Use `loc` and `type`.
 
-**Asserting the whole payload.** Then every unrelated field addition breaks the test, which teaches people to update tests without reading them.
+**Asserting the whole payload.** Then each unrelated field addition breaks the test. This Teaches people to update tests without reading them.
 
-**Forgetting to clear overrides.** One test changes the next, and the failure appears somewhere unrelated with no visible cause.
+**Losing to clear replaces.** One test changes the next. The failure appears one spot unrelated with no visible cause.
 
-**Faking too high.** Overriding the permission dependency skips the permission logic you meant to test. Fake the edges.
+**Faking too high.** replacing the permission dependency skips the permission logic you meant to test. Fake the edges.
 
-**Never running the lifespan.** Then `app.state` is empty, and the error names neither the cause nor the fix.
+**Never running the lifespan.** Then `app.state` is empty. The error names neither the cause nor the fix.
 
 **Only testing the happy path.** The error branches are the ones exercised most in production and least in the suite.
 
 ## What a suite should contain
 
-Per endpoint: the success case with the values you expect; one validation failure asserting `loc` and `type`; one domain failure - the 404 or the 409.
+Per endpoint: the success case with the values you expect. One check failure asserting `loc` and `type`. One domain failure - the 404 or the 409.
 
-Across the application: one test per dependency that can reject, so the 401 and 403 paths are covered; and a handful asserting on `app.openapi()` for endpoints with real consumers, since a removed `response_model` is a breaking change no functional test notices.
+Across the use: one test per dependency that can reject. The 401 and 403 paths are covered. And a handful asserting on `app.openapi()` for endpoints with real consumers. A removed `response_model` is a breaking change no functional test notices.
 
-That is a few short functions per endpoint, and it covers the branches most likely to be wrong.
+That is a few short functions per endpoint. It covers the branches most likely to be wrong.
 
 ## Speed and what it buys
 
-A FastAPI suite is fast by default, and the speed is worth protecting because it changes how the tests get used.
+A FastAPI suite is fast by default. The speed is worth protecting because it changes how the tests get used.
 
-There is no server, so no startup cost per test. With dependencies overridden there is no database, so no fixtures to load or transactions to roll back. Several hundred endpoint tests running in a couple of seconds is normal.
+There's no server, so no startup cost per test. With dependencies overridden there's no DB, so no fixtures to load or transactions to roll back. a few hundred endpoint tests running in a couple of seconds is normal.
 
-That matters because a suite people run constantly catches things a suite people run at the end does not. The moment it takes a minute, it stops being run between edits.
+That matters because a suite people run constantly catches things a suite people run at the end doesn't. The moment it takes a minute, it stops being run between edits.
 
-Two things erode it. Real I/O creeping back in through a dependency somebody forgot to override, and integration tests that construct the whole application per test rather than per module.
+Two things erode it. Real I/O creeping back in through a dependency somebody forgot to replace. Integration tests that make the whole use per test rather than per module.
 
-Both are worth watching, because the decline is gradual and the point where it stops being run is not announced.
+Both are worth watching, because the decline is gradual and the point where it stops being run isn't announced.
 
 ## The parts people skip
 
-Error paths, and they are the ones exercised most in production.
+Error paths, and they're the ones exercised most in production.
 
-A test that a missing resource gives 404, a duplicate gives 409, a bad payload gives 422 with the right `loc`, and an unauthenticated request gives 401 costs four short functions - and covers the branches most likely to be wrong, because they are the branches nobody exercises by hand.
+A test that a missing resource gives 404, a copy gives 409, a bad payload gives 422 with the right `loc`. An unauthenticated request gives 401 costs four short functions - and covers the branches most likely to be wrong. They're the branches no one exercises by hand.
 
 ## Summary
 
-`TestClient` builds the ASGI scope and calls the app directly, so there is no server, no port and no waiting.
+`TestClient` builds the ASGI scope and calls the app right. There's no server, no port and no waiting.
 
-Assert the status first and the body second. For validation, assert `loc` and `type` rather than the message. Override dependencies to remove the database and the token, fake at the edges, and clear between tests.
+Assert the status first and the body second. For check, assert `loc` and `type` rather than the message. replace dependencies to drop the DB and the token, fake at the edges, and clear between tests.
 
-Include a router into a small app to test one resource alone. Use the context-manager form when the test should exercise startup. And assert on the generated schema for anything with consumers, because a removed `response_model` is a breaking change nothing else catches.
+Include a router into a small app to test one resource alone. Use the context-manager form when the test should exercise startup. And assert on the made schema for anything with consumers. A removed `response_model` is a breaking change nothing else catches.
 
 ## What makes an endpoint hard to test
 
-Worth naming, because the answer is usually a design signal rather than a testing problem.
+Worth naming, because the answer is often a design signal rather than a testing problem.
 
 **Work in the handler.** Logic that only exists inside a request can only be tested through one. Moving it to a service makes it a function call.
 
-**Reaching instead of declaring.** A handler calling `get_session()` in its body cannot be given a fake; one declaring `Depends(get_session)` can.
+**Reaching instead of declaring.** A handler calling `get_session()` in its body can't be given a fake. One declaring `Depends(get_session)` can.
 
-**Too many dependencies.** If a test needs six overrides, the endpoint is entangled with six things - and the fixture count is a fair measure of that.
+**Too many dependencies.** If a test needs six replaces, the endpoint is entangled with six things - and the fixture count is a fair measure of that.
 
-**Import-time side effects.** If importing the module connects to something, every test pays, and the suite cannot run without the world being present.
+**Import-time side effects.** If importing the module connects to a thing, each test pays. The suite can't run without the world being present.
 
-Each of those makes tests awkward and each is fixed by a change to the application rather than to the test. When a test is hard to write, the useful first question is what the endpoint is doing that it should not.
+Each of those makes tests awkward and each is fixed by a change to the use rather than to the test. When a test is hard to write, the handy first question is what the endpoint is doing that it shouldn't.
 
 
 ## What to test, and what not to
 
-A suite is a set of choices about what is worth the maintenance, and two extremes are both wrong.
+A suite is a set of choices about what is worth the maintenance. Two extremes are both wrong.
 
-**Testing every branch of every handler** produces a suite that breaks on every refactor and gets updated without being read.
+**Testing each branch of each handler** makes a suite that breaks on each refactor and gets updated without being read.
 
-**Testing only the happy paths** leaves the branches that actually run in production - the 404, the 422, the 401 - entirely uncovered.
+**Testing only the happy paths** leaves the branches that really run in production - the 404, the 422, the 401 - fully uncovered.
 
-The middle is per endpoint: the success case, one validation failure, one domain failure. Then, across the application, one test per dependency that can reject, and a few asserting on the schema for anything with consumers.
+The middle is per endpoint: the success case, one check failure, one domain failure. Then, across the use, one test per dependency that can reject. A few asserting on the schema for anything with consumers.
 
-That is small enough to keep and specific enough to be worth keeping. The measure is whether a failure tells you what broke without opening the test - and asserting on status, `loc` and `type` is what makes it do that.
+That is small enough to keep and exact enough to be worth keeping. The measure is whether a failure tells you what broke without opening the test - and asserting on status, `loc` and `type` is what makes it do that.
 
 
 ## A closing thought
 
-The reason FastAPI applications tend to be well tested is not discipline. It is that the framework removed the usual excuses.
+The reason FastAPI uses tend to be well tested isn't discipline. It's that the framework removed the usual excuses.
 
-There is no server to start, so tests are fast. Dependencies are declared rather than reached for, so they can be replaced. Routers can be included one at a time, so a test can be narrow. Validation happens at the boundary, so handlers have less to test.
+There's no server to start. Tests are fast. Dependencies are declared rather than reached for. So They can be replaced. Routers can be included one at a time, so a test can be narrow. check happens at the boundary, so handlers have less to test.
 
-What remains is writing the tests, and the shape is small: success, validation failure, domain failure, per endpoint.
+What remains is writing the tests. The shape is small: success, check failure, domain failure, per endpoint.
 
 ## Next
 
-The document all of this generates - and how much of an API's usability is decided by how carefully it was filled in.
+The doc all of this makes - and how much of an API's usability is decided by how carefully it was filled in.
 
 ## In one line
 
-No server, no port, no network: assert the status first, `loc` and `type` for validation, override at the edges, clear between tests, and cover the error branches, because those are the ones production exercises most and suites cover least.
+No server, no port, no network: assert the status first, `loc` and `type` for check, replace at the edges, clear between tests. Cover the error branches. Those are the ones production exercises most and suites cover least.
 
-The measure of a suite is whether a failure tells you what broke without opening the test file. Asserting on the status, the `loc` and the `type` is what makes it do that; asserting on prose and whole payloads is what stops it.
+The measure of a suite is whether a failure tells you what broke without opening the test file. Asserting on the status, the `loc` and the `type` is what makes it do that. Asserting on prose and whole payloads is what stops it.
 
-And keep one test with nothing overridden, exercising the real dependency tree. Heavy faking has a failure mode of its own: the fakes quietly stop resembling what they stand in for, and every test keeps passing while the application stops working.
+And keep one test with nothing overridden, exercising the real dependency tree. Heavy faking has a failure mode of its own. The fakes quietly stop resembling what they stand in for. Each test keeps passing while the use stops working.

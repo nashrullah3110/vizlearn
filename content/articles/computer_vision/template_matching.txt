@@ -1,98 +1,98 @@
 title: Template Matching
-intro: The most direct way to find something in an image, and a clear demonstration of why the field moved on.
+intro: The most direct way to find a thing in an image. A clear demo of why the field moved on.
 
 ## The method
 
-Take a patch &mdash; the **template** &mdash; and place it over every possible
-position in the image. At each position, score how well the template agrees with
-what is underneath. The result is a **response map** with one score per position,
+Take a patch &mdash; the **template** &mdash; and place it over each possible
+spot in the image. At each spot, score how well the template agrees with
+what is underneath. The result is a **response map** with one score per spot,
 and the highest score is where the template was found.
 
-The template here is cut from the image itself, using the position controls, so
-a perfect match is guaranteed to exist. The grey square marks where it came from
+The template here is cut from the image itself, using the spot controls, so
+a perfect match is ensured to exist. The grey square marks where it came from
 and the orange square marks where it was found. Move the controls and they track
-each other, with the correlation in the readout staying at 1.000. The method is O(n&middot;m) where n is the image size and m the template size, but it is straightforward and requires no training.
+each other, with the link in the readout staying at 1.000.
 
 ## Scoring: why not just subtract?
 
 The obvious score is the sum of squared differences. It works, and it breaks the
-moment lighting changes: brighten the image by 20 and every difference grows,
-even where the shapes match perfectly.
+moment lighting changes: brighten the image by 20 and each difference grows,
+even where the shapes match just right.
 
-**Normalised cross-correlation** fixes this by standardising both sides before
-comparing &mdash; subtract the mean, divide by the standard deviation, then take
+**Normed cross-link** fixes this by standardising both sides before
+checking &mdash; subtract the mean, divide by the standard deviation, then take
 the dot product:
 
 ```
 NCC = sum( (T - mean_T) * (W - mean_W) ) / ( sd_T * sd_W )
 ```
 
-Subtracting the means removes any constant brightness offset. Dividing by the
-standard deviations removes any constant contrast scaling. What is left measures
+Subtracting the means drops any constant brightness offset. Cutting by the
+standard deviations drops any constant contrast scaling. What is left measures
 **pattern** rather than pixel values, and the result is bounded between
-&minus;1 and 1, which makes scores comparable across positions and images.
+&minus;1 and 1, which makes scores close across spots and images.
 
-That is why NCC is the standard choice, and why the response map here is readable
-as an image: every value is on the same scale.
+That is why NCC is the standard choice. Why the response map here is readable
+as an image: each value is on the same scale.
 
 ## Reading the response map
 
-The bright region around the true match is not a single pixel. It is a blob,
-because a template shifted by one pixel still overlaps almost entirely and still
+The bright region around the true match isn't a single pixel. It's a blob,
+because a template shifted by one pixel still shares almost fully and still
 scores well.
 
-That blob is why picking the maximum is not enough in practice. Several nearby
-positions all score highly, and returning all of them means returning the same
-detection several times. The standard fix is the same one detection uses:
-suppress everything within a radius of a stronger response, which is exactly
-[non-maximum suppression](iou_and_non_max_suppression.html).
+That blob is why picking the max isn't enough . a few nearby
+spots all score highly, and returning all of them means returning the same
+spotting a few times. The standard fix is the same one spotting uses:
+suppress all within a radius of a stronger response, which is just
+[non-max suppression](iou_and_non_max_suppression.html).
 
 Make the template small &mdash; drag the size control down &mdash; and the map
-becomes noisy, with strong responses in places that merely happen to have a
-similar local pattern. A small template does not contain enough structure to be
+turns noisy, with strong responses in places that merely happen to have a
+similar local pattern. A small template doesn't hold enough structure to be
 distinctive.
 
 ## What it cannot do
 
-The limitations are severe and they are the reason the field developed
-alternatives.
+The limitations are severe and they're the reason the field developed
+options.
 
 **Rotation.** A template rotated by ten degrees no longer aligns, and the
-correlation falls sharply. Handling rotation means searching over angles as well
-as positions.
+link falls sharply. Handling rotation means searching over angles as well
+as spots.
 
-**Scale.** The same problem in another dimension. Searching over scales too means
+**Scale.** The same problem in another dim. Searching over scales too means
 an image pyramid and a much larger search.
 
-**Deformation.** A face is not a rigid patch. Any object that bends, or that
-varies between instances, cannot be represented by one template.
+**Deformation.** A face isn't a rigid patch. Any object that bends, or that
+varies between instances, can't be shown by one template.
 
-**Cost.** Every position &#215; every scale &#215; every angle, each requiring
-a full patch comparison, is expensive, though correlation via the FFT helps a
+**Cost.** each spot &#215. each scale &#215. each angle, each needing
+a full patch check, is costly, though link via the FFT helps a
 great deal in the translation-only case.
 
 ## Where it is still the right tool
 
-Template matching has not disappeared, because when its assumptions hold it is
+Template matching hasn't disappeared, because when its assumptions hold it's
 exact, needs no training data, and is trivially explainable.
 
 Industrial inspection with a fixed camera and fixed part orientation. Finding a
-known icon on a screen for UI automation. Aligning scanned documents against a
-form. Matching a fixed logo. In all of these, position is the only unknown, which
-is precisely the case the method solves.
+known icon on a screen for UI automation. Aligning scanned docs against a
+form. Matching a fixed logo. In all of these, spot is the only unknown, which
+is just the case the method solves.
 
 Where the assumptions fail, the successors are **keypoint matching** &mdash;
 [Harris corners](harris_corners.html), SIFT, ORB &mdash; which find distinctive
-points and match those, giving rotation and scale invariance for free, and
-learned detectors, which handle deformation and appearance variation as well.
+points and match those, giving rotation and scale steadiness for free, and
+learned finders, which handle deformation and appearance variation as well.
 
 ## Why normalisation is the whole trick
 
-The reason NCC beats raw subtraction is one line of arithmetic. Take a template of
+The reason NCC beats raw subtraction is one line of math. Take a template of
 pixel values and a patch that is the same pattern brightened by 20 &mdash; the kind
-of lighting change that breaks sum-of-squared-differences completely, since every
-difference grows. Normalised cross-correlation subtracts each side's mean and
-divides by its standard deviation before comparing:
+of lighting change that breaks sum-of-squared-differences fully, since each
+difference grows. Normed cross-link subtracts each side's mean and
+cuts by its standard deviation before checking:
 
 |comparison|score|
 |---|---|
@@ -100,26 +100,26 @@ divides by its standard deviation before comparing:
 |template vs (itself + 20 brightness)|**1.000**|
 |template vs a different pattern|well below 1|
 
-Subtracting the means removes any constant brightness offset; dividing by the
-standard deviations removes any contrast scaling; what remains measures *pattern*,
-bounded in &minus;1 to 1 so scores are comparable across positions. That invariance
+Subtracting the means drops any constant brightness offset. Cutting by the
+standard deviations drops any contrast scaling. What remains measures *pattern*,
+bounded in &minus;1 to 1 so scores are close across spots. That steadiness
 is why the response map is readable as an image and why the peak stays at 1.000
-under a lighting change that would swamp SSD. What normalising cannot fix is the
+under a lighting change that would swamp SSD. What norming can't fix is the
 geometry: a template rotated ten degrees or scaled up no longer aligns, and the
-correlation collapses &mdash; which is the wall that sent the field toward
-[keypoint detectors](harris_corners.html) that survive rotation and scale.
+link merges &mdash; which is the wall that sent the field toward
+[keypoint finders](harris_corners.html) that live rotation and scale.
 
-Reading the response map is its own lesson. The bright region around the true match
-is a blob, not a point, because a template shifted one pixel still overlaps almost
-entirely and still scores well. Taking the argmax returns the same
-detection several times, and the fix is the same [non-maximum
-suppression](iou_and_non_max_suppression.html) that object detection uses. Where
-template matching survives is precisely the case its assumptions fit: a fixed camera
-and fixed orientation, where position is the only unknown &mdash; industrial
+Reading the response map is its own lesson: the bright region around the true match
+is a blob, not a point. A template shifted one pixel still shares almost
+fully and still scores well. So taking the argmax returns the same
+spotting a few times, and the fix is the same [non-max
+suppression](iou_and_non_max_suppression.html) that object spotting uses. Where
+template matching lives is just the case its assumptions fit: a fixed camera
+and fixed orientation, where spot is the only unknown &mdash; industrial
 inspection, finding an icon for UI automation, aligning a scanned form. When the
-object can rotate, scale or deform, it is the wrong method rather than one that needs
+object can rotate, scale or deform, it's the wrong method rather than one that needs
 tuning, and the successors are keypoint matchers like SIFT and ORB that get rotation
-and scale invariance for free.
+and scale steadiness for free.
 
 ## Where it goes wrong
 
@@ -127,15 +127,15 @@ and scale invariance for free.
 
 **Taking the argmax without suppression.** The peak is a blob, not a point.
 
-**A template that is too small.** Not distinctive; the map fills with false
+**A template that is too small.** Not distinctive. The map fills with false
 peaks.
 
-**Expecting invariance it does not have.** If the object can rotate or change
+**Expecting steadiness it doesn't have.** If the object can rotate or change
 size, this is the wrong method, not a method that needs tuning.
 
 ## Sliding a patch, and the correlation that lies
 
-Template matching is the simplest possible detector: slide a patch over the image and score every position. Building it exposes exactly why raw correlation fails, why normalised cross-correlation is the fix, and the limits that no amount of normalising repairs.
+Template matching is the simplest possible finder: slide a patch over the image and score each spot. Building it exposes just why raw link fails, why normed cross-link is the fix. The limits that no amount of norming repairs.
 
 ```python-run
 import numpy as np
@@ -206,7 +206,7 @@ bg_mask[8:11, 19:22] = False
 bg_mask[5:12, 26:33] = False
 best_bg = ssd[bg_mask].max()
 print("%20s  %12.0f" % ("best background", best_bg))
-print("      the exact copy wins, correctly -- its SSD is in effect 0,")
+print("      the exact copy wins, correctly -- its SSD is essentially 0,")
 print("      and the blob is rejected hard. so SSD fixed the brightness")
 print("      bug. but look at the faint plus: %.0f, which is WORSE than"
       % ssd[9, 20])

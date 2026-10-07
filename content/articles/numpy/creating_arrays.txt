@@ -1,25 +1,14 @@
 title: Creating Arrays
-intro: The half-dozen constructors that cover almost everything, and which to reach for when.
+intro: The half-dozen constructors that cover almost all, and which to reach for when.
 
 ## From data you already have
 
-`np.array` takes a list, a tuple, or nested lists, and infers the shape from the nesting. One level gives you 1-D, two levels gives 2-D, and so on.
+`np.array` takes a list, a tuple, or nested lists. Infers the shape from the nesting. One level gives you 1-D, two levels gives 2-D, and so on.
 
-Rows must be the same length. Ragged input raises rather than guessing, which is the right choice &mdash; the alternative would be an array of Python list objects that looks like an array and behaves like nothing you want.
+Rows must be the same length. Ragged input raises rather than guessing. This Is the right choice. The option would be an array of Python list objects that looks like an array and behaves like nothing you want.
 
-If you genuinely have ragged data, you want a list of arrays, or padding to a rectangle, and you should decide which deliberately.
+If you truly have ragged data, you want a list of arrays, or padding to a rectangle. You should decide which on purpose.
 
-`np.zeros(shape)` and `np.ones(shape)` create arrays filled with 0 or 1. They are used for initialisation: a result array to be filled in a loop, a mask array, or a weight matrix. `np.full(shape, value)` fills with any constant: `np.full((3, 4), 7)` gives a 3&times;4 array of sevens.
-
-`np.arange(start, stop, step)` is the array version of `range`. It works with floats, unlike `range`, but floating-point step sizes can give unexpected lengths because of rounding. `np.linspace(start, stop, num)` avoids this by specifying the number of points instead of the step, and it includes both endpoints by default.
-
-`np.eye(n)` creates an n&times;n identity matrix. `np.diag(v)` creates a diagonal matrix from a 1D array, or extracts the diagonal from a 2D one. `np.random.default_rng().standard_normal((m, n))` generates normally distributed random numbers, which is the modern way &mdash; `np.random.randn` still works but the generator API is preferred for reproducibility.
-
-The `dtype` argument controls the element type. `np.zeros(5, dtype=np.int32)` gives integer zeros. `np.array([1, 2, 3], dtype=np.float32)` converts integers to 32-bit floats. Choosing the right dtype at creation time avoids a later conversion that copies the entire array.
-
-`np.empty(shape)` allocates memory without initialising it. The values are whatever happened to be in that memory, which is why it is faster than `np.zeros` and why you must fill every element before reading. Use it only when you are about to overwrite every value immediately.
-
-`np.fromfunction`, `np.fromiter` and `np.frombuffer` construct arrays from functions, iterators and byte buffers. They are less common but worth knowing: `np.fromfunction(lambda i, j: i + j, (3, 3))` builds a matrix whose values are the sum of the row and column indices.
 
 ## From a list, and from nested lists
 
@@ -156,51 +145,51 @@ print("Better still: np.arange(2000.0) - no Python loop at all.")
 ```
 ## When you know the shape but not the values
 
-Most real code knows the shape first. Allocating it directly is both faster and clearer than building a list and converting.
+Most real code knows the shape first. Allocating it right is both faster and clearer than building a list and converting.
 
-`np.zeros(shape)` and `np.ones(shape)` are the common ones. `np.full(shape, value)` fills with anything. `np.eye(n)` is the identity matrix.
+`np.zeros(shape)` and `np.ones(shape)` are the common ones. `np.full(shape, value)` fills with anything. `np.eye(n)` is the identity mat.
 
-Note that the shape argument is a *tuple* for more than one dimension: `np.zeros((2, 3))`. `np.zeros(2, 3)` is a different function signature and will not do what you meant.
+Note that the shape arg is a *tuple* for more than one dim: `np.zeros((2, 3))`. `np.zeros(2, 3)` is a other function signature and won't do what you meant.
 
-`np.empty` deserves a warning. It allocates without initialising, so the contents are whatever happened to be in that memory &mdash; not zeros, not anything predictable. It is marginally faster than `zeros` and only correct when you are about to overwrite every element. Reaching for it by default produces bugs that appear only sometimes.
+`np.empty` deserves a warning. It allocates without resetting. The contents are what happened to be in that memory. Not zeros, not anything predictable. It's marginally faster than `zeros` and only correct when you're about to overwrite each element. Reaching for it by default makes bugs that appear only at times.
 
 ## arange and linspace
 
-Both make a sequence, and the difference is what you specify.
+Both make a sequence, and the gap is what you give.
 
-`np.arange(start, stop, step)` takes a **step** and excludes the stop, exactly like Python's `range`.
+`np.arange(start, stop, step)` takes a **step** and excludes the stop, just like Python's `range`.
 
 `np.linspace(start, stop, num)` takes a **count** and includes the stop.
 
-For integers, `arange` is natural. For floats, it is a trap: the number of elements depends on floating-point accumulation, so `np.arange(0, 1, 0.1)` may give you ten elements or eleven depending on rounding, and `np.arange(0, 0.3, 0.1)` can include a value slightly above 0.3.
+For ints, `arange` is natural. For floats, it's a trap. The number of elements depends on floating-point build-up. `np.arange(0, 1, 0.1)` may give you ten elements or eleven based on rounding. `np.arange(0, 0.3, 0.1)` can include a value slightly above 0.3.
 
-The rule is simple: **if the step is a float, use `linspace`.** You almost always know how many points you want, and `linspace` gives exactly that many, with the endpoint where you asked for it.
+The rule is simple: **if the step is a float, use `linspace`.** You almost always know how many points you want. `linspace` gives just that many, with the endpoint where you asked for it.
 
 ## Matching an existing array
 
 The `_like` family &mdash; `zeros_like`, `ones_like`, `empty_like`, `full_like` &mdash; copies both shape and dtype from an array you already have.
 
-The dtype part is the valuable half. In a pipeline working in `float32` for memory reasons, allocating a result with `np.zeros(shape)` gives `float64`, and the first operation that combines them widens everything back. `zeros_like` keeps the type you chose.
+The dtype part is the valuable half. In a pipeline working in `float32` for memory reasons, allocating a result with `np.zeros(shape)` gives `float64`. The first step that mixes them widens all back. `zeros_like` keeps the type you chose.
 
 ## Choosing a dtype
 
 The dtype is fixed at creation and worth choosing rather than accepting.
 
-Integers come in `int8`, `int16`, `int32` and `int64`, signed and unsigned. Floats come in `float32` and `float64` (and `float16`, with real precision costs).
+ints come in `int8`, `int16`, `int32` and `int64`, signed and unsigned. Floats come in `float32` and `float64` (and `float16`, with real precision costs).
 
-Two reasons to care. **Memory**: a million `float64` values is 8 MB; `float32` halves that, which matters once arrays are large. **Overflow**: an `int8` holds &minus;128 to 127, and `127 + 1` gives &minus;128 with no error and no warning. NumPy does not promote to a wider type to save you.
+Two reasons to care. **Memory**: a million `float64` values is 8 MB. `float32` halves that. This Matters once arrays are large. **Overflow**: an `int8` holds &minus;128 to 127. `127 + 1` gives &minus;128 with no error and no warning. NumPy doesn't promote to a wider type to save you.
 
-That silence is the important part. Python integers grow without limit; NumPy integers wrap. Code ported from lists to arrays can start producing wrong numbers rather than raising, which is much harder to notice.
+That silence is the key part. Python ints grow without limit. NumPy ints wrap. Code ported from lists to arrays can start making wrong numbers rather than raising. This Is much harder to notice.
 
-The default integer width is platform-dependent &mdash; `int64` on most desktops, `int32` on this page's 32-bit WebAssembly. Where the values may be large, say what you want.
+The default int width is platform-dependent. `int64` on most desktops, `int32` on this page's 32-bit WebAssembly. Where the values may be large, say what you want.
 
 ## Never grow an array in a loop
 
-`np.append` does not append. There is nowhere to append to: an array is a fixed block of memory, so `np.append` allocates a new one, copies everything across, and returns it. In a loop that is quadratic.
+`np.append` doesn't append. There's nowhere to append to. An array is a fixed block of memory. `np.append` allocates a new one, copies all across. Returns it. In a loop that is quadratic.
 
-The last editor measures it. The fix is the same as the string-concatenation fix in Python: allocate the result once and assign into it, or better, build the whole thing with a vectorised call and no Python loop at all.
+The last editor measures it. The fix is the same as the string-joining fix in Python. Allocate the result once and assign into it, or better, build the whole thing with a vectorised call and no Python loop at all.
 
-If you genuinely do not know the final size, collect into a Python list and convert once at the end &mdash; lists over-allocate and appending to them is cheap.
+If you truly don't know the final size, collect into a Python list and convert once at the end. Lists over-allocate and appending to them is cheap.
 
 ## Which to reach for
 
@@ -208,51 +197,51 @@ Data in hand: `np.array`.
 
 Known shape, zeros: `np.zeros`. Known shape, matching an existing array: `zeros_like`.
 
-Integer sequence: `np.arange`. Float sequence: `np.linspace`.
+int sequence: `np.arange`. Float sequence: `np.linspace`.
 
-A result you are about to fill completely: `np.empty`, and only then.
+A result you're about to fill fully: `np.empty`, and only then.
 
-Anything else in a loop: stop and ask whether a vectorised expression would build it in one call.
+Anything else in a loop: stop and ask whether a vectorised formula would build it in one call.
 
 ## empty is not zeros
 
-`np.zeros` writes zeros. `np.empty` allocates and writes nothing, so the contents are whatever was previously in that memory.
+`np.zeros` writes zeros. `np.empty` allocates and writes nothing. The contents are what was before in that memory.
 
-That makes `empty` faster, and it is the correct choice when you are about to overwrite every element. It is a bug waiting to happen when you are not.
+That makes `empty` faster, and it's the correct choice when you're about to overwrite each element. It's a bug waiting to happen when you aren't.
 
-The trap is that uninitialised memory is often zeros in practice, especially on a freshly started process, so code that accidentally relies on `empty` giving zeros can pass every test and then produce garbage under real load when the allocator hands back recycled memory.
+The trap is that uninitialised memory is often zeros above all on a freshly started process. Code that accidentally leans on `empty` giving zeros can pass each test and then give garbage under real load when the allocator hands back recycled memory.
 
-The rule: use `empty` only when the very next thing you do fills the whole array. If there is any branch where an element might not be written, use `zeros`.
+The rule: use `empty` only when the very next thing you do fills the whole array. If there's any branch where an element might not be written, use `zeros`.
 
 ## Bringing data in from elsewhere
 
-`np.array` on a list is the common case, but it is not the only door.
+`np.array` on a list is the common case. But It isn't the only door.
 
-`np.frombuffer` wraps existing bytes without copying &mdash; useful for data arriving from a socket, a file read, or another library. The result is read-only if the buffer is, and it shares memory with the source, so the usual view caveats apply.
+`np.frombuffer` wraps existing bytes without copying. handy for data arriving from a socket, a file read, or another library. The result is read-only if the buffer is. It shares memory with the source. The usual view caveats apply.
 
-`np.fromiter` builds an array from any iterable, consuming it lazily. This is the one to reach for with a generator, because `np.array(generator)` does **not** do what you would hope: it creates a zero-dimensional object array containing the generator itself. That failure is silent and confusing, and `fromiter` with an explicit `dtype` is the fix. Pass `count` when you know the length, and it can preallocate instead of growing internally.
+`np.fromiter` builds an array from any iterable, consuming it lazily. This is the one to reach for with a gen. `np.array(gen)` does **not** do what you'd hope. It creates a zero-dimensional object array holding the gen itself. That failure is silent and confusing. `fromiter` with an clear `dtype` is the fix. Pass `count` when you know the length. It can preallocate instead of growing inside.
 
 `np.loadtxt` and `np.load` cover files, and get a module of their own later.
 
 ## The structured constructors
 
-`np.eye(n)` gives an identity matrix; `np.identity(n)` is the same thing with fewer options. `np.eye` takes a `k` argument to offset the diagonal, which is how you build shift matrices.
+`np.eye(n)` gives an identity mat. `np.identity(n)` is the same thing with fewer options. `np.eye` takes a `k` arg to offset the main-line. This Is how you build shift mats.
 
-`np.diag` is two functions in one, depending on what you hand it. Given a 1-D array it builds a matrix with that diagonal. Given a 2-D array it extracts the diagonal. That overloading is convenient and occasionally surprising.
+`np.diag` is two functions in one, based on what you hand it. Given a 1-D array it builds a mat with that main-line. Given a 2-D array it extracts the main-line. That overloading is convenient and at times surprising.
 
-`np.full(shape, value)` fills with a constant, and is clearer than `np.ones(shape) * value` &mdash; it also gets the dtype right, inferring it from the fill value rather than starting from float.
+`np.full(shape, value)` fills with a constant. Is clearer than `np.ones(shape) * value`. It also gets the dtype right, inferring it from the fill value rather than starting from float.
 
-`np.tile` and `np.repeat` build larger arrays from smaller ones. They differ in a way worth remembering: `tile` repeats the whole array, `repeat` repeats each element in place. `np.tile([1,2], 2)` gives `1 2 1 2`; `np.repeat([1,2], 2)` gives `1 1 2 2`.
+`np.tile` and `np.repeat` build larger arrays from smaller ones. They differ in a way worth remembering: `tile` repeats the whole array, `repeat` repeats each element in place. `np.tile([1,2], 2)` gives `1 2 1 2`. `np.repeat([1,2], 2)` gives `1 1 2 2`.
 
 ## array versus asarray
 
-`np.array(x)` copies by default. `np.asarray(x)` does not copy if `x` is already an array of the right dtype.
+`np.array(x)` copies by default. `np.asarray(x)` doesn't copy if `x` is already an array of the right dtype.
 
-That distinction matters at function boundaries. A function that begins `a = np.asarray(a)` accepts lists and arrays alike, and costs nothing when given an array it can use directly. The same function written with `np.array` copies every call, which is wasteful in a loop and can be significant for large inputs.
+That gap matters at function boundaries. A function that begins `a = np.asarray(a)` accepts lists and arrays alike. Costs nothing when given an array it can use right. The same function written with `np.array` copies each call. This Is wasteful in a loop and can be large for large inputs.
 
-Use `asarray` for "make sure this is an array". Use `array` when you specifically want a copy that the caller cannot see you modify.
+Use `asarray` for "make sure this is an array". Use `array` when you namely want a copy that the caller can't see you modify.
 
-Note that `asarray` returning the original means you must not modify it in place unless you own it &mdash; the same views-and-copies question that runs through the whole library.
+Note that `asarray` returning the first means you must not modify it in place unless you own it. The same views-and-copies question that runs through the whole library.
 
 ## A checklist for choosing
 
@@ -260,48 +249,48 @@ Ask, in order:
 
 **Do I already have the values?** `np.array` or `np.asarray`.
 
-**Do I know the shape but not the values?** `zeros`, `ones`, `full`, or `empty` if every element will be overwritten.
+**Do I know the shape but not the values?** `zeros`, `ones`, `full`, or `empty` if each element will be overwritten.
 
-**Is it a sequence of numbers?** `arange` for a step, `linspace` for a count. Prefer `linspace` whenever the values are floats, because `arange` with a float step has an unpredictable length.
+**Is it a sequence of numbers?** `arange` for a step, `linspace` for a count. Prefer `linspace` when the values are floats. `arange` with a float step has an unpredictable length.
 
-**Should it match something I have?** The `_like` family, which copies shape and dtype together and prevents the two from drifting apart.
+**Should it match a thing I have?** The `_like` family. This Copies shape and dtype together and blocks the two from drifting apart.
 
-**Is it coming from a generator or a byte buffer?** `fromiter` or `frombuffer`, never bare `np.array`.
+**Is it coming from a gen or a byte buffer?** `fromiter` or `frombuffer`, never bare `np.array`.
 
-And in every branch, set the dtype at creation rather than converting later. `astype` allocates a whole second array, and choosing correctly the first time avoids both the copy and the class of bugs where an integer array silently refuses the float you assign into it.
+And in each branch, set the dtype at creation rather than converting later. `astype` allocates a whole second array. Choosing right the first time avoids both the copy and the class of bugs where an int array silently refuses the float you assign into it.
 
 ## Common mistakes at this stage
 
-**`np.array(generator)`.** This does not build an array from the generator's values. It builds a zero-dimensional object array containing the generator object itself, and every subsequent operation behaves bizarrely. `np.fromiter(gen, dtype=float)` is the correct call, and passing `count` when the length is known lets it preallocate.
+**`np.array(gen)`.** This doesn't build an array from the gen's values. It builds a zero-dimensional object array holding the gen object itself. Each later step behaves bizarrely. `np.fromiter(gen, dtype=float)` is the correct call. Passing `count` when the length is known lets it preallocate.
 
-**`np.array` on ragged input.** Lists of unequal length no longer produce an object array silently &mdash; modern NumPy raises. That is an improvement, because the object array it used to create looked like an array and performed like a list.
+**`np.array` on ragged input.** Lists of unequal length no longer give an object array silently. Modern NumPy raises. That is an gain. The object array it used to create looked like an array and performed like a list.
 
-**Forgetting that `np.zeros` is float.** `np.zeros(5)` has dtype `float64`, not integer. Code that fills it with counts and then uses it as an index has to convert, and the conversion is a copy. `np.zeros(5, dtype=int)` at creation avoids both.
+**Losing that `np.zeros` is float.** `np.zeros(5)` has dtype `float64`, not int. Code that fills it with counts and then uses it as an index has to convert. The conversion is a copy. `np.zeros(5, dtype=int)` at creation avoids both.
 
-**`np.empty` where `np.zeros` was meant.** Uninitialised memory frequently contains zeros in a fresh process, so this passes tests and fails in production.
+**`np.empty` where `np.zeros` was meant.** Uninitialised memory often holds zeros in a fresh process. This passes tests and fails in production.
 
-**Building with `np.append` in a loop.** Quadratic, and the single most common accidental slowdown in beginner NumPy code.
+**Building with `np.append` in a loop.** Quadratic. The single most common accidental slowdown in beginner NumPy code.
 
 ## A note on reproducible construction
 
-Test data and examples benefit from being deterministic.
+Test data and examples gain from being fixed.
 
-`np.arange` and `np.linspace` are deterministic by construction, which makes them good for examples where the values do not matter but reproducibility does.
+`np.arange` and `np.linspace` are fixed by build. This Makes them good for examples where the values don't matter but reproducibility does.
 
-Where random data is genuinely needed, `np.random.default_rng(seed)` gives a generator whose output is fixed. Seeding at the point of construction, rather than relying on a global, keeps the example self-contained &mdash; which is why every random example in this track creates its own generator.
+Where random data is truly needed, `np.random.default_rng(seed)` gives a gen whose output is fixed. Seeding at the point of build, rather than leaning on a global, keeps the example self-held. Which is why each random example in this track creates its own gen.
 
 ## Getting the shape right the first time
 
-Most construction bugs are shape bugs, and two habits prevent them.
+Most build bugs are shape bugs, and two habits prevent them.
 
-**Pass the shape as a tuple and read it back.** `np.zeros((3, 4))` is unambiguous. `np.zeros(3, 4)` is an error, because the second positional argument is the dtype &mdash; a genuinely confusing failure the first time it happens.
+**Pass the shape as a tuple and read it back.** `np.zeros((3, 4))` is unambiguous. `np.zeros(3, 4)` is an error. The second spot-based arg is the dtype. A truly confusing failure the first time it happens.
 
-**Use the `_like` family when an array should match another.** `np.zeros_like(a)` cannot drift out of sync with `a` the way a hard-coded shape can. When the shape of `a` changes, the output follows, and one fewer place needs editing.
+**Use the `_like` family when an array should match another.** `np.zeros_like(a)` can't drift out of sync with `a` the way a hard-coded shape can. When the shape of `a` changes, the output follows. One fewer place needs editing.
 
 ## A closing note
 
-Creation is the cheapest place to prevent problems, because the dtype and shape chosen here propagate through everything that follows.
+Creation is the cheapest place to prevent problems. The dtype and shape chosen here pass through all that follows.
 
-Setting the dtype at construction avoids a copy and a class of silent conversion bugs. Passing the shape as a tuple avoids the confusing failure where the second argument is read as a dtype. And using the `_like` family keeps derived arrays from drifting out of sync with their source.
+Setting the dtype at build avoids a copy and a class of silent conversion bugs. Passing the shape as a tuple avoids the confusing failure where the second arg is read as a dtype. And using the `_like` family keeps derived arrays from drifting out of sync with their source.
 
-Three small habits, applied once, that remove a disproportionate amount of later debugging.
+Three small habits, applied once, that drop a disproportionate amount of later debugging.

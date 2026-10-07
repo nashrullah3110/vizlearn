@@ -5,35 +5,35 @@ intro: A convolutional layer's parameter count depends on the filter size, the i
 
 For a convolutional layer with kernel size k&times;k, C<sub>in</sub> input channels and F filters:
 
-parameters = (k &times; k &times; C<sub>in</sub> &times; F) + F
+params = (k &times; k &times; C<sub>in</sub> &times; F) + F
 
-Each filter is a small 3-D volume of size k&times;k&times;C<sub>in</sub>, and there are F of them. The trailing <span class="mono-font">+ F</span> is one bias per filter.
+Each filter is a small 3-D volume of size k&times;k&times;C<sub>in</sub>. And there are F of them. The trailing <span class="mono-font">+ F</span> is one bias per filter.
 
-The part worth pausing on is what is <em>absent</em>: the height and width of the input never appear. A layer applied to a 32&times;32 image and the same layer applied to a 4096&times;4096 image have exactly the same number of parameters. This is because the same filter slides across every spatial position &mdash; [parameter sharing](parameter_sharing_in_cnn.html) &mdash; so the number of learned weights depends only on the filter's shape, not the image's. A fully connected layer with the same input and output would have `H &times; W &times; C_in &times; H_out &times; W_out &times; C_out` parameters, which for even a modest 32&times;32 image is millions. The convolution formula produces a few thousand. That gap is the reason CNNs can process high-resolution images at all. The parameter count also tells you how many training examples you need: a layer with 100,000 parameters trained on 1,000 images is almost certainly overfitting, while the same layer on 100,000 images is fine. This page lets you build a network layer by layer, shows the per-layer and cumulative parameter counts, and compares them to the equivalent fully connected layer.
+The part worth pausing on is what is <em>absent</em>: the height and width of the input never appear. A layer applied to a 32&times;32 pic and the same layer applied to a 4096&times;4096 pic have just the same count of params. This is since the same filter slides across each spatial position &mdash; [param sharing](parameter_sharing_in_cnn.html) &mdash; so the count of learned weights depends just on the filter's shape, not the pic's. A fully connected layer with the same input and output would have `H &times; W &times; C_in &times; H_out &times; W_out &times; C_out` params. It for still a modest 32&times;32 pic is millions. The convolution formula gives a few thousand. That gap is the reason CNNs can process high-resolution pics at all. The param count also tells you how many training cases you need: a layer with 100,000 params trained on 1,000 pics is almost certainly overfitting, while the same layer on 100,000 pics is fine. This page lets you build a network layer by layer, shows the per-layer and cumulative param counts. And checks them to the equivalent fully connected layer.
 
 ## Filters are three-dimensional
 
-A “3&times;3 filter” on an RGB input is not 9 weights, it is 3&times;3&times;3 = 27. A filter always spans <em>every</em> input channel, because it looks for a pattern across all of them at once &mdash; an edge detector on colour images must consider red, green and blue together.
+A “3&times;3 filter” on an RGB input is not 9 weights, it is 3&times;3&times;3 = 27. A filter always spans <em>each</em> input channel, since it looks for a pattern across all of them at once &mdash; an edge detector on colour pics must consider red, green and blue together.
 
 Work one through. First conv layer, 3&times;3 kernel, RGB input, 64 filters:
 
 (3 &times; 3 &times; 3 &times; 64) + 64 = 1728 + 64 = <strong>1792</strong>
 
-Second layer, 3&times;3 kernel, taking those 64 channels, producing 128:
+Second layer, 3&times;3 kernel, taking those 64 channels, giving 128:
 
 (3 &times; 3 &times; 64 &times; 128) + 128 = 73728 + 128 = <strong>73,856</strong>
 
-Forty times more, from the same kernel size &mdash; because C<sub>in</sub> and F both grew. The product of those two dominates, which is why deep layers with many channels hold most of a CNN’s weights.
+Forty times more, from the same kernel size &mdash; since C<sub>in</sub> and F both grew. The product of those two dominates. It is why deep layers with many channels hold most of a CNN’s weights.
 
 ## Weight sharing, and the comparison that makes the point
 
-A fully connected layer on a 224&times;224&times;3 image with 64 outputs would need 224 &times; 224 &times; 3 &times; 64 &asymp; <strong>9.6 million</strong> parameters. The convolutional layer above does a comparable job with <strong>1,792</strong>.
+A fully connected layer on a 224&times;224&times;3 pic with 64 outputs would need 224 &times; 224 &times; 3 &times; 64 &asymp; <strong>9.6 million</strong> params. The convolutional layer above does a comparable job with <strong>1,792</strong>.
 
-The saving comes from <strong>weight sharing</strong>: the same filter slides across every position rather than each position having its own weights. That encodes a real assumption &mdash; a vertical edge is a vertical edge wherever it appears &mdash; and it buys two things at once. Far fewer parameters, and translation equivariance, since a feature is detected the same way regardless of where it sits.
+The saving comes from <strong>weight sharing</strong>: the same filter slides across each position rather than each position having its own weights. That encodes a real assumption &mdash; a vertical edge is a vertical edge wherever it appears &mdash; and it buys two things at once. Far fewer params, and translation equivariance, since a feature is detected the same way no matter where it sits.
 
 ## Counting weights, layer by layer
 
-Knowing where a network's parameters live tells you what will overfit, what will be slow, and where a design is wasteful. Three formulas cover almost everything.
+Knowing where a network's params live tells you what will overfit, what will be slow. And where a design is wasteful. Three formulas cover almost all.
 
 <strong>Convolution:</strong>
 
@@ -47,13 +47,13 @@ Knowing where a network's parameters live tells you what will overfit, what will
 
 <p class="mono-font">2 &times; C&nbsp;&nbsp;(a scale and a shift per channel; the running statistics are not trained)</p>
 
-Pooling, ReLU, dropout and flattening have <strong>zero</strong> parameters &mdash; they compute, but they learn nothing.
+Pooling, ReLU, dropout and flattening have <strong>zero</strong> params &mdash; they compute. But they learn nothing.
 
 The detail that catches everyone: a convolution filter spans all input channels. A 3&times;3 filter applied to a 256-channel map holds 3&times;3&times;256 = 2,304 weights.
 
-## A full worked example
+## A full worked case
 
-A small classifier on 32&times;32&times;3 images:
+A small classifier on 32&times;32&times;3 pics:
 
 |Layer|Output shape|Parameters|
 |---|---|---|
@@ -71,39 +71,39 @@ A small classifier on 32&times;32&times;3 images:
 
 Total: <strong>2,193,418</strong> &mdash; and 96% of it is in one layer, the dense layer after the flatten.
 
-That single observation drove a real architectural change. Replace the flatten with global average pooling and the 8&times;8&times;128 tensor becomes 128 values, so the dense layer needs (128+1)&times;256 = 33,024 parameters instead of 2.1 million. The network drops to about 127,000 parameters, trains faster, overfits less, and typically scores the same or better.
+That single observation drove a real architectural change. Replace the flatten with global average pooling and the 8&times;8&times;128 tensor turns 128 vals. So the dense layer needs (128+1)&times;256 = 33,024 params instead of 2.1 million. The network drops to about 127,000 params, trains faster, overfits less. And often scores the same or better.
 
-## Parameters are not the whole cost
+## Params are not the whole cost
 
-Two other numbers matter, and they behave differently.
+Two other counts matter, and they behave differently.
 
-<strong>Operations (FLOPs)</strong> depend on how many times each filter is applied:
+<strong>Steps (FLOPs)</strong> depend on how many times each filter is applied:
 
 <p class="mono-font">FLOPs &asymp; 2 &times; k<sub>h</sub> &times; k<sub>w</sub> &times; C<sub>in</sub> &times; C<sub>out</sub> &times; H<sub>out</sub> &times; W<sub>out</sub></p>
 
-The first convolution above has 896 parameters and about 1.8 million multiply-adds, because it is applied at 1,024 positions. Early layers are parameter-light and compute-heavy; late layers are the reverse.
+The first convolution above has 896 params and about 1.8 million multiply-adds, since it is applied at 1,024 positions. Early layers are param-light and compute-heavy. Late layers are the reverse.
 
-<strong>Activation memory</strong> is what usually limits batch size during training, because every intermediate feature map must be kept for the backward pass. A 224&times;224&times;64 map is 3.2 million floats &mdash; 12.8MB at 32-bit precision, per image, for one layer. Multiply by batch size and by the number of layers and it dwarfs the weights.
+<strong>Activation memory</strong> is what often limits batch size in training, since each intermediate feature map must be kept for the backward pass. A 224&times;224&times;64 map is 3.2 million floats &mdash; 12.8MB at 32-bit precision, per pic, for one layer. Multiply by batch size and by the count of layers and it dwarfs the weights.
 
-That is why a model with 25 million parameters (about 100MB) can still exhaust a 16GB GPU: the weights are not the problem, the activations are.
+That is why a net with 25 million params (about 100MB) can still exhaust a 16GB GPU: the weights are not the problem, the activations are.
 
 ## Interactive Exploration Guide
 
-1. <strong>Grow the kernel.</strong> Raise <strong>3x3</strong> from 3 to 7 and watch the count. It grows with the <em>square</em> of the kernel size, so 7&times;7 costs more than five times a 3&times;3 &mdash; which is why modern networks stack small kernels instead.
-2. <strong>Grow the channels.</strong> Raise <strong>Input Channels</strong> and then <strong>Number of Filters</strong>. Each scales the count linearly, and together they scale it multiplicatively.
-3. <strong>Toggle the bias.</strong> Switch the bias checkbox and note the change is exactly F &mdash; a rounding error next to the weights, which is why layers followed by batch normalisation usually drop it entirely.
-4. <strong>Confirm the image size is irrelevant.</strong> Nothing in the calculation refers to input height or width. That is the property that makes a CNN usable on large images at all.
+1. <strong>Grow the kernel.</strong> Raise <strong>3x3</strong> from 3 to 7 and watch the count. It grows with the <em>square</em> of the kernel size. So 7&times;7 costs more than five times a 3&times;3 &mdash; which is why modern networks stack small kernels instead.
+2. <strong>Grow the channels.</strong> Raise <strong>Input Channels</strong> and then <strong>Count of Filters</strong>. Each scales the count linearly, and together they scale it multiplicatively.
+3. <strong>Toggle the bias.</strong> Switch the bias checkbox and note the change is just F &mdash; a rounding error next to the weights. It is why layers followed by batch normalisation often drop it fully.
+4. <strong>Confirm the pic size is irrelevant.</strong> Nothing in the math means input height or width. That is the property that makes a CNN usable on large pics at all.
 
 ## What trips people up
 
-- <strong>Forgetting the depth dimension.</strong> Counting a 3&times;3 filter as 9 weights instead of 9 &times; C<sub>in</sub> is the most common error, and it understates the layer by a large factor.
-- <strong>Confusing parameters with activations.</strong> Parameters are fixed and independent of image size; activation memory scales with height &times; width &times; channels &times; batch. Out-of-memory errors during training are almost always activations, not weights.
-- <strong>Using large kernels.</strong> Two stacked 3&times;3 layers cover the same receptive field as one 5&times;5 with fewer parameters and an extra non-linearity. VGG made this the standard.
-- <strong>Keeping the bias before batch norm.</strong> The normalisation subtracts the mean and cancels it exactly, so those parameters do nothing.
+- <strong>Forgetting the depth dimension.</strong> Counting a 3&times;3 filter as 9 weights instead of 9 &times; C<sub>in</sub> is the most common error. And it understates the layer by a large factor.
+- <strong>Confusing params with activations.</strong> Params are fixed and independent of pic size. Activation memory scales with height &times; width &times; channels &times; batch. Out-of-memory errors in training are almost always activations, not weights.
+- <strong>With large kernels.</strong> Two stacked 3&times;3 layers cover the same receptive field as one 5&times;5 with fewer params and an extra non-linearity. VGG made this the standard.
+- <strong>Keeping the bias before batch norm.</strong> The normalisation subtracts the mean and cancels it just. So those params do nothing.
 
 ## In one line
 
-A convolutional layer holds (k &times; k &times; C<sub>in</sub> &times; F) + F parameters, with filters spanning every input channel and the image dimensions appearing nowhere. Weight sharing is what buys the enormous reduction against a fully connected layer, along with translation equivariance. Cost grows with the square of the kernel and the product of input and output channels &mdash; which is why small kernels and staged channel growth are the standard design.
+A convolutional layer holds (k &times; k &times; C<sub>in</sub> &times; F) + F params, with filters spanning each input channel and the pic dimensions appearing nowhere. Weight sharing is what buys the enormous reduction against a fully connected layer, along with translation equivariance. Cost grows with the square of the kernel and the product of input and output channels &mdash; which is why small kernels and staged channel growth are the standard design.
 
 ## Checking it in code
 
@@ -122,22 +122,22 @@ for name, module in model.named_children():
         print(f"{name:<12} {n:>12,}")
 ```
 
-Two things worth checking with this. The trainable count should match your intent &mdash; if you froze a backbone for transfer learning and it still reports 11 million trainable parameters, the freezing did not take. And the per-module breakdown shows immediately whether one layer dominates, which is nearly always fixable.
+Two things worth checking with this. The trainable count should match your intent &mdash; if you froze a backbone for transfer learning and it still reports 11 million trainable params, the freezing did not take. And the per-module breakdown shows at once whether one layer dominates. It is nearly always fixable.
 
-Storage follows directly: 4 bytes per parameter in 32-bit precision, 2 in half precision, 1 in int8. A 25-million-parameter model is 100MB, 50MB or 25MB depending on precision, which is the arithmetic behind every quantisation decision.
+Storage follows right: 4 bytes per param in 32-bit precision, 2 in half precision, 1 in int8. A 25-million-param net is 100MB, 50MB or 25MB depending on precision. It is the arithmetic behind each quantisation decision.
 
 ## Rules of thumb
 
-- <strong>Flatten-then-dense is where parameters explode.</strong> Global average pooling is the standard fix.
-- <strong>Doubling the channels roughly quadruples that layer's parameters,</strong> because both `C_in` and `C_out` appear in the formula.
-- <strong>Early layers cost compute; late layers cost parameters.</strong> Optimise the right one for your constraint.
-- <strong>More parameters is not more capacity in any useful sense</strong> if they sit in a badly placed dense layer.
-- <strong>Batch normalisation is nearly free</strong> in parameters and considerably improves trainability.
-- <strong>1&times;1 convolutions are the cheap way to change channel count,</strong> which is why bottleneck blocks use them either side of the expensive 3&times;3.
+- <strong>Flatten-then-dense is where params explode.</strong> Global average pooling is the standard fix.
+- <strong>Doubling the channels roughly quadruples that layer's params,</strong> since both `C_in` and `C_out` appear in the formula.
+- <strong>Early layers cost compute. Late layers cost params.</strong> Optimise the right one for your constraint.
+- <strong>More params is not more capacity in any useful sense</strong> if they sit in a badly placed dense layer.
+- <strong>Batch normalisation is nearly free</strong> in params and considerably improves trainability.
+- <strong>1&times;1 convolutions are the cheap way to change channel count,</strong> which is why bottleneck blocks use them either side of the costly 3&times;3.
 
-## Count every weight in a real architecture
+## Count each weight in a real design
 
-The formula is one line per layer type. Applying it to a whole network shows that almost all the parameters sit somewhere people rarely look, and almost all the compute sits somewhere else entirely.
+The formula is one line per layer type. Applying it to a whole network shows that almost all the params sit somewhere people rarely look. And almost all the compute sits somewhere else fully.
 
 ```python-run
 import numpy as np
@@ -162,7 +162,7 @@ print("   identical. the kernel is reused at every position, so image size")
 print("   changes the COMPUTE and never the parameter count.")
 ```
 
-Now apply those formulas to a full VGG-style network and see where the parameters actually sit.
+Now apply those formulas to a full VGG-style network and see where the params really sit.
 
 ```python-run
 import numpy as np
@@ -204,7 +204,7 @@ for name, kind, spec, hw in layers:
 print("%14s %20s %16s %18s" % ("TOTAL", "", "{:,}".format(total_p), "{:,}".format(total_m)))
 ```
 
-The table reveals the key insight: where parameters sit versus where compute sits.
+The table reveals the key insight: where params sit versus where compute sits.
 
 ```python-run
 import numpy as np
@@ -286,22 +286,22 @@ print("   3x3 512->512 with bias: %s, without: %s -- saves %d parameters."
 
 ## Questions people ask
 
-<strong>Why does my model have more parameters than I calculated?</strong> Biases, batch normalisation, and any auxiliary heads. Also check whether an embedding or a large final classifier is included.
+<strong>Why does my net have more params than I calculated?</strong> Biases, batch normalisation. And any auxiliary heads. Also check whether an embedding or a large final classifier is included.
 
-<strong>Do frozen layers count as parameters?</strong> They count in the total and not in the trainable count, and they still consume memory and compute in the forward pass.
+<strong>Do frozen layers count as params?</strong> They count in the total and not in the trainable count. And they still consume memory and compute in the forward pass.
 
-<strong>How many parameters do I need?</strong> It depends on the data, not on a target. A few hundred thousand is plenty for CIFAR-scale problems; ImageNet-scale models run to tens of millions.
+<strong>How many params do I need?</strong> It depends on the data, not on a target. A few hundred thousand is plenty for CIFAR-scale problems. ImageNet-scale nets run to tens of millions.
 
-<strong>Does more parameters mean better accuracy?</strong> Only with enough data. On a small dataset a large model overfits, and transfer learning from a pretrained one beats training a big model from scratch.
+<strong>Does more params mean better accuracy?</strong> Just with enough data. On a small dataset a large net overfits. And transfer learning from a pretrained one beats training a big net from scratch.
 
 <strong>What limits my batch size?</strong> Activation memory, almost always, not the weights. Gradient checkpointing trades compute for memory when this binds.
 
-<strong>How do I reduce parameters without losing much accuracy?</strong> Global average pooling instead of flatten, depthwise separable convolutions, fewer channels, and quantisation after training.
+<strong>How do I reduce params without losing much accuracy?</strong> Global average pooling instead of flatten, depthwise separable convolutions, fewer channels. And quantisation after training.
 
 ## Recap in one screen
 
 - Conv: (k&times;k&times;C_in + 1) &times; C_out. Dense: (inputs + 1) &times; outputs. BatchNorm: 2 per channel.
-- Pooling, activations and dropout have no parameters.
-- Each filter spans every input channel &mdash; that is the term people forget.
-- The dense layer after a flatten usually holds most of a naive network's weights; global average pooling removes it.
-- Parameters are not the only cost: early layers dominate compute, and activation memory dominates GPU usage.
+- Pooling, activations and dropout have no params.
+- Each filter spans each input channel &mdash; that is the term people forget.
+- The dense layer after a flatten often holds most of a naive network's weights. Global average pooling removes it.
+- Params are not the just cost: early layers dominate compute. And activation memory dominates GPU usage.

@@ -1,15 +1,15 @@
 title: A Complete Workflow: A Practical Guide
-intro: Twenty-two modules, applied to one small dataset in the order you would actually do it. Nothing here is new; the sequence is the point.
+intro: Twenty-two modules, applied to one small dataset in the order you'd really do it. Nothing here is new. The sequence is the point.
 
 ## The order
 
 **Look. Split. Build. Check. Tune. Report.**
 
-Most of what goes wrong in applied machine learning is this sequence performed in a different order &mdash; tuning before checking a baseline, splitting after preprocessing, choosing a metric after seeing the scores. Each of those produces a number that cannot be trusted, and none of them produces an error.
+Most of what goes wrong in applied machine learning is this sequence performed in a different order. Tuning before checking a baseline, splitting after prep, choosing a metric after seeing the scores. Each of those makes a number that can't be trusted. None of them makes an error.
 
-The dataset here is small and synthetic: four columns of mixed type, 8% missing values in one of them, and an 8% positive rate. That combination is deliberately ordinary, because the point is the procedure rather than the result.
+The dataset here is small and synthetic: four columns of mixed type, 8% missing values in one of them. An 8% positive rate. That combination is on purpose plain. The point is the method rather than the result.
 
-The six editors below are one script, not six examples. They share a single interpreter and each one uses what the last one defined, so run them in order from the top &mdash; starting in the middle raises <code>NameError</code> for a variable an earlier step was supposed to create. The workflow covers: inspecting the data (shape, types, distributions, missingness), splitting into train and test *before* any preprocessing, building a [ColumnTransformer](column_transformer.html) + [Pipeline](pipeline.html) to handle numeric and categorical features, fitting a baseline model, evaluating with the right [metric](regression_metrics.html) for the problem (not just accuracy), and tuning hyperparameters with cross-validation. The split-before-preprocessing order is the single most important rule: any statistic computed on the full dataset (a mean for imputation, a vocabulary for encoding, a scaler's range) leaks test information into training, which is [data leakage](data_leakage.html). Pipelines enforce this automatically because the transformer fits only on the training fold. The baseline model should be the simplest thing that could work: logistic regression for classification, linear regression for regression. If the baseline is already good enough, stop. If not, you have a floor to beat and a sanity check for more complex models. This page runs the full workflow end to end, prints the evaluation at each stage, and covers the most common ordering mistakes.
+The six editors below are one script, not six examples. They share a single interpreter and each one uses what the last one defined. Run them in order from the top. Starting in the middle raises <code>NameError</code> for a variable an earlier step was supposed to create.
 
 
 ## Look at the data first
@@ -168,134 +168,134 @@ print("saved %d bytes - the pipeline and its threshold together" % len(blob))
 ```
 ## 1. Look
 
-Four counts, before any decision: the shape, the dtypes, the missing values per column, and the class balance.
+Four counts, before any choice: the shape, the dtypes, the missing values per column, and the class balance.
 
-Each one determines a later choice. The dtypes say which columns need encoding and which need scaling. The missing count says whether an imputer is needed and in which branch. The class balance &mdash; 8% here &mdash; rules out accuracy as a metric and argues for a stratified split.
+Each one finds a later choice. The dtypes say which columns need encoding and which need scaling. The missing count says whether an imputer is needed and in which branch. The class balance. 8% here. Rules out fit as a metric and argues for a stratified split.
 
-This step takes four lines and is the one most often skipped. Every decision that follows is made in the dark without it.
+This step takes four lines and is the one most often skipped. each choice that follows is made in the dark without it.
 
 ## 2. Split
 
-Immediately, and stratified.
+Right away, and stratified.
 
-The test set is set aside now, before anything has been fitted, scaled, imputed or selected. That is what makes the number at the end mean something, and it is the single most important line in the script.
+The test set is set aside now, before any of it has been fitted, scaled, imputed or selected. That is what makes the number at the end mean a thing. It's the single most key line in the script.
 
-Stratifying matters at 8%: an unstratified 20% test set could easily land with a class rate of 5% or 11%, and every metric computed from it would be shifted by an amount nothing reveals.
+Stratifying matters at 8%: an unstratified 20% test set could easily land with a class rate of 5% or 11%. Each metric found from it would be shifted by an amount nothing reveals.
 
-What remains is the **development set**, and everything up to the final step uses only that. Where this module says "development set", a larger project would cross-validate within it rather than splitting again.
+What remains is the **development set**. All up to the final step uses only that. Where this module says "development set", a larger project would cross-validate within it rather than splitting again.
 
 ## 3. Build the pipeline
 
 Two branches, because the columns need different treatment.
 
-Numeric columns get an imputer &mdash; with `add_indicator=True`, since a missing charge may itself be informative &mdash; and then a scaler, because the model is regularised and a penalty on coefficient size needs comparable units. Categorical columns get one-hot encoding with `handle_unknown="ignore"`, so a region absent from a training fold does not crash the run.
+Numeric columns get an imputer. With `add_indicator=True`. A missing charge may itself be helpful &mdash; and then a scaler. The model is smoothed and a fine on coeff size needs close units. cat columns get one-hot encoding with `handle_unknown="skip"`. A region absent from a training fold doesn't crash the run.
 
-`class_weight="balanced"` goes on the model, because the positives are rare.
+`class_weight="weighed"` goes on the model, because the positives are rare.
 
-The important property is that **nothing is fitted outside this object**. The imputer's median, the scaler's mean, the encoder's category list and the model's coefficients are all learned inside `fit`, which means they are all refitted on the training part of every cross-validation fold. The leakage module measured what happens otherwise.
+The key property is that **nothing is fitted outside this object**. The imputer's median, the scaler's mean, the encoder's category list and the model's coeffs are all learned inside `fit`. This Means they're all refitted on the training part of each cross-validation fold. The leakage module measured what happens or else.
 
-Printing the feature names after preprocessing is a cheap sanity check: ten columns from four, and reading them confirms the missing indicator survived and the categories expanded as expected.
+Printing the feature names after prep is a cheap sanity check. Ten columns from four. Reading them confirms the missing indicator survived and the categories expanded as expected.
 
 ## 4. Check against a baseline
 
 Two numbers, and the first one is the dummy.
 
-`DummyClassifier(strategy="most_frequent")` scores an average precision of 0.082 &mdash; exactly the base rate, which is what average precision does for a model with no skill. The pipeline scores 0.478. That gap is the evidence that the model has learned something, and without the first number the second is uninterpretable.
+`DummyClassifier(strategy="most_frequent")` scores an mean precision of 0.082. Just the base rate. This Is what mean precision does for a model with no skill. The pipeline scores 0.478. That gap is the evidence that the model has learned a thing. Without the first number the second is uninterpretable.
 
-The metrics are chosen for the problem rather than accepted from the default. Average precision because positives are rare and ROC AUC would flatter both models. Recall and precision alongside it, because the single summary hides the trade.
+The metrics are chosen for the problem rather than accepted from the default. Mean precision because positives are rare and ROC AUC would flatter both models. Recall and precision alongside it. The single summary hides the trade.
 
-`make_scorer(precision_score, zero_division=0)` appears because the dummy never predicts a positive, which makes precision undefined. Saying what to return is better than five warnings in the output.
+`make_scorer(precision_score, zero_division=0)` appears because the dummy never predicts a plus. This Makes precision undefined. Saying what to return is better than five warnings in the output.
 
 ## 5. Tune
 
-A randomised search over the model's regularisation and the preprocessing's imputation strategy, scored on average precision.
+A randomised search over the model's smoothing and the prep's imputation strategy, scored on average precision.
 
-Two things are worth noticing. The search covers a **preprocessing** choice as well as a model one, which is possible only because the preprocessing is inside the pipeline. And `scoring="average_precision"` is passed explicitly, because the default would optimise accuracy &mdash; and on 8% positives, accuracy prefers a model that predicts nothing.
+Two things are worth noticing. The search covers a **prep** choice and a model one. This Is possible only because the prep is inside the pipeline. And `scoring="average_precision"` is passed by name. The default would optimise fit. And on 8% positives, fit prefers a model that predicts nothing.
 
-`best_score_` comes out at 0.4829. That number is optimistic: it is the best of eight tries on the same folds, and the hyperparameter-search module measured how much that inflates things. It is a guide for choosing, not a result to report.
+`best_score_` comes out at 0.4829. That number is optimistic. It's the best of eight tries on the same folds. The setting-search module measured how much that inflates things. It's a guide for choosing, not a result to report.
 
 ## 6. Choose the threshold, then report
 
-The threshold is a parameter, so it is chosen on the development set &mdash; here by maximising F1 along the precision-recall curve, though a cost calculation would be better if the costs were known.
+The threshold is a param. So It's chosen on the development set. Here by raising F1 along the precision-recall curve, though a cost math would be better if the costs were known.
 
-Then the test set is opened, once. Average precision on it is 0.5283, and the classification report gives the per-class picture at the chosen threshold: recall 0.667 and precision 0.468 on the positive class, from 33 positives in 400 rows.
+Then the test set is opened, once. Mean precision on it's 0.5283. The classification report gives the per-class picture at the chosen threshold. Recall 0.667 and precision 0.468 on the positive class, from 33 positives in 400 rows.
 
-Those numbers are the deliverable. They are honest because nothing about them was chosen after seeing them.
+Those numbers are the deliverable. They're honest because nothing about them was chosen after seeing them.
 
-Finally the model is saved **with its threshold**. A pipeline pickled alone would be loaded elsewhere and used through `predict()`, silently reverting to 0.5 &mdash; which the thresholds module showed can be the difference between catching most of the positives and almost none.
+Finally the model is saved **with its threshold**. A pipeline pickled alone would be loaded elsewhere and used through `predict()`, silently reverting to 0.5. Which the thresholds module showed can be the difference between catching most of the positives and almost none.
 
 ## What is missing, and would come next
 
 This is a complete workflow, not a complete project.
 
-**A second model family.** Gradient boosting would very likely beat this linear one, and the whole script would change by one line, because the pipeline interface does not care what the final estimator is.
+**A second model family.** Grad boosting would very likely beat this linear one. The whole script would change by one line. The pipeline interface doesn't care what the final estimator is.
 
-**More features.** The learning-curve check from the overfitting module would say whether more data helps, and feature work usually beats tuning when it does not.
+**More features.** The learning-curve check from the overfitting module would say whether more data helps. Feature work often beats tuning when it doesn't.
 
-**The timing question.** Every column here was known at prediction time by construction. On real data that has to be asked of each one, and it is the check no code performs.
+**The timing question.** each column here was known at guess time by build. On real data that has to be asked of each one. It's the check no code performs.
 
-**Monitoring.** A model is fitted on the past and used on the future, and the distributions drift. What is measured after deployment matters as much as anything measured before it.
+**Monitoring.** A model is fitted on the past and used on the future. The spreads drift. What is measured after deployment matters as much as any of it measured before it.
 
 ## The checklist, without the code
 
-The same procedure, stated so it can be applied to a dataset that looks nothing like this one.
+The same method, stated so it can be applied to a dataset that looks nothing like this one.
 
-**Before modelling.** Count the rows and columns. List the dtypes. Count missing values per column. Count the classes, or describe the target's distribution. Ask, of every column, whether it would be known at prediction time.
+**Before modelling.** Count the rows and columns. List the dtypes. Count missing values per column. Count the classes, or show the target's spread. Ask, of each column, whether it would be known at guess time.
 
-**Splitting.** Stratify for classification. Group when several rows share an entity. Order forward when the data has a time. Split before anything learns.
+**Splitting.** Stratify for classification. Group when a few rows share an entity. Order forward when the data has a time. Split before any of it learns.
 
-**Building.** One pipeline. Numeric branch: impute, then scale if the model needs it. Categorical branch: impute, then encode with `handle_unknown="ignore"`. Nothing fitted outside.
+**Building.** One pipeline. Numeric branch: impute, then scale if the model needs it. cat branch: impute, then encode with `handle_unknown="skip"`. Nothing fitted outside.
 
 **Checking.** Fit a dummy. Choose a metric from the class balance and the cost of each mistake. Cross-validate with `return_train_score=True` and read the gap.
 
-**Tuning.** Randomised search over a logarithmic range for regularisation, including preprocessing choices, scored on the metric you chose. Check the winner is not at the edge of the range. Read `cv_results_` and treat settings within one standard deviation as tied.
+**Tuning.** Randomised search over a logarithmic range for smoothing, including prep choices, scored on the metric you chose. Check the winner isn't at the edge of the range. Read `cv_results_` and treat settings within one standard deviation as tied.
 
-**Reporting.** Choose the threshold on development data. Open the test set once. Report the metric, the per-class breakdown, the counts behind the rates, and the baseline beside them. Save the model with its threshold and the library version.
+**Reporting.** Choose the threshold on development data. Open the test set once. Report the metric, the per-class breakdown, the counts behind the rates. The baseline beside them. Save the model with its threshold and the library version.
 
-Nothing on that list is difficult. The discipline is doing it in that order every time, including when the first result already looks good &mdash; which is exactly when the temptation to skip to the end is strongest.
+Nothing on that list is hard. The discipline is doing it in that order each time, including when the first result already looks good. Which is just when the temptation to skip to the end is strongest.
 
 ## When the result is disappointing
 
-The procedure gives an honest number, and the honest number is often lower than hoped. What to do next depends on a diagnosis the workflow has already produced.
+The method gives an honest number. The honest number is often lower than hoped. What to do next depends on a diagnosis the workflow has already made.
 
-**Train and test both low.** Underfitting. More flexible model, better features, less regularisation. Tuning will not help.
+**Train and test both low.** Underfitting. More flexible model, better features, less smoothing. Tuning won't help.
 
-**Train high, test low.** Overfitting. More regularisation, a simpler model, or more data &mdash; and the learning curve says whether more data would work.
+**Train high, test low.** Overfitting. More smoothing, a simpler model, or more data. And the learning curve says whether more data would work.
 
-**Both reasonable, but not good enough.** The features do not carry enough signal. This is the most common case and the least welcome, because the answer is domain work rather than modelling: new features, a different unit of analysis, a reframed target.
+**Both reasonable, but not good enough.** The features don't carry enough signal. This is the most common case and the least welcome. The answer is domain work rather than modelling. New features, a different unit of analysis, a reframed target.
 
-**Barely better than the dummy.** Consider that the problem may not be predictable from these features at all. That is a legitimate finding, and reporting it early is far more valuable than six weeks of tuning towards it.
+**Barely better than the dummy.** Consider that the problem may not be predictable from these features at all. That is a legitimate finding. Reporting it early is far more valuable than six weeks of tuning towards it.
 
-The workflow above is what makes each of those diagnoses available. A script that fits one model and prints one accuracy supports none of them.
+The workflow above is what makes each of those diagnoses available. A script that fits one model and prints one fit supports none of them.
 
-<strong>Why is the test average precision higher than the cross-validated one?</strong> Fold variation. With 33 positives in the test set the estimate is noisy, and a small gap either way carries no information.
+<strong>Why is the test mean precision higher than the cross-validated one?</strong> Fold variation. With 33 positives in the test set the estimate is noisy. A small gap either way carries no info.
 
-<strong>Should I refit on everything before deploying?</strong> Yes, once the procedure is settled and the test score is recorded. More data gives a slightly better model - but the score you report is the one from the test set, not from the refit.
+<strong>Should I refit on all before deploying?</strong> Yes, once the method is settled and the test score is recorded. More data gives a slightly better model - but the score you report is the one from the test set, not from the refit.
 
-<strong>Where would a second model go?</strong> In the same search: `{"clf": [LogisticRegression(), RandomForestClassifier()]}` puts the choice itself in the grid, evaluated by the same cross-validation.
+<strong>Where would a second model go?</strong> In the same search: `{"clf": [LogisticRegression(), RandomForestClassifier()]}` puts the choice itself in the grid, tested by the same cross-validation.
 
-<strong>Is pickle the right way to save it?</strong> For your own short-lived use, yes. Record the scikit-learn version beside it, because a pickle is not portable across versions, and prefer `skops` for anything shared.
+<strong>Is pickle the right way to save it?</strong> For your own short-lived use, yes. Record the scikit-learn version beside it. A pickle isn't portable across versions. Prefer `skops` for any of it shared.
 
 ## Where the track has taken you
 
 Twenty-three modules, and the shape of them was deliberate.
 
-The **API** came first, because `fit`, `predict` and `transform` are the part that transfers to every estimator in the library and to every one written after it. Learning the interface once is most of learning scikit-learn.
+The **API** came first, because `fit`, `predict` and `transform` are the part that transfers to each estimator in the library and to each one written after it. Learning the interface once is most of learning scikit-learn.
 
-**Honest numbers** came second and took four modules, which is more than the estimators got. That ordering reflects where the mistakes actually are. A model is a few lines; knowing whether its score is real is the difficult part, and splitting, cross-validation, overfitting and the search's optimism are all facets of the same question.
+**Honest numbers** came second and took four modules. This Is more than the estimators got. That sorting reflects where the mistakes really are. A model is a few lines. Knowing whether its score is real is the hard part. Splitting, cross-validation, overfitting and the search's optimism are all facets of the same question.
 
-**Preparing data** took six, because that is where leakage lives. Scaling, encoding, imputation and column routing are individually simple, and every one of them learns something from data &mdash; which is why they belong inside a pipeline and why the pipeline is not a convenience.
+**Preparing data** took six, because that is where leakage lives. Scaling, encoding, imputation and column routing are on their own simple. Each one of them learns a thing from data. Which is why they belong inside a pipeline and why the pipeline isn't a convenience.
 
-**The models** came last and took the fewest. That is the honest proportion: choosing between logistic regression, a forest and a booster matters far less than everything before it, and the library makes the choice a one-line change precisely so that it can.
+**The models** came last and took the fewest. That is the honest proportion. Choosing between logistic regression, a forest and a booster matters far less than all before it. The library makes the choice a one-line change just so that it can.
 
-What you can do now is take a table you have never seen, work out what it needs, build a pipeline that cannot cheat, and produce a number you would defend. The remaining skill is domain knowledge about the columns, which no library supplies.
+What you can do now is take a table you've never seen, work out what it needs, build a pipeline that can't cheat. Give a number you'd defend. The left skill is domain knowledge about the columns. This No library supplies.
 
 ## Things to try
 
-1. <strong>Swap the model.</strong> Change `LogisticRegression` to `RandomForestClassifier` in step three and re-run everything after it. Nothing else needs to change.
-2. <strong>Remove the indicator.</strong> Drop `add_indicator=True` and compare the cross-validated average precision.
-3. <strong>Break the order.</strong> Fit the imputer on all of `X` before the split, and watch the test score improve for the wrong reason.
+1. <strong>Swap the model.</strong> Change `LogisticRegression` to `RandomForestClassifier` in step three and re-run all after it. Nothing else needs to change.
+2. <strong>Drop the indicator.</strong> Drop `add_indicator=True` and compare the cross-validated mean precision.
+3. <strong>Break the order.</strong> Fit the imputer on all of `X` before the split. Watch the test score improve for the wrong reason.
 
 ## Where this leaves you
 
-Look at the data, split it away, put everything that learns inside a pipeline, compare against a baseline on a metric you chose deliberately, tune with cross-validation, pick the threshold from the cost, and open the test set once. That is the whole of it, and the order is what makes the last number worth reporting.
+Look at the data, split it away, put all that learns inside a pipeline, compare against a baseline on a metric you chose on purpose, tune with cross-validation, pick the threshold from the cost. Open the test set once. That is the whole of it. The order is what makes the last number worth reporting.

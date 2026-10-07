@@ -5,30 +5,30 @@ intro: Before a single row can be stored, something has to declare what a row lo
 
 <strong>Data Definition Language</strong> is the subset of SQL that creates and changes <em>structure</em> &mdash; tables, columns, types, constraints, indexes. It is distinct from DML, which changes the <em>contents</em>. A useful shorthand: DDL is the blueprint, DML is the furniture.
 
-The four core DDL commands are `CREATE`, `ALTER`, `DROP` and `TRUNCATE`. `CREATE TABLE` defines a new table with its columns, types and constraints. `ALTER TABLE` modifies an existing table &mdash; adding or dropping columns, changing types, adding indexes or constraints. `DROP TABLE` removes the table and all its data permanently. `TRUNCATE TABLE` empties the table but keeps the structure intact.
+The four core DDL commands are `CREATE`, `ALTER`, `DROP` and `TRUNCATE`. `CREATE TABLE` sets a new table with its columns, types and constraints. `ALTER TABLE` changes an existing table &mdash; adding or dropping columns, changing types, adding indexes or constraints. `DROP TABLE` removes the table and all its data permanently. `TRUNCATE TABLE` empties the table but keeps the structure intact.
 
-DDL statements are auto-committed in most databases: they take effect immediately and cannot be rolled back. In MySQL, a `CREATE TABLE` in the middle of a transaction implicitly commits everything before it, which can be surprising if you expected the whole transaction to be atomic. PostgreSQL is the notable exception &mdash; it supports transactional DDL, so you can `CREATE`, `ALTER` and `DROP` inside a `BEGIN`/`COMMIT` block and roll back the entire set of changes if something goes wrong.
+DDL statements are auto-committed in most databases: they take effect at once and cannot be rolled back. In MySQL, a `CREATE TABLE` in the middle of a transaction implicitly commits all before it. It can be surprising if you expected the whole transaction to be atomic. PostgreSQL is the notable exception &mdash; it supports transactional DDL. So you can `CREATE`, `ALTER` and `DROP` inside a `BEGIN`/`COMMIT` block and roll back the whole set of changes if something goes wrong.
 
-Constraints are the most important part of a table definition, because they are the database's guarantee about data quality. `NOT NULL` prevents missing values. `UNIQUE` prevents duplicates. `PRIMARY KEY` combines both and gives the table its identity. `FOREIGN KEY` links two tables and prevents orphaned rows. `CHECK` enforces a condition on the values a column can hold. These constraints are enforced on every insert and update, which means errors are caught at the boundary rather than discovered downstream.
+Constraints are the most key part of a table definition, since they are the database's guarantee about data quality. `NOT NULL` stops missing vals. `UNIQUE` stops duplicates. `PRIMARY KEY` mixes both and gives the table its identity. `FOREIGN KEY` links two tables and stops orphaned rows. `CHECK` enforces a condition on the vals a column can hold. These constraints are enforced on each insert and update. It means errors are caught at the edge rather than discovered downstream.
 
 ## The Four Commands
 
-- <span class="mono-font kw">CREATE</span> &mdash; brings a new object into existence. Fails if it already exists (unless you write <span class="mono-font">IF NOT EXISTS</span>).
+- <span class="mono-font kw">CREATE</span> &mdash; brings a new object into existence. Fails if it now exists (unless you write <span class="mono-font">IF NOT EXISTS</span>).
 - <span class="mono-font kw">ALTER</span> &mdash; changes an existing object: add a column, drop a column, change a type, add a constraint. Existing rows are adjusted to fit.
-- <span class="mono-font kw">TRUNCATE</span> &mdash; removes <em>all</em> rows but keeps the table. Faster than <span class="mono-font">DELETE</span> because it does not log each row individually.
-- <span class="mono-font kw">DROP</span> &mdash; deletes the object entirely: structure, data, indexes, everything.
+- <span class="mono-font kw">TRUNCATE</span> &mdash; removes <em>all</em> rows but keeps the table. Faster than <span class="mono-font">DELETE</span> since it does not log each row individually.
+- <span class="mono-font kw">DROP</span> &mdash; deletes the object fully: structure, data, indexes, all.
 
-## DDL Usually Cannot Be Rolled Back
+## DDL Often Cannot Be Rolled Back
 
-In most engines (MySQL and Oracle in particular) DDL statements perform an <strong>implicit commit</strong>: the moment you run one, any open transaction is committed and the change is permanent. A <span class="mono-font">ROLLBACK</span> afterwards will not save you. PostgreSQL is the notable exception &mdash; it supports transactional DDL.
+In most engines (MySQL and Oracle in particular) DDL statements do an <strong>implicit commit</strong>: the moment you run one, any open transaction is committed and the change is permanent. A <span class="mono-font">ROLLBACK</span> afterwards will not save you. PostgreSQL is the notable exception &mdash; it supports transactional DDL.
 
 This is why <span class="mono-font">DROP TABLE</span> on the wrong connection is one of the most feared mistakes in this profession. Press the DROP button here and note that the row counter goes to zero with no undo offered.
 
 ## Constraints: Rules the Database Enforces
 
-Constraints declared in DDL are checked on every write, forever, no matter which application is connecting:
+Constraints declared in DDL are checked on each write, forever, no matter which application is connecting:
 
-- <span class="mono-font">PRIMARY KEY</span> &mdash; unique and not null; identifies the row.
+- <span class="mono-font">PRIMARY KEY</span> &mdash; unique and not null. Finds the row.
 - <span class="mono-font">NOT NULL</span> &mdash; the column must always have a value.
 - <span class="mono-font">UNIQUE</span> &mdash; no two rows may share this value.
 - <span class="mono-font">FOREIGN KEY</span> &mdash; the value must exist in the referenced table.
@@ -36,9 +36,9 @@ Constraints declared in DDL are checked on every write, forever, no matter which
 
 Putting a rule here rather than in application code means it cannot be bypassed by a script, a migration or a careless intern with a database client.
 
-## The commands that define the shape of your data
+## The commands that set the shape of your data
 
-SQL splits into families. DML moves data around &mdash; `SELECT`, `INSERT`, `UPDATE`, `DELETE`. DDL defines the containers that data lives in, and there are four commands worth knowing properly.
+SQL splits into families. DML moves data around &mdash; `SELECT`, `INSERT`, `UPDATE`, `DELETE`. DDL sets the containers that data lives in. And there are four commands worth knowing well.
 
 <strong>`CREATE`</strong> makes something: a table, an index, a view, a schema.
 
@@ -62,11 +62,11 @@ ALTER TABLE employees DROP COLUMN phone;
 ALTER TABLE employees ADD CONSTRAINT salary_cap CHECK (salary < 1000000);
 ```
 
-<strong>`DROP`</strong> removes the object and everything in it. <strong>`TRUNCATE`</strong> empties a table but keeps its structure.
+<strong>`DROP`</strong> removes the object and all in it. <strong>`TRUNCATE`</strong> empties a table but keeps its structure.
 
-## DROP, DELETE and TRUNCATE are three different things
+## DROP, DELETE and TRUNCATE are three other things
 
-They get confused constantly, and the difference matters at exactly the moment you cannot undo it.
+They get confused constantly, and the gap matters at just the moment you cannot undo it.
 
 |&nbsp;|What it removes|Speed|Rollback|Triggers fire|Resets identity|
 |---|---|---|---|---|---|
@@ -74,28 +74,28 @@ They get confused constantly, and the difference matters at exactly the moment y
 |`TRUNCATE TABLE t`|All rows, at once|Very fast|In PostgreSQL yes; MySQL no|No|Usually yes|
 |`DROP TABLE t`|The table itself|Fast|Depends on engine|No|N/A|
 
-`DELETE` is the only one that can be given a `WHERE` clause. `TRUNCATE` deallocates the storage rather than removing rows individually, which is why it is orders of magnitude faster and why it cannot fire row-level triggers. `DROP` leaves nothing behind &mdash; no structure, no indexes, no permissions.
+`DELETE` is the just one that can be given a `WHERE` clause. `TRUNCATE` deallocates the storage rather than removing rows individually. It is why it is orders of magnitude faster and why it cannot fire row-level triggers. `DROP` leaves nothing behind &mdash; no structure, no indexes, no permissions.
 
-The critical operational point: <strong>in MySQL and Oracle, DDL causes an implicit commit</strong>. Any open transaction is committed before the DDL runs, and the DDL itself cannot be rolled back. In PostgreSQL and SQL Server, DDL is transactional &mdash; you can `BEGIN`, alter a table, decide against it, and `ROLLBACK`.
+The critical operational point: <strong>in MySQL and Oracle, DDL causes an implicit commit</strong>. Any open transaction is committed before the DDL runs. And the DDL it cannot be rolled back. In PostgreSQL and SQL Server, DDL is transactional &mdash; you can `BEGIN`, alter a table, decide against it, and `ROLLBACK`.
 
-That difference changes how you write migrations. On PostgreSQL you can wrap a multi-step schema change in a transaction and get all-or-nothing. On MySQL you cannot, so each step has to be individually safe and reversible by hand.
+That gap changes how you write migrations. On PostgreSQL you can wrap a multi-step schema change in a transaction and get all-or-nothing. On MySQL you cannot. So each step has to be individually safe and reversible by hand.
 
 ## Constraints: the rules the database enforces for you
 
-Constraints are the reason a database is more than a file format. Each one is a rule the engine will not let any client break, including the buggy one you deploy at 5pm on a Friday.
+Constraints are the reason a database is more than a file format. Each one is a rule the engine will not let any client break, with the buggy one you deploy at 5pm on a Friday.
 
-- <strong>`PRIMARY KEY`</strong> &mdash; unique and not null; the row's identity.
-- <strong>`FOREIGN KEY`</strong> &mdash; must match a row in another table, or be NULL. Add `ON DELETE CASCADE` to remove children automatically, or `ON DELETE RESTRICT` to refuse the parent's deletion.
-- <strong>`UNIQUE`</strong> &mdash; no duplicates. Allows multiple NULLs in most engines, since NULLs are not equal to each other.
-- <strong>`NOT NULL`</strong> &mdash; a value is required.
-- <strong>`CHECK`</strong> &mdash; an arbitrary condition, such as `CHECK (end_date > start_date)`. Note it passes when the condition is UNKNOWN, so a NULL slips through unless you also declare `NOT NULL`.
-- <strong>`DEFAULT`</strong> &mdash; not strictly a constraint, but the same spirit: a value supplied when none is given.
+- <strong>`PRIMARY KEY`</strong> &mdash; unique and not null. The row's identity.
+- <strong>`FOREIGN KEY`</strong> &mdash; must match a row in another table. Or be NULL. Add `ON DELETE CASCADE` to remove children automatically. Or `ON DELETE RESTRICT` to refuse the parent's deletion.
+- <strong>`UNIQUE`</strong> &mdash; no duplicates. Lets multiple NULLs in most engines, since NULLs are not equal to each other.
+- <strong>`NOT NULL`</strong> &mdash; a value is needed.
+- <strong>`CHECK`</strong> &mdash; an arbitrary condition, such as `CHECK (end_date > start_date)`. Note it passes when the condition is UNKNOWN. So a NULL slips through unless you also declare `NOT NULL`.
+- <strong>`DEFAULT`</strong> &mdash; not strictly a constraint. But the same spirit: a value supplied when none is given.
 
-Enforcing these in application code instead is the most common and most expensive schema mistake. There is always a second writer &mdash; a migration, a script, an admin console, a colleague's notebook &mdash; and it will not have your validation logic.
+Enforcing these in application code instead is the most common and most costly schema mistake. There is always a second writer &mdash; a migration, a script, an admin console, a colleague's notebook &mdash; and it will not have your validation logic.
 
 ## Declaring the shape, and letting the database enforce it
 
-DDL defines what a table is, and every constraint you declare is a rule the database enforces for every writer forever -- including the ones written after you leave. This creates a table, then tries to break each rule in turn.
+DDL sets what a table is. And each constraint you declare is a rule the database enforces for each writer forever -- with the ones written after you leave. This creates a table, then tries to break each rule in turn.
 
 ```sql-run
 -- A table with every common constraint on it.
@@ -154,47 +154,47 @@ SELECT count(*) AS members_now FROM members;
 
 ## Things to try
 
-1. <strong>Build a table</strong> and mark one column as PRIMARY KEY. Watch the generated <span class="mono-font">CREATE TABLE</span> update as you type.
-2. <strong>Press CREATE, then ALTER &middot; ADD COLUMN.</strong> The new column appears on every existing row, filled with NULL &mdash; because the rows already existed and had no value to offer.
+1. <strong>Build a table</strong> and mark one column as PRIMARY KEY. Watch the made <span class="mono-font">CREATE TABLE</span> update as you type.
+2. <strong>Press CREATE, then ALTER &middot; ADD COLUMN.</strong> The new column appears on each existing row, filled with NULL &mdash; since the rows now existed and had no value to offer.
 3. <strong>Press TRUNCATE.</strong> Rows go to zero; the columns stay. The blueprint survives.
-4. <strong>Press DROP.</strong> Both structure and data vanish, and the log records the difference between the two operations.
+4. <strong>Press DROP.</strong> Both structure and data vanish. And the log records the gap between the two steps.
 
 ## In one line
 
-DDL defines the contract your data must obey. Time spent choosing sensible types and constraints up front is repaid every day afterwards &mdash; and because these statements are usually irreversible, they deserve more care than any query you will write.
+DDL sets the contract your data must obey. Time spent choosing sensible types and constraints up front is repaid each day afterwards &mdash; and since these statements are often irreversible, they deserve more care than any query you will write.
 
 ## Changing a table that is in use
 
-On a small table, `ALTER TABLE` is instant. On a large, busy one it can lock the table and take the application down, so the details matter.
+On a small table, `ALTER TABLE` is instant. On a large, busy one it can lock the table and take the application down. So the details matter.
 
-- <strong>Adding a nullable column</strong> is usually instant &mdash; metadata only.
-- <strong>Adding a column with a default</strong> historically rewrote every row. PostgreSQL 11+ and MySQL 8+ handle constant defaults without a rewrite; older versions do not.
+- <strong>Adding a nullable column</strong> is often instant &mdash; metadata just.
+- <strong>Adding a column with a default</strong> historically rewrote each row. PostgreSQL 11+ and MySQL 8+ handle constant defaults without a rewrite. Older versions do not.
 - <strong>Changing a column type</strong> generally rewrites the table and holds a strong lock.
 - <strong>Adding an index</strong> locks writes unless you use `CREATE INDEX CONCURRENTLY` (PostgreSQL) or an online index build.
-- <strong>Adding a `NOT NULL` constraint</strong> requires scanning the table to verify. Adding it as `NOT VALID` and validating later avoids the long lock in PostgreSQL.
+- <strong>Adding a `NOT NULL` constraint</strong> needs scanning the table to verify. Adding it as `NOT VALID` and validating later avoids the long lock in PostgreSQL.
 
-The safe pattern for a risky change is the expand&ndash;migrate&ndash;contract sequence: add the new column, write to both old and new for a period, backfill in batches, switch readers over, then drop the old column in a later release. It takes three deployments instead of one, and it is how schema changes happen on systems that cannot go down.
+The safe pattern for a risky change is the expand&ndash;migrate&ndash;contract sequence: add the new column, write to both old and new for a period, backfill in batches, switch readers over, then drop the old column in a later release. It takes three deployments instead of one. And it is how schema changes happen on systems that cannot go down.
 
-Always set a short `lock_timeout` before running DDL on a live system. A migration that waits behind a long-running query will queue every other query behind itself, turning a slow migration into an outage.
+Always set a short `lock_timeout` before running DDL on a live system. A migration that waits behind a long-running query will queue each other query behind it, turning a slow migration into an outage.
 
 ## Questions people ask
 
 <strong>Can I roll back a `DROP TABLE`?</strong> In PostgreSQL, yes, if it was inside a transaction that you roll back. In MySQL, no. Either way, backups are the real answer.
 
-<strong>What is the difference between `SERIAL` and `IDENTITY`?</strong> `SERIAL` is PostgreSQL's older shorthand that creates a sequence behind the scenes; `GENERATED ALWAYS AS IDENTITY` is the standard-compliant successor and is preferred in new schemas.
+<strong>What is the gap between `SERIAL` and `IDENTITY`?</strong> `SERIAL` is PostgreSQL's older shorthand that creates a sequence behind the scenes. `Made ALWAYS AS IDENTITY` is the standard-compliant successor and is preferred in new schemas.
 
-<strong>Should I use `VARCHAR(255)`?</strong> Only if 255 is a real limit. The number is an inherited habit from old MySQL row formats; in PostgreSQL there is no performance difference between `VARCHAR(255)` and `TEXT`.
+<strong>Should I use `VARCHAR(255)`?</strong> Just if 255 is a real limit. The count is an inherited habit from old MySQL row formats. In PostgreSQL there is no performance gap between `VARCHAR(255)` and `TEXT`.
 
-<strong>Do constraints slow down writes?</strong> Slightly &mdash; each one is a check. Foreign keys also require an index lookup on the parent. The cost is small and the protection is large.
+<strong>Do constraints slow down writes?</strong> Slightly &mdash; each one is a check. Foreign keys also need an index lookup on the parent. The cost is small and the protection is large.
 
-<strong>Can I add a foreign key to an existing table?</strong> Yes, and the engine validates every existing row first. On big tables use the `NOT VALID` then `VALIDATE CONSTRAINT` two-step where supported.
+<strong>Can I add a foreign key to an existing table?</strong> Yes. And the engine validates each existing row first. On big tables use the `NOT VALID` then `VALIDATE CONSTRAINT` two-step where supported.
 
-<strong>How do I version schema changes?</strong> With migration files in source control, applied in order and recorded in a table &mdash; Flyway, Liquibase, Alembic, or your framework's own tool. Manual DDL on production is how environments drift apart.
+<strong>How do I version schema changes?</strong> With migration files in source control, applied in order and recorded in a table &mdash; Flyway, Liquibase, Alembic. Or your framework's own tool. Manual DDL on production is how environments drift apart.
 
 ## Recap in one screen
 
-- DDL defines structure: `CREATE`, `ALTER`, `DROP`, `TRUNCATE`.
-- `DELETE` removes rows and can be filtered; `TRUNCATE` empties fast; `DROP` removes the object entirely.
-- DDL is transactional in PostgreSQL and SQL Server, and auto-commits in MySQL and Oracle &mdash; this changes how migrations must be written.
-- Constraints are enforced by the engine against every client, which application-level validation can never be.
+- DDL sets structure: `CREATE`, `ALTER`, `DROP`, `TRUNCATE`.
+- `DELETE` removes rows and can be filtered. `TRUNCATE` empties fast; `DROP` removes the object fully.
+- DDL is transactional in PostgreSQL and SQL Server. And auto-commits in MySQL and Oracle &mdash; this changes how migrations must be written.
+- Constraints are enforced by the engine against each client. It application-level validation can never be.
 - On live systems, prefer online index builds, short lock timeouts and the expand&ndash;migrate&ndash;contract pattern.

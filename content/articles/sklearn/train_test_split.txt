@@ -1,13 +1,14 @@
 title: Splitting Train and Test: A Practical Guide
-intro: A model's score on the data it learned from tells you how well it memorised, not how well it works. The split is what turns one into the other.
+intro: A model's score on the data it learned from tells you how well it stored, not how well it works. The split is what turns one into the other.
 
 ## The problem it solves
 
-A model that has seen a row can reproduce its answer. That is not a discovery about the model; it is a property of having been shown the answer.
+A model that has seen a row can copy its answer. That isn't a find about the model. It's a property of having been shown the answer.
 
-So a score computed on the training data measures memorisation, and some models memorise perfectly. An unconstrained decision tree will score 1.0 on its training set in effect every time, because it can keep splitting until every sample sits in its own leaf. Report that number and you are reporting the model's capacity to store data, which is not what anyone wants to know.
+So a score found on the training data measures memorisation. Some models store just right. An unconstrained choice tree will score 1.0 on its training set each time. It can keep splitting until each sample sits in its own leaf. Report that number and you're reporting the model's room to store data. This Isn't what anyone wants to know.
 
-The question worth answering is what happens on data the model has never seen, because that is the only situation it will ever face in use. Holding some rows back and never letting the model touch them is the simplest honest way to find out. The standard split is 70&ndash;80% training and 20&ndash;30% test, controlled by `test_size` in scikit-learn's `train_test_split`. The function shuffles the data (unless you pass `shuffle=False`) and returns four objects in a fixed order: `X_train, X_test, y_train, y_test`. Getting that order wrong &mdash; fitting on `X_test` or evaluating on `X_train` &mdash; is the most common bug, and it produces numbers that look reasonable but mean nothing. `random_state` makes the shuffle reproducible: the same integer gives the same split every time, so your results are not a moving target. For classification with imbalanced classes, `stratify=y` ensures both splits have the same class proportions as the full dataset. Without it, a rare class can end up entirely in one split. A single train/test split gives one estimate of performance; [cross-validation](hyperparameter_search.html) gives several by rotating the test fold, which is more reliable but more expensive. This page shows the split in action, prints the shapes and class distributions, and covers the `stratify` and `random_state` parameters.
+The question worth answering is what happens on data the model has never seen. That is the only situation it will ever face in use. Holding some rows back and never letting the model touch them is the simplest honest way to find out.
+
 
 ## The split, and the order of the four returns
 
@@ -137,97 +138,97 @@ print("is predicting the past from the future.")
 ```
 ## What the call does
 
-`train_test_split` shuffles the rows and cuts them into two groups, returning four objects: the features and target for training, then the features and target for testing.
+`train_test_split` shuffles the rows and cuts them into two groups, returning four objects. The features and target for training, then the features and target for testing.
 
-The return order is `X_train, X_test, y_train, y_test` &mdash; both X pieces before either y piece &mdash; and getting it wrong is the single most common early mistake with this function. The failure is not always loud: swapping `X_test` and `y_train` produces a shape error, which is fine, but swapping `y_train` and `y_test` produces a program that runs and reports a meaningless number.
+The return order is `X_train, X_test, y_train, y_test`. Both X pieces before either y piece. And getting it wrong is the single most common early mistake with this function. The failure isn't always loud. Swapping `X_test` and `y_train` makes a shape error. This Is fine. Swapping `y_train` and `y_test` makes a program that runs and reports a meaningless number.
 
-Any number of arrays can be passed and they are all split the same way, on the same rows, which is what keeps `X` and `y` aligned. That property is the whole reason to use the function rather than slicing by hand.
+Any number of arrays can be passed and they're all split the same way, on the same rows. This Is what keeps `X` and `y` aligned. That property is the whole reason to use the function rather than slicing by hand.
 
 ## random_state, and what reproducibility buys
 
-The split is random, so without a seed each run produces a different one, and therefore a different score.
+The split is random, so without a seed each run makes a different one, and so a different score.
 
-That matters more than it sounds. If you change a hyperparameter and the score moves from 0.94 to 0.96, you need to know whether the change did that or whether the split did. With a fixed seed, the split is held constant and the difference is attributable. Without one, you are comparing two things that differ in two ways.
+That matters more than it sounds. If you change a setting and the score moves from 0.94 to 0.96, you need to know whether the change did that or whether the split did. With a fixed seed, the split is held constant and the difference is attributable. Without one, you're checking two things that differ in two ways.
 
-It also makes a bug reproducible. A model that fails on one split and not another is telling you something real, and you cannot investigate it if you cannot get back to the split that failed.
+It also makes a bug reproducible. A model that fails on one split and not another is telling you a thing real. You can't investigate it if you can't get back to the split that failed.
 
-Passing an integer is enough. The specific value carries no meaning &mdash; `random_state=0` and `random_state=42` are equally arbitrary &mdash; and the only thing that matters is that it stays the same across the runs you intend to compare.
+Passing an int is enough. The exact value carries no meaning. `random_state=0` and `random_state=42` are equally any. And the only thing that matters is that it stays the same across the runs you intend to compare.
 
-There is one honest use for leaving it out: measuring how much the score varies between splits, which is a real question and one that a single fixed split cannot answer. The proper tool for that is cross-validation, which repeats the exercise systematically rather than relying on you to run it a few times.
+There's one honest use for leaving it out. Measuring how much the score varies between splits. This Is a real question and one that a single fixed split can't answer. The proper tool for that is cross-validation. This Repeats the exercise systematically rather than leaning on you to run it a few times.
 
 ## stratify, and the split that misrepresents the data
 
-A random split does not guarantee the two halves look alike. On a dataset with three equal classes, a plain split can easily hand you a test set with 17 of one and 14 of another, and on a dataset where one class is rare, it can hand you a test set containing none of it at all.
+A random split doesn't ensure the two halves look alike. On a dataset with three equal classes, a plain split can easily hand you a test set with 17 of one and 14 of another. On a dataset where one class is rare, it can hand you a test set holding none of it at all.
 
-`stratify=y` fixes this by sampling within each class, so both halves carry the same proportions as the original. The cost is nothing, and for classification it should be the default rather than an option you remember on difficult datasets.
+`stratify=y` fixes this by sampling within each class. Both halves carry the same proportions as the first. The cost is nothing. For classification it should be the default rather than an option you note on hard datasets.
 
-Where it becomes important is imbalance. With 1% positives and a 20% test set, an unstratified split has a real chance of putting so few positives in the test set that the metric computed from them is noise. Stratifying guarantees the proportion, which is the minimum needed for the number to mean anything.
+Where it turns essential is imbalance. With 1% positives and a 20% test set, an unstratified split has a real chance of putting so few positives in the test set that the metric found from them is noise. Stratifying ensures the proportion. This Is the min needed for the number to mean any of it.
 
-You can stratify on something other than the target by passing a different array &mdash; a group label, say &mdash; which is occasionally what you want when the target is continuous but some categorical variable must stay balanced.
+You can stratify on a thing other than the target by passing a different array. A group label, say. Which is at times what you want when the target is smooth but some cat variable must stay weighed.
 
 ## The split has to come first
 
-The order of operations matters, and getting it wrong is the most common way to produce an inflated score.
+The order of ops matters, and getting it wrong is the most common way to give an inflated score.
 
-Everything learned from data must be learned from the training set alone. That includes the obvious &mdash; the model &mdash; and the less obvious: the mean and standard deviation used for scaling, the categories known to an encoder, the median used to fill missing values, the vocabulary of a text vectoriser, and the feature-selection decision about which columns to keep.
+All learned from data must be learned from the training set alone. That includes the obvious. The model. And the less obvious. The mean and standard deviation used for scaling, the categories known to an encoder, the median used to fill missing values, the vocab of a text vectoriser. The feature-pick choice about which columns to keep.
 
-Scale the whole dataset and then split, and the scaler has seen the test set. The test score afterwards is not a score on unseen data, because information from those rows reached the model through the scaler's parameters. The effect is usually small and occasionally enormous, and it is always in the direction of making the model look better than it is.
+Scale the whole dataset and then split. The scaler has seen the test set. The test score afterwards isn't a score on unseen data. Info from those rows reached the model through the scaler's params. The effect is often small and at times huge, and it's always in the direction of making the model look better than it's.
 
-The rule that follows is short: **split first, and fit every transformer on the training half only**. Pipelines exist largely to make that structurally impossible to get wrong, which is why they arrive later in this track and why they are not optional in real work.
+The rule that follows is short: **split first. Fit each transformer on the training half only**. Pipelines exist largely to make that structurally hopeless to get wrong. This Is why they arrive later in this track and why they aren't optional in real work.
 
 ## How big should the test set be
 
-The convention is 20% or 25%, and the convention is a compromise between two things pulling in opposite directions.
+The rule is 20% or 25%. The rule is a compromise between two things pulling in opposite directions.
 
-A larger test set gives a more reliable estimate, because the score is computed from more samples and is less at the mercy of which particular rows landed there. A smaller test set leaves more data for training, which usually produces a better model.
+A larger test set gives a more solid guess. The score is found from more samples and is less at the mercy of which given rows landed there. A smaller test set leaves more data for training. This Often makes a better model.
 
-With a lot of data, the tension disappears: 1% of a million rows is ten thousand test samples, which is plenty. With a few hundred rows, both halves are uncomfortable &mdash; the estimate is noisy and the model is starved &mdash; and that is precisely the situation where a single split should be replaced by cross-validation, which uses every row for both purposes without ever training and testing on the same one.
+With a lot of data, the tension disappears: 1% of a million rows is ten thousand test samples. This Is plenty. With a few hundred rows, both halves are uncomfortable. The estimate is noisy and the model is starved. And that is just the situation where a single split should be replaced by cross-validation. This Uses each row for both purposes without ever training and testing on the same one.
 
-The other consideration is the rarest class. A test set that contains four examples of something can only report accuracy on it in steps of 25%, and no amount of careful metric choice recovers from that.
+The other consideration is the rarest class. A test set that holds four examples of a thing can only report fit on it in steps of 25%. No amount of careful metric choice recovers from that.
 
 ## Time changes the rules
 
-When rows are ordered in time, shuffling is wrong.
+When rows are sorted in time, shuffling is wrong.
 
-Shuffling puts rows from after the test period into the training set, so the model learns from the future and is then asked to predict the past. It will do well, and the score will be worthless, because the situation it was scored in cannot occur in use &mdash; in production, the future is exactly what you do not have.
+Shuffling puts rows from after the test period into the training set. The model learns from the future and is then asked to predict the past. It will do well. The score will be worthless. The situation it was scored in can't occur in use. In production, the future is just what you don't have.
 
-`shuffle=False` keeps the order and takes the last portion as the test set, which is the right shape: train on the past, test on the more recent. Note that `stratify` cannot be used with `shuffle=False`, and the two are conceptually incompatible anyway.
+`shuffle=False` keeps the order and takes the last portion as the test set. This Is the right shape. Train on the past, test on the more recent. Note that `stratify` can't be used with `shuffle=False`. The two are conceptually incompatible anyway.
 
-For anything more careful, `TimeSeriesSplit` provides the cross-validation equivalent: a series of splits, each training on everything up to a point and testing on what comes next. The same reasoning applies to any structure with groups that must not be broken across the split &mdash; several rows per patient, per user, per document &mdash; where `GroupShuffleSplit` keeps a group entirely on one side.
+For any of it more careful, `TimeSeriesSplit` gives the cross-validation equal. A series of splits, each training on all up to a point and testing on what comes next. The same thinking applies to any structure with groups that must not be broken across the split. A few rows per patient, per user, per doc. Where `GroupShuffleSplit` keeps a group fully on one side.
 
 ## What the test set is for, and what it is not
 
-A held-out set answers one question: how does this model behave on data it has not seen. It stops answering that question the moment you use it to make a decision.
+A held-out set answers one question: how does this model behave on data it hasn't seen. It stops answering that question the moment you use it to make a choice.
 
-This is the part that gets lost. If you fit five models, look at the test score for each, and pick the best, you have used the test set to choose a model &mdash; and the winner's score is now optimistic, because it was selected for doing well on those particular rows. Do it a dozen times, tweaking as you go, and the test set has been fitted to as surely as if you had trained on it, just more slowly and by hand.
+This is the part that gets lost. If you fit five models, look at the test score for each. Pick the best, you've used the test set to choose a model. And the winner's score is now optimistic. It was selected for doing well on those given rows. Do it a dozen times, tweaking as you go. The test set has been fitted to as surely as if you had trained on it, just more slowly and by hand.
 
-The standard remedy is three sets rather than two. **Train** to fit the model, **validation** to compare models and tune hyperparameters, and **test** touched exactly once at the very end to report a number. In practice the validation half is usually replaced by cross-validation on the training data, which uses the data better, and the test set is still set aside and left alone.
+The standard remedy is three sets rather than two. **Train** to fit the model, **validation** to compare models and tune settings. **test** touched just once at the very end to report a number. the validation half is often replaced by cross-validation on the training data. This Uses the data better. The test set is still set aside and left alone.
 
-The discipline is easier to state than to keep: every look at the test set costs a little of its honesty. Nested cross-validation exists for the situation where you cannot afford even that, and is the correct answer when the difference between two models is small enough to matter.
+The discipline is easier to state than to keep. Each look at the test set costs a little of its honesty. Nested cross-validation exists for the situation where you can't afford even that. Is the correct answer when the difference between two models is small enough to matter.
 
 ## Splits that respect structure
 
-A plain random split assumes rows are independent, and often they are not.
+A plain random split assumes rows are free, and often they aren't.
 
-**Several rows per entity.** Ten readings from the same patient, several photographs of the same object, multiple purchases by one customer. A random split puts some of an entity's rows in training and others in test, so the model can recognise the entity rather than learn the pattern, and the score is inflated by an amount nothing in the output reveals. `GroupShuffleSplit` and `GroupKFold` take a `groups` array and keep each group whole.
+**a few rows per entity.** Ten readings from the same patient, a few photos of the same object, multiple purchases by one customer. A random split puts some of an entity's rows in training and others in test. The model can recognise the entity rather than learn the pattern. The score is inflated by an amount nothing in the output reveals. `GroupShuffleSplit` and `GroupKFold` take a `groups` array and keep each group whole.
 
-**Time.** Covered above, and worth repeating because it is so easy to get wrong: `shuffle=False`, or `TimeSeriesSplit`.
+**Time.** Covered above, and worth repeating because it's so easy to get wrong: `shuffle=False`, or `TimeSeriesSplit`.
 
-**Nested or hierarchical data.** Pupils within schools, measurements within sites. The same reasoning as groups &mdash; if the model can identify the container, it will.
+**Nested or hierarchical data.** Pupils within schools, readings within sites. The same thinking as groups. If the model can spot the container, it will.
 
-The question to ask before splitting is simply: could two rows on opposite sides of the split share something that would let the model cheat? If the answer is yes, a plain random split will overstate the score, and the amount is unpredictable.
+The question to ask before splitting is simply. Could two rows on opposite sides of the split share a thing that would let the model cheat? If the answer is yes, a plain random split will overstate the score, and the amount is unpredictable.
 
-<strong>Is 80/20 a rule?</strong> It is a convention that suits a few thousand rows. With a million, 1% is a fine test set; with two hundred, a single split is the wrong tool and cross-validation is the right one.
+<strong>Is 80/20 a rule?</strong> It's a rule that suits a few thousand rows. With a million, 1% is a fine test set. With two hundred, a single split is the wrong tool and cross-validation is the right one.
 
-<strong>Should the test set be split off before cleaning?</strong> Before anything that <em>learns</em> from the data, yes. Dropping obviously corrupt rows is fine either way; imputing a median is not.
+<strong>Should the test set be split off before cleaning?</strong> Before any of it that <em>learns</em> from the data, yes. Dropping obviously corrupt rows is fine either way. Imputing a median isn't.
 
 ## Things to try
 
-1. <strong>Run the fourth editor.</strong> The training score is 1.0 and the test score is not. That gap is the entire reason this page exists.
-2. <strong>Remove random_state.</strong> Run the same editor three times and watch the test score move. Then put it back.
-3. <strong>Make a class rare.</strong> Keep only ten samples of class 2, split without `stratify`, and count the classes in the test set a few times with different seeds.
-4. <strong>Break the order.</strong> In the last editor, compare the shuffled and unshuffled test rows. The shuffled set contains rows from the beginning of the series.
+1. <strong>Run the fourth editor.</strong> The training score is 1.0 and the test score isn't. That gap is the entire reason this page exists.
+2. <strong>Drop random_state.</strong> Run the same editor three times and watch the test score move. Then put it back.
+3. <strong>Make a class rare.</strong> Keep only ten samples of class 2, split without `stratify`. Count the classes in the test set a few times with different seeds.
+4. <strong>Break the order.</strong> In the last editor, compare the shuffled and unshuffled test rows. The shuffled set holds rows from the beginning of the series.
 
 ## Where this leaves you
 
-One line, four objects, and three arguments worth setting deliberately every time: `random_state` so the experiment is repeatable, `stratify` so the halves resemble each other, and `shuffle=False` when the rows are ordered in time. What it gives you is a number you are entitled to report.
+One line, four objects, and three args worth setting on purpose each time: `random_state` so the test is repeatable, `stratify` so the halves resemble each other, and `shuffle=False` when the rows are sorted in time. What it gives you is a number you're entitled to report.

@@ -1,130 +1,130 @@
 title: Deep Learning for Recommendation Systems
-intro: The network is the small part. Everything that makes a production recommender difficult follows from where the parameters actually live.
+intro: The network is the small part. All that makes a production recommender hard follows from where the params really live.
 
 ## An id is not a feature
 
-The first problem is one that does not exist in vision or language. A user id
-is an arbitrary integer. So is an item id. Neither has any numeric meaning
-&mdash; user 4,192 is not "between" users 4,191 and 4,193 &mdash; so they
-cannot be fed to a network directly.
+The first problem is one that doesn't exist in vision or language. A user id
+is an any int. So is an item id. Neither has any numeric meaning
+&mdash; user 4,192 isn't "between" users 4,191 and 4,193 &mdash; so they
+can't be fed to a network right.
 
-An **embedding table** is the answer: a matrix with one learned row per id. The
-model looks up the row and works with that. This is the same operation as a
-word embedding, and it is doing the same job &mdash; turning a symbol into a
-vector whose geometry means something.
+An **embedding table** is the answer: a mat with one learned row per id. The
+model looks up the row and works with that. This is the same op as a
+word embedding, and it's doing the same job. Turning a symbol into a
+vector whose geometry means a thing.
 
-The consequence shapes the whole page. The table has one row per user and one per
-item, so **its size is set by the catalogue, not by the model design**, and in production the embedding tables dwarf the network itself.
+The consequence is the whole page. The table has one row per user and one per
+item, so **its size is set by the catalogue, not by the model design**.
 
 ## The two towers
 
 Look at the diagram in the explorer. A user tower turns a user id into a
-vector, an item tower turns an item id into a vector, and an interaction
-combines them into a score.
+vector, an item tower turns an item id into a vector, and an interplay
+mixes them into a score.
 
-The tower structure is not stylistic. Keeping the two sides separate until the
+The tower structure isn't stylistic. Keeping the two sides separate until the
 final step means the item tower can be run **once per item, offline**, and its
 outputs stored in a vector index. At request time only the user tower runs, and
-finding the best items becomes an approximate nearest-neighbour query rather
+finding the best items turns an rough nearest-neighbour query rather
 than five million forward passes.
 
 If the two ids were concatenated at the input and fed to a single network, that
-would be impossible: every (user, item) pair would need its own forward pass.
-The two-tower shape is what makes retrieval tractable, and it is why it is the
-standard for the candidate-generation stage of every large system.
+would be hopeless: each (user, item) pair would need its own forward pass.
+The two-tower shape is what makes lookup tractable, and it's why it's the
+standard for the pick-generation stage of each large system.
 
 ## Three ways to interact
 
 Switch the model control and watch the diagram and the numbers change.
 
-**Matrix factorisation** takes the dot product. One number, no parameters in
-the interaction at all. It says the score is high when the two vectors point
+**mat factorisation** takes the dot product. One number, no params in
+the interplay at all. It says the score is high when the two vectors point
 the same way.
 
 **MLP** concatenates the two vectors and passes them through dense layers. In
-principle this can learn any interaction; a dot product is a very specific one.
+principle this can learn any interplay. A dot product is a very exact one.
 
 **NeuMF** does both and fuses them, with *separate* embedding tables for each
-path &mdash; note the parameter count doubling when you select it. The paper's
-argument is that the optimal embedding for a dot product and for an MLP are not
+path &mdash; note the param count doubling when you select it. The paper's
+arg is that the best embedding for a dot product and for an MLP aren't
 the same, so forcing them to share is a constraint neither wants.
 
-Then look at the comparison bars. On this data the dot product wins: matrix
+Then look at the check bars. On this data the dot product wins: mat
 factorisation reaches about 0.76 RMSE where the MLP settles near 0.83 &mdash;
 and pushing the MLP's epoch count past 300 makes it *worse*, which is the
-overfitting you would expect from 444 parameters and 138 ratings.
+overfitting you'd expect from 444 params and 138 ratings.
 
-That is not a quirk of a small page. In 2019 Dacrema, Cremonesi and Jannach
-reproduced the published neural recommendation results and found that a
-properly tuned matrix factorisation matched or beat most of them on the
-standard benchmarks &mdash; the neural models had been compared against weak
-baselines. It is worth knowing about, because "we replaced the dot product with
-an MLP" is not on its own a reason to expect an improvement.
+That isn't a quirk of a small page. In 2019 Dacrema, Cremonesi and Jannach
+copied the published neural recommendation results and found that a
+properly tuned mat factorisation matched or beat most of them on the
+standard benchmarks &mdash; the neural models had been checked against weak
+baselines. It's worth knowing about, because "we replaced the dot product with
+an MLP" isn't on its own a reason to expect an improvement.
 
 ## So what does deep learning actually buy?
 
-Not a better interaction function. Something more basic: **the ability to
-accept anything other than an id.**
+Not a better interplay function. a thing more basic: **the ability to
+accept any of it other than an id.**
 
 A dot product between two id embeddings can only ever use who rated what. A
 network can take, alongside the embeddings:
 
-- item **text and images**, so a title with no ratings still has a vector
+- item **text and images**. So A title with no ratings still has a vector
   &mdash; which is the item cold-start problem solved;
 - **context** &mdash; time of day, device, what the session has already
-  contained;
+  held;
 - **sequence** &mdash; a transformer over the user's recent history, so the
-  model represents "what they are doing now" rather than "what they like in
+  model shows "what they're doing now" rather than "what they like in
   general", which is what SASRec and BERT4Rec are for;
-- **multiple objectives** at once, since clicks, watch time and purchases are
+- **multiple goals** at once, since clicks, watch time and purchases are
   different heads on shared towers.
 
-Every one of those is a genuine capability that factorisation does not have.
-None of them is "the MLP learns a better interaction".
+each one of those is a genuine capability that factorisation doesn't have.
+None of them is "the MLP learns a better interplay".
 
 ## The parameter budget
 
 Set the catalogue-size control to a large service and read the table. This is
-the fact that shapes every production system.
+that shapes each production system.
 
 At 50 million users and 5 million items with 64-dimensional embeddings, the
-tables hold about 3.5 billion parameters. The network on top &mdash; a couple
-of dense layers &mdash; holds a few thousand. The ratio is on screen and it is
+tables hold about 3.5 billion params. The network on top &mdash; a couple
+of dense layers &mdash; holds a few thousand. The ratio is on screen and it's
 not close.
 
-Everything follows from that:
+All follows from that:
 
-- **Sharding.** The tables do not fit on one machine, so they are split across
-  parameter servers while the network is replicated. This is the reason
+- **Sharding.** The tables don't fit on one machine, so they're split across
+  param servers while the network is replicated. This is the reason
   large-scale recommender training infrastructure looks nothing like
   large-scale vision training infrastructure.
 - **Hashing.** Ids are hashed into a fixed number of buckets to cap the table
   size, accepting collisions as the price. Two rare items sharing a row is
-  usually cheaper than a table that grows forever.
-- **Sparse gradients.** One training example touches two rows. A dense
-  optimiser update over three billion parameters per step would be absurd, so
-  the embedding gradients are sparse and only the touched rows move.
-- **Retrieval and ranking as separate stages.** A cheap two-tower model
-  retrieves a few hundred candidates from millions by nearest neighbour; an
-  expensive model with full cross-features ranks those few hundred. Nothing
+  often cheaper than a table that grows forever.
+- **Sparse grads.** One training example touches two rows. A dense
+  tuner update over three billion params per step would be absurd, so
+  the embedding grads are sparse and only the touched rows move.
+- **lookup and ranking as separate stages.** A cheap two-tower model
+  pulls a few hundred picks from millions by nearest neighbour. An
+  costly model with full cross-features ranks those few hundred. Nothing
   large ever scores the whole catalogue.
 
 ## Implicit feedback, which is what you will actually have
 
-This page and the previous one use explicit ratings, because they are easy to
+This page and the previous one use clear ratings, because they're easy to
 reason about. Almost no real system has them. What it has is clicks, plays,
-purchases and dwell time &mdash; **implicit feedback**, which is positive-only.
+purchases and dwell time &mdash; **silent feedback**, which is plus-only.
 
-That changes the problem. There are no negatives, only absences, and an absence
+That changes the problem. There are no negatives, only absences, and an lack
 is ambiguous: the user disliked it, or never saw it. Training needs sampled
 negatives, and the sampling strategy matters more than the architecture
 &mdash; uniform sampling makes the task too easy, popularity-based sampling
-makes it harder and usually better, and in-batch negatives are what large
-two-tower systems actually use because they are free.
+makes it harder and often better, and in-batch negatives are what large
+two-tower systems really use because they're free.
 
-The loss changes too. Squared error on a rating becomes a ranking loss: BPR
-maximises the margin between a positive and a sampled negative, and sampled
-softmax treats retrieval as classification over the catalogue.
+The loss changes too. Squared error on a rating turns a ranking loss: BPR
+raises the margin between a plus and a sampled minus, and sampled
+softmax treats lookup as classification over the catalogue.
 
 ```python
 import torch
@@ -159,47 +159,47 @@ def in_batch_softmax(model, users, items, temperature=0.05):
     return nn.functional.cross_entropy(logits, target)
 ```
 
-The `normalize` calls are what make the final score a cosine similarity, which
-is what nearest-neighbour indexes are built for &mdash; skip them and your
-retrieval index no longer matches your training objective. The `temperature`
-is a real hyperparameter: too high and every item looks equally good, too low
+The `norm` calls are what make the final score a cosine likeness, which
+is what nearest-neighbour indexes are built for. Skip them and your
+lookup index no longer matches your training goal. The `temperature`
+is a real setting: too high and each item looks equally good, too low
 and training destabilises.
 
-`in_batch_softmax` is the trick worth remembering. The diagonal of the
-similarity matrix is the true pairs and everything off it is a negative, so a
+`in_batch_softmax` is the trick worth remembering. The main-line of the
+likeness mat is the true pairs and all off it's a minus, so a
 batch of 1,024 gives 1,023 negatives per example at no extra cost. Its one
-weakness is that popular items appear in more batches and so are sampled as
+weakness is that common items appear in more batches and so are sampled as
 negatives more often, which suppresses them &mdash; production systems correct
 for that with a logQ term.
 
 ## The order to learn this in
 
-Start with matrix factorisation and get the biases and regularisation right,
-because it is a strong baseline that a lot of published neural work failed to
-beat. Move to a two-tower model when you have side information for it to use,
-or when you need to retrieve from millions of items by nearest neighbour. Reach
+Start with mat factorisation and get the biases and smoothing right,
+because it's a strong baseline that a lot of published neural work failed to
+beat. Move to a two-tower model when you've side info for it to use,
+or when you need to pull from millions of items by nearest neighbour. Reach
 for sequence models when the recent session matters more than the long-run
-profile. And measure ranking metrics on held-out interactions throughout,
-because RMSE on a rating is not what a recommender is for.
+profile. And measure ranking metrics on held-out interplays throughout,
+because RMSE on a rating isn't what a recommender is for.
 ## Questions people ask
 
-<strong>Does replacing the dot product with an MLP help?</strong> On its own, usually not. In 2019 Dacrema, Cremonesi and Jannach reproduced the published neural recommendation results and found a properly tuned matrix factorisation matched or beat most of them &mdash; the neural models had been measured against weak baselines. On this page's data factorisation reaches about 0.76 RMSE where the MLP settles near 0.83.
+<strong>Does replacing the dot product with an MLP help?</strong> On its own, often not. In 2019 Dacrema, Cremonesi and Jannach copied the published neural recommendation results and found a properly tuned mat factorisation matched or beat most of them. The neural models had been measured against weak baselines. On this page's data factorisation reaches about 0.76 RMSE where the MLP settles near 0.83.
 
-<strong>Then what does deep learning actually buy?</strong> The ability to accept anything other than an id: item text and images, which solves item cold start; context such as time and device; the recent session through a sequence model; and several objectives at once as separate heads on shared towers. Every one is a capability factorisation lacks, and none of them is "the MLP learns a better interaction".
+<strong>Then what does deep learning really buy?</strong> The ability to accept any of it other than an id. Item text and images. This Solves item cold start. Context such as time and device. The recent session through a sequence model. And a few goals at once as separate heads on shared towers. each one is a capability factorisation lacks. None of them is "the MLP learns a better interplay".
 
-<strong>Why keep the two towers separate?</strong> So the item tower can be run once per item, offline, with its outputs stored in a vector index &mdash; leaving only the user tower to run per request, and turning "find the best items" into a nearest-neighbour query. Concatenate the two ids at the input instead and every (user, item) pair needs its own forward pass, which makes retrieval from millions impossible.
+<strong>Why keep the two towers separate?</strong> So the item tower can be run once per item, offline, with its outputs stored in a vector index. Leaving only the user tower to run per request. Turning "find the best items" into a nearest-neighbour query. Concatenate the two ids at the input instead and each (user, item) pair needs its own forward pass. This Makes lookup from millions hopeless.
 
-<strong>Why normalise the tower outputs?</strong> Because it makes the final score a cosine similarity, which is what nearest-neighbour indexes are built for. Skip the normalisation and the index no longer matches the training objective &mdash; the model is trained under one geometry and served under another, and the retrieval quality quietly drops.
+<strong>Why norm the tower outputs?</strong> Because it makes the final score a cosine likeness. This Is what nearest-neighbour indexes are built for. Skip the norming and the index no longer matches the training goal. The model is trained under one geometry and served under another. The lookup quality quietly drops.
 
-<strong>Where do negatives come from with implicit feedback?</strong> You sample them, and the strategy matters more than the architecture. Uniform sampling makes the task too easy, popularity-based sampling is harder and usually better, and in-batch negatives are what large two-tower systems use because a batch of 1,024 supplies 1,023 negatives at no cost. In-batch sampling does over-penalise popular items, which production systems correct with a logQ term.
+<strong>Where do negatives come from with silent feedback?</strong> You sample them. The strategy matters more than the architecture. Uniform sampling makes the task too easy, popularity-based sampling is harder and often better. In-batch negatives are what large two-tower systems use because a batch of 1,024 supplies 1,023 negatives at no cost. In-batch sampling does over-punish common items. This Production systems correct with a logQ term.
 
-<strong>Why does recommender training infrastructure look nothing like vision's?</strong> Because the parameters are in the embedding tables rather than the network. At 50 million users and 5 million items with 64 dimensions the tables hold about 3.5 billion parameters against a few thousand in the dense layers, and sharded parameter servers, id hashing, sparse gradients and the retrieval/ranking split all follow from that one ratio.
+<strong>Why does recommender training infrastructure look nothing like vision's?</strong> Because the params are in the embedding tables rather than the network. At 50 million users and 5 million items with 64 dims the tables hold about 3.5 billion params against a few thousand in the dense layers. Sharded param servers, id hashing, sparse grads and the lookup/ranking split all follow from that one ratio.
 
 ## Recap in one screen
 
-- An id has no numeric meaning, so it goes through an embedding table &mdash; and that table's size is set by the catalogue, not by any modelling decision.
-- Two towers joined only at the last step is what makes retrieval a nearest-neighbour query instead of millions of forward passes.
-- The interaction function is the least important choice on the page. A tuned dot product is a strong baseline that a good deal of published neural work failed to beat.
-- What deep learning genuinely adds is side information, context, sequence and multiple objectives.
-- Almost no real system has ratings. Implicit feedback is positive-only, so negatives are sampled and squared error gives way to a ranking loss.
-- The parameters live in the tables, which is the single fact behind sharding, hashing, sparse gradients and staged retrieval.
+- An id has no numeric meaning. It goes through an embedding table. And that table's size is set by the catalogue, not by any modelling choice.
+- Two towers joined only at the last step is what makes lookup a nearest-neighbour query instead of millions of forward passes.
+- The interplay function is the least key choice on the page. A tuned dot product is a strong baseline that a good deal of published neural work failed to beat.
+- What deep learning truly adds is side info, context, sequence and multiple goals.
+- Almost no real system has ratings. silent feedback is plus-only. Negatives are sampled and squared error gives way to a ranking loss.
+- The params live in the tables. This Is the single fact behind sharding, hashing, sparse grads and staged lookup.

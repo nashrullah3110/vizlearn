@@ -1,94 +1,94 @@
 title: Grad-CAM
-intro: A heatmap of which regions a network used, built from gradients it already computes.
+intro: A heatmap of which regions a network used, built from grads it already finds.
 
 ## The question
 
 A network says "cat". Which part of the image made it say that?
 
 Grad-CAM answers with a heatmap, and it does so using quantities the network
-produces anyway during backpropagation, which is why it works on any
-convolutional architecture without retraining or modification. The recipe has three steps. Take the feature maps from the last convolutional layer and compute the gradient of the target class score with respect to each map. Global-average-pool those gradients into per-channel weights, then sum the weighted maps through a ReLU. The result is a coarse heatmap at the resolution of the feature maps (typically 7&#215;7 or 14&#215;14), upsampled onto the image to show which spatial regions drove the classification. Grad-CAM is class-specific &mdash; asking about "cat" and "dog" on the same image produces different heatmaps &mdash; and it can be applied to any differentiable output, including intermediate layers. This page shows the heatmap live on an image classifier, lets you switch classes and layers, and covers Grad-CAM++ and Score-CAM as refinements that reduce gradient noise.
+makes anyway during backpropagation. This Is why it works on any
+convolutional architecture without retraining or modification.
 
 ## The recipe
 
-Take the feature maps from the last convolutional layer &mdash; typically 512 or
+Take the feature maps from the last convolutional layer &mdash; often 512 or
 2048 of them, each perhaps 7&#215;7. Then:
 
-1. Compute the gradient of the class score with respect to each feature map.
-2. Average each gradient over its spatial positions. That number is the map's
+1. Find the grad of the class score for each feature map.
+2. Mean each grad over its spatial spots. That number is the map's
    **weight**.
 3. Sum the feature maps, weighted by those numbers.
 4. Apply a ReLU.
 5. Upsample the result to the image size.
 
 Steps 3 and 4 are what the visualisation shows. Three synthetic feature maps sit
-on the left, each with its own weight slider, and the combined heatmap is on the
-right. The maps are made up; the weighting arithmetic is exactly Grad-CAM's.
+on the left, each with its own weight slider. The mixed heatmap is on the
+right. The maps are made up. The weighting math is just Grad-CAM's.
 
 ## What a weight means
 
-The gradient of the score with respect to a feature map answers: if this map's
+The grad of the score for a feature map answers: if this map's
 activations rose slightly, how much would the class score rise?
 
-A **large positive weight** means the class depends heavily on that map, so
-wherever it is active is evidence for the class.
+A **large plus weight** means the class depends heavily on that map, so
+wherever it's active is evidence for the class.
 
-A **negative weight** means the opposite &mdash; that feature argues *against*
-this class. Set one of the sliders negative and watch what happens to the
-heatmap: the region belonging to that map does not go dark, it simply stops
-contributing, because of the ReLU.
+A **minus weight** means the opposite &mdash; that feature argues *against*
+this class. Set one of the sliders minus and watch what happens to the
+heatmap: the region belonging to that map doesn't go dark, it simply stops
+adding, because of the ReLU.
 
 ## Why the ReLU is there
 
 This is the step people skip and then misread the output.
 
-Without the ReLU the heatmap would contain negative regions, meaning "this area
-argued against the class". Grad-CAM discards them deliberately, because the
-question being asked is *what supported this prediction* &mdash; and a
+Without the ReLU the heatmap would hold minus regions, meaning "this area
+argued against the class". Grad-CAM discards them on purpose, because the
+question being asked is *what supported this guess* &mdash; and a
 visualisation mixing support and opposition in one colour scale is very easy to
 misread.
 
 The consequence is that **Grad-CAM never shows you evidence against a class**.
-Drag all three sliders negative: the heatmap is empty, not inverted. If you want
-to know what argued against a prediction, this is the wrong tool, and running it
-on the competing class is usually the practical answer.
+Drag all three sliders minus: the heatmap is empty, not inverted. If you want
+to know what argued against a guess, this is the wrong tool, and running it
+on the competing class is often the hands-on answer.
 
 ## Its limits
 
-**Resolution.** The heatmap has the spatial size of the last convolutional layer,
-often 7&#215;7. Upsampling to 224&#215;224 produces a smooth blob, and that
-smoothness is interpolation rather than evidence. Grad-CAM cannot tell you which
+**detail.** The heatmap has the spatial size of the last convolutional layer,
+often 7&#215;7. Upsampling to 224&#215;224 makes a smooth blob, and that
+smoothness is interpolation rather than evidence. Grad-CAM can't tell you which
 pixel mattered, only which seventh of the image.
 
-**One layer.** It explains the last convolutional layer. Earlier layers see
+**One layer.** It shows the last convolutional layer. Earlier layers see
 different things, and the choice of layer changes the answer.
 
-**Plausibility is not correctness.** A heatmap over the animal's face looks
-convincing whether or not the model used the face. Grad-CAM shows what the
-gradients say. There is published work on saliency methods that produce
-sensible-looking maps for randomly initialised networks, so a
-reasonable-looking heatmap is not evidence the model is reasoning well.
+**Plausibility isn't correctness.** A heatmap over the animal's face looks
+lifelike whether or not the model used the face. Grad-CAM shows what the
+grads say, and there's published work on saliency methods that give
+sensible-looking maps for at random was reset networks &mdash; so a
+reasonable-looking heatmap isn't evidence the model is thinking well.
 
-**It does not survive every architecture unchanged.** Transformers have no final
-convolutional layer, so attention rollout or a variant is used instead.
+**It doesn't live each architecture unchanged.** Transformers have no final
+convolutional layer, so focus rollout or a variant is used instead.
 
 ## Relatives
 
-**CAM**, the predecessor, required the architecture to end in [global average
+**CAM**, the predecessor, needed the architecture to end in [global mean
 pooling](global_average_pooling.html) followed by one dense layer, and read the
-weights straight from that layer. Grad-CAM's contribution was getting the same
-weights from gradients instead, which removed the architectural requirement.
+weights straight from that layer. Grad-CAM's part was getting the same
+weights from grads instead, which removed the architectural need.
 
-**Grad-CAM++** handles several instances of the same class better.
-**Score-CAM** drops gradients entirely, measuring each map's importance by
-occluding with it and seeing what the score does &mdash; slower, and immune to
-gradient saturation.
+**Grad-CAM++** handles a few instances of the same class better.
+**Score-CAM** drops grads fully, measuring each map's importance by
+occluding with it and seeing what the score does. Slower, and immune to
+grad saturation.
 
 ## The weighting, one cell at a time
 
 Grad-CAM's heatmap is a weighted sum of feature maps followed by a ReLU, and doing
-one cell by hand removes the mystery. Three maps, with weights that are the
-spatial-average gradients of the class score, combined at a single location.
+one cell by hand drops the mystery. Three maps, with weights that are the
+spatial-mean grads of the class score, mixed at a single location:
 
 |contribution|value|
 |---|---|
@@ -97,45 +97,45 @@ spatial-average gradients of the class score, combined at a single location.
 |map 3 activation 0.2 &times; weight +0.5|+0.10|
 |sum &rarr; ReLU|**1.20**|
 
-At a cell where the negatively-weighted map dominates the sum comes out negative
+At a cell where the negatively-weighted map dominates the sum comes out minus
 &mdash; say &minus;0.65 &mdash; and the ReLU clips it to 0. That clip is the step
-people skip and then misread. Grad-CAM deliberately discards evidence *against* the
-class, because the question is what supported this prediction. A map mixing
+people skip and then misread: Grad-CAM on purpose discards evidence *against* the
+class, because the question is what supported this guess, and a map mixing
 support and opposition on one colour scale is easy to misread. The consequence is
-that a Grad-CAM heatmap can never show you what argued against a class. Drag
-every weight negative and it goes empty, not inverted. To see the
+that a Grad-CAM heatmap can never show you what argued against a class &mdash; drag
+each weight minus and it goes empty, not inverted. And to see the
 opposing evidence you run it on the competing class instead. The map is also only
 7&times;7 before upsampling, so the smooth blob over the animal's face is
 interpolation, not pixel-level proof.
 
-Grad-CAM's real caution is that plausibility is not correctness. A heatmap over an
-animal's face looks convincing whether or not the model used the face. Published
-work has produced sensible-looking saliency maps for *randomly initialised* networks,
-so a reasonable heatmap is a hypothesis about the model, not a verification
-of it. It also explains exactly one layer, usually the last convolutional one. The
-choice of layer changes the answer, so a Grad-CAM result is really "what the
-gradients at this layer say", not "what the model used". Its ancestor CAM required
-the network to end in global average pooling and read the weights straight from that
-layer. Grad-CAM's contribution was getting the same weights from gradients, which
-removed the architectural requirement.
+Grad-CAM's real caution is that plausibility isn't correctness. A heatmap over an
+animal's face looks lifelike whether or not the model used the face, and published
+work has made sensible-looking saliency maps for *at random was reset* networks
+&mdash; so a reasonable heatmap is a hypothesis about the model, not a verification
+of it. It also shows just one layer, often the last convolutional one, and
+the choice of layer changes the answer. So A Grad-CAM result is really "what the
+grads at this layer say", not "what the model used". Its ancestor CAM needed
+the network to end in global mean pooling and read the weights straight from that
+layer. Grad-CAM's part was getting the same weights from grads, which
+removed the architectural need and is why it works on almost any CNN.
 
 ## Where it goes wrong
 
-**Reading the smooth blob as pixel-level evidence.** It is 7&#215;7,
+**Reading the smooth blob as pixel-level evidence.** It's 7&#215;7,
 interpolated.
 
-**Explaining the wrong class.** Run it on the predicted class *and* on the class
-you expected; the difference is usually the informative part.
+**Showing the wrong class.** Run it on the predicted class *and* on the class
+you expected. The difference is often the helpful part.
 
 **Treating it as proof.** A plausible heatmap is a hypothesis about the model,
 not a verification of it.
 
-**Choosing a layer without saying so.** The layer is a parameter, and the answer
+**Choosing a layer without saying so.** The layer is a param, and the answer
 depends on it.
 
 ## Asking the gradient which pixels mattered
 
-Grad-CAM produces a heatmap over the image for a chosen class, and every step of it is arithmetic you can follow. This builds one end to end on a small network, then checks the two things people forget to check. First, whether the map changes with the class. Second, whether it can be trusted when the prediction is wrong.
+Grad-CAM makes a heatmap over the image for a chosen class. Each step of it's math you can follow. This builds one end to end on a small network, then checks the two things people forget to check -- whether the map changes with the class. Whether it can be trusted when the guess is wrong.
 
 ```python-run
 import numpy as np

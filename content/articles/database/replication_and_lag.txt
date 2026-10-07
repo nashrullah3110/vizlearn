@@ -1,27 +1,27 @@
 title: Replication, Read Replicas and Lag
-intro: How to serve more reads than one machine can, and the staleness that comes with it.
+intro: How to serve more reads than one machine can. The staleness that comes with it.
 
 ## The arrangement
 
-One server &mdash; the **primary** &mdash; accepts every write. It records each
+One server &mdash; the **main** &mdash; accepts each write. It records each
 change in a log, and streams that log to one or more **replicas**, which apply
 the changes to their own copies and serve read queries.
 
 The appeal is that most workloads are overwhelmingly reads. Adding replicas
-multiplies read capacity without any change to the data model, and unlike
-[sharding](sharding_in_databases.html) it is reversible: a replica that is not
+times read room without any change to the data model, and unlike
+[sharding](sharding_in_databases.html) it's reversible: a replica that isn't
 helping can simply be removed.
 
-Replicas also serve as warm standbys. If the primary fails, one is promoted. The cost is staleness: a replica is always at least a little behind the primary, and that gap &mdash; **replication lag** &mdash; is the source of nearly every consistency bug in a replicated system.
+Replicas also serve as warm standbys. If the main fails, one is promoted.
 
 ## How far reads actually scale
 
-"Multiplies read capacity" has a limit, and the limit is worth seeing because it
-decides when replicas stop being the answer. Every replica serves reads *and*
-must apply every write the primary takes &mdash; the write load is not shared out,
-it is copied to all of them. So if one machine handles 10,000 operations a second,
+"Times read room" has a limit, and the limit is worth seeing because it
+decides when replicas stop being the answer. each replica serves reads *and*
+must apply each write the main takes. The write load isn't shared out,
+it's copied to all of them. So if one machine handles 10,000 ops a second,
 a replica taking `W` writes per second has only `10,000 - W` left for reads, and
-`N` replicas serve `N &times; (10,000 - W)`.
+`N` replicas serve `N &times; (10,000 - W)`:
 
 |write rate|1 replica|3 replicas|10 replicas|
 |---|---|---|---|
@@ -29,43 +29,43 @@ a replica taking `W` writes per second has only `10,000 - W` left for reads, and
 |2,000/s (20%)|8,000|24,000|80,000|
 |5,000/s (50%)|5,000|15,000|50,000|
 
-At a light write rate reads scale almost linearly &mdash; ten replicas give nearly
-ten times the read throughput, which is why read replicas are the standard answer
+At a light write rate reads scale almost linearly. Ten replicas give nearly
+ten times the read throughput. This Is why read replicas are the standard answer
 for read-heavy workloads. But look down the columns rather than across: as writes
-climb, every replica loses that capacity to apply work, and the whole fleet's
+climb, each replica loses that room to apply work, and the whole fleet's
 read ceiling drops with it. Once writes alone approach what one machine can do,
 `10,000 - W` heads toward zero and adding replicas buys almost nothing &mdash;
-each new machine spends all its capacity just keeping up with the write stream.
+each new machine spends all its room just keeping up with the write stream.
 
 That is the wall replicas hit and [sharding](sharding_in_databases.html) is built
-to get past: sharding splits the writes across machines, so it is the tool for a
-write-bound system exactly where more replicas is the tool for a read-bound one.
+to get past: sharding splits the writes across machines. It's the tool for a
+write-bound system just where more replicas is the tool for a read-bound one.
 
 ## Lag
 
-A change committed on the primary is not instantly present on a replica. It has
+A change committed on the main isn't instantly present on a replica. It has
 to be written to the log, sent over a network, received, and applied. The gap is
-**replication lag**, and it is never zero.
+**replication lag**, and it's never zero.
 
-Under normal conditions it is milliseconds. Under load it is not, and the reasons
+Under normal rules it's milliseconds. Under load it isn't, and the reasons
 matter:
 
-**A large write.** A single statement updating a million rows produces a great
+**A large write.** A single statement updating a million rows makes a great
 deal of log to ship and apply.
 
-**Single-threaded apply.** Some engines apply the log serially even though the
-primary generated it with many concurrent connections. The replica simply cannot
-keep up with a busy primary.
+**Single-threaded apply.** Some engines apply the log serially though the
+main made it with many concurrent links. The replica simply can't
+keep up with a busy main.
 
 **A long query on the replica.** Applying a change that conflicts with a running
 read forces a choice between cancelling the query and pausing replication. Both
-happen, depending on configuration.
+happen, based on configuration.
 
 **Network.** A cross-region replica has a floor set by the speed of light.
 
 ## The bug this causes
 
-The failure mode is specific and extremely common:
+The failure mode is exact and extremely common:
 
 ```
 1. User updates their profile        -> primary
@@ -74,38 +74,38 @@ The failure mode is specific and extremely common:
 4. User sees their OLD profile
 ```
 
-Nothing errored. The user changed something, was shown the previous value, and
-reasonably concluded the save failed.
+Nothing errored. The user changed a thing, was shown the previous value, and
+fairly concluded the save failed.
 
 The standard fixes, in rough order of preference:
 
 **Read-your-writes routing.** After a write, send that user's reads to the
-primary for a short window. Simple and effective.
+main for a short window. Simple and effective.
 
-**Route by criticality.** Anything the user just affected reads from the primary;
+**Route by criticality.** any of it the user just affected reads from the main;
 dashboards and search read from replicas.
 
-**Wait for the log position.** Record the primary's log position at commit and
+**Wait for the log spot.** Record the main's log spot at commit and
 have the replica wait until it has applied at least that far. Correct, and
-requires engine support.
+needs engine support.
 
-**Do not redirect to a read.** Render the result from what was just written.
+**Don't redirect to a read.** Render the result from what was just written.
 
 ## Synchronous replication
 
 The lag can be removed. `synchronous_commit` in PostgreSQL, semi-sync in MySQL:
-the primary does not acknowledge a commit until at least one replica confirms it
+the main doesn't confirm a commit until at least one replica confirms it
 has the change.
 
-The cost is unavoidable and appears on every write: a commit now includes a
+The cost is unavoidable and appears on each write: a commit now includes a
 network round trip. Throughput falls, and latency rises by the distance to the
-replica. If the synchronous replica becomes unreachable, writes stall entirely
+replica. If the synchronous replica turns unreachable, writes stall fully
 unless a fallback is configured.
 
-That "distance to the replica" is not a figure of speech &mdash; it has a floor set
+That "distance to the replica" isn't a figure of speech. It has a floor set
 by physics, and the floor is worth knowing before choosing where a synchronous
 replica lives. Light in fibre travels at about two-thirds of `c`, so the
-round-trip *cannot* be faster than twice the distance over that speed:
+round-trip *can't* be faster than twice the distance over that speed:
 
 |synchronous replica|round-trip floor|added to every commit|
 |---|---|---|
@@ -114,35 +114,35 @@ round-trip *cannot* be faster than twice the distance over that speed:
 |across a continent (~5,500 km)|~56 ms|every write waits 56 ms+|
 
 Real fibre paths run about half again longer than the straight-line distance, so
-the cross-continent figure is nearer 70&nbsp;ms in practice. That is per commit, and
-no amount of hardware removes it &mdash; it is the reason a synchronous replica is
+the cross-continent figure is nearer 70&nbsp;ms . That is per commit, and
+no amount of hardware drops it. It's the reason a synchronous replica is
 kept nearby and durability across regions is bought with asynchronous copies plus
 the accepted risk of the section above.
 
-This is a direct instance of the [CAP](cap_theorem.html) trade: consistency
-across replicas costs availability and latency, and no configuration escapes it.
+This is a direct instance of the [CAP](cap_theorem.html) trade: agreement
+across replicas costs uptime and latency, and no configuration escapes it.
 The usual compromise is one synchronous replica nearby for durability, and
-asynchronous replicas further away for read capacity.
+asynchronous replicas further away for read room.
 
 ## Failover and lost writes
 
-If the primary fails while a replica is 200ms behind, promoting that replica
-loses 200ms of committed writes. They were acknowledged to clients and are gone.
+If the main fails while a replica is 200ms behind, promoting that replica
+loses 200ms of committed writes. They were confirmed to clients and are gone.
 
-Which is why durability requirements and replication mode are the same decision.
+Which is why durability needs and replication mode are the same choice.
 Asynchronous replication means accepting that a failover can lose the most recent
 writes.
 
 ## Where it goes wrong
 
-**Assuming replicas are current.** They are not, and the window is where the bugs
+**given replicas are current.** They aren't, and the window is where the bugs
 live.
 
-**Sending a write to a replica.** It is read-only; the error is confusing when
-routing is implicit.
+**Sending a write to a replica.** It's read-only. The error is confusing when
+routing is silent.
 
-**Monitoring lag in bytes only.** Bytes behind does not translate to seconds
+**Monitoring lag in bytes only.** Bytes behind doesn't translate to seconds
 behind. Track both.
 
-**Using replicas for locking or counters.** Anything read-then-write must go to
-the primary, or two clients read the same stale value.
+**Using replicas for locking or counters.** any of it read-then-write must go to
+the main, or two clients read the same stale value.

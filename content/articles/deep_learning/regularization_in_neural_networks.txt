@@ -3,21 +3,21 @@ intro: Add a penalty on the size of the weights and the model prefers simpler ex
 
 ## Penalising complexity
 
-An overfitting model has found a way to fit noise, and doing that almost always requires large weights &mdash; sharp, wiggly functions need big coefficients. Regularisation exploits that by adding the size of the weights to the loss:
+An overfitting net has found a way to fit noise. And doing that almost always needs large weights &mdash; sharp, wiggly functions need big coefficients. Regularisation exploits that by adding the size of the weights to the loss:
 
-total loss = data loss + &lambda; &times; penalty(w)
+total loss = data loss + &lambda; &times; cost(w)
 
-Now the optimiser has two objectives in tension: fit the data, and keep the weights small. &lambda; sets the exchange rate. At &lambda; = 0 there is no penalty and you are back to plain training; at very large &lambda; the weights are crushed toward zero and the model underfits. **L2 regularisation** (weight decay) penalises the sum of squared weights, pulling every weight proportionally toward zero &mdash; nothing reaches zero, but the function becomes smoother. **L1 regularisation** penalises the sum of absolute values, pulling with constant force regardless of magnitude, which drives small weights exactly to zero and performs feature selection. **Dropout** takes a different approach entirely: during each training step it randomly sets a fraction of neuron outputs to zero, forcing the network to distribute information across many neurons rather than relying on any one &mdash; an implicit ensemble of thinned networks. **Early stopping** monitors validation loss and halts training when it begins to rise, using the validation curve as a proxy for the complexity the model has absorbed. This page shows the decision boundary with and without each technique, lets you adjust &lambda; and dropout rate, and covers batch normalisation's implicit regularisation effect.
+Now the optimiser has two objectives in tension: fit the data. And keep the weights small. &lambda; sets the exchange rate. At &lambda; = 0 there is no cost and you are back to plain training. At very large &lambda; the weights are crushed toward zero and the net underfits. **L2 regularisation** (weight decay) penalises the sum of squared weights, pulling each weight proportionally toward zero &mdash; nothing reaches zero. But the function turns smoother. **L1 regularisation** penalises the sum of absolute vals, pulling with constant force no matter magnitude. It drives small weights just to zero and does feature choice. **Dropout** takes a other way fully: in each training step it randomly sets a fraction of neuron outputs to zero, forcing the network to distribute information across many neurons rather than relying on any one &mdash; an implicit ensemble of thinned networks. **Early stopping** monitors validation loss and halts training when it begins to rise, with the validation curve as a proxy for the complexity the net has absorbed. This page shows the decision edge with and without each technique, lets you adjust &lambda; and dropout rate. And covers batch normalisation's implicit regularisation effect.
 
 ## L1 and L2, and why one is sparse
 
-<strong>L2 (ridge, weight decay)</strong> penalises the sum of squared weights:<p>penalty = &Sigma; w<sub>i</sub>&sup2; &nbsp;&nbsp;&rarr;&nbsp;&nbsp; gradient = 2w<sub>i</sub></p><strong>L1 (lasso)</strong> penalises the sum of absolute values:<p>penalty = &Sigma; |w<sub>i</sub>| &nbsp;&nbsp;&rarr;&nbsp;&nbsp; gradient = sign(w<sub>i</sub>)</p><p>The gradients explain the difference completely. L2’s pull is <em>proportional to the weight</em>, so as a weight approaches zero the force pulling it there fades &mdash; weights shrink toward zero and never quite arrive. L1’s pull is <em>constant</em> regardless of size, so a weight near zero is pushed just as hard as a large one and is driven exactly to zero, where it stays.</p><p>That is why L1 produces sparse models and performs feature selection, while L2 keeps every feature with a smaller coefficient. <strong>Elastic net</strong> uses both, getting L1’s selection with L2’s stability when features are correlated.</p>
+<strong>L2 (ridge, weight decay)</strong> penalises the sum of squared weights:<p>cost = &Sigma; w<sub>i</sub>&sup2; &nbsp;&nbsp;&rarr;&nbsp;&nbsp; gradient = 2w<sub>i</sub></p><strong>L1 (lasso)</strong> penalises the sum of absolute vals:<p>cost = &Sigma; |w<sub>i</sub>| &nbsp;&nbsp;&rarr;&nbsp;&nbsp; gradient = sign(w<sub>i</sub>)</p><p>The gradients explain the gap fully. L2’s pull is <em>proportional to the weight</em>. So as a weight ways zero the force pulling it there fades &mdash; weights shrink toward zero and never quite arrive. L1’s pull is <em>constant</em> no matter size. So a weight near zero is pushed just as hard as a large one and is driven just to zero. There it stays.</p><p>That is why L1 gives sparse nets and does feature choice, while L2 keeps each feature with a less coefficient. <strong>Elastic net</strong> uses both, getting L1’s choice with L2’s stability when features are correlated.</p>
 
-## Constraining the model on purpose
+## Constraining the net on purpose
 
-A network with millions of parameters can fit almost any training set exactly, including its noise. Regularisation is any deliberate constraint that makes that harder, trading a little training accuracy for better generalisation.
+A network with millions of params can fit almost any training set just, with its noise. Regularisation is any deliberate constraint that makes that harder, trading a little training accuracy for better generalisation.
 
-The methods available, and what each actually does:
+The ways on hand, and what each really does:
 
 |Method|Mechanism|Typical setting|
 |---|---|---|
@@ -31,21 +31,21 @@ The methods available, and what each actually does:
 |Mixup / CutMix|Blends examples and labels|Images|
 |Gradient clipping|Caps the update size|max_norm 1.0|
 
-Only some of these are regularisers in the strict sense; several are stabilisers that happen to reduce overfitting. In practice they are used together and their effects overlap.
+Just some of these are regularisers in the strict sense. A few are stabilisers that happen to reduce overfitting. In practice they are used together and their effects overlap.
 
 ## Weight decay, and what it does geometrically
 
-Adding a penalty on the squared size of the weights changes the objective:
+Adding a cost on the squared size of the weights changes the objective:
 
 <p class="mono-font">loss = prediction error + &lambda; &times; &Sigma;w&sup2;</p>
 
-The gradient of the penalty is `2λw`, so every step pulls each weight slightly towards zero &mdash; hence the name "decay". Weights survive only if the data justifies them.
+The gradient of the cost is `2λw`. So each step pulls each weight slightly towards zero &mdash; hence the name "decay". Weights survive just if the data justifies them.
 
-Two implementation notes that matter.
+Two build notes that matter.
 
-<strong>Use AdamW, not Adam with `weight_decay`.</strong> Plain Adam adds the penalty into the gradient, which then gets divided by the adaptive scaling &mdash; so parameters with small gradients are penalised more, which was never the intent. AdamW applies the decay directly to the weights, decoupled from the scaling.
+<strong>Use AdamW, not Adam with `weight_decay`.</strong> Plain Adam adds the cost into the gradient. It then gets divided by the adaptive scaling &mdash; so params with small gradients are penalised more. It was never the intent. AdamW applies the decay right to the weights, decoupled from the scaling.
 
-<strong>Exclude biases and normalisation parameters.</strong> Decaying a batch-norm `γ` towards zero fights what the layer is for, and biases carry no capacity worth penalising.
+<strong>Exclude biases and normalisation params.</strong> Decaying a batch-norm `γ` towards zero fights what the layer is for. And biases carry no capacity worth penalising.
 
 ```python
 decay, no_decay = [], []
@@ -58,24 +58,24 @@ opt = torch.optim.AdamW([
 ], lr=3e-4)
 ```
 
-That one-line rule &mdash; parameters with one dimension or fewer are exempt &mdash; captures biases and all normalisation parameters, and is what most reference implementations use.
+That one-line rule &mdash; params with one dimension or fewer are exempt &mdash; captures biases and all normalisation params. And is what most reference implementations use.
 
 ## What to reach for first
 
-Not everything at once. A sensible order:
+Not all at once. A sensible order:
 
-1. <strong>Early stopping</strong> &mdash; free, and it needs no tuning beyond a patience value.
-2. <strong>Weight decay</strong> &mdash; cheap, always applicable, and it should in effect always be on.
-3. <strong>Data augmentation</strong> &mdash; the largest single gain on image and audio tasks with limited data.
-4. <strong>Transfer learning</strong> &mdash; if a pretrained model exists for your domain, this outperforms every regulariser on a small dataset.
-5. <strong>Dropout</strong> &mdash; if a gap remains after the above.
-6. <strong>A smaller model</strong> &mdash; last, because it also lowers the ceiling.
+1. <strong>Early stopping</strong> &mdash; free. And it needs no tuning beyond a patience value.
+2. <strong>Weight decay</strong> &mdash; cheap, always applicable. And it should in effect always be on.
+3. <strong>Data augmentation</strong> &mdash; the largest single gain on pic and audio tasks with limited data.
+4. <strong>Transfer learning</strong> &mdash; if a pretrained net exists for your domain, this beats each regulariser on a small dataset.
+5. <strong>Dropout</strong> &mdash; if a gap stays after the above.
+6. <strong>A less net</strong> &mdash; last, since it also lowers the ceiling.
 
-Stacking regularisers has diminishing and sometimes negative returns. Batch normalisation already injects noise, so heavy dropout on top of it often hurts. Add one at a time and measure.
+Stacking regularisers has diminishing and sometimes negative returns. Batch normalisation now injects noise. So heavy dropout on top of it often hurts. Add one at a time and measure.
 
-## Six ways to stop a model memorising
+## Six ways to stop a net memorising
 
-L2, L1, dropout, early stopping, augmentation and more data all fight overfitting by different mechanisms. Here they are on one problem, so the differences are visible rather than described.
+L2, L1, dropout, early stopping, augmentation and more data all fight overfitting by other mechanisms. Here they are on one problem. So the gaps are visible rather than described.
 
 ```python-run
 import numpy as np
@@ -107,7 +107,7 @@ for lam in (1e-6, 1e-3, 1e-1):
 print("\nL2 shrinks every weight toward zero; stronger lambda = smaller weights.")
 ```
 
-Now see how L1 differs: it drives weights to exactly zero and performs feature selection.
+Now see how L1 differs: it drives weights to just zero and does feature choice.
 
 ```python-run
 import numpy as np
@@ -139,7 +139,7 @@ for lam in (1e-3, 1e-1):
 print("\nL1 pushes weights to EXACTLY zero -- it selects features, not just shrinks them.")
 ```
 
-Finally, compare dropout, early stopping and data augmentation to see a different mechanism at work.
+Finally, check dropout, early stopping and data augmentation to see a other mechanism at work.
 
 ```python-run
 import numpy as np
@@ -186,28 +186,28 @@ print("\npenalties crush weight size; augmentation adds information instead.")
 
 ## Guided experiments
 
-1. <strong>Train with no penalty.</strong> Set <strong>Penalty Strength (&lambda;)</strong> to its minimum and press <strong>Train Network</strong>. Weights grow freely and the model fits the targets as closely as it can, noise included.
-2. <strong>Apply L2.</strong> Enable the L2 toggle, set <strong>Penalty Strength (&lambda;)</strong> to about 0.1, press <strong>Reset &amp; Randomize Targets</strong> and train. Every weight shrinks, and none reaches zero &mdash; that smooth shrinkage is the whole behaviour of L2.
-3. <strong>Switch to L1.</strong> Enable the L1 toggle instead at the same &lambda;. Now some weights collapse to exactly zero while others stay large. The model has selected a subset of connections and switched the rest off.
-4. <strong>Turn it up too far.</strong> Set <strong>Penalty Strength (&lambda;)</strong> to 0.8 and train. Nearly everything is crushed toward zero and the model can no longer fit even the real structure &mdash; regularisation causing underfitting, which is the failure mode at the far end.
+1. <strong>Train with no cost.</strong> Set <strong>Cost Strength (&lambda;)</strong> to its min and press <strong>Train Network</strong>. Weights grow freely and the net fits the targets as closely as it can, noise included.
+2. <strong>Apply L2.</strong> Enable the L2 toggle, set <strong>Cost Strength (&lambda;)</strong> to about 0.1, press <strong>Reset &amp; Randomize Targets</strong> and train. Each weight shrinks, and none reaches zero &mdash; that smooth shrinkage is the whole behaviour of L2.
+3. <strong>Switch to L1.</strong> Enable the L1 toggle instead at the same &lambda;. Now some weights collapse to just zero while others stay large. The net has selected a subset of connections and switched the rest off.
+4. <strong>Turn it up too far.</strong> Set <strong>Cost Strength (&lambda;)</strong> to 0.8 and train. Nearly all is crushed toward zero and the net can no longer fit still the real structure &mdash; regularisation causing underfitting. It is the failure mode at the far end.
 
 ## Weight decay is not quite L2
 
-The two are used interchangeably and are only equivalent for plain SGD. Weight decay multiplies the weights by a factor slightly below 1 at each step; L2 adds a term to the loss, so its contribution passes through the optimiser’s gradient machinery.
+The two are used interchangeably and are just equivalent for plain SGD. Weight decay multiplies the weights by a factor slightly below 1 at each step. L2 adds a term to the loss. So its contribution passes through the optimiser’s gradient machinery.
 
-With Adam that difference is real. Adam divides each gradient by a running estimate of its magnitude, which also rescales the L2 term &mdash; so parameters with large gradients end up effectively less regularised. <strong>AdamW</strong> fixes this by applying the decay directly to the weights, outside the adaptive step, and it is the reason AdamW is now the default optimiser for transformers.
+With Adam that gap is real. Adam divides each gradient by a running estimate of its magnitude. It also rescales the L2 term &mdash; so params with large gradients end up effectively less regularised. <strong>AdamW</strong> fixes this by applying the decay right to the weights, outside the adaptive step. And it is the reason AdamW is now the default optimiser for transformers.
 
-## What usually goes wrong
+## What often goes wrong
 
-- <strong>Regularising a model that is underfitting.</strong> If training loss is already high, adding a penalty makes both curves worse. Confirm the model can overfit before trying to stop it.
-- <strong>Penalising the biases.</strong> Biases shift the output rather than scale the input, so shrinking them limits what the model can represent without reducing overfitting. Regularise weights only.
-- <strong>Using L2 with Adam and expecting weight decay.</strong> Use AdamW when you want true decay.
-- <strong>Failing to scale features first.</strong> The penalty treats all weights equally, so a feature on a large scale needs a small weight and is under-penalised relative to the rest. Standardise before regularising.
-- <strong>Tuning &lambda; linearly.</strong> It spans orders of magnitude; search it on a log scale, typically 10<sup>&minus;5</sup> to 10<sup>&minus;1</sup>.
+- <strong>Regularising a net that is underfitting.</strong> If training loss is now high, adding a cost makes both curves worse. Confirm the net can overfit before trying to stop it.
+- <strong>Penalising the biases.</strong> Biases shift the output rather than scale the input. So shrinking them limits what the net can represent without reducing overfitting. Regularise weights just.
+- <strong>With L2 with Adam and expecting weight decay.</strong> Use AdamW when you want true decay.
+- <strong>Failing to scale features first.</strong> The cost treats all weights equally. So a feature on a large scale needs a small weight and is under-penalised relative to the rest. Standardise before regularising.
+- <strong>Tuning &lambda; linearly.</strong> It spans orders of magnitude. Search it on a log scale, often 10<sup>&minus;5</sup> to 10<sup>&minus;1</sup>.
 
 ## In one line
 
-Regularisation adds a weight-size penalty to the loss so the optimiser trades fit against simplicity, with &lambda; setting the rate. L2 shrinks all weights proportionally and keeps every feature; L1 applies constant pressure and drives weights to exactly zero, producing a sparse, self-selecting model. Use it when the model overfits, scale the features first, and reach for AdamW if the optimiser is Adam.
+Regularisation adds a weight-size cost to the loss so the optimiser trades fit against simplicity, with &lambda; setting the rate. L2 shrinks all weights proportionally and keeps each feature. L1 applies constant pressure and drives weights to just zero, giving a sparse, self-selecting net. Use it when the net overfits, scale the features first. And reach for AdamW if the optimiser is Adam.
 
 ## Knowing whether it worked
 
@@ -215,44 +215,44 @@ Regularisation is tuned by watching two curves, not by reasoning about the setti
 
 <strong>Too little:</strong> training loss keeps falling while validation loss rises. The gap widens with epochs.
 
-<strong>About right:</strong> both curves flatten near each other, and validation reaches its best value late in training.
+<strong>About right:</strong> both curves flatten near each other. And validation reaches its best value late in training.
 
-<strong>Too much:</strong> both curves plateau high, and training loss never gets low. The model is being prevented from learning the signal along with the noise.
+<strong>Too much:</strong> both curves plateau high, and training loss never gets low. The net is being stopped from learning the signal along with the noise.
 
-That last case is real and easy to miss, because "the model is not overfitting" looks like success. Check the training loss as well: if the model cannot fit its own training data, the constraint is too tight.
+That last case is real and easy to miss, since "the net is not overfitting" looks like success. Check the training loss as well: if the net cannot fit its own training data, the constraint is too tight.
 
-The other measurement worth making is the effective one: does validation performance improve? A regulariser that reduces the gap without improving validation has achieved nothing except making training worse.
+The other measurement worth making is the effective one: does validation performance improve? A regulariser that reduces the gap without improving validation has reached nothing except making training worse.
 
 ## Implicit regularisation
 
-Several things regularise without being labelled as such, and they explain why large networks generalise better than their parameter counts suggest.
+A few things regularise without being labelled as such. And they explain why large networks generalise better than their param counts suggest.
 
-<strong>Stochastic gradient noise.</strong> Mini-batch gradients are noisy estimates, and that noise biases the optimiser towards flatter minima, which tend to generalise better than sharp ones. Very large batches reduce this noise, which is part of why they sometimes generalise slightly worse.
+<strong>Stochastic gradient noise.</strong> Mini-batch gradients are noisy estimates. And that noise biases the optimiser towards flatter minima. It tend to generalise better than sharp ones. Very large batches reduce this noise. It is part of why they sometimes generalise slightly worse.
 
-<strong>Early stopping is implicit L2.</strong> For linear models this is provable: stopping gradient descent early is equivalent to an L2 penalty of a particular strength.
+<strong>Early stopping is implicit L2.</strong> For linear nets this is provable: stopping gradient descent early is equivalent to an L2 cost of a particular strength.
 
-<strong>Architecture itself.</strong> Convolution's weight sharing and locality are constraints &mdash; a strong prior that image statistics are translation-invariant. That is why CNNs beat transformers on small image datasets: the constraint is doing work that the transformer must learn from data.
+<strong>Design it.</strong> Convolution's weight sharing and locality are constraints &mdash; a strong prior that pic statistics are translation-invariant. That is why CNNs beat transformers on small pic datasets: the constraint is doing work that the transformer must learn from data.
 
-<strong>Parameter sharing</strong> in recurrent and graph networks does the same along their own axes.
+<strong>Param sharing</strong> in recurrent and graph networks does the same along their own axes.
 
 ## Questions people ask
 
-<strong>Which regulariser matters most?</strong> On images, data augmentation. On tabular data, weight decay and early stopping. Across the board, more data.
+<strong>Which regulariser matters most?</strong> On pics, data augmentation. On tabular data, weight decay and early stopping. Across the board, more data.
 
-<strong>What weight decay value?</strong> 0.01 with AdamW is a reasonable default; 0.1 for large transformers. Tune it on a log scale.
+<strong>What weight decay value?</strong> 0.01 with AdamW is a reasonable default. 0.1 for large transformers. Tune it on a log scale.
 
-<strong>Do I need dropout with batch normalisation?</strong> Often not. If you use both, lower the dropout rate.
+<strong>Do I need dropout with batch normalisation?</strong> Often not. If you use both, less the dropout rate.
 
-<strong>Does regularisation slow training?</strong> In epochs, usually yes. In final quality on unseen data, that is the point.
+<strong>Does regularisation slow training?</strong> In epochs, often yes. In final quality on unseen data, that is the point.
 
 <strong>Can I regularise too much?</strong> Yes &mdash; the symptom is a training loss that will not come down.
 
-<strong>Is a bigger model with more regularisation better than a smaller one?</strong> Frequently, yes, especially with pretrained weights. Capacity plus constraint often beats a small model outright.
+<strong>Is a bigger net with more regularisation better than a less one?</strong> Often, yes, especially with pretrained weights. Capacity plus constraint often beats a small net outright.
 
 ## Recap in one screen
 
-- Regularisation trades training accuracy for generalisation by constraining the model.
-- Weight decay is the baseline &mdash; use AdamW, and exclude biases and normalisation parameters.
-- Early stopping is free; augmentation is the biggest win on images; transfer learning beats them all on small datasets.
+- Regularisation trades training accuracy for generalisation by constraining the net.
+- Weight decay is the baseline &mdash; use AdamW. And exclude biases and normalisation params.
+- Early stopping is free. Augmentation is the biggest win on pics. Transfer learning beats them all on small datasets.
 - Add one at a time and judge by validation performance, not by the size of the gap alone.
-- Batch noise, early stopping and the architecture itself all regularise implicitly.
+- Batch noise, early stopping and the design it all regularise implicitly.

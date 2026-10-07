@@ -1,89 +1,89 @@
 title: The Document Model against Rows
-intro: One order, stored two ways, and an honest account of which questions each shape answers well.
+intro: One order, stored two ways. An honest account of which questions each shape answers well.
 
 ## The same order, two shapes
 
-Run the query above and then the variants. The identical order is stored as
-normalised rows and as a single JSON document, and both are queried in the same
+Run the query above and then the variants. The the same order is stored as
+normed rows and as a single JSON doc, and both are queried in the same
 session &mdash; because modern SQL engines support both.
 
 **Relational**: an `orders` row, several `order_items` rows referring back to it,
 a `customers` row. Each fact recorded once, joined when needed.
 
 **Document**: one record containing the order, its items nested inside it, and
-the customer details copied in. The relational shape normalises: each fact lives in one place and is joined when needed, which prevents update anomalies but costs a join per read. The document shape denormalises: everything about one entity is stored together, so reads are fast and joins are unnecessary, but updating a customer's address means finding and patching every document that copied it. This page runs both shapes side by side in the same SQL session, queries each one, and shows where each breaks down.
+the customer details copied in.
 
 ## What documents make easy
 
-**One read for one thing.** Fetching an order means retrieving one document.
+**One read for one thing.** Fetching an order means pulling one doc.
 No joins, no round trips, and the data is contiguous on disk. For a
-read-this-whole-object access pattern, this is genuinely faster and the gap
+read-this-whole-object access pattern, this is truly faster and the gap
 widens as the object gets more parts.
 
-**A shape that matches the code.** The document deserialises straight into an
+**A shape that matches the code.** The doc deserialises straight into an
 object. No object-relational mapping layer reassembling a graph from five result
 sets.
 
-**Schema flexibility.** Adding a field to some documents and not others requires
-no migration. For genuinely heterogeneous data &mdash; product catalogues where
-a book and a fridge share almost no attributes &mdash; this is a real advantage
+**Schema flexibility.** Adding a field to some docs and not others needs
+no migration. For truly heterogeneous data &mdash; product catalogues where
+a book and a fridge share almost no fields. This is a real edge
 rather than laziness.
 
 ## What rows make easy
 
 **Querying from any direction.** "Which customers bought product 902" is
-straightforward relationally and awkward in a document store, because the data
-is organised around orders, not products. Documents optimise one access path and
+straightforward relationally and awkward in a doc store, because the data
+is organised around orders, not products. docs optimise one access path and
 make the others harder.
 
-**Updating a shared fact once.** If the customer's address is copied into every
-order document, changing it means finding and rewriting every one. Relationally
-it is a single `UPDATE`. This is the classic normalisation argument and it has
+**Updating a shared fact once.** If the customer's address is copied into each
+order doc, changing it means finding and rewriting each one. Relationally
+it's a single `UPDATE`. This is the classic norming arg and it has
 not stopped being true.
 
-**Integrity the database enforces.** Foreign keys, uniqueness and check
-constraints are declared once and cannot be bypassed. In a document store these
-usually become application code, which means they hold until some other code
+**Integrity the DB enforces.** Foreign keys, uniqueness and check
+constraints are declared once and can't be bypassed. In a doc store these
+often become use code. This Means they hold until some other code
 path forgets.
 
-**Ad-hoc analysis.** Aggregating across documents means either a scan or a
+**Ad-hoc analysis.** Aggregating across docs means either a scan or a
 purpose-built index, and the queries are harder to write.
 
 ## Denormalisation is the actual trade
 
-Nesting the items inside the order is fine &mdash; an order item belongs to
-exactly one order and is never queried independently. That is not duplication,
+Nesting the items inside the order is fine. An order item belongs to
+just one order and is never queried on its own. That isn't duplication,
 just co-location.
 
-Copying the customer's name and address into every order is duplication, and it
-buys read speed at the cost of update cost and the risk of divergence. Sometimes
+Copying the customer's name and address into each order is duplication, and it
+buys read speed at the cost of update cost and the risk of divergence. at times
 that is right: an invoice arguably *should* record the address as it was at the
-time, in which case it is not duplication at all but a historical fact.
+time, in which case it isn't duplication at all but a historical fact.
 
 The question is always whether the copies must agree. If they must, storing them
-separately means keeping them in sync forever.
+apart means keeping them in sync forever.
 
 ## The distinction has mostly dissolved
 
 PostgreSQL's `jsonb` is indexable, queryable and transactional. MySQL and SQLite
 have JSON functions &mdash; the queries on this page use SQLite's, in the same
-session as ordinary tables.
+session as plain tables.
 
-So the modern answer is usually neither purely one nor the other: relational
-tables for the entities that are queried from several directions and must stay
-consistent, and a JSON column for the parts that are genuinely variable and only
+So the modern answer is often neither purely one nor the other: relational
+tables for the entities that are queried from a few directions and must stay
+steady, and a JSON column for the parts that are truly variable and only
 ever read alongside their parent.
 
-What a dedicated document database still offers is horizontal scaling and
+What a dedicated doc DB still offers is flat scaling and
 operational tooling built around that model from the start. What it gives up is
-joins and multi-document transactions &mdash; though MongoDB has had the latter
-since 4.0, which narrowed the gap considerably.
+joins and multi-doc transactions &mdash; though MongoDB has had the latter
+since 4.0, which narrowed the gap a lot.
 
 ## The number behind the update argument
 
-"Rewriting every one" is the whole cost of copying a shared fact, and it is worth
+"Rewriting each one" is the whole cost of copying a shared fact, and it's worth
 seeing at scale. Suppose the customer's address is denormalised into each of
-their order documents. Changing it is not one write:
+their order docs. Changing it isn't one write:
 
 |orders holding the copy|document store: rewrites|relational: rows changed|
 |---|---|---|
@@ -92,17 +92,17 @@ their order documents. Changing it is not one write:
 |1,000,000|1,000,000|1|
 
 Relationally the address lives in one `customers` row and one `UPDATE` changes it;
-every order simply keeps pointing at it. The document shape trades that single
-write for one per copy, and while the copies are being rewritten the database
+each order simply keeps pointing at it. The doc shape trades that single
+write for one per copy, and while the copies are being rewritten the DB
 briefly disagrees with itself about where the customer lives. That is the exact
-trade: the document read is faster because the join was done once at write time,
-and every later change to a shared fact pays it back in full.
+trade: the doc read is faster because the join was done once at write time,
+and each later change to a shared fact pays it back in full.
 
 ## The read the document shape wins
 
-The mirror image of the update cost is the read, and it is why the trade exists
-at all. Assembling one order &mdash; the order, its five line items, the customer
-&mdash; from normalised tables means touching three tables, and an ORM that loads
+The mirror image of the update cost is the read. It's why the trade exists
+at all. Assembling one order. The order, its five line items, the customer
+&mdash; from normed tables means touching three tables, and an ORM that loads
 them naively issues one query for the order and then one per related set:
 
 |shape|reads to assemble one order|
@@ -111,27 +111,27 @@ them naively issues one query for the order and then one per related set:
 |relational, one join query|3 tables joined|
 |relational, naive ORM|1 + N round trips (the N+1 problem)|
 
-The document was written with the join already done, so the read is a single
-contiguous fetch with no reassembly. That is a real advantage for a
+The doc was written with the join already done. So The read is a single
+contiguous fetch with no reassembly. That is a real edge for a
 read-this-whole-object access pattern, and it grows as the object gains parts. It
-is the same coin as the update cost: the document pays once at write time to make
-this read cheap, and the relational shape pays a little at read time to keep every
+is the same coin as the update cost: the doc pays once at write time to make
+this read cheap, and the relational shape pays a little at read time to keep each
 fact in one place. Which way that trade should fall is a property of the workload, not of the
-database &mdash; read-mostly and object-shaped leans document, write-shared and
+DB &mdash; read-mostly and object-shaped leans doc, write-shared and
 queried-many-ways leans relational.
 
 ## Where it goes wrong
 
-**Choosing documents to avoid schema design.** The schema still exists; it has
-moved into the application, where nothing enforces it.
+**Choosing docs to avoid schema design.** The schema still exists. It has
+moved into the use, where nothing enforces it.
 
-**Unbounded arrays.** A document that grows without limit &mdash; every event
+**Unbounded arrays.** A doc that grows without limit &mdash; each event
 appended to one record &mdash; eventually exceeds the size limit and rewrites
-the whole thing on every append.
+the whole thing on each append.
 
-**Duplicating a fact that must stay consistent.** Fine for a historical snapshot,
+**Duplicating a fact that must stay steady.** Fine for a historical snapshot,
 a slow disaster for live data.
 
-**Using JSON columns for well-structured data.** If every row has the same
-fields, they are columns. Putting them in JSON gives up type checking and
+**Using JSON columns for well-structured data.** If each row has the same
+fields, they're columns. Putting them in JSON gives up type checking and
 constraints for nothing.

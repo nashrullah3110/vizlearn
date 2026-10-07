@@ -15,23 +15,7 @@ It works. The better form is:
 model = Module.model_validate_json(raw)
 ```
 
-It is not merely shorter. It is faster, produces better errors, and is more faithful with numbers. Three separate reasons, and they compound.
-
-The speed difference comes from skipping the intermediate Python dict. `json.loads` parses JSON into Python objects — dicts, lists, strings, floats — and then `model_validate` walks those objects and validates them. `model_validate_json` gives the raw bytes directly to Pydantic's Rust core, which parses and validates in a single pass without allocating a Python dict. On a 10 KB payload, this is 2–3x faster.
-
-The error quality improves because Pydantic sees the original JSON. With `json.loads` first, Pydantic receives Python objects and cannot tell you which byte offset in the JSON caused the error. With `model_validate_json`, the error message can point to the exact location in the raw JSON.
-
-Number fidelity is the subtle win. `json.loads` converts JSON numbers to Python `float`, which is IEEE 754 double precision. A value like `0.1` in JSON becomes `0.1000000000000000055511151231257827021181583404541015625` as a Python float. If the model field is `Decimal`, `model_validate` receives the already-lossy float and converts it to `Decimal("0.1000000000000000055511151231257827021181583404541015625")`. `model_validate_json` reads the JSON string `"0.1"` directly and produces `Decimal("0.1")` — the exact value the sender intended.
-
-`model_validate_json` accepts `bytes`, `bytearray`, and `str`. In a web framework, the request body is usually `bytes`, so there is no encoding step. `Module.model_validate_json(await request.body())` goes from raw HTTP to validated model in one call.
-
-`model_validate_json` also accepts the same `strict`, `context`, and other keyword arguments as `model_validate`. `Module.model_validate_json(raw, strict=True)` disables coercion — a JSON string `"42"` is not accepted for an `int` field.
-
-`TypeAdapter` has the same method. `TypeAdapter(List[Module]).validate_json(raw)` parses and validates a JSON array of modules in one step. This is the form for endpoints that accept bare collections rather than model wrappers.
-
-The habit worth building is to reach for `model_validate_json` whenever the input is raw JSON — which is nearly always in a web context. The two-step form (`json.loads` then `model_validate`) is for the case where you need the intermediate dict for something else (logging the raw payload, extracting one field before validating the whole thing).
-
-`model_dump_json()` is the reverse: it serialises a model instance to a JSON `bytes` object in one step, again through the Rust core. `module.model_dump_json(indent=2)` produces pretty-printed JSON. `module.model_dump_json(exclude={"internal"})` omits fields. The round trip — `model_validate_json` in, `model_dump_json` out — stays in Rust for both directions.
+It isn't merely shorter. It's faster, makes better errors. Is more faithful with numbers. Three split reasons, and they compound.
 
 
 ## One call instead of two
@@ -191,94 +175,94 @@ except ValidationError as e:
 ```
 ## Speed
 
-The two-step version parses JSON into Python objects &mdash; dicts, lists, strings, floats &mdash; and then validates those objects, converting again into what the model wants.
+The two-step version parses JSON into Python objects. Dicts, lists, strings, floats. And then validates those objects, converting again into what the model wants.
 
-Every intermediate object is allocated and thrown away. For a large payload that is a lot of garbage created for no purpose.
+each mid object is allocated and thrown away. For a large payload that is a lot of garbage created for no purpose.
 
-`model_validate_json` parses and validates in a single pass inside `pydantic-core`, the Rust engine. It reads the JSON text and constructs the final values directly, skipping the intermediate representation entirely.
+`model_validate_json` parses and validates in a single pass inside `pydantic-core`, the Rust engine. It reads the JSON text and makes the final values right, skipping the mid form fully.
 
-The saving grows with payload size. For a small request body it is unimportant; for a large document, or a high-throughput endpoint, it is a real difference for a change that makes the code shorter.
+The saving grows with payload size. For a small request body it's unimportant. For a large doc, or a high-throughput endpoint, it's a real gap for a change that makes the code shorter.
 
 ## Error quality
 
-This is the argument that matters most day to day.
+This is the arg that matters most day to day.
 
-With `json.loads`, malformed JSON raises `json.JSONDecodeError` &mdash; a different exception, from a different library, that knows nothing about your model. Your handler needs two `except` clauses producing two shapes of error response, and the JSON one has no field information because there are no fields yet.
+With `json.loads`, malformed JSON raises `json.JSONDecodeError`. A other exception, from a other library, that knows nothing about your model. Your handler needs two `except` clauses making two shapes of error response. The JSON one has no field data because there are no fields yet.
 
-`model_validate_json` folds it in. Malformed JSON becomes a `ValidationError` with the type `json_invalid`, arriving through exactly the same channel as a missing field or a failed constraint.
+`model_validate_json` folds it in. Malformed JSON turns a `ValidationError` with the type `json_invalid`, arriving through just the same channel as a missing field or a failed constraint.
 
 That means one handler. The function that turns a `ValidationError` into a 422 response now covers syntax errors too, without a special case.
 
-The error also carries the **position** in the document. For a missing comma four hundred lines into a config file, being told the line and column is the difference between a fix and a search.
+The error also carries the **spot** in the doc. For a missing comma four hundred lines into a config file, being told the line and column is the gap between a fix and a search.
 
 ## Fidelity with numbers
 
 The subtlest of the three, and the one that costs money.
 
-`json.loads` turns `0.1` into a Python float, because that is what JSON numbers are in Python. The float is already inexact at that moment. Handing it to a `Decimal` field faithfully preserves the wrong value.
+`json.loads` turns `0.1` into a Python float. That is what JSON numbers are in Python. The float is already inexact at that moment. Handing it to a `Decimal` field faithfully preserves the wrong value.
 
-`model_validate_json` reads the characters. When the target is a `Decimal`, it can construct it from the exact text, so `0.1` in the document becomes `Decimal("0.1")` rather than the float's approximation.
+`model_validate_json` reads the characters. When the target is a `Decimal`, it can make it from the exact text. `0.1` in the doc turns `Decimal("0.1")` rather than the float's guess.
 
-For anything financial, that is not a micro-optimisation &mdash; it is the difference between correct and quietly wrong. It also means the advice from the types module ("send money as a string") has a companion: even when a partner sends money as a JSON number, parsing directly recovers more of it than going via Python.
+For anything money, that isn't a micro-tuning. It's the gap between correct and quietly wrong. It also means the advice from the types module ("send money as a string") has a companion. Even when a partner sends money as a JSON number, parsing right recovers more of it than going via Python.
 
 ## The other direction
 
-`model_dump_json()` is the matching call, and it is symmetric for the same reasons: it serialises from the model's data straight to text, without building an intermediate dict.
+`model_dump_json()` is the matching call, and it's even for the same reasons. It serialises from the model's data straight to text, without building an mid dict.
 
-A round trip is exact for every type Pydantic knows. A `date` becomes an ISO string and parses back to the same `date`. A `Decimal` becomes a string and returns as the same `Decimal`. A UUID survives. This makes JSON a reasonable format for caching validated objects, and makes equality assertions in tests trustworthy.
+A round trip is exact for each type Pydantic knows. A `date` turns an ISO string and parses back to the same `date`. A `Decimal` turns a string and returns as the same `Decimal`. A UUID lives. This makes JSON a fair format for caching checked objects. Makes equality assertions in tests trustworthy.
 
 ## Bytes work too
 
-Both methods accept `bytes` as well as `str`, which is what an HTTP body actually is.
+Both methods accept `bytes` and `str`. This Is what an HTTP body really is.
 
-That saves a decode step, and avoids a class of bug where the wrong encoding is assumed. If you are reading a request body or a file, pass the bytes straight in.
+That saves a decode step, and avoids a class of bug where the wrong encoding is assumed. If you're reading a request body or a file, pass the bytes straight in.
 
 ## Non-model shapes
 
-Not every payload is an object. `TypeAdapter` provides the same one-step parsing for anything you can annotate:
+Not each payload is an object. `TypeAdapter` gives the same one-step parsing for anything you can annotate:
 
 ```python
 TypeAdapter(List[Lesson]).validate_json(payload)
 TypeAdapter(Dict[str, float]).validate_json(payload)
 ```
 
-Same speed benefit, same error handling, same fidelity. And `dump_json` in the other direction, which returns `bytes`.
+Same speed gain, same error handling, same fidelity. And `dump_json` in the other direction, which returns `bytes`.
 
-Build the adapter once at module level. Constructing one compiles a schema, and doing that inside a loop is a real and easily-missed performance mistake.
+Build the adapter once at module level. Making one compiles a schema. Doing that inside a loop is a real and easily-missed speed mistake.
 
 ## When to keep the two steps
 
-There are legitimate reasons to parse separately.
+There are legitimate reasons to parse apart.
 
-**You need the raw structure first.** Inspecting a `type` field to choose a model, logging the payload, or routing on something before validating. Though a discriminated union often removes the first of those.
+**You need the raw structure first.** Inspecting a `type` field to choose a model, logging the payload, or routing on a thing before checking. Though a discriminated union often drops the first of those.
 
-**The input is not JSON.** YAML, TOML and msgpack all produce Python objects, and `model_validate` is the right entry point for them.
+**The input isn't JSON.** YAML, TOML and msgpack all give Python objects. `model_validate` is the right entry point for them.
 
-**You already have a dict** from a database driver, another library, or your own code. There is nothing to parse.
+**You already have a dict** from a DB driver, another library, or your own code. There's nothing to parse.
 
-The rule is simple: if you are holding JSON text or bytes, use `model_validate_json`. If you are holding Python objects, use `model_validate`. The mistake is converting text to objects yourself purely to hand them to a validator that would rather have had the text.
+The rule is simple: if you're holding JSON text or bytes, use `model_validate_json`. If you're holding Python objects, use `model_validate`. The mistake is converting text to objects yourself purely to hand them to a checker that would rather have had the text.
 
 ## In practice with a framework
 
-FastAPI already does this for request bodies, so an endpoint annotated with a model gets the fast path without you asking.
+FastAPI already does this for request bodies. An endpoint annotated with a model gets the fast path without you asking.
 
-Where it matters in application code is everywhere else: reading a config file, consuming a queue message, calling another service and validating the response, loading a fixture in a test. Those are all places where the two-step habit is common and the one-step version is strictly better.
+Where it matters in use code is all over else. Reading a config file, consuming a queue message, calling another service and checking the response, loading a fixture in a test. Those are all places where the two-step habit is common and the one-step version is strictly better.
 
 ## Strictness and JSON
 
-The strict-mode module noted that a strict model validating from JSON still accepts the string forms JSON has no alternative to &mdash; a date as text, for instance.
+The strict-mode module noted that a strict model checking from JSON still accepts the string forms JSON has no option to. A date as text, say.
 
-That behaviour depends on Pydantic knowing the input was JSON, which it only does when you use `model_validate_json`. Parse with `json.loads` first and that context is gone: the model sees a Python string where a `date` was wanted, and in strict mode refuses it.
+That action depends on Pydantic knowing the input was JSON. This It only does when you use `model_validate_json`. Parse with `json.loads` first and that context is gone. The model sees a Python string where a `date` was wanted. In strict mode refuses it.
 
-So the two-step form is not merely slower, it can be *stricter in the wrong way*. Another reason to hand the text straight over.
+So the two-step form isn't merely slower, it can be *stricter in the wrong way*. Another reason to hand the text straight over.
 
 ## Large payloads
 
-For very large documents, two things are worth knowing.
+For very large docs, two things are worth knowing.
 
-Parsing is a single pass and memory-bounded by the result rather than by intermediate objects, so `model_validate_json` uses meaningfully less memory than the two-step form on a big document.
+Parsing is a single pass and memory-bounded by the result rather than by mid objects. `model_validate_json` uses usefully less memory than the two-step form on a big doc.
 
-There is no streaming. The whole document is parsed before validation completes, so a hundred-megabyte file is a hundred megabytes in memory. If that matters, the answer is at a different level &mdash; a streaming JSON reader producing records, each validated individually or in batches with a `TypeAdapter`.
+There's no streaming. The whole doc is parsed before check ends. A hundred-megabyte file is a hundred megabytes in memory. If that matters, the answer is at a other level. A streaming JSON reader making records, each checked on their own or in batches with a `TypeAdapter`.
 
 ## Reading from a file
 
@@ -288,69 +272,69 @@ The natural spelling reads bytes and hands them straight over:
 config = Settings.model_validate_json(Path("config.json").read_bytes())
 ```
 
-No decode step, no `json.load`, and a malformed file produces a `ValidationError` naming the position rather than a `JSONDecodeError` from elsewhere.
+No decode step, no `json.load`, and a malformed file makes a `ValidationError` naming the spot rather than a `JSONDecodeError` from elsewhere.
 
-For a config file that is a genuinely nice pattern: one call, one exception type, and errors that say which key was wrong and where in the file it was.
+For a config file that is a truly nice pattern. One call, one exception type. Errors that say which key was wrong and where in the file it was.
 
 ## Other formats
 
-Only JSON gets the fast path, because only JSON has a parser inside the core.
+Only JSON gets the fast path. Only JSON has a parser inside the core.
 
-YAML, TOML and msgpack all go through their own libraries, which produce Python objects, which then go to `model_validate`. That is the correct shape for those formats and there is nothing to optimise &mdash; but it does mean a YAML config gets none of the fidelity benefit for decimals, and a syntax error arrives as that library's exception.
+YAML, TOML and msgpack all go through their own libraries. This Give Python objects. This Then go to `model_validate`. That is the correct shape for those formats and there's nothing to optimise. But it does mean a YAML config gets none of the fidelity gain for decimals. A syntax error arrives as that library's exception.
 
 If exactness matters in a YAML config, quoting the number so it arrives as a string is the pragmatic fix.
 
 ## What to take away
 
-The habit is small: when you are holding JSON text or bytes, hand it to Pydantic rather than to `json.loads`.
+The habit is small: when you're holding JSON text or bytes, hand it to Pydantic rather than to `json.loads`.
 
-It is faster, because it skips an entire intermediate representation. It produces better errors, because syntax and validation failures arrive through one channel with positions attached. It is more faithful, because decimals keep the digits as written. And it is shorter to write.
+It's faster, because it skips an entire mid form. It makes better errors, because syntax and check failures arrive through one channel with spots attached. It's more faithful, because decimals keep the digits as written. And it's shorter to write.
 
 Very few changes improve four things at once for one fewer line of code.
 
 ## Summary
 
-`model_validate_json` for JSON text or bytes; `model_validate` for Python objects. One pass in Rust rather than two with garbage in between. Malformed JSON becomes a `ValidationError` with a position, so one handler covers syntax and validation alike. And decimals keep the precision that a trip through Python floats would have destroyed.
+`model_validate_json` for JSON text or bytes. `model_validate` for Python objects. One pass in Rust rather than two with garbage in between. Malformed JSON turns a `ValidationError` with a spot. One handler covers syntax and check alike. And decimals keep the precision that a trip through Python floats would have destroyed.
 
-`model_dump_json` on the way out, `TypeAdapter` for shapes that are not models, and build adapters once rather than per call.
+`model_dump_json` on the way out, `TypeAdapter` for shapes that aren't models. Build adapters once rather than per call.
 
 ## Where this fits
 
-This is a small change with an unusually good ratio, and it applies in more places than request handling.
+This is a small change with an unusually good ratio. It applies in more places than request handling.
 
-Reading a config file. Consuming a queue message. Validating another service's response. Loading a test fixture. Anywhere JSON text or bytes are in hand and a model is about to be built from them.
+Reading a config file. Consuming a queue message. checking another service's response. Loading a test fixture. Anywhere JSON text or bytes are in hand and a model is about to be built from them.
 
-In each of those the two-step habit is common, and in each of them the one-step form is faster, produces better errors and keeps more precision. It is worth grepping for `json.loads` once and seeing how many of them are immediately followed by a validation call.
+In each of those the two-step habit is common. In each of them the one-step form is faster, makes better errors and keeps more precision. It's worth grepping for `json.loads` once and seeing how many of them are at once followed by a check call.
 
 
 ## Mistakes people make
 
-**Parsing first out of habit.** `json.loads` followed immediately by `model_validate` is the shape to grep for. Every instance of it is slower, produces worse errors and loses decimal precision compared with handing the text over directly.
+**Parsing first out of habit.** `json.loads` followed at once by `model_validate` is the shape to grep for. each instance of it's slower, makes worse errors and loses decimal precision checked with handing the text over right.
 
-**Catching two exception types.** Code with an `except JSONDecodeError` beside an `except ValidationError` is code that parsed separately. Validating the text directly collapses both into one channel and one handler.
+**Catching two exception types.** Code with an `except JSONDecodeError` beside an `except ValidationError` is code that parsed apart. checking the text right merges both into one channel and one handler.
 
-**Decoding bytes unnecessarily.** An HTTP body is bytes and both methods accept bytes. Decoding to `str` first adds a step and a chance to assume the wrong encoding.
+**Decoding bytes needlessly.** An HTTP body is bytes and both methods accept bytes. Decoding to `str` first adds a step and a chance to assume the wrong encoding.
 
-**Expecting streaming.** There is none. The whole document is parsed before validation completes, so a very large file is entirely in memory. Streaming needs a different tool producing records, each validated individually or in batches.
+**Expecting streaming.** There's none. The whole doc is parsed before check ends. A very large file is fully in memory. Streaming needs a other tool making records, each checked on their own or in batches.
 
-**Assuming the fast path applies to YAML or TOML.** Only JSON has a parser inside the core. Other formats go through their own libraries and produce Python objects, which then take the ordinary route &mdash; including losing decimal exactness on the way.
+**given the fast path applies to YAML or TOML.** Only JSON has a parser inside the core. Other formats go through their own libraries and give Python objects. This Then take the plain route. Including losing decimal exactness on the way.
 
-**Using it when you already have a dict.** There is nothing to parse. The rule is simply which you are holding: text or bytes go to `model_validate_json`, Python objects go to `model_validate`.
+**Using it when you already have a dict.** There's nothing to parse. The rule is simply which you're holding. Text or bytes go to `model_validate_json`, Python objects go to `model_validate`.
 
 ## One line, four improvements
 
-Speed, because an entire intermediate representation is skipped. Errors, because syntax and validation failures arrive through one channel with positions attached. Fidelity, because decimals keep the digits as written. Strictness, because the parser knows the input was JSON and applies the right rules.
+Speed, because an entire mid form is skipped. Errors, because syntax and check failures arrive through one channel with spots attached. Fidelity, because decimals keep the digits as written. Strictness, because the parser knows the input was JSON and applies the right rules.
 
-All of it from handing Pydantic the text instead of parsing it first &mdash; which is also less code than the alternative.
+All of it from handing Pydantic the text instead of parsing it first. Which is also less code than the option.
 
 ## Why the habit persists
 
-The two-step form is not the result of anyone deciding it was better. It is what you write when you learn `json` before you learn Pydantic, which is the order nearly everybody learns them in.
+The two-step form isn't the result of anyone deciding it was better. It's what you write when you learn `json` before you learn Pydantic. This Is the order nearly everybody learns them in.
 
-`json.loads` is the obvious way to turn text into data, and once the data exists, validating it is the obvious next step. Both halves are reasonable and the combination is worse than either author intended.
+`json.loads` is the obvious way to turn text into data. Once the data exists, checking it's the obvious next step. Both halves are fair and the mix is worse than either author intended.
 
-That is worth naming because it explains why the pattern is everywhere, including in a lot of documentation and answers online, and why changing it is a matter of noticing rather than of understanding.
+That is worth naming because it shows why the pattern is all over, including in a lot of docs and answers online. Why changing it's a matter of noticing rather than of understanding.
 
-The check takes a minute: search a codebase for `json.loads` and look at the line after each one. Wherever it is a validation call, the two lines collapse into one that is faster, more precise about numbers, and produces errors that say where in the document the problem was.
+The check takes a minute: search a code for `json.loads` and look at the line after each one. Wherever it's a check call, the two lines collapse into one that is faster, more precise about numbers. Makes errors that say where in the doc the problem was.
 
-There is rarely a reason to keep the two-step version once seen &mdash; unless something genuinely needs the raw structure in between, which is a real case and a small one.
+There's rarely a reason to keep the two-step version once seen. Unless a thing truly needs the raw structure in between. This Is a real case and a small one.

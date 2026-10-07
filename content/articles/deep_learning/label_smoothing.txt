@@ -1,77 +1,77 @@
 title: Label Smoothing
-intro: A one-line change to the target that improves calibration, and the reason the loss no longer reaches zero.
+intro: A one-line change to the target that raises calibration. The reason the loss no longer reaches zero.
 
 ## The problem with a hard target
 
-Cross-entropy loss with a one-hot target asks the model to put probability 1 on the
-correct class and exactly 0 on everything else.
+Cross-entropy with a one-hot target asks the model to put chance 1 on the
+correct class and 0 on all else.
 
-Softmax cannot produce exactly 1. It approaches it as the correct logit runs
+Softmax can't give just 1. It approaches it as the correct logit runs
 away from the others, and reaches it only in the limit. So the target is
-unattainable, the gradient never vanishes, and training keeps pushing the logit
-gap wider for as long as you let it.
+unattainable, the grad never vanishes, and training keeps pushing the logit
+gap wider for if you let it.
 
-The consequences are familiar. The model becomes **overconfident**, reporting
+The consequences are familiar. The model turns **too sure**, reporting
 0.99 on cases it gets wrong. It **overfits**, because widening logits on training
-examples is always an available way to reduce the loss. And it is **badly
-calibrated**, producing probabilities that systematically overstate certainty, in exactly the way
+examples is always an available way to reduce the loss. And it's **badly
+calibrated**, in just the way
 [the calibration module](../machine_learning/probability_calibration.html)
 measures.
 
 ## The change
 
-Move a little probability off the correct class and spread it over the others:
+Move a little chance off the correct class and spread it over the others:
 
 ```
 target[correct]  =  1 - eps + eps/K
 target[others]   =  eps/K
 ```
 
-Drag epsilon and watch the bars. At 0 you have the one-hot target. At 0.1 the
+Drag epsilon and watch the bars. At 0 you've the one-hot target. At 0.1 the
 true class asks for 0.91 and each of nine others asks for about 0.011.
 
 That is the entire technique.
 
 ## Why it fixes the problem
 
-The readout gives the **optimal logit gap**: how far apart the logits have to be
-to match the target exactly.
+The readout gives the **best logit gap**: how far apart the logits have to be
+to match the target just.
 
-At epsilon 0 it is infinite, which is the problem restated. At epsilon 0.1 it is
-a specific finite number, and once the model reaches it the gradient is zero.
+At epsilon 0 it's infinite. This Is the problem restated. At epsilon 0.1 it's
+a exact finite number, and once the model reaches it the grad is zero.
 The model now has a reason to *stop*.
 
-That is the mechanism. Not noise, not regularisation in the weight-decay sense
+That is the mechanism. Not noise, not smoothing in the weight-decay sense
 &mdash; a reachable target where before there was none.
 
 ## The loss will not reach zero
 
-The readout also gives the minimum achievable loss, which is the entropy of the
+The readout also gives the min achievable loss. This Is the entropy of the
 smoothed target.
 
-A model matching the smoothed target perfectly still reports a loss around 0.5
-at typical settings. This surprises people who expect training loss to approach
-zero, and it is not a bug: you changed what perfect means.
+A model matching the smoothed target just right still reports a loss around 0.5
+at common settings. This surprises people who expect training loss to approach
+zero, and it isn't a bug: you changed what perfect means.
 
-It also means training and validation losses are no longer comparable with runs
-that did not use smoothing. Compare accuracy, or compare like with like.
+It also means training and validation losses are no longer close with runs
+that didn't use smoothing. Compare fit, or compare like with like.
 
 ## What it buys, and what it costs
 
-**Better calibration.** The headline benefit. Confidences become closer to
-observed accuracies.
+**Better calibration.** The headline gain. Confidences become closer to
+seen accuracies.
 
-**Better generalisation.** Consistent small gains across image classification
-and translation. It was in the Inception-v3 paper and in the original
+**Better generalisation.** Steady small gains across image classification
+and translation. It was in the Inception-v3 paper and in the first
 Transformer, at 0.1 in both, and 0.1 has been the default ever since.
 
-**Tighter class clusters.** Representations of a class group more tightly, with
+**Tighter class clusters.** Forms of a class group more tightly, with
 more even distances between classes.
 
 That last one has a cost. **Label smoothing hurts distillation.** A student
-learns from the teacher's full output distribution, and the informative part is
-the relative sizes of the *wrong* classes &mdash; that this dog was slightly cat
-and not at all lorry. Smoothing deliberately flattens exactly that, erasing what
+learns from the teacher's full output spread, and the helpful part is
+the scaled sizes of the *wrong* classes. That this dog was slightly cat
+and not at all lorry. Smoothing on purpose flattens just that, erasing what
 the student was supposed to learn. If a model is going to be a distillation
 teacher, train it without.
 
@@ -80,7 +80,7 @@ teacher, train it without.
 Two numbers make label smoothing concrete. With `epsilon = 0.1` and `K = 10`
 classes, the target puts `1 - 0.1 + 0.1/10 = 0.91` on the correct class and
 `0.1/10 = 0.011` on each of the other nine. A model that matches that target
-*exactly* still records a cross-entropy equal to the target's own entropy:
+*just* still records a cross-entropy equal to the target's own entropy:
 
 `-(0.91 &middot; ln 0.91 + 9 &middot; 0.011 &middot; ln 0.011) &asymp; 0.50`
 
@@ -89,54 +89,54 @@ classes, the target puts `1 - 0.1 + 0.1/10 = 0.91` on the correct class and
 |one-hot|0 (but never reached &mdash; needs an infinite logit gap)|
 |smoothed, eps = 0.1|~0.50|
 
-That is the whole mechanism, stated as arithmetic. The one-hot target has a floor
+That is the whole mechanism, stated as math. The one-hot target has a floor
 of zero that softmax can only approach by driving the correct logit infinitely
-far from the rest &mdash; so the gradient never vanishes and training keeps
-inflating confidence. The smoothed target has a floor of 0.50 reached at a
+far from the rest &mdash; so the grad never vanishes and training keeps
+inflating trust. The smoothed target has a floor of 0.50 reached at a
 *finite* logit gap, so the model has a reason to stop, and it stops before it
-becomes overconfident. It also means a smoothed run's training loss is not
-comparable with an unsmoothed one: 0.50 is the new zero, and comparing the raw
-numbers across the two is comparing against different floors.
+turns too sure. It also means a smoothed run's training loss isn't
+close with an unsmoothed one: 0.50 is the new zero, and checking the raw
+numbers across the two is checking against different floors.
 
 The one place smoothing actively hurts is distillation. A student learns from the
-teacher's full output distribution, and the informative part is the relative sizes
-of the *wrong* classes &mdash; that a particular dog photo is a little cat-like and
-not at all lorry-like. That structure is exactly what smoothing flattens, by
-design, pushing every wrong class toward the same small value. So a model destined
-to be a distillation teacher should be trained without it, even though 0.1 is the
-right default almost everywhere else &mdash; it was in the Inception-v3 paper and
-the original Transformer, and it has stayed the default because the calibration
-and generalisation gains are consistent across classification and translation
+teacher's full output spread, and the helpful part is the scaled sizes
+of the *wrong* classes &mdash; that a given dog photo is a little cat-like and
+not at all lorry-like. That structure is just what smoothing flattens, by
+design, pushing each wrong class toward the same small value. So a model destined
+to be a distillation teacher should be trained without it, though 0.1 is the
+right default almost all over else. It was in the Inception-v3 paper and
+the first Transformer, and it has stayed the default because the calibration
+and generalisation gains are steady across classification and translation
 alike.
 
-It is also worth remembering what smoothing is not: it is a change to a
-categorical target, so it has no meaning for regression, and it is not a
-substitute for explicit calibration. Temperature scaling on a validation set
-corrects confidence more directly, and the two compose &mdash; smoothing during
+It's also worth remembering what smoothing isn't: it's a change to a
+cat target, so it has no meaning for regression, and it isn't a
+substitute for clear calibration. Temperature scaling on a validation set
+corrects trust more right, and the two compose &mdash; smoothing during
 training, scaling afterwards.
 
 ## Where it goes wrong
 
-**Epsilon too large.** Past about 0.2 you are actively teaching the model that
-wrong answers are plausible, and accuracy falls. Drag it up and watch the target
+**Epsilon too large.** Past about 0.2 you're actively teaching the model that
+wrong answers are plausible, and fit falls. Drag it up and watch the target
 flatten.
 
-**Comparing losses across runs.** The floor moved.
+**Checking losses across runs.** The floor moved.
 
-**Using it on a teacher model.** It removes the dark knowledge distillation
+**Using it on a teacher model.** It drops the dark knowledge distillation
 depends on.
 
-**Applying it to regression.** It is a change to a categorical target and has no
+**Applying it to regression.** It's a change to a cat target and has no
 meaning without one.
 
-**Expecting it to fix a badly calibrated model on its own.** It helps; explicit
+**Expecting it to fix a badly calibrated model on its own.** It helps. Clear
 [temperature
 scaling](../machine_learning/probability_calibration.html) on a validation set
 helps more, and the two combine.
 
 ## Tell the model it might be wrong
 
-Replacing a target of 1.0 with 0.9 changes what the loss is minimised by. This computes that optimum exactly, then shows the effect on confidence and on the logits themselves.
+Replacing a target of 1.0 with 0.9 changes what the loss is minimised by. This finds that optimum just, then shows the effect on trust and on the logits themselves.
 
 ```python-run
 import numpy as np

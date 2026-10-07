@@ -1,23 +1,14 @@
 title: field_validator: Rules an Annotation Cannot Express
-intro: Custom checks and normalisation, and exactly where in the pipeline they run.
+intro: Custom checks and scaling, and just where in the pipeline they run.
 
 ## What is left after types and constraints
 
-Annotations describe the kind of value. Constraints narrow it to a range, a length or a pattern. Between them they cover a great deal, and then they stop.
+Annotations show the kind of value. Constraints narrow it to a range, a length or a pattern. Between them they cover a great deal, and then they stop.
 
-They cannot check membership of a set that lives in a database. They cannot normalise whitespace before checking a length. They cannot say "if this looks like a legacy identifier, convert it". They cannot express any rule whose logic is longer than a comparison.
+They can't check membership of a set that lives in a DB. They can't norm whitespace before checking a length. They can't say "if this looks like a legacy identifier, convert it". They can't express any rule whose logic is longer than a compare.
 
-`field_validator` is where those live. It is a classmethod that receives one field's value, and either returns a value or raises.
+`field_validator` is where those live. It's a classmethod that receives one field's value. Either returns a value or raises.
 
-The decorator takes the field name as a string: `@field_validator("track")`. It can take multiple names to apply the same rule to several fields: `@field_validator("start", "end")`. The function receives `cls` (the class) and `v` (the value), and must return the value, possibly transformed. Raising `ValueError` rejects the input with the message you provide.
-
-The `mode` argument controls when the validator runs. `mode="before"` runs before Pydantic's type coercion, so the value is whatever the caller passed &mdash; possibly a string, a dict, or anything else. `mode="after"` (the default) runs after coercion, so the value is already the declared type. Use "before" when you want to accept alternative input formats; use "after" when you want to check constraints on the typed value.
-
-A validator can normalise as well as validate. Stripping whitespace, lowering case, converting a legacy format &mdash; these are transformations that belong in the validator because they happen at the boundary, before the rest of the application sees the data. Return the cleaned value and it becomes the field's value.
-
-`model_validator` validates across fields rather than one at a time. Use it when a constraint involves two or more fields: "end must be after start", "exactly one of email or phone must be provided". It receives the entire model (or the raw data in "before" mode) and can check any combination of fields.
-
-Validators run in field order for field validators and after all fields for model validators. If a field fails type coercion, its validator does not run. If you need to validate a field that might be missing, annotate it as `Optional` with a default and check for `None` in the validator.
 
 ## A rule the annotation cannot hold
 
@@ -221,23 +212,23 @@ def known_track(cls, v: str) -> str:
 
 Four things about that are load-bearing.
 
-**`@classmethod` is required**, and it must sit *below* `@field_validator`. Decorators apply bottom-up, so this order gives `field_validator` a classmethod to register. Reversed, you get an error that does not obviously say what is wrong, and it is one of the most common mistakes people make with this API.
+**`@classmethod` is needed**, and it must sit *below* `@field_validator`. Decorators apply bottom-up. This order gives `field_validator` a classmethod to register. Reversed, you get an error that doesn't obviously say what is wrong, and it's one of the most common mistakes people make with this API.
 
-**Raise `ValueError`**, not `ValidationError`. Pydantic catches it, attaches the field's location, gives it the type `value_error`, and folds it into the same report as every built-in failure. Constructing a `ValidationError` yourself is awkward and unnecessary. `AssertionError` also works but is a poor choice, because `python -O` removes assertions and your validation would silently stop running.
+**Raise `ValueError`**, not `ValidationError`. Pydantic catches it, attaches the field's location, gives it the type `value_error`. Folds it into the same report as each built-in failure. Making a `ValidationError` yourself is awkward and not needed. `AssertionError` also works but is a poor choice. `python -O` drops assertions and your check would silently stop running.
 
-**Return the value.** This is the mistake that bites hardest, because it fails quietly: a validator that checks and forgets to return sets the field to `None`. If a field mysteriously becomes `None` after you add a validator, this is why.
+**Return the value.** This is the mistake that bites hardest. It fails quietly. A checker that checks and forgets to return sets the field to `None`. If a field mysteriously turns `None` after you add a checker, this is why.
 
-**Name the failure usefully.** The message goes to whoever sent the data. `"unknown track 'astrology'; try one of dsa, maths, ml, python"` is worth the extra few characters over `"invalid"`.
+**Name the failure usefully.** The message goes to whoever sent the data. `"unknown track 'astrology'. Try one of dsa, maths, ml, python"` is worth the extra few characters over `"invalid"`.
 
 ## Validation is also normalisation
 
-Because the returned value becomes the field, a validator is the natural place to clean data.
+Because the returned value turns the field, a checker is the natural place to clean data.
 
-Stripping whitespace, collapsing runs of spaces, lowercasing an identifier, deduplicating a list, normalising a phone number &mdash; all of these belong here, and doing them here means every consumer downstream gets the clean version. The alternative is normalising at each use site, where one place will forget.
+Stripping whitespace, merging runs of spaces, lowercasing an identifier, deduplicating a list, norming a phone number. All of these belong here. Doing them here means each consumer downstream gets the clean version. The option is norming at each use site. Here One place will forget.
 
-There is a small config-level shortcut for the most common case: `str_strip_whitespace=True` in `model_config` strips every string field, which removes a lot of trivial validators in one line.
+There's a small config-level shortcut for the most common case: `str_strip_whitespace=True` in `model_config` strips each string field. This Drops a lot of trivial checkers in one line.
 
-Be careful about how much you transform. A validator that substantially rewrites its input is doing work a reader will not expect from the annotation, and a caller may be surprised that what they sent is not what came back. Normalising whitespace is uncontroversial; silently correcting a misspelt category is not, and probably deserves to be an error instead.
+Be careful about how much you transform. A checker that much rewrites its input is doing work a reader won't expect from the annotation. A caller may be surprised that what they sent isn't what came back. Norming whitespace is uncontroversial. Silently correcting a misspelt group isn't. Probably deserves to be an error instead.
 
 ## Several fields at once
 
@@ -247,13 +238,13 @@ The decorator takes multiple names:
 @field_validator("title", "summary")
 ```
 
-And `"*"` applies to every field, which is occasionally useful for a cross-cutting concern &mdash; rejecting control characters, say &mdash; though a validator that runs on every field has to be careful, because it will receive values of every type.
+And `"*"` applies to each field. This Is at times handy for a cross-cutting concern. Rejecting control characters, say. Though a checker that runs on each field has to be careful. It will receive values of each type.
 
-`ValidationInfo`, the optional second argument, carries `field_name`, which is what lets one validator produce a message naming the specific field it was applied to.
+`ValidationInfo`, the optional second arg, carries `field_name`. This Is what lets one checker give a message naming the exact field it was applied to.
 
 ## Seeing other fields, and the limit of that
 
-`info.data` is a dict of the fields validated *before* this one:
+`info.data` is a dict of the fields checked *before* this one:
 
 ```python
 @field_validator("lessons")
@@ -262,15 +253,15 @@ def enough_time(cls, v, info):
     minutes = info.data.get("minutes")
 ```
 
-Fields are validated in declaration order, so `minutes` is visible to `lessons` only because it is declared above it. Reorder the class and the validator silently stops seeing it.
+Fields are checked in declaration order. `minutes` is visible to `lessons` only because it's declared above it. Reorder the class and the checker silently stops seeing it.
 
-That fragility is the reason to treat `info.data` as a convenience rather than the tool for cross-field rules. Use `.get()` rather than indexing, because a field that failed its own validation is simply absent, and a `KeyError` inside a validator is a much worse error than the one it was trying to report.
+That fragility is the reason to treat `info.data` as a convenience rather than the tool for cross-field rules. Use `.get()` rather than indexing. A field that failed its own check is simply absent. A `KeyError` inside a checker is a much worse error than the one it was trying to report.
 
-For any rule that genuinely depends on more than one field, `model_validator(mode="after")` is the correct tool. It runs once, after everything is populated, and it does not care what order the class was written in. That is the next module.
+For any rule that truly depends on more than one field, `model_validator(mode="after")` is the correct tool. It runs once, after all is populated. It doesn't care what order the class was written in. That is the next module.
 
 ## Before and after
 
-By default a validator runs in `mode="after"` &mdash; after coercion, so the value is already the annotated type. That is what you want for almost every rule, because you are checking a real `int` rather than something that might be a string.
+By default a checker runs in `mode="after"`. After coercion. The value is already the annotated type. That is what you want for almost each rule. You're checking a real `int` rather than a thing that might be a string.
 
 `mode="before"` runs on the raw input, before Pydantic has tried anything. Its use is fixing the *shape* of data rather than the value:
 
@@ -283,29 +274,29 @@ def split_csv(cls, v):
     return v
 ```
 
-A caller sends `"maths,vectors"` where a list was wanted. In `after` mode you would never see it &mdash; validation would already have failed, because a string is not a list. In `before` mode you can convert it and let normal validation proceed.
+A caller sends `"maths,vectors"` where a list was wanted. In `after` mode you'd never see it. Check would already have failed. A string isn't a list. In `before` mode you can convert it and let normal check proceed.
 
-Two rules for `before` validators. Accept whatever might arrive, since the value has not been checked and could be anything, so guard with `isinstance` rather than assuming. And pass through anything you do not handle, unchanged, so the normal path still runs.
+Two rules for `before` checkers. Accept what might arrive. The value hasn't been checked and could be anything. Guard with `isinstance` rather than given. And pass through anything you don't handle, unchanged. So The normal path still runs.
 
 ## Validators and inheritance
 
-Validators are inherited like any other classmethod, so a base model's rules apply to every subclass. That makes a base a good home for cross-cutting normalisation.
+checkers are from parent like any other classmethod. A base model's rules apply to each subclass. That makes a base a good home for cross-cutting scaling.
 
-A subclass can override a validator by defining one with the same name, which replaces it entirely rather than adding to it. If you want both, give them different names &mdash; several validators can target the same field and they run in definition order.
+A subclass can replace a checker by defining one with the same name. This Replaces it fully rather than adding to it. If you want both, give them other names. A few checkers can target the same field and they run in meaning order.
 
 ## When not to reach for one
 
-Three cases where a validator is the wrong answer.
+Three cases where a checker is the wrong answer.
 
-**When a constraint would do.** `Field(gt=0)` and a validator that checks `v > 0` both reject the same values, but only the constraint appears in the JSON Schema. That means the documentation says the minimum, the generated client knows it, and a form can enforce it before a request is sent. A validator is invisible to all of that.
+**When a constraint would do.** `Field(gt=0)` and a checker that checks `v > 0` both reject the same values. Only the constraint appears in the JSON Schema. That means the docs says the min, the made client knows it. A form can enforce it before a request is sent. A checker is invisible to all of that.
 
-**When it needs I/O.** A validator that queries a database to check a foreign key turns validation into a network call, makes the model untestable without a database, and turns a validation error into a timeout. Keep models pure: they check data using only data. Existence checks belong in the layer that owns the storage.
+**When it needs I/O.** A checker that queries a DB to check a foreign key turns check into a network call, makes the model untestable without a DB. Turns a check error into a timeout. Keep models pure. They check data using only data. Existence checks belong in the layer that owns the storage.
 
-**When it is really a type.** A validator enforcing membership of four strings should be a `Literal`. A validator checking a value is one of a set with behaviour should be an `Enum`. Both produce better errors and both appear in the schema.
+**When it's really a type.** A checker enforcing membership of four strings should be a `Literal`. A checker checking a value is one of a set with action should be an `Enum`. Both give better errors and both appear in the schema.
 
 ## Several validators on one field
 
-More than one validator can target the same field, and they run in definition order:
+More than one checker can target the same field, and they run in meaning order:
 
 ```python
 @field_validator("slug")
@@ -317,53 +308,53 @@ def strip(cls, v): return v.strip()
 def lower(cls, v): return v.lower()
 ```
 
-Splitting rules like this is usually clearer than one function doing four things, and each has a name that says what it enforces. The name matters more than it looks &mdash; it appears in tracebacks and it is what a reader scans for when asking "where is the rule about slugs?".
+Splitting rules like this is often clearer than one function doing four things. Each has a name that says what it enforces. The name matters more than it looks. It appears in tracebacks and it's what a reader scans for when asking "where is the rule about slugs?".
 
-The counter-argument is that a chain of tiny validators can obscure the order dependency between them. If step two only makes sense after step one, saying so in one function with two comments is honest; splitting them and hoping nobody reorders is not.
+The counter-arg is that a chain of tiny checkers can obscure the order dependency between them. If step two only makes sense after step one, saying so in one function with two comments is honest. Splitting them and hoping no one reorders isn't.
 
 ## What info carries
 
-The optional second parameter is a `ValidationInfo`, and beyond `field_name` and `data` it has two more things.
+The optional second param is a `ValidationInfo`. Beyond `field_name` and `data` it has two more things.
 
-`config` exposes the model's configuration, which lets a validator behave differently depending on, say, whether the model is strict.
+`config` exposes the model's config. This Lets a checker behave differently based on, say, whether the model is strict.
 
-`context` is arbitrary data you pass in at validation time:
+`context` is any data you pass in at check time:
 
 ```python
 Module.model_validate(payload, context={"tenant": "acme"})
 ```
 
-Inside a validator, `info.context` holds that dict. This is the supported way to give validation access to something external without reaching for a global &mdash; a tenant, a feature flag, a set of permitted values loaded once per request.
+Inside a checker, `info.context` holds that dict. This is the supported way to give check access to a thing external without reaching for a global. A tenant, a feature flag, a set of permitted values loaded once per request.
 
-It is genuinely useful and easy to overuse. A model whose rules depend heavily on context is a model that cannot be understood on its own, and the checks may belong in a service instead.
+It's truly handy and easy to overuse. A model whose rules depend heavily on context is a model that can't be understood on its own. The checks may belong in a service instead.
 
 ## Reusing a rule across models
 
-If two models need the same validator, do not copy it. There are two clean options.
+If two models need the same checker, don't copy it. There are two clean options.
 
-Put it on a shared base model, so every subclass inherits it. Good when the models are genuinely related.
+Put it on a shared base model. Each subclass takes from it. Good when the models are truly related.
 
-Or make it part of a type with `AfterValidator`, so the rule travels with the annotation rather than with the class. That is the `Annotated` module's subject, and it is usually the better answer when the models are unrelated but the field means the same thing in both.
+Or make it part of a type with `AfterValidator`. The rule travels with the annotation rather than with the class. That is the `Annotated` module's subject. It's often the better answer when the models are unrelated but the field means the same thing in both.
 
 Copying the same `@field_validator` into four classes is the thing both of those exist to prevent.
 
 ## Errors worth writing well
 
-The message you raise is seen by whoever sent the data, and it is worth a moment's thought.
+The message you raise is seen by whoever sent the data. It's worth a moment's thought.
 
-Include what was wrong and what would be right. `"unknown track 'astrology'; try one of dsa, maths, ml, python"` costs a few characters and saves a support message.
+Include what was wrong and what would be right. `"unknown track 'astrology'. Try one of dsa, maths, ml, python"` costs a few characters and saves a support message.
 
-Do not include the value if it might be sensitive. The error report already carries `input`, and a message that also embeds a token puts it in a second place.
+Don't include the value if it might be sensitive. The error report already carries `input`. A message that also embeds a token puts it in a second place.
 
-And keep the message about the data, not the code. `"validation failed in known_track"` tells the caller nothing they can act on.
+And keep the message about the data, not the code. `"check failed in known_track"` tells the caller nothing they can act on.
 
 ## Summary
 
-`field_validator` handles what annotations and constraints cannot: logic. It runs after coercion by default, receives one field, and whatever it returns becomes that field &mdash; which makes it as much a normalisation hook as a check.
+`field_validator` handles what annotations and constraints can't: logic. It runs after coercion by default, receives one field. What it returns turns that field. Which makes it as much a scaling hook as a check.
 
-Remember the four mechanics: `@classmethod` underneath, raise `ValueError`, always return, and use `mode="before"` only when you are fixing shape rather than value.
+note the four mechanics: `@classmethod` underneath, raise `ValueError`, always return. Use `mode="before"` only when you're fixing shape rather than value.
 
-And reach for it second. Types first, constraints next, validators for what is left.
+And reach for it second. Types first, constraints next, checkers for what is left.
 
 ## A worked example
 
@@ -387,22 +378,22 @@ def clean(cls, v: List[str]) -> List[str]:
     return out
 ```
 
-Two validators, two jobs, two modes. The first repairs the shape when a caller sends a string. The second normalises and deduplicates once the value really is a list.
+Two checkers, two jobs, two modes. The first repairs the shape when a caller sends a string. The second norms and deduplicates once the value really is a list.
 
-Splitting them this way is deliberate. Doing both in a single `before` validator would mean the cleaning logic runs on unvalidated input and has to defend itself; doing both in `after` would mean the string never arrives. Each piece runs where its assumptions hold.
+Splitting them this way is deliberate. Doing both in a single `before` checker would mean the cleaning logic runs on unvalidated input and has to defend itself. Doing both in `after` would mean the string never arrives. Each piece runs where its assumptions hold.
 
-The result is a field that accepts `"Maths, maths, VECTORS "` or `["Maths", "maths", "VECTORS "]` and produces `["maths", "vectors"]` either way &mdash; and every consumer downstream gets the clean version without knowing any of this happened.
+The result is a field that accepts `"Maths, maths, VECTORS "` or `["Maths", "maths", "VECTORS "]` and makes `["maths", "vectors"]` either way. And each consumer downstream gets the clean version without knowing any of this happened.
 
 ## The order to reach for things
 
-Types, then constraints, then validators. Working down that list rather than up produces models where most rules are visible in the annotations and only the genuinely complex ones are in code &mdash; which is also the order of how much each rule tells your schema, your documentation and your consumers.
+Types, then constraints, then checkers. Working down that list rather than up makes models where most rules are visible in the annotations and only the truly complex ones are in code. Which is also the order of how much each rule tells your schema, your docs and your consumers.
 
 ## Validators and the schema
 
-Worth restating once more, because it is the trade this whole module sits inside.
+Worth restating once more, because it's the trade this whole module sits inside.
 
-A validator enforces a rule perfectly and tells nobody. The value is rejected, the caller gets an error, and every tool that reads your schema &mdash; documentation, generated clients, form builders, contract tests &mdash; remains unaware that the rule exists.
+A checker enforces a rule just right and tells no one. The value is rejected, the caller gets an error. Each tool that reads your schema. docs, made clients, form builders, contract tests. Remains unaware that the rule exists.
 
-That is not an argument against validators. It is an argument for using them for what genuinely needs them, and for reaching first for the annotations and constraints that can say the same thing in a form other tools can read.
+That isn't an arg against checkers. It's an arg for using them for what truly needs them. For reaching first for the annotations and constraints that can say the same thing in a form other tools can read.
 
-When a rule can only be a validator, consider describing it in the model's docstring, which becomes the schema's description. The rule still will not be machine-readable, but a human reading your documentation will at least know it is there rather than discovering it through a rejection.
+When a rule can only be a checker, consider showing it in the model's docstring. This Turns the schema's description. The rule still won't be machine-readable. A human reading your docs will at least know it's there rather than discovering it through a rejection.

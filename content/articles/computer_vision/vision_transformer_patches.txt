@@ -1,43 +1,43 @@
 title: Vision Transformer Patches
-intro: The one step that lets a language architecture read a photograph, and the quadratic cost hiding in it.
+intro: The one step that lets a language architecture read a photo. The quadratic cost hiding in it.
 
 ## Images are grids; transformers want sequences
 
 A transformer operates on a sequence of vectors and has no built-in notion of
-two dimensions. An image is a grid of pixels. Something has to convert one into
+two dims. An image is a grid of pixels. a thing has to convert one into
 the other.
 
-The obvious approach &mdash; one token per pixel &mdash; is impossible. A
-224&#215;224 image is 50,176 pixels, and attention costs grow with the square of
-the sequence length, so that is 2.5 billion pairwise interactions per layer.
+The obvious approach &mdash; one token per pixel &mdash; is hopeless. A
+224&#215;224 image is 50,176 pixels, and focus costs grow with the square of
+the sequence length, so that is 2.5 billion pairwise interplays per layer.
 
 The Vision Transformer's answer is almost aggressively simple: **cut the image
-into square patches and treat each patch as a token.** A 224&times;224 image with 16&times;16 patches becomes a sequence of 196 tokens, each a flattened 768-dimensional vector. That is short enough for standard attention, and it preserves enough spatial structure for the model to learn where things are. The patch size controls the tradeoff: smaller patches mean a longer sequence and quadratically more attention cost, but finer spatial detail.
+into square patches and treat each patch as a token.**
 
 ## The whole preprocessing step
 
-Drag the patch control and watch the grid change. That is genuinely all that
+Drag the patch control and watch the grid change. That is truly all that
 happens to the image before it enters the model:
 
-1. Cut into non-overlapping `P`&#215;`P` patches.
+1. Cut into non-shared `P`&#215;`P` patches.
 2. Flatten each patch to a vector of `P * P * 3` numbers.
-3. Multiply by one learned matrix to get the model width.
-4. Add a positional embedding, because otherwise the order is unknown.
+3. Times by one learned mat to get the model width.
+4. Add a spot-based embedding, because or else the order is unknown.
 
 At the default of 16 pixels on a 224-pixel image, that is a 14&#215;14 grid,
 196 tokens, each starting as 768 raw numbers. The readout gives the same figures
-for whatever patch size you choose.
+for what patch size you choose.
 
-Step 3 is the only learned part, and it is a linear projection with no
-non-linearity. Equivalently, it is a convolution with kernel size `P` and stride
-`P` &mdash; which is how it is usually implemented, and a nice reminder that the
-distinction between "convolutional" and "not" is thinner than the naming
+Step 3 is the only learned part, and it's a linear map with no
+non-linearity. Equivalently, it's a convolution with kernel size `P` and stride
+`P` &mdash; which is how it's often built, and a nice reminder that the
+gap between "convolutional" and "not" is thinner than the naming
 suggests.
 
 ## The quadratic cost
 
-Halve the patch size and the token count quadruples, because the grid gains a
-factor of two in each dimension. Attention cost goes with the square of the token
+Halve the patch size and the token count quadruples. The grid gains a
+factor of two in each dim. Focus cost goes with the square of the token
 count, so it rises **sixteenfold**.
 
 | Patch | Tokens (224px) | Attention cost |
@@ -47,50 +47,50 @@ count, so it rises **sixteenfold**.
 | 8 | 784 | 256&#215; |
 | 4 | 3,136 | 4,096&#215; |
 
-That table is the central constraint on ViT design, and it explains a great deal
-of what followed. Patch size is not a minor hyperparameter; it is the resolution
-at which the model perceives anything, traded directly against compute.
+That table is the central constraint on ViT design, and it shows a great deal
+of what followed. Patch size isn't a minor setting. It's the detail
+at which the model sees any of it, traded right against find.
 
 ## What is lost inside a patch
 
-A 16&#215;16 patch is compressed to a single vector. Structure within it is not
-attended to at all; whatever the projection preserves is what survives.
+A 16&#215;16 patch is compressed to a single vector. Structure within it isn't
+attended to at all. What the map preserves is what lives.
 
 This is the ViT's real weakness at small scale. A convolutional network has
-locality built in &mdash; nearby pixels are processed together by construction
-&mdash; and this **inductive bias** matches how images actually work. A ViT has
-none of it. Every relationship, including "these two patches are adjacent", must
-be learned from data through the positional embeddings.
+locality built in &mdash; nearby pixels are processed together by build
+&mdash; and this **inductive bias** matches how images really work. A ViT has
+none of it. each tie, including "these two patches are adjacent", must
+be learned from data through the spot-based embeddings.
 
-Which is why the original paper's headline finding was about data. On ImageNet
-alone the ViT underperformed a ResNet; pre-trained on 300 million images it
+Which is why the first paper's headline finding was about data. On ImageNet
+alone the ViT underperformed a ResNet. Pre-trained on 300 million images it
 overtook it. With enough data the model learns the structure that convolution
-assumes, and gains flexibility convolution does not have.
+assumes, and gains flexibility convolution doesn't have.
 
-Two responses followed. **DeiT** showed careful augmentation and distillation
+Two responses followed. **DeiT** showed careful boost and distillation
 could train a ViT on ImageNet alone. **Swin Transformer** reintroduced locality
-by restricting attention to windows and merging patches hierarchically, which
-gives back the pyramid a CNN has and makes dense prediction practical.
+by restricting focus to windows and merging patches hierarchically, which
+gives back the pyramid a CNN has and makes dense guess hands-on.
 
 ## Positional embeddings
 
-Attention is permutation-invariant: shuffle the tokens and the output is
-shuffled identically, with nothing else changed. Without positional information
-a ViT literally cannot tell a photograph from a jigsaw of itself.
+Focus is permutation-rule: shuffle the tokens and the output is
+shuffled the same way, with nothing else changed. Without spot-based info
+a ViT truly can't tell a photo from a jigsaw of itself.
 
-The fix is to add a learned vector per position. It is worth appreciating how
-weak this is compared with convolution: the model is told "this is position 37"
-and must learn from data that position 37 is next to 36 and above 23.
+The fix is to add a learned vector per spot. It's worth appreciating how
+weak this is checked with convolution: the model is told "this is spot 37"
+and must learn from data that spot 37 is next to 36 and above 23.
 
-Changing the input resolution changes the number of positions, which is why ViTs
-interpolate their positional embeddings when fine-tuned at a different size.
+Changing the input detail changes the number of spots. This Is why ViTs
+interpolate their spot-based embeddings when fine-tuned at a different size.
 
 ## The patch size is the whole budget
 
-Cutting the image into patches decides everything downstream, and the token count
+Cutting the image into patches decides all downstream, and the token count
 makes it concrete. A 224-pixel image at patch size 16 gives a 14&times;14 grid =
 **196 tokens**, each starting as 16&times;16&times;3 = 768 raw numbers, and
-attention costs the square of the token count.
+focus costs the square of the token count:
 
 |patch|tokens|attention pairs|relative cost|
 |---|---|---|---|
@@ -98,44 +98,44 @@ attention costs the square of the token count.
 |16|196|38,416|16&times;|
 |8|784|614,656|256&times;|
 
-Halve the patch and the token count quadruples, so attention rises sixteenfold.
-That is why patch size is not a minor hyperparameter but the resolution at which the
-model perceives anything, traded directly against compute. It is also why one token
-per pixel &mdash; 50,176 tokens, 2.5 billion pairs a layer &mdash; is impossible.
-The cost inside a patch is subtler. A 16&times;16 region is projected to one vector,
-so structure within it is never attended to. Unlike a convolution, the ViT has no
-built-in locality &mdash; it must *learn* that patch 37 sits beside 36, from data,
-through the positional embeddings. That is why the original ViT needed 300 million
+Halve the patch and the token count quadruples, so focus rises sixteenfold.
+That is why patch size isn't a minor setting but the detail at which the
+model sees any of it, traded right against find. And why one token
+per pixel (50,176 tokens, 2.5 billion pairs a layer) is hopeless. The cost inside
+a patch is subtler: a 16&times;16 region is projected to one vector, so structure
+within it's never attended to, and unlike a convolution the ViT has no built-in
+locality &mdash; it must *learn* that patch 37 sits beside 36, from data, through
+the spot-based embeddings. Which is why the first ViT needed 300 million
 pre-training images to beat a ResNet that had locality for free.
 
-Attention is permutation-invariant &mdash; shuffle the tokens and the output is
-shuffled identically. Without positional embeddings a ViT literally cannot tell a
-photograph from a jigsaw of itself. The fix, a learned vector per position, is
-strikingly weak next to convolution. The model is told "this is position 37" and
-must learn from data that 37 sits beside 36 and above 23. That missing inductive
-bias is why the plain ViT needed enormous pre-training, and why two responses
-followed. DeiT showed distillation and heavy augmentation could train one on
-ImageNet alone. Swin reintroduced locality by restricting attention to windows and
-merging patches hierarchically, recovering the pyramid a CNN has for free and making
-dense prediction practical.
+Focus is permutation-rule &mdash; shuffle the tokens and the output is
+shuffled the same way &mdash; so without spot-based embeddings a ViT truly can't
+tell a photo from a jigsaw of itself, and the fix, a learned vector per
+spot, is strikingly weak next to convolution: the model is told "this is spot
+37" and must learn from data that 37 sits beside 36 and above 23. That missing
+inductive bias is why the plain ViT needed huge pre-training, and why two
+responses followed &mdash; DeiT showed distillation and heavy boost could
+train one on ImageNet alone, and Swin reintroduced locality by restricting focus
+to windows and merging patches hierarchically, getting back the pyramid a CNN has for
+free and making dense guess hands-on.
 
 ## Where it goes wrong
 
-**Shrinking the patch to gain resolution.** The attention cost is quadratic in
-tokens, so this gets expensive faster than expected.
+**Shrinking the patch to gain detail.** The focus cost is quadratic in
+tokens, so this gets costly faster than expected.
 
 **Training a plain ViT on a small dataset.** Without the inductive bias it needs
 either far more data or the DeiT training recipe.
 
-**Forgetting positional embeddings on a resized input.** The count must match,
-and interpolation is required.
+**Losing spot-based embeddings on a resized input.** The count must match,
+and interpolation is needed.
 
-**Assuming patches must be square and non-overlapping.** Overlapping patches
-help; several later architectures use them.
+**given patches must be square and non-shared.** shared patches
+help. A few later architectures use them.
 
 ## Cutting an image into tokens
 
-A vision transformer starts by chopping the image into patches and flattening each one into a vector. That single step decides the model's cost, its resolution limit, and everything it does not know about geometry -- which it then has to be told.
+A vision transformer starts by chopping the image into patches and flattening each one into a vector. That single step decides the model's cost, its detail limit. All it doesn't know about geometry -- which it then has to be told.
 
 ```python-run
 import numpy as np

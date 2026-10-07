@@ -3,7 +3,7 @@ intro: Models inside models, and the error paths that make deep payloads debugga
 
 ## Composition is the whole mechanism
 
-There is no special syntax for nesting. A model is a type, and a field can be annotated with any type, so a field can be a model:
+There's no special syntax for nesting. A model is a type. A field can be annotated with any type. A field can be a model:
 
 ```python
 class Author(BaseModel):
@@ -15,19 +15,10 @@ class Module(BaseModel):
     author: Author
 ```
 
-That is it. Everything else follows from that one fact, which is worth stating plainly because people often expect a nested schema to need declaring somehow. It does not. If you can write the inner model on its own, you can use it as a field type.
+That is it. all else follows from that one fact. This Is worth stating plainly because people often expect a nested schema to need declaring somehow. It doesn't. If you can write the inner model on its own, you can use it as a field type.
 
-When `Module` is validated, the value for `author` is handed to `Author` for validation. If it is already an `Author`, it passes through. If it is a dict, it becomes one. If it is neither, the error says so.
+When `Module` is checked, the value for `author` is handed to `Author` for check. If it's already an `Author`, it passes through. If it's a dict, it turns one. If it's neither, the error says so.
 
-Error paths are what make nesting practical. If the author's email fails validation, the error message says `author -> email`, not just `email`. Every level of nesting adds a segment to the path, so a deeply nested payload produces an error like `modules -> 0 -> author -> email -> value is not a valid email address`. That path tells the caller exactly where the problem is, which is the difference between a debuggable API and one that says "validation error" and leaves the caller guessing.
-
-Nested models compose freely. A model can contain a list of models, an optional model, a dict keyed by strings with model values, or a union of models. Each of these works because Pydantic validates recursively: the outer model validates its fields, each field that is itself a model validates its own fields, and so on down the tree.
-
-The JSON Schema follows the same structure. A nested model produces a `$ref` to the inner model's schema, so a client code generator or documentation tool shows the full structure without any extra work. The schema is always in sync with the code because it is generated from the code.
-
-Circular references &mdash; model A containing model B which contains model A &mdash; are allowed. Pydantic resolves forward references at model creation time, so you annotate the field with a string (`"ModelA"`) or use `from __future__ import annotations` and the reference resolves when the class is fully defined.
-
-Default values, optional fields and validators on the inner model all work as expected. The outer model does not need to know anything about the inner model's rules; it simply declares the type and Pydantic handles the rest.
 
 ## A model can be a field type
 
@@ -148,7 +139,7 @@ print("given        :", full.author)
 print("inner default:", full.author.email)
 ```
 
-The rules from the defaults module apply without modification, and one of them has a specific trap here.
+The rules from the defaults module apply without change. One of them has a exact trap here.
 
 For a nested model that should always exist, use `default_factory`:
 
@@ -156,11 +147,11 @@ For a nested model that should always exist, use `default_factory`:
 reviewer: Author = Field(default_factory=Author)
 ```
 
-Not `= Author()`. That expression is evaluated once, when the class body runs, so every parent would share one `Author` instance &mdash; and since models are mutable by default, a change through one parent would be visible through all of them. Pydantic deep-copies simple defaults, but constructing the instance at class-definition time is still the wrong shape, and a factory says what you mean.
+Not `= Author()`. That formula is checked once, when the class body runs. Each parent would share one `Author` instance. And since models are mutable by default, a change through one parent would be visible through all of them. Pydantic deep-copies simple defaults. But Making the instance at class-meaning time is still the wrong shape. A factory says what you mean.
 
-For a nested model that may genuinely be absent, `Optional[Author] = None` behaves exactly as it does for any other type, with the same distinction between omitted and explicitly null.
+For a nested model that may truly be absent, `Optional[Author] = None` behaves just as it does for any other type, with the same gap between omitted and by name null.
 
-Note that a nested model whose own fields all have defaults can be built from an empty dict, which occasionally surprises people: `Module(title="x", author={})` succeeds if every `Author` field has a default. That is correct, and it is a good reason to think about whether those inner defaults should exist.
+Note that a nested model whose own fields all have defaults can be built from an empty dict. This At times surprises people: `Module(title="x", author={})` succeeds if each `Author` field has a default. That is correct. It's a good reason to think about whether those inner defaults should exist.
 
 ## Dumping and reloading a nested tree
 
@@ -224,27 +215,27 @@ print("just a bit :", m.model_dump(include={"title": True,
 ```
 ## Dicts in, objects out
 
-The conversion from dict to object is the part that makes nesting useful rather than merely possible.
+The conversion from dict to object is the part that makes nesting handy rather than merely possible.
 
-JSON has objects, and Python decodes them as dictionaries. Without nested models you would receive `{"author": {"name": "Ada"}}` and reach into it with `data["author"]["name"]` &mdash; two dictionary lookups, each of which can raise `KeyError`, neither of which your editor can help with.
+JSON has objects, and Python decodes them as dicts. Without nested models you'd receive `{"author": {"name": "Ada"}}` and reach into it with `data["author"]["name"]`. Two dict lookups, each of which can raise `KeyError`, neither of which your editor can help with.
 
-With nesting you get `m.author.name`. It is checked, it is autocompleted, and a typo is an `AttributeError` at the point of the typo rather than a `KeyError` somewhere downstream.
+With nesting you get `m.author.name`. It's checked, it's autocompleted. A typo is an `AttributeError` at the point of the typo rather than a `KeyError` one spot downstream.
 
-The reverse works too: `model_dump()` recurses, and the result is nested plain dicts. So a model tree converts to and from JSON structure without you writing any of the walking.
+The reverse works too: `model_dump()` recurses. The result is nested plain dicts. So a model tree converts to and from JSON structure without you writing any of the walking.
 
 ## Errors that name the exact value
 
-Nesting is where the `loc` design pays off, and it is worth dwelling on because it is the difference between a debuggable API and an infuriating one.
+Nesting is where the `loc` design pays off. It's worth dwelling on because it's the gap between a debuggable API and an infuriating one.
 
-A failure two levels down produces `loc: ("author", "email")`. Joined with dots, `author.email`. Three levels down with a list in the middle produces `("modules", 0, "lessons", 1, "minutes")` &mdash; the second lesson of the first module.
+A failure two levels down makes `loc: ("author", "email")`. Joined with dots, `author.email`. Three levels down with a list in the middle makes `("modules", 0, "lessons", 1, "minutes")`. The second lesson of the first module.
 
-Compare that with what a hand-rolled validator typically manages: "invalid module". For a payload of any size, the difference is between a caller who can fix the problem in ten seconds and one who has to bisect their own request.
+Compare that with what a hand-rolled checker often manages: "invalid module". For a payload of any size, the gap is between a caller who can fix the problem in ten seconds and one who has to bisect their own request.
 
-There is a related failure worth recognising. If the value for a nested field is not a mapping at all &mdash; a string, say &mdash; the error is on the field itself, with `loc: ("author",)` and the type `model_attributes_type`. That means "I could not even begin to read this as an Author", which is a different problem from a field inside it being wrong, and the shape of the error tells you which you have.
+There's a related failure worth recognising. If the value for a nested field isn't a mapping at all. A string, say. The error is on the field itself, with `loc: ("author",)` and the type `model_attributes_type`. That means "I couldn't even begin to read this as an Author". This Is a other problem from a field inside it being wrong. The shape of the error tells you which you've.
 
 ## Every rule still applies, at every level
 
-A nested model is not a lesser thing. Its constraints run, its validators run, its defaults are filled, its config applies.
+A nested model isn't a lesser thing. Its constraints run, its checkers run, its defaults are filled, its config applies.
 
 ```python
 class Author(BaseModel):
@@ -252,26 +243,26 @@ class Author(BaseModel):
     email: str = Field(pattern=r"^[^@]+@[^@]+\.[^@]+$")
 ```
 
-Use that as a field type and every parent gets those rules for free. This is the compounding benefit of composition: a well-specified small model is reusable, and each place it is reused inherits the entire specification rather than a copy of it that can drift.
+Use that as a field type and each parent gets those rules for free. This is the compounding gain of composition. A well-given small model is reusable. Each place it's reused takes from the entire specification rather than a copy of it that can drift.
 
-It is also the argument for making small models. `Address`, `Money`, `DateRange`, `Contact` &mdash; anything that appears in more than one place and has rules of its own is a model waiting to be extracted. The alternative is the same four fields and the same three constraints written out in five parent models, four of which get updated when the rule changes.
+It's also the arg for making small models. `Address`, `Money`, `DateRange`, `Contact`. Anything that appears in more than one place and has rules of its own is a model waiting to be extracted. The option is the same four fields and the same three constraints written out in five parent models, four of which get updated when the rule changes.
 ## Shaping the output
 
-`model_dump` takes `include` and `exclude`, and both understand structure. A set names top-level fields; a dict reaches inside. The two spellings do not mix in one literal, so once any entry needs to reach inside, every entry becomes a key:
+`model_dump` takes `include` and `exclude`, and both understand structure. A set names top-level fields. A dict reaches inside. The two spellings don't mix in one literal. Once any entry needs to reach inside, each entry turns a key:
 
 ```python
 m.model_dump(exclude={"internal_notes": True, "author": {"email"}})
 ```
 
-That drops one top-level field and one field of the nested model, keeping everything else. For lists of models there is a special key, `"__all__"`, which applies the same selection to every item.
+That drops one top-level field and one field of the nested model, keeping all else. For lists of models there's a special key, `"__all__"`. This Applies the same pick to each item.
 
-This is genuinely useful for the common case of one internal representation and several external views. It is also easy to overuse. Once the exclusion dict is more than a couple of entries, a separate output model is clearer: it is checked, it appears correctly in the schema, and nobody has to trace an exclusion expression to work out what an endpoint actually returns.
+This is truly handy for the common case of one inner form and a few external views. It's also easy to overuse. Once the exclusion dict is more than a couple of entries, a split output model is clearer. It's checked, it appears right in the schema. No one has to trace an exclusion formula to work out what an endpoint really returns.
 
-The rule of thumb: `exclude` for removing one obviously-internal field, a separate model for anything structural.
+The rule of thumb: `exclude` for dropping one obviously-inner field, a split model for anything structural.
 
 ## Recursive models
 
-A model can refer to itself, which is how you describe trees &mdash; comment threads, category hierarchies, nested menus:
+A model can refer to itself. This Is how you show trees. Comment threads, group trees, nested menus:
 
 ```python
 class Node(BaseModel):
@@ -279,21 +270,21 @@ class Node(BaseModel):
     children: List["Node"] = []
 ```
 
-The quotes are needed because the class does not exist yet at the point the annotation is written. In modern Python with `from __future__ import annotations`, or in files where all annotations are strings, you can drop them.
+The quotes are needed because the class doesn't exist yet at the point the annotation is written. In modern Python with `from __future__ import annotations`, or in files where all annotations are strings, you can drop them.
 
-Recursive models validate to any depth and dump to nested dicts as you would expect. Two cautions. Depth is bounded by the recursion limit, so genuinely deep or maliciously nested input can raise, which is worth thinking about if the data is untrusted. And a cycle &mdash; a node that contains itself &mdash; will not terminate on dump; Pydantic detects some cases and raises, but the honest fix is not to build cyclic data in a model designed as a tree.
+Recursive models validate to any depth and dump to nested dicts as you'd expect. Two cautions. Depth is bounded by the recursion limit. Truly deep or maliciously nested input can raise. This Is worth thinking about if the data is untrusted. And a cycle. A node that holds itself. Won't terminate on dump. Pydantic detects some cases and raises. But The honest fix isn't to build cyclic data in a model designed as a tree.
 
 ## What good nesting looks like
 
-Extract a model when a group of fields travels together and has rules of its own. `Address` is a model; `city: str` sitting beside `postcode: str` in four different parents is four copies of a decision.
+Extract a model when a group of fields travels together and has rules of its own. `Address` is a model. `city. Str` sitting beside `postcode: str` in four other parents is four copies of a choice.
 
-Keep the tree shallow where you can. Three levels is normal; six usually means the shape is describing your storage rather than your domain, and a flatter representation with references would read better.
+Keep the tree shallow where you can. Three levels is normal. Six often means the shape is showing your storage rather than your domain. A flatter form with links would read better.
 
-Name inner models for what they are, not for where they sit. `Author` is reusable; `ModuleAuthor` is a name that stops the model being used anywhere else even when it would fit perfectly.
+Name inner models for what they're, not for where they sit. `Author` is reusable. `ModuleAuthor` is a name that stops the model being used anywhere else even when it would fit just right.
 
 ## Reusing a nested model across parents
 
-The strongest argument for extracting a model is that the rules travel with it.
+The strongest arg for extracting a model is that the rules travel with it.
 
 ```python
 class Address(BaseModel):
@@ -302,13 +293,13 @@ class Address(BaseModel):
     postcode: str = Field(pattern=r"^[A-Z0-9 ]{4,8}$")
 ```
 
-Use `Address` in `Customer`, `Invoice` and `Warehouse` and all three enforce the postcode rule. Change the rule and all three change. The alternative &mdash; three copies of three fields and one regular expression &mdash; is three chances for the copies to diverge, and they will.
+Use `Address` in `Customer`, `Invoice` and `Warehouse` and all three enforce the postcode rule. Change the rule and all three change. The option. Three copies of three fields and one regular formula. Is three chances for the copies to diverge, and they'll.
 
-The signal that a model wants extracting is fields that travel together. If `city` and `postcode` never appear apart, they are one concept with two attributes, and naming that concept makes the parent shorter and the rule reusable.
+The signal that a model wants extracting is fields that travel together. If `city` and `postcode` never appear apart, they're one concept with two fields. Naming that concept makes the parent shorter and the rule reusable.
 
 ## Validating against objects, not just dicts
 
-Nested models normally arrive as dicts, because that is what JSON decodes to. Sometimes the source is objects instead &mdash; ORM rows, another library's classes &mdash; and by default a model will not read attributes off an arbitrary object.
+Nested models most times arrive as dicts. That is what JSON decodes to. at times the source is objects instead. ORM rows, another library's classes. And by default a model won't read fields off an any object.
 
 `from_attributes` changes that:
 
@@ -319,21 +310,21 @@ class ModuleOut(BaseModel):
     author: AuthorOut
 ```
 
-Now `ModuleOut.model_validate(orm_row)` reads `row.title` and `row.author`, and validates the nested object the same way. This is how a model turns a database row into a response, and it recurses, so a row with a related object becomes a nested model without any manual walking.
+Now `ModuleOut.model_validate(orm_row)` reads `row.title` and `row.author`. Validates the nested object the same way. This is how a model turns a DB row into a response, and it recurses. A row with a related object turns a nested model without any manual walking.
 
-In Pydantic v1 this setting was called `orm_mode`, which is the name most existing tutorials use.
+In Pydantic v1 this setting was called `orm_mode`. This Is the name most existing tutorials use.
 
 ## Performance, and what nesting costs
 
-A nested model is a validation of its own. A parent with three nested models does four validations, and a list of fifty nested models does fifty-one.
+A nested model is a check of its own. A parent with three nested models does four validations. A list of fifty nested models does fifty-one.
 
-That is the honest cost, and for a request handler it is irrelevant &mdash; the whole tree still validates in microseconds. It becomes worth thinking about for bulk work, and the advice is the same as everywhere else in this library: validate the tree once at the boundary, then pass the resulting objects around without re-validating.
+That is the honest cost, and for a request handler it's irrelevant. The whole tree still validates in microseconds. It turns worth thinking about for bulk work, and the advice is the same as all over else in this library. Validate the tree once at the boundary, then pass the resulting objects around without re-checking.
 
-The specific mistake to avoid is re-validating on the way out. Building a response by constructing an output model from an already-validated input model re-runs every rule in the tree for no benefit. If the shapes are the same, `model_dump()` and a direct construction is cheaper; if they differ, the second validation is doing real work and is fine.
+The exact mistake to avoid is re-checking on the way out. Building a response by making an output model from an already-checked input model re-runs each rule in the tree for no gain. If the shapes are the same, `model_dump()` and a direct build is cheaper. If they differ, the second check is doing real work and is fine.
 
 ## A worked shape
 
-Most real payloads are two or three levels, and the pattern is consistent:
+Most real payloads are two or three levels, and the pattern is steady:
 
 ```python
 class Author(BaseModel):
@@ -350,32 +341,32 @@ class Module(BaseModel):
     lessons: List[Lesson] = Field(min_length=1)
 ```
 
-Read it top to bottom and you have the entire contract: a module has a title, exactly one author with a name and an email, and at least one lesson, each with a positive duration. No function needs to be opened to learn any of that, and none of it can drift, because it is the code that runs.
+Read it top to bottom and you've the entire contract. A module has a title, just one author with a name and an email. At least one lesson, each with a plus duration. No function needs to be opened to learn any of that. None of it can drift. It's the code that runs.
 
-That is what nesting buys. Not the convenience of dotted access, though that is pleasant, but a specification that is executable.
+That is what nesting buys. Not the convenience of dotted access, though that is pleasant. A specification that is executable.
 
 ## The habit to take away
 
-Every time you find a group of fields repeated across two models, or a comment explaining what shape a dictionary is meant to have, you have found a nested model waiting to be named.
+each time you find a group of fields repeated across two models, or a comment showing what shape a dict is meant to have, you've found a nested model waiting to be named.
 
-The cost is three lines. The return is a rule that lives in one place, an error path that says exactly where a failure was, dotted access instead of chained lookups, and a schema that describes the real structure rather than a flat approximation of it.
+The cost is three lines. The return is a rule that lives in one place, an error path that says just where a failure was, dotted access instead of chained lookups. A schema that shows the real structure rather than a flat guess of it.
 
-Composition is the least clever feature in this library and one of the most valuable, precisely because it needs no special syntax. A model is a type. Types go in annotations. Everything else follows.
+Composition is the least clever feature in this library and one of the most valuable, just because it needs no special syntax. A model is a type. Types go in annotations. all else follows.
 
 ## A note on how deep to go
 
-Depth in a model tends to mirror depth in whatever produced the data, and that is not always the shape you want to work with.
+Depth in a model tends to mirror depth in what made the data. That isn't always the shape you want to work with.
 
-A payload that nests six levels because a database has six joined tables is describing storage, not domain. Flattening it &mdash; or replacing an inner object with a reference and fetching separately &mdash; usually produces a model that reads better and an API that is easier to consume.
+A payload that nests six levels because a DB has six joined tables is showing storage, not domain. Flattening it. Or replacing an inner object with a link and fetching apart. Often makes a model that reads better and an API that is easier to consume.
 
-Three levels is comfortable. Four is worth a second look. Beyond that, the question is usually not "how do I model this" but "should the caller be receiving all of this at once".
+Three levels is comfortable. Four is worth a second look. Beyond that, the question is often not "how do I model this" but "should the caller be receiving all of this at once".
 
 ## Next
 
-Nesting one model inside another is half the picture. The other half is collections: lists of models, dicts keyed by something meaningful, and what happens to the error path when the failure is in the seventeenth item.
+Nesting one model inside another is half the picture. The other half is sets. Lists of models, dicts keyed by a thing real. What happens to the error path when the failure is in the seventeenth item.
 
 ## Summary
 
-A model used as a field type is validated with its full rules, dicts become objects recursively, and errors carry the whole path to the failing value.
+A model used as a field type is checked with its full rules, dicts become objects recursively. Errors carry the whole path to the failing value.
 
-Extract a model whenever fields travel together or a group of them is repeated. Use `default_factory` for a nested default. Reach for `include`/`exclude` to drop a field or two, and for a separate output model when the difference is structural.
+Extract a model when fields travel together or a group of them is repeated. Use `default_factory` for a nested default. Reach for `include`/`exclude` to drop a field or two. For a split output model when the gap is structural.

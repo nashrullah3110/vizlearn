@@ -1,120 +1,120 @@
 title: Mixed Precision and Loss Scaling
-intro: Training in half the bits, the failure that causes, and the one-line trick that removes it.
+intro: Training in half the bits, the failure that causes. The one-line trick that drops it.
 
 ## Why bother
 
-Modern accelerators run half-precision matrix multiplies several times faster
+Modern accelerators run half-precision mat times a few times faster
 than single-precision ones, and half-precision tensors take half the memory.
 That means bigger batches, bigger models, and a real speed-up on the same
 hardware.
 
 The catch is the format. **fp32** has 8 exponent bits and 23 mantissa bits.
 **fp16** has 5 and 10, giving a smallest normal value around
-10&#8315;&#8309; and a maximum of 65,504.
+10&#8315;&#8309. And a max of 65,504.
 
-Both ends of that range are a problem, and the small end is the one that bites. Gradients that are perfectly representable in fp32 underflow to zero in fp16, so the weights they should update stop moving entirely &mdash; and the training looks healthy because the loss is still computed in fp32. **Loss scaling** fixes this by multiplying the loss by a large constant before backpropagation, shifting every gradient up into fp16's representable range, then dividing back before the weight update. This page covers the three-part recipe &mdash; fp16 forward pass, scaled fp32 backward pass, fp32 master weights &mdash; and the dynamic scaling strategy that adjusts the scale factor automatically when overflows appear.
+Both ends of that range are a problem. The small end is the one that bites.
 
 ## Watch the gradients disappear
 
-The histogram is gradient magnitudes spread over several orders of magnitude,
-which is what a real network produces. The two marked lines are fp16's floor and
+The histogram is grad magnitudes spread over a few orders of magnitude,
+which is what a real network makes. The two marked lines are fp16's floor and
 ceiling.
 
-With the loss scale at 2&#8304; &mdash; that is, no scaling &mdash; the readout
-reports how many of the 3,000 gradients round to **zero**. Those parameters
-receive no update at all. Not a small update; none.
+With the loss scale at 2&#8304.. That is, no scaling &mdash; the readout
+reports how many of the 3,000 grads round to **zero**. Those params
+receive no update at all. Not a small update. None.
 
 This is the failure that made early fp16 training unreliable. The model trains,
 the loss goes down, and a fraction of the network is silently frozen.
 
 ## Loss scaling
 
-The fix is almost embarrassingly simple. Multiply the loss by a large constant
-before the backward pass. By the chain rule every gradient is multiplied by the
-same constant, so the whole distribution shifts up into the representable range.
-Then divide by that constant before the optimiser steps.
+The fix is almost embarrassingly simple. Times the loss by a large constant
+before the backward pass. By the chain rule each grad is times'd by the
+same constant, so the whole spread shifts up into the representable range.
+Then divide by that constant before the tuner steps.
 
 Drag the loss scale upward and watch the underflow count fall to zero.
 
-The update is mathematically unchanged. The scaling exists purely so the numbers
-survive the trip through fp16 &mdash; it is a change of units, not a change of
-algorithm.
+The update is in math unchanged. The scaling exists purely so the numbers
+live the trip through fp16. It's a change of units, not a change of
+method.
 
-Push it too far and the readout starts reporting **overflow**: gradients that
-have become infinite. That is a failure too, and it is where the automatic
+Push it too far and the readout starts reporting **overflow**: grads that
+have become infinite. That is a failure too, and it's where the auto
 version comes from.
 
 ## Dynamic loss scaling
 
-Nobody tunes the constant by hand. The standard algorithm starts high,
-multiplies by two whenever a stretch of steps completes without overflow, and
-halves it and **skips the step** whenever an infinity or NaN appears.
+No one tunes the constant by hand. The standard method starts high,
+times by two when a stretch of steps ends without overflow, and
+halves it and **skips the step** when an infinity or NaN appears.
 
-Skipping is the important part: an overflowed gradient is not clipped or
-repaired, it is discarded, because there is no way to recover what it should
+Skipping is the key part: an overflowed grad isn't clipped or
+repaired, it's discarded, because there's no way to recover what it should
 have been. A few skipped steps early in training cost nothing.
 
-This is what `torch.cuda.amp.GradScaler` does, and it is why mixed precision is
+This is what `torch.cuda.amp.GradScaler` does, and it's why mixed precision is
 now a decorator rather than a project.
 
 ## What stays in fp32
 
 "Mixed" is the operative word. In a standard setup:
 
-**Weights** are kept in an fp32 master copy. Updates are frequently far smaller
+**Weights** are kept in an fp32 master copy. Updates are often far smaller
 than the weights themselves, and adding a tiny number to a large one in fp16
 rounds to no change at all.
 
-**Matrix multiplies and convolutions** run in fp16, where the speed is.
+**mat times and convolutions** run in fp16. Here The speed is.
 
-**Reductions** &mdash; sums, means, softmax, normalisation statistics &mdash;
-accumulate in fp32, because adding many small numbers is exactly where limited
+**Reductions** &mdash; sums, means, softmax, norming statistics &mdash;
+build up in fp32, because adding many small numbers is just where limited
 mantissa bits go wrong.
 
-**Loss** is computed in fp32.
+**Loss** is found in fp32.
 
 ## bfloat16
 
-The newer alternative has 8 exponent bits and 7 mantissa bits &mdash; the same
+The newer option has 8 exponent bits and 7 mantissa bits &mdash; the same
 range as fp32, with less precision.
 
-That trade removes this entire page. Range was the problem; precision, for
-gradients, mostly was not. **bfloat16 needs no loss scaling**, which is why it
+That trade drops this entire page. Range was the problem. Precision, for
+grads, mostly wasn't. **bfloat16 needs no loss scaling**. This Is why it
 is the default on hardware that supports it, and why large-model training
 largely stopped talking about GradScaler.
 
 ## The range that makes loss scaling necessary
 
-The failure is entirely about fp16's floor. fp16 carries 5 exponent bits, giving
-a smallest normal value around `2^-14 &asymp; 6.1 &times; 10^-5` and a maximum of
-65,504. Real gradients routinely sit *below* that floor:
+The failure is fully about fp16's floor. fp16 carries 5 exponent bits, giving
+a smallest normal value around `2^-14 &asymp; 6.1 &times; 10^-5` and a max of
+65,504. Real grads routinely sit *below* that floor:
 
 |quantity|magnitude|in fp16|
 |---|---|---|
 |a typical small gradient|~1 &times; 10^-7|rounds to **zero**|
 |the same, times a loss scale of 4096|~4 &times; 10^-4|represented fine|
 
-A gradient that rounds to zero is not a small update, it is *no* update &mdash;
-the parameter freezes, silently, while the loss still falls and the run looks
-healthy. Loss scaling fixes it in one line: multiply the loss by a constant before
-the backward pass, so by the chain rule every gradient is multiplied too and the
-whole distribution shifts up into the representable range. Divide it back out
-before the optimiser steps. The update is mathematically unchanged &mdash; it is a
-change of units, not of algorithm. Push the constant too high and gradients
-overflow to infinity instead, which is why the standard scaler is *dynamic*:
+A grad that rounds to zero isn't a small update, it's *no* update &mdash;
+the param freezes, silently, while the loss still falls and the run looks
+healthy. Loss scaling fixes it in one line: times the loss by a constant before
+the backward pass, so by the chain rule each grad is times'd too and the
+whole spread shifts up into the representable range. Divide it back out
+before the tuner steps. The update is in math unchanged &mdash; it's a
+change of units, not of method. Push the constant too high and grads
+overflow to infinity instead. This Is why the standard scaler is *dynamic*:
 start high, double it after stretches without overflow, and halve it and skip the
 step when an infinity appears. bfloat16 sidesteps the whole page by keeping fp32's
 8 exponent bits &mdash; same range, less precision &mdash; so it needs no scaling
 at all.
 
-The other half of "mixed" is what deliberately stays in fp32. Weights keep an
+The other half of "mixed" is what on purpose stays in fp32. Weights keep an
 fp32 master copy, because an update is often far smaller than the weight it
 adjusts and adding a tiny number to a large one in fp16 rounds to no change at
-all. Reductions &mdash; sums, means, softmax, normalisation statistics &mdash;
-accumulate in fp32, because adding many small numbers is exactly where ten mantissa
-bits go wrong and produce the mysterious NaNs that half-precision softmax is known
-for. The fp16 lives where the speed is: the matrix multiplies and convolutions the
-tensor cores accelerate. Layers that are memory-bound rather than compute-bound
+all. Reductions &mdash; sums, means, softmax, norming statistics &mdash;
+build up in fp32, because adding many small numbers is just where ten mantissa
+bits go wrong and give the mysterious NaNs that half-precision softmax is known
+for. The fp16 lives where the speed is: the mat times and convolutions the
+tensor cores accelerate. Layers that are memory-bound rather than find-bound
 gain little, which is why the speed-up is real but never uniform across a model.
 
 ## Where it goes wrong
@@ -123,15 +123,15 @@ gain little, which is why the speed-up is real but never uniform across a model.
 
 **A fixed scale.** Use the dynamic version.
 
-**Reductions in fp16.** Softmax and layer norm in half precision produce
+**Reductions in fp16.** Softmax and layer norm in half precision give
 mysterious NaNs.
 
-**Assuming a speed-up.** It comes from the tensor cores. Layers that are
-memory-bound rather than compute-bound gain little.
+**given a speed-up.** It comes from the tensor cores. Layers that are
+memory-bound rather than find-bound gain little.
 
 ## Half the bits, and the two things that break
 
-float16 halves memory and doubles throughput on tensor cores. It also has a much narrower range than float32, and gradients live near the bottom of that range -- which is the entire reason loss scaling exists.
+float16 halves memory and doubles throughput on tensor cores. It also has a much narrower range than float32. Grads live near the bottom of that range -- which is the entire reason loss scaling exists.
 
 ```python-run
 import numpy as np

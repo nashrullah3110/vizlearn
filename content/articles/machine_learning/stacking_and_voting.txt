@@ -1,51 +1,51 @@
 title: Stacking and Voting Ensembles
-intro: Combining unlike models, when it helps, and a live demonstration of it hurting.
+intro: Mixing unlike models, when it helps, and a live demo of it hurting.
 
 ## Different from bagging and boosting
 
 [Bagging](random_forest.html) and [boosting](gradient_boosting.html) build many
-copies of one kind of model &mdash; hundreds of trees &mdash; and combine them.
+copies of one kind of model. Hundreds of trees &mdash; and combine them.
 
 Voting and stacking combine models of *different* kinds: a logistic regression, a
-gradient-boosted tree and a neural network, say. The hope is that models with
-different inductive biases fail on different rows, so their errors partly cancel.
+grad-boosted tree and a neural network, say. The hope is that models with
+different inductive biases fail on different rows. So Their errors partly cancel.
 
-That hope is a condition, not a guarantee, and this page is largely about the
-condition failing. **Voting** combines predictions by majority rule (hard voting) or by averaging probabilities (soft voting). **Stacking** trains a second-level model &mdash; the meta-learner &mdash; on the base models' outputs, learning which model to trust on which kind of input. This page demonstrates both and shows when combining helps and when it hurts. Adding a weak model to a strong one can drag the ensemble down, and the correlation between base-model errors determines whether combination will work at all.
+That hope is a rule, not a ensure, and this page is largely about the
+rule failing.
 
 ## Voting
 
-**Hard voting** takes the majority label. **Soft voting** averages predicted
-probabilities and thresholds the mean, which is generally better because it uses
-confidence rather than discarding it &mdash; and which requires
-[calibrated](probability_calibration.html) probabilities to be meaningful.
+**Hard voting** takes the majority label. **Soft voting** means predicted
+chances and thresholds the mean. This Is often better because it uses
+trust rather than discarding it &mdash; and which needs
+[calibrated](probability_calibration.html) chances to be real.
 
-Every member counts equally. That is the strength when the members are comparable
-and the weakness when they are not.
+each member counts equally. That is the strength when the members are close
+and the weakness when they aren't.
 
 Look at the readout with the default settings. Three learners score roughly
 62%, 66% and 90%, and the **majority vote scores about 77% &mdash; worse than the
-best member alone.** Two weak learners outvote a strong one whenever they agree.
-They agree often enough to drag the result down.
+best member alone.** Two weak learners outvote a strong one when they agree,
+and they agree often enough to drag the result down.
 
-This is not a contrived arrangement. It is what happens whenever an ensemble is
-assembled without checking whether the members are of comparable quality, and it
+This isn't a contrived setup. It's what happens when an ensemble is
+assembled without checking whether the members are of close quality, and it
 is the reason "just ensemble it" is bad advice.
 
 ## Stacking
 
 Stacking replaces the fixed rule with a learned one. Train the base models, take
-their predictions as features, and fit a second model &mdash; the **meta-learner**
+their guesses as features, and fit a second model &mdash; the **meta-learner**
 &mdash; on those.
 
-The meta-learner discovers what a vote cannot: which model to trust, and when.
+The meta-learner discovers what a vote can't: which model to trust, and when.
 The learned weights are in the readout, and the strong learner attracts most of
-the weight while a weak one can go slightly negative &mdash; meaning the
+the weight while a weak one can go slightly minus &mdash; meaning the
 meta-learner has found that model to be worse than uninformative in some regions.
 
 With the defaults, stacking matches the best single learner rather than beating
-it. That is an honest and common outcome, and it is still a gain over the vote:
-stacking recovered the best model automatically, where voting destroyed it.
+it. That is an honest and common outcome. It's still a gain over the vote:
+stacking got back the best model automatically. Here Voting destroyed it.
 
 Move the thresholds so that the three learners are closer in quality, and the
 picture changes &mdash; the vote catches up, because its assumption is finally
@@ -53,40 +53,40 @@ true.
 
 ## Getting stacking right
 
-The important detail is how the meta-learner's training data is produced.
+The essential detail is how the meta-learner's training data is made.
 
-Training the base models and then feeding their predictions **on the same data**
-to the meta-learner leaks badly. A model that overfits its training set produces
-suspiciously good predictions there, so the meta-learner learns to trust the most
+Training the base models and then feeding their guesses **on the same data**
+to the meta-learner leaks badly. A model that overfits its training set makes
+oddly good guesses there, so the meta-learner learns to trust the most
 overfitted member.
 
-The fix is **cross-validated predictions**: split the data into folds, and for
-each fold predict with base models trained on the other folds. Every prediction
+The fix is **cross-validated guesses**: split the data into folds, and for
+each fold predict with base models trained on the other folds. each guess
 the meta-learner sees is then out-of-sample. This is what scikit-learn's
-`StackingClassifier` does, and it is why stacking costs roughly *k* times the
+`StackingClassifier` does, and it's why stacking costs roughly *k* times the
 training of its members.
 
-A second convention: keep the meta-learner **simple**. Logistic regression is the
-standard choice. It has few base predictions to work with, and a flexible
+A second rule: keep the meta-learner **simple**. Logistic regression is the
+standard choice. It has few base guesses to work with, and a flexible
 meta-learner overfits them readily.
 
 ## When an ensemble is worth it
 
-**Members must be comparable in quality.** Otherwise voting hurts, as above.
+**Members must be close in quality.** Or else voting hurts, as above.
 
 **Members must make different mistakes.** Three models that fail on the same rows
-combine into one model that fails on those rows. Checking the correlation of
-their errors is the diagnostic, and it is worth doing before building anything.
+combine into one model that fails on those rows. Checking the link of
+their errors is the diagnostic, and it's worth doing before building any of it.
 
-**The gain must justify the cost.** An ensemble multiplies training time,
+**The gain must justify the cost.** An ensemble times training time,
 inference time, memory and the number of things that can break in production. A
-one-point gain on a leaderboard is worth it; a one-point gain in a service
-usually is not.
+one-point gain on a leaderboard is worth it. A one-point gain in a service
+often isn't.
 
 ## When the majority is wrong, in numbers
 
-Majority voting only helps when the members are comparable, and the arithmetic
-shows why. For three independent classifiers the vote is correct when at least two
+Majority voting only helps when the members are close, and the math
+shows why. For three free classifiers the vote is correct when at least two
 are, `P = &Sigma;` over the majority outcomes:
 
 |three members|majority-vote accuracy|
@@ -94,44 +94,44 @@ are, `P = &Sigma;` over the majority outcomes:
 |0.62, 0.66, 0.90|0.83 &mdash; **below the 0.90 member**|
 |0.80, 0.80, 0.80|0.90 &mdash; above any member|
 
-Three equal 80% models vote to 90%, which is the ensemble win everyone hopes for:
-independent errors partly cancel. But bolt a 90% model to two mediocre ones and
-the vote drops it to 83%, because whenever the two weak members happen to agree
+Three equal 80% models vote to 90%. This Is the ensemble win everyone hopes for:
+free errors partly cancel. But bolt a 90% model to two mediocre ones and
+the vote drops it to 83%. When the two weak members happen to agree
 they outvote the strong one, and two coin-ish models agree wrongly often enough to
 matter. That is voting's built-in assumption &mdash; equal competence &mdash;
-failing out loud, and it is why "just ensemble it" is bad advice without checking
-the members are comparable. Stacking fixes exactly this by learning the weights
+failing out loud, and it's why "just ensemble it" is bad advice without checking
+the members are close. Stacking fixes just this by learning the weights
 instead of fixing them: the meta-learner hands most of the weight to the strong
-member and can drive a weak one negative, recovering the best model where the vote
-destroyed it. (Real classifiers are not independent, so the true numbers shift
-with error correlation &mdash; which is itself the thing to measure before
-combining anything.)
+member and can drive a weak one minus, getting back the best model where the vote
+destroyed it. (Real classifiers aren't free, so the true numbers shift
+with error link &mdash; which is itself the thing to measure before
+mixing any of it.)
 
 Getting stacking right turns on one detail: the meta-learner must be trained on
-*out-of-sample* base predictions. Feed it predictions the base models made on their
+*out-of-sample* base guesses. Feed it guesses the base models made on their
 own training data and it learns to trust whichever member overfitted most, because
-an overfitted model looks suspiciously accurate there. The fix is cross-validated
-predictions &mdash; for each fold, predict with base models trained on the other
+an overfitted model looks oddly accurate there. The fix is cross-validated
+guesses &mdash; for each fold, predict with base models trained on the other
 folds &mdash; which is why stacking costs roughly k times the training of its
-members. Keep the meta-learner simple, too; logistic regression is the standard
-choice, because it has few base predictions to work from and a flexible meta-learner
+members. Keep the meta-learner simple, too. Logistic regression is the standard
+choice, because it has few base guesses to work from and a flexible meta-learner
 overfits them readily.
 
 ## Where it goes wrong
 
-**Ensembling a strong model with weak ones by vote.** Demonstrated above.
+**Ensembling a strong model with weak ones by vote.** Shown above.
 
-**Fitting the meta-learner on in-sample predictions.** It learns to trust the
+**Fitting the meta-learner on in-sample guesses.** It learns to trust the
 most overfitted base model.
 
 **A complex meta-learner.** Few features, plenty of opportunity to overfit.
 
-**Assuming diversity.** Two gradient-boosted models with different seeds are not
-diverse; check whether their errors actually differ.
+**given range.** Two grad-boosted models with different seeds aren't
+diverse. Check whether their errors really differ.
 
 ## Ensembling models that make different mistakes
 
-Combining models only helps when they are wrong about different rows. This measures that disagreement first, then shows what voting and stacking do with it.
+Mixing models only helps when they're wrong about different rows. This measures that disagreement first, then shows what voting and stacking do with it.
 
 ```python-run
 import numpy as np

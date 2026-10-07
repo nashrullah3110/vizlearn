@@ -1,34 +1,18 @@
 title: Reading a 422, and Making It Useful
-intro: Where the validation error comes from, what each part means, and how to reshape it for your callers.
+intro: Where the check error comes from, what each part means. How to reshape it for your callers.
 
 ## Where it comes from
 
-A 422 is not something FastAPI invents. It is a Pydantic `ValidationError`, caught at the boundary and rendered as JSON.
+A 422 isn't a thing FastAPI invents. It's a Pydantic `ValidationError`, caught at the boundary and rendered as JSON.
 
-The `detail` array is in effect `e.errors()` from the Pydantic track, with one addition: `loc` is prefixed by the part of the request the value came from. So a field error in the body has `loc: ["body", "minutes"]` rather than just `["minutes"]`.
+The `detail` array is `e.errors()` from the Pydantic track, with one addition: `loc` is prefixed by the part of the request the value came from. So a field error in the body has `loc: ["body", "minutes"]` rather than just `["minutes"]`.
 
-Everything the Pydantic track said about reading these applies directly. `loc` is a path. `type` is a stable machine code. `msg` is prose. `input` is what actually arrived. `ctx` carries the rule's parameters.
-
-`loc` always starts with the part of the request the value came from: `"body"`, `"query"`, `"path"`, `"header"`, or `"cookie"`. After that come the field names, and for nested models the path continues deeper — `["body", "address", "zip_code"]` points to the `zip_code` field inside an `address` model inside the request body. For list fields, the index appears as an integer: `["body", "items", 2, "price"]` means the third item's price failed.
-
-`type` is the field to branch on in client code. It is a stable string like `"string_too_short"`, `"missing"`, `"int_parsing"`, or `"value_error"`. It does not change between Pydantic releases (unlike `msg`, which is prose and gets reworded). A client that maps `type` to a user-facing message — `"missing"` to "This field is required", `"string_too_short"` to "Too short" — keeps working across upgrades. A client that displays `msg` directly couples itself to Pydantic's English wording.
-
-`ctx` carries the parameters of the constraint that failed. For `"string_too_short"`, `ctx` contains `{"min_length": 3}`. For `"greater_than"`, it contains `{"gt": 0}`. This is what lets a client build a message like "Must be at least 3 characters" without hardcoding the number — it reads the threshold from `ctx` and fills it into a template. Not every error type has a `ctx`; `"missing"` does not, because there is nothing to parameterise.
-
-`input` is the raw value that was submitted. For `"int_parsing"`, `input` might be `"abc"` — the string the client sent that could not be parsed as an integer. This is useful for debugging but potentially dangerous to echo back to the user: if the input contains HTML or JavaScript, displaying it raw in a browser is an XSS vulnerability. Sanitise it before rendering, or strip it from the response entirely by overriding the validation error handler.
-
-Multiple errors can arrive for the same field. A field with both `min_length=3` and a regex pattern that fails produces two errors, both pointing to the same `loc`. The `detail` list contains all of them, so a form can show every problem at once rather than revealing them one at a time as the user fixes each one.
-
-The response shape is consistent across every endpoint in the application. Whether the error is a missing field, a wrong type, a failed constraint, or a custom validator rejection, the response is always `{"detail": [...]}` with status 422. That consistency is what lets a client library handle validation errors generically — parse `detail`, group by `loc`, display each error next to the field it belongs to.
-
-Customising the 422 response is done by overriding the `RequestValidationError` handler. The default handler returns every field of every error. You might want to strip `input` for security, translate `msg` for localisation, or flatten `loc` from a list to a dotted string for simpler client parsing. The override receives the full `ValidationError`, so you can reshape it however your clients need.
-
-The 422 status itself is a choice. Some APIs prefer 400 Bad Request for all input errors, reserving 422 for semantic failures. FastAPI uses 422 because it maps directly to Pydantic's validation error, and the distinction between "malformed request" (400) and "well-formed but invalid" (422) is useful in practice. If your API must return 400 instead, the exception handler override is where you change it.
+all the Pydantic track said about reading these applies right. `loc` is a path. `type` is a stable machine code. `msg` is prose. `input` is what really arrived. `ctx` carries the rule's params.
 
 
 ## It is a Pydantic error in an HTTP envelope
 
-The <code>detail</code> list is in effect <code>e.errors()</code>, with one addition: <code>loc</code> starts with the part of the request.
+The <code>detail</code> list is essentially <code>e.errors()</code>, with one addition: <code>loc</code> starts with the part of the request.
 
 ```python-run
 import json
@@ -220,39 +204,39 @@ print("matches what we expected:", found == expected)
 
 `path`, `query`, `header`, `cookie` or `body`.
 
-That tells a caller *where to look*, which a bare field name cannot. A client receiving "minutes is invalid" does not know whether to fix the URL, a query parameter or the JSON they posted. `["query", "limit"]` versus `["body", "minutes"]` resolves it immediately.
+That tells a caller *where to look*. This A bare field name can't. A client receiving "minutes is invalid" doesn't know whether to fix the URL, a query param or the JSON they posted. `["query", "limit"]` versus `["body", "minutes"]` resolves it at once.
 
-It also means code that reads `loc[0]` as the field name is wrong here in a way it was not in plain Pydantic. Skip the first element when you want the field, and use it when you want the source.
+It also means code that reads `loc[0]` as the field name is wrong here in a way it wasn't in plain Pydantic. Skip the first element when you want the field. Use it when you want the source.
 
 ## Everything at once
 
-Validation checks every parameter and every field, then raises once.
+check checks each param and each field, then raises once.
 
-For a form, that is the difference between highlighting four broken inputs immediately and revealing them one submission at a time. For a machine client, it is one round trip instead of four.
+For a form, that is the gap between highlighting four broken inputs at once and revealing them one submission at a time. For a machine client, it's one round trip instead of four.
 
-Errors from different sources arrive together, too. A request with a bad path parameter, a bad query parameter and two bad body fields produces one response listing all four, each labelled with its source.
+Errors from other sources arrive together, too. A request with a bad path param, a bad query param and two bad body fields makes one response listing all four, each labelled with its source.
 
 ## 422 versus everything else
 
-This distinction is worth being precise about, because conflating the codes makes an API harder to use.
+This gap is worth being precise about. Conflating the codes makes an API harder to use.
 
-**422** means the request did not fit the declared shape. It is produced automatically, before your handler runs, and it is always the caller's mistake.
+**422** means the request didn't fit the declared shape. It's made on its own, before your handler runs. It's always the caller's mistake.
 
-**400** means the request was syntactically fine but wrong in some way your own code determined. It is one you raise.
+**400** means the request was syntactically fine but wrong in some way your own code found. It's one you raise.
 
-**404** means the thing is not there. That is a fact about the world, not about the request &mdash; `/modules/99` is a perfectly well-formed request. Your code looks, does not find, and raises.
+**404** means the thing isn't there. That is a fact about the world, not about the request. `/modules/99` is a just right well-formed request. Your code looks, doesn't find, and raises.
 
-**409** means the request conflicts with current state: a duplicate, a version mismatch, an already-completed action.
+**409** means the request conflicts with current state: a copy, a version mismatch, an already-done action.
 
 **403** means understood, well-formed, and not allowed.
 
-The rule: if validation can determine it from the declared types and constraints, it is a 422 and you do not write it. If it requires knowing something about the world &mdash; existence, permission, current state &mdash; it is an `HTTPException` you raise.
+The rule: if check can find it from the declared types and constraints, it's a 422 and you don't write it. If it needs knowing a thing about the world. Existence, permission, current state. It's an `HTTPException` you raise.
 
-A common mistake is returning 422 for a missing resource because "the id was invalid". The id was fine; nothing with that id exists. That is a 404.
+A common mistake is returning 422 for a missing resource because "the id was invalid". The id was fine. Nothing with that id exists. That is a 404.
 
 ## Reshaping it
 
-The default envelope is a list of objects with `loc`, `type`, `msg` and `input`. It is precise and it is not what most front ends want, which is usually a map of field to messages.
+The default envelope is a list of objects with `loc`, `type`, `msg` and `input`. It's precise and it isn't what most front ends want. This Is often a map of field to messages.
 
 An exception handler converts it:
 
@@ -266,128 +250,128 @@ async def tidy(request, exc):
     return JSONResponse(status_code=422, content={"errors": problems})
 ```
 
-A list per field, because one field can break several rules at once. The `or "_body"` catches model-level errors from cross-field validators, whose `loc` is just `["body"]` &mdash; and something has to display those, since they are not attached to any input.
+A list per field, because one field can break a few rules at once. The `or "_body"` catches model-level errors from cross-field checkers, whose `loc` is just `["body"]`. And a thing has to display those. They aren't attached to any input.
 
 Combine it with the message table from the Pydantic track and you get copy a person can read, driven by `type` rather than by matching on prose, with `ctx` filling in the actual limits.
 
-Two cautions. Keep the status at 422 rather than inventing your own; clients and tooling recognise it. And log the original `exc.errors()` even while returning your tidied version &mdash; when a caller says "it rejected my email and it was fine", the `input` value settles it.
+Two cautions. Keep the status at 422 rather than inventing your own. Clients and tooling recognise it. And log the first `exc.errors()` even while returning your tidied version. When a caller says "it rejected my email and it was fine", the `input` value settles it.
 
 ## Testing rejections
 
-Validation deserves tests, and the useful ones assert on `loc` and `type`:
+check deserves tests, and the handy ones assert on `loc` and `type`:
 
 ```python
 expected = {(("body", "title"), "string_too_short"),
             (("body", "minutes"), "greater_than")}
 ```
 
-Asserting on `msg` makes the suite fail whenever Pydantic rewords something, which teaches people to distrust it. Asserting on the pair tests what you actually care about: that the right rule fired on the right field.
+Asserting on `msg` makes the suite fail when Pydantic rewords a thing. This Teaches people to distrust it. Asserting on the pair tests what you really care about. That the right rule fired on the right field.
 
-Testing the *positive* case matters too. A test that a valid payload gives 201 and the coerced values you expect documents an intention that is otherwise invisible.
+Testing the *plus* case matters too. A test that a valid payload gives 201 and the coerced values you expect docs an intention that is else invisible.
 
 ## What a good error experience looks like
 
-Three things, and they are cheap.
+Three things, and they're cheap.
 
 **Constrain in the model**, so the rule appears in the schema. A caller reading your docs learns the limit before sending anything.
 
-**Give fields descriptions and examples**, so the interactive docs show a working request rather than an empty box.
+**Give fields descriptions and examples**. So The interactive docs show a working request rather than an empty box.
 
 **Translate `type` codes** into sentences your users can act on, falling back to `msg` for anything unmapped so nothing renders blank.
 
-Most APIs do none of these and return the raw envelope. It is usable, and the gap between usable and good here is about twenty lines.
+Most APIs do none of these and return the raw envelope. It's usable. The gap between usable and good here is about twenty lines.
 
 ## Other errors FastAPI produces
 
-Validation is not the only automatic failure, and recognising the others saves time.
+check isn't the only auto failure, and recognising the others saves time.
 
-**405 Method Not Allowed** means the path matched a route registered for a different method. Usually a POST to a GET-only route, or a typo in the decorator.
+**405 Method Not Allowed** means the path matched a route registered for a other method. often a POST to a GET-only route, or a typo in the decorator.
 
-**307 Temporary Redirect** is the trailing-slash redirect. Harmless until a client drops the body following it, which turns into a POST that arrives mysteriously empty.
+**307 Temporary Redirect** is the trailing-slash redirect. Harmless until a client drops the body following it. This Turns into a POST that arrives mysteriously empty.
 
-**500** with a serialisation message is the response model rejecting what your handler produced.
+**500** with a output message is the response model rejecting what your handler made.
 
-**422 on something you thought was a query parameter** usually means FastAPI classified it as a body &mdash; a list annotation without `Query()` is the common cause.
+**422 on a thing you thought was a query param** often means FastAPI classified it as a body. A list annotation without `Query()` is the common cause.
 
 ## Handling everything else
 
-`RequestValidationError` covers input. Two more handlers complete the picture.
+`RequestValidationError` covers input. Two more handlers full the picture.
 
-`HTTPException` has a default handler you can override, if you want your own envelope for the 404s and 403s you raise as well as for validation.
+`HTTPException` has a default handler you can replace, if you want your own envelope for the 404s and 403s you raise and for check.
 
-A handler for `Exception` catches everything unexpected, which is where you turn an unhandled error into a clean 500 rather than a traceback. Log the real exception there, return something generic to the caller, and never include the traceback in the response &mdash; it is an information leak, and it is the sort that ends up in a screenshot.
+A handler for `Exception` catches all surprise. This Is where you turn an unhandled error into a clean 500 rather than a traceback. Log the real exception there, return a thing plain to the caller. Never include the traceback in the response. It's an data leak. It's the sort that ends up in a screenshot.
 
-Custom exception classes with their own handlers are worth it once an app has real domain errors. Raising `ModuleNotFound` from a service and mapping it to a 404 in one handler keeps HTTP concerns out of your business logic entirely.
+Custom exception classes with their own handlers are worth it once an app has real domain errors. Raising `ModuleNotFound` from a service and mapping it to a 404 in one handler keeps HTTP concerns out of your business logic fully.
 
 ## Why 422 rather than 400
 
-Some APIs use 400 for validation failures, and people occasionally want to change FastAPI's default.
+Some APIs use 400 for check failures. People at times want to change FastAPI's default.
 
-422 means "I understood the request and cannot process the entity" &mdash; the syntax was fine, the content was not. 400 means the request itself was malformed. For a well-formed JSON body with a field out of range, 422 is the more precise statement.
+422 means "I understood the request and can't process the entity". The syntax was fine, the content wasn't. 400 means the request itself was malformed. For a well-formed JSON body with a field out of range, 422 is the more precise statement.
 
-The practical argument for leaving it alone is that clients and tooling recognise the FastAPI convention, and changing it gains nothing except matching a preference. If you must, an exception handler can return 400 with the same body &mdash; but do it consistently across every endpoint or you have made things worse.
+The hands-on arg for leaving it alone is that clients and tooling recognise the FastAPI rule. Changing it gains nothing except matching a preference. If you must, an exception handler can return 400 with the same body. But do it always across each endpoint or you've made things worse.
 
 ## What to log
 
 Log the full `exc.errors()` with a request identifier, and return your tidied version.
 
-The reason is a conversation that happens with every API: a caller reports that a valid request was rejected. The `input` field settles it in seconds &mdash; it shows exactly what arrived, which is frequently not what they believe they sent. Without it, you are asking them to reproduce something they cannot see either.
+The reason is a conversation that happens with each API. A caller reports that a valid request was rejected. The `input` field settles it in seconds. It shows just what arrived. This Is often not what they believe they sent. Without it, you're asking them to copy a thing they can't see either.
 
-Do not log the whole body indiscriminately. It may contain passwords, tokens or personal data, and a log is a place things persist. The error entries carry the offending values only, which is usually the right amount.
+Don't log the whole body indiscriminately. It may hold passwords, tokens or personal data. A log is a place things persist. The error entries carry the offending values only. This Is often the right amount.
 
 ## Summary
 
-A 422 is a Pydantic error with an HTTP envelope. `loc` names the source and the path; `type` is the stable code to match on; `input` is what actually arrived.
+A 422 is a Pydantic error with an HTTP envelope. `loc` names the source and the path. `type` is the stable code to match on. `input` is what really arrived.
 
-Every problem arrives at once. Validation failures are 422s you never write; facts about the world &mdash; missing, forbidden, conflicting &mdash; are exceptions you raise. Reshape the envelope with an exception handler if your clients expect something else, keep the status, and log the original.
+each problem arrives at once. check failures are 422s you never write. Facts about the world. Missing, forbidden, conflicting. Are exceptions you raise. Reshape the envelope with an exception handler if your clients expect a thing else, keep the status, and log the first.
 
 
 ## Mistakes people make
 
-**Reading `loc[0]` as the field name.** Here the first element is the source &mdash; `body`, `query`, `path`, `header`. The field starts at index one.
+**Reading `loc[0]` as the field name.** Here the first element is the source. `body`, `query`, `path`, `header`. The field starts at index one.
 
-**Returning 422 for a missing resource.** The request was well-formed; nothing with that id exists. That is a 404 you raise.
+**Returning 422 for a missing resource.** The request was well-formed. Nothing with that id exists. That is a 404 you raise.
 
-**Asserting on `msg` in tests.** Prose gets reworded and the suite fails for no real reason, which teaches people to ignore it. Assert on `loc` and `type`.
+**Asserting on `msg` in tests.** Prose gets reworded and the suite fails for no real reason. This Teaches people to skip it. Assert on `loc` and `type`.
 
-**Assuming `loc` always has a field.** A cross-field validator produces `["body"]` with nothing after it, and code indexing past the end raises the first time such a rule is added.
+**given `loc` always has a field.** A cross-field checker makes `["body"]` with nothing after it. Code indexing past the end raises the first time such a rule is added.
 
-**Returning the traceback on a 500.** An information leak, and the sort that ends up in a screenshot in a public issue.
+**Returning the traceback on a 500.** An data leak. The sort that ends up in a screenshot in a public issue.
 
-**Not logging the original errors.** When a caller insists their request was valid, the `input` value settles it in seconds. Without it, you are both guessing.
+**Not logging the first errors.** When a caller insists their request was valid, the `input` value settles it in seconds. Without it, you're both guessing.
 
-**Silencing validation errors.** Catching them and substituting defaults means the caller sent something wrong and will never find out.
+**Silencing check errors.** Catching them and substituting defaults means the caller sent a thing wrong and will never find out.
 
 ## Next
 
-That is the foundation: routing, the three sources of input, the shape of the response, and what happens when something does not fit. The next tier goes deeper into the request &mdash; methods, headers, cookies, forms, files, status codes, error handling, and splitting an app into routers.
+That is the foundation: routing, the three sources of input, the shape of the response. What happens when a thing doesn't fit. The next tier goes deeper into the request. Methods, headers, cookies, forms, files, status codes, error handling. Splitting an app into routers.
 
 ## What the tier covered
 
-Seven modules: what the framework actually is, how a function becomes a route, the three places input comes from, what the response declares, and what happens when something does not fit.
+Seven modules: what the framework really is, how a function turns a route, the three places input comes from, what the response declares. What happens when a thing doesn't fit.
 
-That is enough to build a real API. Everything past it is refinement &mdash; better organisation, more of the request, dependencies, the runtime, and the practices that keep an application maintainable once it has more than a handful of endpoints.
+That is enough to build a real API. all past it's refinement. Better organisation, more of the request, dependencies, the runtime. The practices that keep an use maintainable once it has more than a handful of endpoints.
 
-The next tier goes deeper into the request itself: the methods and what each promises, headers and cookies, form data and file uploads, status codes, error handling, and splitting a growing app into routers before it becomes one very long file.
+The next tier goes deeper into the request itself. The methods and what each promises, headers and cookies, form data and file uploads, status codes, error handling. Splitting a growing app into routers before it turns one very long file.
 
 ## One habit to take away
 
-Read the errors your own API produces before anybody else has to.
+Read the errors your own API makes before anybody else has to.
 
-Send a deliberately broken request to each endpoint and look at what comes back. Is the message something a caller could act on? Does the `loc` point at the right thing? Is a cross-field rule producing an error with nowhere to display it? Is anything sensitive echoed back in `input`?
+Send a on purpose broken request to each endpoint and look at what comes back. Is the message a thing a caller could act on? Does the `loc` point at the right thing? Is a cross-field rule making an error with nowhere to display it? Is anything sensitive echoed back in `input`?
 
-It takes minutes per endpoint and it is the only way to see your API the way somebody failing to use it does. Almost every API has at least one error that makes perfect sense to its author and none at all to anyone else.
+It takes minutes per endpoint and it's the only way to see your API the way somebody failing to use it does. Almost each API has at least one error that makes perfect sense to its author and none at all to anyone else.
 
 ## The shape of a good failure
 
-Every rejection an API produces answers three questions, and the default envelope answers all three: what was wrong, where it was, and what was received.
+each rejection an API makes answers three questions. The default envelope answers all three. What was wrong. Here It was, and what was received.
 
-Most hand-rolled validation answers one. That gap is the argument for letting the framework produce these rather than writing checks in handlers &mdash; not that the code is shorter, though it is, but that the caller is told enough to fix the problem without asking anyone.
+Most hand-rolled check answers one. That gap is the arg for letting the framework give these rather than writing checks in handlers. Not that the code is shorter, though it's. That the caller is told enough to fix the problem without asking anyone.
 
-Whatever envelope you settle on, keep those three. A friendlier message that drops the location has made things worse.
+what envelope you settle on, keep those three. A friendlier message that drops the location has made things worse.
 
 ## A closing thought
 
-Errors are the part of an API that gets the least design attention and the most use by anyone struggling with it.
+Errors are the part of an API that gets the least design focus and the most use by anyone struggling with it.
 
-A caller who succeeds first time never reads one. A caller who does not is reading nothing else, and what they find there decides whether they work it out in a minute or give up and open a ticket. It is worth twenty lines.
+A caller who succeeds first time never reads one. A caller who doesn't is reading nothing else. What they find there decides whether they work it out in a minute or give up and open a ticket. It's worth twenty lines.

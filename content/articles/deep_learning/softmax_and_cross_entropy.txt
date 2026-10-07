@@ -3,25 +3,25 @@ intro: The output layer of nearly every classifier, and the loss that is built t
 
 ## Quick Context
 
-A network's final layer produces one raw number per class. These are called <strong>logits</strong>, and they can be anything: 8.2, &minus;3.1, 0.0. They are not probabilities &mdash; they do not sit between 0 and 1 and they do not add up to anything in particular.
+A network's final layer gives one raw count per class. These are called <strong>logits</strong>. And they can be anything: 8.2, &minus;3.1, 0.0. They are not chances &mdash; they do not sit between 0 and 1 and they do not add up to anything in particular.
 
-Softmax converts them into a probability distribution. Cross-entropy then measures how wrong that distribution is. The two are almost always used together, and the reason is more interesting than convention.
+Softmax turns them into a chance spread. Cross-entropy then measures how wrong that spread is. The two are almost always used together. And the reason is more interesting than convention.
 
-Softmax exponentiates each logit and divides by the sum of all the exponentiated logits. The result is a vector of positive numbers that sum to 1 — a valid probability distribution. The largest logit always gets the largest probability, so softmax never changes which class wins; it only tells you how confident the model is.
+Softmax exponentiates each logit and divides by the sum of all the exponentiated logits. The result is a vector of positive counts that sum to 1. A valid chance spread. The largest logit always gets the largest chance. So softmax never changes which class wins. It just tells you how confident the net is.
 
-Cross-entropy measures the gap between two probability distributions: the model's prediction and the true label. For a single correct class (the usual case), the loss simplifies to the negative log of the probability assigned to the correct class. If the model is confident and right, that probability is near 1 and the loss is near 0. If the model is confident and wrong, the probability is near 0 and the loss explodes toward infinity.
+Cross-entropy measures the gap between two chance spreads: the net's prediction and the true label. For a single correct class (the usual case), the loss simplifies to the negative log of the chance given to the correct class. If the net is confident and right, that chance is near 1 and the loss is near 0. If the net is confident and wrong, the chance is near 0 and the loss explodes toward infinity.
 
-The gradient of the combined softmax-cross-entropy loss has a remarkably clean form: for each class, the gradient is simply the predicted probability minus the target (1 for the correct class, 0 for everything else). This means the update pushes the correct class's probability up and every other class's probability down, by an amount proportional to the current error. No second derivatives, no complicated chain rule — which is one reason this combination became the universal default for classification.
+The gradient of the mixed softmax-cross-entropy loss has a remarkably clean form: for each class, the gradient is simply the predicted chance minus the target (1 for the correct class, 0 for all else). This means the update pushes the correct class's chance up and each other class's chance down, by an amount proportional to the current error. No second derivatives, no complicated chain rule. Which is one reason this combination became the universal default for sorting.
 
-In practice, frameworks compute softmax and cross-entropy together in a single fused operation (PyTorch's `CrossEntropyLoss` takes raw logits, not probabilities) because the fused version is numerically stable. Computing softmax separately and then taking the log can produce NaN or Inf when logits are large; the fused version subtracts the maximum logit first, which cancels out mathematically but prevents overflow.
+In practice, frameworks compute softmax and cross-entropy together in a single fused step (PyTorch's `CrossEntropyLoss` takes raw logits, not chances) since the fused version is numerically stable. Computing softmax apart and then taking the log can give NaN or Inf when logits are large. The fused version subtracts the max logit first. It cancels out in math but stops overflow.
 
 ## What softmax does
 
 p<sub>i</sub> = e<sup>z<sub>i</sub></sup> / &Sigma;<sub>j</sub> e<sup>z<sub>j</sub></sup>
 
-Exponentiate every score, then divide by the total. Exponentiating makes everything positive; dividing by the sum makes it add to 1. Those two steps are the whole function.
+Exponentiate each score, then divide by the total. Exponentiating makes all positive. Dividing by the sum makes it add to 1. Those two steps are the whole function.
 
-Two properties are worth holding on to. It is <strong>monotonic</strong>: the largest logit always becomes the largest probability, so softmax never changes which class wins. And it is <strong>shift-invariant</strong>: adding the same constant to every logit leaves the probabilities completely unchanged, because the constant factors out of the numerator and denominator together.
+Two properties are worth holding on to. It is <strong>monotonic</strong>: the largest logit always turns the largest chance. So softmax never changes which class wins. And it is <strong>shift-invariant</strong>: adding the same constant to each logit leaves the chances fully unchanged, since the constant factors out of the numerator and denominator together.
 
 ## What cross-entropy does
 
@@ -29,13 +29,13 @@ For a single correct label, the loss collapses to one term:
 
 loss = &minus;log( p<sub>true</sub> )
 
-Every other class drops out, because the true distribution is 1 for the right answer and 0 everywhere else. So the loss depends on <em>one number</em>: the probability the model gave to the correct class.
+Each other class drops out, since the true spread is 1 for the right answer and 0 all over else. So the loss depends on <em>one count</em>: the chance the net gave to the correct class.
 
-Look at the curve. At p = 1 the loss is 0. At p = 0.5 it is 0.69. At p = 0.1 it is 2.3. As p approaches 0 it goes to infinity. That asymptote is the point: a model that is confidently wrong is punished without limit, while one that hedges is only mildly penalised.
+Look at the curve. At p = 1 the loss is 0. At p = 0.5 it is 0.69. At p = 0.1 it is 2.3. As p ways 0 it goes to infinity. That asymptote is the point: a net that is confidently wrong is punished without limit, while one that hedges is just mildly penalised.
 
-## From scores to probabilities
+## From scores to chances
 
-A classifier's final layer outputs one unbounded number per class &mdash; a logit. Softmax turns those into probabilities:
+A sorter's final layer outputs one unbounded count per class &mdash; a logit. Softmax turns those into chances:
 
 <p class="mono-font">p&#7522; = e<sup>z&#7522;</sup> / &Sigma;<sub>j</sub> e<sup>z&#7502;</sup></p>
 
@@ -44,15 +44,15 @@ Worked through on logits [2.0, 1.0, 0.1]:
 - Exponentiate: e² = 7.39, e¹ = 2.72, e⁰·¹ = 1.11. Sum = 11.22.
 - Divide: <strong>0.659, 0.242, 0.099</strong>. They sum to 1.
 
-Two properties do the work. Exponentiating makes everything positive, which probabilities must be. And dividing by the total makes them sum to 1.
+Two properties do the work. Exponentiating makes all positive, which chances must be. And dividing by the total makes them sum to 1.
 
-The exponential also <em>exaggerates</em> differences. A logit gap of 1.0 became a probability ratio of 2.7 to 1. A gap of 5 becomes 148 to 1. That sharpening is why a small change in the final layer can flip a prediction decisively, and why temperature scaling &mdash; dividing the logits by a constant before the softmax &mdash; is such an effective way to soften or sharpen a model's confidence.
+The exponential also <em>exaggerates</em> gaps. A logit gap of 1.0 became a chance ratio of 2.7 to 1. A gap of 5 turns 148 to 1. That sharpening is why a small change in the final layer can flip a prediction decisively. And why temperature scaling &mdash; dividing the logits by a constant before the softmax. Is such an effective way to soften or sharpen a net's confidence.
 
 ## The loss that goes with it
 
-Cross-entropy measures how far the predicted distribution is from the truth. With a one-hot target the sum collapses to a single term:
+Cross-entropy measures how far the predicted spread is from the truth. With a one-hot target the sum collapses to a single term:
 
-<p class="mono-font">loss = &minus;log(probability assigned to the correct class)</p>
+<p class="mono-font">loss = &minus;log(chance given to the correct class)</p>
 
 |Probability given to the true class|Loss|
 |---|---|
@@ -62,25 +62,25 @@ Cross-entropy measures how far the predicted distribution is from the truth. Wit
 |0.10|2.30|
 |0.01|4.61|
 
-The penalty grows without bound as the prediction approaches zero, so a confidently wrong model is punished far harder than an uncertain one. Squared error caps the penalty at 1 and gives confident mistakes only a gentle nudge, which is exactly why classification uses cross-entropy.
+The cost grows without bound as the prediction ways zero. So a confidently wrong net is punished far harder than an uncertain one. Squared error caps the cost at 1 and gives confident mistakes just a gentle nudge. It is just why sorting uses cross-entropy.
 
-A useful sanity check at initialisation: with C balanced classes, the expected starting loss is ln(C). For 10 classes that is 2.30. Seeing that number in the first few steps means the model is initialised sensibly; seeing something wildly different suggests a bug in the labels or the loss.
+A useful sanity check at setup: with C balanced classes, the expected starting loss is ln(C). For 10 classes that is 2.30. Seeing that count in the first few steps means the net is set up sensibly. Seeing something wildly other suggests a bug in the labels or the loss.
 
 ## Why the two are always paired
 
-Softmax and cross-entropy are combined for a mathematical reason that matters in practice. The derivative of the pair, with respect to the logits, is startlingly simple:
+Softmax and cross-entropy are mixed for a math-based reason that matters in practice. The derivative of the pair, with respect to the logits, is startlingly simple:
 
 <p class="mono-font">&part;L/&part;z&#7522; = p&#7522; &minus; y&#7522;</p>
 
-Predicted probability minus the true label. Nothing else. No sigmoid derivative to shrink the gradient, no saturation term.
+Predicted chance minus the true label. Nothing else. No sigmoid derivative to shrink the gradient, no saturation term.
 
-Compare with sigmoid plus squared error, where the gradient includes `a(1 − a)` &mdash; a factor that goes to zero exactly when the model is confidently wrong. That model learns slowest in the cases it most needs to fix. The softmax and cross-entropy pairing has no such term, and that is why it became the standard.
+Check with sigmoid plus squared error. There the gradient includes `a(1 − a)`. A factor that goes to zero just when the net is confidently wrong. That net learns slowest in the cases it most needs to fix. The softmax and cross-entropy pairing has no such term. And that is why it became the standard.
 
-It also explains why frameworks fuse them. `nn.CrossEntropyLoss` applies log-softmax and the negative log-likelihood in one numerically stable step, and computes that clean gradient directly.
+It also explains why frameworks fuse them. `nn.CrossEntropyLoss` applies log-softmax and the negative log-likelihood in one numerically stable step. And computes that clean gradient right.
 
-## Why they are always implemented together
+## Why they are always built together
 
-Softmax turns scores into probabilities and cross-entropy scores them. Computed separately both overflow; computed together the gradient collapses to one subtraction.
+Softmax turns scores into chances and cross-entropy scores them. Computed apart both overflow. Computed together the gradient collapses to one subtraction.
 
 ```python-run
 import numpy as np
@@ -115,7 +115,7 @@ print("  every library does that subtraction. it changes nothing")
 print("  mathematically and everything numerically.")
 ```
 
-Cross-entropy measures how far the predicted distribution lands from the true label, and the combined loss has the same overflow trap that softmax does on its own.
+Cross-entropy measures how far the predicted spread lands from the true label. And the mixed loss has the same overflow trap that softmax does on its own.
 
 ```python-run
 import numpy as np
@@ -143,7 +143,7 @@ print("  that is why frameworks give you cross_entropy(LOGITS, target) and")
 print("  warn you not to apply softmax yourself first.")
 ```
 
-The gradient of the combined softmax-plus-cross-entropy simplifies to a single subtraction, which a numerical check confirms.
+The gradient of the mixed softmax-plus-cross-entropy simplifies to a single subtraction. It a numerical check confirms.
 
 ```python-run
 import numpy as np
@@ -177,43 +177,43 @@ print("other loss on top of a softmax is a worse deal than it looks.")
 
 ## Guided tour
 
-1. <strong>Watch the gap do the work.</strong> Set the <strong>Score for cat</strong> slider to 6. Its probability shoots up and every other class is squeezed toward zero. Softmax cares about the <em>differences</em> between logits, not their absolute size.
-2. <strong>Prove shift invariance.</strong> Click <strong>Add 100 to Every Score</strong>. The logits all become enormous and the probabilities do not move at all. This is not a curiosity &mdash; it is what lets a real implementation subtract the maximum before exponentiating, which is the only thing standing between you and numerical overflow.
-3. <strong>Punish a confident mistake.</strong> Set the <strong>True Label</strong> to fish, then set the <strong>Score for fish</strong> slider to -6. The model is now confidently wrong and the loss climbs steeply. Accuracy would record this as one error; cross-entropy records how badly.
-4. <strong>Flatten it out.</strong> Set the <strong>Temperature</strong> slider to its maximum, 4. Dividing the logits by a large temperature shrinks the gaps between them, and the distribution tends toward uniform. This is exactly the temperature knob on a language model.
-5. <strong>Sharpen it.</strong> Set the <strong>Temperature</strong> slider to 0.1. The gaps are magnified and the distribution collapses onto the single highest logit &mdash; effectively an argmax. Low temperature means safe and repetitive; high means varied and eventually incoherent.
-6. <strong>Read the gradient.</strong> With the true label set, look at the gradient panel. The entry for the correct class is negative and the rest are positive: training pushes the right logit up and the others down, by an amount equal to how wrong the probability was.
+1. <strong>Watch the gap do the work.</strong> Set the <strong>Score for cat</strong> slider to 6. Its chance shoots up and each other class is squeezed toward zero. Softmax cares about the <em>gaps</em> between logits, not their absolute size.
+2. <strong>Prove shift invariance.</strong> Click <strong>Add 100 to Each Score</strong>. The logits all turn enormous and the chances do not move at all. This is not a curiosity. It is what lets a real build subtract the max before exponentiating. It is the just thing standing between you and numerical overflow.
+3. <strong>Punish a confident mistake.</strong> Set the <strong>True Label</strong> to fish, then set the <strong>Score for fish</strong> slider to -6. The net is now confidently wrong and the loss climbs steeply. Score would record this as one error. Cross-entropy records how badly.
+4. <strong>Flatten it out.</strong> Set the <strong>Temperature</strong> slider to its max, 4. Dividing the logits by a large temperature shrinks the gaps between them. And the spread tends toward uniform. This is just the temperature knob on a language net.
+5. <strong>Sharpen it.</strong> Set the <strong>Temperature</strong> slider to 0.1. The gaps are magnified and the spread collapses onto the single highest logit &mdash; effectively an argmax. Low temperature means safe and repetitive. High means varied and eventually incoherent.
+6. <strong>Read the gradient.</strong> With the true label set, look at the gradient panel. The entry for the correct class is negative and the rest are positive: training pushes the right logit up and the others down, by an amount equal to how wrong the chance was.
 
 ## Why they are paired
 
-Take the derivative of cross-entropy with respect to the raw logits and almost everything cancels:
+Take the derivative of cross-entropy with respect to the raw logits and almost all cancels:
 
 &part;loss / &part;z<sub>i</sub> = p<sub>i</sub> &minus; y<sub>i</sub>
 
-Predicted minus actual. No exponentials, no division, no chain of awkward terms &mdash; the softmax derivative and the log derivative annihilate each other exactly. It is numerically stable, it is one subtraction, and it is why every framework fuses the two into a single operation (<span class="mono-font">CrossEntropyLoss</span> in PyTorch takes raw logits, not probabilities).
+Predicted minus actual. No exponentials, no division, no chain of awkward terms. The softmax derivative and the log derivative annihilate each other just. It is numerically stable, it is one subtraction. And it is why each framework fuses the two into a single step (<span class="mono-font">CrossEntropyLoss</span> in PyTorch takes raw logits, not chances).
 
-That fusion is also a very common bug: applying softmax yourself and <em>then</em> passing the result to a loss that expects logits applies softmax twice, which flattens the distribution and quietly cripples training.
+That fusion is also a very common bug: applying softmax yourself and <em>then</em> passing the result to a loss that expects logits applies softmax twice. It flattens the spread and quietly cripples training.
 
 ## Where you meet it next
 
-Softmax is not only an output layer. It is the normalising step inside <a href="../natural_language_processing/attention_mechanism.html" style="color: var(--accent-primary)">attention</a>: attention scores are logits, and softmax turns them into weights that sum to 1 so they can average the values. Every property above &mdash; monotonic, shift-invariant, temperature-controllable &mdash; applies there unchanged.
+Softmax is not just an output layer. It is the scaling step inside <a href="../natural_language_processing/attention_mechanism.html" style="color: var(--accent-primary)">attention</a>: attention scores are logits. And softmax turns them into weights that sum to 1 so they can average the vals. Each property above &mdash; monotonic, shift-invariant, temperature-controllable &mdash; applies there unchanged.
 
 ## Where this goes wrong
 
 - <strong>Applying softmax twice.</strong> As above. If your loss function is named for logits, give it logits.
-- <strong>Using it for multi-label problems.</strong> Softmax forces the outputs to compete &mdash; they must sum to 1. If an example can belong to several classes at once, you want independent sigmoids and binary cross-entropy instead.
-- <strong>Reading probabilities as calibrated confidence.</strong> Modern networks are systematically overconfident; a 0.99 often means rather less than 99%. Calibration is a separate step.
-- <strong>Forgetting the max subtraction.</strong> Writing softmax by hand and exponentiating a logit of 1000 gives infinity, then NaN. Subtract the maximum first; it changes nothing mathematically and everything numerically.
+- <strong>With it for multi-label problems.</strong> Softmax forces the outputs to compete. They must sum to 1. If an case can belong to a few classes at once, you want free sigmoids and binary cross-entropy instead.
+- <strong>Reading chances as calibrated confidence.</strong> Modern networks are step by step too sure. A 0.99 often means rather less than 99%. Tuning is a split step.
+- <strong>Forgetting the max subtraction.</strong> Writing softmax by hand and exponentiating a logit of 1000 gives infinity, then NaN. Subtract the max first. It changes nothing in math and all numerically.
 
 ## Summing up
 
-Softmax exponentiates the raw scores and divides by their total, turning any set of logits into a probability distribution &mdash; monotonic, so the winner never changes, and shift-invariant, which is what makes it numerically safe. Cross-entropy then reduces to minus the log of the probability given to the true class, so a confident mistake is punished without limit while a hedge is not. Paired, their gradient with respect to the logits collapses to predicted minus actual, which is why frameworks fuse them into one operation and why you should never apply softmax before a loss that expects logits.
+Softmax exponentiates the raw scores and divides by their total, turning any set of logits into a chance spread &mdash; monotonic. So the winner never changes. And shift-invariant, which is what makes it numerically safe. Cross-entropy then reduces to minus the log of the chance given to the true class. So a confident mistake is punished without limit while a hedge is not. Paired, their gradient with respect to the logits collapses to predicted minus actual. It is why frameworks fuse them into one step and why you should never apply softmax before a loss that expects logits.
 
 ## Numerical stability, and the bug everyone hits
 
-`e^1000` is infinity in floating point, and once an infinity appears the result is `NaN`. Since logits are unbounded, this is a real risk.
+`e^1000` is infinity in floating point. And once an infinity appears the result is `NaN`. Since logits are unbounded, this is a real risk.
 
-The fix is to subtract the maximum logit before exponentiating. Because the constant cancels between numerator and denominator, the result is unchanged, but the largest exponent becomes `e⁰ = 1`:
+The fix is to subtract the max logit before exponentiating. Since the constant cancels between numerator and denominator, the result is unchanged. But the largest exponent turns `e⁰ = 1`:
 
 ```python
 import numpy as np
@@ -224,7 +224,7 @@ def softmax(z):
     return e / e.sum()
 ```
 
-Every framework does this internally, which leads to the practical rule: <strong>pass logits to the loss function, never probabilities</strong>.
+Each framework does this internally. It leads to the real rule: <strong>pass logits to the loss function, never chances</strong>.
 
 ```python
 import torch.nn as nn
@@ -234,38 +234,38 @@ logits = model(x)                      # no softmax in the model
 loss = criterion(logits, targets)      # integer class indices, not one-hot
 ```
 
-Applying softmax in the model and then using `CrossEntropyLoss` applies it twice. The model still trains &mdash; badly, slowly, with no error message. It is one of the most common bugs in deep learning code.
+Applying softmax in the net and then with `CrossEntropyLoss` applies it twice. The net still trains &mdash; badly, slowly, with no error message. It is one of the most common bugs in deep learning code.
 
 For binary problems, `BCEWithLogitsLoss` is the equivalent fused pair.
 
 ## Variants worth knowing
 
-<strong>Sigmoid instead of softmax</strong> for multi-label problems, where several classes can be true at once. Softmax forces the outputs to compete for a fixed total, which is wrong there.
+<strong>Sigmoid instead of softmax</strong> for multi-label problems. There a few classes can be true at once. Softmax forces the outputs to compete for a fixed total. It is wrong there.
 
-<strong>Label smoothing</strong> replaces the one-hot target with, say, 0.9 on the true class and the remaining 0.1 spread across the others. The model is no longer pushed towards infinite confidence, which improves calibration and usually test accuracy.
+<strong>Label smoothing</strong> replaces the one-hot target with, say, 0.9 on the true class and the left 0.1 spread across the others. The net is no longer pushed towards infinite confidence. It improves tuning and often test score.
 
-<strong>Temperature scaling</strong> divides logits by T before the softmax. T &gt; 1 softens the distribution; T &lt; 1 sharpens it. Fitting a single T on held-out data is the standard, cheap way to calibrate a network's confidence, and it changes no predictions' ranking.
+<strong>Temperature scaling</strong> divides logits by T before the softmax. T &gt; 1 softens the spread. T &lt; 1 sharpens it. Fitting a single T on held-out data is the standard, cheap way to calibrate a network's confidence. And it changes no predictions' ranking.
 
-<strong>Focal loss</strong> down-weights examples the model already gets right, focusing training on the hard ones. Designed for object detection, where background vastly outnumbers objects.
+<strong>Focal loss</strong> down-weights cases the net now gets right, focusing training on the hard ones. Designed for object detection, where background vastly outnumbers objects.
 
 ## Questions people ask
 
-<strong>Why exponentiate rather than just normalise the logits?</strong> Because logits can be negative, and dividing negatives by a sum does not give probabilities. Exponentiating guarantees positivity and gives a smooth, differentiable function.
+<strong>Why exponentiate rather than just scale the logits?</strong> Since logits can be negative. And dividing negatives by a sum does not give chances. Exponentiating guarantees positivity and gives a smooth, differentiable function.
 
-<strong>Should my model end with softmax?</strong> No &mdash; return logits and let the loss apply it. Apply softmax explicitly only at inference, when you want to display probabilities.
+<strong>Should my net end with softmax?</strong> No. Give logits and let the loss apply it. Apply softmax clearly just at test time, when you want to display chances.
 
-<strong>Are softmax outputs real probabilities?</strong> They are a distribution, and typically an overconfident one. Check with a reliability diagram and apply temperature scaling if the numbers matter.
+<strong>Are softmax outputs real chances?</strong> They are a spread. And often an too sure one. Check with a reliability diagram and apply temperature scaling if the counts matter.
 
-<strong>What loss for two classes?</strong> Either a single sigmoid output with binary cross-entropy, or two logits with softmax. Both work; the sigmoid version has one fewer parameter.
+<strong>What loss for two classes?</strong> Either a single sigmoid output with binary cross-entropy. Or two logits with softmax. Both work; the sigmoid version has one fewer param.
 
-<strong>Why is my loss exactly ln(number of classes) and not falling?</strong> The model is predicting uniformly and learning nothing &mdash; check the learning rate, the label alignment and whether gradients are reaching the parameters.
+<strong>Why is my loss just ln(count of classes) and not falling?</strong> The net is predicting uniformly and learning nothing. Check the learning rate, the label alignment and whether gradients are reaching the params.
 
-<strong>Does softmax have parameters?</strong> No. It is a fixed function applied to the final layer's outputs.
+<strong>Does softmax have params?</strong> No. It is a fixed function applied to the final layer's outputs.
 
 ## Recap in one screen
 
-- Softmax exponentiates the logits and normalises, turning scores into a distribution that sums to 1.
-- The exponential exaggerates differences, which is why temperature scaling is an effective confidence dial.
-- Cross-entropy is `−log(probability of the correct class)`, punishing confident mistakes without limit.
+- Softmax exponentiates the logits and scales, turning scores into a spread that sums to 1.
+- The exponential exaggerates gaps. It is why temperature scaling is an effective confidence dial.
+- Cross-entropy is `−log(chance of the correct class)`, punishing confident mistakes without limit.
 - Together their gradient is simply `predicted − actual`, with no saturating term.
-- Subtract the maximum logit for stability, and always hand logits to the fused loss rather than probabilities.
+- Subtract the max logit for stability. And always hand logits to the fused loss rather than chances.

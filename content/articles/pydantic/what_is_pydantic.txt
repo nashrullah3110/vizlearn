@@ -3,18 +3,18 @@ intro: Python's type annotations do nothing on their own. This is the library th
 
 ## The gap between what you wrote and what runs
 
-Write a function like this and you have made a promise:
+Write a function like this and you've made a promise:
 
 ```python
 def modules_left(count: int) -> str:
     return "You have " + str(count) + " modules to go"
 ```
 
-The promise is that `count` is a whole number. Python does not keep it. Annotations are stored on the function object and otherwise ignored at runtime &mdash; they exist for human readers, editors and type checkers like mypy, none of which are present when your program is actually running. Call `modules_left("twelve")` and Python does exactly what you asked: it concatenates strings and returns a sentence that reads fine.
+The promise is that `count` is a whole number. Python doesn't keep it. Annotations are stored on the function object and else skipped at runtime. They exist for human readers, editors and type checkers like mypy, none of which are present when your program is really running. Call `modules_left("twelve")` and Python does just what you asked. It concatenates strings and returns a sentence that reads fine.
 
-That is a small problem when the wrong value is only printed. It becomes a real one the moment something arithmetic happens. A string that has been travelling through three function calls disguised as an integer fails at the point it is finally divided, and the traceback points at the division, not at the front door where the bad value walked in.
+That is a small problem when the wrong value is only printed. It turns a real one the moment a thing math happens. A string that has been travelling through three function calls disguised as an int fails at the point it's finally cut. The traceback points at the division, not at the front door where the bad value walked in.
 
-This is the gap Pydantic fills. It reads the annotations you already write and enforces them, at a moment you choose. You define a model class with annotated fields, and when you instantiate it Pydantic validates every value &mdash; checking types, applying constraints (min/max, regex, length), and coercing where the conversion is unambiguous (the string `"42"` becomes the integer `42`). Invalid input raises a `ValidationError` with a structured list of every field that failed and why, at the point of entry rather than three calls later at the point of use. Pydantic v2 rewrites the validation core in Rust, making it fast enough to sit on a hot path without apology. FastAPI builds its entire request/response validation on Pydantic models, so learning one teaches you both. This page walks through model definition, validation errors, nested models, custom validators, and the serialisation methods (`model_dump`, `model_dump_json`) that round-trip data between Python objects and the formats APIs actually send.
+This is the gap Pydantic fills. It reads the annotations you already write and enforces them, at a moment you choose.
 
 
 ## A type hint is only a note to the reader
@@ -167,11 +167,11 @@ print("  required:", schema["required"])
 ```
 ## Validation is a boundary problem
 
-Almost no bad data originates inside your program. It arrives: from a JSON request body, a form post, a config file, a CSV, a database column that has been nullable since 2019, an environment variable, another team's API. Everything that crosses into your code from outside is, until proven otherwise, a guess.
+Almost no bad data originates inside your program. It arrives. From a JSON request body, a form post, a config file, a CSV, a DB column that has been nullable since 2019, an setting var, another team's API. all that crosses into your code from outside is, until proven else, a guess.
 
-The useful discipline is to check that data once, at the edge, and convert it into something trustworthy. After that line, every function downstream can assume the shape is right and stop defending itself. The alternative &mdash; an `isinstance` check at the top of every function, or worse, no check and a hope &mdash; spreads the same anxiety through the whole codebase.
+The handy discipline is to check that data once, at the edge. Convert it into a thing trustworthy. After that line, each function downstream can assume the shape is right and stop defending itself. The option. An `isinstance` check at the top of each function, or worse, no check and a hope. Spreads the same anxiety through the whole code.
 
-A Pydantic model is that boundary written down. It is a class whose annotations describe what you require, and constructing one is the act of checking.
+A Pydantic model is that boundary written down. It's a class whose annotations show what you need. Making one is the act of checking.
 
 ```python
 from pydantic import BaseModel
@@ -182,51 +182,51 @@ class Module(BaseModel):
     published: bool
 ```
 
-Three lines, and you now have something that will refuse to exist unless the data fits.
+Three lines, and you now have a thing that will refuse to exist unless the data fits.
 
 ## Coercion: the part people do not expect
 
-The first surprise for most people is that Pydantic does not merely check &mdash; it converts. Hand the model above `minutes="9"` and you get back an integer `9`, not an error.
+The first surprise for most people is that Pydantic doesn't merely check. It converts. Hand the model above `minutes="9"` and you get back an int `9`, not an error.
 
-That is deliberate, and it follows from where models are used. Data crossing a boundary is usually text. A query string has no integers in it. An HTML form sends strings. A CSV is strings all the way down. If a model rejected everything that arrived as text, you would spend your life writing `int(request.args["minutes"])` and catching `ValueError` by hand &mdash; which is precisely the code Pydantic exists to delete.
+That is deliberate, and it follows from where models are used. Data crossing a boundary is often text. A query string has no ints in it. An HTML form sends strings. A CSV is strings all the way down. If a model rejected all that arrived as text, you'd spend your life writing `int(request.args["minutes"])` and catching `ValueError` by hand. Which is just the code Pydantic exists to delete.
 
-So the default behaviour, called **lax mode**, is to accept anything that has an unambiguous reading. `"9"` becomes `9`. `9.0` becomes `9`. `"true"`, `"yes"` and `1` all become `True`. But `"nine"` does not become anything, because there is no unambiguous reading, and neither does `9.5`, because turning it into `9` would silently lose information you might have needed.
+So the default action, called **lax mode**, is to accept anything that has an unambiguous reading. `"9"` turns `9`. `9.0` turns `9`. `"true"`, `"yes"` and `1` all become `True`. But `"nine"` doesn't become anything. There's no unambiguous reading. Neither does `9.5`, because turning it into `9` would silently lose data you might have needed.
 
-Where that trade is wrong &mdash; and sometimes it is, particularly deep inside a system where types should already be correct &mdash; strict mode is available, and gets a module of its own later in this track.
+Where that trade is wrong. And at times it's, above all deep inside a system where types should already be correct &mdash; strict mode is on hand. Gets a module of its own later in this track.
 
 ## Errors that are worth reading
 
-The second thing that distinguishes Pydantic from a hand-written check is the quality of its refusals.
+The second thing that sets apart Pydantic from a hand-written check is the quality of its refusals.
 
-A hand-written validator usually raises on the first problem it meets. The caller fixes that one, resubmits, and discovers the next. Pydantic checks every field and raises once, carrying the complete list. For a form, that is the difference between one error message at a time and a form that highlights all four broken inputs at once.
+A hand-written checker often raises on the first problem it meets. The caller fixes that one, resubmits. Discovers the next. Pydantic checks each field and raises once, carrying the full list. For a form, that is the gap between one error message at a time and a form that highlights all four broken inputs at once.
 
-Each entry in that list has three parts worth reading separately.
+Each entry in that list has three parts worth reading apart.
 
-The **location** is a path, not a name. For a flat model it is just the field. For anything nested it describes the route: `address.pin` is one level down, `modules.2.minutes` is the `minutes` field of the third item in a list. When a payload is deep, this is the fastest way to find the offending value.
+The **location** is a path, not a name. For a flat model it's just the field. For anything nested it shows the route: `address.pin` is one level down, `modules.2.minutes` is the `minutes` field of the third item in a list. When a payload is deep, this is the fastest way to find the offending value.
 
-The **type** is a stable machine-readable code &mdash; `int_parsing`, `string_too_short`, `greater_than` &mdash; not a sentence. It is what you match on if you are converting errors into an API response or a translated message, and it will not change underneath you when the wording is improved.
+The **type** is a stable machine-readable code. `int_parsing`, `string_too_short`, `greater_than`. Not a sentence. It's what you match on if you're converting errors into an API response or a translated message. It won't change underneath you when the wording is better.
 
-The **input** is the value that was actually received. Nine times in ten, seeing it is the whole diagnosis: you expected a number and the caller sent `"null"` as a string.
+The **input** is the value that was really received. Nine times in ten, seeing it's the whole diagnosis. You expected a number and the caller sent `"null"` as a string.
 
 ## What else the model buys you
 
-Once the shape of your data is written down precisely enough to validate against, it is written down precisely enough for other things too.
+Once the shape of your data is written down just enough to validate against, it's written down just enough for other things too.
 
-`model_dump()` gives you a plain dictionary. `model_dump_json()` gives you a JSON string, handling the types &mdash; dates, UUIDs, decimals &mdash; that `json.dumps` refuses. And `model_json_schema()` produces a JSON Schema document describing the model.
+`model_dump()` gives you a plain dict. `model_dump_json()` gives you a JSON string, handling the types. Dates, UUIDs, decimals. That `json.dumps` refuses. And `model_json_schema()` makes a JSON Schema doc showing the model.
 
-That last one is quietly the reason Pydantic is everywhere. FastAPI does not have its own validation layer; it uses Pydantic, and it turns those generated schemas into the interactive documentation you get for free at `/docs`. The same mechanism drives structured output in LLM libraries, where the schema tells the model what shape to answer in. You describe your data once, and several tools read that description.
+That last one is quietly the reason Pydantic is all over. FastAPI doesn't have its own check layer. It uses Pydantic. It turns those made schemas into the interactive docs you get for free at `/docs`. The same method drives structured output in LLM libraries. Here The schema tells the model what shape to answer in. You show your data once. A few tools read that description.
 
 ## What it is not
 
-Pydantic is not an ORM, though it is often paired with one. It does not talk to your database, and a model is not a table.
+Pydantic isn't an ORM, though it's often paired with one. It doesn't talk to your DB. A model isn't a table.
 
-It is not a static type checker either. Mypy analyses code without running it; Pydantic checks values while the program runs. They complement each other rather than compete, and using both is normal.
+It isn't a static type checker either. Mypy analyses code without running it. Pydantic checks values while the program runs. They complement each other rather than compete, and using both is normal.
 
-And it is not free. Validation costs something, which is exactly why the boundary discipline matters: validate on the way in, once, and then trust the result rather than re-checking the same object at every layer.
+And it isn't free. check costs a thing. This Is just why the boundary discipline matters. Validate on the way in, once. Then trust the result rather than re-checking the same object at each layer.
 
 ## What the hand-written version looks like
 
-It is worth seeing the code Pydantic replaces, because the comparison explains several of its design decisions at once.
+It's worth seeing the code Pydantic replaces. The compare shows a few of its design choices at once.
 
 ```python
 def parse_module(raw):
@@ -246,50 +246,50 @@ def parse_module(raw):
     return {"title": title, "minutes": minutes}
 ```
 
-Fifteen lines for two fields, and it is already worse than it looks. It stops at the first error, so a caller with two mistakes discovers them one at a time. Its messages do not say which field failed in a machine-readable way. It has no idea what to do about a third field when somebody adds one, and nothing forces that person to remember this function exists. And it describes the same shape a second time, in prose, in whatever documentation exists.
+Fifteen lines for two fields, and it's already worse than it looks. It stops at the first error. A caller with two mistakes discovers them one at a time. Its messages don't say which field failed in a machine-readable way. It has no idea what to do about a third field when somebody adds one, and nothing forces that person to note this function exists. And it shows the same shape a second time, in prose, in what docs exists.
 
-The Pydantic version is the class definition and nothing else. Every one of those problems is solved as a side effect rather than as an additional feature.
+The Pydantic version is the class meaning and nothing else. each one of those problems is solved as a side effect rather than as an extra feature.
 
 ## The cost, and when it matters
 
-Validation is not free, and it is worth being concrete rather than reassuring.
+check isn't free, and it's worth being concrete rather than reassuring.
 
-Building a model does real work: reading a compiled schema, checking each field, converting where needed, and constructing the object. A plain class assignment does none of that. If you construct millions of objects in a tight loop, you will measure the difference.
+Building a model does real work: reading a compiled schema, checking each field, converting where needed. Making the object. A plain class set does none of that. If you make millions of objects in a tight loop, you'll measure the gap.
 
-Two things make it matter less than people fear. The first is that Pydantic v2 does the work in Rust rather than Python, which moved it from "noticeable" to "usually irrelevant". The second is scale: a model that validates in single-digit microseconds sits next to a database query taking milliseconds and a network call taking hundreds of milliseconds. In a typical request handler, validation is a rounding error on the request.
+Two things make it matter less than people fear. The first is that Pydantic v2 does the work in Rust rather than Python. This Moved it from "noticeable" to "often irrelevant". The second is scale. A model that validates in single-digit microseconds sits next to a DB query taking milliseconds and a network call taking hundreds of milliseconds. In a common request handler, check is a rounding error on the request.
 
-Where it genuinely matters is bulk. Validating a hundred thousand rows from a file, or every element of a large array in a numerical pipeline, is a case where you should measure. The answer there is usually not to abandon models but to validate the container once rather than each item through a Python loop, which is a topic the `TypeAdapter` module returns to.
+Where it truly matters is bulk. checking a hundred thousand rows from a file, or each element of a large array in a numeric pipeline, is a case where you should measure. The answer there's often not to abandon models but to validate the holder once rather than each item through a Python loop. This Is a topic the `TypeAdapter` module returns to.
 
-The rule that follows is the one this article opened with: validate at the boundary, once. Re-validating an object that has already passed is pure cost with no information gained.
+The rule that follows is the one this article opened with. Validate at the boundary, once. Re-checking an object that has already passed is pure cost with no data gained.
 
 ## Where it came from, and why v2 matters
 
-Pydantic v1 was pure Python. It was popular enough to become a dependency of a large part of the ecosystem, and slow enough that its performance was a recurring complaint.
+Pydantic v1 was pure Python. It was common enough to become a dependency of a large part of the ecosystem. Slow enough that its speed was a recurring complaint.
 
-Version 2, released in 2023, kept the API broadly recognisable and rewrote the engine in Rust as a separate package called `pydantic-core`. When you install `pydantic` you get both: a Python layer that reads your annotations and builds a schema, and a compiled core that executes that schema against data.
+Version 2, released in 2023, kept the API broadly recognisable and rewrote the engine in Rust as a split package called `pydantic-core`. When you install `pydantic` you get both. A Python layer that reads your annotations and builds a schema. A compiled core that runs that schema against data.
 
-This split explains several things you will notice. It is why validation is fast. It is why the error `type` codes look like machine identifiers rather than sentences &mdash; they come from the core. It is why `model_validate_json` beats `json.loads` plus validation, since the core parses and validates in one pass without building intermediate Python objects. And it is why a wheel exists for every platform: there is compiled code in there.
+This split shows a few things you'll notice. It's why check is fast. It's why the error `type` codes look like machine identifiers rather than sentences. They come from the core. It's why `model_validate_json` beats `json.loads` plus check. The core parses and validates in one pass without building mid Python objects. And it's why a wheel exists for each platform: there's compiled code in there.
 
-The practical consequence for you is about documentation. A great deal of Pydantic material online predates v2 and describes an API that has moved. The reliable signals: v1 uses `@validator`, `.dict()`, `.json()` and `class Config`; v2 uses `@field_validator`, `.model_dump()`, `.model_dump_json()` and `model_config`. If an article uses the first set, treat everything in it as historical.
+The hands-on result for you is about docs. A great deal of Pydantic material online predates v2 and shows an API that has moved. The solid signals. V1 uses `@checker`, `.dict()`, `.json()` and `class Config`. V2 uses `@field_validator`, `.model_dump()`, `.model_dump_json()` and `model_config`. If an article uses the first set, treat all in it as historical.
 
 ## Four things people expect it to be
 
-**An ORM.** It is not, and it does not talk to a database. It pairs well with one &mdash; SQLModel exists precisely to join them &mdash; but a model is not a table and validating one does not persist anything.
+**An ORM.** It isn't, and it doesn't talk to a DB. It pairs well with one. SQLModel exists just to join them. But a model isn't a table and checking one doesn't persist anything.
 
-**A static type checker.** Also no. Mypy and Pyright analyse code without running it and catch mistakes in your own source. Pydantic checks values at runtime and catches mistakes in data. They overlap in vocabulary and not in job, and a serious codebase uses both.
+**A static type checker.** Also no. Mypy and Pyright analyse code without running it and catch mistakes in your own source. Pydantic checks values at runtime and catches mistakes in data. They share in vocab and not in job. A serious code uses both.
 
-**A serialisation format.** `model_dump_json` produces JSON, but Pydantic is not competing with `json` or `msgpack`. It describes and checks the shape; the encoding is a service it offers on top.
+**A output format.** `model_dump_json` makes JSON. Pydantic isn't competing with `json` or `msgpack`. It shows and checks the shape. The encoding is a service it offers on top.
 
-**Automatic.** Nothing validates until you ask. A function annotated with a model type does not check its argument; only constructing or validating a model does. There is a `@validate_call` decorator that brings the same checking to function arguments, and it is opt-in for the same reason.
+**auto.** Nothing validates until you ask. A function annotated with a model type doesn't check its arg. Only making or checking a model does. There's a `@validate_call` decorator that brings the same checking to function args. It's opt-in for the same reason.
 
 ## The habit worth forming
 
-When you find yourself writing `if not isinstance(...)`, or reaching into a dictionary with `.get()` and a default, or writing a comment that explains what shape a parameter is meant to have &mdash; that is a model waiting to be written.
+When you find yourself writing `if not isinstance(...)`, or reaching into a dict with `.get()` and a default, or writing a comment that shows what shape a param is meant to have. That is a model waiting to be written.
 
-The comment in particular is the strongest signal. A sentence describing the shape of data is a schema that cannot be executed, checked or kept honest. Turning it into a model costs about the same number of lines and cannot go stale.
+The comment in given is the strongest signal. A sentence showing the shape of data is a schema that can't be ran, checked or kept honest. Turning it into a model costs about the same number of lines and can't go stale.
 
 ## Where this track goes
 
-The next module builds a first model properly &mdash; fields, required versus optional, and what you get back. After that comes the part everyone trips over: precisely which values Pydantic will convert and which it will refuse, and how to read the error when it refuses.
+The next module builds a first model properly. Fields, needed versus optional. What you get back. After that comes the part all trips over. just which values Pydantic will convert and which it will refuse. How to read the error when it refuses.
 
-The fastest way through all of it is to keep changing the values in the editors above and pressing Run. A rule you have watched break is a rule you remember.
+The fastest way through all of it's to keep changing the values in the editors above and pressing Run. A rule you've watched break is a rule you note.

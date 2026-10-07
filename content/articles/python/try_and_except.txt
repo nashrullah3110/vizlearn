@@ -1,5 +1,5 @@
 title: try and except: A Practical Guide
-intro: A try block runs code that might fail; an except block says what to do when a specific failure happens. The difficulty is not the syntax &mdash; it is being disciplined about which failures you actually catch.
+intro: A try block runs code that might fail. An except block says what to do when a exact failure happens. The trouble isn't the syntax. It's being disciplined about which failures you really catch.
 
 ## The shape
 
@@ -12,31 +12,19 @@ except ValueError:
 ```
 
 
-If `int()` raises `ValueError`, control jumps to the handler. If it raises anything else, the handler is skipped and the error keeps travelling up. That selectivity is the point.
-
-The `try` block should contain the smallest amount of code that might raise. Wrapping fifty lines in a single `try` means any of them could trigger the handler, and you will catch exceptions you did not anticipate from lines you forgot were there. The fix is to put only the risky call in the `try` and everything else outside it.
-
-`except Exception` catches nearly everything and is almost always wrong. It catches `TypeError`, `AttributeError`, `KeyError` and every other programming error that should crash loudly so you can fix it. The correct pattern is to name the specific exception you expect: `except ValueError`, `except KeyError`, `except FileNotFoundError`.
-
-`else` runs only if the `try` block completed without raising. `finally` runs regardless of whether an exception was raised, caught, or propagated. The combination `try / except / else / finally` covers every case: the error path, the success path, and the cleanup path. `finally` is where you close resources that are not managed by a `with` statement.
-
-`as` captures the exception object: `except ValueError as e` lets you read `str(e)` for the error message or access the exception's attributes. Raising a new exception with `raise NewError("...") from e` chains the original exception, preserving the traceback for debugging.
-
-You can raise exceptions yourself with `raise ValueError("age must be positive")`. Custom exceptions inherit from `Exception`: `class InsufficientFunds(Exception): pass`. Naming the exception after the condition that triggered it makes the handler self-documenting: `except InsufficientFunds` says what went wrong without reading the message.
-
-The anti-pattern to avoid is a bare `except:` with no exception type. It catches `KeyboardInterrupt` and `SystemExit`, preventing the user from stopping the program with Ctrl+C. Always name the exception type you are handling.
+If `int()` raises `ValueError`, control jumps to the handler. If it raises any of it else, the handler is skipped and the error keeps travelling up. That selectivity is the point.
 
 ## Catch what you expect, nothing more
 
-except:&nbsp;&nbsp;&nbsp;&nbsp;# catches everything
+except:&nbsp;&nbsp;&nbsp;&nbsp;# catches all
 
-This is almost always a mistake. It catches the error you were thinking of, and also your typos, your `NameError`s, your `AttributeError`s from a refactor you half-finished. The program stops crashing and starts producing wrong answers quietly, which is strictly worse: a crash tells you where to look.
+This is almost always a mistake. It catches the error you were thinking of. Also your typos, your `NameError`s, your `AttributeError`s from a refactor you half-finished. The program stops crashing and starts making wrong answers quietly. This Is strictly worse: a crash tells you where to look.
 
-The second program on this page has a deliberate typo inside a bare `except`. It returns 0, cheerfully, and nothing anywhere says a name was misspelled.
+The second program on this page has a deliberate typo inside a bare `except`. It returns 0, cheerfully. Nothing anywhere says a name was misspelled.
 
 Name the exception:
 
-except ValueError:<br>except (KeyError, IndexError):<br>except Exception as e:&nbsp;&nbsp;# broad, but at least not BaseException
+except ValueError:<br>except (KeyError, IndexError):<br>except Exception as e:&nbsp;&nbsp;# broad. But At least not BaseException
 
 ## as e, and why you want it
 
@@ -47,18 +35,18 @@ except ValueError as e:
 ```
 
 
-The exception object carries the detail &mdash; which key was missing, which value would not parse. Discarding it and printing "something went wrong" throws away the only part that would have helped.
+The exception object carries the detail. Which key was missing. This Value wouldn't parse. Discarding it and printing "a thing went wrong" throws away the only part that would have helped.
 
 ## else and finally
 
-- `else` runs when the `try` block raised nothing. It keeps the risky line alone in the `try`, so the handler cannot accidentally catch an error from the follow-up code.
-- `finally` runs either way, raised or not. It is where cleanup goes.
+- `else` runs when the `try` block raised nothing. It keeps the risky line alone in the `try`. The handler can't accidentally catch an error from the follow-up code.
+- `finally` runs either way, raised or not. It's where cleanup goes.
 
-For files and locks, prefer `with`, which does the same job with less ceremony.
+For files and locks, prefer `with`. This Does the same job with less ceremony.
 
 ## Raising your own
 
-Handling is half of it. When a caller hands you something impossible, say so:
+Handling is half of it. When a caller hands you a thing hopeless, say so:
 
 
 ```python
@@ -67,61 +55,61 @@ if age < 0:
 ```
 
 
-Include the offending value in the message. "Invalid input" costs the next person a debugging session; "got -1" ends it immediately.
+Include the offending value in the message. "Invalid input" costs the next person a debugging session. "got -1" ends it right away.
 
 ## Ask forgiveness, not permission
 
-Python leans toward trying the operation and handling the failure, rather than checking first. Checking `if key in d` before `d[key]` does the lookup twice and still has a gap between the check and the use. Try it and catch `KeyError`; it is faster in the common case and correct in all of them.
+Python leans toward trying the op and handling the failure, rather than checking first. Checking `if key in d` before `d[key]` does the lookup twice and still has a gap between the check and the use. Try it and catch `KeyError`. It's faster in the common case and correct in all of them.
 
 ## Which exceptions to expect
 
-The instruction to catch specific exceptions is easy to agree with and harder to
-follow, because it requires knowing what a piece of code can raise. Three ways
-to find out, in order of reliability.
+The instruction to catch exact exceptions is easy to agree with and harder to
+follow, because it needs knowing what a piece of code can raise. Three ways
+to find out, in order of trust.
 
-Read the documentation: the standard library is explicit about what its
-functions raise, and `int()`, `open()` and `dict` lookups all document theirs.
-Run it and see: trigger the failure deliberately once, read the traceback, and
-catch what actually appeared. And reason about it: an operation that parses can
+Read the docs: the standard library is clear about what its
+functions raise, and `int()`, `open()` and `dict` lookups all doc theirs.
+Run it and see: trigger the failure on purpose once, read the traceback, and
+catch what really appeared. And reason about it: an op that parses can
 raise `ValueError`, one that touches the filesystem can raise `OSError`, one
 that indexes can raise `IndexError` or `KeyError`.
 
-Catching `Exception` is the honest middle ground when you genuinely cannot
+Catching `Exception` is the honest middle ground when you truly can't
 enumerate them - a plugin boundary, a top-level handler that must not crash the
-program - and it is different from a bare `except`, because it still lets
+program - and it's different from a bare `except`, because it still lets
 `KeyboardInterrupt` and `SystemExit` through. Those two are how a user stops
-your program, and swallowing them is how a program becomes impossible to quit.
+your program, and swallowing them is how a program turns hopeless to quit.
 
 ## Keep the try block small
 
 A `try` that wraps twenty lines catches errors from all twenty, including ones
-you never thought about. If the handler says "could not parse the date", but the
-block also contains a database call, then a database failure now reports itself
+you never thought about. If the handler says "couldn't parse the date", but the
+block also holds a DB call, then a DB failure now reports itself
 as a date problem, and the person debugging it starts in the wrong place.
 
 Wrap the line that can fail, and put the follow-up work in `else`. The block
-stays honest about what it is handling.
+stays honest about what it's handling.
 
 ## Failing loudly is usually right
 
-There is a reflex, especially early on, to wrap anything that has ever raised in
-a `try` and carry on. It feels defensive. What it actually does is convert a
-loud, located failure into a quiet, wrong result that surfaces somewhere else
+There's a reflex, above all early on, to wrap any of it that has ever raised in
+a `try` and carry on. It feels defensive. What it really does is convert a
+loud, located failure into a quiet, wrong result that surfaces a place else
 with no traceback pointing home.
 
-An exception is not automatically a problem to suppress. It is information, and
-often the most useful information the program will produce. Handle the ones you
+An exception isn't automatically a problem to suppress. It's info, and
+often the most handy info the program will give. Handle the ones you
 have a real answer for - a missing optional file, a user typing letters into a
 number field, a network call worth retrying - and let the rest travel. A crash
 in development is a bug report that writes itself.
 
 ## Cleanup belongs to `with`
 
-`finally` guarantees that cleanup runs, and for files, locks and connections
-there is a better tool: a context manager. `with open(...)` closes the file
+`finally` ensures that cleanup runs, and for files, locks and links
+there's a better tool: a context manager. `with open(...)` closes the file
 whether the block succeeded or raised, without the extra indentation and without
-the risk of forgetting. Reach for `finally` when there is no context manager for
-what you are doing, and for `with` when there is.
+the risk of losing. Reach for `finally` when there's no context manager for
+what you're doing, and for `with` when there's.
 
 ## A retry loop, whole
 
@@ -154,48 +142,48 @@ attempt 2 failed: timed out
 result: ok
 ```
 
-Four details are worth copying. The `try` contains only the call that can fail,
-so a bug in the printing would not be caught as a connection problem. The
-`except` names one specific exception, so a `TypeError` from a refactor still
-crashes loudly. The `as e` keeps the message, which is the part that tells you
+Four details are worth copying. The `try` holds only the call that can fail,
+so a bug in the printing wouldn't be caught as a link problem. The
+`except` names one exact exception. So A `TypeError` from a refactor still
+crashes loudly. The `as e` keeps the message. This Is the part that tells you
 *why* it failed. And the `break` on success means the `else` runs only when
-every attempt was used, which is exactly the "gave up" case.
+each attempt was used. This Is just the "gave up" case.
 
 In production this would sleep between attempts, with the delay growing each
-time, and would only retry errors that are actually transient &mdash; a
-timeout, yes; a `PermissionError`, never, because retrying it will fail
-identically four more times and delay the real error.
+time, and would only retry errors that are really transient &mdash; a
+timeout, yes. A `PermissionError`, never, because retrying it will fail
+the same way four more times and delay the real error.
 
 ## The hierarchy, and what catching one gets you
 
-Exceptions form a tree, and catching a class catches every subclass beneath it.
-That is what makes `except Exception` catch almost everything, and it is also
-how you catch a useful family without listing its members.
+Exceptions form a tree, and catching a class catches each subclass beneath it.
+That is what makes `except Exception` catch almost all, and it's also
+how you catch a handy family without listing its members.
 
-At the top is `BaseException`. Directly beneath it sit `SystemExit`,
+At the top is `BaseException`. right beneath it sit `SystemExit`,
 `KeyboardInterrupt` and `GeneratorExit` &mdash; the three that are *not*
-errors, but control flow. `Exception` holds everything else, and is what you
+errors, but control flow. `Exception` holds all else, and is what you
 should catch when you must catch broadly, because it leaves those three alone.
 This is the concrete difference between `except Exception:` and a bare
-`except:`, and it is the reason the bare form makes a program impossible to
+`except:`, and it's the reason the bare form makes a program hopeless to
 interrupt with Ctrl-C.
 
-Below `Exception`, the groupings are useful. `OSError` covers
+Below `Exception`, the groupings are handy. `OSError` covers
 `FileNotFoundError`, `PermissionError`, `IsADirectoryError`, `TimeoutError` and
-the rest of the filesystem and network family, so `except OSError` is a
-reasonable way to say "anything the operating system refused".
+the rest of the filesystem and network family. So `except OSError` is a
+reasonable way to say "any of it the operating system refused".
 `ArithmeticError` covers `ZeroDivisionError` and `OverflowError`.
-`LookupError` covers `KeyError` and `IndexError`, which is occasionally exactly
+`LookupError` covers `KeyError` and `IndexError`, which is at times just
 what you want when reaching into a structure that might be short or missing a
 field.
 
-Knowing the tree turns "catch specific exceptions" from a rule into something
-actionable: catch the narrowest class that covers the failures you actually
+Knowing the tree turns "catch exact exceptions" from a rule into a thing
+actionable: catch the narrowest class that covers the failures you really
 have an answer for.
 
 ## Raising with the cause attached
 
-When you catch an exception and raise a different one, the original is worth
+When you catch an exception and raise a different one, the first is worth
 keeping:
 
 ```python
@@ -216,24 +204,24 @@ caused by: ValueError
 
 `from exc` sets `__cause__`, and the printed traceback then shows both:
 the low-level failure, the line "The above exception was the direct cause of
-the following exception", and your higher-level message. You get the *what* and
+these exception", and your higher-level message. You get the *what* and
 the *why* in one traceback.
 
-Without `from`, Python still attaches the original as `__context__` and prints
+Without `from`, Python still attaches the first as `__context__` and prints
 "During handling of the above exception, another exception occurred" &mdash;
-which is nearly as useful and reads as accidental rather than deliberate.
-`raise ... from None` suppresses it entirely, which is occasionally right when
-the internal error is noise a caller cannot act on.
+which is nearly as handy and reads as accidental rather than deliberate.
+`raise ... from None` suppresses it fully. This Is at times right when
+the inner error is noise a caller can't act on.
 
 The reason this matters is that translating exceptions is good practice. A
-library that lets a raw `KeyError` from its internal dictionary escape has
-leaked its implementation; one that raises `ConfigError("missing 'host'") from
-exc` has given the caller something to catch and the maintainer something to
+library that lets a raw `KeyError` from its inner dict escape has
+leaked its setup. One that raises `ConfigError("missing 'host'") from
+exc` has given the caller a thing to catch and the maintainer a thing to
 debug.
 
 ## Exceptions of your own
 
-Defining one is a single line, and the payoff is that callers can catch exactly
+Defining one is a single line, and the payoff is that callers can catch just
 your failure:
 
 ```python
@@ -242,21 +230,21 @@ class ConfigError(Exception):
 ```
 
 Subclass `Exception`, not `BaseException`. Name it for the problem rather than
-the place, and end it with `Error` by convention.
+the place, and end it with `Error` by rule.
 
 The reason to bother is selectivity. A caller who wants to handle a
-configuration problem and let everything else through cannot do that if you
+configuration problem and let all else through can't do that if you
 raised `ValueError`, because `ValueError` is also what `int()` raises three
 frames down. A dedicated class makes the handler precise.
 
 A small hierarchy pays off in a library: one base class such as
-`ThingError(Exception)`, with specific subclasses beneath it. Callers who want
-everything catch the base; callers who care about one case catch the subclass;
-and adding a new failure mode later does not break either.
+`ThingError(Exception)`, with exact subclasses beneath it. Callers who want
+all catch the base. Callers who care about one case catch the subclass;
+and adding a new failure mode later doesn't break either.
 
 Attach the data rather than only formatting it into the message.
 An exception that stores `self.path` or `self.field` lets a handler make a
-decision, where a handler given only a string has to parse English to find out
+choice, where a handler given only a string has to parse English to find out
 what went wrong.
 
 ## The middle ground between crashing and swallowing
@@ -264,9 +252,9 @@ what went wrong.
 The advice to let exceptions travel and the need for a program that keeps
 running are both real, and the space between them is where `logging` lives.
 
-A handler has three honest choices. Handle it &mdash; you know what the failure
-means and what to do instead. Translate it &mdash; catch it, raise something
-more meaningful with `from`, and let it continue upward. Or record it and
+A handler has three honest choices. Handle it. You know what the failure
+means and what to do instead. Translate it. Catch it, raise a thing
+more real with `from`, and let it continue upward. Or record it and
 re-raise, which is what `logging.exception` is for: it writes the message and
 the full traceback to wherever logs go, and a bare `raise` afterwards sends the
 exception on its way.
@@ -280,14 +268,14 @@ except ValueError:
 ```
 
 That pattern &mdash; log with the traceback, then skip this item and carry on
-&mdash; is the correct shape for batch work, where one bad record should not
-end a run over ten thousand. The important part is `logging.exception` rather
+&mdash; is the correct shape for batch work. Here One bad record shouldn't
+end a run over ten thousand. The crucial part is `logging.exception` rather
 than `logging.error`, because the first includes the traceback and the second
 throws it away.
 
-What is not an honest choice is `except Exception: pass`. It is the one form
-that destroys information without replacing it, and the resulting program does
-not fail &mdash; it produces output that is quietly incomplete, which is the
+What isn't an honest choice is `except Exception: pass`. It's the one form
+that destroys info without replacing it, and the resulting program does
+not fail &mdash; it makes output that is quietly incomplete, which is the
 hardest kind of wrong to notice.
 
 ## Questions people ask
@@ -296,40 +284,40 @@ hardest kind of wrong to notice.
 The bare form also catches `KeyboardInterrupt` and `SystemExit`, so it stops
 Ctrl-C from working. Never use it.
 
-<strong>Can I catch several exceptions in one handler?</strong> Yes, with a
+<strong>Can I catch a few exceptions in one handler?</strong> Yes, with a
 tuple: `except (KeyError, IndexError) as e:`.
 
-<strong>Does `finally` run if the `try` returns?</strong> Yes. It runs on every
+<strong>Does `finally` run if the `try` returns?</strong> Yes. It runs on each
 exit path, including `return` and `break`.
 
 <strong>What happens if `finally` itself raises?</strong> Its exception
-replaces whatever was in flight, which is why `finally` blocks should be
+replaces what was in flight. This Is why `finally` blocks should be
 simple.
 
 <strong>How do I re-raise after logging?</strong> A bare `raise` inside the
-handler re-raises the current exception with its original traceback intact.
+handler re-raises the current exception with its first traceback intact.
 
 <strong>Should I use exceptions for control flow?</strong> Python does, more
-than most languages &mdash; `StopIteration` ends every `for` loop. Use them for
+than most languages &mdash; `StopIteration` ends each `for` loop. Use them for
 the exceptional path, not as a substitute for an `if`.
 
-<strong>Is try/except slow?</strong> Setting up a `try` is nearly free; raising
-and catching is not. That is why "ask forgiveness" wins when failures are rare
-and loses when they are the common case.
+<strong>Is try/except slow?</strong> Setting up a `try` is nearly free. Raising
+and catching isn't. That is why "ask forgiveness" wins when failures are rare
+and loses when they're the common case.
 
 <strong>What is an exception group?</strong> From Python 3.11,
-`ExceptionGroup` carries several exceptions at once &mdash; raised by
+`ExceptionGroup` carries a few exceptions at once &mdash; raised by
 concurrent code where more than one task failed &mdash; and `except*` handles
 them selectively.
 
 ## Recap in one screen
 
-- Catch the narrowest exception you have an answer for; a bare `except:` also
+- Catch the narrowest exception you've an answer for. A bare `except:` also
   swallows Ctrl-C.
 - Keep the `try` block down to the line that can fail, and put the follow-up in
   `else`.
-- `as e` keeps the detail, which is the part that makes the message useful.
+- `as e` keeps the detail. This Is the part that makes the message handy.
 - `raise NewError(...) from exc` preserves the cause, so the traceback shows
   both the what and the why.
-- An exception you cannot handle is information, not a problem &mdash; letting
+- An exception you can't handle is info, not a problem &mdash; letting
   it travel beats a quiet wrong answer.

@@ -1,27 +1,11 @@
 title: Unions and Discriminated Unions: Stop Pydantic Guessing
-intro: A field that could be several shapes, and how to make the choice explicit.
+intro: A field that could be a few shapes. How to make the choice clear.
 
 ## The problem a union creates
 
-`Union[A, B]` says a value may be either. What it does not say is how to decide which, and something has to decide.
+`Union[A, B]` says a value may be either. What it doesn't say is how to decide which, and a thing has to decide.
 
-For simple types the decision is usually obvious and usually right. For models it is frequently neither, and the failure mode is the worst kind: it does not raise, it just gives you the wrong object.
-
-Pydantic v2 uses "smart" union matching by default. It tries an exact type match first — `3` against `Union[int, str]` matches `int` without trying `str`. If no exact match exists, it tries each type in order and takes the first one that validates. For `Union[int, str]`, `"hello"` is an exact match for `str` and stops there. `"3"` is an exact match for `str` too, not a coercion to `int`.
-
-The problem starts with model unions. `Union[ModuleOut, LessonOut]` where both models have overlapping fields — both have `id` and `title` — means Pydantic cannot distinguish them from the data alone. It tries `ModuleOut` first (left to right), and if the data validates against it, that is what you get, even if `LessonOut` was what the sender intended.
-
-A discriminated union solves this by adding a field whose value identifies the type. `Literal["module"]` on `ModuleOut` and `Literal["lesson"]` on `LessonOut`, with `discriminator="type"` on the union field, means Pydantic reads the `type` field first, picks the right model, and validates against only that one. No ambiguity, no order dependence, no wrong-model surprises.
-
-`Discriminator` with a callable handles cases where the discriminator is not a simple field. `Discriminator(lambda v: v.get("kind", "default"))` reads the discriminator from a computed value. This is useful when the incoming data uses different field names for different sources, or when the discriminator is derived from a combination of fields.
-
-`Tagged` unions (using `Tag`) annotate each member of the union with a discriminator value directly in `Annotated`. `Annotated[ModuleOut, Tag("module")]` associates the tag `"module"` with `ModuleOut`. This keeps the discriminator definition next to the type rather than inside the type.
-
-The performance difference is real. A plain `Union[A, B, C, D]` tries up to four validations per input. A discriminated union reads one field and tries one validation. On a list of a thousand mixed items, the discriminated union is nearly four times faster.
-
-`Union[X, None]` — or equivalently `Optional[X]` or `X | None` — is the simplest union and the most common. It means the field can be the type or `null`. Pydantic handles this without a discriminator: `None` is tried first, and if the value is not `None`, the type is tried. No ambiguity is possible.
-
-The rule for choosing: if the types in the union are structurally distinguishable (different required fields, different types for the same field), a plain union works. If they overlap — same fields, same types, different semantics — a discriminated union is the only reliable approach.
+For simple types the choice is often obvious and often right. For models it's often neither. The failure mode is the worst kind. It doesn't raise, it just gives you the wrong object.
 
 
 ## Smart mode: exact match first
@@ -196,23 +180,23 @@ except ValidationError as e:
 ```
 ## Smart mode, and what it actually does
 
-Pydantic v2 does not simply try members left to right. It uses **smart mode**, which is a two-pass strategy.
+Pydantic v2 doesn't simply try members left to right. It uses **smart mode**. This Is a two-pass plan.
 
-First it looks for a member the value already matches exactly, without any conversion. An `int` input against `Union[int, str]` matches `int`; a `str` input matches `str`. No ambiguity, no order dependence.
+First it looks for a member the value already matches just, without any conversion. An `int` input against `Union[int, str]` matches `int`. A `str` input matches `str`. No ambiguity, no order dependence.
 
-Only if nothing matches exactly does it try conversion, left to right, taking the first that succeeds.
+Only if nothing matches just does it try conversion, left to right, taking the first that succeeds.
 
-This resolves most everyday unions sensibly, and it is a genuine improvement over v1, which was strictly left-to-right and would happily turn an integer into a string because `str` was written first.
+This resolves most everyday unions sensibly. It's a genuine gain over v1. This Was strictly left-to-right and would happily turn an int into a string because `str` was written first.
 
-But it does not eliminate ambiguity. It relocates it to the cases where nothing matches exactly &mdash; which, for data arriving from JSON as strings, is a lot of cases.
+But it doesn't drop ambiguity. It relocates it to the cases where nothing matches just. Which, for data arriving from JSON as strings, is a lot of cases.
 
 ## Where order still decides
 
-`Union[int, float]` given the string `"7"` produces an `int`. `Union[float, int]` given the same string produces a `float`. Neither member matched exactly, so conversion ran left to right and the first success won.
+`Union[int, float]` given the string `"7"` makes an `int`. `Union[float, int]` given the same string makes a `float`. Neither member matched just. Conversion ran left to right and the first success won.
 
-If the difference matters to your program &mdash; and the difference between `7` and `7.0` matters in more places than people expect, from JSON output to dictionary keys to equality comparisons &mdash; then you have a behaviour that depends on the order somebody wrote two words in. That will survive exactly until somebody reorders them for tidiness.
+If the gap matters to your program. And the gap between `7` and `7.0` matters in more places than people expect, from JSON output to dict keys to equality checks. Then you've a action that depends on the order somebody wrote two words in. That will live just until somebody reorders them for tidiness.
 
-The lesson is not to memorise the rules. It is that a plain union of convertible types is an unstable way to express a real distinction.
+The lesson isn't to store the rules. It's that a plain union of convertible types is an unstable way to express a real gap.
 
 ## Unions of models are worse
 
@@ -228,15 +212,15 @@ class Quiz(BaseModel):
     questions: int = 0
 ```
 
-Both accept `{"title": "Vectors"}`, because the other field has a default in each. Neither matches "exactly" in any meaningful sense, so the first that validates wins &mdash; and that is `Video`, purely because of where it appears in the annotation.
+Both accept `{"title": "Vectors"}`, because the other field has a default in each. Neither matches "just" in any real sense. The first that validates wins. And that is `Video`, purely because of where it appears in the annotation.
 
-The result is a `Video` that was meant to be a `Quiz`, constructed without any error, and discovered somewhere much later when `questions` is missing.
+The result is a `Video` that was meant to be a `Quiz`, made without any error. Found one spot much later when `questions` is missing.
 
-Defaults make this dramatically more likely, which is worth noticing: adding a default to a field of one union member can change how *other* payloads are classified.
+Defaults make this sharply more likely. This Is worth noticing. Adding a default to a field of one union member can change how *other* payloads are classified.
 
 ## The fix is a tag
 
-A discriminated union asks the data to say which shape it is. Each member gets a `Literal` field with a distinct value, and the union names it:
+A discriminated union asks the data to say which shape it's. Each member gets a `Literal` field with a distinct value, and the union names it:
 
 ```python
 class Video(BaseModel):
@@ -252,31 +236,31 @@ class Quiz(BaseModel):
 content: Union[Video, Quiz] = Field(discriminator="kind")
 ```
 
-Now there is no guessing. Pydantic reads `kind`, looks up the corresponding model, and validates against that one only.
+Now there's no guessing. Pydantic reads `kind`, looks up the matching model. Validates against that one only.
 
-This is the same pattern as a tagged union in other languages, and the same one you see in real API payloads everywhere &mdash; Stripe events, webhook bodies, message envelopes. If your data already has a `type` or `kind` field, it is already discriminated and you are just telling Pydantic about it.
+This is the same pattern as a tagged union in other languages. The same one you see in real API payloads all over. Stripe events, webhook bodies, message envelopes. If your data already has a `type` or `kind` field, it's already discriminated and you're just telling Pydantic about it.
 
 ## Three things you get
 
-**Correctness.** The tag decides, so the answer does not depend on annotation order, on which fields happen to have defaults, or on which member was added first.
+**Correctness.** The tag decides, so the answer doesn't depend on annotation order, on which fields happen to have defaults, or on which member was added first.
 
-**Better errors.** Without a discriminator, a failure means Pydantic tried every member and none worked, so you get the errors from all of them &mdash; a pile of messages about branches you were never in. With a discriminator, it tried exactly one, and reports exactly that one's problem.
+**Better errors.** Without a critic, a failure means Pydantic tried each member and none worked. You get the errors from all of them. A pile of messages about branches you were never in. With a critic, it tried just one. Reports just that one's problem.
 
-That difference is stark on a union with five members. It turns "here are fifteen errors, work out which three are yours" into "seconds should be a valid integer".
+That gap is stark on a union with five members. It turns "here are fifteen errors, work out which three are yours" into "seconds should be a valid int".
 
-**Speed.** One dictionary lookup on the tag, rather than attempting validation against each member until something sticks.
+**Speed.** One dict lookup on the tag, rather than attempting check against each member until a thing sticks.
 
 ## When the tag is wrong
 
-The discriminator field is validated too. A value that matches no member produces a single `union_tag_invalid` error listing the permitted tags, which is an excellent error &mdash; it tells the caller both what was wrong and what the options are.
+The critic field is checked too. A value that matches no member makes a single `union_tag_invalid` error listing the permitted tags. This Is an great error. It tells the caller both what was wrong and what the options are.
 
-A payload missing the tag entirely gives `union_tag_not_found`. Again, one clear error rather than a scatter.
+A payload missing the tag fully gives `union_tag_not_found`. Again, one clear error rather than a scatter.
 
 ## Practical shapes
 
-Discriminated unions compose. A `List[Union[Video, Quiz]]` with a discriminator validates each item by its own tag, which is exactly what a feed of mixed content needs, and errors still carry the index.
+Discriminated unions compose. A `List[Union[Video, Quiz]]` with a critic validates each item by its own tag. This Is just what a feed of mixed content needs. Errors still carry the index.
 
-The tag field is a real field. It appears in `model_dump()`, it is required, and it must be a `Literal` &mdash; a plain `str` will not do, because the whole mechanism depends on the value being known at class-definition time.
+The tag field is a real field. It appears in `model_dump()`, it's needed. It must be a `Literal`. A plain `str` won't do. The whole method depends on the value being known at class-meaning time.
 
 For a union that grows over time, `Union` of many members is unwieldy to write. `Annotated` helps:
 
@@ -284,55 +268,55 @@ For a union that grows over time, `Union` of many members is unwieldy to write. 
 Content = Annotated[Union[Video, Quiz, Article], Field(discriminator="kind")]
 ```
 
-Now `Content` is a named type you can use anywhere, and adding a fourth member is one edit in one place.
+Now `Content` is a named type you can use anywhere. Adding a fourth member is one edit in one place.
 
 ## Optional is a union too
 
-Worth noticing, because it clarifies a thing people treat as special: `Optional[X]` is exactly `Union[X, None]`, and everything above applies to it.
+Worth noticing, because it clarifies a thing people treat as special: `Optional[X]` is just `Union[X, None]`. All above applies to it.
 
-It happens to be the least ambiguous union possible, since `None` is only ever itself and nothing converts to it. That is why `Optional` never causes the problems this module describes, and why it is safe to reach for without thinking.
+It happens to be the least ambiguous union possible. `None` is only ever itself and nothing converts to it. That is why `Optional` never causes the problems this module shows. Why it's safe to reach for without thinking.
 
 ## What to reach for
 
-Use a plain union for genuinely simple cases where every member is a distinct, non-convertible type &mdash; `Union[int, None]`, or a union of models with obviously disjoint required fields.
+Use a plain union for truly simple cases where each member is a distinct, non-convertible type. `Union[int, None]`, or a union of models with obviously disjoint needed fields.
 
-Use a discriminated union for anything polymorphic: content types, event types, message kinds, shape variants. If you are modelling "one of these things", this is the tool.
+Use a discriminated union for anything polymorphic: content types, event types, message kinds, shape variants. If you're modelling "one of these things", this is the tool.
 
-Consider whether you want a union at all. Sometimes the honest model is one type with optional fields, and sometimes two separate endpoints. A union in an API is a thing every client has to branch on, and the tag makes that branching possible &mdash; but fewer branches is still better than more.
+Consider whether you want a union at all. at times the honest model is one type with optional fields. At times two split endpoints. A union in an API is a thing each client has to branch on. The tag makes that branching possible. But fewer branches is still better than more.
 
 ## Left-to-right, when you actually want it
 
-Smart mode is the default, and there is a second mode for the cases where you want the older behaviour:
+Smart mode is the default, and there's a second mode for the cases where you want the older action:
 
 ```python
 value: Union[int, str] = Field(union_mode="left_to_right")
 ```
 
-Now members are tried strictly in order and the first success wins, with no exact-match pass first. That is occasionally what you want &mdash; a deliberate preference order, where you would rather have an `int` if the value can possibly be one.
+Now members are tried strictly in order and the first success wins, with no exact-match pass first. That is at times what you want. A deliberate preference order. Here You'd rather have an `int` if the value can possibly be one.
 
-It is worth knowing this exists mainly so that you recognise the behaviour when reading v1 code, which worked this way always. A union in an old codebase may be relying on order in a way that quietly changed meaning during the v2 migration.
+It's worth knowing this exists mainly so that you recognise the action when reading v1 code. This Worked this way always. A union in an old code may be leaning on order in a way that quietly changed meaning during the v2 migration.
 
 ## The performance argument
 
-There is a cost to a plain union that is easy to overlook.
+There's a cost to a plain union that is easy to overlook.
 
-Validating against `Union[A, B, C, D]` may mean attempting up to four validations, each of which builds errors before failing. For a list of a thousand items, a union whose correct member is usually last is doing four times the necessary work and discarding three quarters of it.
+checking against `Union[A, B, C, D]` may mean attempting up to four validations, each of which builds errors before failing. For a list of a thousand items, a union whose correct member is often last is doing four times the needed work and discarding three quarters of it.
 
-A discriminated union does one dictionary lookup and one validation. For large collections of polymorphic data &mdash; an event log, a feed, a batch of webhook payloads &mdash; that difference is measurable rather than theoretical.
+A discriminated union does one dict lookup and one check. For large sets of polymorphic data. An event log, a feed, a batch of webhook payloads. That gap is measurable rather than theoretical.
 
-So the tag is not only about correctness and error quality. It is also the fast path.
+So the tag isn't only about correctness and error quality. It's also the fast path.
 
 ## Nullable unions and the shape of Optional
 
-`Optional[X]` is `Union[X, None]`, and it is the one union that never causes ambiguity, because nothing converts to `None` and `None` converts to nothing.
+`Optional[X]` is `Union[X, None]`, and it's the one union that never causes ambiguity. Nothing converts to `None` and `None` converts to nothing.
 
-That is worth stating because it explains why `Optional` feels different from other unions even though it is not special. It is not that Pydantic treats it differently; it is that its members cannot overlap.
+That is worth stating because it shows why `Optional` feels other from other unions though it isn't special. It isn't that Pydantic treats it differently. It's that its members can't share.
 
-A related shape that does need care: `Optional[Union[A, B]]`, or equivalently `Union[A, B, None]`. The `None` part is unambiguous; the `A` versus `B` part has all the problems described above. Adding a discriminator still works &mdash; `None` is handled separately from the tagged members &mdash; so a nullable discriminated union is a perfectly good thing to write.
+A related shape that does need care: `Optional[Union[A, B]]`, or equivalently `Union[A, B, None]`. The `None` part is unambiguous. The `A` versus `B` part has all the problems given above. Adding a critic still works. `None` is handled apart from the tagged members. So a nullable discriminated union is a just right good thing to write.
 
 ## Migrating a plain union to a tagged one
 
-If you have an existing union that is misbehaving, the change is usually additive rather than breaking.
+If you've an existing union that is misbehaving, the change is often additive rather than breaking.
 
 Add a `kind` field with a `Literal` to each member and give it a default matching that member's tag:
 
@@ -341,46 +325,46 @@ class Video(BaseModel):
     kind: Literal["video"] = "video"
 ```
 
-Existing code that constructs `Video(...)` without a tag keeps working, because the default fills it in. Existing *data* without the tag will now fail validation, which is the part to plan for &mdash; either a migration that adds the field, or a `model_validator(mode="before")` that infers the tag from the shape for a transition period.
+Existing code that makes `Video(...)` without a tag keeps working. The default fills it in. Existing *data* without the tag will now fail check. This Is the part to plan for. Either a migration that adds the field, or a `model_validator(mode="before")` that infers the tag from the shape for a transition period.
 
-The inference validator is a useful trick and a temporary one. It looks at which fields are present, decides what the payload must be, and writes the tag in. Keep it until the old data is gone, then delete it, because it is exactly the guessing that the discriminator was introduced to remove.
+The inference checker is a handy trick and a temporary one. It looks at which fields are present, decides what the payload must be. Writes the tag in. Keep it until the old data is gone, then delete it. It's just the guessing that the critic was added to drop.
 
 ## Unions in the schema
 
-A plain union becomes `anyOf` in JSON Schema: a list of alternatives with nothing to say how a consumer should choose between them. A generated client will typically produce a type that could be any of them and leave the disambiguation to whoever calls it.
+A plain union turns `anyOf` in JSON Schema. A list of options with nothing to say how a consumer should choose between them. A made client will often give a type that could be any of them and leave the disambiguation to whoever calls it.
 
-A discriminated union becomes `oneOf` with a `discriminator` object naming the property and mapping its values to schemas. Tooling understands this: generated clients produce a proper tagged type, documentation groups the variants and shows which tag selects which, and validators on the other side can check the same rule you check.
+A discriminated union turns `oneOf` with a `critic` object naming the property and mapping its values to schemas. Tooling understands this. Made clients give a proper tagged type, docs groups the variants and shows which tag selects which. Checkers on the other side can check the same rule you check.
 
-If your API is consumed by generated clients, this alone is a strong reason to tag every polymorphic field. The difference between the two client types &mdash; one you have to narrow by inspection, one that narrows itself &mdash; is felt by every consumer on every call.
+If your API is consumed by made clients, this alone is a strong reason to tag each polymorphic field. The gap between the two client types. One you've to narrow by inspection, one that narrows itself. Is felt by each consumer on each call.
 
 ## A checklist
 
 If the members are a fixed set of *kinds* of thing, tag them.
 
-If the data already has a `type`, `kind` or `event` field, you have a tag; tell Pydantic about it.
+If the data already has a `type`, `kind` or `event` field, you've a tag. Tell Pydantic about it.
 
 If the members are simple, disjoint scalar types, a plain union is fine.
 
-If you are relying on the order you wrote the members in, stop and add a tag, because that dependency is invisible to the next reader.
+If you're leaning on the order you wrote the members in, stop and add a tag. That dependency is invisible to the next reader.
 
-And if you cannot find a natural tag, consider whether the union is really modelling one thing with optional parts, which is often what a hard-to-tag union turns out to be.
+And if you can't find a natural tag, consider whether the union is really modelling one thing with optional parts. This Is often what a hard-to-tag union turns out to be.
 
 ## What the tag is really doing
 
-A discriminated union works because it moves a decision from inference to declaration.
+A discriminated union works because it moves a choice from inference to declaration.
 
-Without a tag, something has to work out what a payload is by looking at what it contains. That is guessing, however carefully implemented, and guessing has a failure mode where it is confidently wrong. With a tag, the payload states what it is and validation checks that claim against one schema.
+Without a tag, a thing has to work out what a payload is by looking at what it holds. That is guessing. Carefully built. Guessing has a failure mode where it's confidently wrong. With a tag, the payload states what it's and check checks that claim against one schema.
 
-That is a pattern well beyond Pydantic. Any time a system decides what something is by examining its shape, adding an explicit marker makes the system simpler, faster and more honest about its failures. The discriminator is the version of that idea you get for one line of annotation.
+That is a pattern well beyond Pydantic. Any time a system decides what a thing is by checking its shape, adding an clear marker makes the system simpler, faster and more honest about its failures. The critic is the version of that idea you get for one line of annotation.
 
 ## Before you reach for a union
 
-One question worth asking first: is this really several shapes, or one shape whose fields vary?
+One question worth asking first: is this really a few shapes, or one shape whose fields vary?
 
-A union of two models that share nine of their ten fields is usually the second thing wearing the costume of the first. One model with an optional field is simpler to write, simpler to consume and simpler to document.
+A union of two models that share nine of their ten fields is often the second thing wearing the costume of the first. One model with an optional field is simpler to write, simpler to consume and simpler to doc.
 
-Reach for a union when the alternatives are genuinely different &mdash; different required fields, different meaning, different handling downstream. When they are the same thing with a variation, model the variation.
+Reach for a union when the options are truly other. Other needed fields, other meaning, other handling downstream. When they're the same thing with a variation, model the variation.
 
 ## Next
 
-Unions choose between shapes. The next module is about choosing between *values*: enums and literals, which are how you say a field may only ever hold one of a small fixed set.
+Unions choose between shapes. The next module is about choosing between *values*. Enums and literals. This Are how you say a field may only ever hold one of a small fixed set.

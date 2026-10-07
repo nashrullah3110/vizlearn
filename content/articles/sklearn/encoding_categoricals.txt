@@ -1,21 +1,12 @@
 title: Encoding Categories: A Practical Guide
-intro: Every estimator in scikit-learn takes numbers. Turning "london" into a number is easy; doing it without inventing a fact that is not in the data takes one decision.
+intro: each estimator in scikit-learn takes numbers. Turning "london" into a number is easy. Doing it without inventing a fact that isn't in the data takes one choice.
 
 ## Why it cannot be skipped
 
-scikit-learn's estimators operate on numeric arrays. A column of strings raises rather than being converted automatically, and the error &mdash; `could not convert string to float` &mdash; is one of the first anyone meets on real data.
+scikit-learn's estimators operate on numeric arrays. A column of strings raises rather than being converted automatically. The error. `couldn't convert string to float`. Is one of the first anyone meets on real data.
 
-The conversion is not mechanical, because there is more than one way to do it and they encode different claims about the data. Getting it wrong does not raise; it produces a model that has been told something false.
+The conversion isn't mechanical, because there's more than one way to do it and they encode different claims about the data. Getting it wrong doesn't raise. It makes a model that has been told a thing false.
 
-The fundamental question is whether the categories have an order. Shirt sizes (S, M, L, XL) do: L is between M and XL, and the model should know that. Cities (London, Paris, Tokyo) do not: there is no sense in which Paris is between London and Tokyo, and a numeric encoding that implies one is a lie the model will learn from.
-
-For unordered categories, one-hot encoding creates one binary column per category. A row with "London" gets a 1 in the London column and 0 everywhere else. No column is numerically between any other, so no ordering is implied. The cost is dimensionality: a column with 50 categories becomes 50 columns.
-
-For ordered categories, ordinal encoding assigns consecutive integers: S=0, M=1, L=2, XL=3. The numeric ordering matches the real ordering, so a tree-based model can split on "size > 1" and get a meaningful partition. Applying ordinal encoding to unordered categories tells the model that "Paris > London", which is false and sometimes harmful.
-
-Two scikit-learn classes handle this: `OneHotEncoder` for unordered categories and `OrdinalEncoder` for ordered ones. Both go inside a pipeline so they are fitted only on training data. The common mistake is encoding outside the pipeline, which leaks information about the validation set into the training process.
-
-Target encoding, label encoding and frequency encoding are alternatives with different trade-offs in dimensionality, leakage risk and information content.
 
 ## One column per category
 
@@ -158,105 +149,105 @@ print("appears only in the held-out part is handled, not crashed on.")
 ```
 ## The mistake to avoid
 
-The obvious approach is to number the categories: london 0, paris 1, berlin 2. It is one line and it is wrong for most categorical columns.
+The obvious approach is to number the categories. London 0, paris 1, berlin 2. It's one line and it's wrong for most cat columns.
 
-Numbering asserts an **order** and a **spacing**. It says berlin is greater than paris, that paris sits exactly between london and berlin, and that the distance from london to berlin is twice the distance from london to paris. None of that is true of cities, and a model that computes with those numbers will use every one of those false relationships.
+Numbering asserts an **order** and a **spacing**. It says berlin is greater than paris, that paris sits just between london and berlin. That the distance from london to berlin is twice the distance from london to paris. None of that is true of cities. A model that finds with those numbers will use each one of those false ties.
 
-For a linear model the damage is direct: a single coefficient is fitted for the column, so the model can only express "more city is more target", which is meaningless. For a distance-based model, berlin and london are computed as far apart while london and paris are close. For a tree the damage is milder &mdash; a tree can split the numbers into groups and partially recover &mdash; but it still has to spend splits undoing an ordering that was invented.
+For a linear model the damage is direct. A single coeff is fitted for the column. The model can only express "more city is more target". This Is meaningless. For a distance-based model, berlin and london are found as far apart while london and paris are close. For a tree the damage is milder. A tree can split the numbers into groups and in part recover. But it still has to spend splits undoing an sorting that was invented.
 
 ## One-hot encoding
 
-The safe answer is one column per category, each holding 1 when the row is that category and 0 otherwise.
+The safe answer is one column per category, each holding 1 when the row is that category and 0 or else.
 
-No ordering is implied, because no two categories share a column. Each gets its own coefficient in a linear model, so the model can learn that paris raises the target and berlin lowers it, which numbering could never express.
+No sorting is implied, because no two categories share a column. Each gets its own coeff in a linear model. The model can learn that paris raises the target and berlin lowers it. This Numbering could never express.
 
-`OneHotEncoder` learns the categories during `fit` and stores them in `categories_`, sorted. `get_feature_names_out()` returns the generated names &mdash; `city_london`, `city_paris` &mdash; which is what keeps coefficients and feature importances readable after the transformation.
+`OneHotEncoder` learns the categories during `fit` and stores them in `categories_`, sorted. `get_feature_names_out()` returns the made names. `city_london`, `city_paris`. Which is what keeps coeffs and feature importances readable after the change.
 
-By default it returns a sparse matrix, because with many categories almost every entry is zero. `sparse_output=False` gives a dense array, which is convenient for looking at and a bad idea when the number of categories is large.
+By default it returns a sparse mat. With many categories almost each entry is zero. `sparse_output=False` gives a dense array. This Is convenient for looking at and a bad idea when the number of categories is large.
 
 ## The unseen category
 
-The most important argument on the encoder is `handle_unknown`, and the default is the strict one.
+The most key arg on the encoder is `handle_unknown`. The default is the strict one.
 
-A category present at prediction time but absent during training raises `ValueError` by default. That is the right behaviour while you are developing &mdash; it tells you the data has changed &mdash; and usually the wrong behaviour in production, where a new city appearing should not take the service down.
+A category present at guess time but absent during training raises `ValueError` by default. That is the right action while you're developing. It tells you the data has changed. And often the wrong action in production. Here A new city appearing shouldn't take the service down.
 
-`handle_unknown="ignore"` encodes the unknown value as all zeros: not any of the known categories, which is an honest representation of "something I have not seen". The model then predicts from the remaining features.
+`handle_unknown="skip"` codes the unknown value as all zeros. Not any of the known categories. This Is an honest form of "a thing I haven't seen". The model then predicts from the left features.
 
-This matters inside cross-validation too. Each fold refits the encoder on its own training part, so a category appearing only in the held-out fold is unknown to that fold's encoder. Without `handle_unknown="ignore"`, cross-validation on a dataset with rare categories crashes on whichever fold happens to isolate one.
+This matters inside cross-validation too. Each fold refits the encoder on its own training part. A category appearing only in the held-out fold is unknown to that fold's encoder. Without `handle_unknown="skip"`, cross-validation on a dataset with rare categories crashes on whichever fold happens to isolate one.
 
-`min_frequency` and `max_categories`, added more recently, are the built-in answer to the same problem from the other end: they fold rare categories into a single "infrequent" column during fitting, so the rare values are handled by design rather than by exception.
+`min_frequency` and `max_categories`, added more recently, are the built-in answer to the same problem from the other end. They fold rare categories into a single "infrequent" column during fitting. The rare values are handled by design rather than by exception.
 
 ## When ordering is real
 
-Some categories genuinely are ordered. Small, medium, large. Bronze, silver, gold. Disagree, neutral, agree. Here an integer encoding is not a lie, and it is better than one-hot because it lets the model use the ordering with a single coefficient instead of learning three independent ones.
+Some categories truly are sorted. Small, medium, large. Bronze, silver, gold. Disagree, neutral, agree. Here an int encoding isn't a lie. It's better than one-hot because it lets the model use the sorting with a single coeff instead of learning three free ones.
 
-`OrdinalEncoder` does it &mdash; and left to itself it sorts alphabetically, which is almost never the order you meant. The editor above shows the damage: with small, medium and large, alphabetical order produces large 0, medium 1, small 2, so the encoding says small is the biggest.
+`OrdinalEncoder` does it &mdash; and left to itself it sorts alphabetically. This Is almost never the order you meant. The editor above shows the damage. With small, medium and large, alphabetical order makes large 0, medium 1, small 2. The encoding says small is the biggest.
 
-`categories=[["small", "medium", "large"]]` states the order explicitly, and passing it is not optional. The list is nested because the encoder handles several columns at once, one list per column.
+`categories=[["small", "medium", "large"]]` states the order by name. Passing it isn't optional. The list is nested because the encoder handles a few columns at once, one list per column.
 
-The test for whether a column is ordinal: is there a defensible answer to "which is bigger", and is the gap between consecutive values roughly comparable? Sizes pass the first and often fail the second, which is why ordinal encoding of survey scales is common and mildly wrong.
+The test for whether a column is ordinal. Is there a defensible answer to "which is bigger". Is the gap between back to back values roughly close? Sizes pass the first and often fail the second. This Is why ordinal encoding of survey scales is common and mildly wrong.
 
 ## drop, and the collinearity question
 
-With `k` categories, one-hot produces `k` columns of which any one is determined by the others &mdash; if it is not london and not paris, it is berlin. That redundancy is called collinearity.
+With `k` categories, one-hot makes `k` columns of which any one is found by the others. If it isn't london and not paris, it's berlin. That redundancy is called collinearity.
 
-`drop="first"` removes one column per feature. For a plain linear regression this matters: with an intercept, perfectly collinear columns make the solution non-unique and the individual coefficients unstable. For anything regularised &mdash; Ridge, Lasso, `LogisticRegression` with its default penalty &mdash; it does not, because the penalty resolves the ambiguity, and dropping a column makes the remaining coefficients harder to interpret since they become relative to the dropped baseline.
+`drop="first"` drops one column per feature. For a plain linear regression this matters. With an intercept, just right collinear columns make the answer non-unique and the single coeffs unstable. For any of it smoothed. Ridge, Lasso, `LogisticRegression` with its default fine. It doesn't. The fine resolves the ambiguity. Dropping a column makes the left coeffs harder to read since they become scaled to the dropped baseline.
 
-`drop="if_binary"` is the sensible middle: it drops the redundant column only for two-category features, where two columns are obviously one too many, and leaves multi-category features alone.
+`drop="if_binary"` is the sensible middle: it drops the redundant column only for two-category features. Here Two columns are obviously one too many, and leaves multi-category features alone.
 
-For trees, dropping is actively unhelpful &mdash; it removes a column the tree might have split on and gains nothing.
+For trees, dropping is actively unhelpful. It drops a column the tree might have split on and gains nothing.
 
 ## High cardinality
 
-One-hot encoding a column with thousands of distinct values produces thousands of columns, almost all zero, and the editor above shows 1639 distinct user ids becoming 1639 columns.
+One-hot encoding a column with thousands of distinct values makes thousands of columns, almost all zero. The editor above shows 1639 distinct user ids turning 1639 columns.
 
-Three problems follow. The matrix becomes enormous and mostly empty. Most columns are 1 for only a handful of rows, so any coefficient fitted to them is fitted to almost no data. And the model can memorise individual ids, which looks like skill on the training data and is worthless on anyone new.
+Three problems follow. The mat turns huge and mostly empty. Most columns are 1 for only a handful of rows. Any coeff fitted to them is fitted to almost no data. And the model can store single ids. This Looks like skill on the training data and is worthless on anyone new.
 
-Three responses, in increasing order of effort. **Group the rare values** into an "other" category, which `min_frequency` does for you. **Encode something about the category rather than its identity** &mdash; for a postcode, the region; for a product, its price band. Or **target encoding**, replacing each category with the mean target for that category, which is compact and powerfully prone to leakage: computed on the whole dataset it tells the model the answer, so it must be computed inside the folds, which is what `TargetEncoder` handles.
+Three responses, in growing order of effort. **Group the rare values** into an "other" category. This `min_frequency` does for you. **Encode a thing about the category rather than its identity**. For a postcode, the region. For a product, its price band. Or **target encoding**, replacing each category with the mean target for that category. This Is compact and powerfully prone to leakage. Found dataset it tells the model the answer. It must be found inside the folds, which is what `TargetEncoder` handles.
 
-The question worth asking first is whether the column belongs in the model at all. A user id usually carries no generalisable information; what you want is what the user *did*.
+The question worth asking first is whether the column belongs in the model at all. A user id often carries no generalisable info. What you want is what the user *did*.
 
 ## LabelEncoder is not for this
 
-`LabelEncoder` appears in a great deal of example code applied to feature columns, and it is documented for encoding the **target**.
+`LabelEncoder` appears in a great deal of example code applied to feature columns. It's documented for encoding the **target**.
 
-It accepts only 1-D input, so using it on features means looping over columns and applying it one at a time. That works, produces an ordinal encoding with all the problems above, and &mdash; the real objection &mdash; it has no `handle_unknown`, so a new category at prediction time raises with no option to do otherwise.
+It accepts only 1-D input. So Using it on features means looping over columns and applying it one at a time. That works, makes an ordinal encoding with all the problems above, and. The real objection. It has no `handle_unknown`, so a new category at guess time raises with no option to do or else.
 
-Use `OrdinalEncoder` for ordered features, `OneHotEncoder` for unordered ones, and `LabelEncoder` only when converting string class labels into integers for `y`, which most estimators do not even require.
+Use `OrdinalEncoder` for sorted features, `OneHotEncoder` for unordered ones. `LabelEncoder` only when converting string class labels into ints for `y`. This Most estimators don't even need.
 
 ## Categories that arrive as numbers
 
-The hardest categorical columns to spot are the ones already stored as integers, because nothing raises and nothing looks wrong.
+The hardest cat columns to spot are the ones already stored as ints. Nothing raises and nothing looks wrong.
 
-A postcode district, a product code, a department id, a day-of-week stored as 0 to 6, a survey answer coded 1 to 5. Each is a category wearing a number, and a model handed it raw will treat department 7 as greater than department 3 and exactly twice department 3.5.
+A postcode district, a product code, a department id, a day-of-week stored as 0 to 6, a survey answer coded 1 to 5. Each is a category wearing a number. A model handed it raw will treat department 7 as greater than department 3 and just twice department 3.5.
 
-Nothing in the data announces this. The column is numeric, the estimator accepts it, the fit succeeds, and the model quietly uses an ordering that means nothing. It is the mirror image of the ordinal mistake: there, an order was invented where none existed; here, an order that happens to exist in the encoding is mistaken for one that exists in the world.
+Nothing in the data announces this. The column is numeric, the estimator accepts it, the fit succeeds. The model quietly uses an sorting that means nothing. It's the mirror image of the ordinal mistake. There, an order was invented where none existed. Here, an order that happens to exist in the encoding is mistaken for one that exists in the world.
 
-The check is to ask what the arithmetic would mean. If the average of two values is meaningless &mdash; the average of department 2 and department 8 &mdash; the column is categorical regardless of its dtype. If it is meaningful, as with an age or a price, it is genuinely numeric.
+The check is to ask what the math would mean. If the mean of two values is meaningless. The mean of department 2 and department 8. The column is cat even so of its dtype. If it's real, as with an age or a price, it's truly numeric.
 
-Day-of-week is the interesting middle case. It has an order, the gaps are equal, and it wraps around: Sunday is adjacent to Monday, which no integer encoding captures. The usual fix is a pair of features, the sine and cosine of the angle around the week, which makes the wrap-around explicit and is the standard trick for any cyclical quantity &mdash; hours, months, compass bearings.
+Day-of-week is the notable middle case. It has an order, the gaps are equal. It wraps around: Sunday is adjacent to Monday. This No int encoding captures. The usual fix is a pair of features, the sine and cosine of the angle around the week. This Makes the wrap-around clear and is the standard trick for any cyclical quantity. Hours, months, compass bearings.
 
 ## Reading the model afterwards
 
-One-hot encoding multiplies the columns, and a fitted model reports one number per column. Keeping the two aligned is what makes the result readable.
+One-hot encoding times the columns, and a fitted model reports one number per column. Keeping the two aligned is what makes the result readable.
 
-`get_feature_names_out()` on the encoder returns the generated names in order, and on a `Pipeline` or `ColumnTransformer` it returns the names for everything the whole chain produced. Zipping that against `coef_` or `feature_importances_` gives a labelled result rather than an array of numbers whose positions you have to reconstruct.
+`get_feature_names_out()` on the encoder returns the made names in order. On a `Pipeline` or `ColumnTransformer` it returns the names for all the whole chain made. Zipping that against `coef_` or `feature_importances_` gives a labelled result rather than an array of numbers whose spots you've to rebuild.
 
-Two things to remember when reading them. The importance of a category is spread across its columns, so a feature with twenty categories has its influence divided twenty ways and will look weaker than a single numeric column carrying the same information &mdash; which is a known bias in tree-based feature importances, not a fact about the data. And with `drop="first"`, every remaining coefficient is relative to the dropped category, so a positive coefficient means "higher than the baseline", not "high".
+Two things to note when reading them. The importance of a category is spread across its columns. A feature with twenty categories has its sway cut twenty ways and will look weaker than a single numeric column carrying the same info. Which is a known bias in tree-based feature importances, not a fact about the data. And with `drop="first"`, each left coeff is scaled to the dropped category. So A plus coeff means "higher than the baseline", not "high".
 
-<strong>Do trees need one-hot encoding?</strong> scikit-learn's do, because they cannot take strings. `HistGradientBoostingClassifier` accepts declared categorical features natively, which is both faster and better than one-hot for high-cardinality columns.
+<strong>Do trees need one-hot encoding?</strong> scikit-learn's do. They can't take strings. `HistGradientBoostingClassifier` accepts declared cat features natively. This Is both faster and better than one-hot for high-cardinality columns.
 
-<strong>Should I one-hot encode before or after splitting?</strong> After, and inside a pipeline - otherwise the encoder learns the category list from the test rows too.
+<strong>Should I one-hot encode before or after splitting?</strong> After. Inside a pipeline - or else the encoder learns the category list from the test rows too.
 
-<strong>What about missing values in a categorical column?</strong> `OneHotEncoder` treats `NaN` as its own category by default, which is often the right behaviour: "not stated" is frequently informative rather than merely absent.
+<strong>What about missing values in a cat column?</strong> `OneHotEncoder` treats `NaN` as its own category by default. This Is often the right action: "not stated" is often helpful rather than merely absent.
 
 ## Things to try
 
-1. <strong>Read the alphabetical disaster.</strong> The third editor encodes small as 2 and large as 0. Look at the numbers before reading the fix.
-2. <strong>Meet the unknown category.</strong> In the second editor, remove `handle_unknown="ignore"` from the safe encoder and watch it raise on tokyo.
-3. <strong>Explode a column.</strong> In the fifth editor, raise the number of distinct users and watch the column count follow it exactly.
-4. <strong>Group the rare ones.</strong> Add `min_frequency=50` to that encoder and see how many columns survive.
+1. <strong>Read the alphabetical disaster.</strong> The third editor codes small as 2 and large as 0. Look at the numbers before reading the fix.
+2. <strong>Meet the unknown category.</strong> In the second editor, drop `handle_unknown="skip"` from the safe encoder and watch it raise on tokyo.
+3. <strong>Explode a column.</strong> In the fifth editor, raise the number of distinct users and watch the column count follow it just.
+4. <strong>Group the rare ones.</strong> Add `min_frequency=50` to that encoder and see how many columns live.
 
 ## Where this leaves you
 
-One-hot for unordered categories with `handle_unknown="ignore"`, ordinal with an explicit `categories=` when the order is real, `drop="if_binary"` as a reasonable default, and a plan for any column with more than a few dozen distinct values before it becomes a few dozen columns of nearly nothing.
+One-hot for unordered categories with `handle_unknown="skip"`, ordinal with an clear `categories=` when the order is real, `drop="if_binary"` as a reasonable default. A plan for any column with more than a few dozen distinct values before it turns a few dozen columns of nearly nothing.

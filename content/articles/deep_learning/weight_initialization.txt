@@ -3,45 +3,45 @@ intro: The starting values of the weights decide whether a deep network trains a
 
 ## Why not zero, and why not all-equal
 
-Initialising every weight to zero seems harmless and completely breaks the network. If all weights in a layer are identical, every neuron in that layer computes the same output, receives the same gradient, and applies the same update &mdash; so they stay identical forever. A layer of 512 such neurons has the expressive power of one.
+Initialising each weight to zero seems harmless and fully breaks the network. If all weights in a layer are identical, each neuron in that layer computes the same output, gets the same gradient. And applies the same update &mdash; so they stay identical forever. A layer of 512 such neurons has the expressive power of one.
 
-This is the <strong>symmetry breaking</strong> problem, and it is why initialisation must be random. Biases can safely start at zero, because the weights already break the symmetry. The scale of the random values matters as much as their randomness. Each layer multiplies its input by a weight matrix, so activation variance is multiplied layer by layer. If the per-layer factor is below 1, activations shrink geometrically and deep layers see almost nothing; if above 1, they grow and saturate or overflow. **Xavier** (Glorot) initialisation sets the variance to `2 / (fan_in + fan_out)`, which keeps variance constant through layers using tanh or sigmoid activations. **He** (Kaiming) initialisation sets it to `2 / fan_in`, which accounts for the fact that ReLU zeros out half its inputs and would otherwise halve the variance at every layer. Using Xavier with ReLU or He with sigmoid are common mistakes that quietly destabilise training &mdash; the network trains but converges to a worse solution, and the symptom is indistinguishable from a bad learning rate. This page shows activation distributions at each layer under zero, Xavier, and He initialisation, and lets you switch activation functions to see which pairing works.
+This is the <strong>symmetry breaking</strong> problem. And it is why setup must be random. Biases can safely start at zero, since the weights now break the symmetry. The scale of the random vals matters as much as their randomness. Each layer multiplies its input by a weight matrix. So output variance is multiplied layer by layer. If the per-layer factor is below 1, outputs shrink geometrically and deep layers see almost nothing. If above 1, they grow and saturate or overflow. **Xavier** (Glorot) setup sets the variance to `2 / (fan_in + fan_out)`. It keeps variance constant through layers with tanh or sigmoid outputs. **He** (Kaiming) setup sets it to `2 / fan_in`. It accounts for the fact that ReLU zeros out half its inputs and would otherwise halve the variance at each layer. With Xavier with ReLU or He with sigmoid are common mistakes that quietly destabilise training. The network trains but converges to a worse solution. And the symptom is indistinguishable from a bad learning rate. This page shows output spreads at each layer under zero, Xavier. And He setup. And lets you switch output functions to see which pairing works.
 
-## The variance is what actually matters
+## The variance is what really matters
 
-Randomness alone is not enough; the <em>scale</em> of the random values decides whether signal survives depth. Each layer multiplies its input by a weight matrix, so the variance of the activations is multiplied layer by layer.
+Randomness alone is not enough. The <em>scale</em> of the random vals decides whether signal survives depth. Each layer multiplies its input by a weight matrix. So the variance of the outputs is multiplied layer by layer.
 
-If that per-layer factor is below 1, activations shrink geometrically and the deepest layers see almost nothing. If it is above 1, they grow geometrically and saturate or overflow. The target is a factor of about 1, so activations keep roughly constant scale from the first layer to the last &mdash; and the same for gradients on the way back.
+If that per-layer factor is below 1, outputs shrink geometrically and the deepest layers see almost nothing. If it is above 1, they grow geometrically and saturate or overflow. The target is a factor of about 1. So outputs keep roughly constant scale from the first layer to the last. And the same for gradients on the way back.
 
-That is the whole design goal, and the named schemes are just different solutions to it:
+That is the whole design goal. And the named schemes are just other solutions to it:
 
-- <strong>Xavier / Glorot</strong> &mdash; variance <span class="mono-font">2 / (n<sub>in</sub> + n<sub>out</sub>)</span>. Derived for activations symmetric about zero, so it suits tanh and sigmoid.
-- <strong>He / Kaiming</strong> &mdash; variance <span class="mono-font">2 / n<sub>in</sub></span>. ReLU zeroes negative inputs and therefore roughly halves the variance passing through, so He compensates with the extra factor of 2. This is the right default for any ReLU network.
-- <strong>LeCun</strong> &mdash; variance <span class="mono-font">1 / n<sub>in</sub></span>, used with SELU and self-normalising networks.
+- <strong>Xavier / Glorot</strong> &mdash; variance <span class="mono-font">2 / (n<sub>in</sub> + n<sub>out</sub>)</span>. Derived for outputs symmetric about zero. So it suits tanh and sigmoid.
+- <strong>He / Kaiming</strong> &mdash; variance <span class="mono-font">2 / n<sub>in</sub></span>. ReLU zeroes negative inputs and therefore roughly halves the variance passing through. So He compensates with the extra factor of 2. This is the right default for any ReLU network.
+- <strong>LeCun</strong> &mdash; variance <span class="mono-font">1 / n<sub>in</sub></span>, used with SELU and self-scaling networks.
 
-Note that all of them scale with layer width. A 1024-unit layer needs smaller initial weights than a 64-unit one, because it sums many more terms.
+Note that all of them scale with layer width. A 1024-unit layer needs less initial weights than a 64-unit one, since it sums many more terms.
 
 ## Why the starting point matters
 
-Training begins from random weights, and the choice of "random" is not arbitrary. Two failure modes bracket the sensible range.
+Training begins from random weights. And the choice of "random" is not arbitrary. Two failure modes bracket the sensible range.
 
-<strong>All zeros.</strong> Every unit in a layer computes the same thing, receives the same gradient, and updates identically. The layer never differentiates and behaves as a single unit forever. Symmetry must be broken, which is why the weights are random at all.
+<strong>All zeros.</strong> Each unit in a layer computes the same thing, gets the same gradient. And updates identically. The layer never differentiates and behaves as a single unit forever. Symmetry must be broken. It is why the weights are random at all.
 
-<strong>Too large or too small.</strong> Activations either grow or shrink as they pass through layers. After twenty layers, activations that shrink by 0.8 per layer have shrunk to 1% of their original scale, and the gradients follow. The network is dead before the first update.
+<strong>Too large or too small.</strong> Outputs either grow or shrink as they pass through layers. After twenty layers, outputs that shrink by 0.8 per layer have shrunk to 1% of their first scale. And the gradients follow. The network is dead before the first update.
 
-The goal is a scale that keeps the variance of activations roughly constant through depth &mdash; and that scale depends on the layer's width and its activation function.
+The goal is a scale that keeps the variance of outputs roughly constant through depth. And that scale depends on the layer's width and its output function.
 
 ## The two schemes worth knowing
 
-<strong>Xavier (Glorot)</strong> initialisation, for tanh and sigmoid:
+<strong>Xavier (Glorot)</strong> setup, for tanh and sigmoid:
 
 <p class="mono-font">Var(W) = 2 / (fan_in + fan_out)</p>
 
-<strong>He (Kaiming)</strong> initialisation, for ReLU:
+<strong>He (Kaiming)</strong> setup, for ReLU:
 
 <p class="mono-font">Var(W) = 2 / fan_in</p>
 
-The difference is the factor of 2, and the reason is direct: ReLU zeroes half its inputs, so it halves the variance passing through. Doubling the initial variance compensates exactly.
+The gap is the factor of 2. And the reason is direct: ReLU zeroes half its inputs. So it halves the variance passing through. Doubling the initial variance compensates just.
 
 |Activation|Use|
 |---|---|
@@ -50,7 +50,7 @@ The difference is the factor of 2, and the reason is direct: ReLU zeroes half it
 |GELU, SiLU|He, or the framework default|
 |Linear output layer|Xavier, or small values|
 
-Using Xavier with ReLU is a real if subtle mistake: activations shrink through depth by a factor of &radic;2 per layer, and a 30-layer network arrives at the loss with almost no signal.
+With Xavier with ReLU is a real if subtle mistake: outputs shrink through depth by a factor of &radic;2 per layer. And a 30-layer network arrives at the loss with almost no signal.
 
 ```python
 import torch.nn as nn
@@ -62,52 +62,52 @@ for m in model.modules():
             nn.init.zeros_(m.bias)
 ```
 
-Biases are initialised to zero &mdash; there is no symmetry problem for them, since the weights already differ.
+Biases are set up to zero. There is no symmetry problem for them, since the weights now differ.
 
-## Special cases in modern architectures
+## Special cases in modern designs
 
-<strong>Batch normalisation's `γ` and `β`</strong> start at 1 and 0, so the layer initially passes its normalised input through unchanged.
+<strong>Batch normalisation's `γ` and `β`</strong> start at 1 and 0. So the layer initially passes its scaled input through unchanged.
 
-<strong>The last block's normalisation in a residual network</strong> is sometimes initialised to zero (`γ = 0`), which makes each residual block start as an exact identity. The network begins as a shallow one and deepens itself as training proceeds &mdash; a trick that stabilises very deep and very large models.
+<strong>The last block's normalisation in a residual network</strong> is sometimes set up to zero (`γ = 0`). It makes each residual block start as an exact identity. The network begins as a shallow one and deepens it as training proceeds. A trick that steadies very deep and very large nets.
 
-<strong>Transformers</strong> often scale the initialisation of the output projections by 1/&radic;(2 &times; layers), because the residual stream accumulates contributions from every block and would otherwise grow with depth.
+<strong>Transformers</strong> often scale the setup of the output projections by 1/&radic;(2 &times; layers), since the residual stream builds up contributions from each block and would otherwise grow with depth.
 
-<strong>Embeddings</strong> are typically initialised from a normal distribution with a small standard deviation (0.02 is the common choice in language models).
+<strong>Embeddings</strong> are often set up from a normal spread with a small standard deviation (0.02 is the common choice in language nets).
 
-<strong>Orthogonal initialisation</strong> for recurrent weight matrices keeps the largest singular value at 1, which is exactly the condition that prevents the hidden state exploding or vanishing over time steps.
+<strong>Orthogonal setup</strong> for recurrent weight matrices keeps the largest singular value at 1. It is just the condition that stops the hidden state exploding or vanishing over time steps.
 
 ## Exploration guide
 
-1. <strong>Train from a reasonable start.</strong> Press <strong>Reset Weights</strong> and then <strong>Train Network</strong>. Activations stay in a usable range across the layers and the loss falls steadily.
-2. <strong>Watch the layer-to-layer scale.</strong> During training, compare the activation magnitudes at the first and last layers. When initialisation is right they are comparable; a systematic shrink or growth across depth is the failure this whole topic exists to prevent.
-3. <strong>Add normalisation.</strong> Enable the batch-norm toggle and press <strong>Reset Weights</strong>, then train again. Convergence becomes markedly less sensitive to where the weights started &mdash; normalisation rescales each layer regardless.
-4. <strong>Reset repeatedly.</strong> Press <strong>Reset Weights</strong> several times and train each time. Runs differ, sometimes noticeably. The initial draw is a genuine source of run-to-run variance, which is why single-run comparisons are unreliable.
+1. <strong>Train from a reasonable start.</strong> Press <strong>Reset Weights</strong> and then <strong>Train Network</strong>. Outputs stay in a usable range across the layers and the loss falls steadily.
+2. <strong>Watch the layer-to-layer scale.</strong> In training, check the output magnitudes at the first and last layers. When setup is right they are comparable. A systematic shrink or growth across depth is the failure this whole topic exists to stop.
+3. <strong>Add normalisation.</strong> Enable the batch-norm toggle and press <strong>Reset Weights</strong>, then train again. Convergence turns markedly less sensitive to where the weights started. Normalisation rescales each layer regardless.
+4. <strong>Reset repeatedly.</strong> Press <strong>Reset Weights</strong> a few times and train each time. Runs differ, sometimes noticeably. The initial draw is a genuine source of run-to-run variance. It is why single-run comparisons are unreliable.
 
 ## Traps worth knowing
 
-- <strong>Zero initialisation.</strong> Symmetry never breaks and the layer collapses to a single effective neuron. Zero is fine for biases and wrong for weights.
-- <strong>A fixed standard deviation such as 0.01 everywhere.</strong> Ignores layer width, so wide layers explode and deep stacks vanish. This was standard before 2010 and is a large part of why deep networks did not train.
-- <strong>Xavier with ReLU.</strong> Understates the variance by a factor of 2, since Xavier does not account for ReLU discarding half the distribution. Use He for ReLU.
-- <strong>Assuming batch norm makes it irrelevant.</strong> Normalisation reduces the sensitivity but does not remove it, particularly in very deep networks and in the layers before the first normalisation.
-- <strong>Reinitialising a pretrained layer.</strong> When fine-tuning, only the new head should be initialised; overwriting the pretrained weights discards everything transfer learning was for.
+- <strong>Zero setup.</strong> Symmetry never breaks and the layer collapses to a single effective neuron. Zero is fine for biases and wrong for weights.
+- <strong>A fixed standard deviation such as 0.01 all over.</strong> Ignores layer width. So wide layers explode and deep stacks vanish. This was standard before 2010 and is a large part of why deep networks did not train.
+- <strong>Xavier with ReLU.</strong> Understates the variance by a factor of 2, since Xavier does not account for ReLU discarding half the spread. Use He for ReLU.
+- <strong>Assuming batch norm makes it irrelevant.</strong> Normalisation reduces the response but does not remove it, very in very deep networks and in the layers before the first normalisation.
+- <strong>Reinitialising a pretrained layer.</strong> When fine-tuning, just the new head should be set up. Overwriting the pretrained weights discards all transfer learning was for.
 
 ## What to remember
 
-Initialisation must be random to break symmetry, and scaled to layer width so activation and gradient variance stay roughly constant with depth. He initialisation is the default for ReLU networks because ReLU halves the variance and He’s factor of 2 restores it; Xavier suits tanh and sigmoid. Get this wrong and a deep network either learns nothing or diverges &mdash; before the optimiser has had any say in the matter.
+Setup must be random to break symmetry. And scaled to layer width so output and gradient variance stay roughly constant with depth. He setup is the default for ReLU networks since ReLU halves the variance and He’s factor of 2 restores it. Xavier suits tanh and sigmoid. Get this wrong and a deep network either learns nothing or diverges. Before the solver has had any say in the matter.
 
 ## How much does it still matter?
 
 Less than it did, and more than nothing.
 
-Batch normalisation and residual connections both reduce sensitivity to initialisation, which is part of why they were such a breakthrough &mdash; they made deep networks trainable even from an imperfect starting point. Pretrained weights remove the question entirely for transfer learning.
+Batch normalisation and residual connections both reduce response to setup. It is part of why they were such a breakthrough. They made deep networks trainable still from an imperfect starting point. Pretrained weights remove the question fully for transfer learning.
 
-But it still matters in three situations: training from scratch without normalisation layers, very deep or very large models where small per-layer errors compound, and recurrent networks where the same matrix is applied many times.
+But it still matters in three cases: training from scratch without normalisation layers, very deep or very large nets where small per-layer errors compound. And recurrent networks where the same matrix is applied many times.
 
-And the framework defaults are not always right. PyTorch's default for `nn.Linear` is a uniform distribution based on fan-in that predates He initialisation, and it is not optimal for ReLU networks. Setting it explicitly costs three lines.
+And the framework defaults are not always right. PyTorch's default for `nn.Linear` is a uniform spread based on fan-in that predates He setup. And it is not best for ReLU networks. Setting it clearly costs three lines.
 
-## Diagnosing a bad initialisation
+## Diagnosing a bad setup
 
-Before training, do a single forward pass and print the standard deviation of the activations at each layer:
+Before training, do a single forward pass and print the standard deviation of the outputs at each layer:
 
 ```python
 acts = {}
@@ -121,13 +121,13 @@ for k, v in acts.items():
     print(f"{k:<40} std {v:.4f}")
 ```
 
-Healthy: roughly similar values throughout. Shrinking towards zero with depth means the initialisation is too small (or Xavier was used with ReLU). Growing means it is too large, and the first gradient step will be violent.
+Healthy: roughly close vals throughout. Shrinking towards zero with depth means the setup is too small (or Xavier was used with ReLU). Growing means it is too large. And the first gradient step will be violent.
 
-The same check on the initial loss is worth doing: with C balanced classes it should be about ln(C). A much larger value means the initial predictions are confidently wrong, which usually means the output layer's weights are too large.
+The same check on the initial loss is worth doing: with C balanced classes it should be about ln(C). A much more value means the initial predictions are confidently wrong. It often means the output layer's weights are too large.
 
 ## Zero, too big, too small, and right
 
-Initialisation decides whether a deep network trains at all. Four schemes on the same architecture, measured by what happens to the activations after ten layers.
+Setup decides whether a deep network trains at all. Four schemes on the same design, measured by what happens to the outputs after ten layers.
 
 ```python-run
 import numpy as np
@@ -165,7 +165,7 @@ print("\nthe rules: Xavier variance 1/n_in (tanh/sigmoid),")
 print("He variance 2/n_in (relu -- the 2 compensates for relu halving).")
 ```
 
-The next block shows where the factor of 2 in He initialisation comes from.
+The next block shows where the factor of 2 in He setup comes from.
 
 ```python-run
 import numpy as np
@@ -215,22 +215,22 @@ print("broke the symmetry.")
 
 ## Questions people ask
 
-<strong>Can I initialise all weights to the same non-zero value?</strong> No &mdash; the symmetry problem is identical to using zeros. Units must start different.
+<strong>Can I set up all weights to the same non-zero value?</strong> No. The symmetry problem is identical to with zeros. Units must start other.
 
-<strong>Should biases be zero?</strong> Yes, almost always. One exception: setting the output bias of a binary classifier to the log-odds of the positive class speeds up early training on imbalanced data.
+<strong>Should biases be zero?</strong> Yes, almost always. One exception: setting the output bias of a binary sorter to the log-odds of the positive class speeds up early training on imbalanced data.
 
 <strong>Normal or uniform?</strong> Barely matters &mdash; the variance is what counts. Both are provided for both schemes.
 
-<strong>What about fine-tuning?</strong> The pretrained weights are the initialisation. Only a newly added head needs initialising, and it should be small so it does not disturb the pretrained features on the first step.
+<strong>What about fine-tuning?</strong> The pretrained weights are the setup. Just a newly added head needs initialising. And it should be small so it does not disturb the pretrained features on the first step.
 
-<strong>Does initialisation affect the final result?</strong> With normalisation and residuals, usually only mildly &mdash; different seeds land at similar quality. Without them, it can decide whether the model trains at all.
+<strong>Does setup affect the final result?</strong> With normalisation and residuals, often just mildly. Other seeds land at close quality. Without them, it can decide whether the net trains at all.
 
-<strong>Why does my loss start enormous?</strong> Output-layer weights too large, or a label/logit mismatch. Compare against ln(number of classes).
+<strong>Why does my loss start enormous?</strong> Output-layer weights too large. Or a label/logit mismatch. Check against ln(count of classes).
 
 ## Recap in one screen
 
-- Zeros break the network by symmetry; wrong scales make activations grow or vanish through depth.
-- He initialisation (variance 2/fan_in) for ReLU; Xavier (2/(fan_in+fan_out)) for tanh and sigmoid.
-- The factor of 2 in He exists because ReLU discards half the signal.
-- Biases start at zero; residual blocks are sometimes started as exact identities.
-- Batch normalisation and residuals reduce sensitivity, but do not remove the need to get it roughly right.
+- Zeros break the network by symmetry. Wrong scales make outputs grow or vanish through depth.
+- He setup (variance 2/fan_in) for ReLU. Xavier (2/(fan_in+fan_out)) for tanh and sigmoid.
+- The factor of 2 in He exists since ReLU discards half the signal.
+- Biases start at zero. Residual blocks are sometimes started as exact identities.
+- Batch normalisation and residuals reduce response. But do not remove the need to get it roughly right.

@@ -1,25 +1,11 @@
 title: Aggregations and axis
-intro: sum, mean and max - and the one argument that decides what they mean.
+intro: sum, mean and max - and the one arg that decides what they mean.
 
 ## The default collapses everything
 
-`a.sum()` with no arguments adds every element, whatever the shape, and returns a single value.
+`a.sum()` with no args adds each element, what the shape, and returns a single value.
 
-That value is a NumPy scalar rather than a Python `int` or `float`. It behaves like one almost everywhere; wrap it in `int()` or `float()` when you need a genuine Python number, for JSON or for a format string that cares.
-
-`axis=0` collapses the rows: the operation runs down each column, and the result has one value per column. `axis=1` collapses the columns: the operation runs across each row, and the result has one value per row. The axis you name is the axis that disappears.
-
-The mnemonic that prevents confusion: `axis=0` means "along rows" (the row index varies, the column is fixed), and `axis=1` means "along columns" (the column index varies, the row is fixed). A `(3, 4)` array with `axis=0` gives 4 values (one per column). With `axis=1` it gives 3 values (one per row).
-
-`keepdims=True` preserves the reduced axis as a size-1 dimension. `a.sum(axis=0)` on a `(3, 4)` array gives shape `(4,)`. `a.sum(axis=0, keepdims=True)` gives shape `(1, 4)`. The size-1 dimension is what makes the result broadcastable back to the original shape — `a - a.mean(axis=0, keepdims=True)` centres each column without a shape mismatch.
-
-The common aggregations are `sum`, `mean`, `std`, `var`, `min`, `max`, `argmin`, `argmax`, `prod`, and `cumsum`. `cumsum` is the odd one: it does not reduce — it returns an array of the same shape, where each element is the running total up to that point. `cumprod` does the same with multiplication.
-
-`np.nanmean(a)`, `np.nansum(a)`, `np.nanstd(a)` — the `nan`-prefixed versions ignore `NaN` values instead of propagating them. `a.mean()` on an array with one `NaN` returns `NaN`. `np.nanmean(a)` returns the mean of the non-`NaN` values. The `nan` versions are in the `np` namespace, not as array methods.
-
-`np.median(a)` and `np.percentile(a, 50)` are not array methods — they are functions in the `np` namespace. `np.percentile(a, [25, 50, 75])` returns the quartiles. `np.quantile` is the same function with the argument expressed as a fraction (0.25 instead of 25).
-
-For boolean arrays, `sum` counts `True` values (since `True` is 1 and `False` is 0). `a.sum(axis=0)` on a boolean mask gives the count of `True` values per column. `np.any(a, axis=0)` returns `True` if any value in each column is `True`. `np.all(a, axis=1)` returns `True` if every value in each row is `True`.
+That value is a NumPy scalar rather than a Python `int` or `float`. It behaves like one almost all over. Wrap it in `int()` or `float()` when you need a genuine Python number, for JSON or for a format string that cares.
 
 
 ## Without an axis, everything reduces
@@ -155,89 +141,89 @@ print("   ", np.diff(np.array([1, 3, 6, 10])))
 ```
 ## axis names what disappears
 
-This is the rule, and it is the opposite of how most people read it at first.
+This is the rule, and it's the opposite of how most people read it at first.
 
-`axis=0` does **not** mean "along the rows" in the sense of giving one answer per row. It means *collapse axis 0*. Axis 0 is the row axis, so the rows vanish and you are left with one value per column.
+`axis=0` does **not** mean "along the rows" in the sense of giving one answer per row. It means *collapse axis 0*. Axis 0 is the row axis. The rows vanish and you're left with one value per column.
 
-`axis=1` collapses the columns and leaves one value per row.
+`axis=1` merges the columns and leaves one value per row.
 
-Reading it as "which axis am I removing?" makes every case predictable, including higher dimensions where intuition runs out. The shape rule is simple: the result has the input shape with that axis deleted.
+Reading it as "which axis am I dropping?" makes each case predictable, including higher dims where intuition runs out. The shape rule is simple. The result has the input shape with that axis deleted.
 
-A useful check when unsure: print `a.shape` and `a.sum(axis=k).shape` and confirm the missing entry is the one you meant.
+A handy check when unsure: print `a.shape` and `a.sum(axis=k).shape` and confirm the missing entry is the one you meant.
 
 ## keepdims
 
-Reductions drop the axis, and that is usually what you want &mdash; until you try to use the result against the original array.
+Reductions drop the axis, and that is often what you want. Until you try to use the result against the first array.
 
-Row means of a `(3, 4)` array give shape `(3,)`. Subtracting that from the `(3, 4)` array fails, because broadcasting aligns from the right and compares 4 with 3.
+Row means of a `(3, 4)` array give shape `(3,)`. Subtracting that from the `(3, 4)` array fails. Broadcasting aligns from the right and checks 4 with 3.
 
-`keepdims=True` gives `(3, 1)` instead, which broadcasts down the rows correctly.
+`keepdims=True` gives `(3, 1)` instead. This Broadcasts down the rows right.
 
-Note the asymmetry: centring by **column** needs no `keepdims`, because `mean(axis=0)` gives `(4,)` which already aligns with the last axis. Centring by **row** needs it. That asymmetry is a direct consequence of right-aligned broadcasting, and it is why `keepdims` exists.
+Note the skew: centring by **column** needs no `keepdims`. `mean(axis=0)` gives `(4,)` which already aligns with the last axis. Centring by **row** needs it. That skew is a direct result of right-aligned broadcasting, and it's why `keepdims` exists.
 
-A square array hides the error &mdash; both alignments are legal &mdash; so this is worth getting right on principle rather than by testing.
+A square array hides the error. Both alignments are legal. So this is worth getting right on principle rather than by testing.
 
 ## Several axes at once
 
-`axis` takes a tuple. On a `(frames, rows, cols)` stack, `axis=(1, 2)` reduces each frame to one number, and `axis=0` averages across frames to give one image.
+`axis` takes a tuple. On a `(frames, rows, cols)` stack, `axis=(1, 2)` reduces each frame to one number. `axis=0` means across frames to give one image.
 
 That covers most of what people reach for loops to do with image or batch data.
 
 ## argmin and argmax
 
-These return **positions** rather than values.
+These return **spots** rather than values.
 
-On a 1-D array the position is an index. On a multi-dimensional array with no `axis`, the position is into the *flattened* array, which is rarely directly useful. `np.unravel_index(a.argmax(), a.shape)` converts it into coordinates.
+On a 1-D array the spot is an index. On a multi-dimensional array with no `axis`, the spot is into the *flattened* array. This Is rarely right handy. `np.unravel_index(a.argmax(), a.shape)` converts it into coords.
 
-With an `axis`, you get one position per remaining slice, which is usually what you want: `a.argmax(axis=1)` gives the column of the largest value in each row.
+With an `axis`, you get one spot per left slice. This Is often what you want: `a.argmax(axis=1)` gives the column of the largest value in each row.
 
-Ties resolve to the **first** occurrence. That matters when the maximum is not unique and something downstream assumes it is.
+Ties resolve to the **first** case. That matters when the max isn't unique and a thing downstream assumes it's.
 
 ## Cumulative operations
 
-`cumsum` and `cumprod` are not reductions: they keep the shape and fill in running totals. Without an axis they operate on the flattened array, which is occasionally what you want and often not, so pass `axis` deliberately.
+`cumsum` and `cumprod` aren't reductions: they keep the shape and fill in running totals. Without an axis they operate on the flattened array. This Is at times what you want and often not. Pass `axis` on purpose.
 
-`np.diff` is the inverse of `cumsum` &mdash; consecutive differences, one element shorter.
+`np.diff` is the inverse of `cumsum`. In a row differences, one element shorter.
 
 ## Boolean reductions
 
-`any` and `all` take `axis` exactly like `sum`, because a boolean array is numeric and these are just reductions over it.
+`any` and `all` take `axis` just like `sum`. A boolean array is numeric and these are just reductions over it.
 
-`mask.any(axis=0)` answers "does any row satisfy this, per column". `mask.sum(axis=1)` counts matches per row. Between them and `argmax`, most "find the first row where..." questions have a one-line answer.
+`mask.any(axis=0)` answers "does any row meet this, per column". `mask.sum(axis=1)` counts matches per row. Between them and `argmax`, most "find the first row where..." questions have a one-line answer.
 
 ## The common mistakes
 
 **Reading `axis=0` as "per row".** It gives per column. The axis named is the one removed.
 
-**Forgetting `keepdims` when centring by row.** It raises on a rectangular array and silently misbehaves on a square one.
+**Losing `keepdims` when centring by row.** It raises on a rectangular array and silently misbehaves on a square one.
 
-**Using a flat `argmax` as if it were coordinates.** Unravel it.
+**Using a flat `argmax` as if it were coords.** Unravel it.
 
-**Reducing without an axis by accident.** `a.mean()` on a 2-D array gives one number; if you wanted per-column means, the missing argument is the whole bug and the result still looks like a plausible number.
+**Reducing without an axis by accident.** `a.mean()` on a 2-D array gives one number. If you wanted per-column means, the missing arg is the whole bug and the result still looks like a plausible number.
 
 ## The accumulator dtype
 
-`a.sum()` on an integer array accumulates in that array's integer type, and that type can overflow.
+`a.sum()` on an int array builds up in that array's int type, and that type can overflow.
 
-Summing a million `int32` values each around ten thousand overflows silently and gives a negative answer. The array is fine; the accumulator is not.
+Summing a million `int32` values each around ten thousand overflows silently and gives a minus answer. The array is fine. The accumulator isn't.
 
-`a.sum(dtype=np.int64)` fixes it by accumulating in a wider type than the data. The same argument works on `mean`, `prod` and the rest.
+`a.sum(dtype=np.int64)` fixes it by building up in a wider type than the data. The same arg works on `mean`, `prod` and the rest.
 
-NumPy already does something like this by default for the narrowest types &mdash; summing `int8` accumulates in the platform integer &mdash; but it does not promote `int32` or `int64`, so the risk is real for exactly the widths people actually use.
+NumPy already does something like this by default for the narrowest types. Summing `int8` builds up in the platform int. But it doesn't promote `int32` or `int64`. The risk is real for just the widths people really use.
 
-For floats the concern is different: not overflow but precision loss. Summing many `float32` values accumulates rounding error. `a.sum(dtype=np.float64)` reads the narrow array and accumulates in the wide type, which is the standard compromise between memory and accuracy.
+For floats the concern is other: not overflow but precision loss. Summing many `float32` values builds up rounding error. `a.sum(dtype=np.float64)` reads the narrow array and builds up in the wide type. This Is the standard compromise between memory and score.
 
-NumPy uses pairwise summation internally rather than a naive running total, so the error grows far more slowly than a hand-written loop would. It is still worth being deliberate when summing millions of `float32` values.
+NumPy uses pairwise summation inside rather than a naive running total. The error grows far more slowly than a hand-written loop would. It's still worth being deliberate when summing millions of `float32` values.
 
 ## Weighted means and percentiles
 
-`np.average` is not a synonym for `np.mean`. It takes a `weights` argument, which `mean` does not.
+`np.mean` isn't a synonym for `np.mean`. It takes a `weights` arg, which `mean` doesn't.
 
-`np.average(x, weights=w)` computes the weighted mean, and `returned=True` also gives back the sum of the weights, which is what you need to combine averages from several groups correctly.
+`np.mean(x, weights=w)` finds the weighted mean. `returned=True` also gives back the sum of the weights. This Is what you need to combine means from a few groups right.
 
-`np.median` is the 50th percentile, and `np.percentile(a, q)` generalises it. Both accept an `axis`, so per-column medians are one call.
+`np.median` is the 50th percentile, and `np.percentile(a, q)` generalises it. Both accept an `axis`. Per-column medians are one call.
 
-Percentiles involve interpolation between the two nearest ranks when the requested quantile does not fall on an element. The `method` argument selects among several conventions, and different statistical packages default differently &mdash; which is the usual explanation when NumPy's answer disagrees slightly with another tool's.
+Percentiles involve blending between the two nearest ranks when the requested quantile doesn't fall on an element. The `method` arg selects among a few rules. Other statistical packages default differently. Which is the usual reason when NumPy's answer disagrees slightly with another tool's.
 
 `np.quantile` is the same function taking fractions rather than percentages.
 
@@ -245,11 +231,11 @@ All of these have `nan`-aware variants: `nanmedian`, `nanpercentile`, `nanquanti
 
 ## reduce and accumulate as the general form
 
-Every reduction has a ufunc underneath, and the ufunc's `reduce` method is the general case.
+each reduction has a ufunc underneath, and the ufunc's `reduce` method is the general case.
 
-`np.add.reduce(a, axis=0)` is `a.sum(axis=0)`. `np.maximum.reduce` is `a.max()`. `np.logical_and.reduce` is `a.all()`.
+`np.add.reduce(a, axis=0)` is `a.sum(axis=0)`. `np.max.reduce` is `a.max()`. `np.logical_and.reduce` is `a.all()`.
 
-This matters when you want a reduction NumPy does not name. A running maximum has no `cummax` function, but `np.maximum.accumulate(a)` is exactly that, and is the standard way to compute a drawdown baseline or a high-water mark.
+This matters when you want a reduction NumPy doesn't name. A running max has no `cummax` function. `np.max.build up(a)` is just that. Is the standard way to find a drawdown baseline or a high-water mark.
 
 `np.ufunc.reduceat` performs segmented reductions &mdash; a reduction over slices defined by a list of start indices &mdash; which is the closest thing NumPy has to a group-by on sorted data.
 
@@ -259,49 +245,49 @@ This matters when you want a reduction NumPy does not name. A running maximum ha
 
 `np.histogram` reduces to counts per bin and returns the bin edges alongside them.
 
-`np.bincount` counts occurrences of small non-negative integers, and is substantially faster than `unique(return_counts=True)` for that case because it indexes directly rather than sorting. Its `weights` argument turns it into a group-sum: `np.bincount(group_ids, weights=values)` sums values per group in one call, which is the fastest group-by NumPy offers.
+`np.bincount` counts cases of small non-minus ints. Is much faster than `unique(return_counts=True)` for that case because it indexes right rather than sorting. Its `weights` arg turns it into a group-sum: `np.bincount(group_ids, weights=values)` sums values per group in one call. This Is the fastest group-by NumPy offers.
 
 ## Empty arrays and the identity element
 
-`np.sum([])` is `0.0`. `np.prod([])` is `1.0`. Both return the identity element for the operation, which is mathematically the right answer.
+`np.sum([])` is `0.0`. `np.prod([])` is `1.0`. Both return the identity element for the step. This Is in math the right answer.
 
-`np.max([])` raises, because there is no identity for a maximum.
+`np.max([])` raises, because there's no identity for a max.
 
-`np.mean([])` returns `nan` with a warning, since it divides by zero.
+`np.mean([])` returns `nan` with a warning, since it cuts by zero.
 
-This matters in code that reduces over groups where some group might be empty. A sum silently gives zero, which may or may not be the meaning you want; a max raises, which at least tells you. Filtering out empty groups before reducing, or using the `initial` argument that `max` and `min` accept, makes the intent explicit.
+This matters in code that reduces over groups where some group might be empty. A sum silently gives zero. This May or may not be the meaning you want. A max raises. This At least tells you. Filtering out empty groups before reducing, or using the `initial` arg that `max` and `min` accept, makes the intent clear.
 
 ## The habits worth forming
 
-Pass `axis` explicitly. The default of "reduce everything" is right often enough to hide a missing argument, and wrong often enough to matter.
+Pass `axis` by name. The default of "reduce all" is right often enough to hide a missing arg. Wrong often enough to matter.
 
-Pass `keepdims=True` whenever the result will be used against the original array.
+Pass `keepdims=True` when the result will be used against the first array.
 
-Pass `dtype` when summing integers that could be large, or many `float32` values.
+Pass `dtype` when summing ints that could be large, or many `float32` values.
 
-Check the shape of the result rather than assuming it. One printed `.shape` resolves most confusion about which axis went where, and it is faster than reasoning about it.
+Check the shape of the result rather than given it. One printed `.shape` resolves most confusion about which axis went where. It's faster than thinking about it.
 
 ## Reductions on boolean arrays
 
-Because booleans promote to integers, every numeric reduction works on a mask and means something useful.
+Because booleans promote to ints, each numeric reduction works on a mask and means a thing handy.
 
-`mask.sum()` counts. `mask.mean()` gives the proportion &mdash; the fraction of elements satisfying the condition, which is often exactly the summary you want and avoids a division you would otherwise write by hand.
+`mask.sum()` counts. `mask.mean()` gives the proportion. The fraction of elements meeting the rule. This Is often just the summary you want and avoids a division you'd else write by hand.
 
-`mask.any()` and `mask.all()` are the logical reductions, and take `axis` like everything else.
+`mask.any()` and `mask.all()` are the logical reductions, and take `axis` like all else.
 
-`mask.argmax()` finds the first True, since True is 1 and ties go to the first occurrence. It returns 0 when nothing is True, which is indistinguishable from a match at position zero &mdash; check `mask.any()` first.
+`mask.argmax()` finds the first True, since True is 1 and ties go to the first case. It returns 0 when nothing is True. This Is the same from a match at spot zero &mdash; check `mask.any()` first.
 
-Combining these covers most "how many rows satisfy" and "which is the first row where" questions in one line each.
+Mixing these covers most "how many rows meet" and "which is the first row where" questions in one line each.
 
 ## Reductions with a condition
 
-Modern ufunc reductions accept `where`, which restricts the reduction to selected elements without building an intermediate array.
+Modern ufunc reductions accept `where`. This Restricts the reduction to selected elements without building an mid array.
 
-`a.sum(where=mask)` sums only the matching elements. `a.mean(where=mask)` averages them. Compared with `a[mask].sum()`, it avoids allocating the extracted subset, which matters on large arrays inside a loop.
+`a.sum(where=mask)` sums only the matching elements. `a.mean(where=mask)` means them. Checked with `a[mask].sum()`, it avoids allocating the extracted subset. This Matters on large arrays inside a loop.
 
-`initial` supplies a starting value, which is what makes `max` work on a possibly-empty selection: `a.max(initial=0, where=mask)` returns 0 rather than raising when nothing matches.
+`initial` supplies a starting value. This Is what makes `max` work on a possibly-empty pick: `a.max(initial=0, where=mask)` returns 0 rather than raising when nothing matches.
 
-Those two arguments together cover the awkward cases in group-wise reductions, where some groups may be empty and the plain functions either raise or return an identity that means something different.
+Those two args together cover the awkward cases in group-wise reductions. Here Some groups may be empty and the plain functions either raise or return an identity that means a thing other.
 
 ## Reductions across a stack of arrays
 
@@ -313,28 +299,28 @@ The answer is to stack them and reduce along the new axis:
 result = np.stack(arrays).mean(axis=0)
 ```
 
-That is the elementwise mean across all of them. `max(axis=0)` gives the elementwise maximum, and so on.
+That is the elementwise mean across all of them. `max(axis=0)` gives the elementwise max, and so on.
 
-For two arrays there are direct functions &mdash; `np.maximum(a, b)` and `np.minimum(a, b)` are elementwise and broadcast &mdash; and they are worth distinguishing from `np.max`, which reduces a single array. The names differ by one letter and the operations are entirely different, which is a recurring source of confusion.
+For two arrays there are direct functions. `np.max(a, b)` and `np.min(a, b)` are elementwise and broadcast. And they're worth distinguishing from `np.max`. This Reduces a single array. The names differ by one letter and the steps are fully other. This Is a recurring source of confusion.
 
-`np.maximum.reduce(arrays)` generalises the pairwise version to any number, without the intermediate stack.
+`np.max.reduce(arrays)` generalises the pairwise version to any number, without the mid stack.
 
 ## The summary
 
-Pass `axis` explicitly, and read it as "the axis that disappears".
+Pass `axis` by name, and read it as "the axis that disappears".
 
-Pass `keepdims=True` whenever the result will be used against the original.
+Pass `keepdims=True` when the result will be used against the first.
 
-Pass `dtype` when summing many integers or many `float32` values.
+Pass `dtype` when summing many ints or many `float32` values.
 
-Use the `nan*` variants when missing values are possible, and know that they make a decision on your behalf about what missing means.
+Use the `nan*` variants when missing values are possible. Know that they make a choice on your behalf about what missing means.
 
-Use `where` and `initial` for conditional reductions rather than extracting a subset first.
+Use `where` and `initial` for gated reductions rather than extracting a subset first.
 
-And when the result shape is not what you expected, print `a.shape` and the result's shape together. One comparison resolves nearly every axis confusion faster than reasoning about it does.
+And when the result shape isn't what you expected, print `a.shape` and the result's shape together. One compare resolves nearly each axis confusion faster than thinking about it does.
 
 ## A closing note
 
-Reductions are simple until an axis is involved, and then almost every confusion comes from one place: reading `axis=0` as "along the rows" rather than "collapse the rows".
+Reductions are simple until an axis is involved. Then almost each confusion comes from one place. Reading `axis=0` as "along the rows" rather than "collapse the rows".
 
-The axis named is the axis removed. Holding onto that phrasing makes the result shape predictable in any number of dimensions, and turns `keepdims`, tuple axes and higher-dimensional reductions from special cases into consequences of the same rule.
+The axis named is the axis removed. Holding onto that phrasing makes the result shape predictable in any number of dims. Turns `keepdims`, tuple axes and higher-dimensional reductions from special cases into results of the same rule.

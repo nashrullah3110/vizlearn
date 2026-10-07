@@ -3,15 +3,15 @@ intro: Fifty years on, the relational model is still the default way to store bu
 
 ## The problem it solves
 
-A <strong>relational database</strong> stores data in <strong>tables</strong> of rows and columns, where every table describes one kind of thing &mdash; customers, orders, products &mdash; and tables are connected by shared key values rather than by nesting data inside each other.
+A <strong>relational database</strong> stores data in <strong>tables</strong> of rows and columns. There each table describes one kind of thing. Customers, orders, products &mdash; and tables are connected by shared key vals rather than by nesting data inside each other.
 
-The design principle is normalisation: each fact is stored exactly once, in one table, and other tables reference it by key. A customer's name lives in the customers table. An order references that customer by `customer_id`, a foreign key that points to the customers table's primary key. If the customer's name changes, you update one row in one table, and every query that joins on the key automatically sees the new name.
+The design principle is normalisation: each fact is stored just once, in one table. And other tables reference it by key. A customer's name lives in the customers table. An order references that customer by `customer_id`, a foreign key that points to the customers table's primary key. If the customer's name changes, you update one row in one table. And each query that joins on the key automatically sees the new name.
 
-This avoids the three anomalies that plague denormalised data. An update anomaly means changing a fact in one row but forgetting to change it in the copies. An insertion anomaly means you cannot record something (a customer with no orders) because there is no table for it. A deletion anomaly means removing the last order deletes the customer too. Normalisation eliminates all three, at the cost of requiring joins to reassemble related data.
+This avoids the three anomalies that plague denormalised data. An update anomaly means changing a fact in one row but forgetting to change it in the copies. An insertion anomaly means you cannot record something (a customer with no orders) since there is no table for it. A deletion anomaly means removing the last order deletes the customer too. Normalisation removes all three, at the cost of needing joins to reassemble tied data.
 
-SQL is the language. It is declarative: you say what data you want, not how to get it. The database's query optimiser decides whether to use an index, which join algorithm to apply, and in what order to scan the tables. This separation of what from how is why the same SQL query can run on a laptop and a distributed cluster without rewriting &mdash; the optimiser adapts to the hardware.
+SQL is the language. It is declarative: you say what data you want, not how to get it. The database's query solver decides whether to use an index. It join algorithm to apply. And in what order to scan the tables. This separation of what from how is why the same SQL query can run on a laptop and a distributed cluster without rewriting. The solver adapts to the hardware.
 
-The major engines &mdash; PostgreSQL, MySQL, SQL Server, Oracle, SQLite &mdash; all implement the relational model and speak SQL, with minor dialect differences. PostgreSQL is the most standards-compliant and feature-rich open-source option. SQLite is embedded (no server, the database is a single file) and is the most widely deployed database engine in the world, shipping inside every smartphone and web browser.
+The major engines &mdash; PostgreSQL, MySQL, SQL Server, Oracle, SQLite. All build the relational net and speak SQL, with minor dialect gaps. PostgreSQL is the most standards-compliant and feature-rich open-source option. SQLite is embedded (no server, the database is a single file) and is the most widely deployed database engine in the world, shipping inside each smartphone and web browser.
 
 ## Keys are the whole trick
 
@@ -24,53 +24,53 @@ The major engines &mdash; PostgreSQL, MySQL, SQL Server, Oracle, SQLite &mdash; 
 |Surrogate key|An artificial id (integer or UUID) with no business meaning|
 |Natural key|A real-world identifier, such as an ISBN or email|
 
-The foreign key is what turns a pile of tables into a database. Declared properly, it makes an order pointing at a non-existent customer impossible &mdash; not unlikely, not caught by a validation function somewhere, but rejected by the engine for every client that ever connects.
+The foreign key is what turns a pile of tables into a database. Declared well, it makes an order pointing at a non-existent customer impossible. Not unlikely, not caught by a validation function somewhere. But rejected by the engine for each client that ever connects.
 
-Surrogate versus natural keys is one of the few genuinely contested design questions. Surrogate keys are stable (people change email addresses) and compact, so most schemas use them. The right answer is usually both: a surrogate primary key for references, plus a `UNIQUE` constraint on the natural key so the real-world rule is still enforced.
+Surrogate versus natural keys is one of the few genuinely contested design questions. Surrogate keys are stable (people change email addresses) and compact. So most schemas use them. The right answer is often both: a surrogate primary key for references, plus a `UNIQUE` constraint on the natural key so the real-world rule is still enforced.
 
 ## Why Split the Data at All?
 
-<p>Switch this lab to <strong>one flat table</strong> and look at the red cells. The customer's name and city now repeat on every order they ever placed. That redundancy causes three classic problems:</p><ul><li><strong>Update anomaly</strong> &mdash; changing a customer's name means finding and editing every copy. Miss one and your data now contradicts itself. Press the rename button in both models and compare the counts.</li><li><strong>Insertion anomaly</strong> &mdash; you cannot record a new customer until they place an order, because there is nowhere to put them.</li><li><strong>Deletion anomaly</strong> &mdash; deleting a customer's only order erases the customer entirely.</li></ul><strong>Normalisation</strong> is the process of splitting tables until each fact is stored exactly once. The cost is that answering a question often requires a <span class="mono-font">JOIN</span> &mdash; and that trade, correctness for a little query effort, is the central bargain of the relational model.
+<p>Switch this lab to <strong>one flat table</strong> and look at the red cells. The customer's name and city now repeat on each order they ever placed. That redundancy causes three classic problems:</p><ul><li><strong>Update anomaly</strong>. Changing a customer's name means finding and editing each copy. Miss one and your data now contradicts it. Press the rename button in both nets and check the counts.</li><li><strong>Insertion anomaly</strong>. You cannot record a new customer until they place an order, since there is nowhere to put them.</li><li><strong>Deletion anomaly</strong>. Deleting a customer's just order erases the customer fully.</li></ul><strong>Normalisation</strong> is the process of splitting tables until each fact is stored just once. The cost is that answering a question often needs a <span class="mono-font">JOIN</span>. And that trade, correctness for a little query effort, is the central bargain of the relational net.
 
 ## ACID: the other half of the promise
 
-The relational model describes how data is arranged. ACID describes what happens when several people change it at once, and it is the reason banks and hospitals run on these systems.
+The relational net describes how data is arranged. ACID describes what happens when a few people change it at once. And it is the reason banks and hospitals run on these systems.
 
-- <strong>Atomicity</strong> &mdash; a transaction happens completely or not at all. No half-finished transfer.
-- <strong>Consistency</strong> &mdash; every constraint holds before and after. No orphaned rows.
+- <strong>Atomicity</strong> &mdash; a transaction happens fully or not at all. No half-finished transfer.
+- <strong>Consistency</strong> &mdash; each constraint holds before and after. No orphaned rows.
 - <strong>Isolation</strong> &mdash; concurrent transactions do not see each other's unfinished work.
 - <strong>Durability</strong> &mdash; once committed, it survives a power cut.
 
-Together those guarantees mean the application does not have to reason about concurrency in the general case. Without them, every developer touching the system would have to get locking right, every time, for ever.
+Together those guarantees mean the application does not have to reason about concurrency in the general case. Without them, each developer touching the system would have to get locking right, each time, for ever.
 
 ## Tables, rows and the idea underneath
 
-A relational database stores data in tables: rows are records, columns are attributes, and every row in a table has the same columns. That much is just a spreadsheet.
+A relational database stores data in tables: rows are records, columns are attributes. And each row in a table has the same columns. That much is just a spreadsheet.
 
-What makes it <em>relational</em> is that tables refer to each other by value rather than by pointer. An order does not contain a customer; it contains a customer <em>id</em>, and the database can follow that id to the customers table whenever asked. Nothing is nested, nothing is duplicated, and the connections are made at query time.
+What makes it <em>relational</em> is that tables refer to each other by value rather than by pointer. An order does not hold a customer. It holds a customer <em>id</em>. And the database can follow that id to the customers table whenever asked. Nothing is nested, nothing is duplicated. And the connections are made at query time.
 
-That design decision, from Edgar Codd's 1970 paper, is why the model has outlasted everything built to replace it. Because relationships are values rather than structure, you can ask questions nobody anticipated when the schema was designed &mdash; join any two tables on any matching columns, and the answer comes out. A system that stored orders inside customers would answer "orders per customer" instantly and "customers per product" only with a full rewrite.
+That design decision, from Edgar Codd's 1970 paper, is why the net has outlasted all built to replace it. Since relationships are vals rather than structure, you can ask questions nobody anticipated when the schema was designed. Join any two tables on any matching columns. And the answer comes out. A system that stored orders inside customers would answer "orders per customer" instantly and "customers per product" just with a full rewrite.
 
 ## Why split the data at all
 
-Splitting has an obvious cost: getting a customer's name onto their order list requires a join. The benefits are less obvious until something goes wrong without them.
+Splitting has an obvious cost: getting a customer's name onto their order list needs a join. The gains are less obvious until something goes wrong without them.
 
-Store the customer's city on every order and one customer moving house means updating hundreds of rows. Miss one and the database now contains two contradictory answers to the same question, with no way to tell which is right.
+Store the customer's city on each order and one customer moving house means updating hundreds of rows. Miss one and the database now holds two contradictory answers to the same question, with no way to tell which is right.
 
-Store it once, in the customers table, and the update touches a single row. Everything that references that customer sees the new value immediately, because there is only one value.
+Store it once, in the customers table. And the update touches a single row. All that references that customer sees the new value at once, since there is just one value.
 
-This is the argument for normalisation in a sentence: <strong>each fact should be stored in exactly one place</strong>. The join is the price, and the database is extremely good at joins.
+This is the argument for normalisation in a sentence: <strong>each fact should be stored in just one place</strong>. The join is the price. And the database is very good at joins.
 
 ## Exploration guide
 
-1. <strong>Click a customer row.</strong> Their orders light up in the orders table &mdash; that is the foreign key doing its job.
+1. <strong>Click a customer row.</strong> Their orders light up in the orders table. That is the foreign key doing its job.
 2. <strong>Click an order.</strong> The single product it references is highlighted. One value, one link, no ambiguity.
-3. <strong>Switch to the flat table</strong> and watch the cell count rise while the number of tables drops to one. Every red cell is a duplicated fact.
-4. <strong>Run the rename in both models.</strong> Normalised: one cell changes. Flat: several &mdash; and every one is an opportunity to get it wrong.
+3. <strong>Switch to the flat table</strong> and watch the cell count rise while the count of tables drops to one. Each red cell is a duplicated fact.
+4. <strong>Run the rename in both nets.</strong> Scaled: one cell changes. Flat: a few &mdash; and each one is an opportunity to get it wrong.
 
-## What "relational" actually buys you
+## What "relational" really buys you
 
-The relational model is a small idea -- data in tables, relationships expressed as shared values rather than as pointers -- and its consequences are large. All of them are visible in four tables.
+The relational net is a small idea -- data in tables, relationships expressed as shared vals rather than as pointers -- and its consequences are large. All of them are visible in four tables.
 
 ```sql-run
 -- The whole database, listed. Four tables and nothing else: no
@@ -94,7 +94,7 @@ FROM customers c LEFT JOIN orders o ON o.customer_id = c.id
 GROUP BY c.id, c.name ORDER BY orders DESC LIMIT 3;
 ```
 
-The same shared-value mechanism lets you traverse relationships in any direction, including paths the schema designer never anticipated.
+The same shared-value mechanism lets you traverse relationships in any way, with paths the schema designer never anticipated.
 
 ```sql-run
 -- Products back to customers, through two tables the original designer
@@ -128,15 +128,15 @@ SELECT 'columns in orders', count(*) FROM pragma_table_info('orders');
 
 ## Summing up
 
-Store each fact once, identify it with a primary key, and reference it with a foreign key. The database then enforces the relationships for you. Flattening everything looks simpler until the first time you have to change something.
+Store each fact once, find it with a primary key. And reference it with a foreign key. The database then enforces the relationships for you. Flattening all looks simpler until the first time you have to change something.
 
 ## SQL, and why it survived
 
-SQL is a <em>declarative</em> language: you describe the result you want, not the steps to produce it. `SELECT name FROM customers WHERE country = 'UK'` says nothing about indexes, scan order or join algorithms &mdash; the query planner decides all of that, and can change its mind as the data grows.
+SQL is a <em>declarative</em> language: you describe the result you want, not the steps to give it. `SELECT name FROM customers WHERE country = 'UK'` says nothing about indexes, scan order or join algorithms. The query planner decides all of that. And can change its mind as the data grows.
 
-That separation is why a query written in 1995 still runs, and runs faster, on hardware and engines that did not exist then. It is also why two people write the same query differently and get the same plan.
+That separation is why a query written in 1995 still runs. And runs faster, on hardware and engines that did not exist then. It is also why two people write the same query differently and get the same plan.
 
-The language is standardised (SQL:2023 is the current revision), and every engine adds its own extensions. The core &mdash; `SELECT`, joins, aggregation, transactions &mdash; is portable; date functions, string functions, upserts and window frame details are where dialects diverge.
+The language is standardised (SQL:2023 is the current revision). And each engine adds its own extensions. The core &mdash; `SELECT`, joins, aggregation, transactions &mdash; is portable. Date functions, string functions, upserts and window frame details are where dialects diverge.
 
 ## The main engines, briefly
 
@@ -148,36 +148,36 @@ The language is standardised (SQL:2023 is the current revision), and every engin
 |SQL Server|Microsoft's, deep integration with the .NET and Windows ecosystem|
 |Oracle|Enterprise features and enterprise licensing|
 
-SQLite deserves a mention beyond its size: it is probably the most widely deployed database in the world, and it is a full relational engine with transactions, constraints and window functions in a file you can email.
+SQLite deserves a mention beyond its size: it is probably the most widely deployed database in the world. And it is a full relational engine with transactions, constraints and window functions in a file you can email.
 
 ## Relational or not?
 
 The honest comparison is not "relational versus NoSQL" but "which set of guarantees does this workload need".
 
-Relational databases are the right default when your data has clear structure and relationships, when you need transactions across several records, when queries will be ad hoc and unpredictable, and when correctness matters more than raw write throughput. That covers the large majority of business applications.
+Relational databases are the right default when your data has clear structure and relationships, when you need transactions across a few records, when queries will be ad hoc and unpredictable. And when correctness matters more than raw write throughput. That covers the large majority of business applications.
 
-Non-relational stores earn their place with genuinely schema-less documents, with write volumes that need horizontal sharding beyond what one node can serve, with key-value caching, with graph traversal many levels deep, and with time-series ingestion at enormous rates.
+Non-relational stores earn their place with genuinely schema-less documents, with write volumes that need horizontal sharding beyond what one node can serve, with key-value caching, with graph traversal many levels deep. And with time-series ingestion at enormous rates.
 
-Note that the gap has narrowed from both sides. PostgreSQL stores and indexes JSON documents competently; several document databases now offer multi-document transactions. "Use the right tool" increasingly means "check whether the relational one already does it", because frequently it does.
+Note that the gap has narrowed from both sides. PostgreSQL stores and indexes JSON documents competently. A few document databases now offer multi-document transactions. "Use the right tool" increasingly means "check whether the relational one now does it", since often it does.
 
 ## Questions people ask
 
 <strong>Is a relational database slow?</strong> Not for the workloads it was designed for. A well-indexed PostgreSQL instance answers point queries in microseconds and handles tens of thousands of transactions a second on ordinary hardware.
 
-<strong>What does "relation" mean?</strong> The mathematical term for a table &mdash; a set of tuples &mdash; not the relationships between tables, which is the common assumption.
+<strong>What does "relation" mean?</strong> The math-based term for a table. A set of tuples &mdash; not the relationships between tables. It is the common assumption.
 
-<strong>Do I need to normalise everything?</strong> Normalise by default, denormalise deliberately for measured read paths. Starting denormalised because it might be faster is how schemas become unmaintainable.
+<strong>Do I need to scale all?</strong> Scale by default, denormalise deliberately for measured read paths. Starting denormalised since it might be faster is how schemas turn unmaintainable.
 
 <strong>Can relational databases scale?</strong> Vertically, very far. Horizontally, with more effort &mdash; read replicas are straightforward, sharding writes is not. Managed distributed SQL systems now offer horizontal scaling with relational semantics.
 
-<strong>What is a view?</strong> A saved query that behaves like a table. It stores no data; it re-runs each time. A materialised view does store the result and needs refreshing.
+<strong>What is a view?</strong> A saved query that behaves like a table. It stores no data. It re-runs each time. A materialised view does store the result and needs refreshing.
 
-<strong>Is JSON in a relational database a mistake?</strong> Not when used for genuinely variable data such as event payloads or user preferences. It becomes one when you put fields you regularly filter and join on inside a JSON blob instead of in columns.
+<strong>Is JSON in a relational database a mistake?</strong> Not when used for genuinely var data such as event payloads or user preferences. It turns one when you put fields you often filter and join on inside a JSON blob instead of in columns.
 
 ## Recap in one screen
 
-- Data lives in tables; rows are records and columns are attributes.
-- Tables reference each other by value through foreign keys, which is what makes arbitrary joins possible.
-- Each fact is stored once, so an update happens in one place.
+- Data lives in tables. Rows are records and columns are attributes.
+- Tables reference each other by value through foreign keys. It is what makes arbitrary joins possible.
+- Each fact is stored once. So an update happens in one place.
 - ACID transactions make concurrency the database's problem rather than yours.
 - SQL is declarative: you state the result, the planner chooses how.

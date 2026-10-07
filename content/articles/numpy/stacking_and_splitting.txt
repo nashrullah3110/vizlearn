@@ -1,25 +1,16 @@
 title: Stacking and Splitting
-intro: Joining along an existing axis or a new one, and why those are different functions.
+intro: Joining along an existing axis or a new one. Why those are other functions.
 
 ## Two different questions
 
-You have several arrays and want one. There are two distinct things that could mean, and NumPy gives them separate functions rather than guessing.
+You've a few arrays and want one. There are two distinct things that could mean. NumPy gives them split functions rather than guessing.
 
-**`concatenate`** joins along an axis that already exists. Two `(2, 3)` arrays concatenated on axis 0 give `(4, 3)` &mdash; more rows, same number of dimensions.
+**`concatenate`** joins along an axis that already exists. Two `(2, 3)` arrays concatenated on axis 0 give `(4, 3)`. More rows, same number of dims.
 
-**`stack`** creates a new axis. The same two arrays stacked give `(2, 2, 3)` &mdash; a pile of two frames, one dimension more than the inputs.
+**`stack`** creates a new axis. The same two arrays stacked give `(2, 2, 3)`. A pile of two frames, one dim more than the inputs.
 
-Asking which you want is the first step, and the answer is usually obvious once phrased that way: appending records is concatenation; collecting frames or samples into a batch is stacking.
+Asking which you want is the first step. The answer is often obvious once phrased that way. Appending records is joining. Collecting frames or samples into a batch is stacking.
 
-`np.vstack` and `np.hstack` are shortcuts for concatenation along axis 0 and axis 1 respectively. They handle the common case where you do not want to think about axis numbers: `vstack` stacks vertically (more rows), `hstack` stacks horizontally (more columns). `np.column_stack` is like `hstack` but promotes 1D arrays to columns first, which is what you usually want when combining feature vectors.
-
-`np.split` is the inverse of `concatenate`: it divides an array along an axis into equal parts or at specified indices. `np.array_split` is the forgiving version that allows unequal parts when the array does not divide evenly. `np.hsplit` and `np.vsplit` are the axis-specific shortcuts.
-
-The shape rule for concatenation is that every axis except the one being joined must match exactly. Concatenating `(2, 3)` and `(4, 3)` on axis 0 gives `(6, 3)`. Concatenating `(2, 3)` and `(2, 5)` on axis 1 gives `(2, 8)`. Mismatched axes raise `ValueError` with both shapes in the message.
-
-For stacking, all arrays must have the same shape. `np.stack([a, b])` on two `(2, 3)` arrays gives `(2, 2, 3)` with the new axis at position 0. `np.stack([a, b], axis=1)` gives `(2, 2, 3)` with the new axis at position 1, and `np.stack([a, b], axis=-1)` puts it at the end.
-
-In machine learning, stacking is how you build batches. Ten images of shape `(28, 28)` stacked give `(10, 28, 28)`, which is the batch format a model expects. Concatenation is how you combine datasets: appending more rows of the same features, or more features for the same rows.
 
 ## concatenate joins along an existing axis
 
@@ -171,45 +162,45 @@ print("Every concatenate allocates a new array and copies everything so far.")
 ```
 ## What must match
 
-`concatenate` requires every axis **except the joining one** to agree. Joining on axis 0 needs matching column counts; joining on axis 1 needs matching row counts.
+`concatenate` needs each axis **except the joining one** to agree. Joining on axis 0 needs matching column counts. Joining on axis 1 needs matching row counts.
 
-`stack` is stricter: all inputs must have exactly the same shape, since they are becoming parallel slices of a new axis.
+`stack` is stricter: all inputs must have just the same shape. They're turning parallel slices of a new axis.
 
-The error messages name the mismatch, and reading them rather than guessing usually locates the problem immediately.
+The error messages name the mismatch. Reading them rather than guessing often locates the problem at once.
 
 ## The convenience functions
 
-`vstack` stacks vertically, `hstack` horizontally, `dstack` along the third axis. For 2-D input they are just `concatenate` with a fixed axis.
+`vstack` stacks vertically, `hstack` flatly, `dstack` along the third axis. For 2-D input they're just `concatenate` with a fixed axis.
 
 For **1-D input they diverge**, and this is where they cause trouble.
 
-`np.vstack([a, b])` on two length-3 arrays gives `(2, 3)` &mdash; it promotes each to a row.
+`np.vstack([a, b])` on two length-3 arrays gives `(2, 3)`. It promotes each to a row.
 
-`np.hstack([a, b])` gives `(6,)` &mdash; it joins them end to end, because axis 1 does not exist so it falls back to axis 0.
+`np.hstack([a, b])` gives `(6,)` &mdash; it joins them end to end. Axis 1 doesn't exist so it falls back to axis 0.
 
-People reaching for `hstack` to make two columns get one long array instead. `column_stack` is the function that does what they meant: it turns 1-D arrays into columns of a 2-D result.
+People reaching for `hstack` to make two columns get one long array instead. `column_stack` is the function that does what they meant. It turns 1-D arrays into columns of a 2-D result.
 
-The general advice: use `concatenate` or `stack` with an explicit `axis` when the dimensionality might vary. The convenience names are fine when you know exactly what shapes you have.
+The general advice: use `concatenate` or `stack` with an clear `axis` when the dimensionality might vary. The convenience names are fine when you know just what shapes you've.
 
 ## Splitting
 
-`np.split(a, n, axis=0)` divides into `n` equal parts and **raises** if the length does not divide exactly. That strictness is useful &mdash; an uneven split is usually a sign that something upstream is not the size you assumed.
+`np.split(a, n, axis=0)` cuts into `n` equal parts and **raises** if the length doesn't divide just. That strictness is handy. An uneven split is often a sign that a thing upstream isn't the size you assumed.
 
-`np.array_split` allows uneven parts, distributing the remainder across the first few. Use it when uneven is genuinely acceptable, such as chunking work for parallel processing.
+`np.array_split` allows uneven parts, distributing the remainder across the first few. Use it when uneven is truly acceptable, such as chunking work for parallel handling.
 
-`split` also accepts a list of positions rather than a count: `np.split(a, [3, 7])` cuts before index 3 and before index 7, giving three pieces. That is often more natural than computing a count.
+`split` also accepts a list of spots rather than a count: `np.split(a, [3, 7])` cuts before index 3 and before index 7, giving three pieces. That is often more natural than finding a count.
 
-The pieces are **views**, not copies, which is worth knowing: splitting a large array is free, and writing into a piece writes into the original.
+The pieces are **views**, not copies. This Is worth knowing. Splitting a large array is free. Writing into a piece writes into the first.
 
 ## Do not build in a loop
 
 The same rule as `np.append`, for the same reason.
 
-Concatenating inside a loop allocates a new array and copies everything accumulated so far, on every iteration. That is quadratic, and the last editor measures the difference.
+Concatenating inside a loop allocates a new array and copies all built up so far, on each loop. That is quadratic. The last editor measures the gap.
 
-Collect into a Python **list** and call `stack` or `concatenate` once at the end. Lists append cheaply; arrays do not append at all.
+Collect into a Python **list** and call `stack` or `concatenate` once at the end. Lists append cheaply. Arrays don't append at all.
 
-If you know the final size in advance, better still: allocate with `np.empty` and assign into slices. That avoids even the single large copy.
+If you know the final size in advance, better still. Allocate with `np.empty` and assign into slices. That avoids even the single large copy.
 
 ## Choosing
 
@@ -217,45 +208,45 @@ Appending records of the same width: `concatenate(axis=0)`.
 
 Adding columns to a table: `concatenate(axis=1)`, or `column_stack` for 1-D inputs.
 
-Collecting frames, samples or channels into a batch: `stack`, with an explicit axis.
+Collecting frames, samples or channels into a batch: `stack`, with an clear axis.
 
-Undoing any of those: `split` when the division is exact, `array_split` when it is not.
+Undoing any of those: `split` when the division is exact, `array_split` when it isn't.
 
-And in every case, if the joining is happening inside a loop, the answer is to move it outside.
+And in each case, if the joining is happening inside a loop, the answer is to move it outside.
 
 ## r_ and c_
 
-`np.r_` and `np.c_` are index-expression shortcuts, and they look strange because they use square brackets rather than parentheses.
+`np.r_` and `np.c_` are index-formula shortcuts. They look strange because they use square brackets rather than parentheses.
 
-`np.r_[a, b]` concatenates along the first axis. `np.c_[a, b]` stacks as columns, equivalent to `column_stack`.
+`np.r_[a, b]` concatenates along the first axis. `np.c_[a, b]` stacks as columns, equal to `column_stack`.
 
-They also accept slice syntax, so `np.r_[0:5, 10, 20:23]` builds an array from a mix of ranges and literals in one expression. That is genuinely convenient for constructing index arrays and test data.
+They also accept slice syntax. So `np.r_[0:5, 10, 20:23]` builds an array from a mix of ranges and literals in one formula. That is truly convenient for making index arrays and test data.
 
-They are compact rather than clear, and they show up more in older code and in interactive sessions than in libraries. Worth recognising; not worth preferring over the named functions in code others will read.
+They're compact rather than clear, and they show up more in older code and in interactive sessions than in libraries. Worth recognising. Not worth preferring over the named functions in code others will read.
 
 ## tile and repeat
 
-Both make an array bigger by duplication, and they differ in a way that is easy to state and easy to forget.
+Both make an array bigger by duplication. They differ in a way that is easy to state and easy to forget.
 
-`np.tile(a, n)` repeats the whole array n times: `[1, 2]` becomes `[1, 2, 1, 2]`.
+`np.tile(a, n)` repeats the whole array n times: `[1, 2]` turns `[1, 2, 1, 2]`.
 
-`np.repeat(a, n)` repeats each element n times: `[1, 2]` becomes `[1, 1, 2, 2]`.
+`np.repeat(a, n)` repeats each element n times: `[1, 2]` turns `[1, 1, 2, 2]`.
 
-`tile` accepts a tuple to repeat along several axes, which is how you build a checkerboard or replicate a small pattern across a grid.
+`tile` accepts a tuple to repeat along a few axes. This Is how you build a checkerboard or replicate a small pattern across a grid.
 
-`repeat` accepts an `axis` and a per-element count, so `np.repeat(rows, counts, axis=0)` expands a table according to a count column &mdash; the standard way to turn aggregated data back into one row per observation.
+`repeat` accepts an `axis` and a per-element count. `np.repeat(rows, counts, axis=0)` expands a table per to a count column. The standard way to turn aggregated data back into one row per finding.
 
-Neither is a substitute for broadcasting. If you are tiling an array purely so that its shape matches another one for an arithmetic operation, broadcasting will do it without allocating anything, and the tile is wasted memory.
+Neither is a substitute for broadcasting. If you're tiling an array purely so that its shape matches another one for an math step, broadcasting will do it without allocating anything. The tile is wasted memory.
 
 ## Padding
 
 `np.pad(a, width, mode)` adds elements around the edges.
 
-`width` can be a single number, a pair for before and after, or a pair per axis. The nesting gets confusing quickly, and it is worth checking the result's shape the first time on any new call.
+`width` can be a single number, a pair for before and after, or a pair per axis. The nesting gets confusing quickly. It's worth checking the result's shape the first time on any new call.
 
-The `mode` argument covers the cases that would otherwise be fiddly: `"constant"` with a `constant_values` argument, `"edge"` to repeat the border, `"reflect"` and `"symmetric"` to mirror, and `"wrap"` to tile.
+The `mode` arg covers the cases that would else be fiddly: `"constant"` with a `constant_values` arg, `"edge"` to repeat the border, `"reflect"` and `"even"` to mirror, and `"wrap"` to tile.
 
-This is how you implement boundary conditions for a convolution or a stencil without writing an index-clamping branch, and it is one of the functions that quietly removes a lot of code.
+This is how you run boundary rules for a conv or a stencil without writing an index-clamping branch. It's one of the functions that quietly drops a lot of code.
 
 ## block, for nested assembly
 
@@ -266,19 +257,19 @@ np.block([[A, B],
           [C, D]])
 ```
 
-produces the block matrix, provided the pieces have compatible shapes. It is far clearer than the equivalent chain of `hstack` inside `vstack`, and it is the right tool for assembling a matrix from named submatrices &mdash; a covariance built from blocks, a system of equations assembled from parts.
+makes the block mat, given the pieces have matching shapes. It's far clearer than the equal chain of `hstack` inside `vstack`. It's the right tool for assembling a mat from named submatrices. A co-var built from blocks, a system of equations assembled from parts.
 
 ## Choosing among the joins
 
-The functions overlap enough to be worth a summary.
+The functions share enough to be worth a summary.
 
-**`concatenate`** &mdash; the general form. Explicit axis, works on any dimensionality, no surprises. Reach for this when the dimensionality might vary or when clarity matters.
+**`concatenate`** &mdash; the general form. clear axis, works on any dimensionality, no surprises. Reach for this when the dimensionality might vary or when clarity matters.
 
 **`stack`** &mdash; when a new axis is what you want. Collecting frames, samples or repeated runs into a batch.
 
-**`vstack` / `hstack` / `dstack`** &mdash; conveniences with a fixed axis. Safe on 2-D, and divergent on 1-D in a way that catches people. Fine when you know the shapes exactly.
+**`vstack` / `hstack` / `dstack`**. Conveniences with a fixed axis. Safe on 2-D. Divergent on 1-D in a way that catches people. Fine when you know the shapes just.
 
-**`column_stack`** &mdash; turns 1-D arrays into columns, which is what people usually want from `hstack` and do not get.
+**`column_stack`** &mdash; turns 1-D arrays into columns. This Is what people often want from `hstack` and don't get.
 
 **`block`** &mdash; nested assembly from named pieces.
 
@@ -288,25 +279,25 @@ And the rule that applies to all of them: none belongs inside a loop. Collect in
 
 ## Splitting, in practice
 
-The pieces returned by `split` are **views**, so splitting a large array is free and writing into a piece writes into the original. That is usually convenient and occasionally surprising, and it follows the same rules as any other slice.
+The pieces returned by `split` are **views**. Splitting a large array is free and writing into a piece writes into the first. That is often convenient and at times surprising. It follows the same rules as any other slice.
 
-`array_split` distributes an uneven remainder across the first pieces, so splitting 10 into 3 gives lengths 4, 3, 3. That is deterministic, which matters if two processes split the same data independently and must agree.
+`array_split` distributes an uneven remainder across the first pieces. Splitting 10 into 3 gives lengths 4, 3, 3. That is fixed. This Matters if two processes split the same data on its own and must agree.
 
-For chunking work rather than dividing it evenly, computing the boundaries yourself and passing them as a list is often clearer than asking for a count &mdash; `np.split(a, range(0, len(a), chunk))` cuts at fixed intervals regardless of whether the total divides evenly.
+For chunking work rather than cutting it evenly, finding the boundaries yourself and passing them as a list is often clearer than asking for a count. `np.split(a, range(0, len(a), chunk))` cuts at fixed intervals even so of whether the total cuts evenly.
 
 ## Joining arrays of different dtypes
 
-Concatenating an integer array with a float array gives a float result, following the same promotion rules as arithmetic.
+Concatenating an int array with a float array gives a float result, following the same promotion rules as math.
 
-That is usually what you want, and occasionally not. Joining an `int64` array of identifiers with a `float64` array of measurements produces a float array in which large identifiers may no longer be exactly representable.
+That is often what you want. At times not. Joining an `int64` array of identifiers with a `float64` array of readings makes a float array in which large identifiers may no longer be just representable.
 
-`dtype=` on `concatenate` forces the result type explicitly, and `casting="no"` makes a mismatch an error rather than a silent promotion. In code where the dtype matters, being explicit costs one argument and removes a whole category of surprise.
+`dtype=` on `concatenate` forces the result type by name. `casting="no"` makes a mismatch an error rather than a silent promotion. In code where the dtype matters, being clear costs one arg and drops a whole group of surprise.
 
-Joining a fixed-width string array with a longer one widens to fit, which is the one place NumPy strings do the accommodating thing rather than truncating.
+Joining a fixed-width string array with a longer one widens to fit. This Is the one place NumPy strings do the accommodating thing rather than truncating.
 
 ## Building an output array up front
 
-When the final size is known, neither joining nor appending is necessary.
+When the final size is known, neither joining nor appending is needed.
 
 ```python
 out = np.empty((n_rows, n_cols))
@@ -314,25 +305,25 @@ for i, row in enumerate(source):
     out[i] = compute(row)
 ```
 
-One allocation, no copying, and the slices being assigned into are views. This is the fastest form when a loop is unavoidable, and it is clearer than accumulating pieces to join later.
+One allocation, no copying, and the slices being assigned into are views. This is the fastest form when a loop is unavoidable, and it's clearer than building up pieces to join later.
 
-`np.empty` is right here because every element is written. If some rows might be skipped, `np.zeros` or `np.full(shape, np.nan)` makes the unfilled entries visible rather than leaving whatever was in memory.
+`np.empty` is right here because each element is written. If some rows might be skipped, `np.zeros` or `np.full(shape, np.nan)` makes the unfilled entries visible rather than leaving what was in memory.
 
-Preallocating also forces you to state the output shape, which frequently surfaces an error in the reasoning before any code runs.
+Preallocating also forces you to state the output shape. This Often surfaces an error in the thinking before any code runs.
 
 ## Splitting for parallel work
 
-`np.array_split(a, n)` is the natural way to divide data among n workers. It handles the case where the length does not divide evenly, distributing the remainder across the first pieces deterministically.
+`np.array_split(a, n)` is the natural way to divide data among n workers. It handles the case where the length doesn't divide evenly, distributing the remainder across the first pieces deterministically.
 
-Because the pieces are views, splitting costs nothing &mdash; but views cannot cross a process boundary, so multiprocessing will copy them anyway when pickling. For thread-based parallelism the views are shared directly, which is one of the reasons threads are attractive for NumPy work.
+Because the pieces are views, splitting costs nothing. But views can't cross a process boundary. Multiprocessing will copy them anyway when pickling. For thread-based parallelism the views are shared right. This Is one of the reasons threads are attractive for NumPy work.
 
-For chunking rather than dividing &mdash; fixed-size pieces, however many that turns out to be &mdash; passing explicit boundaries is clearer:
+For chunking rather than cutting. Fixed-size pieces. Many that turns out to be &mdash; passing clear boundaries is clearer:
 
 ```python
 np.split(a, range(chunk, len(a), chunk))
 ```
 
-That cuts every `chunk` elements and leaves a shorter final piece, which is usually what "process in batches of 1000" means.
+That cuts each `chunk` elements and leaves a shorter final piece. This Is often what "process in batches of 1000" means.
 
 ## The summary
 
@@ -350,10 +341,10 @@ That cuts every `chunk` elements and leaves a shorter final piece, which is usua
 
 **Dividing**: `split` for exact division, `array_split` for uneven, explicit boundaries for fixed-size chunks.
 
-And the rule that overrides all of them: none of these belongs inside a loop that runs once per element. Collect into a Python list and join once, or preallocate and assign into slices.
+And the rule that replaces all of them. None of these belongs inside a loop that runs once per element. Collect into a Python list and join once, or preallocate and assign into slices.
 
 ## A closing note
 
-Joining arrays is one of the places where NumPy offers several functions for what feels like one job, and the abundance is more confusing than helpful at first.
+Joining arrays is one of the places where NumPy offers a few functions for what feels like one job. The abundance is more confusing than helpful at first.
 
-The way through it is the question at the top of this module: does the result have the same number of dimensions as the inputs, or one more? Everything else is a convenience wrapper over that decision, and `concatenate` and `stack` with an explicit `axis` will do any of it correctly if you would rather not remember the rest.
+The way through it's the question at the top of this module. Does the result have the same number of dims as the inputs, or one more? all else is a convenience wrapper over that choice. `concatenate` and `stack` with an clear `axis` will do any of it right if you'd rather not note the rest.

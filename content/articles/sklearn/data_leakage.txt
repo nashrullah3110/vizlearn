@@ -1,13 +1,13 @@
 title: Data Leakage: A Practical Guide
-intro: Every other failure in machine learning makes the score worse. This one makes it better, which is why it survives review and reaches production.
+intro: Every other failure in machine learning makes the score worse. This one makes it better. This Is why it lives review and reaches production.
 
 ## What it is
 
-Leakage is information reaching the model during training that it will not have when it is actually used.
+Leakage is info reaching the model during training that it won't have when it's really used.
 
-The defining property is the direction of the error. Overfitting, a bad metric, an unlucky split &mdash; these produce results that look worse than the model is, or at least ambiguous. Leakage produces results that look *better*. So it does not trigger the instinct that something is wrong; it triggers satisfaction.
+The defining property is the direction of the error. Overfitting, a bad metric, an unlucky split. These give results that look worse than the model is, or at least ambiguous. Leakage makes results that look *better*. So it doesn't trigger the instinct that a thing is wrong. It triggers satisfaction.
 
-That asymmetry is why it is the most expensive mistake in the field. A model with a leak passes every check, gets deployed, and fails on the first real batch &mdash; at which point the evaluation that approved it is worthless and nobody knows why. The three most common forms: a feature that was computed from the target (a "future" column that would not exist at prediction time), preprocessing applied before the train-test split (fitting a scaler or [imputer](missing_values.html) on the full dataset, so the test set's statistics leak into training), and temporal leakage in time-series data (shuffling before splitting, so the model trains on the future). [Pipelines](pipeline.html) fix the second form by construction: the transformer fits only inside the cross-validation fold. The first form requires domain knowledge &mdash; no automated check can tell you whether a column is a legitimate predictor or a leaky proxy. The third requires chronological splitting, not random splitting. A suspiciously high cross-validation score (accuracy above 0.99 on a hard problem) is the diagnostic: when results look too good, leakage is the first hypothesis. This page demonstrates each form of leakage, shows the inflated score, removes the leak, and shows the real score for comparison.
+That skew is why it's the most costly mistake in the field. A model with a leak passes each check, gets deployed. Fails on the first real batch. At which point the test that approved it's worthless and no one knows why.
 
 
 ## A column that was computed from the answer
@@ -176,111 +176,111 @@ print("            was any column computed after the outcome was known?")
 ```
 ## Cross-validation will not save you
 
-Worth stating plainly, because cross-validation is otherwise the answer to almost everything on this track.
+Worth stating plainly, because cross-validation is or else the answer to almost all on this track.
 
-Cross-validation protects against one specific thing: a score that depends on which rows happened to be held out. If the leak is in the *data* &mdash; a column derived from the answer &mdash; then every fold contains it, every fold is inflated, and the mean of five inflated numbers is an inflated number with a reassuring standard deviation.
+Cross-validation protects against one exact thing: a score that depends on which rows happened to be held out. If the leak is in the *data*. A column derived from the answer. Then each fold holds it, each fold is inflated. The mean of five inflated numbers is an inflated number with a reassuring standard deviation.
 
-The first editor shows it: an honest 0.643 becomes 1.000, across all five folds, with no warning of any kind.
+The first editor shows it: an honest 0.643 turns 1.000, across all five folds, with no warning of any kind.
 
 ## The five shapes
 
-**Target leakage.** A feature that encodes the answer, usually because it was recorded after the outcome. A `case_closed_date` predicting whether a case closed. A `discount_given` predicting churn, when the discount was offered *because* the customer was leaving. A diagnosis code entered at the same time as the diagnosis. These are the hardest to spot because the column is legitimately in the database and nothing about its name says when it was written.
+**Target leakage.** A feature that codes the answer, often because it was recorded after the outcome. A `case_closed_date` predicting whether a case closed. A `discount_given` predicting churn, when the discount was offered *because* the customer was leaving. A diagnosis code entered also as the diagnosis. These are the hardest to spot because the column is legitimately in the DB and nothing about its name says when it was written.
 
-**Preprocessing before the split.** A scaler, imputer, encoder or feature selector fitted on all the data has seen the test rows. The cross-validation module measured this: feature selection outside the folds reported 0.825 on pure noise.
+**prep before the split.** A scaler, imputer, encoder or feature selector fitted on all the data has seen the test rows. The cross-validation module measured this. Feature pick outside the folds reported 0.825 on pure noise.
 
-**Duplicate rows.** After a bad join, a re-import, or genuinely repeated records. A duplicate split across train and test means the model has the answer memorised. The second editor scores 1.000 on random data for exactly this reason.
+**Duplicate rows.** After a bad join, a re-import, or truly repeated records. A duplicate split across train and test means the model has the answer stored. The second editor scores 1.000 on random data for just this reason.
 
-**Group leakage.** Several rows describing one entity &mdash; a patient, a customer, a device, a document &mdash; landing on both sides. The model learns to recognise the entity rather than the pattern. The third editor scores 0.87 where the honest answer is chance.
+**Group leakage.** a few rows showing one entity. A patient, a customer, a device, a doc. Landing on both sides. The model learns to recognise the entity rather than the pattern. The third editor scores 0.87 where the honest answer is chance.
 
-**Temporal leakage.** Shuffling data that has an order, so the training set contains the future. The fourth editor goes from R&sup2; of 0.977 to −2.526 when the split respects time, and the second number is the one describing the job the model would actually have.
+**Temporal leakage.** Shuffling data that has an order. The training set holds the future. The fourth editor goes from R&sup2; of 0.977 to −2.526 when the split respects time. The second number is the one showing the job the model would really have.
 
 ## Target encoding deserves its own warning
 
-It is the most useful high-cardinality encoding and the most reliable way to leak.
+It's the most handy high-cardinality encoding and the most solid way to leak.
 
-Replacing a category with the mean target for that category is compact, powerful, and computed from `y`. Do it over the whole dataset and every row has contributed to the number that describes it. With a hundred rows per category the contribution is small; with six, as in the fifth editor, it is a sixth &mdash; and a feature built from random labels predicts those labels at 0.71.
+Replacing a category with the mean target for that category is compact, powerful. Found from `y`. Do it over the whole dataset and each row has contributed to the number that shows it. With a hundred rows per category the part is small. With six, as in the fifth editor, it's a sixth. And a feature built from random labels predicts those labels at 0.71.
 
-The fix is to compute the encoding inside the folds, with the row's own contribution excluded &mdash; which is what scikit-learn's `TargetEncoder` does, using an internal cross-fitting scheme. Hand-rolled target encoding is almost always leaky, and the leak is proportional to how rare the categories are, which is exactly when the encoding is most tempting.
+The fix is to find the encoding inside the folds, with the row's own part excluded. Which is what scikit-learn's `TargetEncoder` does, using an inner cross-fitting scheme. Hand-rolled target encoding is almost always leaky. The leak is proportional to how rare the categories are. This Is just when the encoding is most tempting.
 
 ## How to notice
 
-There is no detector. There is a set of habits.
+There's no finder. There's a set of habits.
 
-**Be suspicious of a good score.** Not sceptical of a good model &mdash; suspicious of a *surprisingly* good one. If the problem is hard and the number is excellent, the first hypothesis should be a leak, not a breakthrough. Comparing against a dummy makes the size of the claim visible.
+**Be suspicious of a good score.** Not sceptical of a good model. Suspicious of a *oddly* good one. If the problem is hard and the number is great, the first hypothesis should be a leak, not a breakthrough. Checking against a dummy makes the size of the claim visible.
 
-**Look at feature importances.** A single feature dominating, especially one nobody expected to matter, is the classic signature. Ask what it is, when it is written, and by what process.
+**Look at feature importances.** A single feature dominating, above all one no one expected to matter, is the classic signature. Ask what it's, when it's written, and by what process.
 
-**Ask the timing question for every column.** *Would this value be known, in this form, at the moment the prediction has to be made?* This is the single most effective check available, and it requires domain knowledge rather than code. A column that is only populated after the event is a leak regardless of how innocent it looks.
+**Ask the timing question for each column.** *Would this value be known, in this form, at the moment the guess has to be made?* This is the single most effective check available. It needs domain knowledge rather than code. A column that is only populated after the event is a leak even so of how innocent it looks.
 
-**Ask who produced the row.** If several rows can come from one entity, group the split. If rows can be duplicated, check. If the data has a timestamp, respect it.
+**Ask who made the row.** If a few rows can come from one entity, group the split. If rows can be duplicated, check. If the data has a timestamp, respect it.
 
-**Test on genuinely later data** where possible. A model that scores well in cross-validation and badly on the next month is telling you something a random split could not.
+**Test on truly later data** where possible. A model that scores well in cross-validation and badly on the next month is telling you a thing a random split couldn't.
 
 ## The habits that prevent it
 
-Split first, before anything that learns. Put every transformer in a pipeline so it is refitted inside each fold. Use `GroupKFold` when rows share an entity and `TimeSeriesSplit` when they are ordered. Check for duplicates before splitting. Hold out a final test set and touch it once.
+Split first, before any of it that learns. Put each transformer in a pipeline so it's refitted inside each fold. Use `GroupKFold` when rows share an entity and `TimeSeriesSplit` when they're sorted. Check for duplicates before splitting. Hold out a final test set and touch it once.
 
-None of these is expensive, and together they close every mechanical route. What they cannot close is target leakage, because that is a fact about the meaning of a column rather than about the code &mdash; which is why the timing question has to be asked of every feature, by someone who knows what the columns mean.
+None of these is costly, and together they close each mechanical route. What they can't close is target leakage. That is a fact about the meaning of a column rather than about the code. Which is why the timing question has to be asked of each feature, by someone who knows what the columns mean.
 
 ## The famous cases
 
-Leakage is not a beginner's mistake. It has invalidated published research, competition results and deployed systems, and the examples are worth knowing because they are all plausible.
+Leakage isn't a beginner's mistake. It has invalidated published research, contest results and deployed systems. The examples are worth knowing because they're all plausible.
 
-A widely cited early result on detecting a disease from chest scans turned out to be partly detecting *which hospital* the scan came from &mdash; sicker patients were concentrated at one site, and the scanner left a signature in the image. The model was excellent at the task it was actually solving and useless at the one it was believed to be solving.
+A widely cited early result on detecting a disease from chest scans turned out to be partly detecting *which hospital* the scan came from. Sicker patients were concentrated at one site. The scanner left a signature in the image. The model was great at the task it was really solving and useless at the one it was believed to be solving.
 
-Competition datasets have repeatedly leaked through row ordering, where the file happened to be sorted by the target, and through id columns that correlated with when a record was created. Both give a model something real to learn that has nothing to do with the problem.
+Contest datasets have again and again leaked through row sorting. Here The file happened to be sorted by the target. Through id columns that linked with when a record was created. Both give a model a thing real to learn that has nothing to do with the problem.
 
-A recurring one in industry: a churn model trained on a table where the "customer contacted support" flag was updated during the cancellation call. The feature was genuinely predictive and genuinely unavailable at the moment a prediction was needed.
+A recurring one in industry: a churn model trained on a table where the "customer contacted support" flag was updated during the cancellation call. The feature was truly predictive and truly down at the moment a guess was needed.
 
-The common thread is that none of these look like errors in the code. Every one is a fact about how the data came to exist, which is why reading the code more carefully never finds them and asking where a column comes from usually does.
+The common thread is that none of these look like errors in the code. each one is a fact about how the data came to exist. This Is why reading the code more carefully never finds them and asking where a column comes from often does.
 
 ## The cost of being too careful
 
-The opposite failure exists and is worth naming, because leakage anxiety can become its own problem.
+The opposite failure exists and is worth naming. Leakage anxiety can become its own problem.
 
-Excluding every feature that has any relationship with the target removes the signal along with the leak. A feature that is predictive because it is genuinely causally upstream is exactly what you want, and dropping it because it is "too predictive" makes the model worse for no reason.
+Excluding each feature that has any tie with the target drops the signal along with the leak. A feature that is predictive because it's truly causally upstream is just what you want. Dropping it because it's "too predictive" makes the model worse for no reason.
 
-Grouping a split when the rows are genuinely independent throws away resolution and gives an unnecessarily pessimistic estimate. Refusing to use any aggregate feature because target encoding can leak rules out a whole class of useful ones that are computed correctly.
+Grouping a split when the rows are truly free throws away detail and gives an needlessly pessimistic guess. Refusing to use any aggregate feature because target encoding can leak rules out a whole class of handy ones that are found right.
 
-The distinction is not how predictive a feature is. It is whether the value would exist, in that form, at the moment the prediction has to be made. A feature that passes that test is allowed to be as predictive as it likes.
+The gap isn't how predictive a feature is. It's whether the value would exist, in that form, at the moment the guess has to be made. A feature that passes that test is allowed to be as predictive as it likes.
 
-<strong>Is a highly predictive feature always suspicious?</strong> No. It is worth one question - would this be known at prediction time - and if the answer is yes, use it.
+<strong>Is a highly predictive feature always suspicious?</strong> No. It's worth one question - would this be known at guess time - and if the answer is yes, use it.
 
-<strong>How do I check for duplicates?</strong> `df.duplicated().sum()` before splitting, and consider near-duplicates too: rows differing only in an id or a timestamp are functionally the same row.
+<strong>How do I check for duplicates?</strong> `df.duplicated().sum()` before splitting. Consider near-duplicates too. Rows differing only in an id or a timestamp are functionally the same row.
 
-<strong>Does leakage matter if I only care about ranking?</strong> Yes. A leaked feature ranks well in evaluation and is absent in production, so the ranking you deploy is not the one you measured.
+<strong>Does leakage matter if I only care about ranking?</strong> Yes. A leaked feature ranks well in test and is absent in production. The ranking you deploy isn't the one you measured.
 
-<strong>Can I fix a leak by removing the column?</strong> Usually, and check what else was derived from it. Aggregates, ratios and encodings built on a leaky column carry the leak with them.
+<strong>Can I fix a leak by dropping the column?</strong> often. Check what else was derived from it. Aggregates, ratios and encodings built on a leaky column carry the leak with them.
 
 ## A checklist before you trust a number
 
-Six questions, in the order they are cheapest to answer. Running through them takes a few minutes and catches the large majority of leaks.
+Six questions, in the order they're cheapest to answer. Running through them takes a few minutes and catches the large majority of leaks.
 
-**Did anything fit before the split?** Scaler, imputer, encoder, selector, vectoriser. If it learned from data and it ran before `train_test_split`, the number is compromised. The fix is a pipeline.
+**Did any of it fit before the split?** Scaler, imputer, encoder, selector, vectoriser. If it learned from data and it ran before `train_test_split`, the number is compromised. The fix is a pipeline.
 
 **Are there duplicate rows?** Count them, including near-duplicates that differ only in an id or a timestamp.
 
-**Can one entity produce several rows?** If so, the split must group them. This is the one people most often get wrong on data that looks tabular and independent.
+**Can one entity give a few rows?** If so, the split must group them. This is the one people most often get wrong on data that looks tabular and free.
 
-**Does the data have an order?** Timestamps, sequence numbers, anything where later rows could not have informed earlier ones. Then the split is forward-only.
+**Does the data have an order?** Timestamps, sequence numbers, any of it where later rows couldn't have informed earlier ones. Then the split is forward-only.
 
-**For every feature: would it exist at prediction time?** Asked column by column, with someone who knows the source system. This is the slow one and the one that catches target leakage, which nothing else will.
+**For each feature: would it exist at guess time?** Asked column by column, with someone who knows the source system. This is the slow one and the one that catches target leakage. This Nothing else will.
 
-**Is the score plausible?** Compared against a dummy, against published results on similar problems, and against what a domain expert would guess. Surprise is the signal.
+**Is the score plausible?** Checked against a dummy, against published results on similar problems. Against what a domain expert would guess. Surprise is the signal.
 
-A model that survives all six is not guaranteed honest, but the remaining routes are narrow and unusual. A model that has not been through them has an unknown probability of being wrong in the most expensive direction.
+A model that lives all six isn't ensured honest. The left routes are narrow and unusual. A model that hasn't been through them has an unknown chance of being wrong in the most costly direction.
 
 <strong>What if I find a leak after deploying?</strong> Retrain without the leaking feature and re-measure honestly before deciding whether the model is still worth running. The old score should be treated as never having existed rather than as a target to recover.
 
-<strong>Is leakage always accidental?</strong> Mostly, and there is a well-known variety that is not: tuning against the test set until the number is satisfactory. That is leakage through the researcher rather than through the data, and it produces the same inflated result.
+<strong>Is leakage always accidental?</strong> Mostly, and there's a well-known range that isn't. Tuning against the test set until the number is satisfactory. That is leakage through the researcher rather than through the data, and it makes the same inflated result.
 
 ## Things to try
 
-1. <strong>Run the first editor.</strong> 0.643 becomes 1.000 from one extra column, and every fold agrees.
-2. <strong>Vary the duplication.</strong> In the second editor, duplicate only a quarter of the rows and see how much of the inflation survives.
-3. <strong>Change the group size.</strong> In the third editor, set `per_person=2` and watch the gap narrow &mdash; the more rows per entity, the worse the leak.
+1. <strong>Run the first editor.</strong> 0.643 turns 1.000 from one extra column, and each fold agrees.
+2. <strong>Vary the duplication.</strong> In the second editor, duplicate only a quarter of the rows and see how much of the inflation lives.
+3. <strong>Change the group size.</strong> In the third editor, set `per_person=2` and watch the gap narrow. The more rows per entity, the worse the leak.
 4. <strong>Make the categories rarer.</strong> In the fifth editor, raise `n_cats` to 150 and watch the leaked score climb.
 
 ## Where this leaves you
 
-The failure that improves your metrics. Cross-validation cannot see it, a good score is evidence for it rather than against it, and the only reliable defence is asking, of every column, whether it would exist at the moment the prediction is needed.
+The failure that raises your metrics. Cross-validation can't see it, a good score is evidence for it rather than against it. The only solid defence is asking, of each column, whether it would exist at the moment the guess is needed.

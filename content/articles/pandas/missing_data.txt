@@ -3,27 +3,18 @@ intro: Finding it, counting it, and the choice that matters more than the code.
 
 ## Three markers
 
-pandas has more than one representation of "missing", for historical reasons.
+pandas has more than one form of "missing", for historical reasons.
 
-`np.nan` is a float. It is what you get in numeric columns, and it is why an integer column with a gap becomes `float64`.
+`np.nan` is a float. It's what you get in numeric columns. It's why an int column with a gap turns `float64`.
 
-`None` is Python's null. In an `object` column it stays `None`; in a float column it is converted to `NaN` on the way in.
+`None` is Python's null. In an `object` column it stays `None`. In a float column it's converted to `NaN` on the way in.
 
 `pd.NA` is the newer, dtype-agnostic marker used by the nullable extension types (`Int64`, `boolean`, `string`).
 
-You rarely need to care which one you have, because `isna()` and `notna()` handle all three. Use them rather than `== None` or `== np.nan`, neither of which works &mdash; `NaN` is not equal to anything, including itself.
+You rarely need to care which one you've. `isna()` and `notna()` handle all three. Use them rather than `== None` or `== np.nan`, neither of which works. `NaN` isn't equal to anything, including itself.
 
-The one place the difference bites: comparisons with `pd.NA` return `pd.NA` rather than `False`, so filtering a nullable column can behave differently from filtering a float one.
+The one place the gap bites: checks with `pd.NA` return `pd.NA` rather than `False`. Filtering a nullable column can behave differently from filtering a float one.
 
-Missing data is not a single problem. It is three problems that look similar and require different responses. The first is detection: knowing where the gaps are. The second is counting: knowing how many gaps there are and whether the column is still usable. The third is handling: deciding what to do about them.
-
-For detection, `isna()` and `notna()` are the only reliable tools. Direct equality checks fail on NaN, and `is None` misses NaN values in float columns. `isna()` works on Series, DataFrames and individual values, and it handles all three markers.
-
-For counting, `isna().sum()` gives the number of missing values per column. `isna().mean()` gives the fraction, which is more useful for deciding whether a column is worth keeping. A column that is 90% missing is rarely worth imputing.
-
-For handling, the three main options are dropping, filling and interpolating. `dropna()` removes rows or columns with missing values. `fillna()` replaces them with a constant, a forward fill, a backward fill, or a per-column value. Interpolation estimates missing values from the surrounding data, which is appropriate for time series but not for categorical data.
-
-The choice between dropping and filling depends on why the data is missing. If the missingness is random, dropping rows loses information but does not bias the result. If the missingness is systematic &mdash; high earners decline to report income, sick patients miss appointments &mdash; dropping rows introduces bias that no amount of imputation fully fixes.
 
 ## Three markers, one test
 
@@ -147,19 +138,19 @@ print("limit caps how far a fill travels:")
 print("   ffill(limit=1):", [None if pd.isna(v) else v for v in s.ffill(limit=1)])
 ```
 
-For ordered data, adjacency carries meaning and the neighbouring value is often the best guess.
+For sorted data, adjacency carries meaning and the neighbouring value is often the best guess.
 
 `ffill()` carries the last known value forward. This is the standard treatment for a sensor reading or a price that is only recorded when it changes.
 
 `bfill()` carries the next value backward.
 
-Both leave an edge unfilled &mdash; `ffill` cannot fill a leading gap, `bfill` cannot fill a trailing one &mdash; which is worth checking rather than assuming the column is now complete.
+Both leave an edge unfilled. `ffill` can't fill a leading gap, `bfill` can't fill a trailing one &mdash; which is worth checking rather than given the column is now full.
 
-`limit=n` caps how far a value travels. Without it, a single reading can propagate across a gap of any length, which turns one measurement into a hundred fabricated ones.
+`limit=n` caps how far a value travels. Without it, a single reading can pass across a gap of any length. This Turns one reading into a hundred fabricated ones.
 
-`interpolate()` fits between the surrounding values rather than repeating one, and takes a `method` for the shape of the fit. It needs a meaningful order, so it belongs on time series and not on arbitrary rows.
+`interpolate()` fits between the nearby values rather than repeating one. Takes a `method` for the shape of the fit. It needs a real order. It belongs on time series and not on any rows.
 
-Note that `fillna(method="ffill")` is deprecated; `ffill()` is the current spelling.
+Note that `fillna(method="ffill")` is deprecated. `ffill()` is the current spelling.
 
 ## Missing is sometimes the signal
 
@@ -186,100 +177,100 @@ print("mean would erase the most informative thing in the column.")
 ```
 ## Count first
 
-Before choosing a strategy, get three numbers:
+Before choosing a plan, get three numbers:
 
 `df.isna().sum()` &mdash; how many are missing in each column.
 
-`df.isna().mean()` &mdash; the same as a proportion, which is far easier to judge.
+`df.isna().mean()` &mdash; the same as a proportion. This Is far easier to judge.
 
-`df.isna().any(axis=1).sum()` &mdash; how many rows would be lost to `dropna()`. This is usually much larger than any single column's count, because different rows are missing different things.
+`df.isna().any(axis=1).sum()` &mdash; how many rows would be lost to `dropna()`. This is often much larger than any single column's count. Other rows are missing other things.
 
-Those three numbers make the decision. Dropping 2% of rows is a rounding error; dropping 40% changes what the dataset is. A column that is 60% empty probably should not be used at all, and no amount of imputation fixes that.
+Those three numbers make the choice. Dropping 2% of rows is a rounding error. Dropping 40% changes what the dataset is. A column that is 60% empty probably shouldn't be used at all. No amount of imputation fixes that.
 
 ## dropna
 
-The default is stricter than most people expect: `df.dropna()` drops a row if **any** value in it is missing.
+The default is stricter than most people expect: `df.dropna()` drops a row if **any** value in it's missing.
 
-`how="all"` only drops rows that are entirely empty, which is the right tool for trailing junk from a spreadsheet export.
+`how="all"` only drops rows that are fully empty. This Is the right tool for trailing junk from a spreadsheet export.
 
 `thresh=n` keeps rows with at least `n` non-missing values.
 
-`subset=["a", "b"]` only considers those columns, which is usually what you actually want &mdash; you care that the key fields are present, not that every optional field is.
+`subset=["a", "b"]` only considers those columns. This Is often what you really want. You care that the key fields are present, not that each optional field is.
 
-`axis=1` drops columns rather than rows, which is the blunt way to remove mostly-empty fields.
+`axis=1` drops columns rather than rows. This Is the blunt way to drop mostly-empty fields.
 
 ## fillna
 
-The code is easy. The choice is a statistical decision, and it is not neutral.
+The code is easy. The choice is a statistical choice, and it isn't neutral.
 
-**Zero** shifts the mean toward zero. For a count where missing genuinely means none, it is correct. For a measurement where missing means unknown, it invents data and biases every summary.
+**Zero** shifts the mean toward zero. For a count where missing truly means none, it's correct. For a reading where missing means unknown, it invents data and biases each summary.
 
-**The mean** preserves the mean by construction and **shrinks the variance**, because you are adding points with no spread. Anything downstream that cares about dispersion &mdash; a standard deviation, a confidence interval, a model that weights by variance &mdash; is then quietly wrong. The fourth editor measures this.
+**The mean** preserves the mean by build and **shrinks the variance**. You're adding points with no spread. Anything downstream that cares about dispersion. A standard deviation, a trust interval, a model that weights by variance. Is then quietly wrong. The fourth editor measures this.
 
-**The median** is more reliable to outliers and has the same variance problem.
+**The median** is more robust to outliers and has the same variance problem.
 
-**A sentinel** like `-1` is honest for categorical codes but must be documented, or someone will average it.
+**A sentinel** like `-1` is honest for cat codes but must be documented, or someone will mean it.
 
-**Group-wise fills** &mdash; filling with the mean of the same city, or the same product &mdash; are usually better than a global fill, because they use information you actually have.
+**Group-wise fills** &mdash; filling with the mean of the same city, or the same product &mdash; are often better than a global fill. They use data you really have.
 ## Missingness as information
 
-The most commonly missed point: **why** a value is absent often matters more than what you replace it with.
+The most often missed point: **why** a value is absent often matters more than what you replace it with.
 
-If a value is missing at random, dropping or imputing is defensible. If it is missing *because of what it would have been* &mdash; a sensor that fails at extremes, an income question people skip when the answer is embarrassing, a test not run because the patient was too ill &mdash; then both dropping and imputing bias the result, in opposite directions.
+If a value is missing at random, dropping or imputing is defensible. If it's missing *because of what it would have been*. A sensor that fails at extremes, an income question people skip when the answer is embarrassing, a test not run because the patient was too ill. Then both dropping and imputing bias the result, in opposite directions.
 
-The last editor shows the extreme case: a column that is missing exactly when another column takes a particular value. Filling it with the mean would erase the most informative thing in the data.
+The last editor shows the extreme case: a column that is missing just when another column takes a given value. Filling it with the mean would erase the most helpful thing in the data.
 
-Adding an indicator column &mdash; `df["x_missing"] = df["x"].isna().astype(int)` &mdash; keeps that information while still allowing a fill. It costs one column and is frequently the single most useful feature in a model built on messy data.
+Adding an indicator column &mdash; `df["x_missing"] = df["x"].isna().astype(int)` &mdash; keeps that data while still allowing a fill. It costs one column and is often the single most handy feature in a model built on messy data.
 
 ## A working order
 
-Count. Look at *which* rows are missing, not just how many. Ask whether the missingness looks random. Add an indicator if it does not. Then choose a fill, and write down which one you used &mdash; because by the time someone asks, the code will have moved on.
+Count. Look at *which* rows are missing, not just how many. Ask whether the missingness looks random. Add an indicator if it doesn't. Then choose a fill. Write down which one you used. Because by the time someone asks, the code will have moved on.
 
 ## Where missing values come from
 
-Knowing the source usually tells you what to do.
+Knowing the source often tells you what to do.
 
-**Not collected** &mdash; the question was not asked, the sensor was not installed. Often missing at random; dropping is defensible.
+**Not collected** &mdash; the question wasn't asked, the sensor wasn't installed. Often missing at random. Dropping is defensible.
 
-**Not applicable** &mdash; a spouse's name for an unmarried person. Not missing at all; a sentinel or a separate flag is more honest than `NaN`.
+**Not applicable** &mdash; a spouse's name for an unmarried person. Not missing at all. A sentinel or a split flag is more honest than `NaN`.
 
-**Failed** &mdash; a sensor error, a timeout. Frequently correlated with the value, and therefore not missing at random.
+**Failed** &mdash; a sensor error, a timeout. often linked with the value. So not missing at random.
 
-**Created by an operation** &mdash; a join that did not match, an alignment mismatch, a `shift`, a `pct_change` on the first row, a value outside a `cut` range. These are the ones people mistake for data problems when they are really code problems.
+**Created by an step** &mdash; a join that didn't match, an alignment mismatch, a `shift`, a `pct_change` on the first row, a value outside a `cut` range. These are the ones people mistake for data problems when they're really code problems.
 
-That last category is worth checking first. If a column gained missing values partway through a pipeline, the cause is upstream in the code, not in the source data.
+That last group is worth checking first. If a column gained missing values partway through a pipeline, the cause is upstream in the code, not in the source data.
 
 ## Missing values in operations
 
 Most aggregations **skip** missing values by default: `sum`, `mean`, `max` all use `skipna=True`.
 
-That is different from NumPy, where a single `NaN` poisons the whole reduction, and it is worth knowing because it changes the denominator. `df["x"].mean()` divides by the number of **present** values, not the row count.
+That is other from NumPy. Here A single `NaN` poisons the whole reduction. It's worth knowing because it changes the denominator. `df["x"].mean()` cuts by the number of **present** values, not the row count.
 
-`skipna=False` makes them propagate, which is occasionally what you want when a missing value should invalidate the result.
+`skipna=False` makes them pass. This Is at times what you want when a missing value should invalidate the result.
 
-`sum()` of an all-missing column returns `0`, not `NaN`, which is defensible and surprising. `min_count=1` makes it return `NaN` instead.
+`sum()` of an all-missing column returns `0`, not `NaN`. This Is defensible and surprising. `min_count=1` makes it return `NaN` instead.
 
 `groupby` **drops** rows whose key is missing, unless `dropna=False`.
 
-`merge` treats `NaN` keys as non-matching in most cases.
+`merge` treats `NaN` keys as non-matching often.
 
-Sorting puts them last regardless of direction.
+Sorting puts them last even so of direction.
 
-Each of these is reasonable in isolation; together they mean missing data quietly changes several numbers at once, and the totals stop reconciling.
+Each of these is fair in alone. Together they mean missing data quietly changes a few numbers at once, and the totals stop merging.
 
 ## Filling within groups
 
-A global fill uses the least information available. A group fill uses more:
+A global fill uses the least data on hand. A group fill uses more:
 
 ```python
 df["temp"] = df["temp"].fillna(df.groupby("city")["temp"].transform("mean"))
 ```
 
-Each missing temperature gets the mean for its own city rather than the mean of everywhere.
+Each missing temp gets the mean for its own city rather than the mean of all over.
 
-The same pattern works with `median`, with `ffill` inside a group (`df.groupby("id")["v"].ffill()`), and with a lookup from another table.
+The same pattern works with `median`, with `ffill` inside a group (`df.groupby("id")["v"].ffill()`). With a lookup from another table.
 
-A group fill leaves gaps where a whole group is missing, so a global fallback afterwards is often needed:
+A group fill leaves gaps where a whole group is missing. A global fallback later is often needed:
 
 ```python
 filled = df.groupby("city")["temp"].transform("mean")
@@ -290,7 +281,7 @@ df["temp"] = df["temp"].fillna(filled).fillna(df["temp"].mean())
 
 The part that is easy to skip and matters most later.
 
-Record, in the code and in whatever the output is:
+Record, in the code and in what the output is:
 
 How many values were missing per column, before you touched them.
 
@@ -298,21 +289,21 @@ What you did &mdash; dropped, filled with what, interpolated how.
 
 Whether you added an indicator.
 
-The reason is that a filled value is indistinguishable from a measured one once it is in the frame. Six months later, nobody can tell which numbers were observed and which were invented, and the analysis cannot be reproduced or corrected.
+a filled value is the same from a measured one once it's in the frame. Six months later, no one can tell which numbers were seen and which were invented. The analysis can't be copied or corrected.
 
-A frame with an `x_imputed` boolean column carries that information with the data, which is more reliable than a comment.
+A frame with an `x_imputed` boolean column carries that data with the data. This Is more robust than a comment.
 
 ## The order to work in
 
-Count them. Look at which rows they are in. Decide whether the missingness looks random. Add an indicator if it does not. Choose a strategy for each column separately &mdash; there is no reason the same one suits every column. Record what you did. Then proceed.
+Count them. Look at which rows they're in. Decide whether the missingness looks random. Add an indicator if it doesn't. Choose a plan for each column apart. There's no reason the same one suits each column. Record what you did. Then proceed.
 
 ## Missing values that pandas created
 
-Worth a separate checklist, because these are code problems rather than data problems and the fix is upstream.
+Worth a split checklist, because these are code problems rather than data problems and the fix is upstream.
 
-**A join that did not match** &mdash; the added columns are `NaN` for unmatched rows. `indicator=True` confirms it.
+**A join that didn't match**. The added columns are `NaN` for unmatched rows. `indicator=True` confirms it.
 
-**Alignment on assignment** &mdash; a Series with different labels assigned to a column fills the unmatched rows.
+**Alignment on set** &mdash; a Series with other labels assigned to a column fills the unmatched rows.
 
 **`shift`, `diff`, `pct_change`** &mdash; the first row of each has no predecessor.
 
@@ -320,66 +311,66 @@ Worth a separate checklist, because these are code problems rather than data pro
 
 **`cut` or `qcut`** &mdash; values outside the bin edges.
 
-**`reindex` or `unstack`** &mdash; combinations that did not occur in the data.
+**`reindex` or `unstack`** &mdash; mixes that didn't occur in the data.
 
-**`resample` upsampling** &mdash; periods with no observation.
+**`resample` upsampling** &mdash; periods with no finding.
 
-If a column gained missing values partway through a pipeline, one of these is the cause, and filling them is treating a symptom.
+If a column gained missing values partway through a pipeline, one of these is the cause. Filling them is treating a symptom.
 
 ## Interpolation options
 
-`interpolate()` defaults to `method="linear"`, which treats the values as evenly spaced regardless of the index.
+`interpolate()` defaults to `method="linear"`. This Treats the values as evenly spaced even so of the index.
 
-`method="time"` uses the actual time gaps, which is what you want on an irregular time series &mdash; without it, a value after a three-week gap is weighted the same as one after an hour.
+`method="time"` uses the actual time gaps. This Is what you want on an irregular time series. Without it, a value after a three-week gap is weighted the same as one after an hour.
 
-`method="nearest"`, `"polynomial"`, `"spline"` fit other shapes; the last two need an `order`.
+`method="nearest"`, `"polynomial"`, `"spline"` fit other shapes. The last two need an `order`.
 
-`limit_direction` controls whether leading and trailing gaps are filled. By default `interpolate` fills forward only, so a leading `NaN` survives.
+`limit_direction` controls whether leading and trailing gaps are filled. By default `interpolate` fills forward only. A leading `NaN` lives.
 
-`limit_area="inside"` restricts filling to gaps between real observations, which is usually the honest choice &mdash; interpolating beyond the ends of your data is extrapolation, and it should be a deliberate decision rather than a default.
+`limit_area="inside"` restricts filling to gaps between real findings. This Is often the honest choice. Interpolating beyond the ends of your data is extrapolation. It should be a deliberate choice rather than a default.
 
 ## Choosing per column
 
-There is no reason one strategy suits every column, and treating them uniformly is usually wrong.
+There's no reason one plan suits each column, and treating them uniformly is often wrong.
 
-An **identifier** with gaps is a data problem; the rows probably cannot be used.
+An **identifier** with gaps is a data problem. The rows probably can't be used.
 
-A **category** can take an explicit `"unknown"` level, which is honest and keeps the rows.
+A **group** can take an clear `"unknown"` level. This Is honest and keeps the rows.
 
 A **count** where missing means none takes zero.
 
-A **measurement** takes a group mean, an interpolation, or nothing &mdash; depending on why it is missing.
+A **reading** takes a group mean, an blending, or nothing. Based on why it's missing.
 
-A **timestamp** rarely takes a fill at all; a missing date usually means the event did not happen.
+A **timestamp** rarely takes a fill at all. A missing date often means the event didn't happen.
 
-Writing the decision down per column, in code, is more maintainable than a single `fillna(0)` across the frame &mdash; which is the most common and least defensible choice.
+Writing the choice down per column, in code, is more maintainable than a single `fillna(0)` across the frame. Which is the most common and least defensible choice.
 
 ## A summary
 
-`isna()` finds all three markers; equality never works.
+`isna()` finds all three markers. Equality never works.
 
-Count per column, as a share, and count the rows you would lose, before deciding anything.
+Count per column, as a share, and count the rows you'd lose, before deciding anything.
 
-`dropna()` drops on **any** missing value; `subset=` is usually what you want.
+`dropna()` drops on **any** missing value. `subset=` is often what you want.
 
-Zero shifts the mean; the mean shrinks the variance; neither is neutral.
+Zero shifts the mean. The mean shrinks the variance. Neither is neutral.
 
-`ffill`/`bfill` for ordered data, with a `limit`.
+`ffill`/`bfill` for sorted data, with a `limit`.
 
 `interpolate(method="time")` for irregular series.
 
-Group fills use information a global fill discards.
+Group fills use data a global fill discards.
 
-Add an indicator when missingness might be informative &mdash; it often is.
+Add an indicator when missingness might be helpful &mdash; it often is.
 
-And record what you did, because a filled value is indistinguishable from a measured one the moment it enters the frame.
+And record what you did. A filled value is the same from a measured one the moment it enters the frame.
 
 ## A closing note
 
-Handling missing data is the part of this track where the code is easiest and the decisions are hardest.
+Handling missing data is the part of this track where the code is easiest and the choices are hardest.
 
-`isna`, `dropna` and `fillna` take a few minutes to learn. What they cannot tell you is whether the values are missing at random, whether the rows you are about to drop share something, or whether filling with a mean is defensible for this particular column.
+`isna`, `dropna` and `fillna` take a few minutes to learn. What they can't tell you is whether the values are missing at random, whether the rows you're about to drop share a thing, or whether filling with a mean is defensible for this given column.
 
-Those are questions about the data rather than about pandas, and the honest answer is often that missingness is informative &mdash; that a value is absent precisely because of what it would have been. In that case both dropping and imputing bias the result, and an indicator column preserves the signal that filling would erase.
+Those are questions about the data rather than about pandas. The honest answer is often that missingness is helpful. That a value is absent just because of what it would have been. In that case both dropping and imputing bias the result. An indicator column preserves the signal that filling would erase.
 
-The practical minimum is: count them per column and as a share, look at which rows they are in, choose per column rather than uniformly, and record what you did &mdash; because once a filled value is in the frame, nothing distinguishes it from a measured one.
+The hands-on min is: count them per column and as a share, look at which rows they're in, choose per column rather than uniformly. Record what you did. Because once a filled value is in the frame, nothing sets apart it from a measured one.

@@ -1,19 +1,11 @@
 title: Nested Data Structures: A Practical Guide
-intro: Real data is rarely a flat list. It is a list of records, each with fields, some of which are themselves lists. Working with it is the same handful of moves repeated at different depths.
+intro: Real data is rarely a flat list. It's a list of records, each with fields, some of which are themselves lists. Working with it's the same handful of moves repeated at different depths.
 
 ## Reading a path
 
 people[0]["langs"][1]
 
-Left to right: index the list, look up the key, index that list. Each step returns something, and the next step operates on it. If you are unsure what a line does, evaluate it one piece at a time &mdash; `people[0]`, then `people[0]["langs"]` &mdash; which is exactly what an editor's debugger shows you.
-
-The most common shape is a list of dictionaries, where each dictionary is a record with named fields. JSON from an API, rows from a database query and CSV parsed with `DictReader` all arrive in this form. The outer list gives you iteration; the inner dicts give you named access. Processing it is always two nested loops or a nested comprehension.
-
-Modification at depth requires understanding references. `people[0]["langs"].append("Rust")` changes the original list inside the original dict — there is no implicit copy. A shallow copy (`list(people)`) duplicates the outer list but shares the inner dicts, so mutating a nested field still changes the original. Use `copy.deepcopy` when you need a fully independent copy.
-
-Missing keys are the main source of runtime errors. `person["address"]["city"]` raises `KeyError` if either level is absent, and the traceback names only the key that failed, not the path. The safe patterns are `.get()` with a default, `try/except KeyError`, or a helper that walks the path and returns a fallback. For deeply nested JSON, these patterns appear on almost every access.
-
-Converting between a list of dicts and a dict of lists is a routine operation. `{k: [row[k] for row in records] for k in records[0]}` produces columnar data from row-oriented records, which is what pandas does when you construct a DataFrame from a list of dicts. The reverse — building records from columns — is `[dict(zip(cols, vals)) for vals in zip(*col_data.values())]`.
+Left to right: index the list, look up the key, index that list. Each step returns a thing. The next step operates on it. If you're unsure what a line does, test it one piece at a time. `people[0]`, then `people[0]["langs"]`. Which is just what an editor's debugger shows you.
 
 ## Walking it
 
@@ -24,93 +16,87 @@ for person in people:
 ```
 
 
-The outer loop takes records, the inner takes the list inside each one. That is the shape of most processing you will do, and the flatten version of it is a nested comprehension:
+The outer loop takes records, the inner takes the list inside each one. That is the shape of most processing you'll do. The flatten version of it's a nested comprehension:
 
 [lang for person in people for lang in person["langs"]]
 
-Same clause order as the loops, and worth using only when it fits on one line.
-
-Modification requires care because of how references work. `people[0]["langs"].append("Rust")` modifies the original list inside the original dictionary. There is no copy unless you make one. This is the expected behaviour when you want to update in place, and a bug when you thought you were working on a separate copy. Shallow copies (`list(people)` or `people[:]`) duplicate the outer list but share the inner dictionaries, so mutating a nested dict still affects the original. Deep copies (`copy.deepcopy(people)`) duplicate everything recursively, which is the safe choice when you need a truly independent copy.
-
-The most common operations on nested structures are lookups with a chain of indices and keys, iteration with nested loops, and flattening into simpler structures for analysis. A list of dicts is the natural representation for JSON records, database rows and API responses. A dict of lists is common for columnar data. Converting between the two is a frequent task: `{k: [row[k] for row in records] for k in records[0]}` turns a list of dicts into a dict of lists, which is what pandas does when you pass a list of dicts to `DataFrame()`.
-
-Missing keys and indices are the main source of errors. `person["address"]["city"]` raises `KeyError` if either key is absent. Chaining `.get()` calls (`person.get("address", {}).get("city", "unknown")`) avoids the exception but is verbose. For deeply nested lookups, a helper function or a try/except block is usually cleaner than a chain of `.get()` calls.
+Same clause order as the loops. Worth using only when it fits on one line.
 
 ## The missing-key problem
 
 data["user"]["settings"]["theme"]
 
-raises as soon as any level is absent, and the `KeyError` names only the key that failed, not the path you were walking. Two ways to be safe:
+raises as soon as any level is absent. The `KeyError` names only the key that failed, not the path you were walking. Two ways to be safe:
 
 data.get("user", {}).get("settings", {}).get("theme", "default")
 
-Each `get` returns `{}` rather than `None` when absent, so the next `get` still has a dictionary to call. That `{}` default is the trick that makes the chain work.
+Each `get` returns `{}` rather than `None` when absent. The next `get` still has a dict to call. That `{}` default is the trick that makes the chain work.
 
-For anything deeper than two or three levels, a small helper is clearer than a long chain, and a `try/except KeyError` around the whole path is clearer still when a missing value really is exceptional.
+For any of it deeper than two or three levels, a small helper is clearer than a long chain. A `try/except KeyError` around the whole path is clearer still when a missing value really is exceptional.
 
 ## Building nested shapes
 
-Flat rows into groups is the most common transformation:
+Flat rows into groups is the most common change:
 
 teams.setdefault(team, []).append(name)
 
-and summing across two levels is a single generator expression:
+and summing across two levels is a single gen formula:
 
 sum(item["price"] for o in orders for item in o["items"])
 
 ## The shape of data that arrives
 
-Most real data is a list of records, and most records are dictionaries. API
-responses, parsed JSON, CSV rows read with `DictReader`, database results - all
+Most real data is a list of records, and most records are dicts. API
+responses, parsed JSON, CSV rows read with `DictReader`, DB results - all
 the same shape.
 
-Recognising this makes the code predictable. The outer loop takes records; a key
-lookup takes a field; an inner loop takes a list-valued field. Three moves cover
-almost everything, and they compose to any depth.
+Recognising this makes the code predictable. The outer loop takes records. A key
+lookup takes a field. An inner loop takes a list-valued field. Three moves cover
+almost all, and they compose to any depth.
 
 The depth itself is the thing to keep an eye on. Two levels are easy to hold in
-your head. Four levels of mixed lists and dictionaries is where a small helper
-function - `def city_of(record):` - pays for itself immediately, because it gives
+your head. Four levels of mixed lists and dicts is where a small helper
+function - `def city_of(record):` - pays for itself right away, because it gives
 the path a name and one place to fix when the shape changes.
 
 ## Modifying nested structures
 
-Reading a nested value is safe; writing one is where aliasing matters. If you
-copied the outer list shallowly and then edit a dictionary inside it, both copies
-change, because they hold the same dictionaries.
+Reading a nested value is safe. Writing one is where aliasing matters. If you
+copied the outer list shallowly and then edit a dict inside it, both copies
+change, because they hold the same dicts.
 
-That is not a reason to deepcopy everything. It is a reason to decide
-deliberately: either the structure is shared and everyone knows it, or you take a
+That isn't a reason to deepcopy all. It's a reason to decide
+on purpose: either the structure is shared and everyone knows it, or you take a
 deep copy at the boundary where it enters your code.
 
 ## Flattening and grouping
 
-The two transformations that come up constantly are inverses of each other.
+The two changes that come up constantly are inverses of each other.
 
 Flattening turns a nested structure into a flat one - all languages anyone knows,
 all items across all orders - and a nested comprehension or `itertools.chain` does
 it in a line.
 
 Grouping turns a flat list into a nested one, keyed by some field.
-`setdefault` or `defaultdict(list)` is the idiom, and it is worth writing out
-once until it feels automatic, because half of the reporting code anyone ever
+`setdefault` or `defaultdict(list)` is the idiom, and it's worth writing out
+once until it feels auto, because half of the reporting code anyone ever
 writes is a grouping followed by an aggregation.
 
 ## JSON is the same shape
 
-`json.load` produces exactly these structures - dictionaries, lists, strings,
+`json.load` makes just these structures - dicts, lists, strings,
 numbers, booleans and `None` - which is why working with parsed JSON needs no new
 skills beyond this page. `json.dumps(data, indent=2)` prints them back readably,
-and is the fastest way to understand something you have just fetched.
+and is the fastest way to understand a thing you've just fetched.
 
-The one asymmetry: JSON object keys are always strings. A dictionary keyed by
-integers survives the round trip as string keys, which is a small surprise that
+The one skew: JSON object keys are always strings. A dict keyed by
+ints lives the round trip as string keys. This Is a small surprise that
 shows up when a lookup that worked before saving fails after loading.
 
 ## A worked example: from rows to a report
 
 Most work with nested data is the same journey &mdash; records in, grouped
-summary out. Here it is end to end:
+summary out. Here it's end to end:
 
 ```python
 orders = [
@@ -133,22 +119,22 @@ ana      7
 bo       2
 ```
 
-Three moves, each from elsewhere in the track. The generator expression sums a
-list-valued field without building an intermediate list. `totals.get(key, 0)`
-accumulates without a first-time special case. And `sorted` with a negated key
+Three moves, each from elsewhere in the track. The gen formula sums a
+list-valued field without building an mid list. `totals.get(key, 0)`
+builds up without a first-time special case. And `sorted` with a negated key
 puts the largest first.
 
 What makes it readable is that each level is handled at one depth. The inner
-sum works on one order's items and knows nothing about customers; the outer
+sum works on one order's items and knows nothing about customers. The outer
 loop works on orders and knows nothing about prices. When nested-data code
-becomes hard to follow, it is almost always because one expression is reaching
+turns hard to follow, it's almost always because one formula is reaching
 through three levels at once.
 
 ## Naming the path
 
-The single most useful habit with nested data is refusing to repeat a long path.
+The single most handy habit with nested data is refusing to repeat a long path.
 `record["user"]["profile"]["display_name"]` written in four places is four
-places to update when the API changes, and four chances to typo a key into a
+places to update when the API changes. Four chances to typo a key into a
 `KeyError` that names only the last one.
 
 A one-line function fixes it:
@@ -159,137 +145,137 @@ def display_name(record):
 ```
 
 The path now exists once. It has a name that says what it means, so the call
-sites read as intent rather than as navigation. It has somewhere to put a
-default or a `try`. And when the shape changes &mdash; and it will &mdash;
-there is one line to edit.
+sites read as intent rather than as navigation. It has a place to put a
+default or a `try`. And when the shape changes. And it will &mdash;
+there's one line to edit.
 
 This is worth doing at two levels of nesting, not four. The instinct to wait
-until it gets bad is why it usually does.
+until it gets bad is why it often does.
 
 ## Where the shape comes from, and what it costs
 
-Nested data almost always arrives rather than being designed: it is the shape
-some API returns, or the shape JSON has, or the shape a database join produced.
+Nested data almost always arrives rather than being designed: it's the shape
+some API returns, or the shape JSON has, or the shape a DB join made.
 That has a consequence worth being deliberate about.
 
 Data in the shape it arrived in is convenient for reading once and awkward for
-everything else. Nothing validates it, so a missing key is discovered at the
-point of use rather than at the point of parsing. Nothing names it, so every
+all else. Nothing validates it. So A missing key is found at the
+point of use rather than at the point of parsing. Nothing names it, so each
 function that touches it has to know the layout. And nothing stops two parts of
 the program disagreeing about whether a field is optional.
 
-The alternative is to convert at the boundary: read the nested structure once,
-pull out what you need, and build objects &mdash; dataclasses, named tuples, or
-just flatter dictionaries with the names you chose. Everything downstream then
+The option is to convert at the boundary: read the nested structure once,
+pull out what you need, and build objects. Dataclasses, named tuples, or
+just flatter dicts with the names you chose. All downstream then
 works with a shape you defined, validated once, at a known place.
 
 For a script that reads a file and prints a summary, this is overkill and the
-raw structure is fine. For anything long-lived, converting at the edge is the
+raw structure is fine. For any of it long-lived, converting at the edge is the
 difference between a program where a shape change breaks one function and one
 where it breaks eleven.
 
 ## Depth, and when to stop nesting
 
 Reading nested data is unavoidable. *Building* deeply nested data is a choice,
-and usually a poor one past two levels.
+and often a poor one past two levels.
 
-A dictionary of dictionaries of lists is hard to inspect, hard to iterate
-without three loops, and impossible to query except by walking. The alternative
-is usually a flat list of records where the nesting becomes fields: instead of
+A dict of dicts of lists is hard to inspect, hard to iterate
+without three loops, and hopeless to query except by walking. The option
+is often a flat list of records where the nesting turns fields: instead of
 `by_region[region][city] = [names]`, a list of
 `{"region": ..., "city": ..., "name": ...}` rows.
 
 Flat records are longer to write and enormously easier to work with. They sort
 by any field, filter with one comprehension, group by whichever key the current
 question needs rather than the one you committed to when you built the
-structure, and convert directly to CSV or a dataframe. The nesting you actually
-need can be produced on demand with a grouping, which is three lines.
+structure, and convert right to CSV or a dataframe. The nesting you really
+need can be made on demand with a grouping. This Is three lines.
 
 The heuristic: nest when the structure reflects genuine containment that will
 never be queried the other way round. Flatten when you can imagine wanting a
-different grouping later &mdash; which, for anything resembling a report, you
+different grouping later &mdash; which, for any of it resembling a report, you
 will.
 
 ## Failing at the boundary rather than in the middle
 
-The characteristic problem with nested data is that a shape mistake surfaces
+The trait problem with nested data is that a shape mistake surfaces
 far from where it entered. A key that is missing from an API response is
-discovered three functions later, as a `KeyError` naming a key that looks
+found three functions later, as a `KeyError` naming a key that looks
 correct, in code that has nothing to do with fetching.
 
-The remedy is to check the shape once, where the data arrives, rather than
-defending against it everywhere afterwards. What that check looks like depends
+The remedy is to check the shape once. Here The data arrives, rather than
+defending against it all over afterwards. What that check looks like depends
 on how much the data matters.
 
 At the simplest, a few lines that pull out the fields you need and raise a
-clear error if they are absent. The error then says "response is missing
-`user.profile.name`" at the point of parsing, which is a diagnosis rather than
+clear error if they're absent. The error then says "response is missing
+`user.profile.name`" at the point of parsing. This Is a diagnosis rather than
 a symptom.
 
-A step up, build the values into a dataclass or a `NamedTuple`. Construction
-fails immediately if a field is missing, the resulting object has known
-attributes rather than arbitrary keys, and every function downstream can be
-written against a shape that is guaranteed rather than hoped for.
+A step up, build the values into a dataclass or a `NamedTuple`. build
+fails right away if a field is missing, the resulting object has known
+fields rather than any keys, and each function downstream can be
+written against a shape that is ensured rather than hoped for.
 
 Further still, a validation library &mdash; Pydantic being the common choice
-&mdash; declares the expected shape as types and reports every problem at once,
+&mdash; declares the expected shape as types and reports each problem at once,
 with the path to each. That is worth it when the data comes from outside your
-control and the cost of processing something malformed is high.
+control and the cost of processing a thing malformed is high.
 
 All three are the same idea at different sizes: convert once, at the edge, and
-let everything inside the boundary assume the data is what it claims to be. The
-alternative &mdash; a `.get` chain at every use site &mdash; spreads the
-uncertainty through the whole program and never actually resolves it.
+let all inside the boundary assume the data is what it claims to be. The
+option &mdash; a `.get` chain at each use site &mdash; spreads the
+uncertainty through the whole program and never really resolves it.
 
 ## Questions people ask
 
-<strong>How do I get a value several levels down safely?</strong> Chain `.get`
+<strong>How do I get a value a few levels down safely?</strong> Chain `.get`
 with `{}` defaults, or wrap the direct path in `try`/`except KeyError` when
-absence is genuinely exceptional.
+lack is truly exceptional.
 
 <strong>Why does `.get("a", {}).get("b")` work but `.get("a").get("b")`
 not?</strong> Because the second returns `None` when the key is missing, and
-`None` has no `.get`. The `{}` keeps a dictionary in the chain.
+`None` has no `.get`. The `{}` keeps a dict in the chain.
 
-<strong>How do I see the shape of something I just parsed?</strong>
+<strong>How do I see the shape of a thing I just parsed?</strong>
 `print(json.dumps(data, indent=2))` for JSON-compatible data, and
-`pprint.pprint` for anything else.
+`pprint.pprint` for any of it else.
 
 <strong>Can I flatten an arbitrarily deep structure?</strong> Yes, with
-recursion or a stack &mdash; but if the depth is unknown, that is usually a
+recursion or a stack &mdash; but if the depth is unknown, that is often a
 sign the data wants to be flat records instead.
 
 <strong>Are nested comprehensions read inside-out?</strong> No. The `for`
-clauses read left to right in the same order as the equivalent nested loops.
+clauses read left to right in the same order as the equal nested loops.
 
 <strong>Why did my copy of a nested structure change?</strong> Because the copy
 was shallow and the inner structures are shared.
 
-<strong>Do JSON keys stay integers?</strong> No. They come back as strings,
+<strong>Do JSON keys stay ints?</strong> No. They come back as strings,
 which is a common surprise after a save-and-load round trip.
 
 <strong>Should I use dotted access instead of brackets?</strong> Libraries that
-turn dictionaries into attribute access look convenient and hide typos, since a
-missing attribute and a missing key report differently. A dataclass gives you
+turn dicts into field access look convenient and hide typos, since a
+missing field and a missing key report differently. A dataclass gives you
 the same ergonomics with the checking.
 
 <strong>What is the fastest way to search nested data?</strong> Build an index
-once &mdash; a dictionary keyed by whatever you search on &mdash; rather than
-walking the structure on every lookup.
+once &mdash; a dict keyed by what you search on &mdash; rather than
+walking the structure on each lookup.
 
 <strong>Is there a standard way to walk a structure of unknown depth?</strong>
-Recursion, with a check on each value for whether it is a dictionary, a list,
-or a leaf. The standard library has no general walker, because what to do at
-each node depends entirely on the task.
+Recursion, with a check on each value for whether it's a dict, a list,
+or a leaf. The standard library has no general walker. What to do at
+each node depends fully on the task.
 
 ## Recap in one screen
 
-- Most real data is a list of records; the moves are index, key lookup, and an
-  inner loop, composed to whatever depth is needed.
+- Most real data is a list of records. The moves are index, key lookup, and an
+  inner loop, composed to what depth is needed.
 - Chain `.get(key, {})` for optional paths, and `try`/`except KeyError` when a
   missing value is exceptional rather than expected.
 - Give a repeated path a named function at two levels of nesting, not four.
 - Convert at the boundary into shapes you defined, unless the script is small
   enough that the raw structure will do.
-- Prefer flat records over deep nesting for anything you might want to group a
+- Prefer flat records over deep nesting for any of it you might want to group a
   different way later.

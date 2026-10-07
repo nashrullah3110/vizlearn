@@ -1,64 +1,64 @@
 title: Neural Network for Regression: A Practical Guide
 intro: A regression network is a classifier with two changes: nothing squashes the output, and the loss measures distance instead of disagreement.
 
-## The two differences that matter
+## The two gaps that matter
 
-- <strong>Linear output layer.</strong> No sigmoid, no softmax. The final neuron emits whatever value it computes, so the network can predict 3.7, &minus;120 or 275,000.
-- <strong>Distance-based loss.</strong> Mean squared error, or mean absolute error when outliers should not dominate.
+- <strong>Linear output layer.</strong> No sigmoid, no softmax. The final neuron emits whatever value it computes. So the network can predict 3.7, &minus;120 or 275,000.
+- <strong>Distance-based loss.</strong> Mean squared error. Or mean absolute error when outliers should not dominate.
 
-Everything else &mdash; hidden layers, ReLU, backpropagation, the optimiser &mdash; is unchanged from a classifier.
+All else &mdash; hidden layers, ReLU, backpropagation, the optimiser &mdash; is unchanged from a classifier.
 
-That simplicity is both the appeal and the trap. Because the change is small, people adapt a classifier by swapping the output layer and the loss, run it, and move on. The mistakes that follow are specific to regression and do not produce error messages.
+That simplicity is both the appeal and the trap. Since the change is small, people adapt a classifier by swapping the output layer and the loss, run it. And move on. The mistakes that follow are set to regression and do not give error messages.
 
-The first is forgetting to scale the target. A classifier's output is always between 0 and 1, so the internal activations stay in a reasonable range. A regression target of 500,000 means the loss starts enormous and the gradients explode on the first step. Normalising the target to zero mean and unit variance, then reversing the transform on the predictions, avoids this entirely.
+The first is forgetting to scale the target. A classifier's output is always between 0 and 1. So the internal activations stay in a reasonable range. A regression target of 500,000 means the loss starts enormous and the gradients explode on the first step. Normalising the target to zero mean and unit variance, then reversing the transform on the predictions, avoids this fully.
 
-The second is using too many hidden units for a smooth function. A regression surface is usually simpler than a classification boundary. A network with 256 hidden units fitting a relationship that is nearly linear will memorise the training noise and predict jagged curves. Start small: one hidden layer of 16 or 32 units is enough for many real-world regression tasks, and you can always add capacity if the validation loss plateaus too high.
+The second is with too many hidden units for a smooth function. A regression surface is often simpler than a classification edge. A network with 256 hidden units fitting a relationship that is nearly linear will memorise the training noise and predict jagged curves. Start small: one hidden layer of 16 or 32 units is enough for many real-world regression tasks. And you can always add capacity if the validation loss plateaus too high.
 
-The third is evaluating with the wrong metric. Accuracy does not exist for regression. Mean squared error penalises large errors heavily. Mean absolute error treats all errors equally. R-squared tells you how much variance the model explains relative to predicting the mean. Each answers a different question, and reporting the wrong one hides the model's real behaviour.
+The third is testing with the wrong metric. Accuracy does not exist for regression. Mean squared error penalises large errors heavily. Mean absolute error treats all errors equally. R-squared tells you how much variance the net explains relative to predicting the mean. Each answers a other question. And reporting the wrong one hides the net's real behaviour.
 
-The output layer, the loss, the target scaling and the evaluation metric are the four things a regression network needs you to get right. Everything else transfers from classification unchanged.
+The output layer, the loss, the target scaling and the test metric are the four things a regression network needs you to get right. All else transfers from classification unchanged.
 
-## A concrete architecture
+## A concrete design
 
-Predicting house price from three features: 3 inputs &rarr; 16 hidden with ReLU &rarr; 1 linear output. That is <span class="mono-font">(3&times;16 + 16) + (16&times;1 + 1) = 81</span> parameters.
+Predicting house price from three features: 3 inputs &rarr; 16 hidden with ReLU &rarr; 1 linear output. That is <span class="mono-font">(3&times;16 + 16) + (16&times;1 + 1) = 81</span> params.
 
-The output neuron is where regression and classification part ways. Leave a sigmoid on it and the largest value the network can ever predict is 1.0 &mdash; every house is priced somewhere between nothing and one. It is a surprisingly easy mistake to make when adapting a classifier.
+The output neuron is where regression and classification part ways. Leave a sigmoid on it and the largest value the network can ever predict is 1.0 &mdash; each house is priced somewhere between nothing and one. It is a surprisingly easy mistake to make when adapting a classifier.
 
-Use several output neurons when you have several continuous targets: predicting an (x, y, z) position is three linear outputs and one shared body.
+Use a few output neurons when you have a few continuous targets: predicting an (x, y, z) position is three linear outputs and one shared body.
 
 ## Why the output layer has no activation
 
-A classification network ends in softmax or sigmoid because the output must be a probability, bounded in [0, 1]. A regression network predicts an unbounded quantity &mdash; a price, a temperature, a duration &mdash; so squashing the output would put a ceiling on what it can ever predict.
+A classification network ends in softmax or sigmoid since the output must be a probability, bounded in [0, 1]. A regression network predicts an unbounded quantity &mdash; a price, a temperature, a duration &mdash; so squashing the output would put a ceiling on what it can ever predict.
 
-The final layer is therefore left linear: a plain weighted sum with no activation applied. Putting a sigmoid there caps every prediction at 1, and putting a ReLU there makes negative predictions impossible &mdash; occasionally what you want for a strictly positive target, and a silent bug otherwise.
+The final layer is therefore left linear: a plain weighted sum with no activation applied. Putting a sigmoid there caps each prediction at 1. And putting a ReLU there makes negative predictions impossible &mdash; at times what you want for a strictly positive target. And a silent bug otherwise.
 
 ## Choosing the loss
 
-The loss encodes what kind of error you care about, and the two standard choices behave very differently:
+The loss encodes what kind of error you care about. And the two standard choices behave very differently:
 
-- <strong>MSE</strong> (mean squared error) squares the error, so an error of 10 counts a hundred times an error of 1. It is smooth and differentiable everywhere, and highly sensitive to outliers.
-- <strong>MAE</strong> (mean absolute error) scales linearly with the error, so outliers do not dominate. Its gradient is constant in magnitude, which converges less cleanly near the minimum.
+- <strong>MSE</strong> (mean squared error) squares the error. So an error of 10 counts a hundred times an error of 1. It is smooth and differentiable all over, and highly sensitive to outliers.
+- <strong>MAE</strong> (mean absolute error) scales linearly with the error. So outliers do not dominate. Its gradient is constant in magnitude, which converges less cleanly near the min.
 - <strong>Huber loss</strong> is quadratic for small errors and linear for large ones, giving MSE’s smooth convergence with MAE’s outlier tolerance. It is the sensible default on noisy data.
 
-These are not interchangeable: minimising MSE fits the conditional <em>mean</em> of the target, minimising MAE fits the <em>median</em>. On a skewed target those are different numbers, and the choice of loss is really a choice about which one you want.
+These are not interchangeable: minimising MSE fits the conditional <em>mean</em> of the target, minimising MAE fits the <em>median</em>. On a skewed target those are other counts. And the choice of loss is really a choice about which one you want.
 
 ## Scaling the target, not just the inputs
 
-Input scaling matters as much as ever. Target scaling is the additional consideration specific to regression.
+Input scaling matters as much as ever. Target scaling is the extra consideration set to regression.
 
-If house prices range over hundreds of thousands, the initial loss is in the billions, the gradients are enormous, and the first update destroys the initialisation. Standardising the target &mdash; or predicting its logarithm &mdash; brings the loss into a sane range.
+If house prices range over hundreds of thousands, the initial loss is in the billions, the gradients are enormous. And the first update destroys the initialisation. Standardising the target &mdash; or predicting its logarithm &mdash; brings the loss into a sane range.
 
 Two things then have to happen, and forgetting either is a common bug:
 
-<strong>Invert the transformation before reporting.</strong> An RMSE computed on standardised targets is in standard deviations, not pounds, and is not comparable to anyone else's number.
+<strong>Invert the transformation before reporting.</strong> An RMSE computed on standardised targets is in standard deviations, not pounds. And is not comparable to anyone else's count.
 
-<strong>Fit the target scaler on training data only,</strong> exactly as for the inputs.
+<strong>Fit the target scaler on training data just,</strong> just as for the inputs.
 
-Predicting `log(y)` deserves particular mention. It suits multiplicative targets &mdash; prices, counts, durations &mdash; because it turns proportional errors into absolute ones, which is usually what matters. Note that exponentiating a predicted mean of logs gives a <em>geometric</em> mean, which is slightly below the arithmetic mean; for most applications that bias is acceptable, and there are corrections if it is not.
+Predicting `log(y)` deserves particular mention. It suits multiplicative targets &mdash; prices, counts, durations &mdash; since it turns proportional errors into absolute ones. It is often what matters. Note that exponentiating a predicted mean of logs gives a <em>geometric</em> mean. It is slightly below the arithmetic mean. For most applications that bias is acceptable. And there are corrections if it is not.
 
-## Predicting a number rather than a class
+## Predicting a count rather than a class
 
-A regression network is a classification network with three changes: one output unit instead of many, no activation on that output, and a regression loss.
+A regression network is a classification network with three changes: one output unit instead of many, no activation on that output. And a regression loss.
 
 |&nbsp;|Classification|Regression|
 |---|---|---|
@@ -67,7 +67,7 @@ A regression network is a classification network with three changes: one output 
 |Loss|Cross-entropy|MSE, MAE or Huber|
 |Metric|Accuracy, F1|RMSE, MAE, R&sup2;|
 
-"No activation" is the part people get wrong. Applying ReLU to the output caps predictions at zero and below, which silently breaks any target that can be negative. Applying sigmoid caps them at 1. Leave it linear unless you have a specific reason &mdash; and if the target is genuinely non-negative, predicting its logarithm is usually better than clamping with ReLU.
+"No activation" is the part people get wrong. Applying ReLU to the output caps predictions at zero and below. It silently breaks any target that can be negative. Applying sigmoid caps them at 1. Leave it linear unless you have a set reason &mdash; and if the target is genuinely non-negative, predicting its logarithm is often better than clamping with ReLU.
 
 ```python
 model = nn.Sequential(
@@ -82,21 +82,21 @@ criterion = nn.MSELoss()               # or nn.HuberLoss()
 
 <strong>MSE</strong> squares the errors, so one large miss dominates. Minimising it predicts the conditional <em>mean</em> of the target.
 
-<strong>MAE</strong> treats every unit of error equally and is reliable to outliers. Minimising it predicts the conditional <em>median</em>.
+<strong>MAE</strong> treats each unit of error equally and is reliable to outliers. Minimising it predicts the conditional <em>median</em>.
 
-<strong>Huber</strong> is squared near zero and linear beyond a threshold &delta; &mdash; smooth gradients near the optimum, bounded influence from outliers. Usually the best default when the data has any outliers at all.
+<strong>Huber</strong> is squared near zero and linear beyond a threshold &delta; &mdash; smooth gradients near the optimum, bounded influence from outliers. Often the best default when the data has any outliers at all.
 
-Two more, for specific needs. <strong>Quantile loss</strong> predicts a chosen percentile rather than the centre, which is how prediction intervals are produced &mdash; train one head for the 10th percentile and one for the 90th and you have an interval. And <strong>Poisson or Tweedie loss</strong> suits counts and heavily zero-inflated targets, where MSE assumes a symmetry the data does not have.
+Two more, for set needs. <strong>Quantile loss</strong> predicts a chosen percentile rather than the centre. It is how prediction intervals are produced &mdash; train one head for the 10th percentile and one for the 90th and you have an interval. And <strong>Poisson or Tweedie loss</strong> suits counts and heavily zero-inflated targets. There MSE assumes a symmetry the data does not have.
 
 ## Try this above
 
 1. Set <strong>Output Neurons</strong> to 1. That is the standard single-target regression head.
-2. Change it to 3 &mdash; multi-target regression, where one network predicts several related numbers from shared hidden features.
+2. Change it to 3 &mdash; multi-target regression. There one network predicts a few tied counts from shared hidden features.
 3. Vary <strong>Hidden Layers</strong> and note the output layer's shape never changes. The head is decided by the task, not the depth.
 
-## What usually goes wrong
+## What often goes wrong
 
-<strong>A squashing activation left on the output.</strong> Caps the prediction range and flattens the gradient for any target outside it, so the model cannot learn its way out.<strong>Unscaled targets.</strong> Squared error on values near 300,000 produces gradients around 10<sup>11</sup>. The first update destroys the weights and the loss becomes NaN. Standardise the target and invert the scaling afterwards.<strong>Reporting accuracy.</strong> There is no such thing for continuous output. Report MAE or RMSE in the target's own units, so "off by £18,000 on average" is something a reader can actually judge.
+<strong>A squashing activation left on the output.</strong> Caps the prediction range and flattens the gradient for any target outside it. So the net cannot learn its way out.<strong>Unscaled targets.</strong> Squared error on vals near 300,000 gives gradients around 10<sup>11</sup>. The first update destroys the weights and the loss turns NaN. Standardise the target and invert the scaling afterwards.<strong>Reporting accuracy.</strong> There is no such thing for continuous output. Report MAE or RMSE in the target's own units. So "off by £18,000 on average" is something a reader can really judge.
 
 ## In one line
 
@@ -104,38 +104,38 @@ Classifier body, linear head, distance-based loss &mdash; and scale your targets
 
 ## The extrapolation problem
 
-A network trained on house sizes from 50 to 200 square metres will happily produce a number for 900. That number is fiction.
+A network trained on house sizes from 50 to 200 square metres will happily give a count for 900. That count is fiction.
 
-Networks interpolate well and extrapolate unpredictably. Outside the range of the training data there is no signal constraining the function, and the shape it takes there is an artefact of the architecture and the initialisation rather than anything learned.
+Networks interpolate well and extrapolate unpredictably. Outside the range of the training data there is no signal constraining the function. And the shape it takes there is an artefact of the design and the initialisation rather than anything learned.
 
-Three responses:
+Three replies:
 
 - <strong>Check the input range at prediction time</strong> and flag or refuse inputs outside it. This is a production concern that is easy to overlook.
-- <strong>Model the right quantity.</strong> Predicting price-per-square-metre, or a change rather than a level, often extrapolates far better than predicting the raw level.
-- <strong>Include the boundary in the training data</strong> if predictions there will be needed.
+- <strong>Net the right quantity.</strong> Predicting price-per-square-metre. Or a change rather than a level, often extrapolates far better than predicting the raw level.
+- <strong>Include the edge in the training data</strong> if predictions there will be needed.
 
-Note that tree-based models have the same limitation in a more visible form: a forest cannot predict outside the range of its training targets at all. Linear models extrapolate confidently and wrongly. There is no free lunch here &mdash; only awareness.
+Note that tree-based nets have the same limitation in a more visible form: a forest cannot predict outside the range of its training targets at all. Linear nets extrapolate confidently and wrongly. There is no free lunch here &mdash; just awareness.
 
-## Are networks even the right tool?
+## Are networks still the right tool?
 
-For tabular regression, often not. Gradient-boosted trees usually match or beat a neural network on rows-and-columns data while needing less tuning, less data and no GPU. This has been tested repeatedly.
+For tabular regression, often not. Gradient-boosted trees often match or beat a neural network on rows-and-columns data while needing less tuning, less data and no GPU. This has been tested repeatedly.
 
 Neural networks earn their place in regression when:
 
 - The inputs are <strong>unstructured</strong> &mdash; predicting a price from photographs, a rating from review text, a measurement from a sensor waveform.
-- There are <strong>many outputs</strong> that share structure, so one network can predict them jointly.
-- The relationship is <strong>genuinely complex and smooth</strong>, and there is enough data to learn it.
-- You need <strong>end-to-end learning</strong> from raw input to number without hand-engineered features.
+- There are <strong>many outputs</strong> that share structure. So one network can predict them jointly.
+- The relationship is <strong>genuinely complex and smooth</strong>. And there is enough data to learn it.
+- You need <strong>end-to-end learning</strong> from raw input to count without hand-engineered features.
 
-Otherwise, fit a gradient-boosted model first and treat it as the baseline the network has to beat.
+Otherwise, fit a gradient-boosted net first and treat it as the baseline the network has to beat.
 
-## Reporting a regression model honestly
+## Reporting a regression net honestly
 
-Three habits make the numbers meaningful:
+Three habits make the counts meaningful:
 
 <strong>Quote a baseline.</strong> "RMSE 28.5" means nothing alone. Against 61.0 for predicting the mean, it is a result.
 
-<strong>Report the error in the target's units.</strong> "Typically wrong by &pound;20k on a &pound;250k house" is actionable; a standardised number is not.
+<strong>Report the error in the target's units.</strong> "Often wrong by &pound;20k on a &pound;250k house" is actionable. A standardised count is not.
 
 <strong>Plot the residuals</strong> against the predictions. A shapeless band around zero is healthy. A curve means a missing non-linear relationship. A funnel widening to the right means the error grows with the target &mdash; predict the logarithm instead. A cluster far from the rest is an outlier group worth investigating.
 
@@ -173,7 +173,7 @@ print("   is able to say.")
 print()
 ```
 
-Building on the same setup, the next block shows the remaining cases.
+Building on the same setup, the next block shows the left cases.
 
 ```python-run
 import numpy as np
@@ -208,7 +208,7 @@ def train(Xa, ya, hidden=24, epochs=500, lr=0.04, huber=False, seed=0):
 print("done")
 ```
 
-The following block covers the remaining operations.
+The next block covers the left steps.
 
 ```python-run
 import numpy as np
@@ -235,7 +235,7 @@ for tol in (0.1, 0.25, 0.5, 1.0):
 print()
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 import numpy as np
@@ -276,20 +276,20 @@ print("   single row can say.")
 
 <strong>Should the output layer have an activation?</strong> No, for unbounded targets. Never ReLU unless negatives are genuinely impossible <em>and</em> you have considered a log transform instead.
 
-<strong>MSE or MAE?</strong> MSE if large errors are disproportionately costly; MAE if outliers are present and should not dominate; Huber as the default compromise.
+<strong>MSE or MAE?</strong> MSE if large errors are disproportionately costly. MAE if outliers are present and should not dominate. Huber as the default compromise.
 
-<strong>Do I need to scale the target?</strong> For networks, usually yes &mdash; and remember to invert before reporting.
+<strong>Do I need to scale the target?</strong> For networks, often yes &mdash; and remember to invert before reporting.
 
-<strong>How do I get prediction intervals?</strong> Quantile regression with two extra output heads, or Monte Carlo dropout, or an ensemble's spread.
+<strong>How do I get prediction intervals?</strong> Quantile regression with two extra output heads. Or Monte Carlo dropout, or an ensemble's spread.
 
-<strong>Can one network predict several targets?</strong> Yes &mdash; several output units and a summed loss. Weight the terms, since a target with a larger scale will otherwise dominate.
+<strong>Can one network predict a few targets?</strong> Yes &mdash; a few output units and a summed loss. Weight the terms, since a target with a more scale will otherwise dominate.
 
-<strong>Why is my model predicting nearly the same value for everything?</strong> It has collapsed to predicting the mean, which is what happens when the features carry little signal, the learning rate is too low, or the target was not scaled.
+<strong>Why is my net predicting nearly the same value for all?</strong> It has collapsed to predicting the mean. It is what happens when the features carry little signal, the learning rate is too low. Or the target was not scaled.
 
 ## Recap in one screen
 
-- One output unit, no output activation, and a regression loss &mdash; everything else is a classification network.
-- Scale the target as well as the inputs, and invert the transformation before reporting errors.
+- One output unit, no output activation. And a regression loss &mdash; all else is a classification network.
+- Scale the target as well as the inputs. And invert the transformation before reporting errors.
 - MSE predicts the mean, MAE predicts the median, Huber is the reliable default.
 - Networks interpolate and do not extrapolate &mdash; guard the input range in production.
 - On tabular data, benchmark against gradient boosting before assuming a network is the right choice.

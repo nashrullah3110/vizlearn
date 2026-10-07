@@ -3,50 +3,50 @@ intro: Batch size decides how many examples the model looks at before it changes
 
 ## Three regimes
 
-- <strong>Batch size 1 (stochastic).</strong> One sample per update. Very noisy gradient, very many updates, and the noise itself sometimes helps escape bad regions.
-- <strong>Full batch.</strong> The whole dataset per update. The gradient is exact, but you get one update per epoch and it is slow.
-- <strong>Mini-batch (32&ndash;256).</strong> What in effect everyone uses. Enough samples for a usable gradient estimate, enough updates to make progress, and it fits on a GPU.
+- <strong>Batch size 1 (stochastic).</strong> One sample per update. Very noisy gradient, very many updates. And the noise it sometimes helps escape bad regions.
+- <strong>Full batch.</strong> The whole dataset per update. The gradient is exact. But you get one update per epoch and it is slow.
+- <strong>Mini-batch (32&ndash;256).</strong> What in effect everyone uses. Enough samples for a usable gradient estimate, enough updates to make progress. And it fits on a GPU.
 
-The batch size controls a three-way trade-off between gradient accuracy, update frequency and hardware utilisation. A batch of 1 gives the noisiest gradient and the most updates per epoch. A full-batch gradient is exact but gives only one update per epoch. Mini-batches of 32 to 256 sit at the sweet spot: the gradient estimate is close enough to the true gradient for stable convergence, updates are frequent enough for fast progress, and the batch is large enough to saturate the GPU's parallel cores.
+The batch size controls a three-way trade-off between gradient accuracy, update frequency and hardware utilisation. A batch of 1 gives the noisiest gradient and the most updates per epoch. A full-batch gradient is exact but gives just one update per epoch. Mini-batches of 32 to 256 sit at the sweet spot: the gradient estimate is close enough to the true gradient for stable convergence, updates are frequent enough for fast progress. And the batch is large enough to saturate the GPU's parallel cores.
 
-Gradient noise is not purely harmful. The stochastic noise from small batches helps the optimiser escape sharp local minima and find flatter minima that generalise better. This is why increasing batch size often requires increasing the learning rate proportionally (linear scaling rule) to maintain the same training dynamics, and why very large batch sizes sometimes produce models that generalise worse even though the training loss is lower.
+Gradient noise is not purely harmful. The stochastic noise from small batches helps the optimiser escape sharp local minima and find flatter minima that generalise better. This is why raising batch size often needs raising the learning rate proportionally (linear scaling rule) to keep the same training dynamics. And why very large batch sizes sometimes give nets that generalise worse still though the training loss is less.
 
-The practical upper bound on batch size is GPU memory. A batch of images must fit in VRAM along with the model parameters, activations and gradients. When the batch does not fit, the usual fixes are to reduce the batch size, use gradient accumulation (run several smaller forward passes and sum the gradients before updating), use mixed-precision training (float16 halves the memory per activation), or distribute across multiple GPUs. Gradient accumulation is the simplest — it simulates a large batch without needing more memory.
+The real upper bound on batch size is GPU memory. A batch of pics must fit in VRAM along with the net params, activations and gradients. When the batch does not fit, the usual fixes are to reduce the batch size, use gradient accumulation (run a few less forward passes and sum the gradients before updating), use mixed-precision training (float16 halves the memory per activation). Or distribute across multiple GPUs. Gradient accumulation is the simplest — it simulates a large batch without needing more memory.
 
-## How the numbers work out
+## How the counts work out
 
 With 1,024 training samples:
 
 - Batch size 32 &rarr; <strong>32 updates</strong> per epoch
 - Batch size 256 &rarr; <strong>4 updates</strong> per epoch
 
-Gradient noise falls roughly with the square root of batch size. Going from 32 to 128 &mdash; a 4&times; increase &mdash; halves the noise, not quarters it. That diminishing return is why batch sizes stop growing well before memory runs out.
+Gradient noise falls roughly with the square root of batch size. Going from 32 to 128 &mdash; a 4&times; increase &mdash; halves the noise, not quarters it. That diminishing give is why batch sizes stop growing well before memory runs out.
 
 ## Why mini-batch won
 
-Batch gradient descent computes an exact gradient and needs a full pass over the data for a single update. On a million samples that is a million forward passes to move the weights once &mdash; accurate and unusable.
+Batch gradient descent computes an exact gradient and needs a full pass over the data for a single update. On a million samples that is a million forward passes to move the weights once &mdash; exact and unusable.
 
-Stochastic gradient descent updates after every sample, so it makes a million updates per epoch, but each gradient is a single-sample estimate and the path jitters badly. It also wastes the hardware: one sample cannot occupy a GPU.
+Stochastic gradient descent updates after each sample. So it makes a million updates per epoch. But each gradient is a single-sample estimate and the path jitters badly. It also wastes the hardware: one sample cannot occupy a GPU.
 
-Mini-batches of 32 to 256 sit at the point where both problems disappear. The gradient estimate is close enough to the true one for stable progress, updates are frequent, and the batch is large enough to fill the device. This is not a compromise nobody is happy with &mdash; it is better than either extreme on both axes that matter.
+Mini-batches of 32 to 256 sit at the point where both problems disappear. The gradient estimate is close enough to the true one for stable progress, updates are frequent. And the batch is large enough to fill the device. This is not a compromise nobody is happy with &mdash; it is better than either extreme on both axes that matter.
 
 ## Batch size and learning rate move together
 
-These two cannot be tuned independently. The gradient of a batch is an <em>average</em>, so a larger batch gives a lower-variance estimate &mdash; and a more reliable estimate can support a larger step.
+These two cannot be tuned independently. The gradient of a batch is an <em>average</em>. So a more batch gives a less-variance estimate &mdash; and a more reliable estimate can support a more step.
 
-The <strong>linear scaling rule</strong> is the standard heuristic: multiply the batch size by k and multiply the learning rate by k. Going from batch 32 at learning rate 0.01 to batch 256 suggests roughly 0.08. Very large batches usually need a warmup period as well, ramping the rate up over the first few epochs, because the scaled rate is unstable while the weights are still random.
+The <strong>linear scaling rule</strong> is the standard heuristic: multiply the batch size by k and multiply the learning rate by k. Going from batch 32 at learning rate 0.01 to batch 256 suggests roughly 0.08. Very large batches often need a warmup period as well, ramping the rate up over the first few epochs, since the scaled rate is unstable while the weights are still random.
 
-The corollary is that comparing two runs at different batch sizes with the same learning rate compares nothing useful.
+The corollary is that checking two runs at other batch sizes with the same learning rate checks nothing useful.
 
 ## Shuffling is not optional
 
-Mini-batches must be drawn from a shuffled dataset, reshuffled every epoch. If the data arrives sorted by class &mdash; all the cats then all the dogs &mdash; then each batch contains one class, every gradient points toward predicting that class, and the model oscillates instead of converging.
+Mini-batches must be drawn from a shuffled dataset, reshuffled each epoch. If the data arrives sorted by class &mdash; all the cats then all the dogs &mdash; then each batch holds one class, each gradient points toward predicting that class. And the net oscillates instead of converging.
 
-Reshuffling each epoch also means the model never sees the same batch composition twice, which adds a small amount of useful noise. The exception is time series, where shuffling destroys the temporal ordering the model is supposed to learn from; there the batches must be contiguous windows.
+Reshuffling each epoch also means the net never sees the same batch composition twice. It adds a small amount of useful noise. The exception is time series. There shuffling destroys the temporal ordering the net is supposed to learn from. There the batches must be contiguous windows.
 
 ## Three sizes of step
 
-The gradient is an average over training examples. How many you average over before updating defines three variants of the same algorithm.
+The gradient is an average over training cases. How many you average over before updating sets three variants of the same algorithm.
 
 |Variant|Examples per update|Gradient quality|Hardware use|
 |---|---|---|---|
@@ -56,19 +56,19 @@ The gradient is an average over training examples. How many you average over bef
 
 <strong>Full-batch</strong> descent takes the true gradient and one step per pass through the data. On a million rows that is a million forward and backward passes for a single weight update, which is unusable.
 
-<strong>Stochastic</strong> descent updates after every example. Steps are cheap and the gradient is a very noisy estimate; worse, a single 784-element vector uses a fraction of a percent of a GPU's capacity.
+<strong>Stochastic</strong> descent updates after each case. Steps are cheap and the gradient is a very noisy estimate. Worse, a single 784-item vector uses a fraction of a percent of a GPU's capacity.
 
-<strong>Mini-batch</strong> is the compromise everyone uses, and it wins on all three counts at once: a usable gradient estimate, a matrix multiplication large enough to saturate the hardware, and enough residual noise to escape saddle points.
+<strong>Mini-batch</strong> is the compromise everyone uses. And it wins on all three counts at once: a usable gradient estimate, a matrix multiplication large enough to saturate the hardware. And enough residual noise to escape saddle points.
 
 ## Why the noise is useful
 
 It is tempting to treat gradient noise as a defect to be minimised. It is not.
 
-<strong>It escapes saddle points.</strong> In high dimensions almost every point with zero gradient is a saddle rather than a minimum. An exact gradient at a saddle is zero and full-batch descent stalls; a noisy one is not, and the model moves on.
+<strong>It escapes saddle points.</strong> In high dimensions almost each point with zero gradient is a saddle rather than a min. An exact gradient at a saddle is zero and full-batch descent stalls. A noisy one is not. And the net moves on.
 
-<strong>It biases towards flat minima.</strong> Noise makes it hard to settle into a narrow crevice in the loss surface, and flat minima generalise better because a small shift in the data costs less. This is the main reason very large batches sometimes generalise slightly worse.
+<strong>It biases towards flat minima.</strong> Noise makes it hard to settle into a narrow crevice in the loss surface. And flat minima generalise better since a small shift in the data costs less. This is the main reason very large batches sometimes generalise slightly worse.
 
-<strong>It acts as a regulariser.</strong> Part of why deep networks generalise better than their parameter counts suggest is this implicit regularisation from stochastic updates.
+<strong>It acts as a regulariser.</strong> Part of why deep networks generalise better than their param counts suggest is this implicit regularisation from stochastic updates.
 
 So the goal is not the cleanest possible gradient. It is a gradient good enough to point downhill, computed on a batch large enough to use the hardware.
 
@@ -76,27 +76,27 @@ So the goal is not the cleanest possible gradient. It is a gradient good enough 
 
 Mini-batch descent assumes each batch is a representative sample. If the data arrives sorted &mdash; by class, by date, by source &mdash; then it is not.
 
-Unshuffled sorted data produces batches containing a single class. The model spends one batch learning "everything is class A", the next unlearning it in favour of class B, and the gradients pull in contradictory directions. Batch normalisation makes it worse, since its statistics are computed per batch and become wildly unrepresentative.
+Unshuffled sorted data gives batches holding a single class. The net spends one batch learning "all is class A", the next unlearning it in favour of class B. And the gradients pull in contradictory ways. Batch normalisation makes it worse, since its statistics are computed per batch and turn wildly unrepresentative.
 
-Reshuffling every epoch matters too: it means the model never sees the same partition of examples twice, which adds useful variation.
+Reshuffling each epoch matters too: it means the net never sees the same partition of cases twice. It adds useful variation.
 
 ```python
 loader = DataLoader(dataset, batch_size=64, shuffle=True, drop_last=True)
 ```
 
-`drop_last=True` discards a final partial batch. With batch normalisation that matters &mdash; a last batch of one or two examples produces meaningless statistics and a visibly worse update.
+`drop_last=True` discards a final partial batch. With batch normalisation that matters &mdash; a last batch of one or two cases gives meaningless statistics and a visibly worse update.
 
-The exception is time series, where shuffling destroys the temporal ordering the model needs. There, batches are contiguous windows and the split is chronological.
+The exception is time series, where shuffling destroys the temporal ordering the net needs. There, batches are contiguous windows and the split is chronological.
 
 ## Try this above
 
-1. Drag <strong>Batch Size</strong> to its minimum. The descent path visibly jitters &mdash; each step is reacting to one or two samples.
-2. Raise it toward the maximum. The path straightens out, but notice it also takes fewer, larger steps to cover the same ground.
-3. Now hold batch size high and lower <strong>Learning Rate</strong>. Progress stalls &mdash; a big smooth gradient with a tiny step size wastes the smoothness.
+1. Drag <strong>Batch Size</strong> to its min. The descent path visibly jitters &mdash; each step is reacting to one or two samples.
+2. Raise it toward the max. The path straightens out. But notice it also takes fewer, more steps to cover the same ground.
+3. Now hold batch size high and less <strong>Learning Rate</strong>. Progress stalls &mdash; a big smooth gradient with a tiny step size wastes the smoothness.
 
-## What usually goes wrong
+## What often goes wrong
 
-<strong>Raising batch size without touching the learning rate.</strong> You get fewer updates per epoch, each no larger than before, so training slows down and people conclude the larger batch "trains worse". The usual remedy is the linear scaling rule: double the batch, double the learning rate, within reason.<strong>Comparing runs by epoch count.</strong> An epoch at batch size 512 contains a fraction of the updates an epoch at batch size 32 does. Compare by number of updates, or by wall-clock time, not by epochs.
+<strong>Raising batch size without touching the learning rate.</strong> You get fewer updates per epoch, each no more than before. So training slows down and people conclude the more batch "trains worse". The usual remedy is the linear scaling rule: double the batch, double the learning rate, within reason.<strong>Checking runs by epoch count.</strong> An epoch at batch size 512 holds a fraction of the updates an epoch at batch size 32 does. Check by count of updates, or by wall-clock time, not by epochs.
 
 ## In one line
 
@@ -106,19 +106,19 @@ Batch size trades gradient noise against how many times per epoch you get to mov
 
 Start with the largest that fits comfortably in memory, up to about 256, then scale the learning rate to match.
 
-The <strong>linear scaling rule</strong> is the standard guidance: double the batch size, double the learning rate. The reasoning is that a batch twice as large gives a gradient with roughly half the noise, so a step twice as long is equally safe. It holds well up to a few thousand examples per batch, with a warm-up period to survive the first large steps.
+The <strong>linear scaling rule</strong> is the standard guidance: double the batch size, double the learning rate. The reasoning is that a batch twice as large gives a gradient with roughly half the noise. So a step twice as long is equally safe. It holds well up to a few thousand cases per batch, with a warm-up period to survive the first large steps.
 
-Beyond that, the noise that was providing implicit regularisation has largely gone, and specialised optimisers (LARS, LAMB) are needed to keep large-batch training competitive. This is why the papers that trained ImageNet in minutes needed more than just more GPUs.
+Beyond that, the noise that was giving implicit regularisation has largely gone. And specialised optimisers (LARS, LAMB) are needed to keep large-batch training strong. This is why the papers that trained ImageNet in minutes needed more than just more GPUs.
 
 Constraints that override the "as large as fits" rule:
 
-- <strong>Batch normalisation</strong> needs at least about 8 examples per batch for usable statistics. Below that, use GroupNorm.
-- <strong>Very large inputs</strong> &mdash; high-resolution images, long sequences &mdash; may force a batch of 1 or 2. Gradient accumulation recovers the effective batch size.
-- <strong>Small datasets</strong> give few updates per epoch at a large batch size, so a smaller batch and more updates often trains better.
+- <strong>Batch normalisation</strong> needs at least about 8 cases per batch for usable statistics. Below that, use GroupNorm.
+- <strong>Very large inputs</strong> &mdash; high-resolution pics, long sequences &mdash; may force a batch of 1 or 2. Gradient accumulation recovers the effective batch size.
+- <strong>Small datasets</strong> give few updates per epoch at a large batch size. So a less batch and more updates often trains better.
 
 ## Gradient accumulation
 
-When the batch you want does not fit, accumulate gradients over several small batches and update once:
+When the batch you want does not fit, accumulate gradients over a few small batches and update once:
 
 ```python
 accum = 8                                    # effective batch = 8 x batch_size
@@ -131,15 +131,15 @@ for i, batch in enumerate(loader):
         opt.zero_grad()
 ```
 
-Dividing the loss by `accum` is important &mdash; without it the accumulated gradient is eight times too large and the effective learning rate is eight times what you set.
+Dividing the loss by `accum` is key &mdash; without it the accumulated gradient is eight times too large and the effective learning rate is eight times what you set.
 
 This is the same accumulation behaviour that makes a forgotten `zero_grad()` a bug. Here it is the feature.
 
 The cost is wall-clock time: eight small batches take about as long as one large one would have. You get the large-batch statistics, not the large-batch speed.
 
-## Full batch, one row, and everything between
+## Full batch, one row, and all between
 
-The same problem solved by batch, stochastic and mini-batch gradient descent, with the noise each one injects measured directly -- because that noise is the whole difference.
+The same problem solved by batch, stochastic and mini-batch gradient descent, with the noise each one injects measured right -- since that noise is the whole gap.
 
 ```python-run
 import numpy as np
@@ -166,7 +166,7 @@ for name, bs in (("batch (full)", N), ("mini-batch", 64),
 print()
 ```
 
-Building on the same setup, the next block shows the remaining cases.
+Building on the same setup, the next block shows the left cases.
 
 ```python-run
 import numpy as np
@@ -201,7 +201,7 @@ def run(bs, epochs, lr, seed=0):
     return w, trace
 ```
 
-The following block covers the remaining operations.
+The next block covers the left steps.
 
 ```python-run
 import numpy as np
@@ -244,7 +244,7 @@ def bumpy_grad(x):
 
 ```
 
-The next block continues with the remaining demonstrations.
+The next block continues with the left demonstrations.
 
 ```python-run
 grid = np.linspace(-8, 12, 40001)
@@ -290,22 +290,22 @@ print("rate to remove the noise once it has done its job.")
 
 ## Questions people ask
 
-<strong>How many updates does one epoch give?</strong> `dataset size / batch size`. With 50,000 examples and a batch of 64, that is 782 &mdash; not 1.
+<strong>How many updates does one epoch give?</strong> `dataset size / batch size`. With 50,000 cases and a batch of 64, that is 782 &mdash; not 1.
 
 <strong>Why did accuracy drop when I raised the batch size?</strong> Fewer updates per epoch and an unscaled learning rate. Scale the rate up and add warm-up.
 
-<strong>Is a power of two required?</strong> No, though it aligns well with hardware and is marginally faster.
+<strong>Is a power of two needed?</strong> No, though it aligns well with hardware and is marginally faster.
 
-<strong>Should I use full-batch descent on a small dataset?</strong> Rarely &mdash; you lose the noise that helps generalisation, and get very few updates. Even on 1,000 rows, mini-batches usually train better.
+<strong>Should I use full-batch descent on a small dataset?</strong> Rarely &mdash; you lose the noise that helps generalisation. And get very few updates. Still on 1,000 rows, mini-batches often train better.
 
-<strong>Does batch size affect the final accuracy?</strong> Somewhat. Very large batches tend to generalise slightly worse; very small ones are slow and noisy.
+<strong>Does batch size affect the final accuracy?</strong> Somewhat. Very large batches tend to generalise slightly worse. Very small ones are slow and noisy.
 
-<strong>What if my dataset does not divide evenly?</strong> The last batch is smaller. Drop it if batch normalisation is in use.
+<strong>What if my dataset does not divide evenly?</strong> The last batch is less. Drop it if batch normalisation is in use.
 
 ## Recap in one screen
 
-- Full batch is accurate and unusable; single-example updates are noisy and waste hardware; mini-batches win on both.
+- Full batch is exact and unusable. Single-case updates are noisy and waste hardware. Mini-batches win on both.
 - The residual noise is useful &mdash; it escapes saddles and favours flat minima.
-- Shuffle every epoch, and drop the final partial batch when using batch normalisation.
+- Shuffle each epoch, and drop the final partial batch when with batch normalisation.
 - Scale the learning rate linearly with batch size, with warm-up.
 - Gradient accumulation buys a large effective batch on small hardware, at the cost of time.

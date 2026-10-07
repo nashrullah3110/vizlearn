@@ -3,7 +3,7 @@ intro: Defining a model, creating one, reading it back, and getting the data out
 
 ## The whole idea in three lines
 
-A Pydantic model is a class that inherits from `BaseModel` and lists its fields as annotations.
+A Pydantic model is a class that takes from from `BaseModel` and lists its fields as annotations.
 
 ```python
 from pydantic import BaseModel
@@ -14,19 +14,10 @@ class Module(BaseModel):
     minutes: int
 ```
 
-That is the entire definition. There is no `__init__`, no assignment of `self.title = title`, no validation code. Pydantic reads the annotations when the class is created and builds the machinery from them &mdash; a constructor, a validator, a serialiser, an equality method and a readable `repr`.
+That is the entire meaning. There's no `__init__`, no set of `self.title = title`, no check code. Pydantic reads the annotations when the class is created and builds the machinery from them. A constructor, a checker, a serialiser, an equality method and a readable `repr`.
 
-The economy matters more than it first appears. Adding a field is one line. In the hand-written equivalent it is four: the parameter, the assignment, the check, and the line in `to_dict`. Those four drift apart over time, and the drift is where bugs live.
+The economy matters more than it first appears. Adding a field is one line. In the hand-written equal it's four. The param, the set, the check. The line in `to_dict`. Those four drift apart over time. The drift is where bugs live.
 
-Creating an instance validates the input automatically. `Module(title=42, track="dsa", minutes="30")` coerces the integer 42 to the string `"42"` and the string `"30"` to the integer 30, because Pydantic's default mode is lenient coercion. If the input cannot be coerced &mdash; `minutes="thirty"` &mdash; it raises `ValidationError` with a clear message naming the field, the input, and what was expected.
-
-Accessing fields uses dot notation: `m.title`, `m.minutes`. By default, model instances are immutable: `m.title = "New"` raises an error unless the model is configured with `model_config = ConfigDict(frozen=False)`. Immutability is the safe default because it prevents accidental mutation in code that passes models around.
-
-`model_dump()` converts the instance to a dict. `model_dump_json()` converts it to a JSON string. Both handle nested models, dates, UUIDs and other types that `json.dumps` cannot serialise on its own. `model_validate(data)` creates an instance from a dict, and `model_validate_json(json_str)` from a JSON string. These four methods &mdash; two for serialisation, two for deserialisation &mdash; are the full round-trip API.
-
-The JSON Schema is generated automatically: `Module.model_json_schema()` returns a dict describing the model's fields, types and constraints. FastAPI uses this to generate OpenAPI documentation, and frontend tools use it to generate forms. Adding a field to the model updates the schema, the documentation and the validation in one change.
-
-Default values are set with `=`: `minutes: int = 60`. Optional fields use `Optional[int]` or `int | None` with a default of `None`. Fields with no default are required; omitting them raises `ValidationError`. The order of fields in the class body determines their order in the schema and in the constructor's signature.
 
 ## Subclass, annotate, done
 
@@ -190,35 +181,35 @@ print("summary :", summary.model_dump())
 ```
 ## Creating one
 
-Models take keyword arguments:
+Models take keyword args:
 
 ```python
 m = Module(title="Dot Product", track="maths", minutes=11)
 ```
 
-Positional arguments are refused, and the refusal is deliberate rather than an oversight. Models grow. A field added in the middle of a class body would silently change what every positional call meant, and nothing would raise &mdash; the values would simply land in the wrong slots. Requiring names makes that class of bug impossible.
+Spot-based args are refused, and the refusal is deliberate rather than an oversight. Models grow. A field added in the middle of a class body would silently change what each spot-based call meant, and nothing would raise. The values would simply land in the wrong slots. needing names makes that class of bug hopeless.
 
-When the data is already a dictionary, which it usually is if it came from JSON, there are two ways in:
+When the data is already a dict. This It often is if it came from JSON, there are two ways in:
 
 ```python
 Module(**data)
 Module.model_validate(data)
 ```
 
-They do the same work. `model_validate` reads better in a pipeline, makes it obvious that validation is happening, and does not break if the dictionary happens to contain a key that is not a valid Python identifier.
+They do the same work. `model_validate` reads better in a pipeline, makes it obvious that check is happening. Doesn't break if the dict happens to hold a key that isn't a valid Python identifier.
 
 ## What you get back
 
-An ordinary object. Attribute access works, methods you define work, and the values have the types the annotations promised:
+An plain object. Field access works, methods you define work. The values have the types the annotations promised:
 
 ```python
 m.title          # "Dot Product"
 m.minutes + 1    # 12  - a real int, not a string
 ```
 
-That last line is the payoff. Downstream code does not need to check or convert anything, because the conversion already happened at the door.
+That last line is the payoff. Downstream code doesn't need to check or convert anything. The conversion already happened at the door.
 
-Models are not dictionaries. `m["title"]` raises, and asking for a field that does not exist raises `AttributeError` like any other object. This is a feature: a typo in a dictionary key returns `None` or a `KeyError` deep inside a function, whereas a typo in an attribute name is caught immediately and is visible to your editor's autocomplete.
+Models aren't dicts. `m["title"]` raises, and asking for a field that doesn't exist raises `AttributeError` like any other object. This is a feature. A typo in a dict key returns `None` or a `KeyError` deep inside a function, whereas a typo in an field name is caught at once and is visible to your editor's autocomplete.
 
 ## Methods and behaviour
 
@@ -233,25 +224,25 @@ class Module(BaseModel):
         return self.title.lower().replace(" ", "_")
 ```
 
-This is worth doing. Logic that depends only on a model's own fields belongs on the model, where it is discoverable and testable, rather than in a loose function three modules away.
+This is worth doing. Logic that depends only on a model's own fields belongs on the model. Here It's discoverable and testable, rather than in a loose function three modules away.
 
-Later in this track you will meet `@computed_field`, which is the version of this that also appears in the serialised output.
+Later in this track you'll meet `@computed_field`. This Is the version of this that also appears in the serialised output.
 
 ## Getting the data out
 
-Two methods, and the difference between them is worth getting right early.
+Two methods, and the gap between them is worth getting right early.
 
-`model_dump()` returns a dictionary of Python objects. A `datetime` field comes back as a `datetime`, a `Decimal` as a `Decimal`. Use it when the data is staying inside your program &mdash; passing to another function, feeding a template, comparing in a test.
+`model_dump()` returns a dict of Python objects. A `datetime` field comes back as a `datetime`, a `Decimal` as a `Decimal`. Use it when the data is staying inside your program. Passing to another function, feeding a template, checking in a test.
 
-`model_dump_json()` returns a JSON string, converting everything into something JSON can represent. Use it when the data is leaving: an HTTP response, a message queue, a file on disk. It handles the types that plain `json.dumps` refuses outright, which is a small mercy you will appreciate the first time a `datetime` appears in a payload.
+`model_dump_json()` returns a JSON string, converting all into a thing JSON can represent. Use it when the data is leaving. An HTTP response, a message queue, a file on disk. It handles the types that plain `json.dumps` refuses outright. This Is a small mercy you'll appreciate the first time a `datetime` appears in a payload.
 
-Both take arguments that shape the output &mdash; `include`, `exclude`, `exclude_none`, `by_alias` &mdash; and those get a module of their own in the serialisation tier.
+Both take args that shape the output. `include`, `exclude`, `exclude_none`, `by_alias`. And those get a module of their own in the output tier.
 
-If you have read older tutorials you will have seen `.dict()` and `.json()`. Those are the Pydantic v1 names. They still work in v2 but emit deprecation warnings, and a great deal of writing on the internet has not caught up.
+If you've read older tutorials you'll have seen `.dict()` and `.json()`. Those are the Pydantic v1 names. They still work in v2 but emit deprecation warnings. A great deal of writing on the internet hasn't caught up.
 
 ## The round trip
 
-Put the two directions together and you have the shape of most web services:
+Put the two directions together and you've the shape of most web services:
 
 ```python
 wire = original.model_dump_json()          # going out
@@ -259,42 +250,42 @@ received = Module.model_validate_json(wire) # coming back in
 original == received                        # True
 ```
 
-That equality is worth noticing. Models compare by value, not identity, so two separately constructed models with the same contents are equal. In tests this turns a page of field-by-field assertions into one line.
+That equality is worth noticing. Models compare by value, not identity. Two apart made models with the same contents are equal. In tests this turns a page of field-by-field assertions into one line.
 
-`model_validate_json` is also the right way to accept JSON. It is tempting to write `json.loads` followed by `model_validate`, and it works, but parsing inside Pydantic's Rust core is faster and the errors it produces know where in the document the problem was.
+`model_validate_json` is also the right way to accept JSON. It's tempting to write `json.loads` followed by `model_validate`. It works. Parsing inside Pydantic's Rust core is faster and the errors it makes know where in the doc the problem was.
 
 ## Two models of the same thing
 
-A pattern that arrives quickly in real work: the same subject needs different shapes in different places. A list endpoint returns a title and a duration; a detail endpoint returns everything; a create endpoint accepts everything except the id, which the server assigns.
+A pattern that arrives quickly in real work. The same subject needs other shapes in other places. A list endpoint returns a title and a duration. A detail endpoint returns all. A create endpoint accepts all except the id. This The server assigns.
 
-The instinct is to build one model with a lot of optional fields. Resist it. Optional-everything means the model no longer documents anything &mdash; every field might be missing, so no reader can tell what is actually guaranteed.
+The instinct is to build one model with a lot of optional fields. Resist it. Optional-all means the model no longer docs anything. each field might be missing. No reader can tell what is really sure.
 
-Separate models say what they mean. `ModuleSummary` has two required fields and is honest about it. Converting between them is one line, because a dump from one is valid input to the other whenever the fields line up.
+split models say what they mean. `ModuleSummary` has two needed fields and is honest about it. Converting between them is one line. A dump from one is valid input to the other when the fields line up.
 
 ## Field order, and why it exists
 
-Fields have an order &mdash; the order you wrote them &mdash; and although you cannot pass them positionally, the order is not cosmetic.
+Fields have an order &mdash; the order you wrote them &mdash; and although you can't pass them positionally, the order isn't cosmetic.
 
-It determines the order of keys in `model_dump()` and in the generated JSON, which matters when a human reads the output or when something downstream diffs two payloads. It determines the order fields appear in the generated schema, and therefore in API documentation. And it determines validation order, which becomes significant once you write validators that look at previously-validated fields.
+It finds the order of keys in `model_dump()` and in the made JSON. This Matters when a human reads the output or when a thing downstream diffs two payloads. It finds the order fields appear in the made schema. So in API docs. And it finds check order. This Turns large once you write checkers that look at before-checked fields.
 
-The practical advice is to order fields the way you would explain them: identity first, then the important attributes, then the optional extras. It costs nothing and every reader of the output benefits.
+The hands-on advice is to order fields the way you'd explain them. Identity first, then the key fields, then the optional extras. It costs nothing and each reader of the output gains.
 
 ## Looking at the model itself
 
-A model knows about its own fields, and that introspection is available to you:
+A model knows about its own fields, and that introspection is on hand to you:
 
 ```python
 Module.model_fields          # {'title': FieldInfo(...), 'minutes': FieldInfo(...)}
 list(Module.model_fields)    # ['title', 'minutes']
 ```
 
-Each `FieldInfo` carries the annotation, whether the field is required, the default if there is one, and any metadata such as a description. This is what the schema generator reads, and it is available to you for the same kind of work &mdash; building a form, generating a table header, checking that every field has a description before you ship.
+Each `FieldInfo` carries the annotation, whether the field is needed, the default if there's one. Any metadata such as a description. This is what the schema gen reads. It's on hand to you for the same kind of work. Building a form, making a table header, checking that each field has a description before you ship.
 
-`model_fields` is defined on the class, not the instance, so you can inspect a model without having any data for it.
+`model_fields` is defined on the class, not the instance. You can inspect a model without having any data for it.
 
 ## Copying and changing
 
-Models are ordinary objects and you can assign to their attributes, but that is often not what you want &mdash; particularly if something else is holding a reference to the same object.
+Models are plain objects and you can assign to their fields. That is often not what you want. Above all if a thing else is holding a link to the same object.
 
 `model_copy` makes a new one:
 
@@ -303,17 +294,17 @@ original = Module(title="Vectors", track="maths", minutes=8)
 longer = original.model_copy(update={"minutes": 12})
 ```
 
-Two things to know about it. The copy is shallow by default, so a nested model or a list is shared between the two objects; pass `deep=True` when that matters. And `update` does **not** validate the new values &mdash; it writes them in directly. If the values came from anywhere untrusted, build a new model instead of copying with an update.
+Two things to know about it. The copy is shallow by default. A nested model or a list is shared between the two objects. Pass `deep=True` when that matters. And `update` does **not** validate the new values. It writes them in right. If the values came from anywhere untrusted, build a new model instead of copying with an update.
 
 ## Making a model immutable
 
-By default a model's attributes can be reassigned, and by default that reassignment is not validated:
+By default a model's fields can be reassigned, and by default that reassignment isn't checked:
 
 ```python
 m.minutes = "not a number"    # allowed, and now the field is a string
 ```
 
-Two settings fix two different halves of that. `validate_assignment=True` runs validation on assignment, so the line above raises. `frozen=True` forbids assignment entirely and makes the model hashable, so it can be a dictionary key or a set member.
+Two settings fix two other halves of that. `validate_assignment=True` runs check on set. The line above raises. `frozen=True` forbids set fully and makes the model hashable. So It can be a dict key or a set member.
 
 ```python
 class Module(BaseModel):
@@ -321,11 +312,11 @@ class Module(BaseModel):
     title: str
 ```
 
-Frozen models are worth reaching for more often than people do. A value that arrives from outside, is validated once and then read many times has no business being mutable, and freezing it removes a whole class of "who changed this?" question.
+Frozen models are worth reaching for more often than people do. A value that arrives from outside, is checked once and then read many times has no business being mutable. Freezing it drops a whole class of "who changed this?" question.
 
 ## Inheritance
 
-Models inherit, and it works the way you would hope: subclass fields are added to the parent's, and the parent's validators still run.
+Models inherit, and it works the way you'd hope. Subclass fields are added to the parent's, and the parent's checkers still run.
 
 ```python
 class ModuleBase(BaseModel):
@@ -337,27 +328,27 @@ class ModuleInDB(ModuleBase):
     created_by: str
 ```
 
-This is the standard way to express the family of shapes one concept needs &mdash; a base with the common fields, then `Create`, `Update` and `InDB` variants that add or relax what they must. It keeps the shared fields in one place, so a change to the base reaches all of them.
+This is the standard way to express the family of shapes one concept needs. A base with the common fields, then `Create`, `Update` and `InDB` variants that add or relax what they must. It keeps the shared fields in one place. A change to the base reaches all of them.
 
-Be careful with one thing: a subclass cannot make an inherited required field optional in a way that reads clearly. Redeclaring `title: str = "untitled"` works, but a reader now has to check two classes to know what `title` does. If the variants differ a lot, separate models are kinder than deep inheritance.
+Be careful with one thing: a subclass can't make an from parent needed field optional in a way that reads clearly. Redeclaring `title: str = "untitled"` works. A reader now has to check two classes to know what `title` does. If the variants differ a lot, split models are kinder than deep class chain.
 
 ## What `repr` gives you
 
-Printing a model prints its fields, which is more useful than the default `<Module object at 0x...>` and is one of the small things that makes models pleasant in a REPL or a log line.
+Printing a model prints its fields. This Is more handy than the default `<Module object at 0x...>` and is one of the small things that makes models pleasant in a REPL or a log line.
 
-You can keep a field out of that output with `Field(repr=False)` &mdash; the obvious use being anything secret. A password hash or an API token in a model that gets logged is a genuine incident waiting to happen, and `repr=False` is the one-word fix.
+You can keep a field out of that output with `Field(repr=False)`. The obvious use being anything secret. A password hash or an API token in a model that gets logged is a genuine incident waiting to happen. `repr=False` is the one-word fix.
 
-Note that it only affects the representation. The value is still in `model_dump()`, so a field that must never leave the process needs `exclude=True` as well, or a separate output model that simply does not have it.
+Note that it only affects the form. The value is still in `model_dump()`. A field that must never leave the process needs `exclude=True` as well, or a split output model that simply doesn't have it.
 
 ## Two mistakes worth avoiding early
 
-**Treating a model like a dictionary.** Models do not support `m["title"]`, and the instinct to reach for it usually signals code that is passing models where it should be passing dicts, or the reverse. Decide which side of the boundary a function is on: if it takes untrusted data, it takes a dict and validates it; if it takes validated data, it takes a model and uses attributes.
+**Treating a model like a dict.** Models don't support `m["title"]`. The instinct to reach for it often signals code that is passing models where it should be passing dicts, or the reverse. Decide which side of the boundary a function is on. If it takes untrusted data, it takes a dict and validates it. If it takes checked data, it takes a model and uses fields.
 
-**Putting expensive work in a model.** A model is constructed every time data arrives, and anything in a validator runs on that path. A network call, a database lookup or a file read inside a model turns validation into I/O, makes the model impossible to test without mocking, and turns a `ValidationError` into a timeout. Keep models pure: they check the shape of data using only the data. Rules that need to consult the world belong in the layer that owns the world.
+**Putting costly work in a model.** A model is made each time data arrives. Anything in a checker runs on that path. A network call, a DB lookup or a file read inside a model turns check into I/O, makes the model hopeless to test without mocking. Turns a `ValidationError` into a timeout. Keep models pure. They check the shape of data using only the data. Rules that need to consult the world belong in the layer that owns the world.
 
 ## A working shape to copy
 
-Putting the module together, the following is close to what a real model looks like once it has been through a couple of rounds of use:
+Putting the module together, these is close to what a real model looks like once it has been through a couple of rounds of use:
 
 ```python
 class Module(BaseModel):
@@ -372,12 +363,12 @@ class Module(BaseModel):
         return self.title.lower().replace(" ", "_")
 ```
 
-Frozen, because it arrives from outside and is then only read. Two required fields, because a module without a title or a track is not a module. Two defaults with obvious values. One method, because the slug is derived from the title and belongs next to it.
+Frozen, because it arrives from outside and is then only read. Two needed fields, because a module without a title or a track isn't a module. Two defaults with obvious values. One method, because the slug is derived from the title and belongs next to it.
 
-Nothing exotic, and it already gives you validation, coercion, equality, a readable `repr`, JSON in both directions and a schema. That ratio &mdash; how much you get for how little you wrote &mdash; is the reason the library is worth learning properly rather than copying from examples.
+Nothing exotic, and it already gives you check, coercion, equality, a readable `repr`, JSON in both directions and a schema. That ratio. How much you get for how little you wrote. Is the reason the library is worth learning properly rather than copying from examples.
 
 ## What to try next
 
-Change something in the editors above and watch what happens. Add a field to a model and leave it out of the constructor call. Pass `minutes` as `"11"` and print its type. Remove a field from the JSON before validating it back.
+Change a thing in the editors above and watch what happens. Add a field to a model and leave it out of the constructor call. Pass `minutes` as `"11"` and print its type. Drop a field from the JSON before checking it back.
 
-The next module is precisely about those conversions: which values Pydantic will quietly accept and turn into the type you asked for, and which it will refuse.
+The next module is just about those conversions. Which values Pydantic will quietly accept and turn into the type you asked for, and which it will refuse.

@@ -1,66 +1,66 @@
 title: 1x1 Convolutions
-intro: A kernel with no spatial extent, and why almost every modern architecture is full of them.
+intro: A kernel with no spatial extent. Why almost each modern architecture is full of them.
 
 ## The operation that looks like nothing
 
-A 3&#215;3 convolution combines a pixel with its eight neighbours. A 1&#215;1
+A 3&#215;3 convolution mixes a pixel with its eight neighbours. A 1&#215;1
 convolution has no neighbours to combine. At first reading it appears to
-multiply each pixel by a number, which is a scaling and hardly worth a layer.
+times each pixel by a number. This Is a scaling and hardly worth a layer.
 
-That reading forgets the channel dimension, and the channel dimension is where
-everything happens.
+That reading forgets the channel dim, and the channel dim is where
+all happens.
 
-A feature map is not a grid of numbers; it is a **stack** of grids, one per
-channel. A layer with 256 channels holds 256 values at every spatial position.
-A 1&#215;1 convolution stands at one position, takes all 256 values there, and
-computes a weighted sum of them. It does it again for each output
-channel, then repeats the whole thing at every position with the same
+A feature map isn't a grid of numbers. It's a **stack** of grids, one per
+channel. A layer with 256 channels holds 256 values at each spatial spot.
+A 1&#215;1 convolution stands at one spot, takes all 256 values there, and
+finds a weighted sum of them. Then does it again for each output
+channel, and then repeats the whole thing at each spot with the same
 weights.
 
-So it does not mix neighbours. It mixes **channels**. Drag the two controls
-above and watch the connection pattern: every input channel reaches every
+So it doesn't mix neighbours. It mixes **channels**. Drag the two controls
+above and watch the link pattern: each input channel reaches each
 output channel, and nothing spatial happens at all.
 
 ## It is a fully-connected layer in disguise
 
-Fix one spatial position and the operation is exactly a dense layer: `Cin`
+Fix one spatial spot and the op is just a dense layer: `Cin`
 inputs, `Cout` outputs, `Cin × Cout` weights. What makes it a convolution is
-that the same dense layer is applied, unchanged, at every position in the map.
+that the same dense layer is applied, unchanged, at each spot in the map.
 
-That is the same weight-sharing argument that motivates convolution in the
-first place. If mixing channels in a particular way is useful at one location,
-it is probably useful at all of them, and sharing the weights makes the layer
-independent of the input's spatial size.
+That is the same weight-sharing arg that motivates convolution in the
+first place. If mixing channels in a given way is handy at one location,
+it's probably handy at all of them, and sharing the weights makes the layer
+free of the input's spatial size.
 
 ## What it is actually for
 
 **Changing the channel count.** This is the common case. A 1&#215;1 convolution
 is the cheapest possible way to turn 256 channels into 64, or 64 into 256, and
-it is why the layer is sometimes called a projection.
+it's why the layer is at times called a map.
 
-**Bottlenecks.** Put a channel reduction before an expensive spatial
-convolution and an expansion after it. ResNet's bottleneck block is exactly
+**Bottlenecks.** Put a channel reduction before an costly spatial
+convolution and an expansion after it. ResNet's bottleneck block is just
 this: 1&#215;1 down to 64 channels, 3&#215;3 at 64, 1&#215;1 back up to 256.
 The 3&#215;3 &mdash; by far the costliest part &mdash; runs on a quarter of the
-channels, and the two 1&#215;1s cost almost nothing by comparison.
+channels, and the two 1&#215;1s cost almost nothing by check.
 
 Count it. A 3&#215;3 straight from 256 to 256 channels needs
 `9 × 256 × 256 ≈ 590,000` weights. The bottleneck version needs
 `256×64 + 9×64×64 + 64×256 ≈ 70,000`. Same input and output shape, an eighth of
-the parameters, and an extra two non-linearities thrown in.
+the params, and an extra two non-linearities thrown in.
 
-**Adding non-linearity without touching resolution.** Each 1&#215;1 is followed
-by an activation, so a stack of them increases representational depth at
+**Adding non-linearity without touching detail.** Each 1&#215;1 is followed
+by an activation, so a stack of them grows representational depth at
 constant spatial size and negligible cost. This was the "network in network"
 idea that named the technique.
 
-**Replacing the classifier head.** Global average pooling followed by a
+**Replacing the classifier head.** Global mean pooling followed by a
 1&#215;1 convolution does the job of a large dense layer with a fraction of the
-parameters, and works for any input size.
+params, and works for any input size.
 
 ## The arithmetic
 
-The readout above compares the two counts directly. For `Cin` input and `Cout`
+The readout above checks the two counts right. For `Cin` input and `Cout`
 output channels:
 
 | Kernel | Weights | Sees |
@@ -72,59 +72,59 @@ output channels:
 That last row is worth noticing. A **depthwise separable** convolution splits
 the work in two: a depthwise 3&#215;3 that mixes neighbours but not channels,
 followed by a 1&#215;1 that mixes channels but not neighbours. Together they
-approximate a full 3&#215;3 at roughly a ninth of the cost. MobileNet is built
-almost entirely from that pair, and half of it is 1&#215;1 convolutions.
+rough a full 3&#215;3 at roughly a ninth of the cost. MobileNet is built
+almost fully from that pair, and half of it's 1&#215;1 convolutions.
 
 ## The bottleneck, counted
 
 The 1&times;1's main job is changing the channel count cheaply, and the ResNet
 bottleneck shows why that is worth a layer. Compare a straight 3&times;3 from 256 to
 256 channels against the bottleneck that squeezes down, does the spatial work
-narrow, and expands back.
+narrow, and expands back:
 
 |design|weights|
 |---|---|
 |one 3&times;3, 256 &rarr; 256|9 &times; 256 &times; 256 = 589,824|
 |1&times;1 to 64, 3&times;3 at 64, 1&times;1 to 256|256&middot;64 + 9&middot;64&middot;64 + 64&middot;256 = 69,632|
 
-Same input and output shape, **8.5&times; fewer** parameters, and two extra
-non-linearities thrown in &mdash; because the expensive 3&times;3 now runs on a
+Same input and output shape, **8.5&times; fewer** params, and two extra
+non-linearities thrown in &mdash; because the costly 3&times;3 now runs on a
 quarter of the channels while the two 1&times;1s that resize the stack cost almost
 nothing. That is the whole reason deep ResNets are affordable. The 1&times;1 is
-doing no spatial work at all. Fix one position and it is exactly a dense
-layer, `Cin &times; Cout` weights, applied unchanged at every position. It
-contributes nothing to the [receptive field](receptive_field.html). Its entire
-value is mixing channels, which is precisely what the spatial kernels cannot afford
+doing no spatial work at all. Fix one spot and it's just a dense
+layer, `Cin &times; Cout` weights, applied unchanged at each spot &mdash; so
+it adds nothing to the [receptive field](receptive_field.html). Its entire
+value is mixing channels. This Is just what the spatial kernels can't afford
 to do at full width.
 
-Beyond resizing channels, the 1&times;1 buys non-linearity at constant resolution.
-Each is followed by an activation, so a stack of them deepens the network
-spatially for almost nothing. That was the "network in network" idea that named the
-technique. It is also half of a depthwise-separable convolution, the pointwise
-step that mixes channels after the depthwise step mixes neighbours. Two cautions. The
-bottleneck is a genuine information bottleneck, so squeezing 256 channels to 8 before
-the spatial work can cost more accuracy than the computation it saves. And a
-1&times;1 with no activation after it, stacked on another linear layer, collapses
-into one linear map, because two matrices multiplied together are a single matrix.
+Beyond resizing channels, the 1&times;1 buys non-linearity at constant detail
+&mdash; each is followed by an activation. So A stack of them deepens the network
+spatially for almost nothing. This Was the "network in network" idea that named the
+technique &mdash; and it's half of a depthwise-separable convolution, the pointwise
+step that mixes channels after the depthwise step mixes neighbours. Two cautions: the
+bottleneck is a genuine info bottleneck. So Squeezing 256 channels to 8 before
+the spatial work can cost more fit than the work it saves. And a
+1&times;1 with no activation after it, stacked on another linear layer, merges
+into one linear map, because two mats times'd together are a single mat.
 
 ## Where it goes wrong
 
-**Expecting spatial work from it.** It cannot smooth, sharpen or find an edge.
-If the receptive field needs to grow, a 1&#215;1 contributes nothing &mdash;
-its contribution to the [receptive field](receptive_field.html) is exactly
+**Expecting spatial work from it.** It can't smooth, sharpen or find an edge.
+If the receptive field needs to grow, a 1&#215;1 adds nothing &mdash;
+its part to the [receptive field](receptive_field.html) is just
 zero.
 
-**Reducing channels too aggressively.** The bottleneck is a genuine information
+**Reducing channels too aggressively.** The bottleneck is a genuine info
 bottleneck. Squeezing 256 channels to 8 before the spatial convolution saves
-computation and can cost more accuracy than it is worth.
+work and can cost more fit than it's worth.
 
-**Forgetting the activation.** A 1&#215;1 with no non-linearity after it,
-stacked on another linear layer, collapses into a single linear map. Two
-matrices multiplied together are one matrix.
+**Losing the activation.** A 1&#215;1 with no non-linearity after it,
+stacked on another linear layer, merges into a single linear map. Two
+mats times'd together are one mat.
 
 ## A convolution that looks at one pixel
 
-A 1x1 kernel has no spatial extent at all, which sounds useless. It is a per-pixel linear layer across channels, and it is what makes bottleneck blocks and depthwise-separable convolutions affordable.
+A 1x1 kernel has no spatial extent at all. This Sounds useless. It's a per-pixel linear layer across channels. It's what makes bottleneck blocks and depthwise-separable convolutions affordable.
 
 ```python-run
 import numpy as np

@@ -1,19 +1,9 @@
 title: Files and with: A Practical Guide
-intro: Opening a file gives you an object to read or write. The with statement makes sure it is closed afterwards, which is the part that is easy to skip and expensive to get wrong.
+intro: Opening a file gives you an object to read or write. The with statement makes sure it's closed afterwards. This Is the part that is easy to skip and costly to get wrong.
 
 ## A note about this page
 
-These editors run Python in your browser against an in-memory filesystem. The files are real while the program runs and vanish afterwards, so everything below behaves exactly as it would on your machine &mdash; it just does not persist.
-
-File handling in Python follows a simple pattern: open, read or write, close. The `open()` function returns a file object, and methods on that object do the work. `f.read()` returns the entire contents as a string. `f.readline()` returns one line. `f.readlines()` returns a list of lines. `f.write(text)` writes a string. `f.writelines(list_of_strings)` writes each string in the list, without adding newlines.
-
-The mode argument to `open()` controls what you can do. `"r"` reads (the default). `"w"` writes, truncating the file to zero length first. `"a"` appends, writing at the end without truncating. `"x"` creates and writes, but raises if the file already exists, which prevents accidental overwrites. Adding `"b"` to any mode opens in binary mode, where you read and write bytes instead of strings.
-
-The encoding argument matters for text files. `open("f.txt", encoding="utf-8")` reads UTF-8. Omitting it uses the platform default, which is UTF-8 on most systems but not all. Specifying the encoding explicitly prevents the bug where code works on your machine and breaks on a colleague's because their default encoding differs.
-
-The `with` statement is the correct way to open files. It guarantees the file is closed when the block ends, whether it ended normally or by raising an exception. Forgetting to close a file is not harmless: on a long-running program, open handles accumulate until the operating system refuses to open more, and on a write, data sitting in a buffer may never reach the disk.
-
-Iterating over a file object yields one line at a time: `for line in f:` reads one line into memory, processes it, and moves to the next. That is the memory-efficient way to handle large files, compared to `f.read()` which loads the entire file into a single string.
+These editors run Python in your browser against an in-memory filesystem. The files are real while the program runs and vanish afterwards. All below behaves just as it would on your machine. It just doesn't persist.
 
 ## with, and why
 
@@ -24,9 +14,9 @@ with open("notes.txt") as f:
 ```
 
 
-When the block ends the file is closed, whether it ended normally or by raising. Doing it by hand means `f.close()` in a `finally`, and forgetting it leaves the handle open &mdash; which on a long-running program eventually exhausts the operating system's limit, and on a write leaves data sitting in a buffer that never reaches the disk.
+When the block ends the file is closed, whether it ended most times or by raising. Doing it by hand means `f.close()` in a `finally`. Losing it leaves the handle open. Which on a long-running program eventually exhausts the operating system's limit. On a write leaves data sitting in a buffer that never reaches the disk.
 
-`with` is not a style preference here. It is the correct way to open a file.
+`with` isn't a style preference here. It's the correct way to open a file.
 
 ## Three ways to read
 
@@ -38,21 +28,21 @@ for line in f: # one line at a time
 ```
 
 
-The third is the one to reach for by default. It holds a single line in memory regardless of file size, so it works on a file larger than your RAM, and it reads no worse than the others.
+The third is the one to reach for by default. It holds a single line in memory even so of file size. It works on a file larger than your RAM. It reads no worse than the others.
 
 Lines keep their trailing `\n`, which is why `line.rstrip()` appears in almost every loop over a file.
 
 ## The modes
 
-"r"&nbsp;&nbsp;read, the default &mdash; raises if the file is missing<br>"w"&nbsp;&nbsp;write &mdash; <strong>truncates immediately</strong><br>"a"&nbsp;&nbsp;append &mdash; writes to the end<br>"x"&nbsp;&nbsp;create &mdash; raises if it already exists
+"r"&nbsp;&nbsp;read, the default &mdash; raises if the file is missing<br>"w"&nbsp;&nbsp;write &mdash; <strong>truncates right away</strong><br>"a"&nbsp;&nbsp;append &mdash; writes to the end<br>"x"&nbsp;&nbsp;create &mdash; raises if it already exists
 
-`"w"` is the dangerous one. It empties the file the moment it is opened, before you write anything, so an `open(path, "w")` that then raises leaves you with nothing. When you mean "add to this", `"a"` is the mode.
+`"w"` is the dangerous one. It empties the file the moment it's opened, before you write any of it. An `open(path, "w")` that then raises leaves you with nothing. When you mean "add to this", `"a"` is the mode.
 
 `"x"` is worth remembering when overwriting would be a bug: it refuses rather than destroying.
 
 ## Missing files raise
 
-`open("nope.txt")` raises `FileNotFoundError`, it does not return an empty file. Handle it, or let it propagate &mdash; both are reasonable, but do not check with `os.path.exists` first: the file can disappear between the check and the open, and the `try` handles that correctly anyway.
+`open("nope.txt")` raises `FileNotFoundError`, it doesn't return an empty file. Handle it, or let it pass. Both are reasonable. Don't check with `os.path.exists` first. The file can disappear between the check and the open. The `try` handles that right anyway.
 
 ## Paths, and why pathlib is worth the switch
 
@@ -67,34 +57,34 @@ text = data.read_text(encoding="utf-8")
 ```
 
 `read_text` and `write_text` open, read or write, and close in one call, which
-covers the common case where you want the whole file and do not need to stream
-it. For anything iterative, `data.open()` gives you the same file object `open`
+covers the common case where you want the whole file and don't need to stream
+it. For any of it iterative, `data.open()` gives you the same file object `open`
 would.
 
-`Path` also carries the questions you would otherwise ask the `os` module:
+`Path` also carries the questions you'd or else ask the `os` module:
 `.exists()`, `.suffix`, `.stem`, `.parent`, `.glob("*.txt")`.
 
 ## Encoding is not optional in practice
 
-Text mode decodes bytes into a string using an encoding, and if you do not name
+Text mode decodes bytes into a string using an encoding, and if you don't name
 one, Python uses the platform default. That default differs between machines,
-which is how a script that works on one computer produces `UnicodeDecodeError` on
-another, with data that has not changed.
+which is how a script that works on one computer makes `UnicodeDecodeError` on
+another, with data that hasn't changed.
 
-Naming it removes the whole class of problem:
+Naming it drops the whole class of problem:
 
 ```python
 open(path, encoding="utf-8")
 ```
 
-If you are handling files you did not create and cannot assume, `errors="replace"`
-lets you read something rather than crashing, at the cost of substituting the
-bytes it could not decode.
+If you're handling files you didn't create and can't assume, `errors="replace"`
+lets you read a thing rather than crashing, at the cost of substituting the
+bytes it couldn't decode.
 
 ## Writing safely
 
-Writing directly over the only copy of a file has an obvious failure mode: if the
-program dies halfway, the original is gone and the replacement is incomplete. The
+Writing right over the only copy of a file has an obvious failure mode: if the
+program dies halfway, the first is gone and the swap is incomplete. The
 standard remedy is to write beside it and rename:
 
 ```python
@@ -103,15 +93,15 @@ tmp.write_text(new_content, encoding="utf-8")
 tmp.replace(path)
 ```
 
-`replace` is atomic on the same filesystem, so a reader sees either the old file
+`replace` is atomic on the same filesystem. So A reader sees either the old file
 or the new one and never a half-written one.
 
 ## Binary mode
 
 Adding `b` - `open(path, "rb")` - skips decoding and gives bytes. That is what
-you want for images, archives, and anything you are copying rather than reading.
+you want for images, archives, and any of it you're copying rather than reading.
 The mistake in the other direction is more common: opening a text file in binary
-mode and then being puzzled that comparisons against strings all fail, because
+mode and then being puzzled that checks against strings all fail, because
 `b"abc"` and `"abc"` are different types that never compare equal.
 
 ## A worked example, start to finish
@@ -139,12 +129,12 @@ print(count, "rows, mean", round(total / count, 1))
 ```
 
 `splitlines()` rather than `split("\n")` because it handles the line endings of
-files written on other systems, and because it does not leave an empty string
+files written on other systems, and because it doesn't leave an empty string
 at the end from the final newline. `encoding="utf-8"` appears on both calls,
-because the default is the platform's and the platform's is not yours.
+because the default is the platform's and the platform's isn't yours.
 
 For a file of this size, reading it whole is fine. The version that scales is
-the loop over the open file, which holds one line at a time:
+the loop over the open file. This Holds one line at a time:
 
 ```python
 with path.open(encoding="utf-8") as f:
@@ -157,16 +147,16 @@ memory, which is the point at which it matters a great deal.
 
 ## What `with` actually is
 
-`with` is not special syntax for files. It works with any object implementing
+`with` isn't special syntax for files. It works with any object building
 two methods, and knowing that turns it from a rule into a tool.
 
 An object is a **context manager** if it has `__enter__`, called on the way in,
-and `__exit__`, called on the way out. `open` returns one, so does a lock, a
-database connection, a temporary directory, and anything from `contextlib`.
-`__exit__` runs whether the block finished normally, returned, or raised, which
-is the guarantee the whole construct exists to provide.
+and `__exit__`, called on the way out. `open` returns one. So Does a lock, a
+DB link, a temporary directory, and any of it from `contextlib`.
+`__exit__` runs whether the block finished most times, returned, or raised, which
+is the ensure the whole make exists to provide.
 
-The `as` name receives whatever `__enter__` returns &mdash; for a file, the
+The `as` name receives what `__enter__` returns. For a file, the
 file object itself. That is why `with open(...) as f` gives you `f` and why the
 name is optional when the object is only needed for its side effect.
 
@@ -183,11 +173,11 @@ def timer(label):
     print(label, round(time.perf_counter() - start, 3))
 ```
 
-Everything before the `yield` is setup, everything after is cleanup, and the
-`yield` is where the body of the `with` runs. This is the same generator
-machinery from elsewhere in the track, used for a completely different purpose.
+All before the `yield` is setup, all after is cleanup, and the
+`yield` is where the body of the `with` runs. This is the same gen
+machinery from elsewhere in the track, used for a fully different purpose.
 
-Several managers can share one statement:
+a few managers can share one statement:
 `with open(a) as f, open(b, "w") as g:` opens both and closes both, in reverse
 order, even if the second `open` raises.
 
@@ -195,70 +185,70 @@ order, even if the second `open` raises.
 
 The single most common mistake with files is treating a structured format as
 plain text. CSV is the usual victim, because it looks like `split(",")` will
-work, and it does until a field contains a comma inside quotes &mdash; at which
-point the parse silently produces the wrong number of columns.
+work, and it does until a field holds a comma inside quotes &mdash; at which
+point the parse silently makes the wrong number of columns.
 
-The standard library has a module for each of the formats you are likely to
+The standard library has a module for each of the formats you're likely to
 meet. `csv` handles quoting, embedded newlines and different delimiters, and
-`csv.DictReader` gives you dictionaries keyed by the header row. `json` handles
+`csv.DictReader` gives you dicts keyed by the header row. `json` handles
 escaping, Unicode and nesting, and round-trips to Python types.
 `configparser` reads INI files. `sqlite3` is there when a file of records has
 started to want queries.
 
-Each of them costs one import and removes an entire category of bug you would
-otherwise discover on somebody else's data. The rule is worth stating plainly:
-if the format has a name, something in the standard library already reads it.
+Each of them costs one import and drops an entire category of bug you'd
+or else discover on somebody else's data. The rule is worth stating plainly:
+if the format has a name, a thing in the standard library already reads it.
 
 ## Where file code goes wrong in practice
 
 Four failures account for most of it, and none of them are exotic.
 
-**The path is relative to the wrong place.** A relative path is resolved
+**The path is scaled to the wrong place.** A scaled path is resolved
 against the process's working directory, not the script's location, so the same
 program works when run from its own folder and fails from anywhere else. If a
 file lives beside the script, `Path(__file__).parent / "data.txt"` says so.
 
 **The file is open longer than intended.** A file opened without `with` and
-never closed keeps a handle and, on writes, keeps data in a buffer that has not
+never closed keeps a handle and, on writes, keeps data in a buffer that hasn't
 reached the disk. On a short script the interpreter cleans up on exit and the
-bug is invisible; in a long-running program it accumulates until the process
+bug is invisible. In a long-running program it builds up until the process
 hits the operating system's limit.
 
 **The encoding was assumed.** This is the failure that travels: it works on the
 machine that wrote the file and raises `UnicodeDecodeError` on a colleague's.
-Name the encoding on every text-mode open.
+Name the encoding on each text-mode open.
 
-**The write was not atomic.** A program that dies mid-write leaves a truncated
+**The write wasn't atomic.** A program that dies mid-write leaves a truncated
 file where the good one used to be. The write-then-rename pattern earlier on
-this page costs two lines and removes the possibility.
+this page costs two lines and drops the possibility.
 
 ## Line endings, and the translation you did not ask for
 
 Text mode does more than decode bytes into characters: it also translates line
-endings, and knowing that explains a family of confusing results.
+endings, and knowing that shows a family of confusing results.
 
-Windows ends lines with carriage-return plus newline; everything else uses a
+Windows ends lines with carriage-return plus newline. All else uses a
 newline alone. Python's text mode hides the difference. On reading, any of the
-variants becomes a plain newline in your string, which is why a loop over lines
-behaves identically on every platform. On writing, a newline is translated back
-into whatever the platform uses.
+variants turns a plain newline in your string. This Is why a loop over lines
+behaves the same way on each platform. On writing, a newline is translated back
+into what the platform uses.
 
 That is almost always what you want, and it has two consequences worth
-knowing. First, the string you read is not byte-for-byte what is in the file,
-so a length computed from the text can differ from the file size. Second, if
+knowing. First, the string you read isn't byte-for-byte what is in the file,
+so a length found from the text can differ from the file size. Second, if
 you open a file in binary mode you get no translation at all, and lines end
-with whatever the file actually contains &mdash; which is why text read as
+with what the file really holds. Which is why text read as
 binary often shows a trailing carriage return that seems to have come from
 nowhere.
 
 The one place it actively causes trouble is the `csv` module, which does its
 own line-ending handling. Opening a CSV without `newline=""` lets both layers
-translate, and the result is a blank line between every row on Windows. The
-documented fix is exactly that argument, and it is worth passing habitually
+translate, and the result is a blank line between each row on Windows. The
+documented fix is just that arg, and it's worth passing habitually
 rather than discovering the need for it later.
 
 `newline=""` is also what you want when reading a file whose exact line endings
-matter &mdash; a diff tool, a formatter, anything that must write back what it
+matter &mdash; a diff tool, a formatter, any of it that must write back what it
 read without silently changing it.
 
 ## Questions people ask
@@ -275,15 +265,15 @@ the file the moment it opens. `"a"` keeps what is there and writes at the end.
 open.
 
 <strong>Why does my file have blank lines between rows?</strong> On Windows,
-opening a CSV without `newline=""` produces doubled line endings. Pass
+opening a CSV without `newline=""` makes doubled line endings. Pass
 `newline=""` to `open` when using the `csv` module.
 
-<strong>Can I read a file backwards?</strong> Not directly. Read the lines and
+<strong>Can I read a file backwards?</strong> Not right. Read the lines and
 reverse them, or seek from the end if the file is too big for that.
 
 <strong>What does `errors="replace"` do?</strong> Substitutes a placeholder for
-bytes that cannot be decoded, so you get something rather than an exception.
-Useful for salvage, not for data you care about.
+bytes that can't be decoded. So You get a thing rather than an exception.
+handy for salvage, not for data you care about.
 
 <strong>Is `pathlib` slower than string paths?</strong> Marginally, and never
 enough to matter next to the file system call that follows.
@@ -292,44 +282,44 @@ enough to matter next to the file system call that follows.
 can even open it for reading and writing at once. Whether that is a good idea
 is a different question.
 
-<strong>What does `f.seek(0)` do?</strong> Moves the position back to the
+<strong>What does `f.seek(0)` do?</strong> Moves the spot back to the
 start, which is how you read a file a second time without reopening it.
 
 <strong>Why is my file empty until the program ends?</strong> Because the data
-is still in a buffer. Closing the file &mdash; which `with` does &mdash; or
+is still in a buffer. Closing the file. Which `with` does &mdash; or
 calling `f.flush()` writes it out.
 
 <strong>Should I use `os.path` or `pathlib`?</strong> `pathlib` for new code.
-`os.path` is not deprecated and you will keep meeting it, so both are worth
+`os.path` isn't deprecated and you'll keep meeting it, so both are worth
 reading fluently.
 
 <strong>How do I append to a file that might not exist?</strong> Mode `"a"`
-creates it if it is missing, so no check is needed.
+creates it if it's missing, so no check is needed.
 
 ## Recap in one screen
 
-- `with` closes the file whether the block ends normally or raises; it is the
+- `with` closes the file whether the block ends most times or raises. It's the
   correct way to open one, not a style choice.
 - Iterating the file object reads one line at a time and works on files larger
   than memory.
-- `"w"` truncates on open; `"a"` appends; `"x"` refuses to overwrite.
-- Name `encoding="utf-8"` on every text-mode open, because the default varies
+- `"w"` truncates on open. `"a"` appends. `"x"` refuses to overwrite.
+- Name `encoding="utf-8"` on each text-mode open, because the default varies
   by machine.
-- If the format has a name &mdash; CSV, JSON, INI &mdash; use the module rather
+- If the format has a name. CSV, JSON, INI. Use the module rather
   than splitting strings.
 
 ## with is a protocol, and files are only its most common user
 
 Nothing in `with` is about files. It calls `__enter__`, runs the block, and
-calls `__exit__` however the block ends &mdash; which makes it the right shape
-for anything with a matching pair of operations. Open and close. Begin and
+calls `__exit__` but the block ends. Which makes it the right shape
+for any of it with a matching pair of ops. Open and close. Begin and
 commit. Acquire and release.
 
-<ul><li><a href="../concurrency/locks_and_the_ways_they_go_wrong.html">Locks, and the ways they go wrong</a> &mdash; <code>with lock:</code> is this page's pattern with a different resource, and the reason to prefer it over <code>acquire()</code> and <code>release()</code> is one you have already met: an exception in the middle of the block still releases.</li></ul>
+<ul><li><a href="../concurrency/locks_and_the_ways_they_go_wrong.html">Locks, and the ways they go wrong</a>. <code>with lock:</code> is this page's pattern with a different resource, and the reason to prefer it over <code>acquire()</code> and <code>release()</code> is one you've already met. An exception in the middle of the block still releases.</li></ul>
 
-There is one place `with` will not save you. Opening and reading a file is a
+There's one place `with` won't save you. Opening and reading a file is a
 blocking call, and inside an `async def` it stops the event loop rather than
-yielding to it &mdash; the `with` block is scoped perfectly correctly and the
+yielding to it &mdash; the `with` block is scoped just right right and the
 whole loop is frozen for its duration.
 
-<ul><li><a href="../async_python/the_blocking_call_that_freezes_the_loop.html">The blocking call that freezes the loop</a> &mdash; where the heartbeat stops, and where to put file and CPU work so that it does not.</li></ul>
+<ul><li><a href="../async_python/the_blocking_call_that_freezes_the_loop.html">The blocking call that freezes the loop</a>. Where the heartbeat stops. Where to put file and CPU work so that it doesn't.</li></ul>

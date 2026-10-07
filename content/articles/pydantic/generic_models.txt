@@ -1,8 +1,8 @@
 title: Generic Models: One Envelope, Many Payloads
-intro: The pattern behind every paginated response, written once instead of once per resource.
+intro: The pattern behind each paginated response, written once instead of once per resource.
 ## The duplication
 
-Every API with more than one list endpoint grows the same class several times:
+each API with more than one list endpoint grows the same class a few times:
 
 ```python
 class ModulePage(BaseModel):
@@ -16,23 +16,7 @@ class LessonPage(BaseModel):
     page: int
 ```
 
-Identical apart from one type. A third resource means a third copy, and a change to pagination means editing all of them &mdash; or, more realistically, editing most of them.
-
-`Generic[T]` lets you write the envelope once: `class Page(BaseModel, Generic[T])` with `items: List[T]`. Then `Page[Module]`, `Page[Lesson]`, `Page[Track]` each produce a concrete model with the right `items` type, full validation, and a correct JSON Schema — without copying a single line.
-
-The generic is parameterised at the type level, not at runtime. `Page[Module]` creates a distinct class whose schema says `items` is an array of `Module` objects. `Page[Lesson]` creates another whose schema says `items` is an array of `Lesson` objects. Each is a real model: you can use it as a `response_model`, validate against it, and generate a typed client from its schema. There is no `Any` anywhere.
-
-Nesting works the way you would expect. A `Page[Module]` where `Module` itself contains `List[Lesson]` produces a schema that nests `Lesson` inside `Module` inside `Page`. The generic parameter flows through the entire tree.
-
-Default values and constraints on the generic model's own fields work normally. `total: int = Field(ge=0)` on the generic model applies to every parameterisation. `items: List[T] = []` gives every parameterisation an empty default.
-
-Multiple type parameters are supported. `class Pair(BaseModel, Generic[K, V])` with `key: K` and `value: V` parameterises two fields independently. `Pair[str, int]` validates string keys and integer values; `Pair[UUID, Module]` validates UUIDs and modules.
-
-`TypeVar` bounds constrain what types can fill the parameter. `T = TypeVar("T", bound=BaseModel)` means only `BaseModel` subclasses are allowed. `Page[int]` would be rejected at type-checking time — and at runtime, Pydantic validates using the bound when no specific type is provided.
-
-The practical ceiling is that a generic model's type parameter must be known at class-creation time, not at runtime from a variable. `Page[some_type]` where `some_type` comes from a config file does not work the way you would expect. If the type is truly dynamic, a generic is the wrong tool — a discriminated union or a dict is more honest.
-
-The alternative — writing one model per resource — is not wrong for two or three resources. The generic starts earning its complexity cost at about four, where the risk of divergence between copies outweighs the indirection of a type parameter.
+same apart from one type. A third resource means a third copy. A change to pagination means editing all of them. Or, more realistically, editing most of them.
 
 
 ## The duplication a generic removes
@@ -192,9 +176,9 @@ class Result(BaseModel, Generic[D, E]):
     error: Optional[E] = None
 ```
 
-Written once, used as `Result[Module, Problem]` everywhere. This is a pattern many codebases reinvent per endpoint.
+Written once, used as `Result[Module, Problem]` all over. This is a pattern many codebases reinvent per endpoint.
 
-Keep the count low. Two parameters is comfortable, three is a stretch, and beyond that the type is usually trying to be several types at once.
+Keep the count low. Two params is comfortable, three is a stretch. Beyond that the type is often trying to be a few types at once.
 
 ## What the schema does with it
 
@@ -232,41 +216,41 @@ class Page(BaseModel, Generic[T]):
     page: int = 1
 ```
 
-Inherit from `BaseModel` and `Generic[T]`, use `T` where the varying type goes, and parameterise at the point of use:
+Inherit from `BaseModel` and `plain[T]`, use `T` where the varying type goes. Parameterise at the point of use:
 
 ```python
 Page[Module](items=[...], total=1)
 ```
 
-One definition. Adding a field to the envelope reaches every resource at once, and there is no possibility of the copies disagreeing because there are no copies.
+One meaning. Adding a field to the envelope reaches each resource at once. There's no possibility of the copies disagreeing because there are no copies.
 
 ## It is still validated
 
-A common assumption is that a generic loosens things. It does not.
+A common assumption is that a plain loosens things. It doesn't.
 
-`Page[Module]` validates `items` as a list of `Module`, with every rule `Module` carries. Coercion works, constraints run, errors have the usual paths &mdash; `("items", 0, "minutes")` names the first item's field exactly as it would in a non-generic model.
+`Page[Module]` validates `items` as a list of `Module`, with each rule `Module` carries. Coercion works, constraints run, errors have the usual paths. `("items", 0, "minutes")` names the first item's field just as it would in a non-plain model.
 
-`Page[int]` validates a list of integers, with the same coercion rules as anywhere else. The parameter can be any type Pydantic understands, not only models.
+`Page[int]` validates a list of ints, with the same coercion rules as anywhere else. The param can be any type Pydantic understands, not only models.
 
 ## Each parameterisation is a real class
 
-`Page[Module]` is a distinct class, created the first time you write it and cached afterwards.
+`Page[Module]` is a distinct class, created the first time you write it and cached later.
 
-That has two consequences worth knowing.
+That has two results worth knowing.
 
-It has a name, `Page[Module]`, which appears in the schema and in error messages, so a consumer sees a specific type rather than a vague envelope.
+It has a name, `Page[Module]`. This Appears in the schema and in error messages. A consumer sees a exact type rather than a vague envelope.
 
-And building it costs something. The cost is small and paid once per parameterisation, but it means `Page[Module]` inside a hot function is doing a lookup that a module-level alias would avoid:
+And building it costs a thing. The cost is small and paid once per parameterisation. It means `Page[Module]` inside a hot function is doing a lookup that a module-level alias would avoid:
 
 ```python
 ModulePage = Page[Module]
 ```
 
-That alias is also better style: it names the type once and every use site is shorter.
+That alias is also better style: it names the type once and each use site is shorter.
 
 ## Bounded parameters
 
-An unbounded `TypeVar` can be anything, so a generic cannot assume anything about it. A bound fixes that:
+An unbounded `TypeVar` can be anything. A plain can't assume anything about it. A bound fixes that:
 
 ```python
 TResource = TypeVar("TResource", bound=Resource)
@@ -278,94 +262,94 @@ class Page(BaseModel, Generic[TResource]):
         return [item.id for item in self.items]
 ```
 
-Because the parameter must be a `Resource`, every item is guaranteed to have `id`, and the method is safe. Without the bound, mypy would object and the method would be a runtime gamble.
+Because the param must be a `Resource`, each item is sure to have `id`. The method is safe. Without the bound, mypy would object and the method would be a runtime gamble.
 
-Bounds are also documentation. `Generic[TResource]` with a bound says what kind of thing this envelope is for; a bare `T` says nothing.
+Bounds are also docs. `plain[TResource]` with a bound says what kind of thing this envelope is for. A bare `T` says nothing.
 ## Schemas and clients
 
-Each parameterisation generates its own schema, titled with the parameterised name.
+Each parameterisation makes its own schema, titled with the parameterised name.
 
-That is the practical payoff for consumers. A generated TypeScript client gets `PageModule` and `PageLesson` as distinct types, each with correctly typed `items`. Without generics you would have written those classes by hand and got the same result at more cost; with a hand-rolled `items: List[Any]` envelope you would get a client that types `items` as `any` and helps nobody.
+That is the hands-on payoff for consumers. A made TypeScript client gets `PageModule` and `PageLesson` as distinct types, each with right typed `items`. Without type vars you'd have written those classes by hand and got the same result at more cost. With a hand-rolled `items: List[Any]` envelope you'd get a client that types `items` as `any` and helps no one.
 
-FastAPI handles generic response models directly &mdash; `response_model=Page[Module]` &mdash; and documents it correctly.
+FastAPI handles plain response models right. `response_model=Page[Module]` &mdash; and docs it right.
 
 ## Inheritance and generics together
 
-A generic model can be subclassed, and a subclass can fix the parameter:
+A plain model can be subclassed, and a subclass can fix the param:
 
 ```python
 class ModulePage(Page[Module]):
     facets: Dict[str, int] = {}
 ```
 
-That gives you the shared envelope plus something specific to one resource. It is a good pattern when one endpoint genuinely needs an extra field, and a bad one if every subclass adds something &mdash; at that point the envelope is not actually shared.
+That gives you the shared envelope plus a thing exact to one resource. It's a good pattern when one endpoint truly needs an extra field. A bad one if each subclass adds a thing. At that point the envelope isn't really shared.
 
 ## When not to reach for one
 
-**Two use sites.** Two near-identical classes are easier to read than a generic. The pattern earns its keep at three or four, and the cost of waiting is small.
+**Two use sites.** Two near-same classes are easier to read than a plain. The pattern earns its keep at three or four. The cost of waiting is small.
 
-**The classes differ in more than one type.** A generic with a parameter and three overridden fields is not a shared shape.
+**The classes differ in more than one type.** A plain with a param and three overridden fields isn't a shared shape.
 
-**A union would say it better.** If the payload is one of a fixed small set rather than arbitrary, a discriminated union describes that precisely and a generic does not.
+**A union would say it better.** If the payload is one of a fixed small set rather than any, a discriminated union shows that just and a plain doesn't.
 
-**The envelope has no structure.** `Generic[T]` wrapping a single field of type `T` is a box. `TypeAdapter` validates the payload directly without one.
+**The envelope has no structure.** `plain[T]` wrapping a single field of type `T` is a box. `TypeAdapter` validates the payload right without one.
 
 ## Generics and validation cost
 
-Parameterising is not free, and it is worth knowing where the cost falls.
+Parameterising isn't free, and it's worth knowing where the cost falls.
 
-`Page[Module]` builds a class the first time it is written: resolving the type variable, constructing a schema, caching the result. Every subsequent use of the same parameterisation reuses it.
+`Page[Module]` builds a class the first time it's written. Resolving the type var, making a schema, caching the result. each later use of the same parameterisation reuses it.
 
-So the cost is per distinct parameterisation, paid once, and it is the same cost a hand-written `ModulePage` would have paid at import. Validation itself is identical &mdash; the schema the generic produces is the schema the hand-written class would have produced.
+So the cost is per distinct parameterisation, paid once. It's the same cost a hand-written `ModulePage` would have paid at import. check itself is same. The schema the plain makes is the schema the hand-written class would have made.
 
-The mistake, as with `TypeAdapter`, is doing the parameterisation somewhere repetitive. `Page[Module]` inside a function called per request performs a cached lookup each time; a module-level alias performs it once. The difference is small and free to avoid.
+The mistake, as with `TypeAdapter`, is doing the parameterisation one spot repetitive. `Page[Module]` inside a function called per request performs a cached lookup each time. A module-level alias performs it once. The gap is small and free to avoid.
 
 ## Generics with FastAPI
 
-`response_model=Page[Module]` works directly, and the documentation names the type correctly &mdash; `PageModule` in the generated schema, with `items` typed as an array of `Module`.
+`response_model=Page[Module]` works right, and the docs names the type right. `PageModule` in the made schema, with `items` typed as an array of `Module`.
 
-That is worth doing rather than falling back to an untyped envelope. A response model of `Page[Module]` gives every consumer a real type; a model with `items: List[Any]` gives them nothing, and they will write the type by hand on their side and get it wrong when yours changes.
+That is worth doing rather than falling back to an untyped envelope. A response model of `Page[Module]` gives each consumer a real type. A model with `items: List[Any]` gives them nothing. They'll write the type by hand on their side and get it wrong when yours changes.
 
-The same applies to a `Result[Data, Error]` envelope. If your API wraps every response, making that wrapper generic is the difference between a client library that knows what each endpoint returns and one that unwraps `any`.
+The same applies to a `Result[Data, Error]` envelope. If your API wraps each response, making that wrapper plain is the gap between a client library that knows what each endpoint returns and one that unwraps `any`.
 
 ## Summary
 
-`class Page(BaseModel, Generic[T])`, used as `Page[Module]`. The parameter is fully validated with its own rules. Each parameterisation is a real, named class that appears correctly in the schema and in generated clients.
+`class Page(BaseModel, plain[T])`, used as `Page[Module]`. The param is fully checked with its own rules. Each parameterisation is a real, named class that appears right in the schema and in made clients.
 
-Bound the type variable when the generic needs to rely on what the parameter provides. Alias parameterisations at module level. Keep the parameter count to one or two.
+Bound the type var when the plain needs to lean on what the param gives. Alias parameterisations at module level. Keep the param count to one or two.
 
-And reach for it at the third copy of an envelope, not the second &mdash; two similar classes are easier to read than a generic, and the pattern earns its keep as soon as there are more.
+And reach for it at the third copy of an envelope, not the second. Two similar classes are easier to read than a plain. The pattern earns its keep as soon as there are more.
 
 
 ## Mistakes people make
 
-**Reaching for one at the second copy.** Two similar classes read better than a generic. The pattern earns its keep around the third or fourth, and waiting costs almost nothing.
+**Reaching for one at the second copy.** Two similar classes read better than a plain. The pattern earns its keep around the third or fourth, and waiting costs almost nothing.
 
-**Parameterising in a hot path.** `Page[Module]` performs a cached class lookup every time it is evaluated. A module-level alias does it once and reads better at every use site.
+**Parameterising in a hot path.** `Page[Module]` performs a cached class lookup each time it's checked. A module-level alias does it once and reads better at each use site.
 
-**Leaving the type variable unbounded when methods need it.** A method calling `item.id` on a bare `T` is a runtime gamble that mypy will object to. `TypeVar(bound=Resource)` makes the guarantee real and documents what the envelope is for.
+**Leaving the type var unbounded when methods need it.** A method calling `item.id` on a bare `T` is a runtime gamble that mypy will object to. `TypeVar(bound=Resource)` makes the promise real and docs what the envelope is for.
 
-**Too many parameters.** Two is comfortable. Three is a stretch. Beyond that the type is trying to be several types, and separate classes will be clearer.
+**Too many params.** Two is comfortable. Three is a stretch. Beyond that the type is trying to be a few types. Split classes will be clearer.
 
-**Wrapping a single field.** `Generic[T]` around a model with one field of type `T` is a box. `TypeAdapter` validates the payload directly and produces a schema that describes what the data actually is.
+**Wrapping a single field.** `plain[T]` around a model with one field of type `T` is a box. `TypeAdapter` validates the payload right and makes a schema that shows what the data really is.
 
-**Assuming a generic is looser.** It is not. `Page[Module]` validates its items with every rule `Module` carries, and the error paths are identical to a hand-written envelope's.
+**given a plain is looser.** It isn't. `Page[Module]` validates its items with each rule `Module` carries. The error paths are same to a hand-written envelope's.
 
-**Forgetting `response_model=Page[Module]`.** Falling back to an untyped envelope in FastAPI means every consumer gets `any` and writes the type by hand on their side &mdash; where it will be wrong the first time yours changes.
+**Losing `response_model=Page[Module]`.** Falling back to an untyped envelope in FastAPI means each consumer gets `any` and writes the type by hand on their side. Where it will be wrong the first time yours changes.
 
 ## Reading a generic model
 
-One practical note for anyone maintaining these.
+One hands-on note for anyone keeping these.
 
-A generic reads worse than the classes it replaces, and that is the trade. `class ModulePage(BaseModel)` with three concrete fields can be understood at a glance; `class Page(BaseModel, Generic[T])` requires the reader to hold a type variable in their head and then find the parameterisations to know what it is ever filled with.
+A plain reads worse than the classes it replaces. That is the trade. `class ModulePage(BaseModel)` with three concrete fields can be understood at a glance. `class Page(BaseModel, plain[T])` needs the reader to hold a type var in their head and then find the parameterisations to know what it's ever filled with.
 
-Two things make that cost small. Name the type variable meaningfully &mdash; `TResource` says more than `T` once there is more than one. And alias the parameterisations at module level, so a reader searching for "what does the modules endpoint return" finds `ModulePage = Page[Module]` rather than an expression buried in a decorator.
+Two things make that cost small. Name the type var usefully. `TResource` says more than `T` once there's more than one. And alias the parameterisations at module level. A reader searching for "what does the modules endpoint return" finds `ModulePage = Page[Module]` rather than an formula buried in a decorator.
 
-Neither costs anything, and both turn a generic from something clever into something ordinary.
+Neither costs anything, and both turn a plain from a thing clever into a thing plain.
 
 ## A worked shape
 
-Most APIs end up with two generic envelopes and nothing else.
+Most APIs end up with two plain envelopes and nothing else.
 
 ```python
 T = TypeVar("T")
@@ -385,35 +369,35 @@ ModulePage = Page[Module]
 LessonPage = Page[Lesson]
 ```
 
-Two definitions and a handful of aliases replace one envelope class per resource, which in a system of fifteen resources is fifteen classes all saying the same thing.
+Two meanings and a handful of aliases replace one envelope class per resource. This In a system of fifteen resources is fifteen classes all saying the same thing.
 
-The aliases matter as much as the generics. They give each parameterisation a name a reader can search for, keep the parameterisation out of hot paths, and make endpoint signatures short: `response_model=ModulePage` rather than a bracketed expression in a decorator.
+The aliases matter as much as the type vars. They give each parameterisation a name a reader can search for, keep the parameterisation out of hot paths. Make endpoint signatures short: `response_model=ModulePage` rather than a bracketed formula in a decorator.
 
-Adding a field to pagination &mdash; a cursor, a `has_more` flag &mdash; is then one edit that reaches every list endpoint at once, correctly, including in the documentation and in every generated client. That is the property worth having, and the reason the pattern survives contact with a real codebase.
+Adding a field to pagination. A cursor, a `has_more` flag &mdash; is then one edit that reaches each list endpoint at once, right, including in the docs and in each made client. That is the property worth having. The reason the pattern lives contact with a real code.
 
 ## Generics and static checking
 
-One benefit that does not show up at runtime at all.
+One gain that doesn't show up at runtime at all.
 
-Mypy and Pyright understand `Generic[T]`, so `Page[Module]` is a type they can reason about. `page.items[0].title` is checked; `page.items[0].name` is flagged before the code runs.
+Mypy and Pyright understand `plain[T]`. So `Page[Module]` is a type they can reason about. `page.items[0].title` is checked. `page.items[0].name` is flagged before the code runs.
 
-A hand-written `ModulePage` gives the same static benefit, so this is not an argument for generics over concrete classes. It is an argument against the shortcut people reach for when they tire of writing envelopes:
+A hand-written `ModulePage` gives the same static gain. This isn't an arg for type vars over concrete classes. It's an arg against the shortcut people reach for when they tire of writing envelopes:
 
 ```python
 class Page(BaseModel):
     items: List[Any]
 ```
 
-That validates nothing about the payload, tells mypy nothing, and produces a schema in which `items` is an array of anything. Every consumer &mdash; your own code, a static checker, a generated client &mdash; is worse off.
+That validates nothing about the payload, tells mypy nothing. Makes a schema in which `items` is an array of anything. each consumer. Your own code, a static checker, a made client &mdash; is worse off.
 
-The choice is not really "generic or concrete". It is "typed or untyped", and the generic is what makes the typed option cheap enough that nobody reaches for the untyped one.
+The choice isn't really "plain or concrete". It's "typed or untyped". The plain is what makes the typed option cheap enough that no one reaches for the untyped one.
 
 ## Why envelopes end up generic
 
-It is worth noticing why this pattern appears in nearly every API of any size, because it is not really about generics.
+It's worth noticing why this pattern appears in nearly each API of any size. It isn't really about type vars.
 
-An API with fifteen list endpoints has fifteen responses that differ in exactly one place. That is a shape, and shapes want names. Writing fifteen classes to express one shape is the kind of duplication that looks harmless in a small codebase and becomes a maintenance surface in a large one &mdash; not because typing it is hard, but because changing it later means finding all fifteen.
+An API with fifteen list endpoints has fifteen responses that differ in just one place. That is a shape. Shapes want names. Writing fifteen classes to express one shape is the kind of duplication that looks harmless in a small code and turns a maintenance surface in a large one. Not because typing it's hard. Because changing it later means finding all fifteen.
 
-The generic is simply the language feature that lets the shape have a name. `Page` is the concept; `Page[Module]` is that concept applied. Once written, adding a field to pagination is a single edit that cannot miss a case, and every consumer sees the change consistently.
+The plain is simply the language feature that lets the shape have a name. `Page` is the concept. `Page[Module]` is that concept applied. Once written, adding a field to pagination is a single edit that can't miss a case. Each consumer sees the change always.
 
-That is the same argument as extracting a nested model, or naming a constrained type, or putting config on a shared base. Each is a different mechanism for the same principle: state a decision once, in a place that has a name, and let everything that needs it refer to that rather than to a copy.
+That is the same arg as extracting a nested model, or naming a constrained type, or putting config on a shared base. Each is a other method for the same principle. State a choice once, in a place that has a name. Let all that needs it refer to that rather than to a copy.

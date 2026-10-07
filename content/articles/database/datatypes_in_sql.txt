@@ -3,47 +3,47 @@ intro: Choosing a type decides what values are legal, how much disk they consume
 
 ## Quick Context
 
-A <strong>datatype</strong> declares what a column may contain. The database uses it to reject invalid data, to decide how many bytes each value occupies, and to choose how comparisons and arithmetic behave. Get it wrong and you pay in storage, in speed, or &mdash; worst &mdash; in silently incorrect numbers.
+A <strong>datatype</strong> declares what a column may hold. The database uses it to reject invalid data, to decide how many bytes each value occupies. And to choose how comparisons and arithmetic behave. Get it wrong and you pay in storage, in speed. Or &mdash; worst &mdash; in silently incorrect counts.
 
-The major families are integers (SMALLINT, INT, BIGINT), exact decimals (DECIMAL/NUMERIC), floating point (FLOAT, DOUBLE), strings (CHAR, VARCHAR, TEXT), dates and times (DATE, TIMESTAMP, INTERVAL), and binary (BLOB, BYTEA). Each family has trade-offs in storage size, precision and query performance.
+The major families are integers (SMALLINT, INT, BIGINT), exact decimals (DECIMAL/NUMERIC), floating point (FLOAT, DOUBLE), strings (CHAR, VARCHAR, TEXT), dates and times (DATE, TIMESTAMP, INTERVAL). And binary (BLOB, BYTEA). Each family has trade-offs in storage size, precision and query performance.
 
-The most common mistake is storing money in FLOAT. Binary floating point cannot represent 0.1 exactly, so adding 0.10 + 0.20 does not produce 0.30 — it produces a value that fails an equality check. DECIMAL(10,2) stores the digits themselves and is exact, which is why every financial schema uses it.
+The most common mistake is storing money in FLOAT. Binary floating point cannot represent 0.1 just. So adding 0.10 + 0.20 does not give 0.30 — it gives a value that fails an equality check. DECIMAL(10,2) stores the digits them and is exact. It is why each financial schema uses it.
 
-The second most common mistake is choosing INT for a primary key on a table that will grow. INT overflows at about 2.1 billion rows, and several well-known services have had emergency outages when a busy id column hit that ceiling. BIGINT for the primary key is cheap insurance on any table with unpredictable growth.
+The second most common mistake is choosing INT for a primary key on a table that will grow. INT overflows at about 2.1 billion rows. And a few well-known services have had emergency outages when a busy id column hit that ceiling. BIGINT for the primary key is cheap insurance on any table with unpredictable growth.
 
-String types differ in how they store and pad data. CHAR(n) is fixed-width and pads with spaces; VARCHAR(n) stores only the characters present plus a length byte; TEXT has no declared limit. For most columns VARCHAR is the right choice. CHAR is useful only for codes with a guaranteed fixed length (country codes, currency codes).
+String types differ in how they store and pad data. CHAR(n) is fixed-width and pads with spaces. VARCHAR(n) stores just the characters present plus a length byte. TEXT has no declared limit. For most columns VARCHAR is the right choice. CHAR is useful just for codes with a guaranteed fixed length (country codes, currency codes).
 
-Choosing the right type is choosing the right contract. The database enforces it on every insert and update, which means a type error surfaces as a constraint violation at write time rather than a wrong answer at query time.
+Choosing the right type is choosing the right contract. The database enforces it on each insert and update. It means a type error surfaces as a constraint violation at write time rather than a wrong answer at query time.
 
 ## Integers: pick the smallest that fits
 
 `SMALLINT` holds &plusmn;32,767 in 2 bytes. `INT` holds about &plusmn;2.1 billion in 4. `BIGINT` holds roughly &plusmn;9.2 quintillion in 8.
 
-The reason to care is not the bytes themselves; it is that narrower columns mean more rows per page, which means fewer disk reads and better cache use on tables with millions of rows.
+The reason to care is not the bytes them. It is that narrower columns mean more rows per page. It means fewer disk reads and better cache use on tables with millions of rows.
 
-The reason to care in the other direction is famous: an `INT` primary key runs out at about 2.1 billion rows, and several well-known services have had emergency outages when a busy id column hit that ceiling. For any table that could plausibly grow, `BIGINT` for the key is cheap insurance. For a `country_id` referencing 200 countries, `SMALLINT` is plenty.
+The reason to care in the other way is famous: an `INT` primary key runs out at about 2.1 billion rows. And a few well-known services have had emergency outages when a busy id column hit that ceiling. For any table that could plausibly grow, `BIGINT` for the key is cheap insurance. For a `country_id` referencing 200 countries, `SMALLINT` is plenty.
 
 ## Never Store Money in FLOAT
 
-<span class="mono-font">FLOAT</span> and <span class="mono-font">DOUBLE</span> are binary floating point. They cannot represent 0.1 exactly, for the same reason base 10 cannot write 1/3 exactly. Errors are tiny individually and accumulate over millions of rows.<p>The demo above adds 0.10 + 0.20 in both types. FLOAT does not produce 0.30 &mdash; it produces something imperceptibly different, and <span class="mono-font">= 0.30</span> is then false. <span class="mono-font">DECIMAL(10,2)</span> stores the digits themselves and is exact.</p><strong>Rule:</strong> money, quantities and anything a human will audit go in <span class="mono-font">DECIMAL</span> / <span class="mono-font">NUMERIC</span>. Reserve FLOAT for measurements where a rounding error in the fifteenth digit genuinely does not matter.
+<span class="mono-font">FLOAT</span> and <span class="mono-font">DOUBLE</span> are binary floating point. They cannot represent 0.1 just, for the same reason base 10 cannot write 1/3 just. Errors are tiny individually and accumulate over millions of rows.<p>The demo above adds 0.10 + 0.20 in both types. FLOAT does not give 0.30 &mdash; it gives something imperceptibly other. And <span class="mono-font">= 0.30</span> is then false. <span class="mono-font">DECIMAL(10,2)</span> stores the digits them and is exact.</p><strong>Rule:</strong> money, quantities and anything a human will audit go in <span class="mono-font">DECIMAL</span> / <span class="mono-font">NUMERIC</span>. Reserve FLOAT for measurements where a rounding error in the fifteenth digit genuinely does not matter.
 
 ## CHAR vs VARCHAR vs TEXT
 
-- <span class="mono-font">CHAR(n)</span> &mdash; fixed width. Always consumes n characters, padding with spaces. Only sensible when values really are uniform, like a 2-letter country code.
-- <span class="mono-font">VARCHAR(n)</span> &mdash; variable width up to n, storing only what you use plus a small length prefix. The sane default.
-- <span class="mono-font">TEXT</span> &mdash; unbounded. Convenient, but some engines store it separately from the row, which can slow reads.
+- <span class="mono-font">CHAR(n)</span> &mdash; fixed width. Always consumes n characters, padding with spaces. Just sensible when vals really are uniform, like a 2-letter country code.
+- <span class="mono-font">VARCHAR(n)</span> &mdash; var width up to n, storing just what you use plus a small length prefix. The sane default.
+- <span class="mono-font">TEXT</span> &mdash; unbounded. Convenient, but some engines store it apart from the row, which can slow reads.
 
-The <span class="mono-font">n</span> in <span class="mono-font">VARCHAR(n)</span> is mostly a <em>constraint</em>, not an allocation &mdash; declaring VARCHAR(255) everywhere does not waste space, but it also fails to document what the column really holds.
+The <span class="mono-font">n</span> in <span class="mono-font">VARCHAR(n)</span> is mostly a <em>constraint</em>, not an allocation &mdash; declaring VARCHAR(255) all over does not waste space. But it also fails to document what the column really holds.
 
 ## Dates, Times and the NULL Question
 
-Store dates in <span class="mono-font">DATE</span> / <span class="mono-font">TIMESTAMP</span>, never in a string. Only a real date type gives you correct sorting, date arithmetic, and rejection of 2024-02-31. For anything spanning time zones, prefer <span class="mono-font">TIMESTAMP WITH TIME ZONE</span>.
+Store dates in <span class="mono-font">DATE</span> / <span class="mono-font">TIMESTAMP</span>, never in a string. Just a real date type gives you correct sorting, date arithmetic. And rejection of 2024-02-31. For anything spanning time zones, prefer <span class="mono-font">TIMESTAMP WITH TIME ZONE</span>.
 
-Finally, every type also permits <span class="mono-font">NULL</span> unless you say <span class="mono-font">NOT NULL</span>. NULL means <em>unknown</em>, which is genuinely different from 0 or an empty string &mdash; and it propagates through arithmetic and comparisons in ways that surprise people.
+Finally, each type also permits <span class="mono-font">NULL</span> unless you say <span class="mono-font">NOT NULL</span>. NULL means <em>unknown</em>, which is genuinely other from 0 or an empty string &mdash; and it propagates through arithmetic and comparisons in ways that surprise people.
 
 ## Choosing a type is choosing a set of guarantees
 
-A column's type is not decoration. It decides what can be stored, how much space each row takes, which comparisons are legal, and which bugs are impossible.
+A column's type is not decoration. It decides what can be stored, how much space each row takes. It comparisons are legal. And which bugs are impossible.
 
 Get it right and the database rejects nonsense before it enters. Get it wrong and you spend years writing code to work around a decision made in five seconds.
 
@@ -68,29 +68,29 @@ SELECT 0.1::REAL + 0.2::REAL;      -- 0.30000001192092896
 SELECT 0.1::NUMERIC + 0.2::NUMERIC; -- 0.3
 ```
 
-Floating point stores numbers in binary, and 0.1 has no exact binary representation, exactly as 1/3 has no exact decimal one. The error is tiny per operation and accumulates across millions of them, which is how a ledger ends up a few pence out and nobody can say where.
+Floating point stores counts in binary. And 0.1 has no exact binary form, just as 1/3 has no exact decimal one. The error is tiny per step and accumulates across millions of them. It is how a ledger ends up a few pence out and nobody can say where.
 
-Use `NUMERIC(12, 2)` &mdash; twelve digits in total, two after the point &mdash; for currency. It is exact, it compares reliably, and it is slower in a way no financial application will ever notice.
+Use `NUMERIC(12, 2)` &mdash; twelve digits in total, two after the point &mdash; for currency. It is exact, it checks reliably. And it is slower in a way no financial application will ever notice.
 
-The common alternative is storing minor units (pence, cents) as a `BIGINT`, which is exact by construction and avoids decimal arithmetic entirely. Both are correct; pick one and be consistent, because mixing them across a codebase causes its own class of bug.
+The common option is storing minor units (pence, cents) as a `BIGINT`. It is exact by construction and avoids decimal arithmetic fully. Both are correct. Pick one and be consistent, since mixing them across a codebase causes its own class of bug.
 
 Floats are the right choice for genuine measurements &mdash; temperatures, distances, sensor readings &mdash; where a relative error of 10&#8315;&#185;&#8309; is irrelevant and the speed matters.
 
 ## Text, and the CHAR/VARCHAR/TEXT question
 
-`CHAR(n)` is fixed length and pads with spaces &mdash; useful for genuinely fixed codes such as a two-letter country code, and a nuisance everywhere else because the padding turns up in comparisons.
+`CHAR(n)` is fixed length and pads with spaces &mdash; useful for genuinely fixed codes such as a two-letter country code. And a nuisance all over else since the padding turns up in comparisons.
 
-`VARCHAR(n)` is variable length with a maximum. `TEXT` is variable length with no limit.
+`VARCHAR(n)` is var length with a max. `TEXT` is var length with no limit.
 
-In PostgreSQL, `VARCHAR(n)` and `TEXT` are stored identically and perform identically &mdash; the length is a constraint, not an optimisation. So the question becomes: is `n` a real business rule? A country code of exactly 2, yes. A `VARCHAR(255)` for a name is an inherited habit from old MySQL row formats and constrains nothing meaningful.
+In PostgreSQL, `VARCHAR(n)` and `TEXT` are stored identically and do identically &mdash; the length is a constraint, not an optimisation. So the question turns: is `n` a real business rule? A country code of just 2, yes. A `VARCHAR(255)` for a name is an inherited habit from old MySQL row formats and constrains nothing meaningful.
 
-In MySQL the picture is a little different: `VARCHAR` columns participate in the row size limit and index prefix rules in ways `TEXT` does not, so the choice has more consequences there.
+In MySQL the picture is a little other: `VARCHAR` columns participate in the row size limit and index prefix rules in ways `TEXT` does not. So the choice has more consequences there.
 
-Two related choices worth making deliberately: the <strong>collation</strong>, which decides sorting and case sensitivity, and whether to store emails and usernames in a case-insensitive type such as PostgreSQL's `CITEXT`, which prevents "Alice@example.com" and "alice@example.com" being two different users.
+Two tied choices worth making deliberately: the <strong>collation</strong>, which decides sorting and case sensitivity. And whether to store emails and usernames in a case-insensitive type such as PostgreSQL's `CITEXT`. It stops "Alice@case.com" and "alice@case.com" being two other users.
 
 ## What the engine does with a type you declared
 
-A column's declared type is a promise about what goes in it, and how strictly that promise is kept differs sharply between engines. SQLite is the permissive end of that range, which makes it a useful place to see what a type is actually for.
+A column's declared type is a promise about what goes in it. And how strictly that promise is kept differs sharply between engines. SQLite is the permissive end of that range. It makes it a useful place to see what a type is really for.
 
 ```sql-run
 -- SQLite has five storage classes: NULL, INTEGER, REAL, TEXT, BLOB.
@@ -125,7 +125,7 @@ FROM t;
 -- code written against one surprises you on the other.
 ```
 
-The practical consequences of type affinity show up in comparisons and in how SQLite handles dates as plain text.
+The real consequences of type affinity show up in comparisons and in how SQLite handles dates as plain text.
 
 ```sql-run
 -- The practical consequences are in comparisons.
@@ -166,59 +166,59 @@ LIMIT 3;
 ## Experiments to try
 
 1. <strong>Select TINYINT and enter 200.</strong> Rejected &mdash; out of range. Now try 100, which fits comfortably.
-2. <strong>Select INT and enter 3000000000.</strong> Overflow again, at exactly the boundary that has broken many real systems.
-3. <strong>Compare the storage figures.</strong> Switching a column from BIGINT to INT on a billion-row table saves four gigabytes.
-4. <strong>Read the money demo closely.</strong> The FLOAT sum is not 0.30, and the equality test fails. That is not a bug in this page &mdash; it is how binary floating point works everywhere.
+2. <strong>Select INT and enter 3000000000.</strong> Overflow again, at just the edge that has broken many real systems.
+3. <strong>Check the storage figures.</strong> Switching a column from BIGINT to INT on a billion-row table saves four gigabytes.
+4. <strong>Read the money demo closely.</strong> The FLOAT sum is not 0.30. And the equality test fails. That is not a bug in this page &mdash; it is how binary floating point works all over.
 5. <strong>Select CHAR(10) and type a short word</strong> to see how much of the fixed width is wasted on padding.
 
 ## Worth remembering
 
-Pick the narrowest type that will hold every legitimate value, use DECIMAL for anything monetary, use real date types for dates, and add NOT NULL wherever a missing value would be meaningless. These choices are hard to change later and quietly govern correctness forever.
+Pick the narrowest type that will hold each legitimate value, use DECIMAL for anything monetary, use real date types for dates. And add NOT NULL wherever a missing value would be meaningless. These choices are hard to change later and quietly govern correctness forever.
 
 ## Dates, times and time zones
 
-This is where subtle bugs live, and one distinction prevents most of them.
+This is where subtle bugs live, and one distinction stops most of them.
 
-<strong>`TIMESTAMP WITHOUT TIME ZONE`</strong> stores a wall-clock reading with no idea where in the world it was taken. Two servers in different regions will interpret the same stored value differently.
+<strong>`TIMESTAMP WITHOUT TIME ZONE`</strong> stores a wall-clock reading with no idea where in the world it was taken. Two servers in other regions will interpret the same stored value differently.
 
-<strong>`TIMESTAMPTZ` (with time zone)</strong> converts the input to UTC on the way in and back to the client's zone on the way out. It represents an actual moment in time, unambiguously.
+<strong>`TIMESTAMPTZ` (with time zone)</strong> turns the input to UTC on the way in and back to the client's zone on the way out. It represents an actual moment in time, unambiguously.
 
-For anything that records when something happened, use the time-zone-aware type and store UTC. Convert to local time for display only, at the edge of the system.
+For anything that records when something happened, use the time-zone-aware type and store UTC. Turn to local time for display just, at the edge of the system.
 
-`DATE` for birthdays and anniversaries is correct precisely because they are <em>not</em> moments in time &mdash; a birthday does not shift when you fly to another country.
+`DATE` for birthdays and anniversaries is correct precisely since they are <em>not</em> moments in time &mdash; a birthday does not shift when you fly to another country.
 
-Two further traps. `BETWEEN '2026-01-01' AND '2026-01-31'` on a timestamp column silently excludes everything after midnight on the 31st; use `>= '2026-01-01' AND < '2026-02-01'`. And storing a duration as a timestamp is a category error &mdash; use `INTERVAL` or an integer number of seconds.
+Two more traps. `BETWEEN '2026-01-01' AND '2026-01-31'` on a timestamp column silently excludes all after midnight on the 31st. Use `>= '2026-01-01' AND < '2026-02-01'`. And storing a duration as a timestamp is a category error &mdash; use `INTERVAL` or an integer count of seconds.
 
 ## JSON, arrays and enums
 
 Modern relational engines carry types that used to be reasons to leave.
 
-<strong>`JSONB`</strong> (PostgreSQL) stores a parsed, indexable JSON document. It is genuinely useful for variable payloads &mdash; event bodies, per-tenant settings, third-party API responses. It becomes a mistake when fields you regularly filter, sort or join on are buried inside it: those belong in columns, where they can be typed, constrained and indexed properly. A reasonable rule is to promote a field to a column as soon as it appears in a `WHERE` clause twice.
+<strong>`JSONB`</strong> (PostgreSQL) stores a parsed, indexable JSON document. It is genuinely useful for var payloads &mdash; event bodies, per-tenant settings, third-party API replies. It turns a mistake when fields you often filter, sort or join on are buried inside it: those belong in columns. There they can be typed, constrained and indexed well. A reasonable rule is to promote a field to a column as soon as it appears in a `WHERE` clause twice.
 
-<strong>Arrays</strong> hold several values in one column. Convenient for tags, and a trap for anything that will later need its own attributes &mdash; the moment you want "when was this tag added", you need a junction table.
+<strong>Arrays</strong> hold a few vals in one column. Convenient for tags, and a trap for anything that will later need its own attributes &mdash; the moment you want "when was this tag added", you need a junction table.
 
-<strong>`ENUM`</strong> constrains a column to a fixed list. It documents intent and is compact, but adding a value requires a schema change in most engines. A small lookup table with a foreign key is more flexible and usually the better long-term choice.
+<strong>`ENUM`</strong> constrains a column to a fixed list. It documents intent and is compact. But adding a value needs a schema change in most engines. A small lookup table with a foreign key is more flexible and often the better long-term choice.
 
-<strong>`UUID`</strong> as a primary key trades sortability and 16 bytes for the ability to generate ids on the client without coordination. Random UUIDs fragment B-tree indexes because inserts land everywhere; UUIDv7, which is time-ordered, avoids that and is the version to prefer for keys.
+<strong>`UUID`</strong> as a primary key trades sortability and 16 bytes for the ability to generate ids on the client without coordination. Random UUIDs fragment B-tree indexes since inserts land all over. UUIDv7, which is time-ordered, avoids that and is the version to prefer for keys.
 
 ## Questions people ask
 
-<strong>Does the type affect index size?</strong> Yes, directly. A `BIGINT` index is twice the size of an `INT` one, and a `TEXT` index on long values can be enormous.
+<strong>Does the type affect index size?</strong> Yes, right. A `BIGINT` index is twice the size of an `INT` one. And a `TEXT` index on long vals can be enormous.
 
 <strong>Should I use `BOOLEAN` or a 0/1 integer?</strong> `BOOLEAN` where the engine has it &mdash; it is self-documenting and compact. Remember it has three states with NULL.
 
 <strong>What happens if a value overflows?</strong> A proper engine raises an error. MySQL in non-strict mode historically truncated silently, which is why strict mode matters.
 
-<strong>Can I change a column's type later?</strong> Yes, with `ALTER TABLE`, but it typically rewrites the table and holds a lock &mdash; expensive on large tables and a planned operation on live systems.
+<strong>Can I change a column's type later?</strong> Yes, with `ALTER TABLE`. But it often rewrites the table and holds a lock &mdash; costly on large tables and a planned step on live systems.
 
-<strong>Is `VARCHAR(50)` faster than `VARCHAR(500)`?</strong> Not in PostgreSQL, where storage is identical. The limit is a constraint; use it to express a real rule, not a guess.
+<strong>Is `VARCHAR(50)` faster than `VARCHAR(500)`?</strong> Not in PostgreSQL, where storage is identical. The limit is a constraint. Use it to express a real rule, not a guess.
 
-<strong>How should I store phone numbers?</strong> As text, always. They have leading zeros, plus signs and country prefixes, and no arithmetic is ever performed on them.
+<strong>How should I store phone counts?</strong> As text, always. They have leading zeros, plus signs and country prefixes. And no arithmetic is ever done on them.
 
 ## Recap in one screen
 
 - Types are constraints: they decide what can be stored and which errors are impossible.
-- `NUMERIC` or minor-unit integers for money; floats only for measurements.
-- Pick the narrowest integer that fits, but use `BIGINT` for keys on tables that could grow.
-- `TIMESTAMPTZ` in UTC for moments in time; `DATE` for calendar dates.
-- `JSONB` for genuinely variable data; promote anything you filter on into a real column.
+- `NUMERIC` or minor-unit integers for money. Floats just for measurements.
+- Pick the narrowest integer that fits. But use `BIGINT` for keys on tables that could grow.
+- `TIMESTAMPTZ` in UTC for moments in time. `DATE` for calendar dates.
+- `JSONB` for genuinely var data. Promote anything you filter on into a real column.

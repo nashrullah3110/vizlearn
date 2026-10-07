@@ -1,30 +1,14 @@
 title: Dependency Overrides
-intro: Swapping a dependency for a test, and why that makes the whole tier practical.
+intro: Swapping a dependency for a test, and why that makes the whole tier hands-on.
 ## The mechanism
 
 ```python
 app.dependency_overrides[get_db] = fake_db
 ```
 
-A dictionary on the app, mapping the real callable to a replacement. When FastAPI resolves a dependency it checks that dictionary first, and uses the stand-in if one is registered.
+A dict on the app, mapping the real callable to a swap. When FastAPI resolves a dependency it checks that dict first. Uses the stand-in if one is registered.
 
-That is the whole feature. It needs no test framework, no patching, and no change to the endpoints.
-
-The override replaces the callable at resolution time, not at import time. The endpoints still declare `Depends(get_db)`, and they do not know the implementation changed. The contract — "this parameter is a database session" — is the same; only the provider is different.
-
-Clearing the overrides restores the originals. `app.dependency_overrides.clear()` removes all overrides, and `del app.dependency_overrides[get_db]` removes one. In tests, clearing in a fixture teardown (or an `addfinalize`) prevents one test's overrides from leaking into another.
-
-The replacement must have a compatible signature. If `get_db` returns a `Session`, the override should return something that behaves like a `Session` — or at least like the subset the handler uses. A `dict` works if the handler only calls `.get()` and `.set()`; a full `MagicMock` works if you do not care about types.
-
-Sub-dependencies are also overridable. `app.dependency_overrides[get_token] = lambda: "test-token"` replaces the lowest-level dependency, and `current_user` — which depends on `get_token` — receives the fake token. This lets you test each layer independently without building the entire dependency tree.
-
-Overrides work on class dependencies too. `app.dependency_overrides[Pagination] = lambda: Pagination(limit=5, offset=0)` replaces the class construction. The handler receives the overridden instance, and the query parameters are ignored.
-
-The override dictionary is on the app instance, not on the router. Router-level overrides do not exist. If two routers share a dependency and you want different overrides for each, the solution is a separate test client per router or a per-test override that targets the specific dependency each router uses.
-
-This is why the whole dependency tier is practical. Without overrides, testing an endpoint that touches a database requires a running database, test data, and cleanup. With overrides, the endpoint receives a fake that returns canned data, the test runs in milliseconds, and nothing touches a real database. The dependency system pays for itself in the test suite.
-
-Overrides also work in non-test scenarios. A staging environment that reads from a cache instead of a database can override `get_db` with `get_cache`. A feature-flagged endpoint can override a dependency to switch between implementations. The mechanism is the same dictionary; the use case is broader than testing.
+That is the whole feature. It needs no test framework, no patching. No change to the endpoints.
 
 
 ## Replacing one for a test
@@ -118,11 +102,11 @@ print()
 print("current_user and admin were never mentioned, and both changed.")
 ```
 
-Overriding a dependency replaces it wherever it appears, including deep inside a tree.
+replacing a dependency replaces it wherever it appears, including deep inside a tree.
 
-So overriding `token` at the bottom changes `current_user` and `admin_only` above it, without either being mentioned. That is usually what you want: fake the one thing at the edge &mdash; the network call, the database, the clock &mdash; and let the real logic above it run unchanged.
+So replacing `token` at the bottom changes `current_user` and `admin_only` above it, without either being mentioned. That is often what you want. Fake the one thing at the edge. The network call, the DB, the clock. And let the real logic above it run unchanged.
 
-It is also the reason to fake as low as possible. Overriding `admin_only` skips the permission logic entirely; overriding `token` lets that logic actually be tested.
+It's also the reason to fake as low as possible. replacing `admin_only` skips the permission logic fully. Replacing `token` lets that logic really be tested.
 
 ## Router-level dependencies too
 
@@ -206,67 +190,67 @@ print("lifecycle:", log)
 ```
 ## Why it matters
 
-Everything in this tier pushes requirements into dependencies: the database session, the current user, the permission check, the filters. That is good design and it would be a problem if those were hard to replace, because every test would then need a real database and a real token.
+all in this tier pushes needs into dependencies. The DB session, the current user, the permission check, the filters. That is good design and it would be a problem if those were hard to replace. Each test would then need a real DB and a real token.
 
-Overrides are the release valve. The endpoint keeps declaring `Depends(get_db)`; the test decides what `get_db` means.
+replaces are the release valve. The endpoint keeps declaring `Depends(get_db)`. The test decides what `get_db` means.
 
-Two consequences worth noticing. Tests get faster, because nothing real is constructed. And tests get *narrower* &mdash; a test for a handler's logic is not also a test of authentication, which means a broken token service does not fail two hundred unrelated tests.
+Two results worth noticing. Tests get faster. Nothing real is made. And tests get *narrower*. A test for a handler's logic isn't also a test of authentication. This Means a broken token service doesn't fail two hundred unrelated tests.
 
 ## The key is the function object
 
-This is the one thing that goes wrong, and the symptom is confusing: the override appears to be ignored.
+This is the one thing that goes wrong. The symptom is confusing: the replace appears to be skipped.
 
-The dictionary is keyed by identity, so the object you use as the key must be the same object the endpoints depend on. If your test imports `get_db` from `app.db` and the router imported it from `.db`, and those resolve to two different module objects, you have two different functions and the override targets the wrong one.
+The dict is keyed by identity. The object you use as the key must be the same object the endpoints depend on. If your test imports `get_db` from `app.db` and the router imported it from `.db`. Those resolve to two other module objects, you've two other functions and the replace targets the wrong one.
 
-The fix is to be consistent about import paths. When an override silently does nothing, compare the two objects before looking anywhere else.
+The fix is to be steady about import paths. When an replace silently does nothing, compare the two objects before looking anywhere else.
 ## Router and app level too
 
-An override replaces the function wherever it is declared, which includes `dependencies=[...]` on a router or the app.
+An replace replaces the function wherever it's declared. This Includes `dependencies=[...]` on a router or the app.
 
-That is what makes a router-wide authentication requirement pleasant to test. Without it, every test of every route under `/admin` would need a valid key.
+That is what makes a router-wide authentication need pleasant to test. Without it, each test of each route under `/admin` would need a valid key.
 
 ## Clean up
 
-Overrides live on the app object, which usually outlives a single test.
+replaces live on the app object. This Often outlives a single test.
 
-A test that sets one and does not remove it changes every test that runs afterwards, and the failure appears somewhere unrelated with no obvious cause. In pytest the standard shape is a fixture that sets the override, yields, and clears it &mdash; the same setup/teardown discipline as a `yield` dependency, applied to the test.
+A test that sets one and doesn't drop it changes each test that runs later. The failure appears one spot unrelated with no obvious cause. In pytest the standard shape is a fixture that sets the replace, yields. Clears it. The same setup/teardown discipline as a `yield` dependency, applied to the test.
 
-`app.dependency_overrides.clear()` removes everything; `del app.dependency_overrides[fn]` removes one.
+`app.dependency_overrides.clear()` drops all. `del app.dependency_overrides[fn]` drops one.
 
 ## Beyond tests
 
-Occasionally useful outside testing.
+at times handy outside testing.
 
-A **local development** override can swap a real payment provider for a recording stub, or a real mailer for one that writes to a file.
+A **local development** replace can swap a real payment provider for a recording stub, or a real mailer for one that writes to a file.
 
 A **demo build** can replace a live data source with fixtures.
 
-Both are legitimate, and both deserve care: an override registered in production code is a piece of behaviour that does not appear in any endpoint's signature. If it is not a test, make it loud &mdash; guarded by an explicit setting, logged at startup, and impossible to enable by accident.
+Both are legitimate, and both deserve care: an replace registered in production code is a piece of action that doesn't appear in any endpoint's signature. If it isn't a test, make it loud. Guarded by an clear setting, logged at startup, and hopeless to enable by accident.
 
 ## What this tier gives you
 
-Dependencies let an endpoint declare what it needs. Sub-dependencies let those requirements compose. `yield` gives them a lifetime. Router-level declarations apply them to a section. Overrides let all of it be replaced at the edges.
+Dependencies let an endpoint declare what it needs. Sub-dependencies let those needs compose. `yield` gives them a lifetime. Router-level declarations apply them to a section. replaces let all of it be replaced at the edges.
 
-Together that is most of what separates a FastAPI application that stays testable from one that does not &mdash; and none of it requires anything beyond functions and a default argument.
+Together that is most of what splits a FastAPI use that stays testable from one that doesn't. And none of it needs anything beyond functions and a default arg.
 
 
 ## Mistakes people make
 
-**Two import paths for one function.** The dictionary is keyed by identity, so `from app.db import get_db` and `from .db import get_db` can be different objects. The override then targets a function nobody depends on, and does nothing, silently.
+**Two import paths for one function.** The dict is keyed by identity. `from app.db import get_db` and `from .db import get_db` can be other objects. The replace then targets a function no one depends on, and does nothing, silently.
 
-**Not clearing between tests.** Overrides live on the app. One test that forgets makes a later, unrelated test fail with no visible cause.
+**Not clearing between tests.** replaces live on the app. One test that forgets makes a later, unrelated test fail with no visible cause.
 
-**Faking too high in the tree.** Overriding `admin_only` skips the permission logic you meant to test. Override the edge - the token, the database, the clock - and let the real logic run.
+**Faking too high in the tree.** replacing `admin_only` skips the permission logic you meant to test. replace the edge - the token, the DB, the clock - and let the real logic run.
 
-**Using them in production without saying so.** An override is behaviour that appears in no endpoint signature. If it is not a test, gate it behind an explicit setting and log it at startup.
+**Using them in production without saying so.** An replace is action that appears in no endpoint signature. If it isn't a test, gate it behind an clear setting and log it at startup.
 
-**Forgetting they work on router-level dependencies.** They do, which is what makes a section-wide auth requirement testable.
+**Losing they work on router-level dependencies.** They do. This Is what makes a section-wide auth need testable.
 
-**Overriding instead of designing.** If a test needs six overrides, the endpoint probably depends on six things it should not.
+**replacing instead of designing.** If a test needs six replaces, the endpoint probably depends on six things it shouldn't.
 
 ## The shape in pytest
 
-The standard arrangement is a fixture that sets, yields and clears - the same discipline as a `yield` dependency:
+The standard setup is a fixture that sets, yields and clears - the same discipline as a `yield` dependency:
 
 ```python
 @pytest.fixture
@@ -276,89 +260,89 @@ def client():
     app.dependency_overrides.clear()
 ```
 
-Every test using that fixture gets the fake, and no test can leak it into the next one. It is four lines, and it is the difference between a suite that is trustworthy and one that fails differently depending on ordering.
+each test using that fixture gets the fake. No test can leak it into the next one. It's four lines. It's the gap between a suite that is trustworthy and one that fails differently based on sorting.
 
 
 ## What good test structure looks like
 
-Overrides work best with a small amount of structure around them.
+replaces work best with a small amount of structure around them.
 
-**One fixture per fake.** A `fake_db` fixture, a `fake_user` fixture, each setting one override and clearing it. Tests then compose the ones they need rather than sharing a single do-everything client.
+**One fixture per fake.** A `fake_db` fixture, a `fake_user` fixture, each setting one replace and clearing it. Tests then compose the ones they need rather than sharing a single do-all client.
 
-**Fake at the edges.** Override the database, the clock, the HTTP client, the token decoder. Do not override the permission logic, the filters, or anything you are trying to test.
+**Fake at the edges.** replace the DB, the clock, the HTTP client, the token decoder. Don't replace the permission logic, the filters, or anything you're trying to test.
 
-**Prefer real objects to mocks.** A `fake_db` returning a dict or an in-memory list exercises more of the real code path than a mock that asserts it was called. The point of overriding is to remove the network, not the logic.
+**Prefer real objects to mocks.** A `fake_db` returning a dict or an in-memory list exercises more of the real code path than a mock that asserts it was called. The point of replacing is to drop the network, not the logic.
 
 **Keep one test with nothing overridden.** An integration test that exercises the real tree catches the case where the fakes have quietly diverged from what they stand in for - which is the failure mode of heavy faking.
 
 ## The limits
 
-Overrides replace a dependency, and that is all they do.
+replaces replace a dependency, and that is all they do.
 
-They cannot change what an endpoint declares, so an endpoint depending on something unnecessary still depends on it in tests. They do not apply to code called *inside* a handler - a handler that imports and calls `get_session()` directly is untouched by any override, which is the strongest practical argument for declaring dependencies rather than reaching for them.
+They can't change what an endpoint declares. An endpoint based on a thing not needed still depends on it in tests. They don't apply to code called *inside* a handler - a handler that imports and calls `get_session()` right is untouched by any replace. This Is the strongest hands-on arg for declaring dependencies rather than reaching for them.
 
-And they are per app object. Tests that construct their own `FastAPI()` per module get isolation for free; tests that share one imported app need the discipline of clearing.
+And they're per app object. Tests that make their own `FastAPI()` per module get alone for free. Tests that share one imported app need the discipline of clearing.
 
 ## Beyond the test suite
 
 Two uses outside testing are legitimate, and both deserve care.
 
-**Local development.** Swapping a payment provider for a recording stub, or a mailer for one that writes to a file, lets a developer run the whole application without credentials for anything external. It is genuinely useful and it is one setting away from being enabled somewhere it should not be.
+**Local development.** Swapping a payment provider for a recording stub, or a mailer for one that writes to a file, lets a developer run the whole use without credentials for anything external. It's truly handy and it's one setting away from being enabled one spot it shouldn't be.
 
-**Demonstrations.** Replacing a live data source with fixtures gives a stable demo that does not depend on the state of a shared environment.
+**Demos.** Replacing a live data source with fixtures gives a stable demo that doesn't depend on the state of a shared setting.
 
-The rule for both: an override registered outside a test is behaviour that appears in no endpoint signature and no schema. Gate it behind an explicit setting, log it loudly at startup, and make the default off. A reader of the code should not have to know the overrides exist to understand what an endpoint does.
+The rule for both: an replace registered outside a test is action that appears in no endpoint signature and no schema. Gate it behind an clear setting, log it loudly at startup. Make the default off. A reader of the code shouldn't have to know the replaces exist to understand what an endpoint does.
 
 ## What it says about the design
 
-A final observation. If a test needs six overrides to run one endpoint, the overrides are not the problem - the endpoint is depending on six things.
+A final finding. If a test needs six replaces to run one endpoint, the replaces aren't the problem - the endpoint is based on six things.
 
-Overrides make dependencies replaceable; they do not make an over-connected endpoint simple. When the fixture list grows, the useful question is whether the handler is doing work that belongs in a service, or depending on things it does not actually need.
+replaces make dependencies replaceable. They don't make an over-connected endpoint simple. When the fixture list grows, the handy question is whether the handler is doing work that belongs in a service, or based on things it doesn't really need.
 
-Used that way the feature is also a design signal: the number of things you have to fake to test an endpoint is a fair measure of how entangled it is.
+Used that way the feature is also a design signal. The number of things you've to fake to test an endpoint is a fair measure of how entangled it's.
 
 
 ## Why this closes the tier
 
-The five modules in this tier fit together, and overrides are what make the arrangement practical rather than merely elegant.
+The five modules in this tier fit together. Replaces are what make the setup hands-on rather than merely elegant.
 
-Dependencies let an endpoint declare what it needs. Sub-dependencies let those requirements build on each other. `yield` gives them a lifetime. Router-level declarations apply them to a whole section.
+Dependencies let an endpoint declare what it needs. Sub-dependencies let those needs build on each other. `yield` gives them a lifetime. Router-level declarations apply them to a whole section.
 
-Every one of those pushes real things - a database, a token service, a clock - further from the handler and closer to the edge of the application. Without a way to replace them, that would make the endpoints harder to test rather than easier, and the whole approach would be a net loss.
+each one of those pushes real things - a DB, a token service, a clock - further from the handler and closer to the edge of the use. Without a way to replace them, that would make the endpoints harder to test rather than easier. The whole approach would be a net loss.
 
-Overrides invert it. Because the edges are declared rather than reached for, they can be swapped, and a handler that depends on four external things can be tested with none of them present.
+replaces invert it. Because the edges are declared rather than reached for, they can be swapped. A handler that depends on four external things can be tested with none of them present.
 
-That is the trade this tier is really about: declaring requirements instead of acquiring them. Everything else follows from it.
+That is the trade this tier is really about: declaring needs instead of acquiring them. all else follows from it.
 
 ## Summary
 
-`app.dependency_overrides[real] = fake` replaces a dependency everywhere it appears, including in a tree and on a router.
+`app.dependency_overrides[real] = fake` replaces a dependency all over it appears, including in a tree and on a router.
 
-The key is the function object, so inconsistent import paths are the usual reason an override silently does nothing. Overrides live on the app, so clear them between tests or one quietly changes the next.
+The key is the function object. Inconsistent import paths are the usual reason an replace silently does nothing. replaces live on the app. So Clear them between tests or one quietly changes the next.
 
-Fake at the edges - the database, the clock, the token - and let the real logic above run. Keep one test with nothing overridden, so the fakes cannot drift from what they stand in for without something failing.
+Fake at the edges - the DB, the clock, the token - and let the real logic above run. Keep one test with nothing overridden. The fakes can't drift from what they stand in for without a thing failing.
 
 
 ## Summary, in one line
 
-`app.dependency_overrides[real] = fake` swaps a dependency everywhere it appears - keyed by the function object, cleared between tests, and applied as low in the tree as possible so the logic above it still runs.
+`app.dependency_overrides[real] = fake` swaps a dependency all over it appears - keyed by the function object, cleared between tests. Applied as low in the tree as possible so the logic above it still runs.
 
 
 ## Two rules
 
-**Key on the same object the endpoints use.** Inconsistent imports are the reason an override silently does nothing.
+**Key on the same object the endpoints use.** Inconsistent imports are the reason an replace silently does nothing.
 
-**Clear between tests.** A leaked override fails a later, unrelated test with no visible cause.
+**Clear between tests.** A leaked replace fails a later, unrelated test with no visible cause.
 
 
 ## Where it sits in the tier
 
 Last of the five, and the one that justifies the other four.
 
-Pushing requirements into dependencies moves real things - databases, tokens, clocks - to the edge of the application. That would make testing harder if the edge could not be replaced. Overrides are what make it replaceable, and therefore what makes the whole approach pay.
+Pushing needs into dependencies moves real things - DBs, tokens, clocks - to the edge of the use. That would make testing harder if the edge couldn't be replaced. replaces are what make it replaceable. So what makes the whole approach pay.
 
 ## Next
 
-The runtime: what actually happens when a request arrives, why an `async def` endpoint that makes a blocking call stalls every other request in the process, and the parts of the framework that need a real event loop.
+The runtime: what really happens when a request arrives, why an `async def` endpoint that makes a blocking call stalls every other request in the process. The parts of the framework that need a real event loop.
 
-And the failure to watch for is silence: an override that targets a different object than the endpoints use does nothing at all, reports nothing, and leaves the test passing against the real dependency.
+And the failure to watch for is silence. An replace that targets a other object than the endpoints use does nothing at all, reports nothing. Leaves the test passing against the real dependency.

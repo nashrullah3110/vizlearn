@@ -3,24 +3,24 @@ intro: Without a non-linearity between layers, stacking them is pointless: any c
 
 ## Why depth needs a bend
 
-Two linear layers in a row compute <span class="mono-font">W<sub>2</sub>(W<sub>1</sub>x) = (W<sub>2</sub>W<sub>1</sub>)x</span>, which is just another single matrix. A hundred stacked linear layers still only draw a straight boundary. Inserting a non-linear function between them is what lets a network represent curves, corners and disjoint regions.
+Two linear layers in a row compute <span class="mono-font">W<sub>2</sub>(W<sub>1</sub>x) = (W<sub>2</sub>W<sub>1</sub>)x</span>. It is just another single matrix. A hundred stacked linear layers still just draw a straight edge. Inserting a non-linear function between them is what lets a network represent curves, corners and disjoint regions.
 
-The activation function sits between every pair of layers. After a layer computes its weighted sum, the activation transforms the result element by element before passing it to the next layer. The transformation is always applied independently to each value &mdash; it does not mix information across neurons. Its sole job is to bend the straight line so the next layer has something non-linear to build on.
+The activation function sits between each pair of layers. After a layer computes its weighted sum, the activation transforms the result item by item before passing it to the next layer. The transformation is always applied independently to each value &mdash; it does not mix information across neurons. Its sole job is to bend the straight line so the next layer has something non-linear to build on.
 
-Different activations bend in different ways, and the choice affects both what the network can represent and how well gradients flow during training. Sigmoid squashes everything into the range (0, 1), which is useful for probabilities but causes gradients to vanish when the input is far from zero. Tanh squashes to (&minus;1, 1) and centres the output on zero, which helps the next layer learn faster. ReLU zeroes out negative values and passes positive values unchanged, which keeps gradients alive on the positive side but kills them permanently on the negative side. Leaky ReLU fixes that by allowing a small slope on the negative side.
+Other activations bend in other ways. And the choice affects both what the network can represent and how well gradients flow in training. Sigmoid squashes all into the range (0, 1). It is useful for probabilities but causes gradients to vanish when the input is far from zero. Tanh squashes to (&minus;1, 1) and centres the output on zero. It helps the next layer learn faster. ReLU zeroes out negative vals and passes positive vals unchanged. It keeps gradients alive on the positive side but kills them permanently on the negative side. Leaky ReLU fixes that by letting a small slope on the negative side.
 
-In practice, the default for hidden layers is ReLU. It is fast to compute, its gradient is trivial, and it works well enough for most architectures. The output layer is different: sigmoid for binary classification, softmax for multiclass, and no activation at all for regression. Matching the output activation to the task is not optional &mdash; the wrong choice makes the network structurally incapable of producing the right answer.
+In practice, the default for hidden layers is ReLU. It is fast to compute, its gradient is trivial. And it works well enough for most designs. The output layer is other: sigmoid for binary classification, softmax for multiclass. And no activation at all for regression. Matching the output activation to the task is not optional &mdash; the wrong choice makes the network structurally incapable of giving the right answer.
 
-The vanishing gradient problem, the dying ReLU problem, and the choice of output activation are the three practical concerns this module addresses.
+The vanishing gradient problem, the dying ReLU problem. And the choice of output activation are the three real concerns this module addresses.
 
-## The four you will actually meet
+## The four you will really meet
 
 - <strong>Sigmoid</strong> &mdash; <span class="mono-font">1 / (1 + e<sup>&minus;x</sup>)</span>, output in (0, 1). Reads as a probability, which is why it survives at the output of binary classifiers.
-- <strong>Tanh</strong> &mdash; output in (&minus;1, 1) and centred on zero, which tends to train better than sigmoid in hidden layers.
-- <strong>ReLU</strong> &mdash; <span class="mono-font">max(0, x)</span>. Gradient is exactly 1 for positive input and exactly 0 otherwise. Cheap, and the default for hidden layers.
+- <strong>Tanh</strong> &mdash; output in (&minus;1, 1) and centred on zero. It tends to train better than sigmoid in hidden layers.
+- <strong>ReLU</strong> &mdash; <span class="mono-font">max(0, x)</span>. Gradient is just 1 for positive input and just 0 otherwise. Cheap, and the default for hidden layers.
 - <strong>Leaky ReLU</strong> &mdash; <span class="mono-font">max(0.01x, x)</span>. Keeps a small gradient alive on the negative side.
 
-## Numbers at three inputs
+## Counts at three inputs
 
 Definitions blur together; a table of actual outputs does not. For x = &minus;2, 0 and 3:
 
@@ -32,7 +32,7 @@ Definitions blur together; a table of actual outputs does not. For x = &minus;2,
 |Leaky ReLU|&minus;0.02|0.00|3.00|
 |GELU|&minus;0.05|0.00|2.996|
 
-Three things fall out of that table. Sigmoid and tanh both flatten at the extremes, so their derivatives there are near zero. ReLU discards the negative side entirely and passes the positive side through untouched. And GELU behaves almost identically to ReLU for large inputs while staying smooth near zero.
+Three things fall out of that table. Sigmoid and tanh both flatten at the extremes. So their derivatives there are near zero. ReLU discards the negative side fully and passes the positive side through untouched. And GELU behaves almost identically to ReLU for large inputs while staying smooth near zero.
 
 The derivatives are what decide trainability:
 
@@ -42,30 +42,30 @@ The derivatives are what decide trainability:
 |Tanh|1.00|&rarr; 0 both ends|
 |ReLU|1.00|1 (positive), 0 (negative)|
 
-Sigmoid's ceiling of 0.25 is the reason deep sigmoid networks do not train: ten layers multiply to 0.25¹⁰ &asymp; one in a million, and the early layers stop receiving a usable signal.
+Sigmoid's ceiling of 0.25 is the reason deep sigmoid networks do not train: ten layers multiply to 0.25¹⁰ &asymp; one in a million. And the early layers stop getting a usable signal.
 
 ## The dying ReLU problem
 
-<p>ReLU outputs zero for any negative input, and its derivative there is also zero. If a neuron’s weights are pushed far enough negative that it outputs zero for <em>every</em> training example, it receives no gradient &mdash; and with no gradient it can never recover. The neuron is permanently dead.</p><p>This is not rare. A large learning rate can kill a substantial fraction of a layer in a single update, and dead neurons are invisible in the loss curve; the network simply has less capacity than you think it does.</p><strong>Leaky ReLU</strong> fixes it by giving negative inputs a small slope, typically 0.01, so the gradient is never exactly zero and a neuron can always climb back. <strong>ELU</strong> and <strong>GELU</strong> do the same with a smooth curve, and GELU is the standard choice in transformers.
+<p>ReLU outputs zero for any negative input. And its derivative there is also zero. If a neuron’s weights are pushed far enough negative that it outputs zero for <em>each</em> training case, it gets no gradient &mdash; and with no gradient it can never recover. The neuron is permanently dead.</p><p>This is not rare. A large learning rate can kill a large fraction of a layer in a single update. And dead neurons are invisible in the loss curve. The network simply has less capacity than you think it does.</p><strong>Leaky ReLU</strong> fixes it by giving negative inputs a small slope, often 0.01. So the gradient is never just zero and a neuron can always climb back. <strong>ELU</strong> and <strong>GELU</strong> do the same with a smooth curve, and GELU is the standard choice in transformers.
 
 ## Which one to use where
 
 - <strong>Hidden layers, general default</strong> &mdash; ReLU. Cheap, no vanishing gradient in the positive region, and works.
 - <strong>Hidden layers, if neurons are dying</strong> &mdash; Leaky ReLU or ELU.
 - <strong>Transformers</strong> &mdash; GELU, in effect universally.
-- <strong>Recurrent networks</strong> &mdash; tanh inside the cell, because bounded outputs keep the recurrent state from growing without limit.
-- <strong>Anywhere deep, with sigmoid</strong> &mdash; avoid. Its maximum derivative of 0.25 shrinks the gradient by at least a factor of four per layer.
+- <strong>Recurrent networks</strong> &mdash; tanh inside the cell, since bounded outputs keep the recurrent state from growing without limit.
+- <strong>Anywhere deep, with sigmoid</strong> &mdash; avoid. Its max derivative of 0.25 shrinks the gradient by at least a factor of four per layer.
 
-## Output activations are a separate decision
+## Output activations are a split decision
 
-Hidden-layer activations exist to introduce non-linearity. Output activations exist to put the prediction in the right range, and the choice is dictated by the task rather than by preference:
+Hidden-layer activations exist to add non-linearity. Output activations exist to put the prediction in the right range. And the choice is dictated by the task rather than by preference:
 
 - <strong>Regression</strong> &mdash; no activation. The output must be unbounded.
 - <strong>Binary classification</strong> &mdash; sigmoid, giving one probability in [0, 1].
 - <strong>Multi-class, one label</strong> &mdash; softmax, giving probabilities across classes that sum to 1.
-- <strong>Multi-label</strong> &mdash; sigmoid on each output independently, since several labels can be true at once and the outputs should <em>not</em> sum to 1.
+- <strong>Multi-label</strong> &mdash; sigmoid on each output independently, since a few labels can be true at once and the outputs should <em>not</em> sum to 1.
 
-One practical warning: frameworks usually fold the output activation into the loss for numerical stability, so <span class="mono-font">CrossEntropyLoss</span> in PyTorch expects raw logits and applies softmax itself. Adding your own softmax before it applies the function twice and quietly degrades training.
+One real warning: frameworks often fold the output activation into the loss for numerical stability. So <span class="mono-font">CrossEntropyLoss</span> in PyTorch expects raw logits and applies softmax it. Adding your own softmax before it applies the function twice and quietly degrades training.
 
 ## Choosing one
 
@@ -79,48 +79,48 @@ One practical warning: frameworks usually fold the output activation into the lo
 |Output, multi-label|Sigmoid per label|
 |Output, unbounded regression|None|
 
-The multi-label row is worth stating plainly: softmax forces the outputs to sum to 1, which is wrong when several labels can be true at once. Using it there is a modelling error, not a preference.
+The multi-label row is worth stating plainly: softmax forces the outputs to sum to 1. It is wrong when a few labels can be true at once. With it there is a modelling error, not a preference.
 
-And "output: none" is deliberate. Frameworks apply softmax or sigmoid inside the loss function for numerical stability, so adding it in the model as well applies it twice &mdash; a real bug that trains slowly and silently.
+And "output: none" is deliberate. Frameworks apply softmax or sigmoid inside the loss function for numerical stability. So adding it in the net as well applies it twice &mdash; a real bug that trains slowly and silently.
 
 ## The dying ReLU problem, and its fixes
 
-A ReLU unit whose pre-activation is always negative outputs zero, has a derivative of zero, receives no gradient, and never recovers. It is dead for the rest of training.
+A ReLU unit whose pre-activation is always negative outputs zero, has a derivative of zero, gets no gradient. And never recovers. It is dead for the rest of training.
 
-A network can lose a substantial fraction of its units this way, usually after a learning rate large enough to push weights into a bad region.
+A network can lose a large fraction of its units this way, often after a learning rate large enough to push weights into a bad region.
 
-The responses, in order of usefulness:
+The replies, in order of usefulness:
 
-- <strong>He initialisation</strong> &mdash; scale initial weights by &radic;(2/fan_in). It is designed for ReLU; Xavier initialisation, designed for tanh, leaves activations shrinking through depth.
-- <strong>A lower learning rate.</strong> A sudden collapse in the fraction of active units is the signature.
+- <strong>He initialisation</strong> &mdash; scale initial weights by &radic;(2/fan_in). It is designed for ReLU. Xavier initialisation, designed for tanh, leaves activations shrinking through depth.
+- <strong>A less learning rate.</strong> A sudden collapse in the fraction of active units is the signature.
 - <strong>Batch normalisation before the activation,</strong> which keeps pre-activations centred so about half the units are active.
 - <strong>Leaky ReLU</strong> (0.01x on the negative side), which keeps a small gradient alive.
 
-Diagnose it by logging the fraction of zero activations per layer. Around 50% is healthy; 90% and rising is a problem.
+Diagnose it by logging the fraction of zero activations per layer. Around 50% is healthy. 90% and rising is a problem.
 
 ## Try this above
 
 1. Drag <strong>Input Value (x)</strong> to around 6 and look at sigmoid and tanh. Both are pinned near their ceiling and the curve is nearly flat &mdash; that flatness is saturation.
 2. Bring x back toward 0. Both functions are at their steepest here, which is where they learn fastest.
-3. Set x to &minus;3 and note ReLU outputs exactly 0, not a small number.
+3. Set x to &minus;3 and note ReLU outputs just 0, not a small count.
 
-## What usually goes wrong
+## What often goes wrong
 
-<strong>Sigmoid in deep hidden layers.</strong> Its derivative peaks at 0.25, so gradients shrink by at least 4&times; per layer. Five layers of sigmoid multiplies the gradient by roughly 0.25<sup>5</sup> &asymp; 0.001 in the best case &mdash; the early layers barely move. This is the vanishing gradient problem, and it is why ReLU became standard.<strong>Dying ReLU.</strong> A neuron pushed firmly negative outputs 0 and has zero gradient, so nothing ever pulls it back. It is dead for the rest of training. Leaky ReLU exists precisely to leave a small escape route.
+<strong>Sigmoid in deep hidden layers.</strong> Its derivative peaks at 0.25. So gradients shrink by at least 4&times; per layer. Five layers of sigmoid multiplies the gradient by roughly 0.25<sup>5</sup> &asymp; 0.001 in the best case &mdash; the early layers barely move. This is the vanishing gradient problem. And it is why ReLU became standard.<strong>Dying ReLU.</strong> A neuron pushed firmly negative outputs 0 and has zero gradient. So nothing ever pulls it back. It is dead for the rest of training. Leaky ReLU exists precisely to leave a small escape route.
 
 ## In one line
 
-ReLU in the hidden layers by default; sigmoid or softmax only at the output, where the bounded range is the point.
+ReLU in the hidden layers by default. Sigmoid or softmax just at the output, where the bounded range is the point.
 
 ## The smooth modern variants
 
-<strong>GELU</strong> multiplies the input by the probability that a standard normal variable is below it &mdash; effectively a soft, probabilistic gate. It is smooth everywhere, allows small negative values through, and is the standard in BERT, GPT and most transformers.
+<strong>GELU</strong> multiplies the input by the probability that a standard normal var is below it &mdash; effectively a soft, probabilistic gate. It is smooth all over, lets small negative vals through. And is the standard in BERT, GPT and most transformers.
 
-<strong>SiLU (Swish)</strong> is `x · sigmoid(x)` &mdash; very similar in shape, slightly cheaper, and common in EfficientNet and modern YOLO variants.
+<strong>SiLU (Swish)</strong> is `x · sigmoid(x)` &mdash; very close in shape, slightly cheaper. And common in EfficientNet and modern YOLO variants.
 
-<strong>Mish, ELU, SELU</strong> each have theoretical arguments and appear occasionally. None has displaced the three above.
+<strong>Mish, ELU, SELU</strong> each have theoretical arguments and appear at times. None has displaced the three above.
 
-Is the difference worth caring about? For convolutional networks, usually not &mdash; ReLU is faster and within noise of the alternatives. For transformers, GELU is the convention and the small gain appears real. The bigger wins are elsewhere: architecture, data, learning rate, normalisation.
+Is the gap worth caring about? For convolutional networks, often not &mdash; ReLU is faster and within noise of the options. For transformers, GELU is the convention and the small gain appears real. The bigger wins are elsewhere: design, data, learning rate, normalisation.
 
 |Function|Smooth?|Cost|Typical use|
 |---|---|---|---|
@@ -137,11 +137,11 @@ The conventional order in a convolutional network is `Conv → BatchNorm → ReL
 
 In transformers the arrangement differs: `LayerNorm → Attention → residual`, then `LayerNorm → FFN(GELU) → residual`. The pre-normalisation variant, with normalisation before each sublayer rather than after, is what makes very deep transformers trainable.
 
-A detail worth knowing: when batch normalisation follows a convolution, the convolution's bias is redundant, because normalisation subtracts the mean anyway. That is why `bias=False` appears on convolutions in ResNet-style code.
+A detail worth knowing: when batch normalisation follows a convolution, the convolution's bias is redundant, since normalisation subtracts the mean anyway. That is why `bias=False` appears on convolutions in ResNet-style code.
 
 ## Six activations, and the one property they exist for
 
-Without a non-linear activation a hundred layers collapse into one matrix. This proves that, then compares what each function does to a gradient.
+Without a non-linear activation a hundred layers collapse into one matrix. This proves that, then checks what each function does to a gradient.
 
 ```python-run
 import numpy as np
@@ -178,7 +178,7 @@ acts = {
 }
 ```
 
-Building on the same setup, the next block shows the remaining cases.
+Building on the same setup, the next block shows the left cases.
 
 ```python-run
 import numpy as np
@@ -206,7 +206,7 @@ print("read the row for sigmoid. at z=4 the gradient is %.4f. multiply ten of"
 print("those together for a ten-layer network and you get %.2e -- the signal"
 ```
 
-The following block covers the remaining operations.
+The next block covers the left steps.
 
 ```python-run
       % ((1 / (1 + np.exp(-4)) * (1 - 1 / (1 + np.exp(-4)))) ** 10))
@@ -237,23 +237,23 @@ print("recurrent nets, where its zero-centred output genuinely helps.")
 
 ## Questions people ask
 
-<strong>Why not use a linear activation?</strong> Because stacked linear layers collapse into one matrix, so the network could only ever draw a straight boundary.
+<strong>Why not use a linear activation?</strong> Since stacked linear layers collapse into one matrix. So the network could just ever draw a straight edge.
 
-<strong>Is ReLU differentiable at zero?</strong> Strictly no &mdash; there is a corner. Frameworks define it as 0 by convention, and it causes no practical trouble.
+<strong>Is ReLU differentiable at zero?</strong> Strictly no &mdash; there is a corner. Frameworks set it as 0 by convention. And it causes no real trouble.
 
-<strong>Should I use sigmoid in hidden layers?</strong> No. Its derivative ceiling of 0.25 causes vanishing gradients. It survives only at outputs.
+<strong>Should I use sigmoid in hidden layers?</strong> No. Its derivative ceiling of 0.25 causes vanishing gradients. It survives just at outputs.
 
 <strong>Is tanh better than sigmoid?</strong> In hidden layers, yes &mdash; it is zero-centred and its derivative reaches 1. Both are still worse than ReLU for depth.
 
-<strong>Do different layers need different activations?</strong> Rarely. One for the hidden layers and one for the output covers almost every architecture.
+<strong>Do other layers need other activations?</strong> Rarely. One for the hidden layers and one for the output covers almost each design.
 
-<strong>What about learnable activations?</strong> PReLU learns the negative slope, and it helps marginally at the cost of extra parameters. Not usually worth the complexity.
+<strong>What about learnable activations?</strong> PReLU learns the negative slope. And it helps marginally at the cost of extra params. Not often worth the complexity.
 
 ## Recap in one screen
 
 - Activations are what stop stacked layers collapsing into a single linear map.
 - Sigmoid's derivative peaks at 0.25, which is why deep sigmoid networks do not train.
-- ReLU passes a derivative of exactly 1 on the positive side &mdash; that is what makes depth work.
-- Its cost is dead units; He initialisation, normalisation and a sensible learning rate prevent most of them.
-- GELU and SiLU are the smooth modern choices, standard in transformers and recent vision models.
+- ReLU passes a derivative of just 1 on the positive side &mdash; that is what makes depth work.
+- Its cost is dead units. He initialisation, normalisation and a sensible learning rate stop most of them.
+- GELU and SiLU are the smooth modern choices, standard in transformers and recent vision nets.
 - Leave the output layer unactivated and let the loss function apply softmax or sigmoid.

@@ -1,9 +1,9 @@
 title: Key-Value and Graph Models
-intro: The simplest data model and the most relationship-centred one, and when each is worth leaving SQL for.
+intro: The simplest data model and the most tie-centred one. When each is worth leaving SQL for.
 
 ## Key-value: doing less on purpose
 
-The interface is three operations:
+The interface is three ops:
 
 ```
 get(key)  ->  value
@@ -11,53 +11,53 @@ put(key, value)
 delete(key)
 ```
 
-The value is opaque &mdash; a blob the store does not interpret. You cannot query
-by its contents, sort by it, or join on it. There is no schema and no query
+The value is opaque &mdash; a blob the store doesn't read. You can't query
+by its contents, sort by it, or join on it. There's no schema and no query
 language.
 
-That poverty is the point. With no query planner, no join algorithms and no
+That poverty is the point. With no query planner, no join methods and no
 secondary indexes to maintain, a lookup is a hash and a read. Redis, Memcached,
-DynamoDB in its simplest mode and etcd all live here, and they are fast in a way
-a general-purpose database cannot match, because they have far less to do.
+DynamoDB in its simplest mode and etcd all live here. They're fast in a way
+a all-round DB can't match, because they've far less to do.
 
-The cost is that every access path must be designed in advance, encoded in the
+The cost is that each access path must be designed in advance, coded in the
 key. Fetching a user by id means `user:1234`. Fetching them by email means
-maintaining a second key, `email:ada@example.com -> 1234`, and keeping the two in
-step yourself &mdash; there is no unique constraint and no transaction spanning
+keeping a second key, `email:ada@example.com -> 1234`, and keeping the two in
+step yourself &mdash; there's no unique constraint and no transaction spanning
 them.
 
 The first variant above shows the shape: a two-column table used as nothing but a
 key lookup.
 
 **Where it fits.** Caches, sessions, feature flags, rate limiters, leaderboards,
-service discovery. Anything with one obvious access path and a strong preference
+service find. any of it with one obvious access path and a strong preference
 for speed.
 
-**Where it does not.** Anything needing an ad-hoc question. "How many active
-sessions are from Leeds" is not answerable without scanning every key, which the
-model is not built for.
+**Where it doesn't.** any of it needing an ad-hoc question. "How many active
+sessions are from Leeds" isn't answerable without scanning each key, which the
+model isn't built for.
 
 ## Graph: relationships as the primary thing
 
 A graph model stores **nodes** and **edges**, and both can carry properties. The
-edges are not derived from matching values, as a foreign key is; they are stored
+edges aren't derived from matching values, as a foreign key is. They're stored
 objects, and traversing one is following a pointer.
 
-The difference shows up in queries about *paths*. "Who reports to Ada, directly
+The difference shows up in queries about *paths*. "Who reports to Ada, right
 or indirectly, to any depth" is one traversal in a graph and a recursive CTE in
-SQL. Run the variant and compare it against the ordinary join beside it.
+SQL &mdash; run the variant and compare it against the plain join beside it.
 
 The gap widens with depth. Each level of a relational traversal is another join,
-and the planner's estimates degrade as they compound. A graph engine follows
-edges directly, and cost scales with the number of edges actually visited rather
+and the planner's guesses degrade as they compound. A graph engine follows
+edges right, and cost scales with the number of edges really visited rather
 than with the size of the tables.
 
 **Where it fits.** Social networks, org charts, fraud rings, dependency graphs,
 recommendation paths, network topology, knowledge graphs. The test is whether
-your interesting questions are about connections rather than about attributes.
+your notable questions are about links rather than about fields.
 
-**Where it does not.** Aggregating over millions of rows. A graph engine is
-usually worse at "total revenue by month" than any relational database.
+**Where it doesn't.** Aggregating over millions of rows. A graph engine is
+often worse at "total revenue by month" than any relational DB.
 
 ## The honest comparison
 
@@ -72,28 +72,28 @@ usually worse at "total revenue by month" than any relational database.
 
 ## Do you need to leave SQL?
 
-Frequently not, and the variants above are the argument.
+Often not, and the variants above are the arg.
 
-A key-value table in Postgres &mdash; a primary key and a `jsonb` column &mdash;
+A key-value table in Postgres. A main key and a `jsonb` column &mdash;
 gets you most of the model with transactions and the option of querying the
-value later. Redis wins on raw latency; if that is not the binding constraint,
-the simpler operational story usually is.
+value later. Redis wins on raw latency. If that isn't the binding constraint,
+the simpler operational story often is.
 
 Recursive CTEs handle graph traversal, and for a few hundred thousand edges at
-modest depth they are perfectly good. Dedicated graph engines start winning at
+modest depth they're just right good. Dedicated graph engines start winning at
 deep traversals over large graphs, and at query *expressibility* &mdash; Cypher
 and Gremlin say in one line what a recursive CTE says in fifteen.
 
-The strong argument for a separate store is when the workload is
-overwhelmingly of one shape. The weak argument is that the model is fashionable.
+The strong arg for a separate store is when the workload is
+overwhelmingly of one shape. The weak arg is that the model is fashionable.
 
 ## Why traversal depth is where graphs win
 
-The graph advantage is not vague; it scales with depth, and the arithmetic shows
+The graph edge isn't vague. It scales with depth, and the math shows
 where the crossover is. "Friends of friends of friends" over a social graph with
-an average of 100 connections per person touches, level by level, roughly 100 then
+an mean of 100 links per person touches, level by level, roughly 100 then
 10,000 then 1,000,000 people. A relational engine reaches each level with another
-join, and the planner's row estimates degrade as they multiply.
+join, and the planner's row guesses degrade as they times:
 
 |depth|people reached (branching ~100)|relational cost|
 |---|---|---|
@@ -101,9 +101,9 @@ join, and the planner's row estimates degrade as they multiply.
 |2|10,000|join of a join|
 |3|1,000,000|three joins, estimates compounding|
 
-A graph engine follows stored edges directly, so its cost tracks *edges actually
-visited* rather than the product of table sizes, and it does not re-estimate a
-join at each level. At depth one or two a recursive CTE is perfectly good. By
+A graph engine follows stored edges right. So Its cost tracks *edges really
+visited* rather than the product of table sizes, and it doesn't re-guess a
+join at each level. At depth one or two a recursive CTE is just right good. By
 depth three or four over a large graph the relational plan is doing work
 proportional to the tables while the graph is doing work proportional to the
 answer. That divergence &mdash; not lookup speed &mdash; is the real reason to
@@ -111,22 +111,22 @@ reach for a graph.
 
 ## The lookup, and why it is O(1)
 
-The reason a key-value store outruns a general database on its one job is the
-absence of a tree. A relational primary-key lookup descends a B-tree &mdash; about
-`log2(n)` steps &mdash; while a hash-based key-value `get` computes one hash and
-does one read, regardless of size.
+The reason a key-value store outruns a general DB on its one job is the
+lack of a tree. A relational main-key lookup descends a B-tree &mdash; about
+`log2(n)` steps &mdash; while a hash-based key-value `get` finds one hash and
+does one read, even so of size:
 
 |keys stored|B-tree lookup|hash lookup|
 |---|---|---|
 |1,000,000|~20 steps|~1 probe|
 |1,000,000,000|~30 steps|~1 probe|
 
-The B-tree's cost grows, slowly, forever; the hash's does not grow at all. That
-flat line is the whole value proposition. It is bought by giving up everything a
-tree enables &mdash; ordered scans, range queries, "the next key
-after this one" &mdash; none of which a hash can answer. So the choice is not
-"key-value is faster" but "key-value is faster at point lookups and cannot do
-ranges at all." That is exactly the trade to weigh before moving a workload off
+The B-tree's cost grows, slowly, forever. The hash's doesn't grow at all. That
+flat line is the whole value proposition, and it's bought by giving up
+all a tree enables &mdash; sorted scans, range queries, "the next key
+after this one" &mdash; none of which a hash can answer. So the choice isn't
+"key-value is faster" but "key-value is faster at point lookups and can't do
+ranges at all", which is just the trade to weigh before moving a workload off
 SQL for speed.
 
 ## Where it goes wrong
@@ -134,11 +134,11 @@ SQL for speed.
 **Using a key-value store as the system of record without a plan for secondary
 access.** The second access path is your problem, forever.
 
-**Assuming a graph database is faster at everything.** It is faster at
+**given a graph DB is faster at all.** It's faster at
 traversals and often slower at aggregates.
 
 **Recursive CTEs without a depth limit.** A cycle in the data is an infinite
-loop; the variant here carries a guard for exactly that reason.
+loop. The variant here carries a guard for just that reason.
 
-**Modelling everything as a graph.** If the questions are about attributes rather
-than connections, a table is the better graph.
+**Modelling all as a graph.** If the questions are about fields rather
+than links, a table is the better graph.

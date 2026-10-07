@@ -4,22 +4,22 @@ intro: How to see further without downsampling, and the gridding artefact that c
 ## The problem it solves
 
 A network has two ways to grow its [receptive
-field](receptive_field.html): stack more layers, which is slow because growth is
-linear, or downsample, which is fast but throws away resolution.
+field](receptive_field.html): stack more layers. This Is slow because growth is
+linear, or downsample, which is fast but throws away detail.
 
-For classification, throwing away resolution is fine &mdash; the answer is one
-label. For **segmentation** it is not, because the output has to be the same size
-as the input, and detail destroyed by pooling has to be reconstructed by
-something.
+For classification, throwing away detail is fine. The answer is one
+label. For **segmentation** it isn't. The output has to be the same size
+as the input, and detail destroyed by pooling has to be rebuilt by
+a thing.
 
 Dilated convolution is the third way. It grows the receptive field
-geometrically, adds no parameters, and does not reduce resolution at all. A dilation rate of 2 skips every other input pixel, spreading a 3&times;3 kernel across a 5&times;5 area; rate 4 spreads it across 9&times;9. Stacking rates 1, 2, and 4 gives a receptive field of 15 pixels with only three layers and 27 weights.
+geometrically, adds no params, and doesn't reduce detail at all.
 
 ## What dilation does
 
 Take a 3&#215;3 kernel. Instead of reading nine adjacent pixels, read nine
 pixels spaced `d` apart, leaving gaps between them. The weights are unchanged;
-only where they are sampled from moves.
+only where they're sampled from moves.
 
 The effective size of a `k`&#215;`k` kernel at dilation `d` is:
 
@@ -29,56 +29,56 @@ effective = k + (k - 1) * (d - 1)
 
 So a 3&#215;3 at dilation 1 spans 3, at dilation 2 spans 5, at dilation 4 spans
 9. Drag the dilation control and the readout confirms it: nine weights, spanning
-whatever you asked for.
+what you asked for.
 
-That is the whole trick, and its appeal is that everything about the layer's cost
-is unchanged. Same weights, same number of multiplications, wider view.
+That is the whole trick, and its appeal is that all about the layer's cost
+is unchanged. Same weights, same number of times, wider view.
 
 ## Stacking
 
-Drag the layers control up. Two dilated layers reach further than two ordinary
+Drag the layers control up. Two dilated layers reach further than two plain
 ones, and the growth compounds, because each layer's reach is measured in the
 already-expanded units of the layer beneath it.
 
-The standard arrangement uses a rising sequence &mdash; dilation 1, then 2, then
+The standard setup uses a rising sequence. Dilation 1, then 2, then
 4, then 8 &mdash; which gives exponential receptive-field growth at constant
-resolution. A stack of four such layers sees a 33&#215;33 region using 36
+detail. A stack of four such layers sees a 33&#215;33 region using 36
 weights per channel pair and no pooling at all.
 
 ## The gridding problem
 
-There is a defect, and it follows directly from the gaps.
+There's a defect, and it follows right from the gaps.
 
-Stack several layers all at dilation 2, and some input positions are never
-sampled by any of them. The kernel taps land on even offsets at every level, so
-odd positions in between are simply not read. The output develops a
+Stack a few layers all at dilation 2, and some input spots are never
+sampled by any of them. The kernel taps land on even offsets at each level, so
+odd spots in between are simply not read. The output develops a
 checkerboard-like inconsistency, and the network is blind to fine detail that
 happens to fall in the gaps.
 
 The fix is to vary the rate so that the gaps of one layer are covered by another.
 Rates like 1, 2, 5 or 1, 2, 3 are chosen so their sampling patterns interlock,
 and the *hybrid dilated convolution* literature is about picking such sequences.
-The simple version of the rule: do not repeat the same dilation rate several
+The simple version of the rule: don't repeat the same dilation rate a few
 times in a row.
 
 ## Where it is used
 
 **DeepLab** made dilated convolution central to semantic segmentation, and its
-ASPP module runs several rates in parallel and concatenates them, giving the
-network several scales at once from one feature map.
+ASPP module runs a few rates in parallel and concatenates them, giving the
+network a few scales at once from one feature map.
 
-**WaveNet** used dilation in one dimension over audio, where the receptive field
+**WaveNet** used dilation in one dim over audio. Here The receptive field
 has to span thousands of samples and downsampling would destroy the waveform.
 
-**Dense prediction generally** &mdash; depth estimation, optical flow, anything
-whose output is an image &mdash; uses it for the same reason segmentation does.
+**Dense guess often** &mdash; depth estimation, optical flow, any of it
+whose output is an image. Uses it for the same reason segmentation does.
 
 ## The reach a dilated stack buys
 
-The whole point is receptive field without downsampling, and the arithmetic shows
+The whole point is receptive field without downsampling, and the math shows
 how fast it grows. A dilated `k&times;k` kernel spans `k + (k-1)(d-1)`, and stacked
-layers accumulate `(k-1)&middot;d` at each step. Take four 3&times;3 layers at the
-standard rising rates 1, 2, 4, 8.
+layers build up `(k-1)&middot;d` at each step. Take four 3&times;3 layers at the
+standard rising rates 1, 2, 4, 8:
 
 |layer|dilation|reach added|running receptive field|
 |---|---|---|---|
@@ -87,30 +87,30 @@ standard rising rates 1, 2, 4, 8.
 |3|4|8|15|
 |4|8|16|31|
 
-Four layers reach a 31-pixel window &mdash; effectively 33&times;33 counting the
+Four layers reach a 31-pixel window &mdash; in effect 33&times;33 counting the
 kernel &mdash; using 4 &times; 9 = **36 weights** per channel pair and *no pooling
-at all*. A stride-1 stack of ordinary 3&times;3 layers would need fifteen layers to
+at all*. A stride-1 stack of plain 3&times;3 layers would need fifteen layers to
 see as far, because its reach grows by 2 per layer instead of doubling. That
-exponential growth at constant resolution is why DeepLab put dilation at the centre
-of segmentation. The catch is in those same gaps. Repeat one rate and some input
-positions are never sampled by any layer, producing the gridding artefact. That is
+exponential growth at constant detail is why DeepLab put dilation at the centre
+of segmentation. The catch is in those same gaps: repeat one rate and some input
+spots are never sampled by any layer, making the gridding artefact, which is
 why the rates are varied (1, 2, 5) so their sampling patterns interlock.
 
-Where dilation earns its place is dense prediction &mdash; segmentation, depth,
-optical flow &mdash; anything whose output must be the same size as the input, so
-resolution cannot be thrown away by pooling. DeepLab's ASPP module runs several
-rates in parallel and concatenates them, giving the network several scales from one
-feature map. WaveNet used the one-dimensional version over audio, where the
-receptive field has to span thousands of samples. The one cost that is not free is
-memory. A network that never downsamples holds full-resolution activations at every
-layer, which is usually the binding constraint on a segmentation model. The
-parameters are free but the memory is not.
+Where dilation earns its place is dense guess &mdash; segmentation, depth,
+optical flow &mdash; any of it whose output must be the same size as the input, so
+detail can't be thrown away by pooling. DeepLab's ASPP module runs a few
+rates in parallel and concatenates them, giving the network a few scales from one
+feature map, and WaveNet used the one-dimensional version over audio, where the
+receptive field has to span thousands of samples. The one cost that isn't free is
+memory: a network that never downsamples holds full-detail activations at each
+layer, which is often the binding constraint on a segmentation model, so the
+params are free but the memory isn't.
 
-The gridding fix is worth stating as a rule of its own. Never repeat the same
-dilation several times in a row. Rates chosen so their sampling patterns interlock
-&mdash; 1, 2, 5, or 1, 2, 3 &mdash; cover the positions any single rate would skip.
-The hybrid-dilated-convolution literature is largely about picking such
-sequences so that every input position is read by some layer in the stack.
+The gridding fix is worth stating as a rule of its own: never repeat the same
+dilation a few times in a row. Rates chosen so their sampling patterns interlock
+&mdash; 1, 2, 5, or 1, 2, 3. Cover the spots any single rate would skip,
+and the hybrid-dilated-convolution literature is largely about picking such
+sequences so that each input spot is read by some layer in the stack.
 
 ## Where it goes wrong
 
@@ -118,16 +118,16 @@ sequences so that every input position is read by some layer in the stack.
 never seen.
 
 **Using it where pooling would do.** For classification, downsampling is cheaper
-and reduces computation. Dilation keeps the feature map large, and large feature
-maps cost memory at every layer.
+and reduces work. Dilation keeps the feature map large, and large feature
+maps cost memory at each layer.
 
-**Assuming it is free.** The parameters are free; the memory is not. A network
-that never downsamples holds full-resolution activations throughout, which is
+**given it's free.** The params are free. The memory isn't. A network
+that never downsamples holds full-detail activations throughout, which is
 often the binding constraint on segmentation models.
 
 ## Skipping pixels to see further for the same price
 
-A dilated convolution reads the same number of weights from a wider spread of positions. That one change buys receptive field growth that is exponential rather than linear -- and brings a gridding artefact that the fix for it is named after.
+A dilated convolution reads the same number of weights from a wider spread of spots. That one change buys receptive field growth that is exponential rather than linear -- and brings a gridding artefact that the fix for it's named after.
 
 ```python-run
 import numpy as np

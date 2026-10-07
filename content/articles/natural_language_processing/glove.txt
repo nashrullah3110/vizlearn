@@ -1,47 +1,45 @@
 title: GloVe
-intro: Start from the corpus-wide count matrix instead of one window at a time, and fit vectors to the logarithm of it.
+intro: Start from the corpus-wide count mat instead of one window at a time. Fit vectors to the logarithm of it.
 
 ## Two families, one goal
 
 By 2014 there were two ways to get word vectors and they came from different
 traditions.
 
-**Count-based** methods build a word-by-word co-instance matrix over the
-whole corpus and factorise it &mdash; LSA and its relatives. They use the
-global statistics fast, and they had historically done badly on analogy
+**Count-based** methods build a word-by-word co-hit mat over the
+whole corpus and factorise it. LSA and its relatives. They use the
+global statistics efficiently, and they had once done badly on word puzzle
 tasks.
 
-**Prediction-based** methods slide a window and train on local pairs &mdash;
+**guess-based** methods slide a window and train on local pairs &mdash;
 word2vec. They did well on analogies, and they never look at a corpus-level
-number: the same pair seen in ten thousand windows produces ten thousand
-separate gradient steps, and the model never learns the count itself.
+number: the same pair seen in ten thousand windows makes ten thousand
+separate grad steps, and the model never learns the count itself.
 
-GloVe is the argument that this is a false choice. Its name is short for
-*global vectors*, and it takes the count matrix as its starting point while
-keeping the vector arithmetic that made word2vec work.
-
-This page walks through the co-instance matrix, the weighted least-squares objective, and how the resulting vectors compare to [word2vec](word2vec.html) on analogy and similarity tasks.
+GloVe is the arg that this is a false choice. Its name is short for
+*global vectors*, and it takes the count mat as its starting point while
+keeping the vector math that made word2vec work.
 
 ## Counting
 
-The matrix `X` has `X_ij` = the number of times word j appears in the context
-of word i. The heatmap in the explorer is that matrix for the corpus below,
+The mat `X` has `X_ij` = the number of times word j appears in the context
+of word i. The heatmap in the explorer is that mat for the corpus below,
 restricted to fifteen readable words. Click any cell to see its value.
 
-One refinement: neighbours are weighted by **1/d**, so a word four positions
+One refinement: neighbours are weighted by **1/d**. So A word four spots
 away adds a quarter of what an adjacent word does. That is why the cells
-hold fractions rather than integers. It encodes something obviously true &mdash;
-proximity is evidence, and distance weakens it &mdash; without the hard cutoff
+hold fractions rather than ints. It codes a thing obviously true &mdash;
+nearness is evidence, and distance weakens it. Without the hard cutoff
 that a plain window imposes.
 
-Move the window slider and watch the matrix fill in. This is already a
+Move the window slider and watch the mat fill in. This is already a
 difference in kind from word2vec: the entire corpus has been summarised into
 one object before any learning starts, and the training loop never touches the
 text again.
 
 ## The idea: ratios, not probabilities
 
-Here is the observation the paper is built on. Take the conditional probability
+Here is the reading the paper is built on. Take the if-based chance
 `P(k | c)` &mdash; how often word k appears near word c &mdash; and look at the
 table in the explorer for `cat` against `dog`:
 
@@ -52,13 +50,13 @@ table in the explorer for `cat` against `dog`:
 | sits | moderate | moderate | about 1 |
 | the | large | large | about 1 |
 
-The single probabilities are useless. `P(the | cat)` is large, and so is
-`P(the | dog)`, and so is `P(the | anything)`, because `the` is everywhere. Its
+The single chances are useless. `P(the | cat)` is large, and so is
+`P(the | dog)`, and so is `P(the | any of it)`. `the` is all over. Its
 size tells you about `the`, not about cats.
 
 The **ratio** cancels that out. Words that both cats and dogs occur near give a
-ratio near 1 and are correctly reported as uninformative. Words specific to one
-give a ratio far from 1. The signal you want is not in either probability; it
+ratio near 1 and are right reported as uninformative. Words exact to one
+give a ratio far from 1. The signal you want isn't in either chance. It
 is in their quotient.
 
 This is the paper's own worked example with `ice` and `steam` against `solid`,
@@ -69,21 +67,22 @@ structure appear elsewhere.
 ## From ratios to an objective
 
 The derivation asks: what function of word vectors depends on a ratio of
-probabilities? Ratios divide, and the natural vector operation that turns
-division into subtraction is the logarithm, so a function of `w_i - w_j` dotted
-with a context vector is the shape to aim for. Following that requirement through, and requiring symmetry under swapping
-centre and context (since the choice is arbitrary), lands on:
+chances? Ratios divide, and the natural vector op that turns
+division into subtraction is the logarithm. So A function of `w_i - w_j` dotted
+with a context vector is the shape to aim for. Following that need
+through &mdash; and needing the answer to be even under swapping the
+roles of centre and context, since the choice is any &mdash; lands on:
 
 ```
 w_i . w~_j + b_i + b~_j = log X_ij
 ```
 
-Vectors and biases whose dot product reproduces the log of the count. That is a
+Vectors and biases whose dot product copies the log of the count. That is a
 least-squares problem, and the explorer prints it for the cell you click.
 
-The bias terms are doing real work: they absorb the fact that a common word has
-large counts with all of it, so the dot product does not have to encode
-frequency alongside meaning.
+The bias terms are doing real work: they absorb that a common word has
+large counts with all, so the dot product doesn't have to encode
+rate alongside meaning.
 
 ## The weighting function does two jobs
 
@@ -94,38 +93,38 @@ function fixes both:
 f(x) = (x / x_max)^alpha   if x < x_max,   otherwise 1
 ```
 
-**It is zero at zero.** Most of the matrix is zeros. Most word pairs
+**It's zero at zero.** Most of the mat is zeros &mdash; most word pairs
 never co-occur &mdash; and `log 0` is undefined. Weighting those terms by zero
-removes them from the sum fully. Click a cell in the explorer with a count
-of zero and the note tells you the term is dropped; without `f(0) = 0` there
-would be no objective to optimise.
+drops them from the sum fully. Click a cell in the explorer with a count
+of zero and the note tells you the term is dropped. Without `f(0) = 0` there
+would be no goal to optimise.
 
-**It stops rising past x_max.** Without a cap, the handful of enormous counts
+**It stops rising past x_max.** Without a cap, the handful of huge counts
 involving `the` and `of` would dominate the entire loss and every other word
-pair would be fitted incidentally. Capping the weight bounds their influence.
+pair would be fitted incidentally. Capping the weight bounds their sway.
 
-The paper's values are `x_max = 100` and `alpha = 0.75`. And that 0.75
-is the same exponent word2vec uses on its noise distribution, arrived at
+The paper's values are `x_max = 100` and `alpha = 0.75` &mdash; and that 0.75
+is the same exponent word2vec uses on its noise spread, arrived at
 on its own for the same underlying reason. Both controls are sliders in the
 explorer, and the curve redraws as you move them.
 
 ## Honest results on a tiny corpus
 
-The training section fits the objective with AdaGrad, exactly as the paper
+The training section fits the goal with AdaGrad, just as the paper
 does, and then shows the nearest neighbours. Some are right &mdash;
 `man`/`woman`, `paris`/`berlin` &mdash; and some are noise.
 
-That is not a bug in the page. It is what a global-statistics method does with
+That isn't a bug in the page. It's what a global-statistics method does with
 nineteen sentences: it can only know what the counts know, and a pair seen once
 adds one term to a least-squares fit and is then done. Word2vec is
-comparatively more reliable on tiny data because the same pair gets many
-free gradient steps. The released GloVe vectors were trained on between
-6 billion and 840 billion tokens, and the gap between that and this page is the
+comparatively more robust on tiny data because the same pair gets many
+free grad steps. The released GloVe vectors were trained on between
+6 billion and 840 billion tokens. The gap between that and this page is the
 gap between "global statistics" and "a handful of counts".
 
 The final vectors are `w + w~`, summing the two sets rather than discarding
-one. The paper reports this as a small consistent gain, on the argument that
-the two sets differ only by their random initialisation and averaging them
+one. The paper reports this as a small steady gain, on the arg that
+the two sets differ only by their random init and blending them
 reduces noise.
 
 ```python
@@ -150,72 +149,72 @@ def nearest(word, n=5):
     return scored[:n]
 ```
 
-Normalise before comparing. Cosine similarity is the standard measure for these
-vectors and the raw dot product is not the same thing &mdash; vector norm
-correlates with word frequency, so an unnormalised check quietly ranks
+Norm before checking. Cosine likeness is the standard measure for these
+vectors and the raw dot product isn't the same thing &mdash; vector norm
+correlates with word rate, so an unnormalised check quietly ranks
 common words higher.
 
 ## What the biases are for
 
-The two bias terms in the objective are easy to skip past and they are doing
-something specific.
+The two bias terms in the goal are easy to skip past and they're doing
+a thing exact.
 
-Write the objective again:
+Write the goal again:
 
 ```
 w_i . w~_j + b_i + b~_j = log X_ij
 ```
 
 Without `b_i` and `b~_j`, the dot product would have to account for the fact
-that `the` co-occurs enormously with all of it &mdash; not because it is
-related to all of it, but because it is common. The vector for `the` would be
-pushed to have a large component in every direction, which is both meaningless
+that `the` co-occurs enormously with all &mdash; not because it's
+related to all, but because it's common. The vector for `the` would be
+pushed to have a large component in each direction. This Is both meaningless
 and destructive: it distorts every other vector fitted against it.
 
-The biases absorb exactly that. `b_i` learns "word i is frequent", `b~_j`
+The biases absorb just that. `b_i` learns "word i is frequent", `b~_j`
 learns the same for the context role, and the dot product is left to explain
-only what those cannot &mdash; the part of the count that is specific to the
-*pair*. This is the same decomposition that appears in the recommender
+only what those can't &mdash; the part of the count that is exact to the
+*pair*. This is the same breakdown that appears in the recommender
 literature as user and item biases, and for the same reason: the main effects
-should be modelled apart from the interaction, or the interaction spends
-its capacity re-learning them.
+should be modelled apart from the interplay, or the interplay spends
+its room re-learning them.
 
-Click a row of the matrix in the explorer for a common word. Then for a rare
-one, and compare the `log X` values the fit is being asked to reproduce. The
-range across a real corpus spans several orders of magnitude, and no bounded
+Click a row of the mat in the explorer for a common word and then for a rare
+one, and compare the `log X` values the fit is being asked to copy. The
+range across a real corpus spans a few orders of magnitude, and no bounded
 dot product would cover it on its own.
 
 ## Which to use
 
 For most purposes: neither, on their own. Contextual embeddings from a
-transformer are better at nearly all of it, because a static vector per word
-type cannot represent a word with two senses.
+transformer are better at nearly all, because a static vector per word
+type can't represent a word with two senses.
 
-Static vectors still earn their place where the constraints are tight. They are
-a lookup table &mdash; no forward pass, no GPU, microseconds per word. They are
-interpretable enough to debug. And they are a fair initialisation for the
+Static vectors still earn their place where the constraints are tight. They're
+a lookup table &mdash; no forward pass, no GPU, microseconds per word. They're
+readable enough to debug. And they're a reasonable init for the
 embedding layer of a small model trained on little data. Between the two, GloVe
-and skip-gram perform similarly on most benchmarks once the corpus and
-dimension are matched, and the practical difference is that GloVe's training
-parallelises trivially over the count matrix while word2vec streams text.
+and skip-gram perform likewise on most benchmarks once the corpus and
+dim are matched, and the hands-on difference is that GloVe's training
+parallelises trivially over the count mat while word2vec streams text.
 ## Questions people ask
 
-<strong>GloVe or word2vec?</strong> With the corpus and dimension matched they score similarly on most benchmarks. So it is rarely the interesting decision. The real difference is operational: GloVe trains over a precomputed count matrix and parallelises trivially. Word2vec streams text and holds up better on small corpora, because there a pair adds many free gradient steps instead of one least-squares term.
+<strong>GloVe or word2vec?</strong> With the corpus and dim matched they score likewise on most benchmarks. It's rarely the notable choice. The real difference is operational: GloVe trains over a precomputed count mat and parallelises trivially, while word2vec streams text and holds up better on small corpora. There a pair adds many free grad steps instead of one least-squares term.
 
-<strong>Why fit the logarithm of the count?</strong> Because the signal lives in *ratios* of co-instance probabilities. And the logarithm is what turns a ratio into a difference of vectors that a dot product can express. Fitting raw counts would also ask a bounded dot product to span several orders of magnitude, which it cannot do.
+<strong>Why fit the logarithm of the count?</strong> Because the signal lives in *ratios* of co-hit chances. The logarithm is what turns a ratio into a difference of vectors that a dot product can express. Fitting raw counts would also ask a bounded dot product to span a few orders of magnitude. This It can't do.
 
-<strong>Do I have to build the count matrix myself?</strong> Usually not. The released vectors cover 6 billion to 840 billion tokens. If you do build one, note that the matrix, not the optimisation, is the expensive part. It is |V|&sup2; in the worst case. This is why implementations store it sparsely and only ever visit the non-zero cells.
+<strong>Do I have to build the count mat myself?</strong> often not. The released vectors cover 6 billion to 840 billion tokens. If you do build one, note that the mat, not the optimisation, is the costly part. It's |V|&sup2; in the worst case. This Is why setups store it sparsely and only ever visit the non-zero cells.
 
-<strong>What are `x_max` and `alpha` actually doing?</strong> Two jobs in one function. `f(0) = 0` drops the zero cells &mdash; most of the matrix, and where `log` is undefined &mdash; from the sum fully. The cap past `x_max` stops the handful of enormous counts involving `the` and `of` from dominating the loss so thoroughly that every other pair is fitted only incidentally.
+<strong>What are `x_max` and `alpha` really doing?</strong> Two jobs in one function. `f(0) = 0` drops the zero cells. Most of the mat. Where `log` is undefined. From the sum fully. The cap past `x_max` stops the handful of huge counts involving `the` and `of` from dominating the loss so thoroughly that every other pair is fitted only incidentally.
 
-<strong>Why sum `w` and `w~` at the end?</strong> Because the two sets differ only by their random initialisation. So averaging them cancels some noise; the paper reports a small consistent gain. word2vec's habit of discarding the context matrix is the other convention, and neither is derived from anything.
+<strong>Why sum `w` and `w~` at the end?</strong> Because the two sets differ only by their random init. Blending them cancels some noise. The paper reports a small steady gain. word2vec's habit of discarding the context mat is the option rule. Neither is derived from any of it.
 
-<strong>Why normalise before comparing vectors?</strong> Because a vector's norm correlates with its word's frequency. So an unnormalised dot product quietly ranks common words above relevant ones. Cosine similarity is the standard measure for these embeddings, and forgetting the normalisation is a silent bug rather than a loud one.
+<strong>Why norm before checking vectors?</strong> Because a vector's norm correlates with its word's rate. An unnormalised dot product quietly ranks common words above relevant ones. Cosine likeness is the standard measure for these embeddings. Losing the norming is a silent bug rather than a loud one.
 
 ## Recap in one screen
 
-- GloVe summarises the whole corpus into a co-instance matrix first; the training loop never touches the text again.
-- Neighbours are weighted by 1/d, so proximity counts as evidence and distance weakens it without the hard edge a plain window imposes.
-- Single conditional probabilities are dominated by frequency. The *ratio* between two of them cancels that out, and is where the data actually is.
-- The objective fits `w_i . w~_j + b_i + b~_j` to `log X_ij`, with the biases absorbing "this word is common" so the dot product only has to explain what is specific to the pair.
-- The weighting function does two things at once: zero at zero to drop empty cells, flat past `x_max` so the most frequent pairs cannot own the loss.
+- GloVe summarises the whole corpus into a co-hit mat first. The training loop never touches the text again.
+- Neighbours are weighted by 1/d. Nearness counts as evidence and distance weakens it without the hard edge a plain window imposes.
+- Single if-based chances are dominated by rate. The *ratio* between two of them cancels that out. Is where the info really is.
+- The goal fits `w_i . w~_j + b_i + b~_j` to `log X_ij`, with the biases absorbing "this word is common" so the dot product only has to explain what is exact to the pair.
+- The weighting function does two things at once. Zero at zero to drop empty cells, flat past `x_max` so the most frequent pairs can't own the loss.

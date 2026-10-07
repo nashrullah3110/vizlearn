@@ -1,20 +1,20 @@
 title: Mask R-CNN
-intro: Faster R-CNN with a third head, and one fixed rounding bug that is the entire reason the third head works.
+intro: Faster R-CNN with a third head. One fixed rounding bug that is the entire reason the third head works.
 
 ## The architecture, in four parts
 
-Mask R-CNN inherits almost everything from Faster R-CNN and adds one branch &mdash; a per-pixel mask predictor.
+Mask R-CNN inherits almost all from Faster R-CNN and adds one branch.
 
-1. A **backbone with a feature pyramid** &mdash; usually ResNet-50 or -101 with
-   FPN &mdash; producing feature maps at strides 4, 8, 16 and 32.
+1. A **backbone with a feature pyramid**. Often ResNet-50 or -101 with
+   FPN &mdash; making feature maps at strides 4, 8, 16 and 32.
 2. A **region proposal network** sliding over those maps, emitting a few
-   thousand class-agnostic "something is here" boxes, cut to around 1,000 by
+   thousand class-agnostic "a thing is here" boxes, cut to around 1,000 by
    NMS.
 3. **RoIAlign**, which crops a fixed-size feature patch for each proposal.
 4. Three **heads** on that patch: classification, box refinement, and the new
    one, a mask.
 
-The heads are where the parameter budget sits, and the split is unintuitive.
+The heads are where the param budget sits, and the split is unintuitive:
 
 | Head | Input | Structure | Output | Parameters |
 |---|---|---|---|---|
@@ -22,35 +22,35 @@ The heads are where the parameter budget sits, and the split is unintuitive.
 | box | shares those two fc layers | | 4 &times; 80 offsets | ~0.33 M |
 | mask | 14&times;14&times;256 | 4 &times; conv3&times;3(256), deconv, conv1&times;1 | 80 &times; 28 &times; 28 | ~2.64 M |
 
-The mask head is the *cheapest* of the three despite producing 62,720 numbers per proposal,
-because it is entirely fully convolutional and the classification and box regression heads are not.
+The mask head is the *cheapest* of the three despite making 62,720 numbers,
+because it's fully convolutional and the box head isn't.
 
 ## The bug that mattered
 
-RoIPool, inherited from Fast R-CNN, converts an arbitrary region of a feature
+RoIPool, inherited from Fast R-CNN, converts an any region of a feature
 map into a fixed 7&times;7 grid. It does so with two roundings:
 
-1. The proposal's floating-point coordinates are snapped to whole feature cells.
+1. The proposal's floating-point coords are snapped to whole feature cells.
 2. The 7&times;7 bin boundaries inside that region are snapped to whole cells
    too.
 
 Drag the proposal in the explorer and watch the dashed red box &mdash; what
-RoIPool actually pools &mdash; jump around the solid orange one, which is what
+RoIPool really pools &mdash; jump around the solid orange one, which is what
 the RPN proposed. The statistic underneath translates the gap into input
 pixels: at stride 16, being half a feature cell out is **8 pixels** in the
-original image. At stride 32 it is 16.
+first image. At stride 32 it's 16.
 
-For classification this genuinely does not matter. The question "is this a cat"
+For classification this truly doesn't matter. The question "is this a cat"
 has the same answer whether your crop is eight pixels off, and the pooled
 features are a summary either way. For a mask it matters enormously, because
 the output is a per-pixel map that gets pasted back onto the image at that
-location. An eight-pixel systematic offset is visible in every single
-prediction.
+location. An eight-pixel systematic offset is visible in each single
+guess.
 
 ## RoIAlign
 
-RoIAlign removes both roundings. The region keeps its floating-point
-coordinates, the bins are divided exactly, and inside each bin four sample
+RoIAlign drops both roundings. The region keeps its floating-point
+coords, the bins are cut just, and inside each bin four sample
 points are read by **bilinear interpolation** from the four nearest feature
 cells &mdash; then averaged.
 
@@ -58,59 +58,59 @@ The dots in the explorer are those sample points. Watch them slide smoothly as
 you drag, where the red box jumps in discrete steps.
 
 The smoothness is the technical point, not just an aesthetic one. Bilinear
-interpolation is differentiable with respect to the sampling location, so
-gradients flow back to the box coordinates. Rounding is a step function whose
-derivative is zero everywhere it is defined, so RoIPool silently cut that path.
+interpolation is differentiable for the sampling location, so
+grads flow back to the box coords. Rounding is a step function whose
+deriv is zero all over it's defined. So RoIPool silently cut that path.
 
-The two pooled maps are drawn side by side with their mean absolute difference.
+The two pooled maps are drawn side by side with their mean abs difference.
 Nudge the proposal width by a tenth of a cell: the RoIAlign map barely moves,
-the RoIPool map can change substantially. The paper reports that this change
-alone improves mask AP by around 10 points relative on COCO, and by up to 50%
-relative under the strict IoU=0.75 criterion. Being eight pixels
-out is precisely what decides a match at that threshold.
+the RoIPool map can change a lot. The paper reports that this change
+alone raises mask AP by around 10 points scaled on COCO, and by up to 50%
+scaled under the strict IoU=0.75 criterion &mdash; where being eight pixels
+out is just what decides a match.
 
 ## Decoupling mask from class
 
-The second design decision is easy to miss. The mask head predicts **K
+The second design choice is easy to miss. The mask head predicts **K
 separate masks**, one per class, and the loss is only applied to the channel of
 the ground-truth class.
 
-The alternative &mdash; one mask with a per-pixel softmax over classes &mdash;
+The option &mdash; one mask with a per-pixel softmax over classes &mdash;
 is what FCN-style semantic segmentation does, and it forces the classes to
-compete pixel by pixel. Mask R-CNN does not need that competition, because the
+compete pixel by pixel. Mask R-CNN doesn't need that contest, because the
 classification head has already decided what the object is. Letting the mask
-branch answer "which pixels belong to *this* object" independently of "what
-class is it" is worth several points of AP. That independence is why the mask branch never
+branch answer "which pixels belong to *this* object" on its own of "what
+class is it" is worth a few points of AP. It's why the mask branch never
 learns to suppress one class in favour of another.
 
 At inference you take the classification head's argmax and read only that
 channel's 28&times;28 mask, resize it to the predicted box, and threshold at
 0.5. The resize is why instance masks from this family have a characteristically
-soft, slightly blobby boundary: the real resolution of the answer is 28&times;28
-inside the box, however large the box is.
+soft, slightly blobby boundary: the real detail of the answer is 28&times;28
+inside the box, but large the box is.
 
 ## Which pyramid level a proposal is read from
 
-One detail sits between the RPN and RoIAlign and it is the reason the stride
+One detail sits between the RPN and RoIAlign and it's the reason the stride
 control on this page has three settings.
 
-With a feature pyramid there are four candidate maps to crop from, at strides
+With a feature pyramid there are four pick maps to crop from, at strides
 4, 8, 16 and 32, and a proposal has to be assigned to one. Cropping a small
 object from the stride-32 map would give a region a couple of cells across,
-which contains almost nothing. Cropping a large one from stride 4 wastes work
+which holds almost nothing. Cropping a large one from stride 4 wastes work
 and gives features with too little context.
 
 FPN assigns by size: a proposal of area *A* goes to level
 `k = floor(4 + log2(sqrt(A) / 224))`, clamped to the available range. A
-224&times;224 proposal &mdash; the ImageNet size, chosen deliberately &mdash;
-lands on level 4, at stride 16. Anything smaller drops to a finer level and
-anything larger rises to a coarser one.
+224&times;224 proposal &mdash; the ImageNet size, chosen on purpose &mdash;
+lands on level 4, at stride 16. any of it smaller drops to a finer level and
+any of it larger rises to a coarser one.
 
 Switch the stride control in the explorer and watch the misalignment figure
 scale with it. The same half-cell rounding error is 2 pixels at stride 4 and 16
-pixels at stride 32. The coarse levels are where RoIPool hurt
-most, and the effect was largest on exactly the large objects that a
-detector otherwise finds easy.
+pixels at stride 32. This Is why the coarse levels are where RoIPool hurt
+most, and why the effect was largest on just the large objects that a
+finder or else finds easy.
 
 ## The loss, and the multi-task balance
 
@@ -118,11 +118,12 @@ detector otherwise finds easy.
 L = L_cls + L_box + L_mask
 ```
 
-Three terms, equally weighted, plus the RPN's own two. `L_mask` is an average
+Three terms, equally weighted, plus the RPN's own two. `L_mask` is an mean
 binary cross-entropy over the 28&times;28 grid of the correct class's channel
-only. Nothing here is tuned. The paper does not weight the mask loss up or down, which
-is unusual for a multi-task network and suggests the three tasks are genuinely
-compatible rather than competing for capacity.
+only. It's worth noticing that nothing here is tuned: the paper doesn't
+weight the mask loss up or down. This Is unusual for a multi-task network and
+suggests the three tasks are truly compatible rather than competing for
+room.
 
 ```python
 import torchvision
@@ -140,46 +141,47 @@ binary = masks[:, 0] > 0.5           # the 0.5 threshold, applied explicitly
 ```
 
 Two things in that snippet catch people. `masks` comes back already resized and
-pasted to full image resolution, and it is *soft* &mdash; probabilities, not
+pasted to full image detail, and it's *soft* &mdash; chances, not
 booleans &mdash; so a threshold has to be applied, and 0.5 is a choice rather
-than a law. And the masks overlap. This is instance segmentation, so two
-instances can both claim a pixel. Resolving that into a single label per
-pixel is panoptic segmentation, a different task with a different
+than a law. And the masks share: this is instance segmentation, so two
+instances can both claim a pixel, and resolving that into a single label per
+pixel is panoptic segmentation. This Is a different task with a different
 metric.
 
 ## What it left behind
 
 Mask R-CNN was state of the art in 2017 and is now the baseline that faster
-methods are measured against. YOLACT and SOLO produce instance masks in one
+methods are measured against. YOLACT and SOLO give instance masks in one
 stage. Mask2Former and the DETR family replace the whole propose-and-crop
-structure with set prediction and attention, and have no RoIAlign, no NMS and
+structure with set guess and focus, and have no RoIAlign, no NMS and
 no anchors at all.
 
 But RoIAlign itself outlived the architecture. Any time you need to read a
-feature map at a location that is not on the grid, the answer is bilinear
-sampling. Deformable convolutions, spatial transformers, keypoint heads, and the
-3-D detectors that project points into image features all use it for the same
-reasons: it is accurate and it is differentiable in the coordinate. The lesson generalises past detection: **if a location is
-continuous, do not round it.**
+feature map at a location that isn't on the grid &mdash; deformable
+convolutions, spatial transformers, keypoint heads, the 3-D finders that
+project points into image features. The answer is bilinear sampling for
+just the reasons here: it's accurate and it's differentiable in the
+coord. The lesson generalises past spotting: **if a location is
+smooth, don't round it.**
 ## Questions people ask
 
-<strong>Why did rounding hurt masks but not classification?</strong> Because the two answers have different shapes. "Is this a cat" survives a crop that is eight pixels off &mdash; the pooled features are a summary either way. A mask is a per-pixel map pasted back at that location, so a systematic eight-pixel offset is visible in every single prediction. Same error, very different consequence.
+<strong>Why did rounding hurt masks but not classification?</strong> Because the two answers have different shapes. "Is this a cat" lives a crop that is eight pixels off. The pooled features are a summary either way. A mask is a per-pixel map pasted back at that location. A systematic eight-pixel offset is visible in each single guess. Same error, very different consequence.
 
-<strong>Why does the gradient argument matter as much as the accuracy one?</strong> Bilinear interpolation is differentiable with respect to the sampling location, so gradients reach the box coordinates. Rounding is a step function whose derivative is zero wherever it is defined, so RoIPool silently severed that path. RoIAlign did not only reduce an error, it restored a training signal.
+<strong>Why does the grad arg matter as much as the fit one?</strong> Bilinear interpolation is differentiable for the sampling location. Grads reach the box coords. Rounding is a step function whose deriv is zero wherever it's defined. So RoIPool silently severed that path. RoIAlign didn't only reduce an error, it restored a training signal.
 
-<strong>Why are the masks 28&times;28?</strong> That is the mask head's output grid, resized to the predicted box at inference. So the real resolution of the answer is 28&times;28 inside the box, however large the box is. That is exactly why instance masks from this family have soft, slightly blobby boundaries, and why later work raised the grid or refined boundaries separately, as PointRend does.
+<strong>Why are the masks 28&times;28?</strong> That is the mask head's output grid, resized to the predicted box at inference. So the real detail of the answer is 28&times;28 inside the box but large the box is. This Is just why instance masks from this family have soft, slightly blobby boundaries. And why later work raised the grid or refined boundaries apart, as PointRend does.
 
-<strong>Why one mask per class instead of a per-pixel softmax?</strong> Because the classification head has already decided what the object is, so the mask branch only has to answer "which pixels belong to this object". A per-pixel softmax makes the classes compete pixel by pixel &mdash; what FCN-style semantic segmentation does &mdash; and it costs several points of AP here.
+<strong>Why one mask per class instead of a per-pixel softmax?</strong> Because the classification head has already decided what the object is. The mask branch only has to answer "which pixels belong to this object". A per-pixel softmax makes the classes compete pixel by pixel. What FCN-style semantic segmentation does. And it costs a few points of AP here.
 
-<strong>Why do my masks overlap?</strong> Because this is instance segmentation: every instance gets its own independent mask and two can both claim a pixel. Forcing one label per pixel is panoptic segmentation, a different task with a different metric. The returned masks are also soft probabilities, so the 0.5 threshold is a choice rather than a law.
+<strong>Why do my masks share?</strong> Because this is instance segmentation. Each instance gets its own free mask and two can both claim a pixel. Forcing one label per pixel is panoptic segmentation, a different task with a different metric. The returned masks are also soft chances. The 0.5 threshold is a choice rather than a law.
 
-<strong>Which pyramid level does a proposal get cropped from?</strong> By area: `k = floor(4 + log2(sqrt(A) / 224))`, clamped to the available levels. A 224&times;224 proposal lands on stride 16 &mdash; the ImageNet size, chosen deliberately &mdash; and smaller objects drop to finer levels. That is why the half-cell rounding error scaled from 2 pixels at stride 4 to 16 at stride 32, and why the damage was worst on the large objects a detector otherwise finds easy.
+<strong>Which pyramid level does a proposal get cropped from?</strong> By area: `k = floor(4 + log2(sqrt(A) / 224))`, clamped to the available levels. A 224&times;224 proposal lands on stride 16. The ImageNet size, chosen on purpose. And smaller objects drop to finer levels. That is why the half-cell rounding error scaled from 2 pixels at stride 4 to 16 at stride 32. Why the damage was worst on the large objects a finder or else finds easy.
 
 ## Recap in one screen
 
 - Faster R-CNN plus one branch: an FPN backbone, RPN proposals, an RoIAlign crop, then classification, box and mask heads.
-- The mask head is the cheapest of the three despite emitting 62,720 numbers, because it is fully convolutional and the box head is not.
+- The mask head is the cheapest of the three despite emitting 62,720 numbers. It's fully convolutional and the box head isn't.
 - RoIPool rounded twice &mdash; the region to whole feature cells, then the bin boundaries. At stride 16 half a cell is 8 input pixels.
-- RoIAlign keeps the floating-point coordinates and samples by bilinear interpolation: about 10 points of relative mask AP, and up to 50% at the strict IoU=0.75.
-- The masks are per-class, independent, 28&times;28 inside the box, soft, and allowed to overlap.
-- If a location is continuous, do not round it &mdash; the idea that outlived the architecture.
+- RoIAlign keeps the floating-point coords and samples by bilinear interpolation. About 10 points of scaled mask AP. Up to 50% at the strict IoU=0.75.
+- The masks are per-class, free, 28&times;28 inside the box, soft, and allowed to share.
+- If a location is smooth, don't round it. The idea that outlived the architecture.

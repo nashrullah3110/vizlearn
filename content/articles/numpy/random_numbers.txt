@@ -1,29 +1,19 @@
 title: Random Numbers
-intro: The modern Generator API, and how to make results reproducible.
+intro: The modern gen API, and how to make results reproducible.
 
 ## Two APIs, one of them legacy
 
-You will see both in the wild.
+You'll see both in the wild.
 
-`np.random.rand`, `np.random.randint`, `np.random.seed` are the **legacy** interface. They all operate on a single hidden global generator.
+`np.random.rand`, `np.random.randint`, `np.random.seed` are the **legacy** interface. They all operate on a single hidden global gen.
 
-`np.random.default_rng()` returns a **Generator** object with its own state. Every method lives on that object.
+`np.random.default_rng()` returns a **gen** object with its own state. each method lives on that object.
 
-The new one is preferred, and the reason is not cosmetic. A global generator means any library you import can consume from the same stream, so your seeded results change when an unrelated dependency starts drawing numbers. It also cannot be used safely from more than one thread, and it makes tests interfere with each other in ways that are hard to trace.
+The new one is preferred, and the reason isn't cosmetic. A global gen means any library you import can consume from the same stream. Your seeded results change when an unrelated dependency starts drawing numbers. It also can't be used safely from more than one thread, and it makes tests interfere with each other in ways that are hard to trace.
 
-An explicit generator is passed where it is needed, and nothing else can touch it. Create it once, near the top, and thread it through.
+An clear gen is passed where it's needed. Nothing else can touch it. Create it once, near the top, and thread it through.
 
-The legacy functions are not deprecated and existing code does not need rewriting, but new code should use `default_rng`.
-
-A generator holds its own internal state, and drawing from it advances that state deterministically. Given the same seed, the same sequence of calls produces the same numbers on every run, on every platform. That is what reproducibility means in practice: not that the numbers are predictable in a cryptographic sense, but that a colleague can rerun your notebook and get the same train/test split, the same bootstrap samples, and the same initialisation weights.
-
-The default algorithm behind `default_rng` is PCG-64, which is fast, has a period of 2^128, and passes every standard statistical test suite. You do not need to choose it — it is the default — but knowing the name helps when reading documentation or comparing with other libraries. SFC-64 and Philox are available as alternatives for specialised use cases like parallel streams, and you pass them as `default_rng(seed=42)` or `Generator(PCG64(42))` when you need explicit control.
-
-Seeding deserves a sentence of its own. `default_rng(42)` creates a generator seeded with `42`. `default_rng()` with no argument seeds from the operating system's entropy source, which is what you want in production — a different stream every run. The seed is an integer or an array of integers; it is not a float, and passing one raises. When you need several independent generators — one per thread, one per simulation — `SeedSequence` spawns child seeds that are statistically independent, which is safer than picking arbitrary integers and hoping they do not correlate.
-
-The methods on a generator cover the distributions you will actually use: `rng.random()` for uniform floats in [0, 1), `rng.integers(low, high)` for discrete uniform, `rng.normal(loc, scale)` for Gaussian, `rng.choice(a, size, replace)` for sampling from a population, `rng.shuffle(a)` for in-place permutation, and `rng.permutation(a)` for a shuffled copy. Each accepts a `size` parameter that returns an array rather than a scalar, so generating a million samples is one call, not a loop.
-
-Two pitfalls are common. First, creating a new generator inside a function that is called repeatedly gives a different seed each time (or the same one if you hardcode it), neither of which is what you want — create the generator once and pass it in. Second, calling `rng.shuffle` returns `None` because it shuffles in place; assigning its result to a variable and then using that variable gives you `None` and a silently shuffled original.
+The legacy functions aren't deprecated and existing code doesn't need rewriting. New code should use `default_rng`.
 
 
 ## default_rng is the current API
@@ -162,43 +152,43 @@ print("which quietly inflates every score you measure afterwards.")
 ```
 ## Seeding
 
-`default_rng(42)` gives a generator whose sequence is fully determined. Two generators created with the same seed produce identical output.
+`default_rng(42)` gives a gen whose sequence is fully found. Two gens created with the same seed give same output.
 
-The generator is stateful: each call advances it, so consecutive draws from the same generator differ. That is the point &mdash; you seed once, not before every call.
+The gen is stateful: each call advances it. In a row draws from the same gen differ. That is the point. You seed once, not before each call.
 
-Seeding inside a loop is a common bug. It produces the same "random" value every iteration, and the symptom is data that looks suspiciously uniform.
+Seeding inside a loop is a common bug. It makes the same "random" value each loop. The symptom is data that looks oddly uniform.
 
-For genuinely unpredictable values, call `default_rng()` with no argument; it seeds from the operating system.
+For truly unpredictable values, call `default_rng()` with no arg. It seeds from the operating system.
 
 ## Shapes
 
-Every method takes `size`, and it accepts a tuple.
+each method takes `size`, and it accepts a tuple.
 
-`rng.random((3, 4))` gives a `(3, 4)` array in one call. There is never a reason to loop.
+`rng.random((3, 4))` gives a `(3, 4)` array in one call. There's never a reason to loop.
 
-`rng.integers(low, high)` is **half-open**, like `range` and like slicing: `high` is excluded. The legacy `randint` behaved the same way, but `random_integers`, now removed, did not &mdash; which is why the memory is unreliable and worth checking.
+`rng.ints(low, high)` is **half-open**, like `range` and like slicing: `high` is excluded. The legacy `randint` behaved the same way. `random_integers`, now removed, didn't. Which is why the memory is unreliable and worth checking.
 
 ## The distributions
 
-`random` for uniform `[0, 1)`. `integers` for uniform integers. `normal(loc, scale)` for Gaussian. `uniform(low, high)` for a uniform range other than the unit interval.
+`random` for uniform `[0, 1)`. `ints` for uniform ints. `normal(loc, scale)` for Gaussian. `uniform(low, high)` for a uniform range other than the unit interval.
 
-Beyond those there are dozens &mdash; `poisson`, `exponential`, `binomial`, `multivariate_normal` &mdash; all following the same `size` convention.
+Beyond those there are dozens. `poisson`, `steep`, `binomial`, `multivariate_normal` &mdash; all following the same `size` rule.
 
 ## choice
 
-`rng.choice(pool, size=n)` samples with replacement by default.
+`rng.choice(pool, size=n)` samples with swap by default.
 
-`replace=False` samples without, and raises if `size` exceeds the pool. That is the right behaviour: silently returning duplicates when you asked for distinct items would be worse.
+`replace=False` samples without, and raises if `size` exceeds the pool. That is the right action. Silently returning copies when you asked for distinct items would be worse.
 
 `p=weights` gives a weighted draw. The weights must sum to 1 and have one entry per element of the pool.
 
-`choice` also accepts an integer instead of an array, meaning "choose from `arange(n)`", which is often what you want when you are really choosing indices.
+`choice` also accepts an int instead of an array, meaning "choose from `arange(n)`". This Is often what you want when you're really choosing indices.
 
 ## Shuffling
 
 `rng.shuffle(a)` modifies in place and returns `None`. `rng.permutation(a)` returns a shuffled copy.
 
-On a 2-D array, both operate on the **first axis** &mdash; whole rows move, and their contents stay intact. That is almost always what you want for a table of records, and it is worth knowing rather than assuming it shuffles every element.
+On a 2-D array, both operate on the **first axis**. Whole rows move. Their contents stay intact. That is almost always what you want for a table of records. It's worth knowing rather than given it shuffles each element.
 
 ## Splitting data
 
@@ -209,29 +199,29 @@ idx = rng.permutation(n)
 train, test = idx[:cut], idx[cut:]
 ```
 
-The tempting alternative &mdash; drawing a training sample and then a test sample &mdash; allows the same row into both, because the two draws know nothing about each other. That leaks test data into training and inflates every score you measure afterwards, sometimes dramatically, and the code gives no sign anything is wrong.
+The tempting option &mdash; drawing a training sample and then a test sample &mdash; allows the same row into both. The two draws know nothing about each other. That leaks test data into training and inflates each score you measure later, at times sharply. The code gives no sign anything is wrong.
 
-Permuting once makes the disjointness structural rather than probabilistic. The same index array applied to `X` and `y` keeps them aligned.
+Permuting once makes the disjointness structural rather than random. The same index array applied to `X` and `y` keeps them aligned.
 
 ## Reproducibility in practice
 
-Seed at the entry point, not scattered through the code. Record the seed alongside results. Pass the generator explicitly into any function that needs randomness, so it can be tested with a fixed one.
+Seed at the entry point, not scattered through the code. Record the seed alongside results. Pass the gen by name into any function that needs noise. It can be tested with a fixed one.
 
-And be clear about what a seed guarantees: identical results for the same NumPy version and the same sequence of calls. Change the order of operations and the numbers change, even with the seed unchanged.
+And be clear about what a seed promises. Same results for the same NumPy version and the same sequence of calls. Change the order of steps and the numbers change, even with the seed unchanged.
 
 ## What is underneath a Generator
 
-`default_rng` returns a `Generator` wrapping a **bit generator**, which is the thing that actually produces random bits. The default is PCG64.
+`default_rng` returns a `gen` wrapping a **bit gen**. This Is the thing that really makes random bits. The default is PCG64.
 
-The split matters because the two layers have different jobs. The bit generator produces a stream of uniform bits; the Generator turns those into distributions. Swapping the bit generator &mdash; `default_rng(np.random.MT19937(seed))` for the old Mersenne Twister, or `Philox` for a counter-based one &mdash; changes the stream without changing the interface.
+The split matters because the two layers have other jobs. The bit gen makes a stream of uniform bits. The gen turns those into spreads. Swapping the bit gen. `default_rng(np.random.MT19937(seed))` for the old Mersenne Twister, or `Philox` for a counter-based one. Changes the stream without changing the interface.
 
-PCG64 was chosen as the default because it is fast, has good statistical properties, and supports cheap independent streams. Mersenne Twister, the legacy default, is slower and has a much larger state.
+PCG64 was chosen as the default because it's fast, has good statistical properties. Supports cheap split streams. Mersenne Twister, the legacy default, is slower and has a much larger state.
 
-None of these are cryptographically secure. For tokens, passwords or anything an adversary should not predict, use the `secrets` module, not NumPy.
+None of these are cryptographically secure. For tokens, passwords or anything an adversary shouldn't predict, use the `secrets` module, not NumPy.
 
 ## Independent streams
 
-Running the same simulation in parallel needs each worker to draw different numbers, and seeding each with a different arbitrary integer is not a reliable way to get that &mdash; nearby seeds can produce overlapping streams.
+Running the same modelling in parallel needs each worker to draw other numbers. Seeding each with a other any int isn't a solid way to get that. Nearby seeds can give shared streams.
 
 `SeedSequence` is the supported answer:
 
@@ -241,39 +231,39 @@ children = ss.spawn(4)
 rngs = [np.random.default_rng(c) for c in children]
 ```
 
-Each child produces a stream that is statistically independent of the others, and the whole set is reproducible from the single parent seed.
+Each child makes a stream that is statistically split of the others. The whole set is reproducible from the single parent seed.
 
-`rng.spawn(n)` on a Generator does the same thing more directly in recent NumPy versions.
+`rng.spawn(n)` on a gen does the same thing more right in recent NumPy versions.
 
-This is the right way to seed workers in a multiprocessing pool, and it means one recorded seed reproduces the entire parallel run.
+This is the right way to seed workers in a multiprocessing pool. It means one recorded seed copies the entire parallel run.
 
 ## The legacy interface, and when you need it
 
-`np.random.RandomState` is the old object-oriented interface, and the global functions like `np.random.rand` are methods on a hidden instance of it.
+`np.random.RandomState` is the old object-oriented interface. The global functions like `np.random.rand` are methods on a hidden instance of it.
 
-It is frozen for backwards compatibility: its stream is guaranteed never to change across NumPy versions. `Generator` carries no such guarantee, and its output can change between versions if an algorithm is improved.
+It's frozen for backwards match: its stream is sure never to change across NumPy versions. `gen` carries no such promise. Its output can change between versions if an method is better.
 
-That makes `RandomState` the correct choice in exactly one situation: reproducing results from older code or published work where the exact numbers matter.
+That makes `RandomState` the correct choice in just one situation. Copying results from older code or published work where the exact numbers matter.
 
-For everything else, `Generator` is faster, has better distributions, and does not share state with every other piece of code in the process.
+For all else, `gen` is faster, has better spreads. Doesn't share state with every other piece of code in the process.
 
 ## Choosing a distribution
 
 The ones that come up most, and what they model:
 
-`uniform(low, high)` &mdash; no information beyond a range.
+`uniform(low, high)` &mdash; no data beyond a range.
 
-`normal(loc, scale)` &mdash; measurements with symmetric error, sums of many small independent effects.
+`normal(loc, scale)` &mdash; readings with even error, sums of many small split effects.
 
-`lognormal` &mdash; quantities that cannot be negative and are multiplicative: incomes, file sizes, response times.
+`lognormal` &mdash; quantities that can't be minus and are scaling: incomes, file sizes, response times.
 
-`poisson(lam)` &mdash; counts of independent events in a fixed interval: arrivals, defects, requests per second.
+`poisson(lam)` &mdash; counts of split events in a fixed interval: arrivals, defects, requests per second.
 
-`exponential(scale)` &mdash; waiting times between Poisson events.
+`steep(scale)` &mdash; waiting times between Poisson events.
 
 `binomial(n, p)` &mdash; successes out of n trials.
 
-Using `normal` for a quantity that cannot be negative is a common modelling error, and it shows up as negative durations or negative counts in generated test data. `lognormal` or a truncated distribution is usually what was meant.
+Using `normal` for a quantity that can't be minus is a common modelling error. It shows up as minus durations or minus counts in made test data. `lognormal` or a truncated spread is often what was meant.
 
 ## Generating realistic test data
 
@@ -289,77 +279,77 @@ A few patterns worth having.
 
 ## Reproducibility, honestly
 
-A seed guarantees the same numbers for the same NumPy version, the same generator, and the **same sequence of calls**.
+A seed promises the same numbers for the same NumPy version, the same gen. The **same sequence of calls**.
 
-Change the order of operations and the numbers change. Add a draw in the middle and everything after it shifts. Parallelise differently and the assignment of numbers to workers changes.
+Change the order of steps and the numbers change. Add a draw in the middle and all after it shifts. Parallelise differently and the set of numbers to workers changes.
 
-This means a seed reproduces a run, not a result. Code that draws different amounts of randomness depending on the data will not reproduce across changes to that data, even with the seed fixed.
+This means a seed copies a run, not a result. Code that draws other amounts of noise based on the data won't copy across changes to that data, even with the seed fixed.
 
-The practical discipline: seed once at the entry point, record the seed alongside the output, pass the generator explicitly into anything that needs it, and use `SeedSequence` for parallel work. Those four habits cover almost every reproducibility problem people actually hit.
+The hands-on discipline: seed once at the entry point, record the seed alongside the output, pass the gen by name into anything that needs it. Use `SeedSequence` for parallel work. Those four habits cover almost each reproducibility problem people really hit.
 
 ## Passing the generator around
 
-The habit that makes randomness testable is to accept a generator as an argument rather than creating one inside a function.
+The habit that makes noise testable is to accept a gen as an arg rather than creating one inside a function.
 
 ```python
 def make_sample(n, rng):
     return rng.normal(size=n)
 ```
 
-The caller decides the seed, so the same function serves production &mdash; where the generator is seeded from the operating system &mdash; and tests, where a fixed seed makes assertions possible.
+The caller decides the seed. So The same function serves production. Where the gen is seeded from the operating system. And tests. Here A fixed seed makes assertions possible.
 
-A default of `rng=None` with `rng = np.random.default_rng(rng)` inside is a useful pattern: `default_rng` accepts a Generator, an integer seed, a SeedSequence or None, and returns a Generator in every case. That gives callers all four options with one line.
+A default of `rng=None` with `rng = np.random.default_rng(rng)` inside is a handy pattern: `default_rng` accepts a gen, an int seed, a SeedSequence or None. Returns a gen in each case. That gives callers all four options with one line.
 
-The alternative &mdash; calling `np.random.seed` somewhere and hoping &mdash; is what makes randomised code untestable and non-reproducible, because any other code drawing from the same global stream changes the results.
+The option &mdash; calling `np.random.seed` one spot and hoping &mdash; is what makes randomised code untestable and non-reproducible. Any other code drawing from the same global stream changes the results.
 
 ## Randomness in tests
 
-A test that uses random data and a fixed seed is testing one sample. That is usually fine, and it is better than a test with hard-coded magic numbers.
+A test that uses random data and a fixed seed is testing one sample. That is often fine. It's better than a test with hard-coded magic numbers.
 
-The failure mode to avoid is a test that passes for most seeds and fails for some. If a test is checking a statistical property &mdash; that a mean is near zero, that a split is roughly balanced &mdash; the tolerance has to be wide enough for the distribution, not tuned until the current seed passes.
+The failure mode to avoid is a test that passes for most seeds and fails for some. If a test is checking a statistical property. That a mean is near zero, that a split is roughly weighed. The handling has to be wide enough for the spread, not tuned until the current seed passes.
 
-`np.allclose` with an explicit tolerance expresses that far better than exact comparison, and stating the tolerance forces the question of how much variation is acceptable.
+`np.allclose` with an clear handling expresses that far better than exact compare. Stating the handling forces the question of how much variation is acceptable.
 
-For anything where the property should hold for all inputs rather than one sample, property-based testing with several seeds is the honest version.
+For anything where the property should hold for all inputs rather than one sample, property-based testing with a few seeds is the honest version.
 
 ## Common mistakes
 
-**Seeding inside a loop.** Produces the same value every iteration. The symptom is suspiciously uniform data.
+**Seeding inside a loop.** makes the same value each loop. The symptom is oddly uniform data.
 
-**Using `np.random.seed` in a library.** It mutates global state that belongs to the application, not to you.
+**Using `np.random.seed` in a library.** It mutates global state that belongs to the use, not to you.
 
-**Sampling twice for a train/test split.** The two draws are independent, so rows can appear in both. Permute once.
+**Sampling twice for a train/test split.** The two draws are split. Rows can appear in both. Permute once.
 
-**Using `normal` for a non-negative quantity.** Produces negative durations and negative counts. `lognormal` or a truncated distribution is usually what was meant.
+**Using `normal` for a non-minus quantity.** makes minus durations and minus counts. `lognormal` or a truncated spread is often what was meant.
 
-**Expecting `shuffle` to return something.** It modifies in place and returns None, so `a = rng.shuffle(a)` sets `a` to None. `permutation` is the returning version.
+**Expecting `shuffle` to return a thing.** It modifies in place and returns None. `a = rng.shuffle(a)` sets `a` to None. `permutation` is the returning version.
 
-**Assuming a seed reproduces a result rather than a run.** Change the order of draws and the numbers change, seed or no seed.
+**given a seed copies a result rather than a run.** Change the order of draws and the numbers change, seed or no seed.
 
 ## The summary
 
-Create one generator with `default_rng(seed)` at the entry point.
+Create one gen with `default_rng(seed)` at the entry point.
 
-Pass it explicitly to anything that needs randomness.
+Pass it by name to anything that needs noise.
 
-Use `SeedSequence` or `spawn` for parallel workers, never nearby integer seeds.
+Use `SeedSequence` or `spawn` for parallel workers, never nearby int seeds.
 
 Draw whole arrays with `size` rather than looping.
 
 Permute an index array once when splitting or shuffling aligned data.
 
-Record the seed with the results, and remember that it reproduces the sequence of calls, not the conclusion.
+Record the seed with the results. Note that it copies the sequence of calls, not the conclusion.
 
 ## A closing note
 
-Randomness is one of the few areas where the convenient API and the correct API differ, and where the convenient one has been the default for long enough that most examples still use it.
+Noise is one of the few areas where the convenient API and the correct API differ. Where the convenient one has been the default for long enough that most examples still use it.
 
-`np.random.seed` and its companions are not broken, and existing code using them does not need rewriting. But new code has a better option, and the reasons &mdash; isolation, thread safety, reproducible parallelism &mdash; are the kind that only matter once, catastrophically, at the point where results cannot be reproduced.
+`np.random.seed` and its companions aren't broken. Existing code using them doesn't need rewriting. But new code has a better option, and the reasons. Alone, thread safety, reproducible parallelism. Are the kind that only matter once, catastrophically, at the point where results can't be copied.
 
-One generator, created explicitly, passed where it is needed. That single habit covers almost everything.
+One gen, created by name, passed where it's needed. That single habit covers almost all.
 
 ## One last habit
 
 Record the seed with the output, not just in the code.
 
-A seed that lives only in a source file is lost the moment the file changes, and the results it produced become unreproducible without a git archaeology session. Writing it into the output &mdash; a filename, a metadata field, a log line &mdash; costs nothing and is the difference between results that can be regenerated and results that can only be trusted.
+A seed that lives only in a source file is lost the moment the file changes. The results it made become unreproducible without a git archaeology session. Writing it into the output. A filename, a metadata field, a log line. Costs nothing and is the gap between results that can be regenerated and results that can only be trusted.

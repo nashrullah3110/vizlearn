@@ -3,27 +3,13 @@ intro: From dicts, records, arrays and files, and which orientation each assumes
 
 ## The two orientations
 
-Almost every confusion about constructing a DataFrame comes from one question: does this input describe **columns** or **rows**?
+Almost each confusion about making a DataFrame comes from one question: does this input show **columns** or **rows**?
 
-`pd.DataFrame({"a": [1,2,3], "b": [4,5,6]})` describes columns. Each key is a column name and each value is the entire column. This is the most common form and the one to reach for when you have parallel lists.
+`pd.DataFrame({"a": [1,2,3], "b": [4,5,6]})` shows columns. Each key is a column name and each value is the entire column. This is the most common form and the one to reach for when you've parallel lists.
 
-`pd.DataFrame([{"a":1,"b":4}, {"a":2,"b":5}])` describes rows. Each dict is one record. This is the shape data arrives in from an API or a database cursor, and pandas handles it directly.
+`pd.DataFrame([{"a":1,"b":4}, {"a":2,"b":5}])` shows rows. Each dict is one record. This is the shape data arrives in from an API or a DB cursor, and pandas handles it right.
 
-Both produce the same frame. Knowing which one you are writing prevents a transposed result.
-
-`pd.read_csv("file.csv")` is the most common constructor in practice, and it infers column names from the first row, dtypes from the data, and the index from the row numbers. `dtype={"id": "int32", "name": "category"}` overrides the inference per column, which is worth doing on any file you will read more than once — inference is a guess, and a wrong guess wastes memory or produces the wrong type. `parse_dates=["date"]` converts date strings to datetime objects on read, which is faster than converting after.
-
-`pd.read_json`, `pd.read_excel`, `pd.read_sql`, `pd.read_parquet`, and `pd.read_html` each read a different format into the same DataFrame structure. The parquet reader is the fastest for large files and preserves dtypes exactly. The SQL reader takes a query and a connection, which is how you get a database result into pandas without writing a loop. The HTML reader is surprisingly useful — `pd.read_html(url)` returns a list of DataFrames, one per `<table>` on the page.
-
-`pd.DataFrame(np.array(...))` builds a frame from a NumPy array. Column names default to integers — `0, 1, 2` — so passing `columns=["a", "b", "c"]` is almost always necessary. The index defaults to `RangeIndex`, which is usually what you want. The dtype of each column matches the array's dtype.
-
-`pd.DataFrame.from_records(rows, columns=["a", "b"])` builds a frame from a list of tuples, which is the shape you get from `cursor.fetchall()` in a database driver. Each tuple is one row, and the `columns` argument names them.
-
-An empty DataFrame — `pd.DataFrame(columns=["a", "b", "c"])` — is the starting point for building a frame row by row, which is slow but sometimes necessary when the data arrives incrementally. `pd.concat([existing, new_row])` appends a row. For bulk construction, collecting rows in a list and calling `pd.DataFrame(rows)` once at the end is 10–100x faster than repeated `concat` calls.
-
-`index=` sets the row labels at construction time. `pd.DataFrame(data, index=["x", "y", "z"])` assigns string labels. `pd.DataFrame(data, index=pd.date_range("2024-01-01", periods=3))` assigns dates. The index is not a column — it does not appear in `df.columns` — but it controls alignment, slicing, and grouping.
-
-`columns=` controls column order. `pd.DataFrame(data, columns=["b", "a"])` puts `b` first, even if the dict had `a` first. Columns not in the list are dropped; names in the list not in the data become columns of `NaN`.
+Both give the same frame. Knowing which one you're writing blocks a transposed result.
 
 
 ## From a dict of columns
@@ -174,51 +160,51 @@ print("df.append() used to be the popular way - it was removed in pandas 2.0.")
 ```
 ## What each form tolerates
 
-**Dict of columns** requires equal lengths and raises otherwise, which is a useful check. A **scalar** value is the exception: it broadcasts to every row, so `{"a": [1,2,3], "flag": True}` gives a flag column of three `True` values.
+**Dict of columns** needs equal lengths and raises else. This Is a handy check. A **scalar** value is the exception. It broadcasts to each row. `{"a": [1,2,3], "flag": True}` gives a flag column of three `True` values.
 
-**List of dicts** does not require the keys to match. Missing keys become `NaN`, and the column order follows first appearance across all records. That tolerance is convenient for messy input and worth watching: a typo in one record's key silently creates a new mostly-empty column rather than raising.
+**List of dicts** doesn't need the keys to match. Missing keys become `NaN`. The column order follows first appearance across all records. That handling is convenient for messy input and worth watching. A typo in one record's key silently creates a new mostly-empty column rather than raising.
 
-**List of lists** works but names the columns `0, 1, 2`. Pass `columns=` unless you genuinely want integer names. Integer column names are legal and lead to real confusion later, because `df[0]` then means a column and looks like positional indexing.
+**List of lists** works but names the columns `0, 1, 2`. Pass `columns=` unless you truly want int names. int column names are legal and lead to real confusion later. `df[0]` then means a column and looks like spot-based indexing.
 
-**Dict of scalars** raises, because pandas cannot tell whether you meant one row or one column. `pd.DataFrame([d])` means one row; `pd.DataFrame.from_dict(d, orient="index")` means one column. The error is good &mdash; guessing here would be worse.
+**Dict of scalars** raises, because pandas can't tell whether you meant one row or one column. `pd.DataFrame([d])` means one row. `pd.DataFrame.from_dict(d, orient="index")` means one column. The error is good. Guessing here would be worse.
 
 ## read_csv
 
-For real data this is the usual entry point, and it does a lot by default: infers a dtype per column, treats the first line as a header, and parses common missing-value markers.
+For real data this is the usual entry point. It does a lot by default. Infers a dtype per column, treats the first line as a header, and parses common missing-value markers.
 
-The arguments worth knowing early:
+The args worth knowing early:
 
-`index_col` sets a column as the index during the read rather than afterwards.
+`index_col` sets a column as the index during the read rather than later.
 
-`usecols` reads only the columns you name, which matters on wide files &mdash; it saves both time and memory.
+`usecols` reads only the columns you name. This Matters on wide files. It saves both time and memory.
 
-`dtype` overrides inference. This is how you stop an identifier column being read as an integer and losing its leading zeros, and how you read a low-cardinality column straight into `category`.
+`dtype` replaces inference. This is how you stop an identifier column being read as an int and losing its leading zeros. How you read a low-cardinality column straight into `group`.
 
-`parse_dates` converts date columns during the read, which is faster than converting afterwards.
+`parse_dates` converts date columns during the read. This Is faster than converting later.
 
-`nrows` reads a sample, which is the right way to inspect a large file before committing to it.
+`nrows` reads a sample. This Is the right way to inspect a large file before committing to it.
 
-It accepts any file-like object, so `io.StringIO` works for testing and for data that is already in memory.
+It accepts any file-like object. So `io.StringIO` works for testing and for data that is already in memory.
 
 ## Type inference and its costs
 
-`read_csv` and the constructors infer types per column. That is usually helpful and occasionally wrong in expensive ways.
+`read_csv` and the constructors infer types per column. That is often helpful and at times wrong in costly ways.
 
-A column of integers with one missing value becomes `float64`, because integer arrays cannot hold NaN. Identifiers then print as `1001.0`.
+A column of ints with one missing value turns `float64`. Int arrays can't hold NaN. Identifiers then print as `1001.0`.
 
-A column that is mostly numbers with one stray non-numeric value becomes `object`, and every subsequent numeric operation on it either fails or silently operates on strings.
+A column that is mostly numbers with one stray non-numeric value turns `object`. Each later numeric step on it either fails or silently operates on strings.
 
-Both are worth checking with `df.dtypes` immediately after loading. It takes one line and catches a category of bug that otherwise surfaces much later.
+Both are worth checking with `df.dtypes` at once after loading. It takes one line and catches a group of bug that else surfaces much later.
 
 ## Never grow a frame
 
-`acc.loc[len(acc)] = row` inside a loop reallocates the entire frame on every iteration. So did `df.append`, which is why it was **removed in pandas 2.0** rather than merely deprecated.
+`acc.loc[len(acc)] = row` inside a loop reallocates the entire frame on each loop. So did `df.append`. This Is why it was **removed in pandas 2.0** rather than merely deprecated.
 
-The correct pattern is the same as NumPy's: collect into a Python list and construct once at the end. Lists append cheaply; DataFrames do not append at all.
+The correct pattern is the same as NumPy's. Collect into a Python list and make once at the end. Lists append cheaply. DataFrames don't append at all.
 
-If the pieces are already frames, `pd.concat(list_of_frames)` once at the end is the right call &mdash; and `pd.concat` inside a loop is exactly the same mistake in a different costume.
+If the pieces are already frames, `pd.concat(list_of_frames)` once at the end is the right call. And `pd.concat` inside a loop is just the same mistake in a other costume.
 
-The last editor measures it. The gap grows with the number of rows, so a pattern that seems acceptable on a hundred records becomes unusable on a hundred thousand.
+The last editor measures it. The gap grows with the number of rows. A pattern that seems acceptable on a hundred records turns unusable on a hundred thousand.
 
 ## Choosing
 
@@ -232,47 +218,47 @@ The last editor measures it. The gap grows with the number of rows, so a pattern
 
 **One row from a dict**: `pd.DataFrame([d])`.
 
-And in every case, print `df.dtypes` and `df.shape` immediately afterwards. Those two lines catch most of what goes wrong at the boundary between raw data and pandas.
+And in each case, print `df.dtypes` and `df.shape` at once later. Those two lines catch most of what goes wrong at the boundary between raw data and pandas.
 
 ## From a NumPy array
 
-`pd.DataFrame(arr, columns=[...])` wraps an array. The array has **one** dtype, so every column starts with that dtype until you convert.
+`pd.DataFrame(arr, columns=[...])` wraps an array. The array has **one** dtype. Each column starts with that dtype until you convert.
 
-That matters when the array came from something that widened it. An array of mixed data is `object`, and a DataFrame built from it has every column as `object` &mdash; numeric-looking columns that do not behave numerically.
+That matters when the array came from a thing that widened it. An array of mixed data is `object`. A DataFrame built from it has each column as `object`. Numeric-looking columns that don't behave by number.
 
-`index=` sets the labels at the same time.
+`index=` sets the labels also.
 
-For the reverse direction, `df.to_numpy()` collapses back to a single dtype, and `df.values` is the older spelling of the same thing.
+For the reverse direction, `df.to_numpy()` merges back to a single dtype. `df.values` is the older spelling of the same thing.
 
 ## From a database or an API
 
-`pd.read_sql(query, connection)` runs a query and returns a frame, with column names taken from the result. It accepts a SQLAlchemy connection or a raw DBAPI one.
+`pd.read_sql(query, link)` runs a query and returns a frame, with column names taken from the result. It accepts a SQLAlchemy link or a raw DBAPI one.
 
-`pd.read_json` handles JSON, and `pd.json_normalize` is the one worth knowing: it flattens **nested** JSON into columns, turning `{"user": {"name": "ana"}}` into a `user.name` column. Most API responses need it, and building the frame by hand from nested dicts is the long way round.
+`pd.read_json` handles JSON, and `pd.json_normalize` is the one worth knowing. It flattens **nested** JSON into columns, turning `{"user": {"name": "ana"}}` into a `user.name` column. Most API responses need it, and building the frame by hand from nested dicts is the long way round.
 
-`pd.read_html(url_or_html)` scrapes every table on a page into a list of frames. It is startlingly effective for simple pages and needs `lxml` or `bs4` installed.
+`pd.read_html(url_or_html)` scrapes each table on a page into a list of frames. It's startlingly good for simple pages and needs `lxml` or `bs4` installed.
 
 ## Setting the index at creation
 
 Any of the constructors accept `index=`, and `read_csv` accepts `index_col=`.
 
-Doing it at creation is slightly cheaper than `set_index` afterwards, and more importantly it documents that the column is a key rather than data.
+Doing it at creation is slightly cheaper than `set_index` later. More importantly it docs that the column is a key rather than data.
 
 If the index should be a `DatetimeIndex`, parse the dates in the same call: `read_csv(path, parse_dates=["date"], index_col="date")` gives a time-indexed frame in one step.
 
 ## Empty frames, and why they cause trouble
 
-`pd.DataFrame()` is legal and occasionally useful as a placeholder.
+`pd.DataFrame()` is legal and at times handy as a placeholder.
 
-It is a poor starting point for accumulation, for two reasons. Growing it row by row is quadratic, as the last editor shows. And its columns have no meaningful dtype, so the first `concat` into it can widen everything to `object` &mdash; at which point the frame is slow and the numeric columns are no longer numeric.
+It's a poor starting point for build-up, for two reasons. Growing it row by row is quadratic, as the last editor shows. And its columns have no real dtype. The first `concat` into it can widen all to `object`. At which point the frame is slow and the numeric columns are no longer numeric.
 
 `pd.DataFrame(columns=["a", "b"])` has the same problem with more ceremony.
 
-The pattern to use instead is always the same: build a **list** of rows or of frames, and construct once at the end.
+The pattern to use instead is always the same. Build a **list** of rows or of frames. Make once at the end.
 
 ## Checking what you built
 
-Four lines, immediately after construction, catch most problems at the boundary:
+Four lines, at once after build, catch most problems at the boundary:
 
 ```python
 df.shape        # is this the number of rows I expected?
@@ -281,65 +267,65 @@ df.head()       # does the data look like the data?
 df.isna().sum() # where are the gaps?
 ```
 
-The second is the one that earns its keep. Type inference is where most silent damage happens, and it happens exactly once, at construction.
+The second is the one that earns its keep. Type inference is where most silent damage happens. It happens just once, at build.
 
 ## Choosing a constructor
 
 **Parallel lists you already have** &mdash; a dict of columns.
 
-**Records from an API or a cursor** &mdash; a list of dicts, or `json_normalize` if they are nested.
+**Records from an API or a cursor**. A list of dicts, or `json_normalize` if they're nested.
 
-**A file** &mdash; `read_csv`, with `dtype`, `usecols` and `parse_dates` set deliberately.
+**A file** &mdash; `read_csv`, with `dtype`, `usecols` and `parse_dates` set on purpose.
 
-**A query** &mdash; `read_sql`, which names the columns for you.
+**A query** &mdash; `read_sql`. This Names the columns for you.
 
 **A NumPy array** &mdash; the constructor with `columns=`, remembering the single dtype.
 
 **One row from a dict** &mdash; `pd.DataFrame([d])`.
 
-**Accumulated pieces** &mdash; a list, then `pd.DataFrame(rows)` or `pd.concat(frames)` once.
+**built up pieces** &mdash; a list, then `pd.DataFrame(rows)` or `pd.concat(frames)` once.
 
-In every branch, set the dtype at creation rather than converting afterwards. `astype` allocates a second full frame, and getting it right the first time avoids both the copy and the class of bugs where a column silently is not the type you assumed.
+In each branch, set the dtype at creation rather than converting later. `astype` allocates a second full frame. Getting it right the first time avoids both the copy and the class of bugs where a column silently isn't the type you assumed.
 
 ## Reproducible test frames
 
-Small frames written by hand are how you check that an operation does what you think, and it is worth having a habit for them.
+Small frames written by hand are how you check that an step does what you think. It's worth having a habit for them.
 
 A dict of columns is the most readable form for a handful of rows. `pd.DataFrame({"a": [1,2,3], "b": list("xyz")})` fits on one line and shows the columns clearly.
 
-For a frame with a specific index, pass `index=` rather than setting it afterwards.
+For a frame with a exact index, pass `index=` rather than setting it later.
 
-For random test data, seed it: `np.random.default_rng(0)`. Unseeded random test data makes a failing check unreproducible, which is the opposite of what a test is for.
+For random test data, seed it: `np.random.default_rng(0)`. Unseeded random test data makes a failing check unreproducible. This Is the opposite of what a test is for.
 
-`pd.util.testing` used to provide frame generators; the supported route now is `pd.testing.assert_frame_equal` for comparisons, and building the frames yourself.
+`pd.util.testing` used to provide frame gens. The supported route now is `pd.testing.assert_frame_equal` for checks, and building the frames yourself.
 
 ## Checking two frames match
 
-`pd.testing.assert_frame_equal(a, b)` is the precise comparison: values, dtypes, index and column order all have to agree, and the error message says which differed.
+`pd.testing.assert_frame_equal(a, b)` is the precise compare: values, dtypes, index and column order all have to agree. The error message says which differed.
 
-`check_dtype=False` relaxes the type comparison, which is often necessary when one side came through a CSV.
+`check_dtype=False` relaxes the type compare. This Is often needed when one side came through a CSV.
 
-`check_like=True` ignores row and column order.
+`check_like=True` skips row and column order.
 
-This is what belongs in a test, rather than `a.equals(b)`, because when it fails it tells you *what* failed.
+This is what belongs in a test, rather than `a.equals(b)`. When it fails it tells you *what* failed.
 
 ## Copy semantics at construction
 
-`pd.DataFrame(some_array)` does **not** always copy. If the array's dtype and layout are usable directly, pandas may wrap it, and writing to the frame then writes to the array.
+`pd.DataFrame(some_array)` does **not** always copy. If the array's dtype and layout are usable right, pandas may wrap it. Writing to the frame then writes to the array.
 
-`copy=True` forces a copy. Under copy-on-write this stops mattering, which is another reason that change is welcome.
+`copy=True` forces a copy. Under copy-on-write this stops mattering. This Is another reason that change is welcome.
 
-`pd.DataFrame(dict_of_series)` aligns the Series on their indexes, which is easy to forget: three Series with different labels produce a frame with the union of them and `NaN` in the gaps, not three columns side by side.
+`pd.DataFrame(dict_of_series)` aligns the Series on their indexes. This Is easy to forget. Three Series with other labels give a frame with the union of them and `NaN` in the gaps, not three columns side by side.
 
 If you meant "these are parallel columns", reset the indexes first or pass plain lists.
 
 ## The construction checklist
 
-Decide whether the input describes rows or columns.
+Decide whether the input shows rows or columns.
 
 Pass `columns=` if the source has no names.
 
-Set `dtype` at construction, especially for identifiers and for integers that may have gaps.
+Set `dtype` at build, above all for identifiers and for ints that may have gaps.
 
 Set `index=` if a column is really a key.
 
@@ -351,22 +337,22 @@ That is six lines of discipline that prevent most of what the cleaning modules e
 
 ## A closing note
 
-Construction is where a frame's types are decided, and types decided badly here cause problems everywhere afterwards.
+build is where a frame's types are decided. Types decided badly here cause problems all over later.
 
-The two questions worth answering deliberately are whether the input describes rows or columns, and what the dtypes should be. Getting the first wrong gives a transposed frame that is immediately obvious. Getting the second wrong gives a frame that looks correct and behaves oddly much later.
+The two questions worth answering on purpose are whether the input shows rows or columns. What the dtypes should be. Getting the first wrong gives a transposed frame that is at once obvious. Getting the second wrong gives a frame that looks correct and behaves oddly much later.
 
-`dtype=` at construction costs nothing. `astype` afterwards allocates a second copy of every column it touches, and by then the leading zeros may already be gone.
+`dtype=` at build costs nothing. `astype` later allocates a second copy of each column it touches. By then the leading zeros may already be gone.
 
-The other rule is the one shared with NumPy: never grow a frame in a loop. Collect into a list and construct once. `df.loc[len(df)] = row` and `pd.concat` inside a loop are the same quadratic mistake wearing different syntax, and `df.append` was removed rather than merely deprecated because of it.
+The other rule is the one shared with NumPy. Never grow a frame in a loop. Collect into a list and make once. `df.loc[len(df)] = row` and `pd.concat` inside a loop are the same quadratic mistake wearing other syntax. `df.append` was removed rather than merely deprecated because of it.
 
 ## One more thing
 
-`pd.DataFrame.from_records` handles an iterable of tuples with a `columns` argument, and accepts an `index` naming one of the fields. It is the constructor that fits a database cursor most directly, since cursors yield tuples rather than dicts.
+`pd.DataFrame.from_records` handles an iterable of tuples with a `columns` arg. Accepts an `index` naming one of the fields. It's the constructor that fits a DB cursor most right. Cursors yield tuples rather than dicts.
 
-And `pd.concat` of many small frames is usually faster than building one large list of dicts when the pieces are already frames &mdash; the rule is to avoid the loop, not to prefer one container over the other.
+And `pd.concat` of many small frames is often faster than building one large list of dicts when the pieces are already frames. The rule is to avoid the loop, not to prefer one holder over the other.
 
 ## In summary
 
-Decide whether the input describes rows or columns, set the dtypes at construction, and check `shape`, `dtypes` and `head` immediately afterwards.
+Decide whether the input shows rows or columns, set the dtypes at build. Check `shape`, `dtypes` and `head` at once later.
 
-Never grow a frame in a loop &mdash; collect into a list and build once. `df.append` was removed rather than deprecated because of exactly that pattern.
+Never grow a frame in a loop. Collect into a list and build once. `df.append` was removed rather than deprecated because of just that pattern.

@@ -1,5 +1,5 @@
 title: Probability Calibration
-intro: Whether a model's confidence means anything, and why every ranking metric is blind to it.
+intro: Whether a model's trust means any of it. Why each ranking metric is blind to it.
 
 ## Two different questions
 
@@ -7,31 +7,31 @@ intro: Whether a model's confidence means anything, and why every ranking metric
 and [ROC](precision_recall_vs_roc.html) measure this.
 
 **Calibration** asks whether the numbers mean what they say. Of all the cases
-where the model said 0.8, were about 80% actually positive?
+where the model said 0.8, were about 80% really plus?
 
-A model can be excellent at one and terrible at the other, and this is not an
-edge case &mdash; it is the normal situation. A gradient-boosted tree typically produces scores that are too extreme &mdash; cases it scores at 0.9 are positive only 70% of the time &mdash; while a linear SVM produces scores that are not probabilities at all. AUC cannot detect either problem, because it depends only on ranking. **Platt scaling** (fitting a sigmoid to the logits on a held-out set) and **isotonic regression** (fitting a non-parametric monotone map) are the two standard post-hoc fixes. Platt scaling has two parameters and works well when the miscalibration is roughly symmetric; isotonic regression is more flexible but needs more data or it overfits. This page shows the reliability diagram that makes miscalibration visible, demonstrates temperature scaling on the slider above, and compares both calibration methods on the same model.
+A model can be great at one and terrible at the other, and this isn't an
+edge case &mdash; it's the normal situation.
 
 ## The slider proves it
 
 Drag the temperature control and watch the curve deform. That control performs
 **temperature scaling**: it divides the logit by a constant before the sigmoid.
-Dividing by a number less than one sharpens every score toward 0 or 1; dividing
+Cutting by a number less than one sharpens each score toward 0 or 1. Cutting
 by a number greater than one flattens them toward 0.5.
 
-Crucially, this is a **monotonic** transformation. It never changes the order of
-any two predictions. Every ranking metric &mdash; AUC, average precision,
-anything based on ordering &mdash; is **identical at every setting of that
-slider**, while the reliability curve swings from badly over-confident to badly
-under-confident.
+Crucially, this is a **monotonic** change. It never changes the order of
+any two guesses. each ranking metric &mdash; AUC, mean precision,
+any of it based on sorting. Is **the same at each setting of that
+slider**, while the trust curve swings from badly too sure to badly
+too shy.
 
-Which is the point. If you only ever look at AUC, you have no information about
+Which is the point. If you only ever look at AUC, you've no info about
 calibration at all.
 
 ## Reading the diagram
 
-Predictions are binned by confidence, and each bin plots mean confidence against
-observed frequency.
+guesses are binned by trust, and each bin plots mean trust against
+seen rate.
 
 **On the diagonal**: calibrated.
 
@@ -40,69 +40,69 @@ the time. This is the common failure, and the damaging one.
 
 **Above the diagonal**: under-confident. The model hedges when it should not.
 
-**ECE** &mdash; expected calibration error &mdash; is the average vertical
-distance, weighted by how many points fall in each bin. It is the number in the
-readout, and it is a summary that can hide compensating errors: a curve that is
-above the diagonal in one region and below in another can report a small ECE.
+**ECE** &mdash; expected calibration error &mdash; is the mean vertical
+distance, weighted by how many points fall in each bin. It's the number in the
+readout, and it's a summary that can hide compensating errors: a curve that is
+above the main-line in one region and below in another can report a small ECE.
 Look at the curve, not only the number.
 
 ## Why models come out miscalibrated
 
-**Modern neural networks are over-confident**, and increasingly so as they get
-larger. Training to minimise cross-entropy on data it can fit perfectly pushes
-outputs toward 0 and 1 long after the accuracy has stopped improving.
+**Modern neural networks are too sure**, and increasingly so as they get
+larger. Training to cut cross-entropy on data it can fit just right pushes
+outputs toward 0 and 1 long after the fit has stopped raising.
 
-**Support vector machines** produce distances from a hyperplane, not
-probabilities, and passing them through a sigmoid does not make them
-probabilities.
+**Support vector machines** give distances from a hyperplane, not
+chances, and passing them through a sigmoid doesn't make them
+chances.
 
-**Naive Bayes** is famously over-confident because its independence assumption
-multiplies correlated evidence as though it were independent.
+**Naive Bayes** is famously too sure because its freedom assumption
+times linked evidence as though it were free.
 
-**Random forests** tend to be under-confident at the extremes, because averaging
-many trees pulls predictions toward the middle.
+**Random forests** tend to be too shy at the extremes, because blending
+many trees pulls guesses toward the middle.
 
-Logistic regression, fitted on well-specified features, is usually close to
-calibrated &mdash; it optimises exactly this.
+Logistic regression, fitted on well-given features, is often close to
+calibrated &mdash; it optimises just this.
 
 ## Fixing it
 
 All three methods fit a correction on a **held-out** set, never on the training
 data.
 
-**Platt scaling.** Fit a logistic regression to map scores to probabilities. One
-or two parameters, works on small validation sets, assumes the distortion is
+**Platt scaling.** Fit a logistic regression to map scores to chances. One
+or two params, works on small validation sets, assumes the distortion is
 sigmoid-shaped.
 
-**Temperature scaling.** The single-parameter version, and the standard for
-neural networks. Because it changes no rankings, accuracy and AUC are guaranteed
+**Temperature scaling.** The single-param version, and the standard for
+neural networks. Because it changes no rankings, fit and AUC are ensured
 untouched &mdash; a rare free lunch.
 
 **Isotonic regression.** Fits any monotonic mapping. More flexible, and needs
-considerably more data or it overfits the validation set.
+a lot more data or it overfits the validation set.
 
 ## When it matters
 
-**Whenever a probability feeds a decision with costs.** Expected value is
-probability times payoff, so a wrong probability is a wrong decision even when
+**When a chance feeds a choice with costs.** Expected value is
+chance times payoff, so a wrong chance is a wrong choice even when
 the ranking is perfect.
 
-**Medical and risk contexts**, where "30% chance" is communicated to a person.
+**Medical and risk contexts**. Here "30% chance" is communicated to a person.
 
-**When scores are combined** across models or over time.
+**When scores are mixed** across models or over time.
 
 **When a threshold is set from a target rate.** [Choosing a
-threshold](threshold_tuning.html) from calibrated probabilities gives the rate
-you asked for; from uncalibrated scores it does not.
+threshold](threshold_tuning.html) from calibrated chances gives the rate
+you asked for. From uncalibrated scores it doesn't.
 
-If all you do is rank &mdash; show the top 100 results &mdash; calibration is
+If all you do is rank. Show the top 100 results &mdash; calibration is
 irrelevant.
 
 ## Expected calibration error, worked
 
-ECE puts a single number on "do the confidences mean anything". Bin the
-predictions by stated confidence, and in each bin compare the average confidence
-against the fraction actually positive; ECE is the average gap, weighted by bin
+ECE puts a single number on "do the confidences mean any of it". Bin the
+guesses by stated trust, and in each bin compare the mean trust
+against the fraction really plus. ECE is the mean gap, weighted by bin
 size:
 
 |bin|mean confidence|observed accuracy|gap|
@@ -112,26 +112,26 @@ size:
 |low|0.55|0.55|0.00|
 
 With 100 points in each bin the ECE is `(0.20 + 0.05 + 0.00)/3 = 0.083` &mdash;
-the model is eight points miscalibrated on average, driven almost entirely by the
-top bin, where it says 0.90 and is right 70% of the time. That over-confidence is
-the common and damaging failure, and note what it does *not* touch: every one of
-those predictions could still rank correctly, so AUC and average precision are
-unchanged. Temperature scaling &mdash; dividing the logit by a constant fitted on
-held-out data &mdash; pulls the top bin down toward its true accuracy without
-reordering anything, which is why it can fix calibration for free while leaving
-every ranking metric identical. The one caution is that ECE is an average and can
-hide compensating errors, so a curve above the diagonal in one region and below in
-another can post a small ECE; read the reliability curve, not only the number.
+the model is eight points miscalibrated on average, driven almost fully by the
+top bin, where it says 0.90 and is right 70% of the time. That over-trust is
+the common and damaging failure, and note what it does *not* touch: each one of
+those guesses could still rank right. So AUC and mean precision are
+unchanged. Temperature scaling &mdash; cutting the logit by a constant fitted on
+held-out data &mdash; pulls the top bin down toward its true fit without
+reordering any of it. This Is why it can fix calibration for free while leaving
+each ranking metric the same. The one caution is that ECE is an mean and can
+hide compensating errors, so a curve above the main-line in one region and below in
+another can post a small ECE. Read the trust curve, not only the number.
 
 Why models miscalibrate is worth knowing, because it predicts which fix to reach
-for. Modern neural networks are over-confident and increasingly so as they grow,
-because minimising cross-entropy on data they can fit perfectly keeps pushing
-outputs toward 0 and 1 long after accuracy has stopped improving; temperature
-scaling is the standard remedy. Naive Bayes is over-confident because its
-independence assumption multiplies correlated evidence as if it were independent.
-Random forests are usually *under*-confident at the extremes, because averaging many
-trees pulls predictions toward the middle. Logistic regression on well-specified
-features tends to come out close to calibrated, because that is exactly what it
+for. Modern neural networks are too sure and increasingly so as they grow,
+because cutting cross-entropy on data they can fit just right keeps pushing
+outputs toward 0 and 1 long after fit has stopped raising. Temperature
+scaling is the standard remedy. Naive Bayes is too sure because its
+freedom assumption times linked evidence as if it were free.
+Random forests are often *under*-confident at the extremes, because blending many
+trees pulls guesses toward the middle. Logistic regression on well-given
+features tends to come out close to calibrated. That is just what it
 optimises.
 
 ## Where it goes wrong
@@ -141,15 +141,15 @@ nothing.
 
 **Isotonic regression on a small validation set.** It overfits.
 
-**Assuming a good AUC implies good probabilities.** The slider on this page
-exists to disprove exactly that.
+**given a good AUC implies good chances.** The slider on this page
+exists to disprove just that.
 
 **Recalibrating without re-checking after data drift.** A calibration fitted last
-year describes last year's distribution.
+year shows last year's spread.
 
 ## When 0.9 does not mean 90%
 
-A model can rank perfectly and still lie about its confidence. This measures the gap, then closes it two different ways.
+A model can rank just right and still lie about its trust. This measures the gap, then closes it two different ways.
 
 ```python-run
 import numpy as np

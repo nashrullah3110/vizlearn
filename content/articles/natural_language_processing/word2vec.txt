@@ -3,35 +3,35 @@ intro: A model with no hidden layer and no labels that learns, from nothing but 
 
 ## The setup: text labels itself
 
-Supervised learning needs labels. Text has none, and annotating enough of it to
-learn word meanings is not a project anyone was going to finish.
+Guided learning needs labels. Text has none, and annotating enough of it to
+learn word meanings isn't a project anyone was going to finish.
 
 The distributional hypothesis supplies the way out: **words that appear in
-similar contexts have similar meanings**. That is not a claim about semantics,
-it is a claim about statistics, and it turns an unlabelled corpus into a
-supervised dataset. Each position in each sentence becomes a training case
+similar contexts have similar meanings**. That isn't a claim about semantics,
+it's a claim about statistics, and it turns an untagged corpus into a
+guided dataset. each spot in each sentence turns a training example
 where the input is one word and the target is its neighbour.
 
 Look at the token strip in the explorer. With a window of &plusmn;2 around
 `king` in "the king rules the kingdom", the model is asked to associate `king`
 with `the`, `rules`, and the second `the`. Slide the window control and the
 pair list under it changes. Nineteen sentences with a window of 2 give about
-300 pairs; the first paper's Google News corpus gave roughly 100 billion.
+300 pairs. The first paper's Google News corpus gave roughly 100 billion.
 
 ## Two directions through the same window
 
 **Skip-gram** takes the centre word and predicts each context word apart.
-One centre with four neighbours becomes four training pairs.
+One centre with four neighbours turns four training pairs.
 
-**CBOW** goes the other way: average the context vectors and predict the centre
-from them. One position becomes one training case.
+**CBOW** goes the other way: mean the context vectors and predict the centre
+from them. One spot turns one training example.
 
-CBOW is faster, because it makes one update per position instead of 2&times;window,
-and it smooths over the context, which suits frequent words. Skip-gram makes
-many more updates from the same text, which is what lets it learn decent
-vectors for rare words &mdash; a rare word appears in few positions, and
-skip-gram wrings more gradient out of each one. In practice skip-gram with
-negative sampling is the default, and it is what the toggle in the explorer
+CBOW is faster, because it makes one update per spot instead of 2&times;window,
+and it smooths over the context. This Suits frequent words. Skip-gram makes
+many more updates from the same text. This Is what lets it learn decent
+vectors for rare words &mdash; a rare word appears in few spots, and
+skip-gram wrings more grad out of each one. skip-gram with
+minus sampling is the default, and it's what the toggle in the explorer
 starts on.
 
 ## The problem with the obvious objective
@@ -42,10 +42,10 @@ Written as a proper probabilistic model, skip-gram wants:
 P(context | centre) = exp(u_c . v_w) / sum over EVERY word in V of exp(u_k . v_w)
 ```
 
-The denominator is the problem. Each gradient step needs a dot product
-against each word in the vocabulary. At |V| = 100,000 and a corpus of a
-billion tokens, that is the gap between a model you can train and one
-you cannot.
+The denominator is the problem. each grad step needs a dot product
+against each word in the vocab. At |V| = 100,000 and a corpus of a
+billion tokens, that is the difference between a model you can train and one
+you can't.
 
 ## Negative sampling
 
@@ -62,61 +62,62 @@ maximise   log sigma(u_context . v_centre)
 ```
 
 Each step now costs k+1 dot products instead of |V|. The explorer prints the
-arithmetic for one real pair: the dot product, the sigmoid of it, and the fact
-that it is being pushed toward 1 while k sampled words are pushed toward 0.
+math for one real pair: the dot product, the sigmoid of it, and the fact
+that it's being pushed toward 1 while k sampled words are pushed toward 0.
 
-Two details matter. The negatives are drawn from the unigram distribution
-**raised to the power 0.75**, not from the raw counts. The authors report
-this as working better than either the raw or the uniform distribution, and it
-has the effect of sampling common words often but not as often as they occur. And the paper pairs this with **subsampling**, which
-discards frequent tokens like `the` with high probability before pairs are even
-made, so the model does not spend most of its updates learning that
-all of it is near `the`.
+Two details matter. The negatives are drawn from the unigram spread
+**raised to the power 0.75**, not from the raw rates &mdash; a piece of
+tuning the authors report as working better than either the raw or the uniform
+spread, and which has the effect of sampling common words often but not
+as often as they occur. And the paper pairs this with **subsampling**, which
+discards frequent tokens like `the` with high chance before pairs are even
+made, so the model doesn't spend most of its updates learning that
+all is near `the`.
 
-## What is really learned
+## What is actually learned
 
-There are **two** embedding matrices, and this surprises people. Each word has
-a vector for when it is the centre and a different vector for when it is
-context. The dot product in the objective is always between one of each.
+There are **two** embedding mats, and this surprises people. each word has
+a vector for when it's the centre and a different vector for when it's
+context. The dot product in the goal is always between one of each.
 
-The reason is structural. If a single matrix were used, a word's likeness
-with itself would be its own squared norm, which the objective would then try
-to make large &mdash; and a word does not often appear next to itself. Two
-matrices break that. Almost each implementation throws away the context matrix
-at the end and keeps the centre vectors, which is a convention rather than a
-derivation; GloVe, on the next page, sums the two instead.
+The reason is structural. If a single mat were used, a word's likeness
+with itself would be its own squared norm. This The goal would then try
+to make large &mdash; and a word doesn't often appear next to itself. Two
+mats break that. Almost each setup throws away the context mat
+at the end and keeps the centre vectors. This Is a rule rather than a
+derivation. GloVe, on the next page, sums the two instead.
 
 Push the step slider in the explorer from 0 upward and watch the neighbour
-table settle. At 0 the nearest word to `king` is any the random
-initialisation happened to put nearby. By a few thousand steps `queen` has
+table settle. At 0 the nearest word to `king` is what the random
+init happened to put nearby. By a few thousand steps `queen` has
 arrived, and it arrived because those two words truly appear in the same
-positions in this corpus &mdash; `the ___ rules the kingdom` fits both.
+spots in this corpus &mdash; `the ___ rules the kingdom` fits both.
 
-The scatter plot is a projection, and the caption says so. With 8 dimensions
-trained and 2 drawn, points that look adjacent may not be; the cosine table
-below it is the real answer. Set the dimension slider to 2 and the projection
-becomes the space itself &mdash; and the vectors get clearly worse, because
-2 dimensions cannot hold enough distinct directions.
+The scatter plot is a map, and the caption says so. With 8 dims
+trained and 2 drawn, points that look adjacent may not be. The cosine table
+below it's the real answer. Set the dim slider to 2 and the map
+turns the space itself &mdash; and the vectors get noticeably worse, because
+2 dims can't hold enough distinct directions.
 
 ## The analogy result, and how much to believe
 
-`king - man + woman ~ queen` is the case that made word2vec famous.
+`king - man + woman ~ queen` is the demo that made word2vec famous.
 The geometry is real: steady differences between related word pairs do show
 up as roughly parallel offsets in the space, because those pairs really do
 differ in their contexts in steady ways.
 
-It is also weaker than the headline suggests. The standard evaluation excludes
-the three input words from the answer candidates, and without that exclusion the
+It's also weaker than the headline suggests. The standard test excludes
+the three input words from the answer picks, and without that exclusion the
 nearest vector to `king - man + woman` is very often `king` itself. Analogies
 work well for frequent, well-attested relations and poorly for rare ones. The
-corpus here is far too small to show the effect at all, which is the honest
-outcome and is why the explorer does not offer an analogy box.
+corpus here is far too small to show the effect at all. This Is the honest
+outcome and is why the explorer doesn't offer an word puzzle box.
 
 The other well-documented finding is that these vectors absorb the biases in
-the text they were trained on, in exactly the same geometry: occupational
-analogies from news corpora reproduce the gender distribution of those
-occupations in the corpus. That is not a flaw in the algorithm. The algorithm
-is doing its job; it is reporting what the corpus holds.
+the text they were trained on, in just the same geometry: occupational
+analogies from news corpora copy the gender distribution of those
+occupations in the corpus. That isn't a flaw in the method. The method
+is doing its job. It's reporting what the corpus holds.
 
 ```python
 from gensim.models import Word2Vec
@@ -139,12 +140,12 @@ model.wv.most_similar("king", topn=5)
 ```
 
 `min_count=5` is the setting people regret leaving at 1. A word seen once has a
-vector determined almost fully by its initialisation, and keeping thousands
+vector found almost fully by its init, and keeping thousands
 of them adds noise to each nearest-neighbour query while inflating the model.
 
 ## Choosing the window, and what it changes
 
-The window size is not a tuning knob in the usual sense. It changes what kind
+The window size isn't a tuning knob in the usual sense. It changes what kind
 of likeness the vectors encode.
 
 A **small window** (1&ndash;2) makes a word's context almost fully
@@ -153,54 +154,54 @@ put words of the same part of speech together, and the nearest neighbours of a
 verb are other verbs in the same tense.
 
 A **large window** (8&ndash;10) makes the context topical: what tends to appear
-in the same passage. Neighbours become words about the same subject regardless
+in the same passage. Neighbours become words about the same subject even so
 of grammatical role, so `doctor` sits near `hospital` and `patient` rather than
-near other nouns broadly.
+near other nouns .
 
-Neither is correct. If the vectors feed a parser, small is right; if they feed
-a topic classifier or a retrieval system, large is. Move the window control in
-the explorer and watch the pair count change &mdash; and note that on nineteen
+Neither is correct. If the vectors feed a parser, small is right. If they feed
+a topic classifier or a lookup system, large is. Move the window control in
+the explorer and watch the pair count change. And note that on nineteen
 sentences even a window of 4 is reaching most of the way across a sentence, so
-the distinction only appears at a realistic corpus size.
+the gap only appears at a realistic corpus size.
 
 The related setting is what counts as a context at all. word2vec uses linear
 context &mdash; the tokens either side. Replacing that with **dependency
-context**, the words a syntactic parse links to, gives vectors whose
-neighbours are functionally rather than topically similar; that is the
-Levy and Goldberg result, and it is the clearest case that "similar"
-in a word vector means "similar under any context you set".
+context**, the words a syntactic parse links to, makes vectors whose
+neighbours are functionally rather than topically similar. That is the
+Levy and Goldberg result, and it's the clearest demo that "similar"
+in a word vector means "similar under what context you defined".
 
 ## Where this leads
 
 Word2vec vectors are **static**: one vector per word type, so `bank` in "river
 bank" and "bank account" get the same one. That single limitation is what the
 next decade of the field was about. ELMo made the vector depend on the
-sentence; BERT made it depend on the whole sentence in both directions; each
-transformer since gives contextual embeddings by construction.
+sentence. BERT made it depend sentence in both directions. each
+transformer since makes contextual embeddings by build.
 
 The idea that survived intact is the one at the top of this page: **define a
-prediction task that the raw data already answers, and the representation falls
+guess task that the raw data already answers, and the form falls
 out as a side effect**. Masked language modelling is that idea. So is next-token
-prediction, and so is contrastive learning in vision. Word2vec is where it was
+guess, and so is contrastive learning in vision. Word2vec is where it was
 first made to work at scale.
 ## Questions people ask
 
-<strong>Skip-gram or CBOW?</strong> Skip-gram with negative sampling, unless the corpus is large and training time is the binding constraint. CBOW makes one update per position and skip-gram makes 2&times;window. So skip-gram wrings more out of the same text and gives much better vectors for rare words; CBOW is faster and smooths frequent ones.
+<strong>Skip-gram or CBOW?</strong> Skip-gram with minus sampling, unless the corpus is large and training time is the binding constraint. CBOW makes one update per spot and skip-gram makes 2&times;window. Skip-gram wrings more out of the same text and makes much better vectors for rare words. CBOW is faster and smooths frequent ones.
 
-<strong>How many dimensions?</strong> 100&ndash;300 for most corpora, and the released Google News vectors are 300. Below about 50 there are not enough distinct directions to keep meanings apart. Set the explorer's dimension control to 2 and the neighbour table visibly degrades. And past 300 the gains are marginal while each lookup costs more.
+<strong>How many dims?</strong> 100&ndash;300 for most corpora. The released Google News vectors are 300. Below about 50 there aren't enough distinct directions to keep meanings apart. Set the explorer's dim control to 2 and the neighbour table visibly degrades. And past 300 the gains are marginal while each lookup costs more.
 
-<strong>Why two embedding matrices, and which one do I keep?</strong> A word needs different vectors for its centre and context roles. Or its likeness with itself becomes its own squared norm. This the objective would then try to enlarge. And words rarely appear next to themselves. Almost each implementation keeps the centre matrix and discards the context one. That is a convention, not a derivation; GloVe sums them instead.
+<strong>Why two embedding mats, and which one do I keep?</strong> A word needs different vectors for its centre and context roles, or its likeness with itself turns its own squared norm. This The goal would then try to enlarge. And words rarely appear next to themselves. Almost each setup keeps the centre mat and discards the context one. That is a rule, not a derivation. GloVe sums them instead.
 
-<strong>Why the 0.75 exponent on the noise distribution?</strong> Because sampling negatives from raw count draws `the` almost each time, and sampling uniformly draws words that never occur in real contexts. Unigram<sup>0.75</sup> sits between the two. The paper reports it as an empirical result rather than deriving it. And the same exponent turns up on its own in GloVe's weighting function.
+<strong>Why the 0.75 exponent on the noise spread?</strong> Because sampling negatives from raw rate draws `the` almost each time. Sampling uniformly draws words that never occur in real contexts. Unigram<sup>0.75</sup> sits between the two. The paper reports it as an empirical result rather than deriving it. The same exponent turns up on its own in GloVe's weighting function.
 
-<strong>Does `king - man + woman = queen` really work?</strong> The geometry is real. But the case is stage-managed: the standard evaluation removes the three input words from the candidate set, and without that exclusion the nearest vector is very often `king` itself. It holds up for frequent, well-attested relations and poorly for rare ones.
+<strong>Does `king - man + woman = queen` really work?</strong> The geometry is real. The demo is stage-managed. The standard test drops the three input words from the pick set. Without that exclusion the nearest vector is very often `king` itself. It holds up for frequent, well-attested relations and poorly for rare ones.
 
-<strong>Do the vectors encode the corpus's biases?</strong> Yes, and through the same geometry that makes analogies work. Occupational analogies drawn from news text reproduce the occupational gender distribution of that text. The algorithm is not malfunctioning; it is reporting what the corpus holds. This is why each debiasing method is a post-hoc intervention on the vectors rather than a fix to the objective.
+<strong>Do the vectors encode the corpus's biases?</strong> Yes. Through the same geometry that makes analogies work. Occupational analogies drawn from news text copy the occupational gender distribution of that text. The method isn't malfunctioning. It's reporting what the corpus holds. This Is why each debiasing method is a post-hoc intervention on the vectors rather than a fix to the goal.
 
 ## Recap in one screen
 
-- The distributional hypothesis turns an unlabelled corpus into a supervised dataset. Each position in each sentence becomes a training case.
-- Skip-gram predicts each context word from the centre; CBOW predicts the centre from the averaged context.
-- A softmax over the whole vocabulary is unaffordable, so negative sampling replaces "which of |V| words" with "is this pair real", at k+1 dot products per step.
+- The distributional hypothesis turns an untagged corpus into a guided dataset: each spot in each sentence turns a training example.
+- Skip-gram predicts each context word from the centre. CBOW predicts the centre from the averaged context.
+- A softmax over the whole vocab is unaffordable. Minus sampling replaces "which of |V| words" with "is this pair real", at k+1 dot products per step.
 - Negatives come from unigram<sup>0.75</sup>, and frequent tokens are subsampled away before pairs are even made.
-- There are two embedding matrices, and the vectors are **static**. One per word type. So both senses of `bank` share it. That single limitation is what ELMo, BERT and each transformer since set out to remove.
+- There are two embedding mats. The vectors are **static**. One per word type. Both senses of `bank` share it. That single limitation is what ELMo, BERT and each transformer since set out to drop.

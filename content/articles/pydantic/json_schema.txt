@@ -1,29 +1,13 @@
 title: JSON Schema: The Document Your Model Already Wrote
-intro: What the generated schema contains, and why it is the reason Pydantic is everywhere.
+intro: What the made schema holds, and why it's the reason Pydantic is all over.
 
 ## The output you did not write
 
-`Module.model_json_schema()` returns a dictionary that is a valid JSON Schema document: types, required fields, defaults, constraints, descriptions, and definitions for nested models.
+`Module.model_json_schema()` returns a dict that is a valid JSON Schema doc. Types, needed fields, defaults, constraints, descriptions, and meanings for nested models.
 
-You wrote none of it. It is derived entirely from the annotations, `Field` arguments and docstrings already in the class.
+You wrote none of it. It's derived fully from the annotations, `Field` args and docstrings already in the class.
 
-This is quietly the reason Pydantic became a dependency of half the modern Python ecosystem. Validation is useful; a *machine-readable description of your data that cannot drift from the code* is what other tools can build on.
-
-The schema includes everything you declared. `str` becomes `{"type": "string"}`. `int = Field(gt=0, le=180)` becomes `{"type": "integer", "exclusiveMinimum": 0, "maximum": 180}`. `Field(description="...")` adds a `"description"` key. `Field(examples=[...])` adds an `"examples"` key. A `docstring` on the class becomes the schema's top-level `"description"`. Nothing is invented; nothing is omitted.
-
-Nested models produce `$defs` (or `definitions` in older drafts). A `Module` containing a `List[Lesson]` generates a schema where `Module` references `Lesson` by `$ref`, and `Lesson` is defined in `$defs`. The nesting can go arbitrarily deep, and circular references are handled with `$ref` pointers rather than infinite expansion.
-
-`Field(alias="...")` changes the key name in the schema. `title: str = Field(alias="name")` means the JSON key is `"name"`, not `"title"`. This is how you keep Python-style snake_case in your code while exposing camelCase or other conventions in the schema. `model_config = ConfigDict(populate_by_name=True)` allows both the alias and the field name.
-
-`Literal["a", "b", "c"]` produces `{"enum": ["a", "b", "c"]}` in the schema. `Union[int, str]` produces `{"anyOf": [{"type": "integer"}, {"type": "string"}]}`. `Optional[str]` produces `{"anyOf": [{"type": "string"}, {"type": "null"}]}`. The mapping from Python types to JSON Schema types is mechanical and complete.
-
-`json_schema_extra` on `Field` or on the model config adds arbitrary keys to the schema. `Field(json_schema_extra={"x-internal": True})` adds a vendor extension. This is how you pass metadata that JSON Schema does not define — database column names, UI hints, access-control markers — without subclassing or monkey-patching.
-
-The schema's consumers are what make it valuable. FastAPI uses it to generate OpenAPI documentation. Frontend code generators use it to produce TypeScript interfaces. Form libraries use it to build input forms. Validation libraries in other languages use it to validate the same data shape. A JSON Schema document is a contract that crosses language boundaries, and Pydantic generates it from the same class that enforces it at runtime.
-
-`model_json_schema(mode="serialization")` generates the schema for the output shape rather than the input shape. These can differ when a field uses a custom serialiser — the input type might be `Decimal` while the output is `str`. The default `mode="validation"` describes what the model accepts; `mode="serialization"` describes what it produces. Knowing the difference matters when the schema is consumed by a client that reads responses rather than one that sends requests.
-
-`TypeAdapter(List[Module]).json_schema()` generates a schema for a type that is not a model — a list, a dict, a union, or any annotated type. This is useful when your API accepts or returns a bare collection rather than a model wrapper.
+This is quietly the reason Pydantic became a dependency of half the modern Python ecosystem. check is handy. A *machine-readable description of your data that can't drift from the code* is what other tools can build on.
 
 
 ## What a model already knows
@@ -175,75 +159,75 @@ print(json.dumps(Module.model_json_schema(), indent=2))
 ```
 ## What reads it
 
-**FastAPI** turns these schemas into your OpenAPI document, which becomes the interactive docs at `/docs`. The descriptions you wrote on fields appear next to those fields. The examples pre-fill the request form. The constraints show as documented limits.
+**FastAPI** turns these schemas into your OpenAPI doc. This Turns the interactive docs at `/docs`. The descriptions you wrote on fields appear next to those fields. The examples pre-fill the request form. The constraints show as documented limits.
 
-**Client generators** turn OpenAPI into typed clients in TypeScript, Go, Java and the rest. The quality of that generated client is a direct function of the quality of your schema.
+**Client gens** turn OpenAPI into typed clients in TypeScript, Go, Java and the rest. The quality of that made client is a direct function of the quality of your schema.
 
-**LLM tooling** uses schemas to constrain structured output: the schema tells the model what shape to answer in, and the same model then validates the answer.
+**LLM tooling** uses schemas to constrain structured output. The schema tells the model what shape to answer in. The same model then validates the answer.
 
-**Form builders and validators** on the other side of the wire read the same document, so a browser can enforce your `minLength` before a request is ever sent.
+**Form builders and checkers** on the other side of the wire read the same doc. A browser can enforce your `minLength` before a request is ever sent.
 
-One class definition feeds all of them.
+One class meaning feeds all of them.
 
 ## Constraints versus validators, concretely
 
-This is the strongest practical argument in the whole track, and the schema is where you can see it.
+This is the strongest hands-on arg in the whole track. The schema is where you can see it.
 
-`Field(gt=0, le=180)` produces `"exclusiveMinimum": 0, "maximum": 180`. A generated client knows the range. The documentation states it. A form can enforce it.
+`Field(gt=0, le=180)` makes `"exclusiveMinimum": 0, "max": 180`. A made client knows the range. The docs states it. A form can enforce it.
 
-A `field_validator` that checks the same thing produces **nothing**. The schema says `"type": "integer"` and the rule is invisible to every consumer. It is still enforced &mdash; a bad value is still rejected &mdash; but the caller only finds out by being rejected.
+A `field_validator` that checks the same thing makes **nothing**. The schema says `"type": "int"` and the rule is invisible to each consumer. It's still enforced. A bad value is still rejected. But the caller only finds out by being rejected.
 
-Same enforcement, completely different experience for whoever is calling you. That is why the guidance has been: express a rule as a constraint whenever a constraint can express it.
+Same enforcement, fully other experience for whoever is calling you. That is why the guidance has been. Express a rule as a constraint when a constraint can express it.
 
-The same holds for `Literal` against a `pattern`. A `Literal` becomes `"enum": ["draft", "published"]` and a client can render a dropdown. A pattern matching the same two values becomes a regular expression the client cannot do anything with.
+The same holds for `Literal` against a `pattern`. A `Literal` turns `"enum": ["draft", "published"]` and a client can render a dropdown. A pattern matching the same two values turns a regular formula the client can't do anything with.
 
 ## Definitions and references
 
-A nested model appears once in `$defs` and is referenced with `$ref` wherever it is used.
+A nested model appears once in `$defs` and is referenced with `$ref` wherever it's used.
 
-That matters for generated clients: a referenced definition typically becomes a named type in the target language. `Author` used in two fields becomes one `Author` type used twice, rather than two anonymous objects that happen to match.
+That matters for made clients: a referenced meaning often turns a named type in the target language. `Author` used in two fields turns one `Author` type used twice, rather than two anonymous objects that happen to match.
 
-It also keeps the document small when a model is reused heavily, and it is why recursive models produce a schema at all &mdash; a self-reference is just a `$ref` back to the same definition.
+It also keeps the doc small when a model is reused heavily. It's why recursive models give a schema at all. A self-link is just a `$ref` back to the same meaning.
 
 ## The two modes
 
-`model_json_schema(mode="validation")` is the default and describes what the model **accepts**.
+`model_json_schema(mode="check")` is the default and shows what the model **accepts**.
 
-`mode="serialization"` describes what it **emits**.
+`mode="output"` shows what it **emits**.
 
-They differ in real ways. Computed fields appear only in the serialisation schema, because they are output and can never be supplied. A field with `exclude=True` appears in validation and not serialisation. Serialisation aliases apply to one and validation aliases to the other.
+They differ in real ways. Found fields appear only in the output schema. They're output and can never be supplied. A field with `exclude=True` appears in check and not output. output aliases apply to one and check aliases to the other.
 
-Frameworks pick the right one for you: FastAPI uses the validation schema for request bodies and the serialisation schema for response models. Knowing the distinction matters when you generate a schema yourself and wonder why a field is missing.
+Frameworks pick the right one for you: FastAPI uses the check schema for request bodies and the output schema for response models. Knowing the gap matters when you make a schema yourself and wonder why a field is missing.
 
 ## Metadata is the cheap win
 
-`description`, `title` and `examples` on a field change no behaviour and flow straight into the document.
+`description`, `title` and `examples` on a field change no action and flow straight into the doc.
 
-For anything with consumers beyond yourself, this is the highest-value writing you can do per character. A field called `weight` needs a description &mdash; of what, in what unit? A field called `title` does not.
+For anything with consumers beyond yourself, this is the highest-value writing you can do per character. A field called `weight` needs a description. Of what, in what unit? A field called `title` doesn't.
 
-`examples` deserve particular attention because they populate the interactive documentation's request form. A developer trying your API for the first time gets a working request they can send, rather than an empty box. That difference shows up in how many of them succeed.
+`examples` deserve given focus because they populate the interactive docs's request form. A developer trying your API for the first time gets a working request they can send, rather than an empty box. That gap shows up in how many of them succeed.
 
-`json_schema_extra` attaches anything else the schema format supports that Pydantic has no dedicated argument for &mdash; vendor extensions like `x-` keys, or keywords from a newer draft. It takes a dict, or a callable that receives and modifies the generated schema.
+`json_schema_extra` attaches anything else the schema format supports that Pydantic has no dedicated arg for. Vendor extensions like `x-` keys, or keywords from a newer draft. It takes a dict, or a callable that receives and modifies the made schema.
 
 ## What does not translate
 
-Some things simply cannot be expressed in JSON Schema, and knowing which keeps expectations right.
+Some things simply can't be expressed in JSON Schema, and knowing which keeps expectations right.
 
-**Validator logic.** Arbitrary Python has no schema equivalent.
+**checker logic.** Any Python has no schema equal.
 
-**Cross-field rules.** A `model_validator` enforcing "end after start" has no representation. Document it in the model's docstring, which becomes the schema's description, so at least a human reading the docs learns about it.
+**Cross-field rules.** A `model_validator` enforcing "end after start" has no form. doc it in the model's docstring. This Turns the schema's description. At least a human reading the docs learns about it.
 
-**Custom serialisation.** As the previous module covered, a serialiser changes output without changing the schema unless you set `return_type`.
+**Custom output.** As the previous module covered, a serialiser changes output without changing the schema unless you set `return_type`.
 
-Where a rule cannot be expressed, the honest thing is to describe it in prose so the documentation is not silently incomplete.
+Where a rule can't be expressed, the honest thing is to show it in prose so the docs isn't silently incomplete.
 
 ## A habit worth adopting
 
-Print the schema for a model you have just written. It takes one line, and it shows you what your consumers will actually see.
+Print the schema for a model you've just written. It takes one line. It shows you what your consumers will really see.
 
-Constraints you thought you had documented and did not. Fields with no description whose names are not self-explanatory. A `pattern` where a `Literal` would have produced a set of choices. A required field you meant to make optional.
+Constraints you thought you had documented and didn't. Fields with no description whose names aren't self-explanatory. A `pattern` where a `Literal` would have made a set of choices. A needed field you meant to make optional.
 
-It is the fastest review available for an API model, and it uses information the model already contains.
+It's the fastest review on hand for an API model. It uses data the model already holds.
 
 ## Customising the whole document
 
@@ -254,89 +238,89 @@ model_config = ConfigDict(
     json_schema_extra={"examples": [{"title": "Vectors", "minutes": 8}]})
 ```
 
-Model-level examples appear in documentation as complete sample payloads, which is more useful to a first-time caller than per-field examples: they can copy one and send it.
+Model-level examples appear in docs as full sample payloads. This Is more handy to a first-time caller than per-field examples: they can copy one and send it.
 
-For deeper control there is `GenerateJsonSchema`, a class you can subclass to change how schemas are produced across a whole application &mdash; renaming definitions, altering how optionals are represented, adding vendor extensions everywhere. It is the right tool for a house style applied to an entire API and considerable overkill for one model.
+For deeper control there's `GenerateJsonSchema`, a class you can subclass to change how schemas are made across a whole use. Renaming meanings, altering how optionals are shown, adding vendor extensions all over. It's the right tool for a house style applied to an entire API and large overkill for one model.
 
 ## Docstrings become descriptions
 
-A model's docstring becomes the schema's `description`. That is worth knowing because it is free documentation for the rules that cannot be expressed structurally.
+A model's docstring turns the schema's `description`. That is worth knowing because it's free docs for the rules that can't be expressed structurally.
 
-A cross-field invariant &mdash; "ends_on must be after starts_on" &mdash; has no schema representation. Writing it in the docstring means a consumer reading the documentation learns about it, instead of discovering it through a 422.
+A cross-field rule &mdash; "ends_on must be after starts_on" &mdash; has no schema form. Writing it in the docstring means a consumer reading the docs learns about it, instead of discovering it through a 422.
 
-`use_attribute_docstrings=True` extends this to fields, taking the string literal beneath an attribute as its description. It keeps the documentation next to what it describes, which is where it stays accurate.
+`use_attribute_docstrings=True` extends this to fields, taking the string literal beneath an field as its description. It keeps the docs next to what it shows. This Is where it stays accurate.
 
 ## Reading the schema as a review
 
-The most practical use of this module is as a review tool. One line, and you see what your consumers see:
+The most hands-on use of this module is as a review tool. One line. You see what your consumers see:
 
 ```python
 print(json.dumps(Module.model_json_schema(), indent=2))
 ```
 
-Things it reliably surfaces: fields whose name does not explain them and which have no description; a `pattern` where a `Literal` would have produced a set of choices; a rule you thought was documented that turns out to live in a validator; a field in `required` that you meant to default; a nested model inlined because it is used once, where a named definition would give clients a better type.
+Things it well surfaces: fields whose name doesn't explain them and which have no description. A `pattern` where a `Literal` would have made a set of choices. A rule you thought was documented that turns out to live in a checker. A field in `needed` that you meant to default. A nested model inlined because it's used once. Here A named meaning would give clients a better type.
 
-None of that requires running the API. It is the highest-value five minutes available on a model that other people will consume.
+None of that needs running the API. It's the highest-value five minutes on hand on a model that other people will consume.
 
 ## Where schemas end up
 
-Worth knowing the chain, because it explains why the small things matter.
+Worth knowing the chain, because it shows why the small things matter.
 
-Your model generates a schema. FastAPI collects those into an OpenAPI document. That document is read by the interactive docs, by client generators in several languages, by API gateways, by contract-testing tools, and increasingly by LLM tooling deciding what shape to produce.
+Your model makes a schema. FastAPI collects those into an OpenAPI doc. That doc is read by the interactive docs, by client gens in a few languages, by API gateways, by contract-testing tools. Increasingly by LLM tooling deciding what shape to give.
 
 A description you write once is read by everybody in that chain. So is a missing one.
 
 ## What to remember
 
-The schema is generated from what you already wrote, so its quality is a direct function of how specific your annotations are.
+The schema is made from what you already wrote. Its quality is a direct function of how exact your annotations are.
 
-Constraints appear; validators do not. `Literal` and `Enum` become choices; patterns become opaque. Nested models become named definitions and therefore named client types. Descriptions and examples cost nothing and are read by every tool downstream.
+Constraints appear. Checkers don't. `Literal` and `Enum` become choices. Patterns become opaque. Nested models become named meanings and so named client types. Descriptions and examples cost nothing and are read by each tool downstream.
 
-The habit worth forming is simply printing it. Everything above becomes visible the moment you look at the document your model already produces.
+The habit worth forming is simply printing it. all above turns visible the moment you look at the doc your model already makes.
 
 ## Summary
 
-`model_json_schema()` generates a standard document from what you already wrote. Constraints become keywords; validators become nothing. Nested models become referenced definitions and therefore named types in generated clients. `Literal` and `Enum` become renderable choices.
+`model_json_schema()` makes a standard doc from what you already wrote. Constraints become keywords. Checkers become nothing. Nested models become referenced meanings and so named types in made clients. `Literal` and `Enum` become renderable choices.
 
-Two modes, for input and output. Metadata &mdash; descriptions and examples especially &mdash; is the cheapest documentation you will ever write, and it is read by tools you may never see.
+Two modes, for input and output. Metadata. Descriptions and examples above all. Is the cheapest docs you'll ever write. It's read by tools you may never see.
 
 ## The habit
 
 Print the schema for the next model you write.
 
-It takes one line and it is the only view of your model that matches what consumers get. Everything this module describes &mdash; a validator that documented nothing, a pattern that should have been a `Literal`, a field with no description, a required field you meant to default &mdash; becomes visible immediately.
+It takes one line and it's the only view of your model that matches what consumers get. all this module shows. A checker that documented nothing, a pattern that should have been a `Literal`, a field with no description, a needed field you meant to default. Turns visible at once.
 
-The schema was generated from work you had already done. Looking at it is the cheapest quality check available.
+The schema was made from work you had already done. Looking at it's the cheapest quality check on hand.
 
 
 ## Mistakes people make
 
-**Expressing a rule as a validator when a constraint would do.** The rule is enforced and invisible. Documentation, generated clients and browser-side forms all remain unaware of it, so the caller only learns the limit by breaching it.
+**Expressing a rule as a checker when a constraint would do.** The rule is enforced and invisible. docs, made clients and browser-side forms all remain unaware of it. The caller only learns the limit by breaching it.
 
-**Using a `pattern` where a `Literal` belongs.** A regular expression matching four values becomes an opaque string in the schema. The enumeration becomes a set of choices a form can render as a dropdown and a client can turn into a union type.
+**Using a `pattern` where a `Literal` belongs.** A regular formula matching four values turns an opaque string in the schema. The enumeration turns a set of choices a form can render as a dropdown and a client can turn into a union type.
 
-**Leaving fields undescribed.** `weight` needs a description &mdash; of what, in what unit. Names that are not self-explanatory and have no description produce documentation that technically exists and helps nobody.
+**Leaving fields undescribed.** `weight` needs a description. Of what, in what unit. Names that aren't self-explanatory and have no description give docs that strictly exists and helps no one.
 
-**Never looking at it.** The schema is one line away and it is the only view of your model that matches what consumers actually receive. Everything above becomes obvious the moment you print it.
+**Never looking at it.** The schema is one line away and it's the only view of your model that matches what consumers really receive. all above turns obvious the moment you print it.
 
-**Expecting cross-field rules to appear.** A `model_validator` has no schema representation at all. Where a rule cannot be expressed structurally, put it in the model's docstring so at least a human reading the documentation learns about it.
+**Expecting cross-field rules to appear.** A `model_validator` has no schema form at all. Where a rule can't be expressed structurally, put it in the model's docstring so at least a human reading the docs learns about it.
 
-**Forgetting the two modes.** Generating a validation schema and wondering why a computed field is missing, or a serialisation schema and wondering why an excluded field is absent, are both the same misunderstanding: one describes what goes in, the other what comes out.
+**Losing the two modes.** making a check schema and wondering why a found field is missing, or a output schema and wondering why an excluded field is absent, are both the same misunderstanding. One shows what goes in, the other what comes out.
 
 ## Why this is the reason
 
-Validation is useful and other libraries do it.
+check is handy and other libraries do it.
 
-What made Pydantic a dependency of half the modern Python ecosystem is this: a machine-readable description of your data, generated from the code that enforces it, and therefore incapable of drifting from it.
+What made Pydantic a dependency of half the modern Python ecosystem is this. A machine-readable description of your data, made from the code that enforces it. So incapable of drifting from it.
 
-Documentation that cannot go stale. Clients generated from the truth. Forms enforcing the same rules as the server. All from annotations you were going to write anyway.
+docs that can't go stale. Clients made from the truth. Forms enforcing the same rules as the server. All from annotations you were going to write anyway.
 
 ## What good looks like
 
-A well-specified model produces a schema somebody could implement a client against without asking you a question.
+A well-given model makes a schema somebody could run a client against without asking you a question.
 
-Every field has a type narrow enough to be useful &mdash; `Literal` rather than `str` where the set is closed, `date` rather than `str` where it is a date. Every constraint that exists in your head exists in the document. Every field whose name is not self-explanatory has a description. There is at least one complete example. Nested concepts are named models rather than inline objects, so the generated client has named types.
+each field has a type narrow enough to be handy. `Literal` rather than `str` where the set is closed, `date` rather than `str` where it's a date. each constraint that exists in your head exists in the doc. each field whose name isn't self-explanatory has a description. There's at least one full example. Nested concepts are named models rather than inline objects. The made client has named types.
 
-A poorly-specified model produces a document that is technically valid and useless: everything is a string, nothing has bounds, no field is described, and the real rules live in validators the consumer cannot see.
+A poorly-given model makes a doc that is strictly valid and useless. All is a string, nothing has bounds, no field is given. The real rules live in checkers the consumer can't see.
 
-Both are generated automatically from code that validates identically. The difference is entirely in how specific the annotations were &mdash; which is the argument this whole track has been making, arriving finally at the place where it becomes visible to somebody other than you.
+Both are made on its own from code that validates the same way. The gap is fully in how exact the annotations were. Which is the arg this whole track has been making, arriving finally at the place where it turns visible to somebody other than you.

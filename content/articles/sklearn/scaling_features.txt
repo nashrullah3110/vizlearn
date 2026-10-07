@@ -1,21 +1,13 @@
 title: Scaling Features: A Practical Guide
-intro: Half the models in the library are seriously damaged by unscaled features and half are completely indifferent. Knowing which is which saves both wasted work and silently bad results.
+intro: Half the models in the library are seriously damaged by unscaled features and half are fully indifferent. Knowing which is which saves both wasted work and silently bad results.
 
 ## What scaling does
 
-`StandardScaler` learns two numbers per column &mdash; the mean and the standard deviation &mdash; and transforms by subtracting the first and dividing by the second. The result has mean 0 and standard deviation 1 in every column.
+`StandardScaler` learns two numbers per column. The mean and the standard deviation. And transforms by subtracting the first and cutting by the second. The result has mean 0 and standard deviation 1 in each column.
 
-That is the entire operation. The shape of the distribution is unchanged: a skewed column stays skewed, outliers stay outliers, and the relative positions of every value are preserved exactly. Scaling moves and stretches; it does not reshape.
+That is the entire op. The shape of the spread is unchanged. A skewed column stays skewed, outliers stay outliers. The scaled spots of each value are preserved just. Scaling moves and stretches. It doesn't reshape.
 
-The learned numbers live in `mean_` and `scale_`, which is worth knowing because those two arrays are the entire fitted state and the thing that must not be learned from the test data.
-
-Why scaling matters at all depends on the model. Any algorithm that uses distances &mdash; k-nearest neighbours, SVM with an RBF kernel, k-means clustering &mdash; will be dominated by whichever feature has the largest range. A column measured in thousands (annual salary) will overwhelm a column measured in fractions (interest rate), even if the second column is more informative. Scaling puts them on equal footing.
-
-Regularised linear models (ridge, lasso, elastic net, logistic regression with a penalty) also require scaling, because the penalty treats all coefficients equally. An unscaled feature with a large range gets a small coefficient, which the penalty then shrinks further; the same feature scaled to unit variance gets a coefficient the penalty treats fairly. Without scaling, the regularisation is applied unevenly across features.
-
-Models that do not need scaling are tree-based: decision trees, random forests and gradient-boosted trees split on one feature at a time and compare values only within that feature, so the absolute scale is irrelevant. Scaling a tree-based model is harmless but pointless, and skipping it saves a preprocessing step and avoids the risk of data leakage from fitting the scaler on the test set.
-
-`MinMaxScaler` is the alternative when you want values in a fixed range, typically [0, 1]. It is sensitive to outliers &mdash; a single extreme value compresses everything else into a narrow band &mdash; while `StandardScaler` is only shifted by them. `RobustScaler` uses the median and interquartile range instead and is the right choice when outliers are present and should not dominate the transform.
+The learned numbers live in `mean_` and `scale_`. This Is worth knowing because those two arrays are the entire fitted state and the thing that must not be learned from the test data.
 
 
 ## What StandardScaler learns
@@ -149,111 +141,111 @@ print("cannot change which split they choose.")
 ```
 ## Why some models need it
 
-Two families of algorithm are affected, for two different reasons.
+Two families of method are affected, for two different reasons.
 
-**Anything that measures distance.** k-nearest neighbours, SVMs with an RBF kernel, k-means, PCA. These compute how far apart two samples are, usually by summing squared differences across features. A column measured in thousands contributes thousands of times more to that sum than a column measured in single digits, so the distance is effectively decided by whichever feature happens to have the largest units. The model is not weighing the features by importance; it is weighing them by unit.
+**any of it that measures distance.** k-nearest neighbours, SVMs with an RBF kernel, k-means, PCA. These find how far apart two samples are, often by summing squared differences across features. A column measured in thousands adds thousands of times more to that sum than a column measured in single digits. The distance is in effect decided by whichever feature happens to have the largest units. The model isn't weighing the features by importance. It's weighing them by unit.
 
-The editor above shows the cost: k-NN on the wine dataset scores 0.69 unscaled and 0.95 scaled. That is not a tuning improvement, it is the difference between a model that works and one that does not, and it comes from one column being measured in hundreds while others are measured in fractions.
+The editor above shows the cost: k-NN on the wine dataset scores 0.69 unscaled and 0.95 scaled. That isn't a tuning improvement, it's the difference between a model that works and one that doesn't. It comes from one column being measured in hundreds while others are measured in fractions.
 
-**Anything that penalises coefficient size.** Ridge, Lasso, ElasticNet, and `LogisticRegression`, which is regularised by default. The penalty is on the magnitude of the coefficients, and a coefficient's magnitude depends on its feature's units. Without scaling, the penalty falls unevenly across features for reasons that have nothing to do with the data.
+**any of it that punishes coeff size.** Ridge, Lasso, ElasticNet. `LogisticRegression`. This Is smoothed by default. The fine is on the magnitude of the coeffs. A coeff's magnitude depends on its feature's units. Without scaling, the fine falls unevenly across features for reasons that have nothing to do with the data.
 
-There is also a practical third reason: gradient-based solvers converge faster and more reliably on scaled features, which is why unscaled logistic regression produces `ConvergenceWarning`.
+There's also a hands-on third reason: grad-based solvers settle faster and more well on scaled features. This Is why unscaled logistic regression makes `ConvergenceWarning`.
 
 ## Why some models do not
 
-Tree-based models &mdash; decision trees, random forests, gradient boosting &mdash; are completely unaffected, and the reason is structural rather than approximate.
+Tree-based models &mdash; choice trees, random forests, grad boosting &mdash; are fully unaffected. The reason is structural rather than rough.
 
-A tree splits on one feature at a time, asking whether a value is above or below a threshold. Rescaling a column monotonically moves the threshold by the same transformation and leaves the ordering of every sample identical, so exactly the same split is chosen. The tree that results is the same tree.
+A tree splits on one feature at a time, asking whether a value is above or below a threshold. Rescaling a column monotonically moves the threshold by the same change and leaves the sorting of each sample the same. Just the same split is chosen. The tree that results is the same tree.
 
-The editor above measures it: the random forest changes by `+0.0000`. Not "a little"; not at all.
+The editor above measures it: the random forest changes by `+0.0000`. Not "a little". Not at all.
 
-This matters practically because scaling a tree model is harmless but pointless, and adding a scaler to a pipeline that ends in a forest is a step that costs time and clarity for no benefit. It matters more because people who have learned "always scale" sometimes conclude that trees must therefore be doing something odd, when in fact this is one of the reasons trees are so convenient on messy tabular data: they need no preparation at all.
+This matters in practice because scaling a tree model is harmless but pointless. Adding a scaler to a pipeline that ends in a forest is a step that costs time and clarity for no gain. It matters more because people who have learned "always scale" at times conclude that trees must so be doing a thing odd, when this is one of the reasons trees are so convenient on messy tabular data: they need no preparation at all.
 
 ## Choosing between the scalers
 
-`StandardScaler` is the default and the right answer most of the time. It assumes nothing about the range and handles roughly symmetric data well.
+`StandardScaler` is the default and the right answer most of the time. It assumes nothing about the range and handles roughly even data well.
 
-`MinMaxScaler` maps each column onto a fixed range, usually 0 to 1. It is the choice when an algorithm requires bounded input, and its weakness is severe: a single outlier defines the range and compresses everything else against the opposite end. The editor above shows four ordinary values landing in the first hundredth of the range because one value is 100.
+`MinMaxScaler` maps each column onto a fixed range, often 0 to 1. It's the choice when an method needs bounded input. Its weakness is severe. A single outlier defines the range and compresses all else against the opposite end. The editor above shows four plain values landing in the first hundredth of the range because one value is 100.
 
-`RobustScaler` centres on the median and divides by the interquartile range. Because both statistics ignore the tails, extreme values do not distort the transformation of the ordinary ones &mdash; in the same demonstration, the four normal values keep a sensible spread and the outlier simply sits far away. It is the right default when the data has outliers you do not want to remove.
+`RobustScaler` centres on the median and cuts by the interquartile range. Because both statistics skip the tails, extreme values don't distort the change of the plain ones. In the same demo, the four normal values keep a sensible spread and the outlier simply sits far away. It's the right default when the data has outliers you don't want to drop.
 
-`MaxAbsScaler` divides by the largest absolute value and preserves zeros, which makes it the one to use on sparse data where centring would destroy the sparsity.
+`MaxAbsScaler` cuts by the largest abs value and preserves zeros. This Makes it the one to use on sparse data where centring would destroy the sparsity.
 
-`Normalizer` is the odd one out and a frequent source of confusion: it scales each **row** to unit length rather than each column. It is for making samples comparable in direction rather than magnitude &mdash; text vectors, mostly &mdash; and is not a substitute for the column scalers.
+`Normalizer` is the odd one out and a frequent source of confusion. It scales each **row** to unit length rather than each column. It's for making samples close in direction rather than magnitude. Text vectors, mostly. And isn't a substitute for the column scalers.
 
 ## The rule that makes it honest
 
-The scaler must be fitted on the training data only, and then used to transform both halves.
+The scaler must be fitted on the training data only. Then used to transform both halves.
 
-The reason is the same as everywhere else in this track: `mean_` and `scale_` are learned from data, so a scaler fitted on everything has seen the test set, and the score afterwards is not a score on unseen data.
+The reason is the same as all over else in this track: `mean_` and `scale_` are learned from data. A scaler fitted on all has seen the test set. The score afterwards isn't a score on unseen data.
 
-The consequence surprises people the first time. After scaling correctly, the **test set is not centred on zero** &mdash; its mean is whatever it happens to be relative to the training distribution. The editor above shows 0.0184 rather than 0. That is correct and it is the whole point: the test data is being put through exactly the transformation that new data would go through in production, where you do not get to recompute the mean using the future.
+The consequence surprises people the first time. After scaling right, the **test set isn't centred on zero**. Its mean is what it happens to be scaled to the training spread. The editor above shows 0.0184 rather than 0. That is correct and it's the whole point. The test data is being put through just the change that new data would go through in production. Here You don't get to recompute the mean using the future.
 
-A test set that comes out perfectly centred is evidence that the scaler was fitted on it, which means the evaluation is compromised.
+A test set that comes out just right centred is evidence that the scaler was fitted on it. This Means the test is compromised.
 
-The same logic extends to deployment. The scaler is part of the model and has to be saved with it. A model deployed without its scaler, receiving raw features, will produce confident nonsense &mdash; which is one more argument for the pipeline, since saving the pipeline saves both.
+The same logic extends to deployment. The scaler is part of the model and has to be saved with it. A model deployed without its scaler, receiving raw features, will give confident nonsense. Which is one more arg for the pipeline. Saving the pipeline saves both.
 
 ## Just use a pipeline
 
-Every rule above is enforced automatically by putting the scaler in a `Pipeline`.
+each rule above is enforced automatically by putting the scaler in a `Pipeline`.
 
-A pipeline is a single estimator. Its `fit` runs `fit_transform` on each transformer and then `fit` on the final model; its `predict` runs `transform` and then `predict`. So inside a cross-validation loop, the scaler is refitted on each training fold and the held-out fold is only ever transformed &mdash; which is exactly the correct behaviour, achieved without you having to remember it.
+A pipeline is a single estimator. Its `fit` runs `fit_transform` on each transformer and then `fit` on the final model. Its `predict` runs `transform` and then `predict`. So inside a cross-validation loop, the scaler is refitted on each training fold and the held-out fold is only ever transformed. Which is just the correct action, reached without you having to note it.
 
-`make_pipeline(StandardScaler(), LogisticRegression())` is two words longer than fitting the scaler by hand and removes an entire category of mistake. There is in effect no situation in which scaling outside a pipeline is preferable, and the habit is worth forming before the mistakes are.
+`make_pipeline(StandardScaler(), LogisticRegression())` is two words longer than fitting the scaler by hand and drops an entire category of mistake. There's no situation in which scaling outside a pipeline is preferable. The habit is worth forming before the mistakes are.
 
 ## Scaling is not the only transformation a column might want
 
-Standardising fixes the *scale* of a feature and leaves its *shape* alone. Sometimes the shape is the problem.
+Standardising fixes the *scale* of a feature and leaves its *shape* alone. at times the shape is the problem.
 
-A heavily skewed column &mdash; incomes, populations, response times, anything where a few values are orders of magnitude above the rest &mdash; stays heavily skewed after standardising. The mean and standard deviation are themselves distorted by the tail, so most of the data ends up squeezed just below zero with a few enormous values above it, which is exactly the situation that harmed the distance-based models in the first place.
+A heavily skewed column &mdash; incomes, groups, response times, any of it where a few values are orders of magnitude above the rest &mdash; stays heavily skewed after standardising. The mean and standard deviation are themselves distorted by the tail. Most of the data ends up squeezed just below zero with a few huge values above it. This Is just the situation that harmed the distance-based models in the first place.
 
-Three responses. A **log transform**, via `FunctionTransformer(np.log1p)`, compresses the tail and often turns a multiplicative relationship into an additive one that a linear model can fit. `log1p` rather than `log` because it handles zeros without producing negative infinity.
+Three responses. A **log transform**, via `FunctionTransformer(np.log1p)`, compresses the tail and often turns a multiplicative tie into an additive one that a linear model can fit. `log1p` rather than `log` because it handles zeros without making minus infinity.
 
-`PowerTransformer` finds a transformation that makes the column as close to normal as it can, and standardises as it goes. It handles the choice for you and is the reasonable default when you know a column is skewed and do not want to think about which transformation.
+`PowerTransformer` finds a change that makes the column as close to normal as it can. Standardises as it goes. It handles the choice for you and is the reasonable default when you know a column is skewed and don't want to think about which change.
 
-`QuantileTransformer` maps the column onto a uniform or normal distribution by rank. It is the most aggressive of the three: it will normalise anything, at the cost of discarding the actual spacing between values and of behaving unpredictably on values outside the training range.
+`QuantileTransformer` maps the column onto a uniform or normal spread by rank. It's the most aggressive of the three. It will norm any of it, at the cost of discarding the actual spacing between values and of behaving unpredictably on values outside the training range.
 
-All three are transformers with the usual `fit`/`transform`, so they go in a pipeline in the same place a scaler would, and they are subject to exactly the same training-data-only rule.
+All three are transformers with the usual `fit`/`transform`. They go in a pipeline in the same place a scaler would. They're subject to just the same training-data-only rule.
 
 ## The order of the steps
 
-When several transformations apply to the same column, the order is not arbitrary.
+When a few changes apply to the same column, the order isn't any.
 
-Imputation comes before scaling, because a scaler cannot compute a mean over missing values &mdash; it raises. Encoding comes before scaling for the same reason, since a scaler cannot subtract a mean from a string.
+Imputation comes before scaling, because a scaler can't find a mean over missing values. It raises. Encoding comes before scaling for the same reason. A scaler can't subtract a mean from a string.
 
 Skew correction comes before standardising, since the point is to fix the shape and then fix the location and spread of the fixed shape.
 
-Feature selection is usually last among the transformers and before the model, so that the selection sees the features in the form the model will.
+Feature pick is often last among the transformers and before the model. That the pick sees the features in the form the model will.
 
-A `Pipeline` executes its steps in the order given, so writing them in the wrong order produces either an error or a silently worse model. The sequence that covers most cases is: impute, encode, transform skew, scale, select, fit.
+A `Pipeline` executes its steps in the order given. Writing them in the wrong order makes either an error or a silently worse model. The sequence that covers most cases is: impute, encode, transform skew, scale, select, fit.
 
-<strong>Should I scale the target as well?</strong> Rarely for regression - it changes the units your errors are reported in. When it genuinely helps, `TransformedTargetRegressor` does it and inverts the transformation on `predict`, so the predictions come back in the original units.
+<strong>Should I scale the target as well?</strong> Rarely for regression - it changes the units your errors are reported in. When it truly helps, `TransformedTargetRegressor` does it and inverts the change on `predict`. The guesses come back in the first units.
 
-<strong>Does scaling help accuracy on trees, ever?</strong> No. Exactly zero, which the last editor demonstrates. It is harmless and pointless.
+<strong>Does scaling help fit on trees, ever?</strong> No. just zero. This The last editor shows. It's harmless and pointless.
 
-<strong>What about one-hot columns - do those get scaled?</strong> They are already 0 and 1, so standardising them mostly adds noise to the interpretation. It is common to scale only the numeric columns, which is what a `ColumnTransformer` is for.
+<strong>What about one-hot columns - do those get scaled?</strong> They're already 0 and 1. Standardising them mostly adds noise to the reading. It's common to scale only the numeric columns. This Is what a `ColumnTransformer` is for.
 
 ## Categories of model, and what each one wants
 
-A summary worth keeping, because "does this need scaling" comes up for every new estimator.
+A summary worth keeping, because "does this need scaling" comes up for each new estimator.
 
-**Needs it, badly.** k-nearest neighbours, k-means, SVM with any kernel, PCA and anything built on it, and neural networks. All of these either measure distance or descend a gradient, and both are dominated by whichever feature has the largest units.
+**Needs it, badly.** k-nearest neighbours, k-means, SVM with any kernel, PCA and any of it built on it. Neural networks. All of these either measure distance or descend a grad. Both are dominated by whichever feature has the largest units.
 
-**Needs it, for the penalty.** Ridge, Lasso, ElasticNet, and `LogisticRegression` with its default L2. The fit itself would be unaffected, but the regularisation penalises coefficient magnitude, and magnitude depends on units.
+**Needs it, for the fine.** Ridge, Lasso, ElasticNet. `LogisticRegression` with its default L2. The fit itself would be unaffected. The smoothing punishes coeff magnitude, and magnitude depends on units.
 
-**Does not need it, and gains nothing.** Decision trees, random forests, extra trees, gradient boosting in all its varieties, and naive Bayes. These either split one column at a time or treat the columns independently.
+**Doesn't need it, and gains nothing.** choice trees, random forests, extra trees, grad boosting in all its varieties, and naive Bayes. These either split one column at a time or treat the columns on its own.
 
-**Does not need it, but converges faster with it.** Plain `LinearRegression` has a closed-form solution and is genuinely indifferent; the iterative solvers used for very large problems are not.
+**Doesn't need it, but settles faster with it.** Plain `LinearRegression` has a closed-form answer and is truly indifferent. The iterative solvers used for very large problems aren't.
 
-The rule that covers the whole table: if the algorithm ever adds two different features together, compares them, or measures a distance across them, it needs them on a common scale. If it only ever looks at one feature at a time, it does not.
+The rule that covers the whole table: if the method ever adds two different features together, checks them, or measures a distance across them, it needs them on a common scale. If it only ever looks at one feature at a time, it doesn't.
 
 ## Things to try
 
-1. <strong>Run the second editor.</strong> 0.69 against 0.95, from one line. That is the argument in a single number.
-2. <strong>Watch a tree ignore it.</strong> The last editor reports a change of exactly zero for the forest. Try `MinMaxScaler` instead and confirm it is still zero.
-3. <strong>Break the range.</strong> In the third editor, change the outlier to 10000 and see how much further MinMax compresses the ordinary values.
-4. <strong>Cheat deliberately.</strong> In the fourth editor, fit the scaler on all of `X` and note that the test mean becomes 0 - the signature of a compromised evaluation.
+1. <strong>Run the second editor.</strong> 0.69 against 0.95, from one line. That is the arg in a single number.
+2. <strong>Watch a tree skip it.</strong> The last editor reports a change of just zero for the forest. Try `MinMaxScaler` instead and confirm it's still zero.
+3. <strong>Break the range.</strong> In the third editor, change the outlier to 10000 and see how much further MinMax compresses the plain values.
+4. <strong>Cheat on purpose.</strong> In the fourth editor, fit the scaler on all of `X` and note that the test mean turns 0 - the signature of a compromised test.
 
 ## Where this leaves you
 
-Scale for distance-based and regularised models, do not bother for trees, prefer `StandardScaler` unless outliers argue for `RobustScaler`, and fit it inside a pipeline so that the training-data-only rule holds without anyone having to remember it.
+Scale for distance-based and smoothed models, don't bother for trees, prefer `StandardScaler` unless outliers argue for `RobustScaler`. Fit it inside a pipeline so that the training-data-only rule holds without anyone having to note it.

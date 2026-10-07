@@ -1,9 +1,9 @@
 title: Required, Optional and Defaults: The Three-Way Distinction
-intro: Why Optional does not mean optional, and how to tell "not sent" from "sent as null".
+intro: Why Optional doesn't mean optional. How to tell "not sent" from "sent as null".
 
 ## The rule, first
 
-A field is required when it has no default value. That is the entire rule, and the type annotation plays no part in it.
+A field is needed when it has no default value. That is the entire rule. The type annotation plays no part in it.
 
 ```python
 class Module(BaseModel):
@@ -13,21 +13,7 @@ class Module(BaseModel):
 
 Leave out `title` and the model refuses to be built, with an error whose `type` is `missing`. Leave out `minutes` and you get `10`.
 
-Everything confusing about this topic comes from one word being borrowed for two jobs.
-
-The word is `Optional`. In Python's type system, `Optional[str]` means `Union[str, None]` — the value can be a string or `None`. It says nothing about whether the field has a default. An `Optional[str]` field with no default is **required**: you must provide it, but you may provide `None`. An `Optional[str]` field with `= None` is truly optional: omit it and you get `None`. The annotation controls the allowed types; the default controls whether the field can be omitted.
-
-That distinction trips people because in everyday language "optional" means "you can leave it out." In Pydantic it does not. `Optional[str]` without a default requires a value — it just allows that value to be `None`. The mental model that survives is: "the default decides required or optional; the type decides what values are legal."
-
-`None` as a value is different from missing. Consider a PATCH endpoint where the client wants to clear a field. Sending `{"bio": null}` means "set bio to None." Not sending `bio` at all means "leave bio unchanged." A model that uses `bio: Optional[str] = None` cannot tell the difference — both cases produce `None`. Pydantic's `model_fields_set` attribute is how you distinguish them: it is a set of field names the caller actually included, so checking `"bio" in model.model_fields_set` tells you whether the field was explicitly sent.
-
-`Field(default=...)` and `Field(default_factory=...)` are the two ways to set defaults through the `Field` function. `default` takes a value directly: `Field(default=10)`. `default_factory` takes a callable that returns the value: `Field(default_factory=list)`. The factory form exists because mutable defaults — lists, dicts, sets — must not be shared across instances. Pydantic raises an error if you write `tags: List[str] = []` directly, unlike plain Python classes, where the bug is silent and shared mutations corrupt every instance.
-
-A field with `...` (Ellipsis) as its default is explicitly required: `title: str = Field(...)`. This is equivalent to having no default at all, but it lets you add other `Field` arguments like `min_length` or `description` while keeping the field required. Without `...`, adding `Field(min_length=3)` would make the field optional with a default of `None`, which is rarely what you want.
-
-Defaults interact with validation. A default value is **not validated** unless you set `validate_default=True` on the field or on the model's config. That means `x: int = "not a number"` does not raise at class definition time — it raises only when you build an instance without providing `x`, at which point the default is validated and fails. This is intentional: it lets you define a model before the default is meaningful, but it is surprising if you expect the class definition to catch the mismatch.
-
-Inheritance adds one more layer. A child model can override a parent's field, changing its default or type. A field that was required in the parent can become optional in the child, and vice versa. The child's definition wins. But removing a field entirely is not supported — you can only change it, not delete it.
+all confusing about this topic comes from one word being borrowed for two jobs.
 
 
 ## A field with no default is required
@@ -195,46 +181,46 @@ print("only their input           :", minimal.model_dump(exclude_unset=True))
 ```
 ## Optional does not mean optional
 
-`Optional[str]` comes from the `typing` module, where it means exactly one thing: `str or None`. It is a statement about which *values* are allowed. It says nothing whatsoever about whether the field has to be supplied.
+`Optional[str]` comes from the `typing` module. Here It means just one thing: `str or None`. It's a statement about which *values* are allowed. It says nothing whatsoever about whether the field has to be supplied.
 
 ```python
 class Strict(BaseModel):
     note: Optional[str]        # nullable, and STILL REQUIRED
 ```
 
-`Strict(note=None)` works. `Strict()` raises `missing`. This surprises nearly everyone once, and the surprise is entirely the fault of English rather than of Pydantic &mdash; `Optional` was named for type theory, not for form fields.
+`Strict(note=None)` works. `Strict()` raises `missing`. This surprises nearly all once. The surprise is fully the fault of English rather than of Pydantic. `Optional` was named for type theory, not for form fields.
 
-To get the behaviour people usually mean, add the default:
+To get the action people often mean, add the default:
 
 ```python
 class Truly(BaseModel):
     note: Optional[str] = None   # nullable AND optional
 ```
 
-It is worth internalising as two separate questions. *Can this value be null?* is answered by the type. *Must the caller provide it?* is answered by whether there is a default. They are independent, and all four combinations are legitimate and occasionally useful.
+It's worth internalising as two split questions. *Can this value be null?* is answered by the type. *Must the caller provide it?* is answered by whether there's a default. They're split. All four mixes are legitimate and at times handy.
 
-Pydantic v1 blurred this: it made `Optional` fields default to `None` automatically. Pydantic v2 stopped, precisely because the implicit default hid the distinction. If you find old code that relies on it, this is one of the changes that will bite during a migration.
+Pydantic v1 blurred this: it made `Optional` fields default to `None` on its own. Pydantic v2 stopped, just because the silent default hid the gap. If you find old code that leans on it, this is one of the changes that will bite during a migration.
 
 ## Missing and null are different facts
 
-For most models the difference does not matter. For anything that updates existing data, it matters enormously.
+For most models the gap doesn't matter. For anything that updates existing data, it matters enormously.
 
-Consider a PATCH endpoint. A client sends `{"title": "New Name"}`. What should happen to `summary`? Obviously nothing &mdash; they did not mention it. Now a client sends `{"summary": null}`. What should happen? Just as obviously, `summary` should be cleared. Those are opposite intentions, and after validation both fields are `None` in the model.
+Consider a PATCH endpoint. A client sends `{"title": "New Name"}`. What should happen to `summary`? Obviously nothing. They didn't mention it. Now a client sends `{"summary": null}`. What should happen? Just as obviously, `summary` should be cleared. Those are opposite intentions. After check both fields are `None` in the model.
 
-`model_fields_set` recovers the distinction. It is a set of the field names the caller actually supplied:
+`model_fields_set` recovers the gap. It's a set of the field names the caller really supplied:
 
 ```python
 Update(title="x").model_fields_set   # {"title"}
 Update().model_fields_set            # set()
 ```
 
-And `model_dump(exclude_unset=True)` uses it, returning only the fields that were provided. That output is the correct thing to apply to an existing record: absent keys are absent, and an explicit `None` is present and clears the value.
+And `model_dump(exclude_unset=True)` uses it, returning only the fields that were given. That output is the correct thing to apply to an existing record. Absent keys are absent. An clear `None` is present and clears the value.
 
-Getting this wrong is a real and common bug. An update endpoint that dumps the whole model and writes every field will happily overwrite six columns with `None` because the client only mentioned one.
+Getting this wrong is a real and common bug. An update endpoint that dumps the whole model and writes each field will happily overwrite six columns with `None` because the client only mentioned one.
 
 ## The mutable default trap, and why it is not one here
 
-Every Python programmer eventually learns this the hard way:
+each Python programmer eventually learns this the hard way:
 
 ```python
 def add_tag(tag, tags=[]):
@@ -242,64 +228,64 @@ def add_tag(tag, tags=[]):
     return tags
 ```
 
-The list is created once, when the function is defined, and shared by every call that does not pass one. The second call sees the first call's data.
+The list is created once, when the function is defined. Shared by each call that doesn't pass one. The second call sees the first call's data.
 
-Pydantic does not have this bug. A default like `tags: List[str] = []` is deep-copied for each new instance, so two models never share a list. You can write the natural thing and it is safe.
+Pydantic doesn't have this bug. A default like `tags: List[str] = []` is deep-copied for each new instance. Two models never share a list. You can write the natural thing and it's safe.
 
-`default_factory` still matters, though, for defaults that must be *computed* rather than copied. A timestamp, a generated id, a counter &mdash; anything whose value should reflect the moment of creation:
+`default_factory` still matters, though, for defaults that must be *found* rather than copied. A timestamp, a made id, a counter. Anything whose value should reflect the moment of creation:
 
 ```python
 created: datetime = Field(default_factory=datetime.now)
 ```
 
-Written as `= datetime.now()` that would freeze the time the class was defined, and every model would claim to have been created at import.
+Written as `= datetime.now()` that would freeze the time the class was defined. Each model would claim to have been created at import.
 
 ## Defaults are not checked
 
-This one is quiet and occasionally costly. By default, Pydantic does not validate default values:
+This one is quiet and at times costly. By default, Pydantic doesn't validate default values:
 
 ```python
 class Sloppy(BaseModel):
     minutes: int = "not a number"
 ```
 
-That class definition raises nothing, and `Sloppy().minutes` is the string. The reasoning is speed &mdash; you wrote the default yourself, so checking it on every instantiation is work with no expected payoff.
+That class meaning raises nothing, and `Sloppy().minutes` is the string. The thinking is speed. You wrote the default yourself. Checking it on each instantiation is work with no expected payoff.
 
-The cost is that a mistyped default is invisible until something downstream does arithmetic. If you would rather be told, `model_config = ConfigDict(validate_default=True)` turns the checking on, at a small cost per instance.
+The cost is that a mistyped default is invisible until a thing downstream does math. If you'd rather be told, `model_config = ConfigDict(validate_default=True)` turns the checking on, at a small cost per instance.
 
-For a model with hand-written defaults that never change, the default behaviour is fine. For a model whose defaults come from configuration or a constant defined elsewhere, turning validation on is cheap insurance.
+For a model with hand-written defaults that never change, the default action is fine. For a model whose defaults come from config or a constant defined elsewhere, turning check on is cheap insurance.
 
 ## Choosing well
 
 A few habits that keep models honest.
 
-Prefer required fields. Every default is a decision made on behalf of a caller who did not make it, and a model where everything is optional documents nothing &mdash; a reader cannot tell what is actually guaranteed.
+Prefer needed fields. each default is a choice made on behalf of a caller who didn't make it. A model where all is optional docs nothing. A reader can't tell what is really sure.
 
-Do not use `None` as a stand-in for a real default. If a missing duration means ten minutes, write `minutes: int = 10`, not `Optional[int] = None` with a `or 10` scattered through the code that follows.
+Don't use `None` as a stand-in for a real default. If a missing duration means ten minutes, write `minutes. Int = 10`, not `Optional[int] = None` with a `or 10` scattered through the code that follows.
 
-Reserve `None` for values that are genuinely absent in the domain: a summary nobody has written yet, an end date for something still running. Then `None` carries meaning rather than marking a gap in the model.
+Reserve `None` for values that are truly absent in the domain. A summary no one has written yet, an end date for a thing still running. Then `None` carries meaning rather than marking a gap in the model.
 
-And when you are modelling an update rather than a creation, reach for `exclude_unset` early. It is easier to build the endpoint correctly than to work out later why six columns went blank.
+And when you're modelling an update rather than a creation, reach for `exclude_unset` early. It's easier to build the endpoint right than to work out later why six columns went blank.
 
 ## The ellipsis, and other spellings of "required"
 
-You will meet `Field(...)` in older code and in a lot of documentation:
+You'll meet `Field(...)` in older code and in a lot of docs:
 
 ```python
 title: str = Field(..., min_length=3)
 ```
 
-The literal `Ellipsis` was Pydantic v1's way of saying "there is no default, this is required", because `Field` needed something in the default position. It still works in v2, and it is redundant: omitting the default says the same thing.
+The literal `Ellipsis` was Pydantic v1's way of saying "there's no default, this is needed". `Field` needed a thing in the default spot. It still works in v2. It's redundant: omitting the default says the same thing.
 
 ```python
 title: str = Field(min_length=3)     # identical, and clearer
 ```
 
-Prefer the second. The first makes readers who have not met the convention stop and look it up, and it buys nothing.
+Prefer the second. The first makes readers who haven't met the rule stop and look it up, and it buys nothing.
 
 ## Defaults that depend on the environment
 
-A default does not have to be a literal. `default_factory` takes any callable, which means a default can come from configuration, the clock, or a generator:
+A default doesn't have to be a literal. `default_factory` takes any callable. This Means a default can come from config, the clock, or a gen:
 
 ```python
 created: datetime = Field(default_factory=datetime.now)
@@ -307,34 +293,34 @@ request_id: str = Field(default_factory=lambda: uuid4().hex)
 retries: int = Field(default_factory=lambda: int(os.getenv("RETRIES", "3")))
 ```
 
-The third one is worth a caution. Reading configuration inside a default factory works, but it happens at model-construction time rather than at import, which makes it harder to reason about and hard to override in tests. For anything that is really configuration, a settings model is the better home &mdash; that is a module in the last tier.
+The third one is worth a caution. Reading config inside a default factory works. It happens at model-build time rather than at import. This Makes it harder to reason about and hard to replace in tests. For anything that is really config, a settings model is the better home. That is a module in the last tier.
 
-There is also a form of `default_factory` that receives the already-validated data, letting a default depend on other fields. It is powerful and easy to overuse; a value computed from other fields is often better expressed as a `computed_field`, which does not pretend to be an input.
+There's also a form of `default_factory` that receives the already-checked data, letting a default depend on other fields. It's powerful and easy to overuse. A value found from other fields is often better expressed as a `computed_field`. This Doesn't pretend to be an input.
 
 ## How this appears in the schema
 
-The distinction between required, optional and nullable is not just a Python concern &mdash; it shows up in the generated JSON Schema, and therefore in your API documentation and any client generated from it.
+The gap between needed, optional and nullable isn't just a Python concern. It shows up in the made JSON Schema. So in your API docs and any client made from it.
 
-A field with no default appears in the schema's `required` array. A field with a default does not, and its default is recorded. A nullable field's type becomes an `anyOf` including `null`.
+A field with no default appears in the schema's `needed` array. A field with a default doesn't. Its default is recorded. A nullable field's type turns an `anyOf` including `null`.
 
-So the four combinations produce four genuinely different contracts for a consumer:
+So the four mixes give four truly other contracts for a consumer:
 
-`str` &mdash; must be sent, cannot be null.
-`str = "x"` &mdash; may be omitted, cannot be null.
+`str` &mdash; must be sent, can't be null.
+`str = "x"` &mdash; may be omitted, can't be null.
 `Optional[str]` &mdash; must be sent, may be null.
 `Optional[str] = None` &mdash; may be omitted, may be null.
 
-Reading them as sentences like that is the fastest way to check you have written what you meant. If the sentence sounds wrong for your API, the annotation is wrong.
+Reading them as sentences like that is the fastest way to check you've written what you meant. If the sentence sounds wrong for your API, the annotation is wrong.
 
 ## Designing create and update models
 
 The place all of this comes together is a resource with more than one shape.
 
-**Create** takes what a caller may supply. The server-assigned id is absent entirely &mdash; not optional, absent &mdash; because including it invites a caller to try setting it.
+**Create** takes what a caller may supply. The server-assigned id is absent fully. Not optional, absent. Because including it invites a caller to try setting it.
 
-**Update**, for a PATCH, has every field optional with a `None` default, and is dumped with `exclude_unset=True` so that untouched fields stay untouched.
+**Update**, for a PATCH, has each field optional with a `None` default. Is dumped with `exclude_unset=True` so that untouched fields stay untouched.
 
-**Output** has everything the caller is allowed to see, with server-assigned fields required, because by the time you are returning one they exist.
+**Output** has all the caller is allowed to see, with server-assigned fields needed. By the time you're returning one they exist.
 
 ```python
 class ModuleCreate(BaseModel):
@@ -351,15 +337,15 @@ class ModuleOut(BaseModel):
     minutes: int
 ```
 
-Three small classes rather than one clever one. Each says exactly what it means, and none of them needs a comment explaining which fields apply when.
+Three small classes rather than one clever one. Each says just what it means. None of them needs a comment showing which fields apply when.
 
-The temptation is always to collapse them into a single model with everything optional. It looks like less code and it is: it is also a model that documents nothing, generates useless API docs, and cannot tell a client what is guaranteed in a response.
+The temptation is always to collapse them into a single model with all optional. It looks like less code and it's. It's also a model that docs nothing, makes useless API docs. Can't tell a client what is sure in a response.
 
 ## A note on validation order
 
-Fields are validated in declaration order, and defaults are filled as part of that pass. This matters once you write a validator that reads another field: it can only see fields declared *above* it, because the ones below have not been processed yet.
+Fields are checked in declaration order. Defaults are filled as part of that pass. This matters once you write a checker that reads another field. It can only see fields declared *above* it. The ones below haven't been processed yet.
 
-If a rule needs the whole object, that is what `model_validator(mode="after")` is for &mdash; it runs once, after every field is in place. Trying to express a cross-field rule as a field validator on whichever field happens to come last works until somebody reorders the class.
+If a rule needs the whole object, that is what `model_validator(mode="after")` is for. It runs once, after each field is in place. Trying to express a cross-field rule as a field checker on whichever field happens to come last works until somebody reorders the class.
 
 ## A checklist for a field you are about to write
 
@@ -367,28 +353,28 @@ Four questions, in order, and the annotation falls out of the answers.
 
 **Can this be absent?** If yes, it needs a default. If no, leave the default off and let the model refuse.
 
-**Can this be null, meaningfully?** Only if "no value" is a real state in your domain &mdash; an unwritten summary, an unfinished end date. If `None` would just mean "nobody bothered", it is not nullable; it is defaulted.
+**Can this be null, usefully?** Only if "no value" is a real state in your domain. An unwritten summary, an unfinished end date. If `None` would just mean "no one bothered", it isn't nullable. It's defaulted.
 
-**Is the default a constant or does it depend on when we are?** A constant goes in directly. Anything computed &mdash; a time, an id, a fresh container &mdash; goes in `default_factory`.
+**Is the default a constant or does it depend on when we are?** A constant goes in right. Anything found. A time, an id, a fresh holder &mdash; goes in `default_factory`.
 
-**Am I creating or updating?** Creating means required fields are required. Updating means everything is optional and you dump with `exclude_unset=True`.
+**Am I creating or updating?** Creating means needed fields are needed. Updating means all is optional and you dump with `exclude_unset=True`.
 
-Most confusing models are the result of answering the second question with "I suppose so" instead of thinking about it. `Optional[X] = None` is the annotation people reach for when they have not decided, and a model full of them has quietly recorded that nothing was ever decided.
+Most confusing models are the result of answering the second question with "I suppose so" instead of thinking about it. `Optional[X] = None` is the annotation people reach for when they haven't decided. A model full of them has quietly recorded that nothing was ever decided.
 
 ## What this buys downstream
 
-The payoff for being precise here shows up somewhere else entirely: in the code that reads the model.
+The payoff for being precise here shows up one spot else fully: in the code that reads the model.
 
-If `summary: Optional[str] = None` genuinely means "may not have been written yet", then `if module.summary:` is a meaningful branch about the domain. If it means "we were not sure", every reader has to defend against `None` on every field, and the type system has stopped helping.
+If `summary: Optional[str] = None` truly means "may not have been written yet", then `if module.summary:` is a real branch about the domain. If it means "we weren't sure", each reader has to defend against `None` on each field. The type system has stopped helping.
 
-Required fields are a promise to the rest of your program. Each one you make lets code downstream stop checking. That is the actual product of this module: not the syntax, but the discipline of deciding what is guaranteed and then writing it down where the compiler, the schema and the next reader can all see it.
+needed fields are a promise to the rest of your program. Each one you make lets code downstream stop checking. That is the actual product of this module. Not the syntax. The discipline of deciding what is sure and then writing it down where the compiler, the schema and the next reader can all see it.
 
 ## One last distinction
 
-There is a fourth state people occasionally need, beyond required, defaulted and nullable: a field that may be absent but has no sensible default, where you genuinely want to know whether it was supplied.
+There's a fourth state people at times need, beyond needed, defaulted and nullable. A field that may be absent but has no sensible default. Here You truly want to know whether it was supplied.
 
-That is what `model_fields_set` and `exclude_unset` exist for, and it is worth naming explicitly because the instinct is to invent a sentinel &mdash; a magic string, a `-1`, a custom `UNSET` object &mdash; and thread it through the code. Pydantic already tracks the answer. Reach for the sentinel only when the value has to survive serialisation, which is rare, and think hard before you do, because every consumer of that data now has to know about your magic value.
+That is what `model_fields_set` and `exclude_unset` exist for. It's worth naming by name because the instinct is to invent a sentinel. A magic string, a `-1`, a custom `UNSET` object. And thread it through the code. Pydantic already tracks the answer. Reach for the sentinel only when the value has to live output. This Is rare. Think hard before you do. Each consumer of that data now has to know about your magic value.
 
 ## Next
 
-The next module is about the moment a model says no: how to read a `ValidationError` in full, what each part of an entry means, and how to turn one into a message a user can act on.
+The next module is about the moment a model says no. How to read a `ValidationError` in full, what each part of an entry means. How to turn one into a message a user can act on.

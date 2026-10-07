@@ -1,20 +1,20 @@
 title: OLTP, OLAP and Columnar Storage
-intro: Why the database that runs your application is the wrong one for your dashboards.
+intro: Why the DB that runs your use is the wrong one for your dashboards.
 
 ## Two workloads
 
-**OLTP** &mdash; online transaction processing &mdash; is the application
-database. Many concurrent connections, each doing something small: fetch this
+**OLTP** &mdash; online transaction processing &mdash; is the use
+DB. Many concurrent links, each doing a thing small: fetch this
 order, insert this payment, update this status. Queries touch few rows and
-usually want all of a row's columns. Latency per query matters enormously.
+often want all of a row's columns. Latency per query matters enormously.
 
 **OLAP** &mdash; online analytical processing &mdash; is the reporting workload.
-Few concurrent users, each asking something enormous: revenue by region by month
-for three years. Queries touch millions of rows and usually want three or four
-columns out of fifty. Throughput matters; a query taking two seconds instead of
+Few concurrent users, each asking a thing huge: revenue by region by month
+for three years. Queries touch millions of rows and often want three or four
+columns out of fifty. Throughput matters. A query taking two seconds instead of
 two hundred milliseconds is fine.
 
-These want opposite things, and the disagreement is about physical layout. Row stores keep all columns of a row together on disk, which is fast for fetching a whole record but wasteful when a query needs only three columns out of fifty. Column stores keep each column contiguously, which lets an analytical scan read only the data it needs and compress it far better.
+These want opposite things, and the disagreement is about physical layout.
 
 ## How rows are stored
 
@@ -24,10 +24,10 @@ A **row store** keeps each row's fields contiguously:
 [1|Ada|Leeds|2026-08-01|120.00][2|Bo|Bristol|2026-08-03|64.50]...
 ```
 
-Fetching order 2 is a single page read, and everything needed is there. Perfect
+Fetching order 2 is a single page read, and all needed is there. Perfect
 for OLTP.
 
-Now compute the average of `total` over ten million orders. Every page has to be
+Now find the mean of `total` over ten million orders. each page has to be
 read, because the totals are scattered one per row, separated by all the other
 columns. To read 8 bytes of interest you read a 200-byte row, and 96% of the I/O
 is waste.
@@ -42,25 +42,25 @@ names:   [Ada][Bo][Cy][Di]...
 totals:  [120.00][64.50][45.00][220.00]...
 ```
 
-That average now reads only the `totals` region. Reading a fiftieth of the data
-is roughly a fiftieth of the time, and the advantage grows with the width of the
+That mean now reads only the `totals` region. Reading a fiftieth of the data
+is roughly a fiftieth of the time. The edge grows with the width of the
 table.
 
 Two further wins follow from the layout rather than being added to it.
 
 **Compression.** A column holds one type, and often few distinct values. A
 `country` column across ten million rows compresses to almost nothing with
-dictionary encoding; a sorted date column run-length encodes brilliantly. Mixed
-row data does none of this. Ten-times ratios are ordinary, and the speed-up is
+dict encoding. A sorted date column run-length codes brilliantly. Mixed
+row data does none of this. Ten-times ratios are plain, and the speed-up is
 mostly the reduced I/O.
 
-**Vectorised execution.** Values of one type packed contiguously can be processed
+**Vectorised run.** Values of one type packed contiguously can be processed
 in batches with SIMD instructions, instead of one row at a time through a tuple
 interface.
 
 The cost is the mirror image: fetching one whole row means one read per column
 and reassembly, and inserting a row means writing into fifty places. Columnar
-stores are therefore usually append-oriented and batch-loaded, not
+stores are so often append-oriented and batch-loaded, not
 update-in-place.
 
 ## Choosing
@@ -76,19 +76,19 @@ update-in-place.
 
 ## Do not run both on one database
 
-The usual mistake is analytics against the production OLTP database. A report
-scanning ten million rows evicts the working set from the buffer cache, and every
-application query afterwards goes to disk. The dashboard is slow *and* the
+The usual mistake is analytics against the production OLTP DB. A report
+scanning ten million rows evicts the working set from the buffer cache, and each
+use query afterwards goes to disk. The dashboard is slow *and* the
 checkout is slow.
 
-The standard arrangement separates them: OLTP handles the application, data is
+The standard setup separates them: OLTP handles the use, data is
 copied into an analytical store on a schedule or a stream, and reports run there
 with a [star schema](star_schema.html) shaped for them. The copy is stale by
 minutes or hours, which is almost always acceptable for reporting and is the
 price of not having the two workloads fight.
 
 The variants above make the difference concrete: the same table queried the OLTP
-way and the OLAP way, with a note on how much of each row each one actually
+way and the OLAP way, with a note on how much of each row each one really
 needs.
 
 ## Where the line has blurred
@@ -96,37 +96,37 @@ needs.
 **DuckDB** is columnar, embedded and single-file &mdash; analytical power with no
 cluster. **Postgres** has columnar extensions and can query Parquet through
 foreign data wrappers. **Parquet** itself has made columnar a file format rather
-than a database, so the same data can be read by many engines.
+than a DB, so the same data can be read by many engines.
 
 The result is that "we need a data warehouse" is a much bigger claim than it was.
 For datasets under a few hundred gigabytes, DuckDB over Parquet on one machine
-frequently outperforms a cluster.
+often beats a cluster.
 
 ## The I/O gap, in bytes
 
-"A fiftieth of the data" deserves a concrete figure, because it is the whole
-argument for columnar. Take ten million orders, fifty columns, eight bytes each,
-and average one column:
+"A fiftieth of the data" deserves a concrete figure, because it's the whole
+arg for columnar. Take ten million orders, fifty columns, eight bytes each,
+and mean one column:
 
 |layout|bytes read for `AVG(total)`|
 |---|---|
 |row store|10M &times; 50 &times; 8 = **4.0 GB**|
 |column store|10M &times; 8 = **80 MB**|
 
-The row store must pass over every column of every row to reach the one it needs,
+The row store must pass over each column of each row to reach the one it needs,
 so it reads the whole four gigabytes to sum eighty megabytes of actual interest.
-The column store reads only the `total` region &mdash; fifty times less &mdash; and
+The column store reads only the `total` region. Fifty times less &mdash; and
 that ratio is why an aggregate that takes seconds on a row store returns in
 milliseconds on a columnar one. It also compounds with compression: that single
-column, being one type with few distinct values, often compresses several-fold
+column, being one type with few distinct values, often compresses a few-fold
 again, so the real read is smaller still. The wider the table, the larger the
-gap, which is exactly backwards from what OLTP wants.
+gap, which is just backwards from what OLTP wants.
 
 ## Where the ten-times compression comes from
 
-"Ten-times ratios are ordinary" is not a hope; it falls out of a column holding
+"Ten-times ratios are plain" isn't a hope. It falls out of a column holding
 one type with few distinct values. A `country` column over ten million rows has
-maybe 200 distinct values, so dictionary encoding stores a one-byte code per row
+maybe 200 distinct values, so dict encoding stores a one-byte code per row
 plus a tiny lookup, instead of the full string each time:
 
 |encoding|size of the country column|
@@ -134,22 +134,22 @@ plus a tiny lookup, instead of the full string each time:
 |raw text (~10 bytes/value)|~100 MB|
 |dictionary (1 byte/row + dict)|~10 MB|
 
-Ten to one, and a sorted or slowly-changing column run-length encodes even harder
+Ten to one, and a sorted or slowly-changing column run-length codes even harder
 &mdash; a date column that repeats each value for a day's worth of rows stores a
-value and a count rather than the value a million times. A row store cannot do any
+value and a count rather than the value a million times. A row store can't do any
 of this, because each value sits between bytes of other columns of other types,
-with nothing to compress against. The compression is not a feature bolted on; it
+with nothing to compress against. The compression isn't a feature bolted on. It
 is a consequence of putting like values next to like, and most of the resulting
-speed-up is simply that there is less to read.
+speed-up is simply that there's less to read.
 
 ## Where it goes wrong
 
-**Reporting off the primary.** Cache eviction makes the application slow, and the
-cause is not obvious from the application's own metrics.
+**Reporting off the main.** Cache eviction makes the use slow, and the
+cause isn't obvious from the use's own metrics.
 
-**Row-by-row inserts into a columnar store.** They are built for batches; single
+**Row-by-row inserts into a columnar store.** They're built for batches. Single
 inserts are pathologically slow.
 
-**`SELECT *` on a column store.** It gives up the entire advantage.
+**`SELECT *` on a column store.** It gives up the entire edge.
 
-**Assuming you need a cluster.** Measure on one machine first.
+**given you need a cluster.** Measure on one machine first.

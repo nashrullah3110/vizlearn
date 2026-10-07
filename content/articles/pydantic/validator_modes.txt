@@ -1,31 +1,17 @@
 title: Validator Modes: before, after, plain and wrap
-intro: What runs when, relative to coercion, and why the choice decides what a validator can do.
+intro: What runs when, scaled to coercion. Why the choice decides what a checker can do.
 ## The pipeline
 
-Validating one field is a sequence, and every mode is a slot in it:
+checking one field is a sequence, and each mode is a slot in it:
 
-1. **before** validators run on the raw input, exactly as it arrived.
+1. **before** checkers run on the raw input, just as it arrived.
 2. **Coercion** converts the value to the annotated type.
 3. **Constraints** from `Field` are checked.
-4. **after** validators run on the final, converted value.
+4. **after** checkers run on the final, converted value.
 
-`plain` and `wrap` are different: they replace or surround the whole thing rather than sitting inside it.
+`plain` and `wrap` are other: they replace or surround the whole thing rather than sitting inside it.
 
-Almost every confusion about validators dissolves once this sequence is clear, because the question "why did my validator not run?" nearly always has the answer "it was in after mode and the value failed at step 2".
-
-**Before** mode receives the raw input — whatever the caller passed, before any type conversion. The value might be a string when the field is annotated as `int`. It might be a dict when the field is a model. The validator sees exactly what arrived, and it can transform, reject, or pass it through. This is the right mode for normalising input: stripping whitespace, converting date strings to a canonical format, or accepting multiple representations of the same value. If the before validator raises, coercion never runs.
-
-**After** mode receives the final, fully converted value. If the field is `int`, the validator sees an `int`. If the field is a model, the validator sees a validated model instance. This is the right mode for business rules: checking that a quantity is positive, that a date is in the future, or that two fields are consistent with each other. After validators do not run when coercion fails, which is the "step 2" issue from above — if `"abc"` cannot be converted to `int`, no after validator for that field executes.
-
-**Plain** mode replaces the entire pipeline. There is no coercion and no constraint check — only the validator runs. The validator receives the raw input and must return the final value. This is useful when the standard coercion is wrong for your case: you want to accept a string and produce a custom object, or you want to reject certain inputs that Pydantic would otherwise coerce silently (like truncating a float to an int).
-
-**Wrap** mode surrounds the entire pipeline. The validator receives a `handler` function that it can call to run the standard validation (before validators, coercion, constraints, after validators). The wrap validator can inspect the input before calling `handler`, modify the result after, or catch exceptions from the pipeline and recover. This is the most flexible mode and the right choice for cross-cutting concerns like logging what a field received, timing how long validation takes, or providing a fallback value when standard validation fails.
-
-The choice between modes follows a simple rule. If you need to see the raw input: before. If you need to see the converted value: after. If you need to replace the pipeline: plain. If you need to wrap it: wrap. Most validators are before or after; plain and wrap are for advanced cases.
-
-Multiple validators on the same field run in definition order within each mode, and the modes themselves run in the pipeline order: all before validators first, then coercion and constraints, then all after validators. A before validator's return value is what the next before validator (or coercion) sees, so chaining before validators composes transformations — strip whitespace, then lowercase, then check a pattern.
-
-Field validators and model validators are different. A field validator runs on one field; a model validator runs after all fields are validated and can access the entire model. Model validators are the right place for cross-field checks like "start_date must be before end_date" or "if payment_method is 'card', card_number is required." They also have before, after, and wrap modes, with the same semantics applied to the model as a whole rather than to a single field.
+Almost each confusion about checkers dissolves once this sequence is clear. The question "why did my checker not run?" nearly always has the answer "it was in after mode and the value failed at step 2".
 
 
 ## Seeing the pipeline
@@ -194,46 +180,46 @@ print("title:", repr(m.title))
 ```
 ## after: the default
 
-An after validator receives the value already converted. `n: int` given `"12"` reaches an after validator as the integer `12`.
+An after checker receives the value already converted. `n: int` given `"12"` reaches an after checker as the int `12`.
 
-That is what you want for nearly everything. Checking membership of a set, comparing against a bound that a constraint cannot express, normalising a string, deduplicating a list &mdash; all of these are simpler when the value is known to be the right type, because you can operate on it directly with no defensive `isinstance`.
+That is what you want for nearly all. Checking membership of a set, checking against a bound that a constraint can't express, norming a string, deduplicating a list. All of these are simpler when the value is known to be the right type. You can operate on it right with no defensive `isinstance`.
 
-It is also safer. An after validator cannot receive an arbitrary object, so it cannot fail in surprising ways on input it never anticipated.
+It's also safer. An after checker can't receive an any object. It can't fail in surprising ways on input it never anticipated.
 
 ## before: fixing the shape
 
-A before validator sees the raw input. Nothing has been checked, so the value could be anything.
+A before checker sees the raw input. Nothing has been checked. The value could be anything.
 
-Its purpose is repairing the *shape* of data before normal validation gets to it. The canonical case is a field that should be a list, from a caller that sends a comma-separated string:
+Its purpose is repairing the *shape* of data before normal check gets to it. The canonical case is a field that should be a list, from a caller that sends a comma-split string:
 
 ```python
 def split_csv(v):
     return [p.strip() for p in v.split(",")] if isinstance(v, str) else v
 ```
 
-In after mode this code would never run. A string is not a list, so validation fails at step 2 and step 4 is never reached. This is the single most common validator mistake, and the symptom &mdash; "my validator is not being called" &mdash; sounds like a bug in Pydantic rather than a mode choice.
+In after mode this code would never run. A string isn't a list. Check fails at step 2 and step 4 is never reached. This is the single most common checker mistake. The symptom. "my checker isn't being called". Sounds like a bug in Pydantic rather than a mode choice.
 
-Two rules for before validators, both consequences of receiving unchecked input. Guard with `isinstance` rather than assuming a type. And return anything you do not handle unchanged, so normal validation still runs on it.
+Two rules for before checkers, both results of receiving unchecked input. Guard with `isinstance` rather than given a type. And return anything you don't handle unchanged. Normal check still runs on it.
 
-Keep them small. Complex logic operating on unvalidated input is hard to reason about, and errors raised there lack the context that makes Pydantic's messages useful.
+Keep them small. Complex logic operating on unvalidated input is hard to reason about. Errors raised there lack the context that makes Pydantic's messages handy.
 
 ## plain: taking over
 
-A plain validator replaces validation for that field. No coercion runs, no constraints are checked, and whatever it returns becomes the value &mdash; unvalidated.
+A plain checker replaces check for that field. No coercion runs, no constraints are checked. What it returns turns the value &mdash; unvalidated.
 
 ```python
 minutes: Annotated[int, PlainValidator(parse_duration)]
 ```
 
-The annotation still says `int`, and that now serves as documentation and as the schema type rather than as something enforced. Your function is entirely responsible for producing an integer.
+The annotation still says `int`, and that now serves as docs and as the schema type rather than as a thing enforced. Your function is fully in charge for making an int.
 
-This is the right tool for a genuinely custom input format: durations like `"1h30m"`, a coordinate string, a domain-specific identifier. Trying to express those with before validators plus normal coercion is more convoluted than simply owning the parse.
+This is the right tool for a truly custom input format. Durations like `"1h30m"`, a coord string, a domain-exact identifier. Trying to express those with before checkers plus normal coercion is more convoluted than simply owning the parse.
 
-The cost is that you have taken on the whole job, including producing sensible errors. Raise `ValueError` for bad input rather than returning something wrong, or you have built a field that silently accepts nonsense.
+The cost is that you've taken job, including making sensible errors. Raise `ValueError` for bad input rather than returning a thing wrong, or you've built a field that silently accepts nonsense.
 
 ## wrap: around the outside
 
-A wrap validator receives the value *and* a handler that performs the normal validation. That lets it act before, after, and instead of:
+A wrap checker receives the value *and* a handler that performs the normal check. That lets it act before, after, and instead of:
 
 ```python
 def default_on_failure(v, handler):
@@ -243,33 +229,33 @@ def default_on_failure(v, handler):
         return 0
 ```
 
-The main uses are supplying a fallback instead of failing, adding context to an error before re-raising, and short-circuiting expensive validation for a known-good sentinel.
+The main uses are supplying a fallback instead of failing, adding context to an error before re-raising. Short-circuiting costly check for a known-good sentinel.
 
-Use it sparingly, and be honest about the fallback case. Swallowing a `ValidationError` and substituting a default is a decision to lose information: the caller sent something wrong and will never know. That is occasionally right &mdash; a metrics field where a bad value should not fail the whole request &mdash; and frequently a way to hide a bug for months.
+Use it sparingly, and be honest about the fallback case. Swallowing a `ValidationError` and substituting a default is a choice to lose data. The caller sent a thing wrong and will never know. That is at times right. A metrics field where a bad value shouldn't fail the whole request. And often a way to hide a bug for months.
 
 ## Order
 
-Several validators of the same kind run in the order written. Read the annotation left to right and you are reading the pipeline top to bottom.
+a few checkers of the same kind run in the order written. Read the annotation left to right and you're reading the pipeline top to bottom.
 
-Mixed kinds follow the sequence: all before validators, then coercion and constraints, then all after validators.
+Mixed kinds follow the sequence: all before checkers, then coercion and constraints, then all after checkers.
 
-That makes a normalise-then-check type read naturally:
+That makes a norm-then-check type read on its own:
 
 ```python
 Slug = Annotated[str, BeforeValidator(to_slug), Field(pattern=r"^[a-z0-9_]+$")]
 ```
 
-Normalise, then coerce, then check. Swap the order of the metadata and the intent changes.
+Norm, then coerce, then check. Swap the order of the metadata and the intent changes.
 
 ## Two spellings
 
-Everything here exists in both forms.
+all here exists in both forms.
 
-`Annotated[T, BeforeValidator(f)]` makes the rule part of a type, so it is reusable across models. This is the better default for anything a second model will ever need.
+`Annotated[T, BeforeValidator(f)]` makes the rule part of a type. It's reusable across models. This is the better default for anything a second model will ever need.
 
-`@field_validator("x", mode="before")` attaches the rule to one model. Better when the logic is genuinely specific to that model, or when it needs `info.data` to see other fields &mdash; which the `Annotated` form does not provide.
+`@field_validator("x", mode="before")` attaches the rule to one model. Better when the logic is truly exact to that model, or when it needs `info.data` to see other fields. Which the `Annotated` form doesn't provide.
 
-`model_validator` also takes `mode`, with `before` receiving the whole raw payload and `after` receiving the finished model. Same vocabulary, model-wide scope.
+`model_validator` also takes `mode`, with `before` receiving the whole raw payload and `after` receiving the finished model. Same vocab, model-wide scope.
 
 ## Choosing
 
@@ -283,99 +269,99 @@ Ask what the value looks like when your logic needs to see it.
 
 **Need to catch or replace a failure** &mdash; wrap.
 
-And when a validator does not seem to run, check the mode first. It is the answer far more often than anything else.
+And when a checker doesn't seem to run, check the mode first. It's the answer far more often than anything else.
 
 ## A worked example
 
-A duration field accepting `90`, `"90"` and `"1h30m"`, rejecting nonsense, and constrained to a sensible range.
+A duration field accepting `90`, `"90"` and `"1h30m"`, rejecting nonsense. Constrained to a sensible range.
 
-`plain` is the honest choice: the input format is not something coercion can be expected to handle, and taking over the parse is clearer than a chain of before-validators trying to massage `"1h30m"` into something `int()` will accept.
+`plain` is the honest choice: the input format isn't a thing coercion can be expected to handle. Taking over the parse is clearer than a chain of before-checkers trying to massage `"1h30m"` into a thing `int()` will accept.
 
-Since a plain validator skips constraints, the range check moves into the function or into a separate after validator. That is the trade: full control over parsing, full responsibility for everything downstream of it.
+Since a plain checker skips constraints, the range check moves into the function or into a split after checker. That is the trade. Full control over parsing, full job for all downstream of it.
 
 ## Modes on model validators
 
-The same vocabulary applies at model level, with different scope.
+The same vocab applies at model level, with other scope.
 
-`model_validator(mode="before")` receives the raw input for the whole payload &mdash; usually a dict, but it can be anything. It is a classmethod, and it returns the data to be validated. Use it to translate a legacy shape or fill in a derived key before field validation runs.
+`model_validator(mode="before")` receives the raw input for the whole payload. Often a dict. It can be anything. It's a classmethod. It returns the data to be checked. Use it to translate a legacy shape or fill in a derived key before field check runs.
 
 `model_validator(mode="after")` receives the finished model as `self` and returns it. This is where cross-field rules belong.
 
-There is a `mode="wrap"` at model level too, receiving the payload and a handler, which can catch a whole-model failure and substitute something. It is rare and powerful; the same caution about swallowing errors applies.
+There's a `mode="wrap"` at model level too, receiving the payload and a handler. This Can catch a whole-model failure and substitute a thing. It's rare and powerful. The same caution about swallowing errors applies.
 
 ## What each mode can and cannot do
 
 Worth a table in your head.
 
-A **before** validator can change the shape, cannot rely on the type, and its errors carry less context because nothing has been located yet.
+A **before** checker can change the shape, can't lean on the type. Its errors carry less context because nothing has been located yet.
 
-An **after** validator can rely on the type, cannot repair a shape that already failed, and gets good error locations for free.
+An **after** checker can lean on the type, can't repair a shape that already failed. Gets good error locations for free.
 
-A **plain** validator controls everything and inherits nothing &mdash; no coercion, no constraints, so anything you want enforced you must enforce yourself.
+A **plain** checker controls all and takes from nothing. No coercion, no constraints. Anything you want enforced you must enforce yourself.
 
-A **wrap** validator can do all of the above and is the only one that can observe a failure and decide what to do about it.
+A **wrap** checker can do all of the above and is the only one that can see a failure and decide what to do about it.
 
 ## Debugging when a validator misbehaves
 
-Three questions, in order, that resolve nearly every case.
+Three questions, in order, that resolve nearly each case.
 
-**Is it running at all?** Put a `print` at the top. If nothing appears, the mode is wrong &mdash; almost always an after validator whose input failed coercion first.
+**Is it running at all?** Put a `print` at the top. If nothing appears, the mode is wrong. Almost always an after checker whose input failed coercion first.
 
-**What type is it receiving?** Print `type(v)`. A before validator gets raw input and an after validator gets the coerced value; assuming the wrong one is the second most common mistake.
+**What type is it receiving?** Print `type(v)`. A before checker gets raw input and an after checker gets the coerced value. given the wrong one is the second most common mistake.
 
-**Is it returning?** A validator with no `return` sets the field to `None`, silently. If a field becomes `None` after you added a validator, that is the cause.
+**Is it returning?** A checker with no `return` sets the field to `None`, silently. If a field turns `None` after you added a checker, that is the cause.
 
 ## Constraints still run in the middle
 
-A detail that is easy to forget: `Field` constraints sit between the two validator slots.
+A detail that is easy to forget: `Field` constraints sit between the two checker slots.
 
-So `Annotated[int, BeforeValidator(f), Field(gt=0), AfterValidator(g)]` runs `f` on raw input, coerces, checks `> 0`, then runs `g`. An after validator never sees a value that failed a constraint, because the constraint raised first.
+So `Annotated[int, BeforeValidator(f), Field(gt=0), AfterValidator(g)]` runs `f` on raw input, coerces, checks `> 0`, then runs `g`. An after checker never sees a value that failed a constraint. The constraint raised first.
 
-That is usually convenient &mdash; the after validator can assume the bounds hold &mdash; and occasionally the reason a validator meant to *fix* an out-of-range value never runs. Clamping belongs in `before`, or in the constraint's absence.
+That is often convenient &mdash; the after checker can assume the bounds hold &mdash; and at times the reason a checker meant to *fix* an out-of-range value never runs. Clamping belongs in `before`, or in the constraint's lack.
 
 ## Performance
 
-Validators are Python, and Python is the slow part of an otherwise Rust pipeline.
+checkers are Python, and Python is the slow part of an else Rust pipeline.
 
-For a model built a few times per request this is irrelevant. For validating a large collection it is the dominant cost, because each item's validators are a round trip out of the core and back.
+For a model built a few times per request this is irrelevant. For checking a large set it's the dominant cost. Each item's checkers are a round trip out of the core and back.
 
-If profiling points at validation on a hot path, the questions are: can this rule be a constraint instead, since constraints run in Rust; and is the validator doing work that could be done once outside rather than per item. A validator that rebuilds a set of permitted values on every call is a common and easily fixed version of the second.
+If profiling points at check on a hot path, the questions are. Can this rule be a constraint instead. Constraints run in Rust. And is the checker doing work that could be done once outside rather than per item. A checker that rebuilds a set of permitted values on each call is a common and easily fixed version of the second.
 
 ## Summary
 
-Four slots around one pipeline: before, coerce, constrain, after. `plain` replaces the pipeline; `wrap` surrounds it.
+Four slots around one pipeline: before, coerce, constrain, after. `plain` replaces the pipeline. `wrap` surrounds it.
 
-Choose by asking what the value looks like when your logic needs to see it. When a validator does not run, check the mode before anything else. And remember that constraints sit between the two ordinary slots, so an after validator only ever sees values that already passed them.
+Choose by asking what the value looks like when your logic needs to see it. When a checker doesn't run, check the mode before anything else. And note that constraints sit between the two plain slots. An after checker only ever sees values that already passed them.
 
 ## The mental model
 
 One sentence holds most of it: **before sees what arrived, after sees what it became.**
 
-Everything else follows. A validator repairing a shape must run before, because after the shape has already failed. A validator checking meaning should run after, because it can then rely on the type. Constraints sit between them, so an after validator never sees a value that broke one.
+all else follows. A checker repairing a shape must run before. After the shape has already failed. A checker checking meaning should run after, because it can then lean on the type. Constraints sit between them. An after checker never sees a value that broke one.
 
-`plain` and `wrap` step outside that sequence &mdash; one replacing it, the other surrounding it &mdash; and both are for cases where the standard pipeline is not what you want at all.
+`plain` and `wrap` step outside that sequence. One replacing it, the other nearby it. And both are for cases where the standard pipeline isn't what you want at all.
 
 Keep the sentence and the rest is derivable.
 
 
 ## Mistakes people make
 
-**Shape-fixing logic in after mode.** The single most common, and it presents as "my validator never runs". The value failed coercion at step two and step four was never reached.
+**Shape-fixing logic in after mode.** The single most common. It presents as "my checker never runs". The value failed coercion at step two and step four was never reached.
 
-**Assuming the type in a before validator.** It receives raw input, which can be anything at all. Guard with `isinstance` and pass through unchanged whatever you do not handle, so the normal path still runs.
+**given the type in a before checker.** It receives raw input. This Can be anything at all. Guard with `isinstance` and pass through unchanged what you don't handle. The normal path still runs.
 
-**Forgetting to return.** Silent, and it sets the field to `None`. If a field mysteriously becomes `None` after a validator is added, this is why.
+**Losing to return.** Silent, and it sets the field to `None`. If a field mysteriously turns `None` after a checker is added, this is why.
 
-**Expecting constraints to run after a plain validator.** `plain` replaces the pipeline entirely: no coercion and no constraints. Anything you want enforced is now yours to enforce.
+**Expecting constraints to run after a plain checker.** `plain` replaces the pipeline fully. No coercion and no constraints. Anything you want enforced is now yours to enforce.
 
-**Swallowing errors in a wrap validator.** Catching a `ValidationError` and substituting a default is a decision to lose information &mdash; the caller sent something wrong and will never be told. Occasionally correct, frequently a bug hidden for months.
+**Swallowing errors in a wrap checker.** Catching a `ValidationError` and substituting a default is a choice to lose data. The caller sent a thing wrong and will never be told. at times correct, often a bug hidden for months.
 
-**Rebuilding data inside a validator on every call.** A validator that constructs a set of permitted values each time it runs does that work once per item validated. Hoist it out; on a large collection it is the dominant cost.
+**Rebuilding data inside a checker on each call.** A checker that makes a set of permitted values each time it runs does that work once per item checked. Hoist it out. On a large set it's the dominant cost.
 
 ## A closing note
 
-Nearly every question about validators reduces to a question about position.
+Nearly each question about checkers reduces to a question about spot.
 
-Not "how do I write this rule" but "where in the sequence does it need to sit". Once that is settled the code is usually short and obvious, and when a validator behaves strangely the position is almost always what is wrong.
+Not "how do I write this rule" but "where in the sequence does it need to sit". Once that is settled the code is often short and obvious. When a checker behaves strangely the spot is almost always what is wrong.
 
-Before, coerce, constrain, after. Four slots, one order, and everything else follows from knowing which one you are in.
+Before, coerce, constrain, after. Four slots, one order. All else follows from knowing which one you're in.

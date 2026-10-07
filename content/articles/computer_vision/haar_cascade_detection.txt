@@ -1,49 +1,47 @@
 title: Haar Cascade Detection Models
-intro: Three ideas, stacked, that put face detection on a 700 MHz laptop in 2001.
+intro: Three ideas, stacked, that put face spotting on a 700 MHz laptop in 2001.
 
 ## The problem is the number of windows
 
-A detector has to answer one question &mdash; is there a face here? &mdash;
-at every position and every scale in the image. For a 384&times;288 frame,
+A finder has to answer one question. Is there a face here? &mdash;
+at each spot and each scale in the image. For a 384&times;288 frame,
 scanning with a 24&times;24 window at 11 scales gives roughly **180,000
-windows**. At 15 frames per second that is 2.7 million classifications every
-second, and in effect all of them will be answered "no".
+windows**. At 15 frames per second that is 2.7 million classifications each
+second, and all of them will be answered "no".
 
-That framing explains the whole design. Viola and Jones did not build an
+That framing shows the whole design. Viola and Jones didn't build an
 accurate face classifier and then speed it up. They built a system whose cost
 is dominated by how quickly it can say *no*, and then made saying no almost
 free.
-
-Three ideas make it possible. Rectangle features computed in constant time from an integral image, a boosted cascade that rejects most windows in two or three checks, and a scanning strategy that covers every position and scale. This page walks through all three, shows why the cascade ordering matters more than the features themselves, and compares the approach to what has replaced it.
 
 ## Idea one: features that are rectangle differences
 
 A Haar-like feature takes two or more adjacent rectangles, sums the pixel
 values inside each, and subtracts. The two-rectangle feature stacked
-vertically is a horizontal edge detector; the three-rectangle feature is a
+vertically is a flat edge finder. The three-rectangle feature is a
 light band between two dark ones.
 
 Drag the feature in the explorer onto the eye region and the response jumps,
 because the eye band really is darker than the cheek below it. Drag it onto
-the background and the two halves are nearly equal, so the response collapses
-toward zero. That is the entire feature &mdash; a subtraction &mdash; and it
+the background and the two halves are nearly equal, so the response merges
+toward zero. That is the entire feature. A subtraction &mdash; and it
 is chosen for one reason: a rectangle sum can be made free.
 
-There are a lot of these. In a 24&times;24 window, counting every position and
-every size of every prototype gives **more than 160,000 features**, which is
-far more numbers than there are pixels in the window. The point is not that
-each one is good. It is that a few hundred of them, chosen well, are.
+There are a lot of these. In a 24&times;24 window, counting each spot and
+each size of each prototype gives **more than 160,000 features**, which is
+far more numbers than there are pixels in the window. The point isn't that
+each one is good. It's that a few hundred of them, chosen well, are.
 
 ## Idea two: the integral image
 
 The integral image is a table the same size as the image where each entry
-holds the sum of everything above and to the left of it:
+holds the sum of all above and to the left of it:
 
 ```
 ii(x, y) = sum of i(x', y') for all x' <= x and y' <= y
 ```
 
-It is built in a single pass. Once it exists, the sum inside *any* axis-aligned
+It's built in a single pass. Once it exists, the sum inside *any* axis-aligned
 rectangle is:
 
 ```
@@ -51,46 +49,46 @@ sum = ii(D) - ii(B) - ii(C) + ii(A)
 ```
 
 where A, B, C, D are the rectangle's four corners. Four lookups, three
-arithmetic operations, and &mdash; this is the part that matters &mdash;
-**the cost does not depend on the size of the rectangle**. A 4&times;4 patch
-and a 200&times;200 patch cost exactly the same.
+math ops, and &mdash; this is the part that matters &mdash;
+**the cost doesn't depend on the size of the rectangle**. A 4&times;4 patch
+and a 200&times;200 patch cost just the same.
 
 The explorer prints the four corner values and the subtraction for the
-rectangle you have placed. Make the feature ten times larger and the four
-numbers change; the amount of work does not.
+rectangle you've placed. Make the feature ten times larger and the four
+numbers change. The amount of work doesn't.
 
-Two consequences follow immediately. Features of any size are affordable, so
-the detector never has to resize the image to handle different face sizes
-&mdash; it scales the *feature* instead, which is a change to four
-coordinates. And a two-rectangle feature costs six lookups rather than
+Two consequences follow right away. Features of any size are affordable, so
+the finder never has to resize the image to handle different face sizes
+&mdash; it scales the *feature* instead. This Is a change to four
+coords. And a two-rectangle feature costs six lookups rather than
 hundreds of additions, which brings the per-window cost into a range where
-evaluating a few hundred features is realistic.
+testing a few hundred features is realistic.
 
 ## Idea three: AdaBoost picks the few hundred that matter
 
-Of the 160,000 candidate features, almost all are useless. AdaBoost is used as
+Of the 160,000 pick features, almost all are useless. AdaBoost is used as
 a feature selector: each round, it picks the single feature and threshold that
 best classifies the training set under the current sample weights, then
-increases the weight on the examples that feature got wrong so the next round
+grows the weight on the examples that feature got wrong so the next round
 has to attend to them.
 
-Each selected feature becomes a *weak classifier* &mdash; a threshold on one
+Each selected feature turns a *weak classifier*. A threshold on one
 rectangle difference, right maybe 60&ndash;70% of the time. The boosted sum of
 a few hundred of them is a strong classifier.
 
-The paper's first two features are worth knowing because they are so
-interpretable. The first compares the eye region against the region just below
-it, because the eyes are darker than the upper cheeks. The second compares the
+The paper's first two features are worth knowing because they're so
+readable. The first checks the eye region against the region just below
+it, because the eyes are darker than the upper cheeks. The second checks the
 eyes against the bridge of the nose between them, because the bridge is
-lighter. Both are placed and sized by the training procedure, not by a person,
-and both are exactly what a human would have picked.
+lighter. Both are placed and sized by the training method, not by a person,
+and both are just what a human would have picked.
 
 ## The cascade: spend nothing on the easy negatives
 
 A single strong classifier of 200 features applied to 180,000 windows is 36
-million feature evaluations per frame. Too slow. The insight is that
+million feature tests per frame. Too slow. The insight is that
 overwhelming majority of windows are trivially not faces &mdash; flat sky,
-blank wall &mdash; and do not need 200 features to settle.
+blank wall &mdash; and don't need 200 features to settle.
 
 So the classifiers are arranged in stages, cheapest first, and a window is
 discarded the instant any stage rejects it:
@@ -102,33 +100,33 @@ discarded the instant any stage rejects it:
 | 3&ndash;5 | 25&ndash;50 each | harder background |
 | 6&ndash;38 | 50&ndash;200 each | face-like non-faces |
 
-Each stage is tuned to a very high detection rate &mdash; around 99.9% &mdash;
-and a modest false-positive rate, around 50%. Chained, the detection rates
-multiply to something acceptable (0.999<sup>38</sup> is still about 96%) while
-the false-positive rates multiply to something tiny (0.5<sup>38</sup>).
+Each stage is tuned to a very high spotting rate &mdash; around 99.9% &mdash;
+and a modest false-positive rate, around 50%. Chained, the spotting rates
+times to a thing acceptable (0.999<sup>38</sup> is still about 96%) while
+the false-positive rates times to a thing tiny (0.5<sup>38</sup>).
 
-The final detector has **38 stages and 6,061 features**, and the *average*
-window is rejected after about ten feature evaluations. Move the stage slider
+The final finder has **38 stages and 6,061 features**, and the *mean*
+window is rejected after about ten feature tests. Move the stage slider
 in the explorer and watch the surviving-window count fall off a cliff at the
 first stage: that first drop is where the speed comes from, and it costs two
 features.
 
 ## What it is still good for, and what it is not
 
-Haar cascades are not competitive with a CNN detector on accuracy. They are
+Haar cascades aren't competitive with a CNN finder on fit. They're
 sensitive to pose &mdash; the classic frontal-face model degrades sharply past
-about 15&deg; of rotation &mdash; and to lighting, and they produce
-characteristic false positives on textures that happen to contain a
+about 15&deg; of rotation &mdash; and to lighting, and they give
+trait false positives on textures that happen to hold a
 dark-light-dark band.
 
-But they still ship, and for reasons that have not gone away:
+But they still ship, and for reasons that haven't gone away:
 
 - **They run anywhere.** No GPU, no framework, a few hundred kilobytes of
-  model. On a microcontroller or an old browser this is sometimes the only
+  model. On a microcontroller or an old browser this is at times the only
   option.
-- **They are deterministic and inspectable.** When one fires wrongly you can
+- **They're deterministic and inspectable.** When one fires wrongly you can
   find the feature that did it.
-- **They are a training-free dependency.** `cv2.CascadeClassifier` with a
+- **They're a training-free dependency.** `cv2.CascadeClassifier` with a
   shipped XML file is three lines and no data collection.
 
 ```python
@@ -147,65 +145,65 @@ faces = detector.detectMultiScale(
 ```
 
 `scaleFactor` is the scale pyramid: 1.05 is slower and finds more, 1.3 is
-faster and misses small faces. `minNeighbors` is the crude non-maximum
+faster and misses small faces. `minNeighbors` is the crude non-max
 suppression &mdash; raise it to kill false positives, lower it if real faces
 are being dropped. Those two knobs are most of what tuning a cascade consists
 of.
 
 ## Two knobs and the failure each one causes
 
-Almost every complaint about a cascade traces back to `scaleFactor` or
+Almost each complaint about a cascade traces back to `scaleFactor` or
 `minNeighbors`, and the two fail in opposite directions.
 
 `scaleFactor` is the ratio between successive search scales. At 1.05 the
-detector tries about twenty scales between the smallest and largest face it
-looks for; at 1.4 it tries five. The faces that fall *between* two scales are
-the ones that get missed, so a large factor is fast and produces the
-characteristic "it saw him last frame and not this one" flicker. There is no
+finder tries about twenty scales between the smallest and largest face it
+looks for. At 1.4 it tries five. The faces that fall *between* two scales are
+the ones that get missed. So A large factor is fast and makes the
+trait "it saw him last frame and not this one" flicker. There's no
 free lunch here: the cost is roughly proportional to the number of scales.
 
-`minNeighbors` is the crude duplicate-removal step. A real face produces a
-cluster of overlapping detections at neighbouring positions and scales, and a
-spurious one usually produces a single isolated hit. Requiring several
-overlapping detections before reporting one therefore filters most false
+`minNeighbors` is the crude duplicate-removal step. A real face makes a
+cluster of shared detections at neighbouring spots and scales, and a
+spurious one often makes a single isolated hit. needing a few
+shared detections before reporting one so filters most false
 positives &mdash; and deletes any real face that only just cleared the cascade,
-which is exactly the small, dark or partly-turned one you wanted. Setting it to
+which is just the small, dark or partly-turned one you wanted. Setting it to
 0 returns the raw hits and is worth doing once to see how many there are.
 
 The third setting that matters and gets left at its default is `minSize`. A
-detector searching for 20&times;20 faces in a 4K frame is scanning tens of
-millions of windows for something that is never there. Setting a realistic
+finder searching for 20&times;20 faces in a 4K frame is scanning tens of
+millions of windows for a thing that is never there. Setting a realistic
 floor is often a larger speed-up than either of the other two.
 
 ## The line to draw from here
 
-Every idea here reappears later in a different costume. The cascade is the
-ancestor of the two-stage detector: propose cheaply, verify expensively, which
-is exactly what R-CNN and its descendants do. The integral image is the
-ancestor of every "precompute a summed table so the query is O(1)" trick in
+each idea here reappears later in a different costume. The cascade is the
+ancestor of the two-stage finder: propose cheaply, verify expensively, which
+is just what R-CNN and its descendants do. The integral image is the
+ancestor of each "precompute a summed table so the query is O(1)" trick in
 vision. And the rectangle features are, in an uncomfortably direct sense, a
 hand-designed first convolutional layer &mdash; a small set of local
-difference filters, applied everywhere, whose responses are thresholded and
-combined. The difference is that the next twenty years were spent learning
+difference filters, applied all over, whose responses are thresholded and
+mixed. The difference is that the next twenty years were spent learning
 those filters rather than enumerating them.
 ## Questions people ask
 
-<strong>Why does it fail on a face that is only slightly turned?</strong> Because the features encode a fixed brightness layout &mdash; a dark eye band above a lighter cheek, a light nose bridge between two darker eyes. Rotating the head moves those rectangles relative to each other and the responses the cascade thresholds on collapse. Past roughly 15&deg; the frontal model degrades sharply, and the usual answer is a second cascade trained on profiles rather than a fix to the first.
+<strong>Why does it fail on a face that is only slightly turned?</strong> Because the features encode a fixed brightness layout. A dark eye band above a lighter cheek, a light nose bridge between two darker eyes. Rotating the head moves those rectangles scaled to each other and the responses the cascade thresholds on collapse. Past roughly 15&deg; the frontal model degrades sharply. The usual answer is a second cascade trained on profiles rather than a fix to the first.
 
-<strong>Can it find faces smaller than 24&times;24?</strong> No. The search grows the window from the trained size upward and never shrinks below it, so 24&times;24 is the floor. Distant faces in a wide shot need the frame upsampled first, and doubling the image quadruples the window count.
+<strong>Can it find faces smaller than 24&times;24?</strong> No. The search grows the window from the trained size upward and never shrinks below it. 24&times;24 is the floor. Distant faces in a wide shot need the frame upsampled first. Doubling the image quadruples the window count.
 
-<strong>Is the integral image an approximation?</strong> No, it is exact. It is a cumulative sum, so the four-corner formula recovers any rectangle's total precisely in integer arithmetic. The costs are one extra table per frame and a wide enough integer type &mdash; a 1080p frame of 8-bit pixels sums to about 5&times;10<sup>8</sup>, which is why these tables are 32-bit or wider.
+<strong>Is the integral image an guess?</strong> No, it's exact. It's a cumulative sum. The four-corner formula recovers any rectangle's total just in int math. The costs are one extra table per frame and a wide enough int type. A 1080p frame of 8-bit pixels sums to about 5&times;10<sup>8</sup>. This Is why these tables are 32-bit or wider.
 
-<strong>Why grayscale?</strong> The feature is a brightness difference, so colour carries nothing it can read. Converting once per frame also makes the integral image a third of the size.
+<strong>Why grayscale?</strong> The feature is a brightness difference. Colour carries nothing it can read. Converting once per frame also makes the integral image a third of the size.
 
-<strong>Why does it fire on things that are obviously not faces?</strong> Each stage is tuned for about 99.9% detection at roughly 50% false positives &mdash; the guarantee lives in the product across 38 stages, not in any one of them. And a dark-light-dark band is exactly what the early features test, so bookshelves and railings genuinely do excite them. With 180,000 windows per frame even a tiny per-window rate leaves survivors, which is what `minNeighbors` is for.
+<strong>Why does it fire on things that are obviously not faces?</strong> Each stage is tuned for about 99.9% spotting at roughly 50% false positives. The ensure lives in the product across 38 stages, not in any one of them. And a dark-light-dark band is just what the early features test. Bookshelves and railings truly do excite them. With 180,000 windows per frame even a tiny per-window rate leaves survivors. This Is what `minNeighbors` is for.
 
-<strong>Should I train my own cascade?</strong> Rarely, now. `opencv_traincascade` wants thousands of positives and tens of thousands of negatives and can run for days, and the result still inherits the pose sensitivity. If the object is rigid, near-frontal and inference has to be CPU-only it is viable; otherwise fine-tuning a small CNN detector is less work and better.
+<strong>Should I train my own cascade?</strong> Rarely, now. `opencv_traincascade` wants thousands of positives and tens of thousands of negatives and can run for days. The result still inherits the pose sensitivity. If the object is rigid, near-frontal and inference has to be CPU-only it's viable. Or else fine-tuning a small CNN finder is less work and better.
 
 ## Recap in one screen
 
 - One feature is a subtraction: the mean under the white rectangles minus the mean under the black ones.
-- The integral image makes any rectangle sum four lookups regardless of size, which is why the detector scales the *feature* rather than the image.
-- AdaBoost is used as a feature selector over more than 160,000 candidates; the shipped detector keeps 6,061 of them across 38 stages.
-- The cascade is where the speed lives: stage one costs two features and removes about half of all windows, and the average window dies after about ten.
-- It assumes a fixed brightness layout, so it is a controlled-pose detector. Everything after it learned the filters instead of enumerating them.
+- The integral image makes any rectangle sum four lookups even so of size. This Is why the finder scales the *feature* rather than the image.
+- AdaBoost is used as a feature selector over more than 160,000 picks. The shipped finder keeps 6,061 of them across 38 stages.
+- The cascade is where the speed lives. Stage one costs two features and drops about half of all windows. The mean window dies after about ten.
+- It assumes a fixed brightness layout. It's a controlled-pose finder. All after it learned the filters instead of enumerating them.

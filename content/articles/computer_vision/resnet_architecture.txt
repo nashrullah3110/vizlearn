@@ -1,16 +1,16 @@
 title: ResNet
-intro: One block type, four stage depths, and the parameter counts everyone quotes fall straight out of the description.
+intro: One block type, four stage depths. The param counts everyone quotes fall straight out of the description.
 
 ## Not five architectures, one
 
-ResNet-18, -34, -50, -101 and -152 are usually presented as a table of five
-models. They are better understood as a single design with two parameters: the
+ResNet-18, -34, -50, -101 and -152 are often presented as a table of five
+models. They're better understood as a single design with two params: the
 block type, and how many blocks go in each of four stages.
 
-Everything else is fixed. The stem is a 7&times;7 stride-2 convolution to 64
+All else is fixed. The stem is a 7&times;7 stride-2 convolution to 64
 channels followed by a 3&times;3 stride-2 max pool, which takes 224&times;224
 down to 56&times;56 in two steps. Then four stages at widths 64, 128, 256, 512,
-each halving the spatial size and doubling the width. Then global average
+each halving the spatial size and doubling the width. Then global mean
 pooling and one dense layer to the class count.
 
 | Model | Blocks per stage | Block type | Parameters | MACs @ 224 |
@@ -21,125 +21,125 @@ pooling and one dense layer to the class count.
 | ResNet-101 | 3, 4, 23, 3 | bottleneck | 44.55 M | 7.80 G |
 | ResNet-152 | 3, 8, 36, 3 | bottleneck | 60.19 M | 11.51 G |
 
-Every figure in that table is computed by the explorer from the description
+each figure in that table is found by the explorer from the description
 above it, not typed in. Change the depth and watch them move. The point of
-saying so is that if the arithmetic on this page agreed with the paper by
-coincidence you would have no way to tell.
+saying so is that if the math on this page agreed with the paper by
+coincidence you'd have no way to tell.
 
 Note the pair 34 and 50: **same block counts, different block type**. Going
-from basic to bottleneck adds 16 weighted layers and only 3.8 M parameters,
+from basic to bottleneck adds 16 weighted layers and only 3.8 M params,
 because a bottleneck block does its 3&times;3 at a quarter of the width.
 
 ## The block, and why the addition is the point
 
-A plain deep network computes `y = F(x)`. A residual block computes:
+A plain deep network finds `y = F(x)`. A residual block finds:
 
 ```
 y = F(x) + x
 ```
 
-`F` is two or three convolutions with normalisation and ReLU. The `+ x` is an
+`F` is two or three convolutions with norming and ReLU. The `+ x` is an
 identity shortcut carrying the input around them unchanged.
 
-The paper's motivation is a negative result, and it is worth stating properly
-because it is often mis-stated. A 56-layer plain network had *higher training
-error* than a 20-layer one. That is not overfitting &mdash; overfitting would
-show as lower training error and higher test error. It is a **degradation**
-problem: the deeper network could in principle represent everything the
-shallower one does, by making the extra layers compute the identity, and
-optimisation was not finding that solution.
+The paper's motivation is a minus result, and it's worth stating properly
+because it's often mis-stated. A 56-layer plain network had *higher training
+error* than a 20-layer one. That isn't overfitting &mdash; overfitting would
+show as lower training error and higher test error. It's a **degradation**
+problem: the deeper network could in principle represent all the
+shallower one does, by making the extra layers find the identity, and
+optimisation wasn't finding that answer.
 
-Residual connections make the identity the default rather than something to be
-discovered. If `F` outputs zero, the block is the identity exactly, and driving
+Residual links make the identity the default rather than a thing to be
+found. If `F` outputs zero, the block is the identity just, and driving
 a stack of weights to zero is a far easier thing for gradient descent to do
-than driving them to whatever configuration happens to reproduce the input.
+than driving them to what configuration happens to copy the input.
 
-The gradient argument follows from the same equation. Differentiating,
-`dy/dx = dF/dx + 1`. The `+1` means the gradient reaching `x` can never be
-smaller than the gradient at `y` by more than `dF/dx` allows &mdash; there is
-always a path back with a derivative of exactly 1. Deep plain stacks vanish
-because every layer multiplies the gradient by something usually less than one,
-and a hundred such multiplications is zero. There is no such product along the
+The grad arg follows from the same equation. Differentiating,
+`dy/dx = dF/dx + 1`. The `+1` means the grad reaching `x` can never be
+smaller than the grad at `y` by more than `dF/dx` allows &mdash; there's
+always a path back with a deriv of just 1. Deep plain stacks vanish
+because each layer times the grad by a thing often less than one,
+and a hundred such times is zero. There's no such product along the
 shortcut.
 
 ## When the shortcut cannot be the identity
 
-`y = F(x) + x` requires `F(x)` and `x` to have the same shape. At the first
-block of stages 2, 3 and 4 they do not: the stride is 2, so the spatial size
+`y = F(x) + x` needs `F(x)` and `x` to have the same shape. At the first
+block of stages 2, 3 and 4 they don't: the stride is 2, so the spatial size
 halves, and the width doubles.
 
 Open stage 2 in the explorer and the shortcut is drawn dashed and labelled
-**1&times;1 projection**. That is a stride-2 1&times;1 convolution whose only
-job is to make the shapes match. It has parameters, it is trained, and it is
-the one place the "clean identity path" argument does not literally hold. There
-is one per stage and they are a small fraction of the model &mdash; but if you
-implement a residual block yourself, this is the part that will be wrong.
+**1&times;1 map**. That is a stride-2 1&times;1 convolution whose only
+job is to make the shapes match. It has params, it's trained, and it's
+the one place the "clean identity path" arg doesn't truly hold. There
+is one per stage and they're a small fraction of the model &mdash; but if you
+run a residual block yourself, this is the part that will be wrong.
 
-The other implementation detail people get wrong: **do not put a ReLU on the
+The other setup detail people get wrong: **don't put a ReLU on the
 shortcut path**, and add before the final activation, not after. The paper's
-own follow-up on identity mappings tested the alternatives and found that
-anything obstructing the shortcut &mdash; a ReLU, a scaling, a gate &mdash;
+own follow-up on identity mappings tested the options and found that
+any of it obstructing the shortcut. A ReLU, a scaling, a gate &mdash;
 makes very deep networks harder to train, not easier.
 
 ## Where the budget goes
 
-Look at the MACs-per-stage bars in the explorer. They are nearly level across
-the four stages, while the parameter counts quadruple from stage to stage.
+Look at the MACs-per-stage bars in the explorer. They're nearly level across
+the four stages, while the param counts quadruple from stage to stage.
 
 That is a direct consequence of the halve-and-double rule. Halving each spatial
-dimension quarters the number of positions; doubling the width quadruples the
-per-position cost of a convolution (both input and output channels double). The
-two cancel. Meanwhile the parameter count depends only on the channel counts,
+dim quarters the number of spots. Doubling the width quadruples the
+per-spot cost of a convolution (both input and output channels double). The
+two cancel. Meanwhile the param count depends only on the channel counts,
 so it goes up by four each time.
 
-The practical reading:
+The hands-on reading:
 
-- **Early stages are cheap to store and expensive to run.** They are what you
-  attack for latency &mdash; reducing input resolution helps here quadratically.
-- **Late stages are expensive to store and cheap to run.** They are what you
+- **Early stages are cheap to store and costly to run.** They're what you
+  attack for latency &mdash; reducing input detail helps here as n&sup2;.
+- **Late stages are costly to store and cheap to run.** They're what you
   attack for model size, and what you replace when fine-tuning on a small
   dataset.
-- **A feature-pyramid detector taps all four**, which is why stage outputs get
+- **A feature-pyramid finder taps all four**. This Is why stage outputs get
   their own names: C2, C3, C4, C5 at strides 4, 8, 16, 32.
 
 ## Why it is still the default backbone
 
 ResNet-50 is a decade old and remains the first thing to try for a new vision
-task, which is unusual and worth explaining. Pretrained weights exist in every
-framework. Every detection, segmentation and pose library accepts it. Its
+task, which is unusual and worth showing. Pretrained weights exist in each
+framework. each spotting, segmentation and pose library accepts it. Its
 stage strides are the 4/8/16/32 that FPN-style necks assume. It fine-tunes
-without drama on small datasets. And its accuracy is close enough to modern
-alternatives that beating it is rarely where the win is.
+without drama on small datasets. And its fit is close enough to modern
+options that beating it's rarely where the win is.
 
 The follow-up work is worth knowing by name. **ResNeXt** replaced the
 bottleneck's 3&times;3 with a grouped convolution, trading width for
 "cardinality" at equal cost. **Wide ResNet** showed that at fixed budget, wider
 and shallower often beats narrow and deeper. **ResNet-D** and the "bag of
-tricks" papers found a further 1&ndash;2% ImageNet accuracy from changes that
+tricks" papers found a further 1&ndash;2% ImageNet fit from changes that
 cost almost nothing: a three-convolution stem instead of the 7&times;7, and
 moving the stride from the 1&times;1 to the 3&times;3 inside the downsampling
 block, which stops the 1&times;1 from discarding three quarters of its input
-pixels. That last one is a genuine bug in the original, quietly fixed
-everywhere.
+pixels. That last one is a genuine bug in the first, quietly fixed
+all over.
 
 ## The stage names you will meet everywhere
 
 The four stages have standard names, and knowing them saves a lot of confusion
-when reading detection and segmentation code.
+when reading spotting and segmentation code.
 
 The output of stage *i* is called **C*i***, at stride 2<sup>i</sup>: C2 at
 stride 4, C3 at 8, C4 at 16, C5 at 32. A feature pyramid built on top of them
 names its own levels **P2** to **P5** or **P7**. When a config file says
-`out_indices=(0, 1, 2, 3)` or `returned_layers=[1, 2, 3, 4]`, it is asking the
+`out_indices=(0, 1, 2, 3)` or `returned_layers=[1, 2, 3, 4]`, it's asking the
 backbone to hand back those four tensors instead of a single class vector.
 
-The strides are the part that has hardened into a convention. A detection neck,
-a segmentation decoder and an anchor generator all assume 4/8/16/32, which is
-why swapping a backbone for one with a different downsampling schedule usually
-breaks more than it should. It is also why `dilated` or `atrous` variants
+The strides are the part that has hardened into a rule. A spotting neck,
+a segmentation decoder and an anchor gen all assume 4/8/16/32, which is
+why swapping a backbone for one with a different downsampling schedule often
+breaks more than it should. It's also why `dilated` or `atrous` variants
 exist: replacing stage 4's stride with a dilation keeps the map at stride 16
 while preserving the receptive field, which segmentation wants and
-classification does not care about.
+classification doesn't care about.
 
 ```python
 import torch.nn as nn
@@ -173,30 +173,30 @@ class Bottleneck(nn.Module):
         return self.relu(out + identity)     # add first, then activate
 ```
 
-Every convolution is `bias=False` because the batch norm immediately after has
-its own shift, and two consecutive additive constants is one redundant
-parameter per channel. Multiply that by the whole network and it is where the
-"25.50 M or 25.56 M?" discrepancy in parameter counts usually comes from: the
-BN parameters are 53,000 of the total, and whether a count includes them
+each convolution is `bias=False` because the batch norm right away after has
+its own shift, and two back to back additive constants is one redundant
+param per channel. Times that by the whole network and it's where the
+"25.50 M or 25.56 M?" discrepancy in param counts often comes from: the
+BN params are 53,000 of the total, and whether a count includes them
 depends on the tool.
 ## Questions people ask
 
-<strong>Is the shortcut always the identity?</strong> No, and this is the most common misreading. At the first block of stages 2, 3 and 4 the stride is 2 and the width doubles, so the shapes cannot match and a trained 1&times;1 projection carries the shortcut instead. Those projections are the one place the clean-identity argument does not literally hold.
+<strong>Is the shortcut always the identity?</strong> No. This is the most common misreading. At the first block of stages 2, 3 and 4 the stride is 2 and the width doubles. The shapes can't match and a trained 1&times;1 map carries the shortcut instead. Those maps are the one place the clean-identity arg doesn't truly hold.
 
-<strong>Why `bias=False` on every convolution?</strong> Because the batch norm immediately after has its own per-channel shift, so a bias would be a second additive constant with no extra expressive power. It also explains part of why published counts disagree: BN's weights and shifts are about 53,000 parameters in ResNet-50, and whether a tool counts them varies.
+<strong>Why `bias=False` on each convolution?</strong> Because the batch norm right away after has its own per-channel shift. A bias would be a second additive constant with no extra expressive power. It also shows part of why published counts disagree: BN's weights and shifts are about 53,000 params in ResNet-50. Whether a tool counts them varies.
 
-<strong>Does the degradation result mean deeper is worse?</strong> It means deeper *plain* stacks were harder to optimise, not smaller in capacity &mdash; the 56-layer network had higher **training** error than the 20-layer one, which rules out overfitting. Residuals add no capacity; they make a solution the network could already represent reachable by gradient descent.
+<strong>Does the degradation result mean deeper is worse?</strong> It means deeper *plain* stacks were harder to optimise, not smaller in room. The 56-layer network had higher **training** error than the 20-layer one. This Rules out overfitting. Residuals add no room. They make a answer the network could already represent reachable by gradient descent.
 
-<strong>Where does the ReLU go relative to the addition?</strong> Add first, then activate. The identity-mappings follow-up tested the alternatives and found that anything sitting on the shortcut path &mdash; a ReLU, a scaling, a gate &mdash; makes very deep networks harder to train. Pre-activation ordering is the variant that helps past 200 layers.
+<strong>Where does the ReLU go scaled to the addition?</strong> Add first, then activate. The identity-mappings follow-up tested the options and found that any of it sitting on the shortcut path. A ReLU, a scaling, a gate. Makes very deep networks harder to train. Pre-activation sorting is the variant that helps past 200 layers.
 
-<strong>Why is ResNet-50 still the default backbone?</strong> Pretrained weights in every framework, stage strides of 4/8/16/32 that detection necks and segmentation decoders assume, undramatic fine-tuning on small datasets, and accuracy close enough to modern alternatives that beating it is rarely where a project's win actually is.
+<strong>Why is ResNet-50 still the default backbone?</strong> Pretrained weights in each framework, stage strides of 4/8/16/32 that spotting necks and segmentation decoders assume, undramatic fine-tuning on small datasets. Fit close enough to modern options that beating it's rarely where a project's win really is.
 
-<strong>What is the cheapest accuracy I am leaving on the table?</strong> The bag-of-tricks changes: a three-convolution stem instead of the 7&times;7, and moving the downsampling stride from the 1&times;1 to the 3&times;3 so the 1&times;1 stops discarding three quarters of its input pixels. That second one is a genuine bug in the original, worth 1&ndash;2% ImageNet accuracy for almost nothing, and shipped in most libraries as the "D" variant.
+<strong>What is the cheapest fit I am leaving on the table?</strong> The bag-of-tricks changes. A three-convolution stem instead of the 7&times;7. Moving the downsampling stride from the 1&times;1 to the 3&times;3 so the 1&times;1 stops discarding three quarters of its input pixels. That second one is a genuine bug in the first, worth 1&ndash;2% ImageNet fit for almost nothing. Shipped in most libraries as the "D" variant.
 
 ## Recap in one screen
 
-- One design with two knobs &mdash; block type and blocks per stage. The five famous models are points in that space, not five architectures.
-- `y = F(x) + x` makes the identity the default, and differentiating gives `dF/dx + 1`, so there is always a path back with derivative exactly 1.
-- Widths 64/128/256/512 with the spatial size halving each time keeps MACs roughly level per stage while parameters quadruple.
-- Early stages are cheap to store and expensive to run; late stages the reverse. That tells you which end to attack for latency and which for size.
-- The stage outputs C2&ndash;C5 at strides 4/8/16/32 are a convention the whole detection ecosystem is built on.
+- One design with two knobs. Block type and blocks per stage. The five famous models are points in that space, not five architectures.
+- `y = F(x) + x` makes the identity the default. Differentiating gives `dF/dx + 1`. There's always a path back with deriv just 1.
+- Widths 64/128/256/512 with the spatial size halving each time keeps MACs roughly level per stage while params quadruple.
+- Early stages are cheap to store and costly to run. Late stages the reverse. That tells you which end to attack for latency and which for size.
+- The stage outputs C2&ndash;C5 at strides 4/8/16/32 are a rule the whole spotting ecosystem is built on.

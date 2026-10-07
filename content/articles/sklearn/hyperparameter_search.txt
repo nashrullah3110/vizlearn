@@ -1,15 +1,15 @@
 title: Hyperparameter Search: A Practical Guide
-intro: Hyperparameters have to be chosen by measurement rather than by taste. The tools that do it are simple; the number they report is the part that needs care.
+intro: Settings have to be chosen by reading rather than by taste. The tools that do it are simple. The number they report is the part that needs care.
 
 ## What is being searched
 
-Hyperparameters are the settings you pass to the constructor: `C`, `max_depth`, `n_neighbors`, `alpha`. They are not learned from the data during `fit`, so something outside the fit has to choose them.
+Settings are the settings you pass to the constructor: `C`, `max_depth`, `n_neighbors`, `alpha`. They aren't learned from the data during `fit`. A thing outside the fit has to choose them.
 
-Choosing by hand means changing one, re-running, and keeping what scored better &mdash; which is a search, done slowly and without a record. The search tools do the same thing systematically, with cross-validation at each setting so the comparison is not decided by one lucky split.
+Choosing by hand means changing one, re-running. Keeping what scored better. Which is a search, done slowly and without a record. The search tools do the same thing systematically, with cross-validation at each setting so the check isn't decided by one lucky split.
 
-`GridSearchCV` takes a dictionary of parameters to lists of values and tries every combination. The number of fits is the product of the list lengths times the number of folds, and it grows alarmingly: three parameters with five values each and five folds is 375 fits.
+`GridSearchCV` takes a dict of params to lists of values and tries each combination. The number of fits is the product of the list lengths times the number of folds. It grows alarmingly. Three params with five values each and five folds is 375 fits.
 
-Both search objects are themselves estimators. They have `fit`, `predict` and `score`, so a search can go inside a pipeline, inside `cross_val_score`, or anywhere else an estimator goes &mdash; which is what makes nested cross-validation a one-liner. `RandomizedSearchCV` samples a fixed number of combinations from continuous or discrete distributions, so the budget is set directly rather than growing combinatorially. With 60 random samples and three parameters, it covers about the same effective range as a grid search with far fewer fits, and theoretical results show it finds near-optimal settings faster because it does not waste time refining parameters that do not matter. The score that `best_score_` reports is the cross-validated score at the best setting, and it is **optimistically biased** &mdash; it was selected for being the highest, so it overstates the model's true performance. The fix is nested cross-validation: an outer loop evaluates generalisation, and the inner loop searches parameters, so no data point ever appears in both the selection and the evaluation. This page runs both grid and random search on the same parameter space, compares their best scores and wall-clock times, and demonstrates the nested-CV pattern that produces an honest estimate.
+Both search objects are themselves estimators. They've `fit`, `predict` and `score`. A search can go inside a pipeline, inside `cross_val_score`, or anywhere else an estimator goes. Which is what makes nested cross-validation a one-liner.
 
 
 ## The search, and what it leaves you with
@@ -176,119 +176,119 @@ print("scoring= is a decision about the problem, not a formality.")
 ```
 ## Grid or random
 
-`RandomizedSearchCV` samples `n_iter` combinations rather than trying all of them, drawing from lists or from distributions such as `scipy.stats.randint` and `loguniform`.
+`RandomizedSearchCV` samples `n_iter` combinations rather than trying all of them, drawing from lists or from spreads such as `scipy.stats.randint` and `loguniform`.
 
-It is usually the better choice, for a reason that is not obvious. In a typical search most parameters barely matter and one or two dominate. A grid spends its budget evenly, so with two parameters and sixteen combinations it tries only four distinct values of the one that matters. Random search with sixteen samples tries sixteen distinct values of it, because every sample varies everything.
+It's often the better choice, for a reason that isn't obvious. In a common search most params barely matter and one or two dominate. A grid spends its budget evenly. With two params and sixteen combinations it tries only four distinct values of the one that matters. Random search with sixteen samples tries sixteen distinct values of it. Each sample varies all.
 
-The editor above shows six random samples getting within 0.003 of a sixteen-combination grid in 40% of the time, which is the usual shape of the result.
+The editor above shows six random samples getting within 0.003 of a sixteen-combination grid in 40% of the time. This Is the usual shape of the result.
 
-Grid search remains right when the space is genuinely small and you want every combination on record &mdash; two or three parameters with a handful of sensible values each.
+Grid search remains right when the space is truly small and you want each combination on record. Two or three params with a handful of sensible values each.
 
-`HalvingGridSearchCV` and `HalvingRandomSearchCV` are the middle path: they evaluate many candidates on a small subset of the data, discard the worst, and give the survivors more resources. On a large dataset the saving is substantial.
+`HalvingGridSearchCV` and `HalvingRandomSearchCV` are the middle path: they test many picks on a small subset of the data, discard the worst. Give the survivors more resources. On a large dataset the saving is substantial.
 
 ## The number it reports is too high
 
-This is the part that matters most, and it is easy to miss because everything about the procedure looks careful.
+This is the part that matters most. It's easy to miss because all about the method looks careful.
 
-`best_score_` is the cross-validated score of the winning setting. It is the **maximum** of many cross-validated scores computed on the same folds. Taking a maximum over noisy estimates selects for luck as well as quality: the winner is partly the setting that happened to suit those particular folds.
+`best_score_` is the cross-validated score of the winning setting. It's the **max** of many cross-validated scores found on the same folds. Taking a max over noisy guesses selects for luck and quality. The winner is partly the setting that happened to suit those given folds.
 
-The fifth editor makes the size of the effect visible. The labels are random, so the honest accuracy is 0.5. The search reports **0.642**, having picked the best of five depths on the same five folds. Nested cross-validation &mdash; where the whole search is repeated inside each outer fold &mdash; reports 0.575, and even that is not quite 0.5 with only 120 rows.
+The fifth editor makes the size of the effect visible. The labels are random. The honest fit is 0.5. The search reports **0.642**, having picked the best of five depths on the same five folds. Nested cross-validation. Where the whole search is repeated inside each outer fold. Reports 0.575. Even that isn't quite 0.5 with only 120 rows.
 
-So `best_score_` is a selection artefact, and the more settings you try the worse it gets. The remedies are a test set held out before the search and touched once afterwards, or nested cross-validation when you need the estimate itself to be trustworthy. Reporting `best_score_` as the model's performance is one of the most common ways published numbers turn out to be optimistic.
+So `best_score_` is a pick artefact. The more settings you try the worse it gets. The remedies are a test set held out before the search and touched once afterwards, or nested cross-validation when you need the guess itself to be trustworthy. Reporting `best_score_` as the model's speed is one of the most common ways published numbers turn out to be optimistic.
 
 ## Read the table
 
-`cv_results_` holds every setting with its mean score, standard deviation and rank. Reading it rather than only `best_params_` changes what you conclude surprisingly often.
+`cv_results_` holds each setting with its mean score, standard deviation and rank. Reading it rather than only `best_params_` changes what you conclude oddly often.
 
 The second editor is a clean example: `C=0.1` scores 0.9833 and `C=1` scores 0.9832, with standard deviations around 0.02. The winner beat the runner-up by one ten-thousandth, against noise two hundred times larger. Declaring `C=0.1` the best value is reading a coin flip.
 
-Two habits follow. **Compare the gap against the standard deviation** &mdash; anything inside one is a tie. And **prefer the simpler setting among ties**: more regularisation, shallower trees, fewer components. When two settings are indistinguishable on the evidence, the one less likely to have fitted noise is the better bet.
+Two habits follow. **Compare the gap against the standard deviation**. Any of it inside one is a tie. And **prefer the simpler setting among ties**. More smoothing, shallower trees, fewer components. When two settings are the same on the evidence, the one less likely to have fitted noise is the better bet.
 
-`std_test_score` also flags an unreliable search: large standard deviations mean the folds disagree, and no ranking computed from them deserves confidence.
+`std_test_score` also flags an unreliable search: large standard deviations mean the folds disagree. No ranking found from them deserves trust.
 
 ## Searching the whole pipeline
 
-Because a pipeline is an estimator, a search can tune anything inside it using the double-underscore path &mdash; `clf__C`, `pre__num__imputer__strategy`.
+Because a pipeline is an estimator, a search can tune any of it inside it using the double-underscore path &mdash; `clf__C`, `pre__num__imputer__strategy`.
 
-That makes preprocessing choices measurable rather than assumed. Mean or median imputation, scaled or not, how many PCA components, whether to drop the first one-hot column: all of them can go in the grid, and the cross-validation that evaluates them is the same honest one that evaluates the model.
+That makes prep choices measurable rather than assumed. Mean or median imputation, scaled or not, how many PCA components, whether to drop the first one-hot column. All of them can go in the grid. The cross-validation that tests them is the same honest one that tests the model.
 
-A step can be tuned in or out entirely by including `"passthrough"` among its values, which the fourth editor uses to discover that PCA does not help on that data. The same trick swaps whole models: `{"clf": [LogisticRegression(), RandomForestClassifier()]}` puts the model choice itself in the grid.
+A step can be tuned in or out fully by including `"passthrough"` among its values. This The fourth editor uses to discover that PCA doesn't help on that data. The same trick swaps whole models: `{"clf": [LogisticRegression(), RandomForestClassifier()]}` puts the model choice itself in the grid.
 
-The important property is that all of this happens **inside** the folds. A search over preprocessing done by hand, outside cross-validation, is the leak the earlier modules measured.
+The key property is that all of this happens **inside** the folds. A search over prep done by hand, outside cross-validation, is the leak the earlier modules measured.
 
 ## The metric decides the answer
 
-`scoring` defaults to accuracy for classifiers and R&sup2; for regressors, and leaving it there means optimising accuracy whether or not accuracy is what you care about.
+`scoring` defaults to fit for classifiers and R&sup2; for regressors. Leaving it there means optimising fit whether or not fit is what you care about.
 
-The last editor searches `class_weight` on imbalanced data under three metrics. Accuracy and F1 keep the default; balanced accuracy chooses `"balanced"`. Same data, same grid, different winner &mdash; because the metrics disagree about what a good model is, which is exactly what the metrics modules said they would do.
+The last editor searches `class_weight` on imbalanced data under three metrics. Fit and F1 keep the default. Weighed fit chooses `"weighed"`. Same data, same grid, different winner. Because the metrics disagree about what a good model is. This Is just what the metrics modules said they would do.
 
-So `scoring=` is where the decision about which mistakes matter enters the tuning process. Choosing it deliberately is not optional if the classes are imbalanced or the costs are asymmetric.
+So `scoring=` is where the choice about which mistakes matter enters the tuning process. Choosing it on purpose isn't optional if the classes are imbalanced or the costs are skewed.
 
-`refit` can name one metric to refit on when several are being computed, which is how you report a panel of metrics while selecting on one.
+`refit` can name one metric to refit on when a few are being found. This Is how you report a panel of metrics while selecting on one.
 
 ## Keeping it affordable
 
-`n_jobs=-1` parallelises across cores, and search is close to perfectly parallel.
+`n_jobs=-1` parallelises across cores, and search is close to just right parallel.
 
-Search coarsely first &mdash; powers of ten &mdash; then refine around whatever region wins. A logarithmic grid over `C` from 0.001 to 1000 in one pass tells you more than a fine linear grid in the wrong place.
+Search coarsely first &mdash; powers of ten &mdash; then refine around what region wins. A logarithmic grid over `C` from 0.001 to 1000 in one pass tells you more than a fine linear grid in the wrong place.
 
-Reduce the folds to 3 while exploring and raise them for the final comparison. And remember that the parameters worth searching are few: `C` or `alpha` for linear models, `max_depth` and `min_samples_leaf` for trees, `learning_rate` and `n_estimators` for boosting. Searching everything a model exposes wastes budget on parameters that do not move the score.
+Reduce the folds to 3 while exploring and raise them for the final check. And note that the params worth searching are few: `C` or `alpha` for linear models, `max_depth` and `min_samples_leaf` for trees, `learning_rate` and `n_estimators` for boosting. Searching all a model exposes wastes budget on params that don't move the score.
 
 ## Which parameters are worth the budget
 
-Searching everything an estimator exposes wastes most of the fits on settings that do not move the score. A short list of what actually matters, per model family.
+Searching all an estimator exposes wastes most of the fits on settings that don't move the score. A short list of what really matters, per model family.
 
-**Linear models.** `C` or `alpha`, over a logarithmic range, and that is very nearly all. The penalty type (`l1` against `l2`) is worth one comparison when feature selection is desirable.
+**Linear models.** `C` or `alpha`, over a logarithmic range. That is very nearly all. The fine type (`l1` against `l2`) is worth one check when feature pick is wanted.
 
-**Trees.** `max_depth` and `min_samples_leaf`, or `ccp_alpha` instead of both. The criterion is not worth searching &mdash; the decision-trees module measured the three within half a point of each other.
+**Trees.** `max_depth` and `min_samples_leaf`, or `ccp_alpha` instead of both. The criterion isn't worth searching. The choice-trees module measured the three within half a point of each other.
 
-**Random forests.** `max_features` first, then `min_samples_leaf` on noisy data. `n_estimators` is not a search parameter: set it as high as you can afford, since it cannot overfit.
+**Random forests.** `max_features` first, then `min_samples_leaf` on noisy data. `n_estimators` isn't a search param. Set it as high as you can afford, since it can't overfit.
 
-**Gradient boosting.** `learning_rate` and `n_estimators` together, since they trade against each other, plus `max_depth` in a narrow range of about 3 to 8. This family repays tuning more than any other on this list, and is the reason to keep budget in reserve.
+**Grad boosting.** `learning_rate` and `n_estimators` together. They trade against each other, plus `max_depth` in a narrow range of about 3 to 8. This family repays tuning more than any other on this list. Is the reason to keep budget in reserve.
 
-**k-NN.** `n_neighbors`, and `weights` as a two-value comparison.
+**k-NN.** `n_neighbors`, and `weights` as a two-value check.
 
-**SVM.** `C` and `gamma`, both logarithmic, and this pair genuinely needs a two-dimensional search because they interact strongly.
+**SVM.** `C` and `gamma`, both logarithmic. This pair truly needs a two-dimensional search because they interact strongly.
 
-The general shape: one or two parameters carry nearly all the improvement, and they are usually the ones controlling regularisation. Finding them for a new estimator is a matter of reading which parameter the documentation discusses at length.
+The general shape: one or two params carry nearly all the improvement. They're often the ones controlling smoothing. Finding them for a new estimator is a matter of reading which param the docs discusses at length.
 
 ## What a search cannot fix
 
-Worth stating, because tuning is where effort goes when a model disappoints, and it is often the wrong place to spend it.
+Worth stating, because tuning is where effort goes when a model disappoints. It's often the wrong place to spend it.
 
-A search moves a model within its family. It cannot make a linear model represent a curve, cannot make a tree extrapolate, and cannot compensate for features that do not carry the signal. If the learning curve has converged and the model is underfitting, no combination of hyperparameters closes the gap &mdash; the answer is different features or a different family.
+A search moves a model within its family. It can't make a linear model represent a curve, can't make a tree extrapolate. Can't make up for for features that don't carry the signal. If the learning curve has settled and the model is underfitting, no combination of settings closes the gap. The answer is different features or a different family.
 
-Nor can it fix a metric that measures the wrong thing, a split that leaks, or labels that are wrong. A search will optimise whatever it is pointed at, including a leak, and report a confident number for it.
+Nor can it fix a metric that measures the wrong thing, a split that leaks, or labels that are wrong. A search will optimise what it's pointed at, including a leak. Report a confident number for it.
 
-The order that wastes least effort: get the split and the metric right, get the features right, pick a model family that can represent the structure, and tune last. Tuning first is the most common way to spend a week moving a score by half a point.
+The order that wastes least effort: get the split and the metric right, get the features right, pick a model family that can represent the structure. Tune last. Tuning first is the most common way to spend a week moving a score by half a point.
 
-<strong>How many combinations is reasonable?</strong> Whatever finishes in the time you have. Twenty random samples over a sensible range beats an exhaustive grid over the wrong one.
+<strong>How many combinations is reasonable?</strong> What finishes in the time you've. Twenty random samples over a sensible range beats an exhaustive grid over the wrong one.
 
-<strong>Can I search two models at once?</strong> Yes - put the estimator itself in the grid: `{"clf": [LogisticRegression(), RandomForestClassifier()]}`, with each model's own parameters guarded by the step name.
+<strong>Can I search two models at once?</strong> Yes - put the estimator itself in the grid: `{"clf": [LogisticRegression(), RandomForestClassifier()]}`, with each model's own params guarded by the step name.
 
-<strong>Does refit cost much?</strong> One extra fit on the full data, which is negligible next to the search itself. `refit=False` skips it if you only want the table.
+<strong>Does refit cost much?</strong> One extra fit on the full data. This Is negligible next to the search itself. `refit=False` skips it if you only want the table.
 
-<strong>What is `error_score` for?</strong> Some combinations are invalid and raise. The default propagates the error; `error_score=np.nan` records the failure and lets the search continue.
+<strong>What is `error_score` for?</strong> Some combinations are invalid and raise. The default passes the error. `error_score=np.nan` records the failure and lets the search continue.
 
 ## Ranges that are worth searching over
 
 Choosing the values is most of the skill, and two habits cover it.
 
-**Search logarithmically for anything that scales multiplicatively.** Regularisation strengths, learning rates, gamma. The interesting range for `C` spans six orders of magnitude, and a linear grid from 1 to 10 explores almost none of it. `np.logspace(-3, 3, 7)` gives 0.001 to 1000 in seven values, and `scipy.stats.loguniform(1e-3, 1e3)` is the equivalent for random search.
+**Search logarithmically for any of it that scales multiplicatively.** Smoothing strengths, learning rates, gamma. The notable range for `C` spans six orders of magnitude. A linear grid from 1 to 10 explores almost none of it. `np.logspace(-3, 3, 7)` gives 0.001 to 1000 in seven values. `scipy.stats.loguniform(1e-3, 1e3)` is the equal for random search.
 
-**Search linearly for anything that counts things.** Tree depth, number of neighbours, minimum samples in a leaf. These are small integers and a linear range over a plausible span is right.
+**Search linearly for any of it that counts things.** Tree depth, number of neighbours, min samples in a leaf. These are small ints and a linear range over a plausible span is right.
 
-Then check whether the winner sits at the edge of the range. If the best `C` is the largest value tried, the range was too narrow and the search has not found the optimum &mdash; it has found the boundary. Extending and re-running is a one-line change and is the difference between a tuned model and one that stopped where you happened to stop looking.
+Then check whether the winner sits at the edge of the range. If the best `C` is the largest value tried, the range was too narrow and the search hasn't found the optimum. It has found the boundary. Extending and re-running is a one-line change and is the difference between a tuned model and one that stopped where you happened to stop looking.
 
-The corollary is that a first pass should be deliberately wide and coarse. Powers of ten across the whole plausible range, three folds, few candidates. That locates the region in a few seconds, and the refined search can then spend its budget somewhere worth spending it.
+The corollary is that a first pass should be on purpose wide and coarse. Powers of ten across the whole plausible range, three folds, few picks. That locates the region in a few seconds. The refined search can then spend its budget a place worth spending it.
 
 ## Things to try
 
 1. <strong>Read the table.</strong> The second editor's top two settings are separated by 0.0001. Decide for yourself whether that is a result.
-2. <strong>Watch the optimism.</strong> The fifth editor searches random labels and reports 0.642 for something whose truth is 0.5.
-3. <strong>Tune a step away.</strong> In the fourth editor, note that `passthrough` won &mdash; the PCA step was not helping.
+2. <strong>Watch the optimism.</strong> The fifth editor searches random labels and reports 0.642 for a thing whose truth is 0.5.
+3. <strong>Tune a step away.</strong> In the fourth editor, note that `passthrough` won. The PCA step wasn't helping.
 4. <strong>Change the metric.</strong> In the last editor, add `"recall"` and see which setting it prefers.
 
 ## Where this leaves you
 
-Random search over a sensible range, with a pipeline so the preprocessing is tuned honestly, a `scoring` chosen for the problem, `cv_results_` read rather than skimmed, and the winner's score treated as optimistic until a held-out set says otherwise.
+Random search over a sensible range, with a pipeline so the prep is tuned honestly, a `scoring` chosen for the problem, `cv_results_` read rather than skimmed. The winner's score treated as optimistic until a held-out set says or else.

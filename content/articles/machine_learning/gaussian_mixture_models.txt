@@ -3,77 +3,77 @@ intro: What clustering looks like when a point is allowed to belong partly to tw
 
 ## Hard labels throw information away
 
-K-means gives every point exactly one cluster. For a point sitting squarely
-inside a group that is fine. For a point in the overlap between two groups it is
-a fabrication: the algorithm had almost no reason to prefer one over the other,
+K-means gives each point just one cluster. For a point sitting squarely
+inside a group that is fine. For a point in the share between two groups it's
+a fabrication: the method had almost no reason to prefer one over the other,
 and the output records none of that doubt.
 
 A Gaussian mixture keeps the doubt. It models the data as having come from
-several Gaussian distributions mixed together, and reports, for each point, the
-probability that it came from each one.
+a few Gaussian spreads mixed together, and reports, for each point, the
+chance that it came from each one.
 
-Raise the overlap control above and watch the readout. As the two groups merge,
-the number of points assigned with less than 90% confidence climbs &mdash; and
-every one of those is a point k-means would have labelled without hesitation.
+Raise the share control above and watch the readout. As the two groups merge,
+the number of points assigned with less than 90% trust climbs &mdash; and
+each one of those is a point k-means would have labelled without hesitation.
 
 ## The model
 
-Three parameters per component: a mean, a width, and a **mixing weight** saying
+Three params per component: a mean, a width, and a **mixing weight** saying
 what fraction of the data that component accounts for. The density is their
 weighted sum, and the two curves in the chart are the fitted components.
 
 Fitting is a chicken-and-egg problem. Knowing which points belong to which
-component would make estimating the parameters easy, and knowing the parameters
+component would make guessing the params easy, and knowing the params
 would make assigning points easy. Neither is known.
 
 ## Expectation-Maximisation
 
 EM resolves it by alternating, starting from a guess:
 
-**E step.** With the current parameters, compute each point's
-**responsibility** &mdash; the probability that each component produced it.
+**E step.** With the current params, find each point's
+**job** &mdash; the chance that each component made it.
 
-**M step.** With those responsibilities, re-estimate each component's mean, width
-and weight, weighting every point by how much it belongs.
+**M step.** With those jobs, re-guess each component's mean, width
+and weight, weighting each point by how much it belongs.
 
-Repeat. Each iteration provably does not decrease the likelihood, so the process
-converges.
+Repeat. Each iteration provably doesn't fall the likelihood, so the process
+settles.
 
 Drag the iterations control from 1 upward and watch the curves settle. The early
-steps move a great deal; the last twenty barely move at all, which is what
-convergence looks like.
+steps move a great deal. The last twenty barely move at all, which is what
+settling looks like.
 
-The guarantee is only about *local* optima. EM converges to a local maximum that
-depends on the starting point, which is why implementations run it several times
+The ensure is only about *local* optima. EM settles to a local max that
+depends on the starting point. This Is why setups run it a few times
 from different initialisations and keep the best. Scikit-learn's `n_init` exists
 for this.
 
 ## Why it beats k-means, when it does
 
-**Elliptical clusters.** With a full covariance matrix per component, a GMM fits
-stretched and tilted clusters. K-means implicitly assumes spheres, so an
+**Elliptical clusters.** With a full covariance mat per component, a GMM fits
+stretched and tilted clusters. K-means silently assumes spheres, so an
 elongated cluster gets cut in half.
 
 **Different sizes.** Mixing weights let one component account for 80% of the data
 and another for 20%. K-means has no such notion and tends toward equal-sized
 clusters.
 
-**Soft assignment.** Useful in itself when the output feeds something downstream
-that can use a probability.
+**Soft set.** handy in itself when the output feeds a thing downstream
+that can use a chance.
 
 **A likelihood.** Being a proper probabilistic model, a GMM can score how well it
-explains the data, which makes **BIC** and **AIC** available for choosing the
-number of components &mdash; a principled alternative to
+shows the data, which makes **BIC** and **AIC** available for choosing the
+number of components &mdash; a principled option to
 [the elbow](choosing_k.html).
 
-K-means is exactly the limiting case: spherical components of equal weight, with
-responsibilities forced to 0 or 1.
+K-means is just the limiting case: spherical components of equal weight, with
+jobs forced to 0 or 1.
 
 ## The E-step, worked
 
-The soft assignment the whole method turns on is one calculation. Two components,
+The soft set the whole method turns on is one math. Two components,
 N(0,1) with weight 0.6 and N(3,1) with weight 0.4, and a point to assign: its
-responsibility to each is the weighted density there, normalised so the two sum
+job to each is the weighted density there, normed so the two sum
 to 1.
 
 |point|r(component 1)|r(component 2)|
@@ -82,53 +82,53 @@ to 1.
 |x = 1.5|0.600|0.400|
 
 At x = 0.5 the point sits deep in the first component and is assigned to it with
-97% confidence &mdash; but k-means would have recorded the same hard label with no
-hint of the 3% doubt. At x = 1.5, halfway between the means, the responsibilities
+97% trust &mdash; but k-means would have recorded the same hard label with no
+hint of the 3% doubt. At x = 1.5, halfway between the means, the jobs
 fall back to the mixing weights themselves: the data gives almost no reason to
 prefer either component, and the GMM says so where k-means would still pick one.
-That preserved doubt is the whole point, and it is why the number of low-confidence
-assignments climbs as the components overlap. The M-step then re-estimates each
-mean, width and weight using every point weighted by its responsibility, and
-alternating the two provably never decreases the likelihood &mdash; which is also
+That preserved doubt is the whole point, and it's why the number of low-trust
+sets climbs as the components share. The M-step then re-guesses each
+mean, width and weight using each point weighted by its job, and
+alternating the two provably never falls the likelihood &mdash; which is also
 why a GMM can report one, through BIC, and choose its own number of components
-where k-means cannot.
+where k-means can't.
 
-What a GMM buys over k-means, when the data suits it, is three things at once.
-Elliptical clusters, because a full covariance per component fits stretched and
+What a GMM buys over k-means, when the data suits it, is three things at once:
+elliptical clusters, because a full covariance per component fits stretched and
 tilted shapes k-means cuts in half. Unequal sizes, because the mixing weights let
-one component own 80% of the data. And the soft assignment itself, useful whenever
-something downstream can act on a probability. K-means is exactly the limiting
-case &mdash; spherical components of equal weight with responsibilities forced to
-0 or 1 &mdash; which is why it fabricates the confidence a GMM keeps. The costs are
-the assumption of Gaussian components (crescents defeat it) and convergence only to
-a local optimum, which is why libraries run several initialisations and keep the
+one component own 80% of the data. And the soft set itself, handy when
+a thing downstream can act on a chance. K-means is just the limiting
+case &mdash; spherical components of equal weight with jobs forced to
+0 or 1 &mdash; which is why it fabricates the trust a GMM keeps. The costs are
+the assumption of Gaussian components (crescents defeat it) and settling only to
+a local optimum, which is why libraries run a few initialisations and keep the
 best.
 
 The other failure to watch is a singularity: a component can collapse onto a
 single point, driving its width toward zero and the likelihood toward infinity.
-A small constant added to each covariance &mdash; on by default in most libraries
-&mdash; prevents it. It is the same regularisation instinct that stops too many
-components fitting the noise, which is what BIC's penalty on parameter count guards
+A small constant added to each covariance. On by default in most libraries
+&mdash; blocks it, and it's the same smoothing instinct that stops too many
+components fitting the noise. This Is what BIC's fine on param count guards
 against when choosing how many components to keep.
 
 ## Where it goes wrong
 
-**Assuming Gaussian.** If the clusters are crescents, a mixture of Gaussians is
+**given Gaussian.** If the clusters are crescents, a mixture of Gaussians is
 the wrong model, and it will fit two Gaussians to them anyway.
 
 **Singularities.** A component can collapse onto a single point, driving its
-width to zero and the likelihood to infinity. Regularisation &mdash; a small
-constant added to the covariance &mdash; prevents it, and is on by default in
+width to zero and the likelihood to infinity. Smoothing &mdash; a small
+constant added to the covariance. Blocks it, and is on by default in
 most libraries.
 
-**One run from one start.** Local optima are real. Use several initialisations.
+**One run from one start.** Local optima are real. Use a few initialisations.
 
-**Too many components.** With enough Gaussians you can fit anything, including
-the noise. BIC penalises parameter count for this reason.
+**Too many components.** With enough Gaussians you can fit any of it, including
+the noise. BIC punishes param count for this reason.
 
 ## Soft clusters, and shapes k-means cannot fit
 
-A GMM gives every point a probability of belonging to each cluster, and fits ellipses rather than spheres. Both differences show up on the same data.
+A GMM gives each point a chance of belonging to each cluster. Fits ellipses rather than spheres. Both differences show up on the same data.
 
 ```python-run
 import numpy as np
@@ -187,7 +187,7 @@ for ct in ("spherical", "diag", "tied", "full"):
     print("  %-10s agreement %.4f   BIC %9.1f   parameters %d"
           % (ct, adjusted_rand_score(y, m.predict(X)), m.bic(X),
              m._n_parameters()))
-print("  'spherical' is in effect soft k-means. 'full' fits any ellipse.")
+print("  'spherical' is essentially soft k-means. 'full' fits any ellipse.")
 print("  'tied' wins on BIC here because all three ellipses genuinely DO share")
 print("  one shape -- the same shear was applied to all of them -- so it gets")
 print("  full's accuracy for spherical's parameter count. that is BIC working")

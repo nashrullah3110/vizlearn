@@ -5,21 +5,21 @@ intro: A GPU is not a faster CPU. It is a wider one - thousands of slow cores in
 
 A CPU has a handful of cores optimised to finish <em>one</em> instruction stream as fast as possible: high clock speeds, deep pipelines, large caches, aggressive branch prediction. It is built for latency.
 
-A GPU has thousands of much simpler cores running in lockstep on different data. Any single core is slower than a CPU core, and there are so many that the aggregate arithmetic throughput is an order of magnitude higher. It is built for throughput.
+A GPU has thousands of much simpler cores running in lockstep on other data. Any single core is slower than a CPU core. And there are so many that the aggregate arithmetic throughput is an order of magnitude more. It is built for throughput.
 
-Neural network training is almost entirely matrix multiplication, which is the ideal case for that design: every output element is an independent dot product, so there is nothing to serialise and nothing to predict. The speedup is not free &mdash; data must be transferred to GPU memory over a PCIe or NVLink bus, and that transfer is the bottleneck when the computation per batch is small. Batch size is therefore the variable that decides whether a GPU helps: below a threshold the cores sit idle waiting for data and a CPU can genuinely compete; above it, throughput dominates and the GPU wins by an order of magnitude. This page lets you sweep batch size and model width on both devices, shows where the crossover happens, and covers mixed-precision training and data-loading strategies that keep the GPU fed.
+Neural network training is almost fully matrix multiplication. It is the ideal case for that design: each output item is an independent dot product. So there is nothing to serialise and nothing to predict. The speedup is not free &mdash; data must be transferred to GPU memory over a PCIe or NVLink bus. And that transfer is the bottleneck when the computation per batch is small. Batch size is therefore the var that decides whether a GPU helps: below a threshold the cores sit idle waiting for data and a CPU can genuinely compete. Above it, throughput dominates and the GPU wins by an order of magnitude. This page lets you sweep batch size and net width on both devices, shows where the crossover happens. And covers mixed-precision training and data-loading plans that keep the GPU fed.
 
-## Why batch size is the variable that matters
+## Why batch size is the var that matters
 
-Multiplying a 1&times;512 input by a 512&times;512 weight matrix uses a tiny fraction of a GPU’s cores; the rest sit idle. Multiply a 256&times;512 batch by the same weights and the work grows 256-fold while the time barely moves, because that work fills capacity that was already there and already paid for.
+Multiplying a 1&times;512 input by a 512&times;512 weight matrix uses a tiny fraction of a GPU’s cores. The rest sit idle. Multiply a 256&times;512 batch by the same weights and the work grows 256-fold while the time barely moves, since that work fills capacity that was now there and now paid for.
 
-This is why batch size dominates GPU utilisation. Below a threshold the GPU is latency-bound and a CPU can genuinely be competitive; above it, throughput takes over and the GPU wins by a wide margin. The same reasoning explains why wider layers use a GPU better than narrow ones.
+This is why batch size dominates GPU utilisation. Below a threshold the GPU is latency-bound and a CPU can genuinely be strong. Above it, throughput takes over and the GPU wins by a wide margin. The same reasoning explains why wider layers use a GPU better than narrow ones.
 
 ## Why a GPU is faster for this particular job
 
-A CPU has a handful of powerful cores optimised for doing different things quickly, one after another. A GPU has thousands of simple cores optimised for doing the <em>same</em> thing to many values simultaneously.
+A CPU has a handful of powerful cores optimised for doing other things quickly, one after another. A GPU has thousands of simple cores optimised for doing the <em>same</em> thing to many vals at once.
 
-Neural network training is almost entirely matrix multiplication, which is exactly that pattern: multiply and add, thousands of independent times, with no branching. It maps onto GPU hardware nearly perfectly.
+Neural network training is almost fully matrix multiplication. It is just that pattern: multiply and add, thousands of independent times, with no branching. It maps onto GPU hardware nearly perfectly.
 
 The gap in practice:
 
@@ -30,21 +30,21 @@ The gap in practice:
 |Fine-tuning BERT|Days|~1 hour|
 |Inference, single request|Often fine|Faster, and often unnecessary|
 
-The pattern is that GPUs win when the model is large and the batches are large enough to keep thousands of cores busy. For a two-layer network on 10,000 rows, the overhead of moving data to the device can make the GPU <em>slower</em>.
+The pattern is that GPUs win when the net is large and the batches are large enough to keep thousands of cores busy. For a two-layer network on 10,000 rows, the cost of moving data to the device can make the GPU <em>slower</em>.
 
-## What actually limits GPU training
+## What really limits GPU training
 
-Rarely the arithmetic. Three other things usually bind first.
+Rarely the arithmetic. Three other things often bind first.
 
-<strong>Memory.</strong> Activations from the forward pass must be kept for the backward pass, and that dominates &mdash; a ResNet-50's weights are about 100MB while its activations at batch size 64 run to several gigabytes. This is why out-of-memory errors arrive when you raise the batch size, not when you load the model.
+<strong>Memory.</strong> Activations from the forward pass must be kept for the backward pass. And that dominates &mdash; a ResNet-50's weights are about 100MB while its activations at batch size 64 run to a few gigabytes. This is why out-of-memory errors arrive when you raise the batch size, not when you load the net.
 
-<strong>The data loader.</strong> If the CPU cannot decode and augment images fast enough, the GPU idles. Watch `nvidia-smi`: utilisation oscillating between 100% and near zero means the loader is the bottleneck, and more `num_workers` is the fix.
+<strong>The data loader.</strong> If the CPU cannot decode and augment pics fast enough, the GPU idles. Watch `nvidia-smi`: utilisation oscillating between 100% and near zero means the loader is the bottleneck. And more `num_workers` is the fix.
 
-<strong>Data transfer.</strong> Moving tensors between host and device costs time. Keep them on the GPU, use `pin_memory=True`, and avoid `.cpu()` or `.item()` calls inside the training loop &mdash; each one forces a synchronisation that stalls the pipeline.
+<strong>Data transfer.</strong> Moving tensors between host and device costs time. Keep them on the GPU, use `pin_memory=True`. And avoid `.cpu()` or `.item()` calls inside the training loop &mdash; each one forces a synchronisation that stalls the pipeline.
 
 ## Mixed precision: the free speed-up
 
-Modern GPUs have dedicated hardware for 16-bit matrix multiplication, several times faster than 32-bit. Mixed precision uses 16-bit for the heavy arithmetic and keeps 32-bit copies of the weights for accuracy.
+Modern GPUs have dedicated hardware for 16-bit matrix multiplication, a few times faster than 32-bit. Mixed precision uses 16-bit for the heavy arithmetic and keeps 32-bit copies of the weights for accuracy.
 
 ```python
 scaler = torch.cuda.amp.GradScaler()
@@ -60,59 +60,59 @@ for batch in loader:
 
 Two to three times faster and roughly half the memory, with in effect no accuracy cost. It should be the default for any GPU training.
 
-The `GradScaler` exists for a specific reason: 16-bit numbers underflow to zero below about 6e-8, and many gradients are smaller than that. Scaling the loss up before the backward pass and unscaling afterwards keeps them representable. On newer hardware, `bfloat16` has a wider exponent range and needs no scaler at all.
+The `GradScaler` exists for a set reason: 16-bit counts underflow to zero below about 6e-8. And many gradients are less than that. Scaling the loss up before the backward pass and unscaling afterwards keeps them representable. On newer hardware, `bfloat16` has a wider exponent range and needs no scaler at all.
 
 ## Interactive Exploration Guide
 
-1. <strong>Start where the CPU can win.</strong> Set <strong>Batch Size</strong> to 1 and press <strong>Start Race</strong>. With one sample the GPU’s parallelism is unused and the launch overhead dominates &mdash; the CPU is competitive or ahead.
-2. <strong>Find the crossover.</strong> Raise <strong>Batch Size</strong> to 32 and race again, then 128. Somewhere in that range the GPU pulls decisively ahead; below it the two are close.
-3. <strong>Push it wide.</strong> Set <strong>Batch Size</strong> to 512. GPU time barely increases while CPU time scales roughly linearly &mdash; that flatness is unused capacity being filled rather than extra speed appearing.
+1. <strong>Start where the CPU can win.</strong> Set <strong>Batch Size</strong> to 1 and press <strong>Start Race</strong>. With one sample the GPU’s parallelism is unused and the launch cost dominates &mdash; the CPU is strong or ahead.
+2. <strong>Find the crossover.</strong> Raise <strong>Batch Size</strong> to 32 and race again, then 128. Somewhere in that range the GPU pulls decisively ahead. Below it the two are close.
+3. <strong>Push it wide.</strong> Set <strong>Batch Size</strong> to 512. GPU time barely raises while CPU time scales roughly linearly &mdash; that flatness is unused capacity being filled rather than extra speed appearing.
 4. <strong>Widen the layer instead.</strong> Raise <strong>Hidden</strong> to 32 and keep the batch small. More arithmetic per sample helps the GPU too, for the same reason: the bottleneck is occupancy, not the amount of work.
 
 ## The transfer cost nobody budgets for
 
-CPU and GPU have separate memory. Every tensor must cross the PCIe bus, and that bus is slow relative to on-device bandwidth &mdash; roughly 16&ndash;32 GB/s against 900+ GB/s of GPU memory bandwidth.
+CPU and GPU have split memory. Each tensor must cross the PCIe bus. And that bus is slow relative to on-device bandwidth &mdash; roughly 16&ndash;32 GB/s against 900+ GB/s of GPU memory bandwidth.
 
-So a computation is only worth moving to the GPU if the arithmetic saved exceeds the transfer cost. Copying a batch across to run one cheap elementwise operation is slower than doing it on the CPU. This is why the standard advice is to move the model and the batch to the device once and keep <em>everything</em> there for the whole step, rather than moving tensors back and forth &mdash; and why an innocuous <span class="mono-font">.cpu()</span> or <span class="mono-font">.item()</span> inside a training loop can dominate the profile, since it also forces a synchronisation that stalls the pipeline.
+So a computation is just worth moving to the GPU if the arithmetic saved exceeds the transfer cost. Copying a batch across to run one cheap elementwise step is slower than doing it on the CPU. This is why the standard advice is to move the net and the batch to the device once and keep <em>all</em> there for the whole step, rather than moving tensors back and forth &mdash; and why an innocuous <span class="mono-font">.cpu()</span> or <span class="mono-font">.item()</span> inside a training loop can dominate the profile, since it also forces a synchronisation that stalls the pipeline.
 
 ## What trips people up
 
-- <strong>Batch too small to occupy the device.</strong> The most common reason a GPU shows 15% utilisation. If memory allows, increase the batch before blaming the hardware.
+- <strong>Batch too small to occupy the device.</strong> The most common reason a GPU shows 15% utilisation. If memory lets, increase the batch before blaming the hardware.
 - <strong>A data loader that cannot keep up.</strong> If preprocessing happens on one CPU thread, the GPU waits. Use multiple worker processes and pinned memory.
-- <strong>Synchronising inside the loop.</strong> Calling <span class="mono-font">.item()</span> on the loss every step forces the CPU to wait for the GPU. Accumulate on device and read occasionally.
-- <strong>Expecting a speedup on small models.</strong> For a small network on tabular data the CPU is often faster outright &mdash; there is not enough parallel work to amortise the launch and transfer overhead.
+- <strong>Synchronising inside the loop.</strong> Calling <span class="mono-font">.item()</span> on the loss each step forces the CPU to wait for the GPU. Accumulate on device and read at times.
+- <strong>Expecting a speedup on small nets.</strong> For a small network on tabular data the CPU is often faster outright &mdash; there is not enough parallel work to amortise the launch and transfer cost.
 
 ## In one line
 
-A GPU trades per-core speed for thousands of cores, which suits neural networks because matrix multiplication is embarrassingly parallel. The speedup is real only when there is enough work in flight to occupy the device, so batch size and layer width matter more than anything else, and the separate memory space means transfers and synchronisations can quietly become the bottleneck. Small model, small batch: the CPU may well win.
+A GPU trades per-core speed for thousands of cores. It suits neural networks since matrix multiplication is embarrassingly parallel. The speedup is real just when there is enough work in flight to occupy the device. So batch size and layer width matter more than anything else. And the split memory space means transfers and synchronisations can quietly turn the bottleneck. Small net, small batch: the CPU may well win.
 
 ## When the CPU is the right choice
 
-Not everything needs a GPU, and reaching for one reflexively wastes money.
+Not all needs a GPU, and reaching for one reflexively wastes money.
 
-<strong>Tabular data with gradient boosting.</strong> XGBoost and LightGBM on CPU are extremely fast and frequently beat neural networks on this data anyway.
+<strong>Tabular data with gradient boosting.</strong> XGBoost and LightGBM on CPU are very fast and often beat neural networks on this data anyway.
 
-<strong>Small networks.</strong> Below a few hundred thousand parameters and with modest batches, the transfer overhead can exceed the compute saving.
+<strong>Small networks.</strong> Below a few hundred thousand params and with modest batches, the transfer cost can exceed the compute saving.
 
-<strong>Inference at low volume.</strong> A single prediction from a modest model takes milliseconds on a CPU. Many production systems serve models on CPU deliberately: no GPU to provision, simpler deployment, lower cost.
+<strong>Inference at low volume.</strong> A single prediction from a modest net takes milliseconds on a CPU. Many production systems serve nets on CPU deliberately: no GPU to provision, simpler deployment, less cost.
 
-<strong>Data preprocessing.</strong> Loading, decoding and augmenting are CPU work, and that is where the parallelism should go.
+<strong>Data preprocessing.</strong> Loading, decoding and augmenting are CPU work. And that is where the parallelism should go.
 
-The practical rule: profile before buying. If GPU utilisation sits at 20%, the answer is a better data pipeline, not a bigger GPU.
+The real rule: profile before buying. If GPU utilisation sits at 20%, the answer is a better data pipeline, not a bigger GPU.
 
 ## Scaling beyond one device
 
-<strong>Data parallelism</strong> is the common approach: each GPU holds a full copy of the model, processes a different slice of the batch, and the gradients are averaged across devices. Use `DistributedDataParallel` rather than the older `DataParallel`, which is significantly slower.
+<strong>Data parallelism</strong> is the common way: each GPU holds a full copy of the net, processes a other slice of the batch. And the gradients are averaged across devices. Use `DistributedDataParallel` rather than the older `DataParallel`, which is much slower.
 
-Note that the effective batch size is multiplied by the number of GPUs, so the learning rate needs scaling accordingly.
+Note that the effective batch size is multiplied by the count of GPUs. So the learning rate needs scaling accordingly.
 
-<strong>Model parallelism</strong> splits the model itself across devices, and is only needed when the model does not fit on one. <strong>Pipeline parallelism</strong> splits it by layers and streams micro-batches through. <strong>Sharded training</strong> (ZeRO, FSDP) splits the optimiser state, gradients and parameters across devices, which is what makes training models with tens of billions of parameters possible &mdash; Adam's state alone is twice the model size.
+<strong>Net parallelism</strong> splits the net it across devices. And is just needed when the net does not fit on one. <strong>Pipeline parallelism</strong> splits it by layers and streams micro-batches through. <strong>Sharded training</strong> (ZeRO, FSDP) splits the optimiser state, gradients and params across devices. It is what makes training nets with tens of billions of params possible &mdash; Adam's state alone is twice the net size.
 
-For most work, one GPU with mixed precision and a well-tuned data loader is enough, and reaching for distributed training before saturating a single device is premature.
+For most work, one GPU with mixed precision and a well-tuned data loader is enough. And reaching for distributed training before saturating a single device is premature.
 
-## What a GPU is actually better at
+## What a GPU is really better at
 
-A GPU is not a fast CPU. It is thousands of slow cores, which makes it enormously better at some shapes of work and no better at all at others -- and that distinction decides how you write training code.
+A GPU is not a fast CPU. It is thousands of slow cores. It makes it enormously better at some shapes of work and no better at all at others -- and that distinction decides how you write training code.
 
 ```python-run
 import numpy as np
@@ -136,7 +136,7 @@ print("independent work to fill every core at once.")
 print()
 ```
 
-Building on the same setup, the next block shows the remaining cases.
+Building on the same setup, the next block shows the left cases.
 
 ```python-run
 import numpy as np
@@ -176,7 +176,7 @@ print()
 print("what this means in practice, as a list of consequences:")
 ```
 
-The following block covers the remaining operations.
+The next block covers the left steps.
 
 ```python-run
 print()
@@ -218,22 +218,22 @@ print("30 percent utilisation is telling you the bottleneck is somewhere else.")
 
 ## Questions people ask
 
-<strong>How much GPU memory do I need?</strong> 8GB trains most vision models at modest batch sizes; 24GB is comfortable; large language model fine-tuning wants 40GB or more, or parameter-efficient methods like LoRA.
+<strong>How much GPU memory do I need?</strong> 8GB trains most vision nets at modest batch sizes. 24GB is comfortable. Large language net fine-tuning wants 40GB or more. Or param-fast ways like LoRA.
 
-<strong>Why is my GPU only 30% utilised?</strong> The data loader, almost always. Raise `num_workers`, pre-resize images, and check for `.item()` calls in the loop.
+<strong>Why is my GPU just 30% utilised?</strong> The data loader, almost always. Raise `num_workers`, pre-resize pics, and check for `.item()` calls in the loop.
 
 <strong>Does mixed precision hurt accuracy?</strong> In practice no, with the gradient scaler in place. It is standard.
 
-<strong>Can I train on Apple Silicon?</strong> Yes &mdash; PyTorch's MPS backend uses the integrated GPU. Slower than a discrete card, and much faster than CPU for medium models.
+<strong>Can I train on Apple Silicon?</strong> Yes &mdash; PyTorch's MPS backend uses the integrated GPU. Slower than a discrete card. And much faster than CPU for medium nets.
 
-<strong>Should I use TPUs?</strong> They are excellent for very large-scale training on Google's stack, and involve more code changes than moving between GPUs.
+<strong>Should I use TPUs?</strong> They are excellent for very large-scale training on Google's stack. And involve more code changes than moving between GPUs.
 
-<strong>Is more VRAM or a faster GPU better?</strong> VRAM decides what you <em>can</em> train; speed decides how long it takes. Memory is usually the binding constraint first.
+<strong>Is more VRAM or a faster GPU better?</strong> VRAM decides what you <em>can</em> train. Speed decides how long it takes. Memory is often the binding constraint first.
 
 ## Recap in one screen
 
-- GPUs win because training is mostly matrix multiplication, which parallelises almost perfectly.
+- GPUs win since training is mostly matrix multiplication, which parallelises almost perfectly.
 - Activation memory, not the weights, is what limits batch size and causes out-of-memory errors.
-- An idle GPU usually means a starved data loader &mdash; check utilisation before blaming the hardware.
-- Mixed precision gives 2&ndash;3&times; speed and half the memory for in effect no accuracy cost; use it by default.
-- Small models, tabular data and low-volume inference are all legitimately CPU work.
+- An idle GPU often means a starved data loader &mdash; check utilisation before blaming the hardware.
+- Mixed precision gives 2&ndash;3&times; speed and half the memory for in effect no accuracy cost. Use it by default.
+- Small nets, tabular data and low-volume inference are all legitimately CPU work.

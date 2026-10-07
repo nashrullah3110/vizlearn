@@ -1,30 +1,12 @@
 title: Common Mistakes
-intro: The errors that produce a chart which looks fine and is not.
+intro: The errors that give a chart which looks fine and isn't.
 ## The plot lands somewhere else
 
-`plt.plot` draws on the **current** axes. After `plt.subplots(1, 2)`, the current axes is the last one created, so a stray `plt.plot` goes to the right-hand panel regardless of intent.
+`plt.plot` draws on the **current** axes. After `plt.subplots(1, 2)`, the current axes is the last one created. A stray `plt.plot` goes to the right-hand panel even so of intent.
 
-In a notebook it is worse, because the current figure is whatever the last executed cell created &mdash; which, with out-of-order execution, is not necessarily the one above.
+In a notebook it's worse. The current figure is what the last ran cell created. Which, with out-of-order run, isn't always the one above.
 
-`ax.plot(...)` removes the question. This is the practical reason the object-oriented API is worth the extra characters.
-
-The second common mistake is plotting data that is there but invisible. The three usual causes are: the data is outside the axis limits, the marker size is zero, and the colour matches the background.
-
-Axis limits are set automatically to fit the data, but a previous `set_xlim` or `set_ylim` call can override them, and then new data plotted outside those limits simply does not appear. `ax.autoscale()` resets the limits to fit everything currently plotted. In a notebook, the same axes object can survive across cells if the figure was not closed, so limits set three cells ago can clip data plotted now.
-
-A scatter plot with `s=0` draws invisible points. It happens when the size argument is computed from data that contains zeros — `ax.scatter(x, y, s=values)` where `values` includes `0` or `NaN`. The fix is to set a minimum: `s=np.maximum(values, 5)`. Similarly, `linewidth=0` on a line plot makes the line invisible, which is correct for a filled area but wrong for a line chart.
-
-Colour matches background when plotting white data on a white figure, or when `alpha=0` makes everything transparent. `ax.set_facecolor("lightgray")` during debugging reveals invisible white elements. Removing the facecolor afterwards restores the original appearance.
-
-The third class of mistake is a chart that appears but misrepresents the data. The most common example is a line chart on categorical data. `ax.plot(categories, values)` connects the points with lines, implying a continuous relationship between "alpha" and "beta" that does not exist. A bar chart is the correct choice for categorical comparisons. `ax.bar(categories, values)` shows each value independently.
-
-Shared axes on subplots catch people when the scales differ. `plt.subplots(1, 2, sharey=True)` forces both panels to use the same y limits, which is correct when comparing like with like but misleading when one panel's values are 10x the other's — the smaller panel looks flat. Dropping `sharey` or using `sharey=False` lets each panel scale independently, and a note in the title or caption alerts the reader to the different scales.
-
-Log scale on data that includes zero or negative values raises a warning and drops those points silently. `ax.set_yscale("log")` with a value of 0 produces `-inf`, which matplotlib clips. The data point vanishes without an error. `ax.set_yscale("symlog")` handles zero and negative values by switching to linear scale near the origin, but the transition can be visually confusing if the reader does not expect it.
-
-Legends disappear when no `label=` argument was passed to the plot call. `ax.legend()` with no labels produces an empty legend or a warning. The fix is to pass `label="series name"` to every `plot`, `scatter`, or `bar` call whose series should appear in the legend. Alternatively, `ax.legend(["a", "b"])` assigns labels by order, which works but breaks when the plotting order changes.
-
-These mistakes share a property: the code runs without error, and the chart renders without complaint. The result looks like a chart, and the reader assumes it is correct. That silence is why matplotlib mistakes are harder to catch than matplotlib errors — errors stop the program, mistakes stop the reader.
+`ax.plot(...)` drops the question. This is the hands-on reason the object-oriented API is worth the extra characters.
 
 
 ## Nothing appears
@@ -63,13 +45,13 @@ Three causes, distinguishable in a few seconds.
 
 **No data.** `len(x)` and `len(y)`. An empty array plots without complaint.
 
-**All missing.** `np.isnan(y).all()`. NaN is skipped, so an all-NaN series draws an empty line object.
+**All missing.** `np.isnan(y).all()`. NaN is skipped. So An all-NaN series draws an empty line object.
 
 **The view is elsewhere.** `ax.get_xlim()` and `get_ylim()`. Limits set before the data was added, or set to the wrong range, put the data outside the visible box.
 
-`len(ax.lines)` distinguishes "the draw call never ran" from "it ran and there is nothing to see", which is usually the fastest thing to check.
+`len(ax.lines)` sets apart "the draw call never ran" from "it ran and there's nothing to see". This Is often the fastest thing to check.
 
-A fourth possibility in a script: you never showed or saved the figure. In a notebook figures display automatically; in a script they do not, and `plt.show()` or `savefig` is required.
+A fourth possibility in a script: you never showed or saved the figure. In a notebook figures display on its own. In a script they don't. `plt.show()` or `savefig` is needed.
 
 ## The plot goes to the wrong axes
 
@@ -219,44 +201,44 @@ ax.plot([0, 1], [0, 1])
 ax.set_title("one deliberate figure")
 ```
 
-matplotlib keeps a reference to every figure created through pyplot, so they are never collected while it holds them.
+matplotlib keeps a link to each figure created through pyplot. They're never collected while it holds them.
 
-After twenty, it warns: "More than 20 figures have been opened." That is a warning, not an error &mdash; the loop continues, and memory keeps growing until something else fails.
+After twenty, it warns: "More than 20 figures have been opened." That is a warning, not an error. The loop continues. Memory keeps growing until a thing else fails.
 
 `plt.close(fig)` in the loop. `plt.close("all")` between sections of a notebook.
 
 The threshold is `rcParams["figure.max_open_warning"]`, and raising it to silence the message is the wrong response to a real problem.
 ## Cropped output
 
-A figure is saved at the size `figsize` declares, at `dpi` resolution. The window you were looking at has nothing to do with it.
+A figure is saved at the size `figsize` declares, at `dpi` detail. The window you were looking at has nothing to do with it.
 
-So a chart whose labels fit on screen can be cropped in the file, and the first time this happens it looks like matplotlib lost the label.
+So a chart whose labels fit on screen can be cropped in the file. The first time this happens it looks like matplotlib lost the label.
 
-`tight_layout()` or `constrained_layout=True` reserve the space. `bbox_inches="tight"` at save time expands the output to include everything.
+`tight_layout()` or `constrained_layout=True` reserve the space. `bbox_inches="tight"` at save time expands the output to include all.
 
-Rotated tick labels and long y-axis labels are the usual casualties, and a chart type that does not need rotation &mdash; `barh` rather than `bar` &mdash; avoids the problem entirely.
+Rotated tick labels and long y-axis labels are the usual casualties. A chart type that doesn't need rotation. `barh` rather than `bar`. Avoids the problem fully.
 
 ## Colour that does not survive
 
-Colours chosen to be visually distinct are often not distinct in **luminance**, and luminance is what remains in greyscale and what colour-blind readers rely on most.
+Colours chosen to be visually distinct are often not distinct in **luminance**. Luminance is what remains in greyscale and what colour-blind readers lean on most.
 
-Red, green and dark red are three obviously different colours with nearly the same brightness. Printed in black and white, they are one colour.
+Red, green and dark red are three obviously other colours with nearly the same brightness. Printed in black and white, they're one colour.
 
-Two habits fix it: use a palette designed for the purpose &mdash; the viridis family, or Okabe&ndash;Ito for categories &mdash; and vary a second channel so colour is reinforcing rather than carrying the meaning.
+Two habits fix it: use a palette designed for the purpose. The viridis family, or Okabe&ndash;Ito for groups. And vary a second channel so colour is reinforcing rather than carrying the meaning.
 
 The greyscale test is quick and catches most of it.
 
 ## Silent clipping
 
-Setting limits that exclude data does not warn. The excluded points are simply not drawn, and a bar taller than the axis runs off the top looking like any other tall bar.
+Setting limits that exclude data doesn't warn. The excluded points are simply not drawn. A bar taller than the axis runs off the top looking like any other tall bar.
 
-That is a serious failure: the reader sees a chart where one category is four times the next largest, and has no way to know.
+That is a serious failure: the reader sees a chart where one group is four times the next largest. Has no way to know.
 
-matplotlib cannot warn about it, because clipping is often exactly what you want &mdash; zooming into a region is a legitimate operation.
+matplotlib can't warn about it. Clipping is often just what you want. Zooming into a region is a legitimate step.
 
-The check is one line: compare `max(data)` against `ax.get_ylim()[1]`. Where a value is genuinely off-scale and the chart must stay zoomed, say so with an annotation giving the real number.
+The check is one line: compare `max(data)` against `ax.get_ylim()[1]`. Where a value is truly off-scale and the chart must stay zoomed, say so with an annotation giving the real number.
 
-The related version is a category filtered out earlier in the pipeline and never noticed, which is why comparing the number of bars against the number of groups is worth doing.
+The related version is a group filtered out earlier in the pipeline and never noticed. This Is why checking the number of bars against the number of groups is worth doing.
 ## A short list
 
 Use `ax.` methods, not `plt.`.
@@ -271,57 +253,57 @@ Compare the data's range against the axis limits.
 
 Close figures in loops.
 
-And the one from the design module that outranks all of them: know what the chart is for before drawing it, because none of these checks help a chart that is answering the wrong question.
+And the one from the design module that outranks all of them. Know what the chart is for before drawing it. None of these checks help a chart that is answering the wrong question.
 
 ## Mistakes of interpretation
 
-Beyond the mechanical errors, a set of chart-level mistakes produce output that is technically correct and misleading.
+Beyond the rote errors, a set of chart-level mistakes give output that is strictly correct and misleading.
 
 **A truncated bar axis.** Length must be read from zero.
 
 **Dual axes.** The crossing point is a choice, not a finding.
 
-**Unshared axes across panels.** The layout invites a comparison the scales do not support.
+**Unshared axes across panels.** The layout invites a compare the scales don't support.
 
 **An uncentred diverging colormap.** Half the data is coloured as though it had the opposite sign.
 
-**A line through sparse points.** It asserts values between the observations.
+**A line through sparse points.** It asserts values between the findings.
 
-**A pie with many slices.** The reader cannot rank them.
+**A pie with many slices.** The reader can't rank them.
 
-**A mean without a spread.** Two very different distributions look identical.
+**A mean without a spread.** Two very other spreads look same.
 
-Each of these is a default that matplotlib will happily produce, which is why they are worth knowing as a list.
+Each of these is a default that matplotlib will happily give. This Is why they're worth knowing as a list.
 
 ## Mistakes of omission
 
-Things whose absence is the error:
+Things whose lack is the error:
 
 No units on the axis labels.
 
 No indication of sample size, when it varies between groups.
 
-No note that an axis is logarithmic, which changes how every distance on it should be read.
+No note that an axis is logarithmic. This Changes how each distance on it should be read.
 
-No statement of what an error bar represents.
+No statement of what an error bar shows.
 
 No caption saying when the data is from and what it covers.
 
-These cost a line each and are the difference between a chart that can be acted on and one that has to be asked about.
+These cost a line each and are the gap between a chart that can be acted on and one that has to be asked about.
 
 ## Debugging a figure
 
 A routine that resolves most problems quickly:
 
-**Print the data.** Shape, range, count of NaN. Most "the chart is wrong" is "the data is not what I thought".
+**Print the data.** Shape, range, count of NaN. Most "the chart is wrong" is "the data isn't what I thought".
 
-**Check the artists.** `len(ax.lines)`, `len(ax.patches)`, `len(ax.collections)` &mdash; did the draw call happen?
+**Check the artists.** `len(ax.lines)`, `len(ax.patches)`, `len(ax.sets)`. Did the draw call happen?
 
 **Check the view.** `ax.get_xlim()`, `get_ylim()` against the data's range.
 
-**Save it and look at the file**, which is what other people will see.
+**Save it and look at the file**. This Is what other people will see.
 
-**Look at it in greyscale**, which catches encoding problems that colour hides.
+**Look at it in greyscale**. This Catches encoding problems that colour hides.
 
 In that order, because each is cheaper than the next.
 
@@ -333,9 +315,9 @@ Does the title state the finding?
 
 Do the axes have units?
 
-Is the baseline appropriate?
+Is the baseline right?
 
-Are the panels comparable, if the layout implies they should be?
+Are the panels close, if the layout implies they should be?
 
 Is anything clipped, hidden or overplotted?
 
@@ -345,35 +327,35 @@ Is there one message?
 
 Is the source and date on it?
 
-Eight questions, most answered in seconds, and between them they catch nearly everything in this module.
+Eight questions, most answered in seconds. Between them they catch nearly all in this module.
 
 ## The general lesson
 
-matplotlib will draw whatever it is asked. It has no opinion about whether the chart is honest, readable or answering a question anyone asked.
+matplotlib will draw what it's asked. It has no view about whether the chart is honest, readable or answering a question anyone asked.
 
-That is the right design for a library and it means the responsibility sits with the person writing the call. The mechanical parts of this track &mdash; the arguments, the objects, the defaults &mdash; are the easy half. The decisions are the half that determines whether the chart was worth drawing.
+That is the right design for a library and it means the job sits with the person writing the call. The rote parts of this track. The args, the objects, the defaults. Are the easy half. The choices are the half that finds whether the chart was worth drawing.
 
 ## Mistakes that look like matplotlib bugs
 
-A few behaviours get reported as bugs and are working as designed.
+A few actions get reported as bugs and are working as designed.
 
-**A figure appears blank in a script** &mdash; nothing called `show` or `savefig`.
+**A figure appears blank in a script**. Nothing called `show` or `savefig`.
 
-**Colours ignored** &mdash; passing `c=` where `color=` was meant, or a colour list to a function taking a single colour.
+**Colours skipped** &mdash; passing `c=` where `color=` was meant, or a colour list to a function taking a single colour.
 
-**`set_facecolor` doing nothing on a box plot** &mdash; `patch_artist=True` was not passed.
+**`set_facecolor` doing nothing on a box plot** &mdash; `patch_artist=True` wasn't passed.
 
-**Ticks reappearing** after being set &mdash; a later autoscale replaced the locator.
+**Ticks reappearing** after being set. A later autoscale replaced the locator.
 
-**A legend showing one entry for many lines** &mdash; one `label` on a call that drew several.
+**A legend showing one entry for many lines**. One `label` on a call that drew a few.
 
 **Text invisible after `transparent=True`** &mdash; the foreground was never changed.
 
-Each has a one-line fix and none of them raises, which is what makes them frustrating rather than difficult.
+Each has a one-line fix and none of them raises. This Is what makes them frustrating rather than hard.
 
 ## Building the habit
 
-The checks in this module are worth turning into a routine rather than remembering individually.
+The checks in this module are worth turning into a routine rather than remembering on their own.
 
 A short function that draws and then asserts is one way:
 
@@ -387,43 +369,43 @@ def finish(ax, title, xlabel, ylabel):
     return ax
 ```
 
-It enforces the labels, applies the house treatment, and fails if something was skipped.
+It enforces the labels, applies the house treatment, and fails if a thing was skipped.
 
-More generally, the mistakes in this track fall into two groups: things matplotlib will not tell you (clipping, wrong axes, cropped output) and things nobody will tell you (a misleading baseline, an uninterpretable interval, a chart answering the wrong question). The first group is caught by checking; the second only by asking what the chart is for.
+More often, the mistakes in this track fall into two groups. Things matplotlib won't tell you (clipping, wrong axes, cropped output) and things no one will tell you (a misleading baseline, an uninterpretable interval, a chart answering the wrong question). The first group is caught by checking. The second only by asking what the chart is for.
 
 ## The two kinds of error
 
-It is worth separating them, because they are found in different ways.
+It's worth separating them, because they're found in other ways.
 
-**Errors matplotlib could tell you about but does not.** A plot on the wrong axes, a clipped bar, a cropped label, an empty series, a figure never closed. These are mechanical, they have definite answers, and the checks in this module find them in seconds. They are also the ones that produce a chart which is obviously odd once looked at.
+**Errors matplotlib could tell you about but doesn't.** A plot on the wrong axes, a clipped bar, a cropped label, an empty series, a figure never closed. These are rote, they've definite answers. The checks in this module find them in seconds. They're also the ones that give a chart which is obviously odd once looked at.
 
-**Errors nobody can tell you about.** A truncated baseline, an uncentred diverging scale, a dual axis, a mean without a spread, a chart answering a question nobody asked. These produce output that is technically correct and misleading, and no check catches them because nothing is wrong with the code.
+**Errors no one can tell you about.** A truncated baseline, an uncentred diverging scale, a dual axis, a mean without a spread, a chart answering a question no one asked. These give output that is strictly correct and misleading. No check catches them because nothing is wrong with the code.
 
-The first kind is fixed by looking at the chart. The second is fixed by asking what the chart claims and whether the data supports it &mdash; which is a different activity, and the one that matters more.
+The first kind is fixed by looking at the chart. The second is fixed by asking what the chart claims and whether the data supports it. Which is a other activity. The one that matters more.
 
 ## In summary
 
-An empty plot is empty data, all-NaN data, or limits pointing elsewhere; `len(ax.lines)` says whether the draw happened.
+An empty plot is empty data, all-NaN data, or limits pointing elsewhere. `len(ax.lines)` says whether the draw happened.
 
-`plt.plot` lands on the current axes, which is rarely the one you meant.
+`plt.plot` lands on the current axes. This Is rarely the one you meant.
 
-A figure saves at its declared size, so look at the file rather than the screen.
+A figure saves at its declared size. Look at the file rather than the screen.
 
-Limits that exclude data clip it silently, and a too-tall bar looks like any other tall bar.
+Limits that exclude data clip it silently. A too-tall bar looks like any other tall bar.
 
 Colours of similar luminance vanish in greyscale.
 
 Figures left open warn after twenty and keep consuming memory.
 
-And the checklist that catches most of it &mdash; title states the finding, units on the labels, correct baseline, nothing hidden, works without colour, one message, source and date &mdash; takes under a minute and is the difference between a chart that is finished and one that is merely drawn.
+And the checklist that catches most of it. Title states the finding, units on the labels, correct baseline, nothing hidden, works without colour, one message, source and date. Takes under a minute and is the gap between a chart that is finished and one that is merely drawn.
 
 ## A worked debug
 
 A concrete example of the routine, on the most common complaint: "the chart is wrong".
 
-**Look at the data going in.** `df.shape`, `df.head()`, `df.dtypes`, `df.isna().sum()`. About half of all wrong charts are correct renderings of wrong data, and this finds them before any plotting is examined.
+**Look at the data going in.** `df.shape`, `df.head()`, `df.dtypes`, `df.isna().sum()`. About half of all wrong charts are correct renderings of wrong data. This finds them before any plotting is checked.
 
-**Check the artists.** Did the draw call happen, and how many things did it create? A legend with one entry where five were expected means one call drew five lines with one label.
+**Check the artists.** Did the draw call happen. How many things did it create? A legend with one entry where five were expected means one call drew five lines with one label.
 
 **Check the view.** Limits against the data's range.
 
@@ -433,10 +415,10 @@ A concrete example of the routine, on the most common complaint: "the chart is w
 
 **Look at it in greyscale.**
 
-The order matters because each step is cheaper than the next, and the first one resolves the majority. The instinct to start by reading matplotlib documentation is usually the slowest available route.
+The order matters because each step is cheaper than the next. The first one resolves the majority. The instinct to start by reading matplotlib docs is often the slowest on hand route.
 
 ## The short version
 
-Two kinds of error: the ones matplotlib could report and does not, and the ones nobody can report because nothing is wrong with the code.
+Two kinds of error: the ones matplotlib could report and doesn't. The ones no one can report because nothing is wrong with the code.
 
-The first are found by looking &mdash; at the data, the artists, the limits, the saved file. The second are found by asking what the chart claims and whether the data supports it, which is the harder and more valuable habit.
+The first are found by looking. At the data, the artists, the limits, the saved file. The second are found by asking what the chart claims and whether the data supports it. This Is the harder and more valuable habit.

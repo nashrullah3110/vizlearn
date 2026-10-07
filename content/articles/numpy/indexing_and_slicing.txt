@@ -1,28 +1,12 @@
 title: Indexing and Slicing
-intro: Elements, rows and rectangles - and the one behaviour that differs from lists in a way that matters.
+intro: Elements, rows and rectangles - and the one action that differs from lists in a way that matters.
 ## Slices, per axis
 
-The familiar `start:stop:step`, once per dimension.
+The familiar `start:stop:step`, once per dim.
 
-`a[1:3]` takes rows. `a[:, 1:4]` takes columns. `a[1:3, 1:4]` takes both and gives you a rectangle. `a[::2]` takes every other row, and `a[:, ::-1]` reverses the columns.
+`a[1:3]` takes rows. `a[:, 1:4]` takes columns. `a[1:3, 1:4]` takes both and gives you a rectangle. `a[::2]` takes every other row. `a[:, ::-1]` reverses the columns.
 
-This composability is most of what makes array code compact. A block of a matrix, a channel of an image, every second sample of a signal &mdash; all are one expression.
-
-A slice of an array is a **view**, not a copy. That is the single behaviour that differs from lists in a way that matters. `b = a[1:3]` does not allocate new memory. `b` points into the same buffer as `a`, and modifying `b[0]` changes `a[1]`. This is efficient — slicing a 100-million-element array is instantaneous — but it means that holding a small slice of a large array keeps the entire large array alive in memory. `.copy()` makes an independent array when you need one.
-
-Lists do not work this way. `b = my_list[1:3]` creates a new list, and changing `b` never affects `my_list`. That difference catches people who learned slicing on lists and expect the same behaviour from arrays.
-
-Negative indices work as they do in Python: `a[-1]` is the last element, `a[-2]` the second-to-last. `a[:-1]` takes everything except the last row. Negative steps reverse: `a[::-1]` reverses the rows, and `a[:, ::-1]` reverses the columns. Because these are views, reversing a million-element array costs nothing — it just changes the stride direction.
-
-`...` (Ellipsis) fills in as many `:` as needed. For a 5-D array, `a[..., 0]` is equivalent to `a[:, :, :, :, 0]`. It is most useful in functions that work on arrays of arbitrary dimension, where you cannot write out the right number of colons.
-
-`np.newaxis` (or equivalently `None`) inserts a length-1 axis. `a[:, np.newaxis]` turns a shape `(5,)` array into `(5, 1)`, which is a column vector. This is the standard way to make two arrays broadcastable: if `a` is `(5,)` and `b` is `(3,)`, then `a[:, None] * b[None, :]` gives a `(5, 3)` outer product.
-
-Assigning to a slice writes in place. `a[1:3] = 0` sets two rows to zero. `a[:, 0] = [10, 20, 30]` replaces the first column. The right-hand side must be broadcast-compatible with the slice's shape, or NumPy raises a ValueError. Because slices are views, this modifies the original array — there is no intermediate copy.
-
-Out-of-range indices behave differently for single elements and slices. `a[100]` on a length-5 array raises `IndexError`. But `a[3:100]` silently clips to `a[3:5]`, returning the two remaining elements with no error. This is consistent with Python list slicing but occasionally hides bugs — you get an unexpectedly short result rather than an error.
-
-Combining indexing and slicing in a single expression is the idiomatic way to extract subsets from structured data. `data[0, :5, ::2]` takes the first layer, the first five columns, and every other element along the third axis. Reading expressions like this left to right, one axis at a time, is the habit that makes array code readable.
+This composability is most of what makes array code compact. A block of a mat, a channel of an image, each second sample of a signal. All are one formula.
 
 
 ## One index per axis
@@ -43,13 +27,13 @@ print("a[1]     :", a[1], "shape", a[1].shape, "<- a whole row")
 print("a[:, 1]  :", a[:, 1], "shape", a[:, 1].shape, "<- a whole column")
 ```
 
-A comma separates axes, so `a[1, 2]` means row one, column two. That is the idiomatic form and the efficient one.
+A comma splits axes, so `a[1, 2]` means row one, column two. That is the idiomatic form and the fast one.
 
-`a[1][2]` reaches the same element by first producing row one as an array, then indexing that. For reading a single value the difference is small; inside a loop it is a temporary array per iteration.
+`a[1][2]` reaches the same element by first making row one as an array, then indexing that. For reading a single value the gap is small. Inside a loop it's a temporary array per loop.
 
-Negative indices count from the end, exactly as in Python. `a[-1, -1]` is the last element of the last row.
+Minus indices count from the end, just as in Python. `a[-1, -1]` is the last element of the last row.
 
-Indexing with fewer indices than axes gives you everything in the remaining ones. On a `(3, 4)` array, `a[1]` is a row of four.
+Indexing with fewer indices than axes gives you all in the left ones. On a `(3, 4)` array, `a[1]` is a row of four.
 
 ## Slices work per axis too
 
@@ -173,9 +157,9 @@ print("and fails; against (3,1) it compares 4 with 1 and stretches.")
 ```
 ## Slices are views
 
-Here is the behaviour that differs from lists, and it catches nearly everybody once.
+Here is the action that differs from lists, and it catches nearly everybody once.
 
-Slicing a **list** copies. Slicing an **array** gives you a view onto the same memory. Writing through the view changes the original.
+Slicing a **list** copies. Slicing an **array** gives you a view onto the same memory. Writing through the view changes the first.
 
 ```python
 arr = np.arange(5)
@@ -183,156 +167,156 @@ view = arr[1:4]
 view[0] = 99        # arr is now [0, 99, 2, 3, 4]
 ```
 
-That is deliberate and valuable: slicing a large array costs nothing, so you can pass windows around freely without copying gigabytes. It is also a source of bugs when a function slices its input, modifies the slice, and unintentionally alters the caller's data.
+That is deliberate and valuable: slicing a large array costs nothing. You can pass windows around freely without copying gigabytes. It's also a source of bugs when a function slices its input, modifies the slice. Unintentionally alters the caller's data.
 
-The defence is to be explicit. `arr[1:4].copy()` when you need independence, and `np.shares_memory(a, b)` when you are not sure what you have. There is a whole module on this later, because it applies to more operations than slicing.
+The defence is to be clear. `arr[1:4].copy()` when you need freedom. `np.shares_memory(a, b)` when you aren't sure what you've. There's a whole module on this later. It applies to more steps than slicing.
 
 ## Ellipsis
 
-Trailing axes you do not mention are taken whole, so on a three-dimensional array `a[0]` gives you everything under index zero.
+Trailing axes you don't mention are taken whole. On a three-dimensional array `a[0]` gives you all under index zero.
 
-`...` stands for as many axes as needed, wherever it appears. `a[..., 0]` is the first element along the **last** axis, whatever the number of leading axes.
+`...` stands for as many axes as needed, wherever it appears. `a[..., 0]` is the first element along the **last** axis, what the number of leading axes.
 
-That is genuinely useful in code that handles arrays of varying dimensionality: `a[..., -1]` takes the last column of a 2-D array, the last channel of a 3-D one, and the same thing again for higher dimensions, without a special case.
+That is truly handy in code that handles arrays of varying dimensionality: `a[..., -1]` takes the last column of a 2-D array, the last channel of a 3-D one. The same thing again for higher dims, without a special case.
 
 ## Assigning into a selection
 
-Anything you can select, you can assign to, and the assignment happens in place.
+Anything you can select, you can assign to, and the set happens in place.
 
-A scalar fills the whole region: `a[1] = 5` sets every element of row one. An array must match the shape of the target &mdash; or be broadcastable to it, which is the next module.
+A scalar fills the whole region: `a[1] = 5` sets each element of row one. An array must match the shape of the target. Or be broadcastable to it. This Is the next module.
 
-Getting a length wrong raises rather than doing something surprising, which is the behaviour you want. It is also a reliable early sign that an upstream shape is not what you assumed.
+Getting a length wrong raises rather than doing a thing surprising. This Is the action you want. It's also a solid early sign that an upstream shape isn't what you assumed.
 
 ## The axis-dropping rule
 
-This is small, easy to miss, and explains a great deal of later confusion.
+This is small, easy to miss, and shows a great deal of later confusion.
 
-An **integer** index removes that axis. `a[1]` on a `(3, 4)` array gives shape `(4,)`.
+An **int** index drops that axis. `a[1]` on a `(3, 4)` array gives shape `(4,)`.
 
 A **slice** keeps it. `a[1:2]` gives shape `(1, 4)`.
 
 The same applies to columns: `a[:, 2]` is `(3,)` while `a[:, 2:3]` is `(3, 1)`.
 
-Both contain the same three numbers, and they behave completely differently the moment they meet another array.
+Both hold the same three numbers. They behave fully differently the moment they meet another array.
 
-Broadcasting aligns shapes **from the right**. Against a `(3, 4)` array, a `(3,)` column compares 4 with 3 and **raises** &mdash; even though it came out of that very array. The `(3, 1)` version compares 4 with 1, stretches, and works.
+Broadcasting aligns shapes **from the right**. Against a `(3, 4)` array, a `(3,)` column checks 4 with 3 and **raises**. though it came out of that very array. The `(3, 1)` version checks 4 with 1, stretches, and works.
 
-The last editor shows exactly that: the same column, taken two ways, one of which is an error. It is worth running, because "I sliced this out of the array so of course it fits" is a reasonable-sounding assumption that is simply false.
+The last editor shows just that: the same column, taken two ways, one of which is an error. It's worth running. "I sliced this out of the array so it fits" is a fair-sounding assumption that is simply false.
 
-When an operation gives you a surprisingly large result, or complains about shapes that "obviously" match, this is the first thing to check.
+When an step gives you a oddly large result, or complains about shapes that "obviously" match, this is the first thing to check.
 
 ## Negative indices and reversal
 
-Negative indices count from the end, exactly as in Python lists. `a[-1]` is the last element, `a[-2]` the second last.
+Minus indices count from the end, just as in Python lists. `a[-1]` is the last element, `a[-2]` the second last.
 
-They work per axis, so `a[-1, -1]` is the bottom-right element of a 2-D array, and `a[:, -1]` is the last column.
+They work per axis, so `a[-1, -1]` is the bottom-right element of a 2-D array. `a[:, -1]` is the last column.
 
-A negative step reverses. `a[::-1]` gives the array backwards, and it is a **view** &mdash; no data is copied, the stride is simply negative. That makes reversal free, which is why sorting descending is written as `np.sort(a)[::-1]` without any performance concern.
+A minus step reverses. `a[::-1]` gives the array backwards. It's a **view**. No data is copied, the stride is simply minus. That makes reversal free. This Is why sorting descending is written as `np.sort(a)[::-1]` without any speed concern.
 
-On more than one axis, each gets its own direction: `a[::-1, :]` reverses the rows and leaves the columns; `a[::-1, ::-1]` reverses both, which is a 180-degree rotation.
+On more than one axis, each gets its own direction: `a[::-1, :]` reverses the rows and leaves the columns. `a[::-1, ::-1]` reverses both. This Is a 180-degree rotation.
 
 ## Steps
 
-The third slice component is the step. `a[::2]` takes every second element, `a[1::2]` every second starting from the first.
+The third slice part is the step. `a[::2]` takes each second element, `a[1::2]` each second starting from the first.
 
-Strided slices are views, because a regular step is exactly what a stride can express. That is worth knowing when working with large arrays: downsampling an image by taking every fourth pixel costs nothing until you write to the result.
+Strided slices are views, because a regular step is just what a stride can express. That is worth knowing when working with large arrays. Downsampling an image by taking each fourth pixel costs nothing until you write to the result.
 
-Combining a step with a negative direction works but reads badly, and `a[::-2]` is one of the few slice forms worth writing a comment for.
+Mixing a step with a minus direction works but reads badly. `a[::-2]` is one of the few slice forms worth writing a comment for.
 
 ## Out of range: slices clip, indices raise
 
-This asymmetry catches people.
+This skew catches people.
 
 `a[100]` on a ten-element array raises `IndexError`.
 
 `a[5:100]` on the same array returns five elements. Slices clip silently to what exists.
 
-Both behaviours are defensible &mdash; an out-of-range index has no meaningful answer, while an out-of-range slice does &mdash; but the inconsistency means a slice-based bug produces a short array rather than an exception, and the failure surfaces somewhere else.
+Both actions are defensible &mdash; an out-of-range index has no real answer, while an out-of-range slice does &mdash; but the inconsistency means a slice-based bug makes a short array rather than an exception. The failure surfaces one spot else.
 
-If a slice must produce a specific length, check the length rather than assuming it. `assert len(chunk) == n` at the point of slicing localises the problem far better than a shape error three functions later.
+If a slice must give a exact length, check the length rather than given it. `assert len(chunk) == n` at the point of slicing localises the problem far better than a shape error three functions later.
 
 ## Assignment through a selection
 
-Anything you can select, you can assign to, and the value must either match the selection's shape or broadcast to it.
+Anything you can select, you can assign to. The value must either match the pick's shape or broadcast to it.
 
 `a[0] = 5` fills the first row with fives, broadcasting the scalar.
 
-`a[0] = [1, 2, 3]` sets the row, requiring exactly three values.
+`a[0] = [1, 2, 3]` sets the row, needing just three values.
 
-`a[0] = [1, 2]` raises, because two values neither match three nor broadcast to it.
+`a[0] = [1, 2]` raises. Two values neither match three nor broadcast to it.
 
-Assignment also **converts silently to the array's dtype**. Assigning 3.7 into an integer array stores 3. Assigning a long string into a fixed-width string array truncates it. Neither warns. This is a direct consequence of the array owning its dtype: the block cannot change type to accommodate what you put in it.
+set also **converts silently to the array's dtype**. Assigning 3.7 into an int array stores 3. Assigning a long string into a fixed-width string array truncates it. Neither warns. This is a direct result of the array owning its dtype. The block can't change type to accommodate what you put in it.
 
 ## The rule that explains the shapes
 
-There is one rule that predicts the shape of any basic selection:
+There's one rule that predicts the shape of any basic pick:
 
-**An integer removes an axis. A slice keeps it.**
+**An int drops an axis. A slice keeps it.**
 
-`a[0]` on a `(3, 4)` array gives `(4,)` &mdash; the row axis is gone.
+`a[0]` on a `(3, 4)` array gives `(4,)`. The row axis is gone.
 
-`a[0:1]` gives `(1, 4)` &mdash; the axis survives with length one.
+`a[0:1]` gives `(1, 4)` &mdash; the axis lives with length one.
 
-`a[:, 0]` gives `(3,)`; `a[:, 0:1]` gives `(3, 1)`.
+`a[:, 0]` gives `(3,)`. `a[:, 0:1]` gives `(3, 1)`.
 
-That last pair is the one that matters in practice, because the `(3, 1)` form broadcasts down a column and the `(3,)` form does not. When a broadcast fails on something you expected to work, an integer index that dropped an axis is a likely cause.
+That last pair is the one that matters because the `(3, 1)` form broadcasts down a column and the `(3,)` form doesn't. When a broadcast fails on a thing you expected to work, an int index that dropped an axis is a likely cause.
 
 ## A note on tuples
 
-`a[0, 1]` and `a[(0, 1)]` are the same thing &mdash; the comma builds a tuple, and NumPy interprets a tuple as one index per axis.
+`a[0, 1]` and `a[(0, 1)]` are the same thing. The comma builds a tuple. NumPy reads a tuple as one index per axis.
 
-`a[[0, 1]]` is a **list** and means something else entirely: fancy indexing, selecting rows 0 and 1.
+`a[[0, 1]]` is a **list** and means a thing else fully: fancy indexing, selecting rows 0 and 1.
 
-That distinction between a tuple and a list inside brackets is invisible at a glance and changes both the meaning and whether you get a view. It is worth being deliberate about, especially when the index is built programmatically &mdash; a list assembled in a loop and passed as an index does fancy indexing, and `tuple(...)` around it is the fix when you meant per-axis selection.
+That gap between a tuple and a list inside brackets is invisible at a glance and changes both the meaning and whether you get a view. It's worth being deliberate about, above all when the index is built programmatically. A list assembled in a loop and passed as an index does fancy indexing. `tuple(...)` around it's the fix when you meant per-axis pick.
 
 ## Indexing that is built programmatically
 
-When an index is assembled at runtime rather than written literally, the tuple-versus-list distinction becomes a real hazard.
+When an index is assembled at runtime rather than written truly, the tuple-versus-list gap turns a real hazard.
 
-`a[tuple(idx)]` selects one element per axis. `a[list(idx)]` does fancy indexing along the first axis. The two produce completely different results from the same values, and neither raises.
+`a[tuple(idx)]` selects one element per axis. `a[list(idx)]` does fancy indexing along the first axis. The two give fully other results from the same values, and neither raises.
 
-For code that builds indices dynamically, `tuple()` around the result makes the intent explicit and matches what NumPy expects for per-axis selection.
+For code that builds indices dynamically, `tuple()` around the result makes the intent clear and matches what NumPy expects for per-axis pick.
 
-`np.s_` is a small convenience for storing a slice as a value: `sl = np.s_[1:3, ::2]` can be passed around and applied later as `a[sl]`. It is useful for configurable windows, and clearer than constructing `slice(1, 3)` objects by hand.
+`np.s_` is a small convenience for storing a slice as a value: `sl = np.s_[1:3, ::2]` can be passed around and applied later as `a[sl]`. It's handy for configurable windows. Clearer than making `slice(1, 3)` objects by hand.
 
 ## Views, once more
 
-Every basic slice is a view. That is the single most consequential fact in this module, and it is worth stating in its practical form:
+each basic slice is a view. That is the single most consequential fact in this module. It's worth stating in its hands-on form:
 
-**Writing into a slice writes into the original.**
+**Writing into a slice writes into the first.**
 
-`a[1:3] = 0` sets elements of `a`. `b = a[1:3]; b += 1` also modifies `a`. A function that slices its argument and writes to the slice modifies the caller's array.
+`a[1:3] = 0` sets elements of `a`. `b = a[1:3]. B += 1` also modifies `a`. A function that slices its arg and writes to the slice modifies the caller's array.
 
-This is not a flaw. It is why slicing large arrays costs nothing and why NumPy code can pass windows around freely. But it differs from Python lists, where `a[1:3]` is a copy, and that difference is the source of a whole category of surprising bugs for people arriving from ordinary Python.
+This isn't a flaw. It's why slicing large arrays costs nothing and why NumPy code can pass windows around freely. But it differs from Python lists. Here `a[1:3]` is a copy. That gap is the source of a whole group of surprising bugs for people arriving from plain Python.
 
-`np.shares_memory(a, b)` settles any specific case. `copy()` breaks the connection when you want it broken.
+`np.shares_memory(a, b)` settles any exact case. `copy()` breaks the link when you want it broken.
 
 ## A summary of the selection forms
 
-`a[i]` &mdash; one element or one sub-array; drops an axis.
+`a[i]` &mdash; one element or one sub-array. Drops an axis.
 
-`a[i:j]` &mdash; a range; keeps the axis; a view.
+`a[i:j]` &mdash; a range. Keeps the axis. A view.
 
-`a[i:j:k]` &mdash; a strided range; still a view.
+`a[i:j:k]` &mdash; a strided range. Still a view.
 
-`a[::-1]` &mdash; reversed; still a view.
+`a[::-1]` &mdash; reversed. Still a view.
 
 `a[i, j]` &mdash; one index per axis, via a tuple.
 
-`a[..., j]` &mdash; the last axis, whatever the dimensionality.
+`a[..., j]` &mdash; the last axis, what the dimensionality.
 
 `a[None]` &mdash; a new length-1 axis at the front.
 
-`a[mask]` &mdash; boolean selection; a copy.
+`a[mask]` &mdash; boolean pick. A copy.
 
-`a[[i, j]]` &mdash; fancy indexing; a copy; can reorder and repeat.
+`a[[i, j]]` &mdash; fancy indexing. A copy. Can reorder and repeat.
 
-The first seven are views and free. The last two allocate, and get modules of their own. Knowing which group an expression falls into predicts both its cost and whether writing to the result affects the original &mdash; which between them explains most of NumPy's indexing behaviour.
+The first seven are views and free. The last two allocate. Get modules of their own. Knowing which group an formula falls into predicts both its cost and whether writing to the result affects the first. Which between them shows most of NumPy's indexing action.
 
 ## A closing note
 
-Indexing is where NumPy diverges most visibly from ordinary Python, in two ways that both matter.
+Indexing is where NumPy diverges most visibly from plain Python, in two ways that both matter.
 
-A slice is a view rather than a copy, so writing through it reaches the original. And an integer index drops an axis while a length-one slice keeps it, which decides whether a later broadcast succeeds.
+A slice is a view rather than a copy. Writing through it reaches the first. And an int index drops an axis while a length-one slice keeps it. This Decides whether a later broadcast succeeds.
 
 Neither is complicated, and both explain a large share of the surprises that follow in later modules.

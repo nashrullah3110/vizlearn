@@ -2,25 +2,11 @@ title: Transpose and Moving Axes
 intro: Reordering axes without moving a single byte.
 ## Strides again
 
-An array knows how many bytes to step for each axis. Transposing swaps those numbers along with the shape, and the underlying buffer is untouched.
+An array knows how many bytes to step for each axis. Transposing swaps those numbers along with the shape. The underlying buffer is untouched.
 
-That is why `a.T` on a gigabyte array returns instantly. It is a view, and `np.shares_memory(a, a.T)` confirms it.
+That is why `a.T` on a gigabyte array returns instantly. It's a view, and `np.shares_memory(a, a.T)` confirms it.
 
-Everything else in this module follows from that one fact.
-
-For a 2-D array, `.T` swaps rows and columns — the matrix transpose. Row 0 becomes column 0, row 1 becomes column 1, and so on. The shape `(3, 4)` becomes `(4, 3)`. This is the most common use, and for many people it is the only one.
-
-For higher-dimensional arrays, `.T` reverses all axes. A `(2, 3, 4)` array becomes `(4, 3, 2)`. That is often not what you want — reversing three axes at once is a specific operation, and the operation you actually need is usually moving one axis to a different position. `np.transpose(a, axes=(1, 0, 2))` swaps the first two axes while leaving the third in place. `np.moveaxis(a, source, destination)` is the more readable version: `np.moveaxis(a, 0, -1)` moves axis 0 to the end.
-
-The reason these operations are free is that no data is copied. The array's shape and strides change, but the underlying buffer is the same. `a.T` on a `(1000, 1000)` float64 array — 8 MB of data — returns instantly, because it is not moving 8 MB. It is changing two numbers in the array's metadata.
-
-That efficiency has a consequence for memory layout. A C-contiguous array (the default) has consecutive elements along the last axis. After `.T`, consecutive elements are along the first axis — the array is now Fortran-contiguous. Operations that walk along the last axis (which is what most NumPy functions do) are slower on the transposed view because they are jumping through memory instead of reading sequentially. `.copy()` makes a new C-contiguous array, which restores performance at the cost of an allocation.
-
-`np.swapaxes(a, axis1, axis2)` swaps exactly two axes. For a 3-D array, `np.swapaxes(a, 0, 2)` swaps axes 0 and 2, leaving axis 1 in place. It is equivalent to `np.transpose(a, (2, 1, 0))` but reads more clearly when you are moving exactly two.
-
-`np.expand_dims(a, axis)` and `np.squeeze(a)` add and remove length-1 axes, which is related to transposing in that both reshape without copying. `expand_dims` inserts a new axis of length 1 at the specified position; `squeeze` removes all axes of length 1. These are the tools for making shapes compatible for broadcasting — adding a dimension so a 1-D array becomes a column vector or a row vector.
-
-The `.T` shorthand is only for read access. You cannot assign to `a.T` directly — `a.T = something` raises. To modify the transposed view, assign to `a.T[:]` or use the transposed view as an index target. This is a deliberate safeguard: assigning to a view is a side effect on the original, and making it explicit prevents accidental writes.
+all else in this module follows from that one fact.
 
 ## .T reverses the axes
 
@@ -64,11 +50,11 @@ print(v[:, None] - v)
 
 `v.T` where `v` has shape `(3,)` gives shape `(3,)`. Nothing happens.
 
-There is no second axis to swap, so the operation is meaningless and NumPy performs it silently rather than raising. People coming from MATLAB or from linear algebra notation expect a column vector and get their input back.
+There's no second axis to swap. The step is meaningless and NumPy performs it silently rather than raising. People coming from MATLAB or from linear algebra form expect a column vector and get their input back.
 
-The fix is to add an axis: `v[:, None]` gives `(3, 1)`, and `v[None, :]` gives `(1, 3)`. `reshape(-1, 1)` does the same job.
+The fix is to add an axis: `v[:, None]` gives `(3, 1)`. `v[None, :]` gives `(1, 3)`. `reshape(-1, 1)` does the same job.
 
-This is also why an outer-style operation is written `v[:, None] - v` rather than `v.T - v`. The first broadcasts `(3,1)` against `(3,)` to give `(3,3)`; the second subtracts an array from itself and gives zeros.
+This is also why an outer-style step is written `v[:, None] - v` rather than `v.T - v`. The first broadcasts `(3,1)` against `(3,)` to give `(3,3)`. The second subtracts an array from itself and gives zeros.
 
 ## transpose with an explicit order
 
@@ -161,9 +147,9 @@ print("rot90 twice == flipping both ways:",
 
 `.T` reverses **all** axes. On shape `(2, 3, 4)` it gives `(4, 3, 2)`.
 
-That is well defined but rarely what anyone wants, because with three or more axes the interesting operation is usually moving one specific axis somewhere.
+That is well defined but rarely what anyone wants. With three or more axes the notable step is often moving one exact axis one spot.
 
-`a.transpose(2, 0, 1)` names the new order in terms of old positions: old axis 2 first, then old axis 0, then old axis 1. Reading it in that direction &mdash; "where does each new axis come from" &mdash; is the way to keep it straight.
+`a.transpose(2, 0, 1)` names the new order by old spots. Old axis 2 first, then old axis 0, then old axis 1. Reading it in that direction. "where does each new axis come from". Is the way to keep it straight.
 
 ## swapaxes and moveaxis
 
@@ -171,31 +157,31 @@ Both are clearer than counting.
 
 `np.swapaxes(a, 0, 2)` exchanges two axes and leaves the rest alone.
 
-`np.moveaxis(a, 0, -1)` takes axis 0 and puts it at the end, sliding the others along. This is the canonical fix for image layout: deep learning frameworks want `(channels, height, width)`, image libraries want `(height, width, channels)`, and `moveaxis` converts between them for free.
+`np.moveaxis(a, 0, -1)` takes axis 0 and puts it at the end, sliding the others along. This is the canonical fix for image layout. Deep learning frameworks want `(channels, height, width)`, image libraries want `(height, width, channels)`. `moveaxis` converts between them for free.
 
 Both return views.
 
 ## Contiguity, and the copy you did not ask for
 
-An array created by `reshape` on fresh data is **C-contiguous**: the last axis varies fastest and the elements sit in memory in the order you would read them.
+An array created by `reshape` on fresh data is **C-contiguous**. The last axis varies fastest and the elements sit in memory in the order you'd read them.
 
-Transposing breaks that. The transposed view is F-contiguous instead &mdash; the same buffer, read column-first.
+Transposing breaks that. The transposed view is F-contiguous instead. The same buffer, read column-first.
 
-Most operations do not care. But anything that needs a flat contiguous buffer must copy:
+Most steps don't care. But anything that needs a flat contiguous buffer must copy:
 
-`ravel()` returns a view when it can and a copy when it cannot. On a transposed array, it cannot.
+`ravel()` returns a view when it can and a copy when it can't. On a transposed array, it can't.
 
-`reshape` has the same behaviour, which is why "reshape returns a view" carries a *usually*.
+`reshape` has the same action. This Is why "reshape returns a view" carries a *often*.
 
-Neither warns you. If it matters &mdash; because the array is large, or because you were relying on writing through the result &mdash; check with `np.shares_memory`, or force the issue with `np.ascontiguousarray` so the copy is explicit and happens where you can see it.
+Neither warns you. If it matters. Because the array is large, or because you were leaning on writing through the result. Check with `np.shares_memory`, or force the issue with `np.ascontiguousarray` so the copy is clear and happens where you can see it.
 
 ## Transpose is not rotation
 
 This trips people up on image data.
 
-Transpose reflects along the main diagonal. Rotating a quarter turn is `np.rot90`. Mirroring is `np.flipud` (up-down) and `np.fliplr` (left-right).
+Transpose reflects along the main main-line. Rotating a quarter turn is `np.rot90`. Mirroring is `np.flipud` (up-down) and `np.fliplr` (left-right).
 
-They are related &mdash; a rotation is a transpose followed by a flip &mdash; but they are different operations, and reaching for `.T` to turn an image gives a mirrored result that looks almost right and is not.
+They're related &mdash; a rotation is a transpose followed by a flip &mdash; but they're other steps. Reaching for `.T` to turn an image gives a mirrored result that looks almost right and isn't.
 
 ## C order and F order, stated plainly
 
@@ -205,11 +191,11 @@ C order &mdash; NumPy's default, named for the C language &mdash; means the **la
 
 Fortran order means the **first** axis varies fastest. Column by column.
 
-A transposed C-ordered array is F-contiguous, because reading the transpose row by row is reading the original column by column. Nothing moved; the same bytes are simply described differently.
+A transposed C-sorted array is F-contiguous. Reading the transpose row by row is reading the first column by column. Nothing moved. The same bytes are simply given differently.
 
-Both flags can be true at once for a 1-D array or an array with a length-1 axis, and both can be false for a strided slice like `a[::2]`. `a.flags` reports all of it.
+Both flags can be true at once for a 1-D array or an array with a length-1 axis. Both can be false for a strided slice like `a[::2]`. `a.flags` reports all of it.
 
-Where this becomes practical: some LAPACK routines want Fortran order and will copy internally if they do not get it, and interfacing with Fortran or MATLAB-derived code sometimes requires `np.asfortranarray`. For everything else, staying in C order and not thinking about it is right.
+Where this turns hands-on: some LAPACK routines want Fortran order and will copy inside if they don't get it. Interfacing with Fortran or MATLAB-derived code at times needs `np.asfortranarray`. For all else, staying in C order and not thinking about it's right.
 
 ## expand_dims and squeeze at boundaries
 
@@ -217,104 +203,104 @@ The length-1 axis is the currency of shape negotiation between libraries.
 
 A model trained on batches expects `(batch, features)` and gets a single sample of shape `(features,)`. `x[None]` or `np.expand_dims(x, 0)` adds the batch axis.
 
-A result comes back as `(n, 1)` and the next function wants `(n,)`. `squeeze` removes it.
+A result comes back as `(n, 1)` and the next function wants `(n,)`. `squeeze` drops it.
 
-`expand_dims(a, axis)` is the explicit form of `a[None]`, and reads better when the axis position is computed rather than literal.
+`expand_dims(a, axis)` is the clear form of `a[None]`. Reads better when the axis spot is found rather than literal.
 
-`squeeze` with no argument removes **every** length-1 axis, which is the source of a genuinely nasty intermittent bug: a batch of one sample loses its batch dimension, so the code works for every batch size except one. Always name the axis &mdash; `squeeze(axis=1)` &mdash; in code that handles variable batch sizes.
+`squeeze` with no arg drops **each** length-1 axis. This Is the source of a truly nasty intermittent bug. A batch of one sample loses its batch dim. The code works for each batch size except one. Always name the axis. `squeeze(axis=1)`. In code that handles var batch sizes.
 
 ## einsum as general axis manipulation
 
-Once an operation needs a transpose, two `newaxis` insertions and a sum over a particular axis, `np.einsum` usually expresses it more clearly.
+Once an step needs a transpose, two `newaxis` insertions and a sum over a given axis, `np.einsum` often expresses it more clearly.
 
-The subscript string names an index for each axis of each operand and says which survive:
+The subscript string names an index for each axis of each operand and says which live:
 
-`"ij->ji"` is a transpose. `"ii->i"` extracts a diagonal. `"ij->j"` sums over rows. `"ij,jk->ik"` is matrix multiplication. `"bij,bjk->bik"` is batched matrix multiplication.
+`"ij->ji"` is a transpose. `"ii->i"` extracts a main-line. `"ij->j"` sums over rows. `"ij,jk->ik"` is mat product. `"bij,bjk->bik"` is batched mat product.
 
-Indices that appear on the left but not the right are summed over. Indices repeated between operands are matched and multiplied.
+Indices that appear on the left but not the right are summed over. Indices repeated between operands are matched and times'd.
 
-It is not always fast &mdash; for plain matrix products, `@` dispatches to a tuned BLAS routine and einsum may not. Its advantage is legibility: the string states the operation, where a chain of transposes and broadcasts states only the mechanics.
+It isn't always fast &mdash; for plain mat products, `@` dispatches to a tuned BLAS routine and einsum may not. Its edge is legibility. The string states the step. Here A chain of transposes and broadcasts states only the mechanics.
 
-`np.einsum_path` can be used to inspect and optimise the contraction order for expressions with several operands, where the order genuinely matters.
+`np.einsum_path` can be used to inspect and optimise the contraction order for expressions with a few operands. Here The order truly matters.
 
 ## The batch-axis convention
 
-Most numerical code follows one convention: **the batch axis comes first, and the axes being operated on come last**.
+Most numeric code follows one rule: **the batch axis comes first. The axes being operated on come last**.
 
 `(batch, height, width, channels)` for images in TensorFlow. `(batch, channels, height, width)` in PyTorch. `(samples, features)` for tabular data.
 
-The reason the operated-on axes go last is broadcasting: trailing axes align automatically, so a per-channel or per-feature parameter of shape `(channels,)` combines with the data without any index juggling. Put the channel axis first and the same operation needs `[:, None, None]`.
+The reason the operated-on axes go last is broadcasting. Trailing axes align on its own. A per-channel or per-feature param of shape `(channels,)` mixes with the data without any index juggling. Put the channel axis first and the same step needs `[:, None, None]`.
 
-`matmul` follows the same convention: it treats the last two axes as the matrix and broadcasts everything before them, so a `(batch, n, k) @ (k, m)` works directly.
+`matmul` follows the same rule: it treats the last two axes as the mat and broadcasts all before them. A `(batch, n, k) @ (k, m)` works right.
 
-Following the convention in your own arrays means broadcasting and `matmul` cooperate with you rather than requiring a transpose at every boundary.
+Following the rule in your own arrays means broadcasting and `matmul` cooperate with you rather than needing a transpose at each boundary.
 
 ## In practice
 
 Use `.T` freely on 2-D and never on 1-D.
 
-Use `moveaxis` or `swapaxes` on higher dimensions, because they name what you meant and `.T` reverses everything.
+Use `moveaxis` or `swapaxes` on higher dims. They name what you meant and `.T` reverses all.
 
-Remember that all of them return views over the same bytes, so a later `ravel` or `reshape` may copy without telling you &mdash; check with `np.shares_memory` when it matters, or force it with `np.ascontiguousarray`.
+note that all of them return views over the same bytes. A later `ravel` or `reshape` may copy without telling you. Check with `np.shares_memory` when it matters, or force it with `np.ascontiguousarray`.
 
-And keep the batch axis first. Most of the shape gymnastics people write is the cost of having put it somewhere else.
+And keep the batch axis first. Most of the shape gymnastics people write is the cost of having put it one spot else.
 
 ## Diagonals and axis-aware helpers
 
-`np.diagonal(a)` extracts the main diagonal and returns a view in modern NumPy &mdash; read-only, because writing to it has no consistent meaning across the strides involved.
+`np.main-line(a)` extracts the main main-line and returns a view in modern NumPy. Read-only. Writing to it has no steady meaning across the strides involved.
 
-`np.trace(a)` sums the diagonal without materialising it.
+`np.trace(a)` sums the main-line without materialising it.
 
-`np.fill_diagonal(a, value)` writes to the diagonal in place, which is the supported way to modify it. It is the standard step when building an adjacency or distance matrix that should have zeros on the diagonal.
+`np.fill_diagonal(a, value)` writes to the main-line in place. This Is the supported way to modify it. It's the standard step when building an adjacency or distance mat that should have zeros on the main-line.
 
-`offset` on `diagonal` selects the super- or sub-diagonals, which is how you extract a band.
+`offset` on `main-line` selects the super- or sub-diags. This Is how you extract a band.
 
 ## rollaxis, and why not to use it
 
-Older code uses `np.rollaxis`, which moves an axis but with argument semantics that are genuinely hard to reason about &mdash; the destination is interpreted differently depending on direction.
+Older code uses `np.rollaxis`. This Moves an axis but with arg semantics that are truly hard to reason about. The destination is read differently based on direction.
 
-`np.moveaxis` was added specifically to replace it, with the obvious semantics: source and destination, both plain positions.
+`np.moveaxis` was added namely to replace it, with the obvious semantics: source and destination, both plain spots.
 
-If you meet `rollaxis` in existing code, translating it to `moveaxis` and checking the resulting shape is usually worth doing while you are there. If you are writing new code, there is no reason to use it.
+If you meet `rollaxis` in existing code, translating it to `moveaxis` and checking the resulting shape is often worth doing while you're there. If you're writing new code, there's no reason to use it.
 
 ## Checking that a transform did what you meant
 
-Axis manipulation is the easiest place in NumPy to produce a result that has the right shape and the wrong contents.
+Axis handling is the easiest place in NumPy to give a result that has the right shape and the wrong contents.
 
 Two checks catch nearly all of it.
 
-**Verify a known element.** After `moveaxis(a, 0, -1)`, confirm that `b[i, j, k] == a[k, i, j]`. One assertion documents the transform better than a comment does.
+**Verify a known element.** After `moveaxis(a, 0, -1)`, confirm that `b[i, j, k] == a[k, i, j]`. One assertion docs the transform better than a comment does.
 
-**Use distinguishable test data.** `np.arange(24).reshape(2, 3, 4)` has a unique value in every position, so any misplacement is visible. An array of ones or of random values hides exactly the errors you are looking for.
+**Use distinguishable test data.** `np.arange(24).reshape(2, 3, 4)` has a unique value in each spot. Any misplacement is visible. An array of ones or of random values hides just the errors you're looking for.
 
-This is worth doing because the failure mode &mdash; correct shape, permuted contents &mdash; produces no error and often no obviously wrong output, just results that are subtly worse than they should be.
+This is worth doing because the failure mode. Correct shape, permuted contents. Makes no error and often no obviously wrong output, just results that are subtly worse than they should be.
 
 ## The summary
 
-`.T` &mdash; reverses all axes. Right for 2-D, wrong for most higher-dimensional intent, and silently a no-op on 1-D.
+`.T` &mdash; reverses all axes. Right for 2-D, wrong for most higher-dimensional intent. Silently a no-op on 1-D.
 
-`transpose(order)` &mdash; explicit permutation, read as "where each new axis comes from".
+`transpose(order)` &mdash; clear permutation, read as "where each new axis comes from".
 
 `swapaxes(i, j)` &mdash; exchange two, leave the rest.
 
-`moveaxis(src, dst)` &mdash; relocate one, slide the rest. The clearest of the four, and the right default for anything above 2-D.
+`moveaxis(src, dst)` &mdash; relocate one, slide the rest. The clearest of the four. The right default for anything above 2-D.
 
-`expand_dims` / `squeeze` &mdash; add and remove length-1 axes, with `squeeze` needing an explicit axis in any code that handles variable batch sizes.
+`expand_dims` / `squeeze` &mdash; add and drop length-1 axes, with `squeeze` needing an clear axis in any code that handles var batch sizes.
 
-`einsum` &mdash; when the index bookkeeping has become the substance of the operation.
+`einsum` &mdash; when the index bookkeeping has become the substance of the step.
 
-All of them return views. That is what makes them free, and it is also why a later `ravel` or `reshape` may copy without saying so &mdash; `np.shares_memory` when it matters, `np.ascontiguousarray` when you want the copy to happen somewhere visible.
+All of them return views. That is what makes them free. It's also why a later `ravel` or `reshape` may copy without saying so. `np.shares_memory` when it matters, `np.ascontiguousarray` when you want the copy to happen one spot visible.
 
 ## A closing note on cost
 
-Every operation in this module is free, and that is worth stating once more because it changes how you write code.
+each step in this module is free. That is worth stating once more because it changes how you write code.
 
-There is no reason to avoid a transpose, a `moveaxis` or an `expand_dims` on performance grounds. They adjust a handful of integers describing the array and return immediately, whatever its size.
+There's no reason to avoid a transpose, a `moveaxis` or an `expand_dims` on speed grounds. They adjust a handful of ints showing the array and return at once, what its size.
 
-The cost, when it comes, arrives later &mdash; at the point something needs contiguous memory and quietly copies. That is where to look when a pipeline is slower than the operations in it suggest, and `a.flags` plus `np.shares_memory` will tell you within a minute.
+The cost, when it comes, arrives later. At the point a thing needs contiguous memory and quietly copies. That is where to look when a pipeline is slower than the steps in it suggest. `a.flags` plus `np.shares_memory` will tell you within a minute.
 
 ## Where axis work fits
 
 Reordering axes is almost always a translation step: between how data arrived and how the next function wants it.
 
-That means the right question is rarely "how do I transpose this" but "what layout does the thing I am calling expect". Answering that first usually reveals that one `moveaxis` at the boundary replaces several scattered ones inside, and that keeping a single convention throughout removes most of them entirely.
+That means the right question is rarely "how do I transpose this" but "what layout does the thing I am calling expect". Answering that first often reveals that one `moveaxis` at the boundary replaces a few scattered ones inside. That keeping a single rule throughout drops most of them fully.

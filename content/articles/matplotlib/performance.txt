@@ -1,25 +1,13 @@
 title: Performance and Large Data
-intro: What makes a figure slow, and what to do when there are more points than pixels.
+intro: What makes a figure slow. What to do when there are more points than pixels.
 
 ## Artists, not data
 
 matplotlib's cost is dominated by the number of **artists** it manages, not the number of data values.
 
-One `plot` call with a million points creates one `Line2D`. A loop making two thousand calls creates two thousand artists, each with its own properties, transform and draw pass &mdash; and that is far slower even with a fraction of the data.
+One `plot` call with a million points creates one `Line2D`. A loop making two thousand calls creates two thousand artists, each with its own properties, transform and draw pass. And that is far slower even with a fraction of the data.
 
-The rule that follows is the same one as NumPy and pandas: **pass arrays, do not loop**. Where a loop is unavoidable, `LineCollection` and its relatives draw many segments as a single artist.
-
-The practical consequence is that you should batch drawing calls. Instead of looping over segments and calling `ax.plot` once per segment, build arrays of x and y coordinates separated by `NaN` (which breaks the line) and draw them in one call. One `Line2D` with gaps is far cheaper than a thousand `Line2D` objects with the same total number of points.
-
-`LineCollection`, `PathCollection`, and `PolyCollection` are the artist classes designed for this. Each draws many line segments, markers, or polygons as a single object with a single draw pass. `ax.scatter` already uses `PathCollection`, which is why a scatter plot of a million points is fast — it is one artist. Building a `LineCollection` manually takes a list of `(N, 2)` arrays, one per segment, and draws all of them with one call to `ax.add_collection`.
-
-Rendering backend matters. The default Agg backend rasterises everything to a pixel buffer, which scales with figure DPI and size but not with the number of data points (once they are drawn). The SVG and PDF backends produce one XML element or PDF path per artist, so a figure with ten thousand artists generates a file that is slow to open and huge on disk. For publication-quality vector output of dense plots, rasterising the data layer with `ax.set_rasterization_zorder(1)` while keeping the axes and labels as vectors gives the best of both worlds.
-
-Downsampling is the other lever. A million-point line on a 1000-pixel-wide figure cannot show more than about 2000 visually distinct points — two per column (the min and the max). Plotting all million is faithful but slow. The LTTB algorithm (Largest Triangle Three Buckets) reduces a time series to a fixed number of points while preserving the visual shape, and libraries like `mpl-point-clipping` or manual slicing with `a[::step]` achieve similar speedups with less sophistication.
-
-Interactive figures have tighter budgets. `%matplotlib widget` in a notebook re-renders on every pan and zoom, so a figure that takes 200 ms to draw feels sluggish. Keeping the artist count low and the data pre-downsampled makes the difference between a responsive exploration and a slideshow.
-
-Profiling is straightforward. `fig.canvas.draw()` with a timer around it measures the draw time. If it is over about 50 ms, the figure will stutter interactively, and the usual suspect is too many artists — `len(ax.get_children())` shows the count.
+The rule that follows is the same one as NumPy and pandas: **pass arrays, don't loop**. Where a loop is unavoidable, `LineCollection` and its relatives draw many segments as a single artist.
 
 
 ## Drawing cost grows with artists, not data
@@ -144,19 +132,19 @@ print("chart looks the same. It does hide genuine spikes, so for")
 print("min/max envelopes, aggregate rather than sample.")
 ```
 
-A seven-inch figure at 100 dpi is 700 pixels wide. Two hundred thousand points is roughly 285 per pixel column, and 284 of them are drawn exactly on top of others.
+A seven-inch figure at 100 dpi is 700 pixels wide. Two hundred thousand points is roughly 285 per pixel column. 284 of them are drawn just on top of others.
 
 They cost time and file size and contribute nothing visible.
 
-Reducing them is not a compromise; it is removing something the reader could never see. Two approaches, and the difference matters.
+Reducing them isn't a compromise. It's dropping a thing the reader could never see. Two approaches, and the gap matters.
 
-**Subsampling** &mdash; `x[::step]` &mdash; is trivial and drops whatever it does not land on. A single-sample spike disappears. For smooth, dense data that is fine; for anything where extremes matter it is not.
+**Subsampling** &mdash; `x[::step]` &mdash; is trivial and drops what it doesn't land on. A single-sample spike disappears. For smooth, dense data that is fine. For anything where extremes matter it isn't.
 
-**Aggregating** &mdash; binning by x and drawing the min and max in each bin as a filled band &mdash; keeps the envelope. The chart looks nearly identical to the full data because the envelope is what the eye was reading anyway, and genuine spikes survive.
+**Aggregating** &mdash; binning by x and drawing the min and max in each bin as a filled band &mdash; keeps the envelope. The chart looks nearly same to the full data because the envelope is what the eye was reading anyway, and genuine spikes live.
 
 The fourth editor puts one real spike in the data and shows subsampling losing it while binning keeps it.
 
-For scatter data, the equivalent is `hexbin` or `hist2d`, which replaces overplotted points with measured density.
+For scatter data, the equal is `hexbin` or `hist2d`. This Replaces overplotted points with measured density.
 
 ## Aggregate rather than sample
 
@@ -275,25 +263,25 @@ ax.set_title("seconds for 20 charts")
 
 For many points that all look alike, `ax.plot(x, y, "o")` is faster than `ax.scatter(x, y)`.
 
-`scatter` builds a collection that carries a size and colour per point, because that is what it is for. When those do not vary, the machinery is unused and paid for anyway.
+`scatter` builds a set that carries a size and colour per point. That is what it's for. When those don't vary, the machinery is unused and paid for anyway.
 
-So: `scatter` when size or colour encodes something, `plot` when it does not.
+So: `scatter` when size or colour codes a thing, `plot` when it doesn't.
 ## File size
 
-Vector formats store every element, so a scatter of 30,000 points is 30,000 objects in the PDF. Such files are slow to open and large.
+Vector formats store each element. So A scatter of 30,000 points is 30,000 objects in the PDF. Such files are slow to open and large.
 
-`rasterized=True` on the artist stores **that layer** as pixels while everything else &mdash; axes, ticks, labels, title &mdash; stays vector:
+`rasterized=True` on the artist stores **that layer** as pixels while all else. Axes, ticks, labels, title &mdash; stays vector:
 
 ```python
 ax.scatter(x, y, s=2, rasterized=True)
 fig.savefig("out.pdf", dpi=200)
 ```
 
-The result is a small file with sharp text and a pixel-based data layer, which is exactly the right trade for a dense scatter in a document. The `dpi` at save time controls the resolution of the rasterised part.
+The result is a small file with sharp text and a pixel-based data layer. This Is just the right trade for a dense scatter in a doc. The `dpi` at save time controls the detail of the rasterised part.
 
 ## Drawing loops
 
-Generating many similar charts &mdash; one per group, per day, per file &mdash; spends most of its time creating figures, not drawing data.
+making many similar charts &mdash; one per group, per day, per file &mdash; spends most of its time creating figures, not drawing data.
 
 Two levels of fix.
 
@@ -307,25 +295,25 @@ ax.relim(); ax.autoscale_view()
 fig.savefig(path)
 ```
 
-`relim` and `autoscale_view` are needed because setting data does not rescale the axes.
+`relim` and `autoscale_view` are needed because setting data doesn't rescale the axes.
 
-This is meaningfully faster when the layout is identical between charts, and it is the same mechanism animations use.
+This is usefully faster when the layout is same between charts. It's the same method animations use.
 
 ## When matplotlib is the wrong tool
 
-matplotlib renders once and is not built for interactive exploration of large data.
+matplotlib renders once and isn't built for interactive exploration of large data.
 
-**Datashader** aggregates hundreds of millions of points into an image, and is the right answer above a few million.
+**Datashader** aggregates hundreds of millions of points into an image. Is the right answer above a few million.
 
-**Plotly, Bokeh, Altair** give pan-and-zoom in a browser, which matplotlib's interactive backends do only awkwardly.
+**Plotly, Bokeh, Altair** give pan-and-zoom in a browser. This Matplotlib's interactive backends do only awkwardly.
 
 **mpl-scatter-density** and similar handle the dense-scatter case within matplotlib.
 
-The signal is usually the size: if a figure takes more than a few seconds to draw, the answer is a different approach rather than a faster matplotlib.
+The signal is often the size: if a figure takes more than a few seconds to draw, the answer is a other approach rather than a faster matplotlib.
 
 ## Measuring draw time
 
-Timing a matplotlib figure needs care, because the drawing is lazy: creating artists is fast and nothing is rendered until the canvas is drawn.
+Timing a matplotlib figure needs care. The drawing is lazy. Creating artists is fast and nothing is rendered until the canvas is drawn.
 
 ```python
 t = time.perf_counter()
@@ -333,75 +321,75 @@ fig.canvas.draw()
 elapsed = time.perf_counter() - t
 ```
 
-Without the explicit `draw()`, the timing measures only object creation and reports numbers far too good.
+Without the clear `draw()`, the timing measures only object creation and reports numbers far too good.
 
-The first draw of a session also pays for font cache and backend initialisation, which can be a second or more. A warm-up figure before timing anything is the difference between a meaningful comparison and a misleading one &mdash; the editors in this module do exactly that.
+The first draw of a session also pays for font cache and backend init. This Can be a second or more. A warm-up figure before timing anything is the gap between a real compare and a misleading one. The editors in this module do just that.
 
 ## Where the time goes
 
-For a typical figure, in rough order:
+For a common figure, in rough order:
 
 **Artist creation** when there are many artists.
 
 **Rendering** the artists to pixels.
 
-**Text layout**, which is more expensive than it sounds &mdash; a chart with hundreds of tick labels or annotations spends real time measuring glyphs.
+**Text layout**, which is more costly than it sounds. A chart with hundreds of tick labels or annotations spends real time measuring glyphs.
 
-**Font cache building**, once per environment, and occasionally minutes on first run.
+**Font cache building**, once per setting, and at times minutes on first run.
 
-**Saving**, particularly to vector formats with many elements.
+**Saving**, above all to vector formats with many elements.
 
-The practical consequences: fewer artists, fewer text objects, and rasterised layers for dense data.
+The hands-on results: fewer artists, fewer text objects, and rasterised layers for dense data.
 
 ## Interactive versus file output
 
-An interactive backend redraws on every pan, zoom and resize, so a figure that takes two seconds to draw is unusable interactively while being perfectly fine as a file.
+An interactive backend redraws on each pan, zoom and resize. A figure that takes two seconds to draw is unusable interactively while being just right fine as a file.
 
-That changes the trade-off. For a saved figure, drawing a million points slowly once is acceptable. For something a person will manipulate, the point budget is far smaller, and downsampling is not an optimisation but a requirement.
+That changes the trade-off. For a saved figure, drawing a million points slowly once is acceptable. For a thing a person will change, the point budget is far smaller. Downsampling isn't an tuning but a need.
 
-`fig.canvas.draw_idle()` defers a redraw until the event loop is free, which is what interactive tools use to stay responsive.
+`fig.canvas.draw_idle()` defers a redraw until the event loop is free. This Is what interactive tools use to stay responsive.
 
 ## Animations
 
-`FuncAnimation` re-renders a figure per frame, so the per-frame cost is what matters.
+`FuncAnimation` re-renders a figure per frame. So The per-frame cost is what matters.
 
-`blit=True` redraws only the artists that changed, which is much faster and requires the update function to return them.
+`blit=True` redraws only the artists that changed. This Is much faster and needs the update function to return them.
 
-The same reuse principle as the drawing loop applies: create the artists once, update their data each frame with `set_data`, and never call `plot` inside the update.
+The same reuse principle as the drawing loop applies. Create the artists once, update their data each frame with `set_data`. Never call `plot` inside the update.
 
 ## The wider picture
 
-matplotlib is designed for correctness and control rather than throughput, and its limits are reached sooner than people expect &mdash; tens of thousands of artists, or a few million points.
+matplotlib is designed for correctness and control rather than throughput. Its limits are reached sooner than people expect. Tens of thousands of artists, or a few million points.
 
 The escape routes, roughly by problem:
 
 **Too many points** &mdash; aggregate, or use datashader.
 
-**Too many artists** &mdash; collections instead of loops.
+**Too many artists** &mdash; sets instead of loops.
 
 **Too slow interactively** &mdash; a browser-based library.
 
 **Too many figures** &mdash; reuse, and close.
 
-The one that matters most is the first. Most performance problems in matplotlib are really a display problem: drawing more than the reader can see, which costs time and communicates nothing.
+The one that matters most is the first. Most speed problems in matplotlib are really a display problem. Drawing more than the reader can see. This Costs time and sends nothing.
 
 ## Font cache and first-run cost
 
-A surprise on a fresh environment: the very first matplotlib figure can take a long time, occasionally minutes, while the font cache is built.
+A surprise on a fresh setting: the very first matplotlib figure can take a long time, at times minutes, while the font cache is built.
 
-It happens once per environment and is cached afterwards, and it is a common source of "matplotlib is incredibly slow" reports from people who ran it once in a new container.
+It happens once per setting and is cached later. It's a common source of "matplotlib is incredibly slow" reports from people who ran it once in a new holder.
 
-In a container or CI image, drawing one throwaway figure at build time moves the cost out of the first real run.
+In a holder or CI image, drawing one throwaway figure at build time moves the cost out of the first real run.
 
-`matplotlib.get_cachedir()` shows where it lives, and deleting it forces a rebuild &mdash; which is the fix when a newly installed font is not being found.
+`matplotlib.get_cachedir()` shows where it lives, and deleting it forces a rebuild. Which is the fix when a newly installed font isn't being found.
 
 ## A performance checklist
 
 When a figure is slow, in the order worth checking:
 
-**How many artists?** `len(ax.lines) + len(ax.collections) + len(ax.patches)`. Hundreds is fine; tens of thousands is the problem.
+**How many artists?** `len(ax.lines) + len(ax.sets) + len(ax.patches)`. Hundreds is fine. Tens of thousands is the problem.
 
-**How many points, against how many pixels?** If it is more than a few per pixel column, the extras are invisible.
+**How many points, against how many pixels?** If it's more than a few per pixel column, the extras are invisible.
 
 **Is it in a loop?** Are figures being closed?
 
@@ -411,11 +399,11 @@ When a figure is slow, in the order worth checking:
 
 **Is it the first run?** The font cache.
 
-Most slow figures are the first two, and both are fixed by drawing less rather than by drawing faster.
+Most slow figures are the first two. Both are fixed by drawing less rather than by drawing faster.
 
 ## Budgets
 
-Rough numbers, which are more useful than general advice.
+Rough numbers, which are more handy than general advice.
 
 **Artists**: up to a few thousand is comfortable. Tens of thousands is slow. Hundreds of thousands will not finish in a reasonable time.
 
@@ -429,54 +417,54 @@ Rough numbers, which are more useful than general advice.
 
 **Vector output**: above roughly 10,000 elements the file becomes slow to open.
 
-Those thresholds explain most of the practical advice: pass arrays rather than looping, aggregate before plotting, rasterise dense layers, and reuse figures in loops.
+Those thresholds explain most of the hands-on advice. Pass arrays rather than looping, aggregate before plotting, rasterise dense layers, and reuse figures in loops.
 
 ## In summary
 
-Cost is driven by artists, not data points, so one call with an array beats a loop of calls by a wide margin.
+Cost is driven by artists, not data points. One call with an array beats a loop of calls by a wide margin.
 
 `plot` beats `scatter` when the markers are uniform.
 
-Past a few thousand points there are more points than pixels, and the extras cost time while communicating nothing.
+Past a few thousand points there are more points than pixels. The extras cost time while communicating nothing.
 
-Subsampling drops genuine extremes; binning to a min/max envelope keeps them, and looks the same.
+Subsampling drops genuine extremes. Binning to a min/max envelope keeps them, and looks the same.
 
 `rasterized=True` keeps a vector file small while leaving the text sharp.
 
-Creating figures is the expensive part of a drawing loop, so reuse them &mdash; and close them regardless, because matplotlib will not.
+Creating figures is the costly part of a drawing loop. Reuse them. And close them even so, because matplotlib won't.
 
-And when a figure takes seconds to draw, the answer is usually a different approach rather than a faster matplotlib.
+And when a figure takes seconds to draw, the answer is often a other approach rather than a faster matplotlib.
 
 ## When to stop optimising
 
-A figure that takes two seconds to draw once, and is then saved, is fine. There is nothing to fix.
+A figure that takes two seconds to draw once. Is then saved, is fine. There's nothing to fix.
 
 The cases that justify effort are narrower than they look:
 
-**A figure regenerated frequently** &mdash; in a dashboard build, a CI job, a loop over thousands of groups. The cost multiplies.
+**A figure regenerated often** &mdash; in a dashboard build, a CI job, a loop over thousands of groups. The cost times.
 
-**An interactive figure**, where every pan and zoom pays it again.
+**An interactive figure**, where each pan and zoom pays it again.
 
-**A figure that does not finish**, or exhausts memory, which is a correctness problem rather than a speed one.
+**A figure that doesn't finish**, or exhausts memory. This Is a correctness problem rather than a speed one.
 
-**A file too large to open**, which is the vector-scatter case.
+**A file too large to open**. This Is the vector-scatter case.
 
-Outside those, drawing time is usually a rounding error next to the data work that preceded it, and the effort is better spent on whether the chart says the right thing.
+Outside those, drawing time is often a rounding error next to the data work that preceded it. The effort is better spent on whether the chart says the right thing.
 
-That is worth stating because performance is easy to optimise and easy to over-optimise, and a fast chart nobody can read is not an improvement.
+That is worth stating because speed is easy to optimise and easy to over-optimise. A fast chart no one can read isn't an gain.
 
 ## One more thing
 
-`fig.canvas.draw_idle()` requests a redraw at the next opportunity rather than immediately, which is what keeps an interactive figure responsive when several things change at once.
+`fig.canvas.draw_idle()` requests a redraw at the next opportunity rather than at once. This Is what keeps an interactive figure responsive when a few things change at once.
 
-For a script it makes no difference, since the draw happens at save time either way. It matters in a callback that updates several artists, where an immediate draw per change would render the figure several times for one logical update.
+For a script it makes no gap. The draw happens at save time either way. It matters in a callback that updates a few artists. Here An direct draw per change would render the figure a few times for one logical update.
 
 ## The short version
 
-Nearly every performance problem in matplotlib is a display problem in disguise: drawing more than the output can show.
+Nearly each speed problem in matplotlib is a display problem in disguise: drawing more than the output can show.
 
-Fixing it by drawing less &mdash; aggregating, subsampling with care, rasterising a dense layer &mdash; makes the chart faster and usually more readable at the same time, which is unusual among optimisations.
+Fixing it by drawing less. Aggregating, subsampling with care, rasterising a dense layer &mdash; makes the chart faster and often more readable also. This Is unusual among optimisations.
 
 ## Reading the code back
 
-Performance work here is a short list checked in order: is there a loop creating artists, are there more points than pixels, are figures being closed, is the output vector with a dense layer in it. Four questions, and the first two account for nearly everything. None of them requires knowing anything about how matplotlib renders.
+speed work here is a short list checked in order. Is there a loop creating artists, are there more points than pixels, are figures being closed, is the output vector with a dense layer in it. Four questions. The first two account for nearly all. None of them needs knowing anything about how matplotlib renders.

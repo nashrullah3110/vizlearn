@@ -3,21 +3,21 @@ intro: Classification tells you what. A regression head tells you where.
 
 ## What a detector outputs and how it is trained
 
-An object detector's output head does two jobs per candidate region: classify what is there, and regress four numbers describing where it is precisely &mdash; typically a box centre, width and height, or the offsets needed to nudge a fixed anchor box onto the real object. The classification half is an ordinary softmax problem. The localisation half is what this module is about, and <a href="iou_and_non_max_suppression.html" style="color: var(--accent-primary)">IoU</a> sits at the centre of it twice: once inside the training loss, and again in how the model gets graded afterward.
+An object detector's output head does two jobs per candidate region: classify what is there. And regress four counts describing where it is precisely. Often a box centre, width and height. Or the offsets needed to nudge a fixed anchor box onto the real object. The sorting half is an ordinary softmax problem. The localisation half is what this module is about. And <a href="iou_and_non_max_suppression.html" style="color: var(--accent-primary)">IoU</a> sits at the centre of it twice: once inside the training loss. And again in how the net gets graded afterward.
 
-This page covers the two box representations (corner and centre forms), how anchor boxes work, what the regression target actually is, and the IoU-based loss that replaced smooth-L1 in most modern architectures. The visualisation above lets you drag predicted and ground-truth boxes and watch IoU, the classification label, and the loss value update in real time.
+This page covers the two box forms (corner and centre forms), how anchor boxes work, what the regression target really is. And the IoU-based loss that replaced smooth-L1 in most modern designs. The visualisation above lets you drag predicted and ground-truth boxes and watch IoU, the sorting label. And the loss value update in real time.
 
-Anchor boxes are the starting point: a grid of fixed rectangles at multiple scales and aspect ratios, each one a hypothesis the model refines. The regression head predicts small offsets (dx, dy, dw, dh) relative to each anchor rather than absolute coordinates, which keeps the numbers small and training stable. At inference, [non-max suppression](iou_and_non_max_suppression.html) collapses overlapping predictions into one box per object, using IoU to decide which boxes are duplicates.
+Anchor boxes are the starting point: a grid of fixed rectangles at multiple scales and aspect ratios, each one a hypothesis the net refines. The regression head predicts small offsets (dx, dy, dw, dh) relative to each anchor rather than absolute coordinates. It keeps the counts small and training stable. At test time, [non-max suppression](iou_and_non_max_suppression.html) collapses overlapping predictions into one box per object, with IoU to decide which boxes are duplicates.
 
 ## IoU as loss, IoU as grade
 
-A natural localization loss is simply <code>1 − IoU</code> between the predicted box and the ground truth box: 0 when they coincide exactly, approaching 1 as they stop overlapping at all. At evaluation time, the same IoU number gets a different job — a detection is usually scored as a <strong>true positive</strong> only if its IoU with the matching ground truth box clears a threshold, conventionally <strong>0.5</strong> under the PASCAL VOC convention. A box can be visibly "close" and still count as a complete miss if it doesn't clear that bar.
+A natural localization loss is simply <code>1 − IoU</code> between the predicted box and the ground truth box: 0 when they coincide just, approaching 1 as they stop overlapping at all. At test time, the same IoU count gets a other job. A detection is often scored as a <strong>true positive</strong> just if its IoU with the matching ground truth box clears a threshold, conventionally <strong>0.5</strong> under the PASCAL VOC convention. A box can be visibly "close" and still count as a complete miss if it doesn't clear that bar.
 
-## Classification says what; detection says what and where
+## Sorting says what. Detection says what and where
 
-A classifier answers one question about a whole image. A detector answers two questions about every object in it: <em>what is it</em>, and <em>where is it</em> &mdash; expressed as a rectangle.
+A sorter answers one question about a whole pic. A detector answers two questions about each object in it: <em>what is it</em>. And <em>where is it</em> &mdash; expressed as a rectangle.
 
-A bounding box is four numbers, and there are three common conventions:
+A bounding box is four counts. And there are three common conventions:
 
 |Format|Numbers|Used by|
 |---|---|---|
@@ -25,35 +25,35 @@ A bounding box is four numbers, and there are three common conventions:
 |`(x, y, width, height)`|Top-left corner and size|COCO|
 |`(cx, cy, w, h)` normalised|Centre and size, 0&ndash;1|YOLO|
 
-Mixing them up is the single most common bug in detection code, and it fails quietly: boxes appear in roughly plausible places and the metrics are mysteriously poor. Always check which convention a dataset and a model each expect.
+Mixing them up is the single most common bug in detection code. And it fails quietly: boxes appear in roughly plausible places and the metrics are mysteriously poor. Always check which convention a dataset and a net each expect.
 
-Each box also carries a class label and a confidence score, so one detection is: a rectangle, a name, and a number between 0 and 1.
+Each box also carries a class label and a confidence score. So one detection is: a rectangle, a name. And a count between 0 and 1.
 
 ## The hard parts
 
-Detection is substantially harder than classification for reasons that are structural rather than incidental.
+Detection is much harder than sorting for reasons that are structural rather than incidental.
 
-<strong>The number of outputs varies.</strong> A network produces a fixed-size output; an image may contain zero objects or fifty. Every detector architecture is, at heart, a way of handling that mismatch.
+<strong>The count of outputs varies.</strong> A network gives a fixed-size output. An pic may hold zero objects or fifty. Each detector design is, at heart, a way of handling that mismatch.
 
-<strong>Objects vary enormously in scale.</strong> A pedestrian may be 20 pixels tall or 500. A single feature map has one effective scale, which is why detectors predict from several feature maps at once.
+<strong>Objects vary enormously in scale.</strong> A pedestrian may be 20 pixels tall or 500. A single feature map has one effective scale. It is why detectors predict from a few feature maps at once.
 
-<strong>Localisation and classification are different tasks</strong> with different losses, trained jointly &mdash; typically a cross-entropy for the class and a regression loss (smooth L1, or a direct IoU loss) for the coordinates.
+<strong>Localisation and sorting are other tasks</strong> with other losses, trained jointly. Often a cross-entropy for the class and a regression loss (smooth L1, or a direct IoU loss) for the coordinates.
 
-<strong>The background dominates.</strong> Most candidate positions contain nothing at all, often by a thousand to one. That extreme imbalance is why focal loss &mdash; which down-weights easy, well-classified examples &mdash; was invented for detection specifically.
+<strong>The background dominates.</strong> Most candidate positions hold nothing at all, often by a thousand to one. That extreme imbalance is why focal loss. Which down-weights easy, well-classified cases &mdash; was invented for detection namely.
 
 ## Two families of detector
 
-<strong>Two-stage detectors</strong> (R-CNN, Fast R-CNN, Faster R-CNN) first propose regions that might contain something, then classify and refine each proposal. More accurate, historically slower, and still preferred where precision matters more than latency.
+<strong>Two-stage detectors</strong> (R-CNN, Fast R-CNN, Faster R-CNN) first propose regions that might hold something, then classify and refine each proposal. More exact, historically slower. And still preferred where precision matters more than latency.
 
-<strong>One-stage detectors</strong> (YOLO, SSD, RetinaNet) predict boxes and classes directly from the feature maps in a single pass. Much faster, and the accuracy gap has largely closed &mdash; which is why most production systems now use them.
+<strong>One-stage detectors</strong> (YOLO, SSD, RetinaNet) predict boxes and classes right from the feature maps in a single pass. Much faster, and the score gap has largely closed. Which is why most production systems now use them.
 
-<strong>Anchor-based versus anchor-free</strong> is the other axis. Anchor-based methods place a set of predefined box shapes at every position and learn offsets from them. Anchor-free methods (FCOS, CenterNet, recent YOLO versions) predict boxes directly, removing the anchor hyperparameters that were always awkward to tune.
+<strong>Anchor-based versus anchor-free</strong> is the other axis. Anchor-based ways place a set of predefined box shapes at each position and learn offsets from them. Anchor-free ways (FCOS, CenterNet, recent YOLO versions) predict boxes right, removing the anchor hyperparameters that were always awkward to tune.
 
-<strong>DETR</strong> and its successors take a third route entirely, treating detection as set prediction with a transformer and removing the need for non-maximum suppression &mdash; conceptually cleaner, and slower to train.
+<strong>DETR</strong> and its successors take a third route fully, treating detection as set prediction with a transformer and removing the need for non-max suppression &mdash; conceptually cleaner. And slower to train.
 
-## Four numbers, and everything that depends on them
+## Four counts, and all that depends on them
 
-A bounding box is four numbers, and almost every detection bug comes from a disagreement about which four. This works through the formats, the conversions, IoU, non-max suppression and the loss -- all of it arithmetic you can check line by line.
+A bounding box is four counts. And almost each detection bug comes from a disagreement about which four. This works through the formats, the conversions, IoU, non-max suppression and the loss -- all of it arithmetic you can check line by line.
 
 ```python-run
 import numpy as np
@@ -104,7 +104,7 @@ print("   indices and added 1, which is why VOC numbers and COCO numbers")
 print("   for the same model differ slightly.")
 ```
 
-IoU measures how well a predicted box overlaps the ground truth, and the max/min pattern makes it straightforward to compute.
+IoU measures how well a predicted box overlaps the ground truth. And the max/min pattern makes it straightforward to compute.
 
 ```python-run
 def iou(a, b):
@@ -181,7 +181,7 @@ keep, killed = nms(DETS, 0.5)
 print("threshold 0.5 -> keeps %d of %d" % (len(keep), len(DETS)))
 ```
 
-Lowering the threshold suppresses more boxes. Compare the two settings side by side.
+Lowering the threshold suppresses more boxes. Check the two settings side by side.
 
 ```python-run
 import numpy as np
@@ -245,7 +245,7 @@ print("   soft-NMS (decay the score instead of deleting) and DETR")
 print("   (predict a fixed set, no NMS at all) were designed around.")
 ```
 
-Detection also needs a regression loss on the box coordinates, and the standard choices each have a weakness.
+Detection also needs a regression loss on the box coordinates. And the standard choices each have a weakness.
 
 ```python-run
 def iou(a, b):
@@ -284,14 +284,14 @@ print("   the same thing whenever you can arrange it.")
 
 ## Things to try
 
-1. <strong>Read the starting position.</strong> The predicted box is offset and undersized relative to the ground truth — overlap is low, loss is close to 1, and it does not count as a match.
-2. <strong>Drag dx and dy toward 0.</strong> IoU climbs as the boxes line up spatially, and the loss falls in lockstep — this is the gradient signal a real localization head would be trained on.
-3. <strong>Now close dw and dh too.</strong> Position alone isn't enough — a box in the right place but the wrong size still loses IoU on both sides.
-4. <strong>Watch the Match readout as IoU crosses 0.5.</strong> It flips from a miss to a match at exactly that boundary, even though the loss was already improving smoothly well before the flip.
+1. <strong>Read the starting position.</strong> The predicted box is offset and undersized relative to the ground truth. Overlap is low, loss is close to 1. And it does not count as a match.
+2. <strong>Drag dx and dy toward 0.</strong> IoU climbs as the boxes line up spatially. And the loss falls in lockstep. This is the gradient signal a real localization head would be trained on.
+3. <strong>Now close dw and dh too.</strong> Position alone isn't enough. A box in the right place but the wrong size still loses IoU on both sides.
+4. <strong>Watch the Match readout as IoU crosses 0.5.</strong> It flips from a miss to a match at just that edge, still though the loss was now improving smoothly well before the flip.
 
 ## Summing up
 
-<code>1 − IoU</code> is a smooth, differentiable signal that a network can actually be trained against. Whether a detection counts as correct at evaluation time is not smooth at all — it's a hard threshold on that same IoU number. A model can make genuine, loss-reducing progress on a box for a long stretch before that progress ever shows up as a correct detection in your metrics.
+<code>1 − IoU</code> is a smooth, differentiable signal that a network can really be trained against. Whether a detection counts as correct at test time is not smooth at all. It's a hard threshold on that same IoU count. A net can make genuine, loss-reducing progress on a box for a long stretch before that progress ever shows up as a correct detection in your metrics.
 
 ## How detections are scored
 
@@ -299,44 +299,44 @@ print("   the same thing whenever you can arrange it.")
 
 <p class="mono-font">IoU = area of overlap / area of union</p>
 
-It runs from 0 (no overlap) to 1 (perfect). A prediction usually counts as correct if its IoU with a ground-truth box of the same class exceeds a threshold &mdash; 0.5 is the traditional choice.
+It runs from 0 (no overlap) to 1 (perfect). A prediction often counts as correct if its IoU with a ground-truth box of the same class exceeds a threshold. 0.5 is the classic choice.
 
-<strong>Non-maximum suppression</strong> is the cleanup step. A detector typically fires several times on the same object, so NMS keeps the highest-scoring box and discards any box overlapping it by more than a threshold. Without it, every object is reported three or four times.
+<strong>Non-max suppression</strong> is the cleanup step. A detector often fires a few times on the same object. So NMS keeps the highest-scoring box and discards any box overlapping it by more than a threshold. Without it, each object is reported three or four times.
 
-<strong>mAP (mean Average Precision)</strong> is the standard headline metric. For each class, sweep the confidence threshold, build a precision-recall curve, take its area; then average across classes. COCO's version averages further over IoU thresholds from 0.5 to 0.95, which rewards precise localisation rather than approximate boxes.
+<strong>mAP (mean Average Precision)</strong> is the standard headline metric. For each class, sweep the confidence threshold, build a precision-recall curve, take its area. Then average across classes. COCO's version averages more over IoU thresholds from 0.5 to 0.95. It rewards precise localisation rather than approximate boxes.
 
-The practical reading: mAP@0.5 tells you whether objects are found; mAP@0.5:0.95 tells you whether the boxes are tight.
+The real reading: mAP@0.5 tells you whether objects are found. MAP@0.5:0.95 tells you whether the boxes are tight.
 
-## Annotation, and where projects actually fail
+## Annotation, and where projects really fail
 
-Detection datasets are expensive, and the quality of the boxes sets the ceiling on the model.
+Detection datasets are costly. And the quality of the boxes sets the ceiling on the net.
 
-- <strong>Be consistent about tightness.</strong> Does the box include the shadow? The handle? The occluded part? Write the rule down before annotating, because a model trained on inconsistent boxes learns the inconsistency.
-- <strong>Label every instance.</strong> A missed object is trained as background, which actively teaches the model not to detect it.
+- <strong>Be consistent about tightness.</strong> Does the box include the shadow? The handle? The occluded part? Write the rule down before annotating, since a net trained on inconsistent boxes learns the inconsistency.
+- <strong>Label each instance.</strong> A missed object is trained as background. It actively teaches the net not to detect it.
 - <strong>Decide on occlusion and truncation rules</strong> for objects half out of frame.
-- <strong>Watch class imbalance.</strong> Rare classes need either more examples or a weighted loss.
-- <strong>Match augmentation to the boxes.</strong> Flipping, rotating or cropping an image must transform the coordinates too &mdash; libraries such as Albumentations do this correctly, and hand-rolled pipelines frequently do not.
+- <strong>Watch class imbalance.</strong> Rare classes need either more cases or a weighted loss.
+- <strong>Match augmentation to the boxes.</strong> Flipping, rotating or cropping an pic must transform the coordinates too. Libraries such as Albumentations do this correctly. And hand-rolled pipelines often do not.
 
-A few hundred well-annotated images plus a pretrained backbone will usually outperform thousands of sloppy ones.
+A few hundred well-annotated pics plus a pretrained backbone will often beat thousands of sloppy ones.
 
 ## Questions people ask
 
 <strong>Which detector should I start with?</strong> A recent YOLO or a torchvision Faster R-CNN, fine-tuned from pretrained weights. Training a detector from scratch needs far more data than most projects have.
 
-<strong>How much data do I need?</strong> With transfer learning, a few hundred annotated images per class gets a usable model. Thousands for production reliability.
+<strong>How much data do I need?</strong> With transfer learning, a few hundred annotated pics per class gets a usable net. Thousands for production reliability.
 
-<strong>What IoU threshold should I use for NMS?</strong> 0.5 is typical. Lower it if duplicates persist, raise it if genuinely overlapping objects are being suppressed.
+<strong>What IoU threshold should I use for NMS?</strong> 0.5 is typical. Less it if duplicates persist, raise it if genuinely overlapping objects are being suppressed.
 
-<strong>Why are small objects missed?</strong> Because they occupy few pixels in the feature maps used for prediction. Feature pyramids, higher-resolution input and tiled inference are the standard responses.
+<strong>Why are small objects missed?</strong> Since they occupy few pixels in the feature maps used for prediction. Feature pyramids, more-resolution input and tiled test time are the standard replies.
 
-<strong>What is the difference from segmentation?</strong> Detection gives boxes; semantic segmentation labels every pixel; instance segmentation gives per-object masks. Boxes are cheaper to annotate and often enough.
+<strong>What is the gap from segmentation?</strong> Detection gives boxes. Semantic segmentation labels each pixel. Instance segmentation gives per-object masks. Boxes are cheaper to annotate and often enough.
 
 <strong>How do I detect objects in video?</strong> Detect per frame, then associate detections across frames with a tracker (SORT, ByteTrack) to give each object a persistent identity.
 
 ## Recap in one screen
 
-- Detection outputs a box, a class and a confidence for every object present.
-- Box formats differ between datasets &mdash; corners, corner-plus-size, and normalised centre-plus-size.
-- Two-stage detectors propose then classify; one-stage detectors predict directly and are now the practical default.
-- IoU measures overlap, NMS removes duplicates, and mAP is the headline metric.
-- Annotation consistency sets the ceiling; augmentation must transform the boxes as well as the image.
+- Detection outputs a box, a class and a confidence for each object present.
+- Box formats differ between datasets &mdash; corners, corner-plus-size. And scaled centre-plus-size.
+- Two-stage detectors propose then classify. One-stage detectors predict right and are now the real default.
+- IoU measures overlap, NMS removes duplicates. And mAP is the headline metric.
+- Annotation consistency sets the ceiling. Augmentation must transform the boxes as well as the pic.

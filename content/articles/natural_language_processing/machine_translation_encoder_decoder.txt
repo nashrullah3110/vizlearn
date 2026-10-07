@@ -1,38 +1,45 @@
 title: Machine Translation with an Encoder-Decoder
-intro: Two problems, not one - deciding what each output word depends on, and deciding which output sequence to emit.
+intro: Two problems, not one - deciding what each output word depends on. Deciding which output sequence to emit.
 
 ## Alignment, without an alignment model
 
-Before 2014, machine translation used alignment models. These were separate parts. They decided which source words matched each target word. This was a major research area.
+Statistical machine translation before 2014 had an clear alignment
+component: a separate model, trained apart, deciding which source words
+each target word came from. It was a whole subfield.
 
-Neural translation dropped alignment models. It got alignment for free. Attention weights train on one task: predict the next token. They by itself concentrate on the right source words.
+Neural translation deleted it, and got alignment for free. The focus
+weights &mdash; trained on nothing but "predict the next target token" &mdash;
+turn out to focus on the source words a translator would point at.
 
-The heatmap in the explorer shows this. Each row is one target word, each
+The heatmap in the explorer shows this. each row is one target word, each
 column one source word, and the row sums to 1. Look at the first sentence: `le
-chat noir` becomes `the black cat`, and the alignment **crosses**, because
+chat noir` turns `the black cat`, and the alignment **crosses**, because
 French puts the adjective after the noun. Target word 2 (`black`) attends to
-source word 3 (`noir`). No rule encoded that; a model that mis-aligned it would
+source word 3 (`noir`). No rule coded that. A model that mis-aligned it would
 translate badly and be penalised.
 
 The second sentence shows the harder cases. French negation wraps the verb in
-two words, `ne ... pas`, where English uses one, `not` &mdash; so `not` attends
+two words, `ne ... pas`. Here English uses one, `not` &mdash; so `not` attends
 to both. And `do` has nothing at all to align to: it exists only because English
-needs an auxiliary in negated sentences. Its attention is diffuse, which is
-the model correctly reporting that there is no source word to point at.
+needs an auxiliary in negated sentences. Its focus is diffuse, which is
+the model right reporting that there's no source word to point at.
 
 The **entropy** statistic quantifies that. A sharp alignment is under about 0.6
-bits; a diffuse one is higher, and the "effective sources" figure converts it
+bits. A diffuse one is higher, and the "effective sources" figure converts it
 back into a count of words. Sliding the temperature control shows the two
-failure modes: flatten the distribution and the context vector becomes an
-average of the whole sentence, sharpen it too far and a word that truly
+failure modes: flatten the spread and the context vector turns an
+mean of the whole sentence, sharpen it too far and a word that truly
 depends on two source words can only look at one.
 
 ## The second problem: which sequence?
 
-The model gives a chance distribution over the next token. It depends on the source and last output. It does *not* give a translation. Converting chances into a sentence needs search. The search is a separate algorithm.
+The model gives you a chance spread over the next token, conditioned
+on the source and all emitted so far. It does *not* give you a
+translation. Turning one into the other is a search over an exponentially large
+space, and it's a separate method with its own settings.
 
-**Greedy decoding** takes the highest-chance token at each step. It is
-cheap, it is what people implement first, and it is wrong in a set and
+**Greedy decoding** takes the highest-chance token at each step. It's
+cheap, it's what people run first, and it's wrong in a exact and
 damaging way.
 
 Select the second sentence in the explorer and set the beam width to 1. The
@@ -45,48 +52,48 @@ model's own next-token table gives, after `i`:
 | don't | &minus;1.50 |
 
 Greedy takes `speak`, and the output is **"i speak french"** &mdash; a fluent
-sentence with the opposite meaning, because the negation is gone and there is
-no way back. Widen the beam to 3 and `do` stays alive; it leads to `not`,
+sentence with the opposite meaning, because the negation is gone and there's
+no way back. Widen the beam to 3 and `do` stays alive. It leads to `not`,
 `speak`, `french`, and a total log-chance of &minus;1.22 against greedy's
 &minus;2.25.
 
-That is the entire argument for beam search, and the case is chosen because
-the failure is *semantic*. Greedy decoding does not give clearly worse
-grammar. It gives confident, well-formed sentences that mean something else.
+That is the entire arg for beam search, and the example is chosen because
+the failure is *semantic*. Greedy decoding doesn't give noticeably worse
+grammar. It makes confident, well-formed sentences that mean a thing else.
 
 ## How beam search works
 
 Keep the k best partial sequences at each step. Expand each with each
-doable next token, score all the candidates, keep the best k again, and
-continue until they have all emitted end-of-sequence.
+possible next token, score all the picks, keep the best k again, and
+continue until they've all emitted end-of-sequence.
 
 The tree in the explorer draws this. Each row is one step, the surviving beams
 are the boxes, and the edges show which parent each came from. The best-scoring
 beam is highlighted, and you can watch it change parent partway down &mdash;
-which is just the moment beam search does something greedy cannot.
+which is just the moment beam search does a thing greedy can't.
 
-Two things are worth knowing about the width. It is *not* exact search: beam
-search offers no guarantee of finding the highest-chance sequence, because
+Two things are worth knowing about the width. It's *not* exact search: beam
+search offers no ensure of finding the highest-chance sequence, because
 a sequence whose prefix falls out of the top k at any step is gone forever. And
-raising it does not monotonically help. Past roughly 10, translation quality
-measured by BLEU often *degrades*, which is a well-documented and slightly
+growing it doesn't monotonically help. Past roughly 10, translation quality
+measured by BLEU often *degrades*. This Is a well-documented and slightly
 uncomfortable result: the model's true highest-chance output tends to be
-short and dull, and a narrow beam's failure to find it is doing useful work.
-The statistic in the explorer comparing your beam against beam 5 is there to
-make the point that wider is often just the same answer for more compute.
+short and dull, and a narrow beam's failure to find it's doing handy work.
+The statistic in the explorer checking your beam against beam 5 is there to
+make the point that wider is often just the same answer for more find.
 
-## The length cost
+## The length penalty
 
-Each token multiplies another chance below 1, so a longer sequence has a
+each token times another chance below 1. So A longer sequence has a
 lower total chance, always. Unnormalised, the search so prefers to
 stop early &mdash; it will truncate rather than finish the sentence.
 
-Set the length cost **alpha to 0** in the explorer on the first sentence.
-The winning beam becomes "the cat", with a total log-chance of
+Set the length fine **alpha to 0** in the explorer on the first sentence.
+The winning beam turns "the cat", with a total log-chance of
 &minus;1.72, beating the full "the black cat sleeps on the mat" at &minus;2.10.
-The short output is not better; it is shorter.
+The short output isn't better. It's shorter.
 
-The standard fix divides the score by a function of length:
+The standard fix cuts the score by a function of length:
 
 ```
 score = (sum of log probabilities) / ((5 + |Y|) / 6) ^ alpha
@@ -96,8 +103,8 @@ At alpha = 0.7 the full sentence scores &minus;1.225 against the truncation's
 &minus;1.409, and wins. Push alpha past 1 and the correction over-corrects: the
 model starts padding, because length is now rewarded on its own.
 
-This is a genuine hyperparameter with no principled value, tuned on a
-development set, and it is the reason two implementations of "the same" model
+This is a genuine setting with no principled value, tuned on a
+development set, and it's the reason two setups of "the same" model
 give different output.
 
 ```python
@@ -124,70 +131,70 @@ def beam_search(model, src, beam=4, alpha=0.7, max_len=64, eos=2):
     return max(finished, key=lambda c: c[1] / ((5 + len(c[0])) / 6) ** alpha)[0]
 ```
 
-The comment marks the mistake that is easiest to make: normalising after
-choice rather than before means the pruning at each step still has the
-short-sequence bias, and the cost only affects the final pick.
+The comment marks the mistake that is easiest to make: norming after
+pick rather than before means the pruning at each step still has the
+short-sequence bias, and the fine only affects the final pick.
 
 ## Why it stops
 
-One mechanical detail decides how long the output is, and it is not a length
-parameter.
+One mechanical detail decides how long the output is, and it isn't a length
+param.
 
-The target vocabulary holds a special end-of-sequence token, and it is
+The target vocab holds a special end-of-sequence token, and it's
 predicted like any other word. The model has learned, from the training data,
 that after a complete sentence the most likely next token is the one that ends
-it. Generation stops when that token is emitted &mdash; or when a maximum
+it. Generation stops when that token is emitted. Or when a max
 length is hit, which is a safety net rather than the intended path.
 
-This is why the length cost operates where it does. The competition is
+This is why the length fine operates where it does. The contest is
 between emitting end-of-sequence now and emitting another content word, and
-both are just entries in the same distribution. When the built up
+both are just entries in the same spread. When the built up
 log-chance is the score, stopping is always locally attractive, because it
 is the only choice that stops making the score worse.
 
 Watch the beam table with the first sentence and alpha at 0: the winning
 sequence ends after two words, with `</s>` scoring &minus;0.95 against
-going on. It is not that the model does not know the rest of the sentence; it
+continuing. It isn't that the model doesn't know the rest of the sentence. It
 is that the search prefers not to say it.
 
-The same method gives the opposite failure in a badly-trained model.
+The same mechanism makes the opposite failure in a badly-trained model.
 If end-of-sequence is under-predicted &mdash; common when training data has few
-short cases &mdash; generation runs to the length cap and gives a
+short examples &mdash; generation runs to the length cap and makes a
 sentence that trails off mid-clause. Both failures look like decoder problems
-and are, at bottom, arithmetic about one token.
+and are, at bottom, math about one token.
 
 ## What changed, and what did not
 
-The recurrence in this design is gone &mdash; a transformer encoder and
-decoder replaced it, and the attention that was one part became the whole
-model. Word-level vocabularies are gone too, replaced by subword tokenisation,
+The recurrence in this architecture is gone. A transformer encoder and
+decoder replaced it, and the focus that was one component became the whole
+model. Word-level vocab lists are gone too, replaced by subword tokenisation,
 which is what stopped translations holding `<unk>` for each rare name.
 
-All of it on the second half of this page survived unchanged. A transformer
-still gives a distribution over the next token and still needs a search over
-sequences to turn that into output. Beam width and length cost are still
+All on the second half of this page survived unchanged. A transformer
+still makes a spread over the next token and still needs a search over
+sequences to turn that into output. Beam width and length fine are still
 tuned per model. And a large language model making text is doing just
 this, often with sampling instead of beam search &mdash; temperature, top-k
-and nucleus sampling are other answers to the same question this page
-asks: given a next-token distribution, which sequence do you really emit?
+and nucleus sampling are option answers to the same question this page
+asks: given a next-token spread. This Sequence do you really emit?
 ## Questions people ask
 
-<strong>Why does greedy decoding fail so badly here?</strong> Because the damage is semantic rather than grammatical. After `i`, `speak` outscores `do` by about a tenth of a nat, and taking it deletes the negation with no route back &mdash; "i speak french" is perfectly fluent and means the opposite. Greedy decoding rarely gives bad grammar; it gives confident, well-formed sentences that say something else.
+<strong>Why does greedy decoding fail so badly here?</strong> Because the damage is semantic rather than grammatical. After `i`, `speak` outscores `do` by about a tenth of a nat. Taking it deletes the negation with no route back. "i speak french" is just right fluent and means the opposite. Greedy decoding rarely makes bad grammar. It makes confident, well-formed sentences that say a thing else.
 
-<strong>Is a wider beam always better?</strong> No, in two ways. It is not exact search. A prefix that falls out of the top k at any step is gone permanently. And past a width of roughly 10, BLEU often *degrades*. The model's true highest-chance output tends to be short and dull. So a narrow beam's failure to find it is quietly doing useful work.
+<strong>Is a wider beam always better?</strong> No, in two ways. It isn't exact search. A prefix that falls out of the top k at any step is gone permanently. And past a width of roughly 10, BLEU often *degrades*. The model's true highest-chance output tends to be short and dull. A narrow beam's failure to find it's quietly doing handy work.
 
-<strong>What should the length cost be?</strong> There is no principled value; it is tuned on a development set, often somewhere around 0.6&ndash;0.7. At alpha = 0 the search truncates, because a shorter sequence multiplies fewer chances below 1 and so always scores better. Past alpha = 1 the correction over-corrects and the model pads, because length is now rewarded on its own.
+<strong>What should the length fine be?</strong> There's no principled value. It's tuned on a development set, often a place around 0.6&ndash;0.7. At alpha = 0 the search truncates. A shorter sequence times fewer chances below 1 and so always scores better. Past alpha = 1 the correction over-corrects and the model pads, because length is now rewarded on its own.
 
-<strong>Where does the length normalisation go in the loop?</strong> Before ranking, not after. Normalising only the final pick leaves each middle pruning step with the full short-sequence bias. So the cost appears to be applied and mostly is not. It is the easiest version of this bug to ship because the output is plausible.
+<strong>Where does the length norming go in the loop?</strong> Before ranking, not after. Norming only the final pick leaves each mid pruning step with the full short-sequence bias. The fine appears to be applied and mostly isn't. It's the easiest version of this bug to ship because the output is plausible.
 
-<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an ordinary vocabulary entry competing with the content words, and. This is because each extra token lowers the built up log-chance, stopping is always locally attractive &mdash;. This is just what the length cost exists to counteract. The opposite failure comes from under-predicted end-of-sequence, often from training data with few short cases. Generation runs to the cap and trails off mid-clause.
+<strong>What decides how long the output is?</strong> Not a length setting. End-of-sequence is an plain vocab entry competing with the content words. Because each extra token lowers the built up log-chance, stopping is always locally attractive. Which is just what the length fine exists to counteract. The opposite failure comes from under-predicted end-of-sequence, often from training data with few short examples. Generation runs to the cap and trails off mid-clause.
 
-<strong>Does any of this survive the transformer?</strong> The whole second half of the page does. A transformer still emits a distribution over the next token and still needs a search to turn that into text, and beam width and length cost are still tuned per model. Temperature, top-k and nucleus sampling are other answers to the same question. Given a next-token distribution, what do you really emit?
+<strong>Does any of this live the transformer?</strong> The whole second half of the page does. A transformer still emits a spread over the next token and still needs a search to turn that into text. Beam width and length fine are still tuned per model. Temperature, top-k and nucleus sampling are option answers to the same question. Given a next-token spread, what do you really emit?
 
 ## Recap in one screen
 
-- Two separate problems, not one: what each output word depends on, and which output sequence to emit.
-- Attention weights give alignment for free, trained on nothing but next-token prediction. Including crossing alignments, and one target word attending to two source words as `not` does to `ne` and `pas`.
-- A target word with no source counterpart, like the auxiliary `do`, gets diffuse attention. That is the model correctly reporting there is nothing to point at.
-- Greedy decoding is cheap and fails semantically; beam search keeps k prefixes alive so a single token cannot find the rest of the sentence.
-- Built up log-chance always favours stopping early, so the score is divided by a function of length. With an exponent that is tuned, not derived.
+- Two separate problems, not one: what each output word depends on. Which output sequence to emit.
+- Attention weights deliver alignment for free, trained on nothing but next-token guess. Including crossing alignments. One target word attending to two source words as `not` does to `ne` and `pas`.
+- A target word with no source counterpart, like the auxiliary `do`, gets diffuse focus. That is the model right reporting there's nothing to point at.
+- Greedy decoding is cheap and fails semantically. Beam search keeps k prefixes alive so a single token can't find the rest of the sentence.
+- Built up log-chance always favours stopping early. The score is cut by a function of length. With an exponent that is tuned, not derived.

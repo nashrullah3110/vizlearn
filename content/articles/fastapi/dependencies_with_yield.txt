@@ -11,38 +11,9 @@ def get_session():
         db.close()
 ```
 
-Everything before the `yield` runs before the handler. The yielded value is what the handler receives. Everything after runs once the response has been produced.
+all before the `yield` runs before the handler. The yielded value is what the handler receives. all after runs once the response has been made.
 
-It is a generator, and it behaves like a context manager &mdash; which is exactly the point, because "acquire, use, release" is what a database session, a file handle, a lock or a temporary directory all need.
-
-The `try/finally` is not optional. Without it, an exception in the handler skips the cleanup. A database session opened in the `yield` dependency and not closed in a `finally` leaks a connection. After enough leaked connections, the pool is exhausted and every request hangs.
-
-The most common pattern is a database session that commits on success and rolls back on failure:
-
-```python
-def get_session():
-    db = Session()
-    try:
-        yield db
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-```
-
-The handler receives `db`, uses it, and never calls `commit`, `rollback`, or `close`. The dependency owns the lifecycle; the handler owns the logic.
-
-`async def` yield dependencies work the same way. An async dependency that opens an async database session yields it, and the cleanup after `yield` uses `await session.close()`. The `async` version runs on the event loop; the sync version runs in the threadpool. Both are valid, and which to use depends on whether the resource's driver is async.
-
-Nesting yield dependencies works. A yield dependency can depend on another yield dependency: `get_session` depends on `get_engine`, which also yields. FastAPI resolves them in dependency order — `get_engine` first, then `get_session` — and cleans them up in reverse order after the response.
-
-The cleanup code runs after the response is produced but before it is sent to the client. This means an exception in the cleanup code produces a 500 error, not a silent failure. If the cleanup must not affect the response, catch and log the exception rather than letting it propagate.
-
-`contextmanager` from the standard library produces the same shape — a generator with `yield` inside `try/finally`. FastAPI recognises both `contextmanager`-decorated functions and bare generators, so existing context managers can be used as dependencies without modification.
-
-Yield dependencies replace middleware for request-scoped resources. Middleware runs for every request; a dependency runs only for endpoints that declare it. The dependency is also visible in the function signature, which makes the handler's requirements explicit rather than hidden in middleware registration order.
+It's a gen, and it behaves like a context manager. Which is just the point. "acquire, use, release" is what a DB session, a file handle, a lock or a temporary folder all need.
 
 
 ## yield splits it in two
@@ -243,13 +214,13 @@ print("The response was already decided. Log the failure; do not raise it.")
 
 The reason this exists rather than a plain dependency returning a session: cleanup must happen even when the handler fails.
 
-Without `try/finally`, a handler that raises a 404 would skip the close and leak the connection. With it, the session is returned to the pool either way. In an application handling real traffic, that difference is the gap between a pool that stays healthy and one that is exhausted an hour after deploy.
+Without `try/finally`, a handler that raises a 404 would skip the close and leak the link. With it, the session is returned to the pool either way. In an use handling real traffic, that gap is the gap between a pool that stays healthy and one that is exhausted an hour after deploy.
 
-The rule is simple: if a yield dependency acquires anything, the `yield` belongs inside a `try`, and the release belongs in `finally`.
+The rule is simple: if a yield dependency acquires anything, the `yield` belongs inside a `try`. The release belongs in `finally`.
 
 ## The transaction pattern
 
-Because the teardown can observe whether the handler raised, the standard database shape falls out naturally:
+Because the teardown can see whether the handler raised, the standard DB shape falls out on its own:
 
 ```python
 def get_db():
@@ -264,140 +235,140 @@ def get_db():
         db.close()
 ```
 
-`commit()` sits immediately after the `yield`, so it only runs if the handler completed. Any exception &mdash; including an `HTTPException` &mdash; rolls back and re-raises. `close()` runs regardless.
+`commit()` sits at once after the `yield`. It only runs if the handler done. Any exception. Including an `HTTPException`. Rolls back and re-raises. `close()` runs even so.
 
-Three lines, and every endpoint using this dependency now has correct transaction handling without writing any. That is a large amount of correctness for very little code, and it is the single most common use of the feature.
+Three lines, and each endpoint using this dependency now has correct transaction handling without writing any. That is a large amount of correctness for very little code, and it's the single most common use of the feature.
 
-Note the `raise` in the `except`. Swallowing there would turn a failed request into a successful-looking one with a rolled-back transaction, which is worse than either outcome alone.
+Note the `raise` in the `except`. Swallowing there would turn a failed request into a good-looking one with a rolled-back transaction. This Is worse than either outcome alone.
 
 ## Nesting and order
 
-A yield dependency can depend on another. Setups run outermost first, teardowns run in reverse &mdash; the same discipline as nested `with` blocks, and for the same reason: the inner thing may need the outer one to still exist while it closes.
+A yield dependency can depend on another. Setups run outermost first, teardowns run in reverse. The same discipline as nested `with` blocks. For the same reason. The inner thing may need the outer one to still exist while it closes.
 
-The fourth editor above prints the whole sequence. It is worth running once, because the ordering is the sort of thing that is obvious when you see it and easy to get backwards when reasoning about it.
+The fourth editor above prints the whole sequence. It's worth running once. The sorting is the sort of thing that is obvious when you see it and easy to get backwards when thinking about it.
 
 ## Caching applies
 
-A yield dependency is cached per request like any other. Two parameters wanting the same session get one session, opened once and closed once.
+A yield dependency is cached per request like any other. Two params wanting the same session get one session, opened once and closed once.
 
-That matters for correctness rather than just performance: two separate sessions in one request would mean two transactions, and a handler that read through one and wrote through the other would produce results nobody could explain.
+That matters for correctness rather than just speed. Two split sessions in one request would mean two transactions. A handler that read through one and wrote through the other would give results no one could explain.
 
 ## What not to do in teardown
 
-**Do not raise.** By the time the teardown runs, the response has been decided and is being sent. An exception there cannot become a clean error for the caller, and depending on where it happens it may truncate the response or surface as a server error unrelated to anything the client did.
+**Don't raise.** By the time the teardown runs, the response has been decided and is being sent. An exception there can't become a clean error for the caller. Based on where it happens it may truncate the response or surface as a server error unrelated to anything the client did.
 
-If cleanup can fail, catch it and log it. The request already succeeded or failed on its own terms, and a cleanup problem is an operational issue rather than something the caller can act on.
+If cleanup can fail, catch it and log it. The request already succeeded or failed on its own terms. A cleanup problem is an working issue rather than a thing the caller can act on.
 
-**Do not do slow work.** The teardown runs after the handler, and for a synchronous dependency it is on the request path. A long-running cleanup delays the response for no benefit to the caller. Anything genuinely slow belongs in a background task.
+**Don't do slow work.** The teardown runs after the handler. For a synchronous dependency it's on the request path. A long-running cleanup delays the response for no gain to the caller. Anything truly slow belongs in a background task.
 
-**Do not rely on the exception being visible.** In older FastAPI versions the exception was not always available to the teardown in the way people expected. The `try/except/finally` shape above works because it wraps the `yield` directly rather than trying to inspect state.
+**Don't lean on the exception being visible.** In older FastAPI versions the exception wasn't always on hand to the teardown in the way people expected. The `try/except/finally` shape above works because it wraps the `yield` right rather than trying to inspect state.
 
 ## What belongs here
 
-Anything with a lifetime tied to the request: database sessions, transactions, file handles, temporary directories, locks, an HTTP client that should be closed.
+Anything with a lifetime tied to the request: DB sessions, transactions, file handles, temporary folders, locks, an HTTP client that should be closed.
 
-What does not: work that could be done once at startup. A connection *pool* is created at startup and lives for the process; a *session* is taken from it per request. Confusing the two produces either a pool rebuilt on every request or a session shared between them, and both are bad in different ways.
+What doesn't: work that could be done once at startup. A link *pool* is created at startup and lives for the process. A *session* is taken from it per request. Confusing the two makes either a pool rebuilt on each request or a session shared between them. Both are bad in other ways.
 
-That distinction is the lifespan module's subject.
+That gap is the lifespan module's subject.
 
 
 ## Mistakes people make
 
-**No `try/finally`.** The single most consequential omission. A handler that raises then skips the cleanup, and a connection leaks on exactly the requests you most want to survive.
+**No `try/finally`.** The single most consequential omission. A handler that raises then skips the cleanup. A link leaks on just the requests you most want to live.
 
-**Committing in `finally`.** It runs on failure too, so a rolled-back-looking request quietly commits. Commit belongs immediately after the `yield`, where only success reaches it.
+**Committing in `finally`.** It runs on failure too. A rolled-back-looking request quietly commits. Commit belongs at once after the `yield`. Here Only success reaches it.
 
-**Swallowing the exception.** An `except` that rolls back and does not re-raise turns a failed request into one that looks successful with nothing written.
+**Swallowing the exception.** An `except` that rolls back and doesn't re-raise turns a failed request into one that looks good with nothing written.
 
-**Raising in the teardown.** The response is already being built. The error cannot reach the caller cleanly and may truncate what was being sent.
+**Raising in the teardown.** The response is already being built. The error can't reach the caller cleanly and may truncate what was being sent.
 
-**Slow cleanup.** The teardown is on the request path. Anything genuinely slow belongs in a background task.
+**Slow cleanup.** The teardown is on the request path. Anything truly slow belongs in a background task.
 
-**Creating the pool per request.** A pool is startup work with a process lifetime; a session is request work. Rebuilding the pool per request is catastrophic for throughput, and sharing a session across requests is catastrophic for correctness.
+**Creating the pool per request.** A pool is startup work with a process lifetime. A session is request work. Rebuilding the pool per request is catastrophic for throughput. Sharing a session across requests is catastrophic for correctness.
 
 ## Sync or async
 
 Both forms work, and the choice follows the resource.
 
-`def get_session()` runs in the threadpool, which is right for a blocking driver - psycopg2, a synchronous HTTP client, a file.
+`def get_session()` runs in the threadpool. This Is right for a blocking driver - psycopg2, a synchronous HTTP client, a file.
 
-`async def get_session()` runs on the event loop, which is right for an async driver - asyncpg, httpx's async client.
+`async def get_session()` runs on the event loop. This Is right for an async driver - asyncpg, httpx's async client.
 
-Mixing is allowed: an async handler may depend on a sync yield dependency and the other way round. What matters is that a blocking call is not made directly on the loop, which is the runtime tier's subject.
+Mixing is allowed: an async handler may depend on a sync yield dependency and the other way round. What matters is that a blocking call isn't made right on the loop. This Is the runtime tier's subject.
 
 
 ## How it works underneath
 
-Knowing the mechanism removes most of the surprises.
+Knowing the method drops most of the surprises.
 
-A `yield` dependency is a generator. FastAPI wraps it in a context manager and enters it before calling the handler, holding it open in an `AsyncExitStack` that lives for the request. When the response has been produced, the stack unwinds and every context manager exits in reverse order.
+A `yield` dependency is a gen. FastAPI wraps it in a context manager and enters it before calling the handler, holding it open in an `AsyncExitStack` that lives for the request. When the response has been made, the stack unwinds and each context manager exits in reverse order.
 
-That is why teardown ordering is reverse, why teardown runs on failure, and why raising in teardown is awkward: the stack is unwinding while the response is already on its way out.
+That is why teardown sorting is reverse, why teardown runs on failure. Why raising in teardown is awkward. The stack is unwinding while the response is already on its way out.
 
-It also explains the lifetime precisely. The dependency is alive for the whole request, including while the response is being serialised - so a session yielded here is still usable by a response model reading lazy attributes, which is a common source of confusion when it is *not* the case in other frameworks.
+It also shows the lifetime just. The dependency is alive for the whole request, including while the response is being serialised - so a session yielded here is still usable by a response model reading lazy fields. This Is a common source of confusion when it's *not* the case in other frameworks.
 
 ## A checklist
 
 Before shipping a yield dependency, four questions.
 
-Does it acquire something? Then the `yield` is inside a `try` and the release is in `finally`.
+Does it acquire a thing? Then the `yield` is inside a `try` and the release is in `finally`.
 
-Can the handler fail? Then anything conditional on success sits between the `yield` and the `except`.
+Can the handler fail? Then anything gated on success sits between the `yield` and the `except`.
 
-Can the cleanup fail? Then it is caught and logged, not raised.
+Can the cleanup fail? Then it's caught and logged, not raised.
 
-Is this per-request, or per-process? A session is per request; the pool it comes from is not.
+Is this per-request, or per-process? A session is per request. The pool it comes from isn't.
 
 ## One more thing to watch
 
 A subtle one, worth knowing before it bites.
 
-The dependency stays open while the **response is serialised**, not just while the handler runs. A session yielded here is still alive when a response model reads an attribute that triggers a lazy load.
+The dependency stays open while the **response is serialised**, not just while the handler runs. A session yielded here is still alive when a response model reads an field that triggers a lazy load.
 
-That is convenient, and it is also how a single serialisation quietly becomes fifty queries: the model touches a relationship, the session is still open, and the ORM obliges. The fix is on the query side - load what the response needs up front - but the reason it is possible at all is this lifetime.
+That is convenient, and it's also how a single output quietly turns fifty queries. The model touches a link, the session is still open, and the ORM obliges. The fix is on the query side - load what the response needs up front - but the reason it's possible at all is this lifetime.
 
-It is also why closing the session inside the handler is a mistake that appears to work. The handler returns fine; the serialiser then finds a closed session, and the error names neither.
+It's also why closing the session inside the handler is a mistake that appears to work. The handler returns fine. The serialiser then finds a closed session, and the error names neither.
 
 ## Summary
 
-Code before the `yield` is setup, the yielded value is what the handler receives, and code after it runs once the response has been produced - on success and on failure alike.
+Code before the `yield` is setup, the yielded value is what the handler receives. Code after it runs once the response has been made - on success and on failure alike.
 
-Wrap the `yield` in `try/finally` whenever anything is acquired. Put `commit()` immediately after it and `rollback()` in an `except` that re-raises, and the transaction pattern falls out in three lines.
+Wrap the `yield` in `try/finally` when anything is acquired. Put `commit()` at once after it and `rollback()` in an `except` that re-raises. The transaction pattern falls out in three lines.
 
-Teardowns run in reverse order, the per-request cache still applies, and nothing in the teardown should raise or be slow.
+Teardowns run in reverse order, the per-request cache still applies. Nothing in the teardown should raise or be slow.
 
 
 ## Summary, in one line
 
-Setup before the `yield`, teardown after it, `try/finally` around it whenever anything is acquired - and `commit()` immediately after the `yield` so that only a successful handler reaches it.
+Setup before the `yield`, teardown after it, `try/finally` around it when anything is acquired - and `commit()` at once after the `yield` so that only a good handler reaches it.
 
-Everything else in this module is a consequence of those four facts.
+all else in this module is a result of those four facts.
 
 
 ## A closing thought
 
-Almost every resource bug in a web application is a lifetime bug: something opened and not closed, closed too early, or shared between requests that should not share it.
+Almost each resource bug in a web use is a lifetime bug. A thing opened and not closed, closed too early, or shared between requests that shouldn't share it.
 
-`yield` dependencies exist to make the common lifetime - one request - the easy one to express. Setup, use, teardown, in one function, applied by declaring a parameter.
+`yield` dependencies exist to make the common lifetime - one request - the easy one to express. Setup, use, teardown, in one function, applied by declaring a param.
 
-The failure modes it removes are the ones that do not show up in development: a connection leaked on the error path, a transaction left open, a pool exhausted an hour after deploy under real traffic.
+The failure modes it drops are the ones that don't show up in development. A link leaked on the error path, a transaction left open, a pool exhausted an hour after deploy under real traffic.
 
 
 ## Two rules
 
-Everything here reduces to two.
+all here reduces to two.
 
-**Wrap the `yield` in `try/finally` whenever the dependency acquires anything.** That single line is the difference between a pool that survives a bad afternoon and one that does not.
+**Wrap the `yield` in `try/finally` when the dependency acquires anything.** That single line is the gap between a pool that lives a bad afternoon and one that doesn't.
 
-**Put success-only work between the `yield` and the `except`.** That is where `commit()` goes, and it is why the transaction pattern needs no flag, no inspection of the response, and no cooperation from the handler.
+**Put success-only work between the `yield` and the `except`.** That is where `commit()` goes. It's why the transaction pattern needs no flag, no inspection of the response. No cooperation from the handler.
 
 
 ## Where it sits in the tier
 
-Of the five modules here, this is the one whose absence causes production incidents rather than inconvenience.
+Of the five modules here, this is the one whose lack causes production incidents rather than inconvenience.
 
-A missing `Depends` is a repeated four lines. A missing `try/finally` is a connection pool that empties under load on the error path, which is the path that gets busy exactly when everything else is going wrong.
+A missing `Depends` is a repeated four lines. A missing `try/finally` is a link pool that empties under load on the error path. This Is the path that gets busy just when all else is going wrong.
 
 ## Next
 
-Dependencies that depend on dependencies, the tree FastAPI resolves before your handler runs, and why a shared node in that tree is still only called once.
+Dependencies that depend on dependencies, the tree FastAPI resolves before your handler runs. Why a shared node in that tree is still only called once.

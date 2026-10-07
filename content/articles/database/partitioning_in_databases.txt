@@ -1,28 +1,24 @@
 title: Partitioning by Range and Hash
-intro: Cutting one table into pieces the planner can skip, and the choice of where to cut.
+intro: Cutting one table into pieces the planner can skip. The choice of where to cut.
 
 ## One table, several files
 
-Partitioning splits a table into physical pieces by a rule on one or more
-columns. Applications keep querying the single logical table; the engine decides
+Splitting splits a table into physical pieces by a rule on one or more
+columns. uses keep querying the single logical table. The engine decides
 which pieces are involved.
 
-This is **not** sharding. Every partition lives in the same database on the same
+This is **not** sharding. each split lives in the same DB on the same
 server. [Sharding](sharding_in_databases.html) spreads data across separate
 machines and is a much larger commitment.
 
-The query above builds three range partitions and a view that unions them, which
-is the shape a partitioned table has underneath. Run the variants to see what
-each strategy costs. The two main strategies &mdash; range and hash &mdash; serve different access
-patterns. Range partitioning groups rows by a continuous value like date, so
-queries on a date range touch only the relevant partition. Hash partitioning
-distributes rows evenly and prevents hot partitions when the access pattern is
-unpredictable.
+The query above builds three range splits and a view that unions them, which
+is the shape a split table has underneath. Run the variants to see what
+each strategy costs.
 
 ## Range partitioning
 
-Pick an ordered column &mdash; almost always a timestamp &mdash; and give each
-partition a bounded interval.
+Pick an sorted column &mdash; almost always a timestamp &mdash; and give each
+split a bounded interval.
 
 ```
 orders_2024  :  order_date >= '2024-01-01' AND < '2025-01-01'
@@ -31,29 +27,29 @@ orders_2026  :  order_date >= '2026-01-01' AND < '2027-01-01'
 ```
 
 A query with `WHERE order_date >= '2026-01-01'` can be proved to need only the
-last partition, so the engine reads one file instead of three. That proof is
-**partition pruning**, and it is where nearly all the benefit is.
+last split, so the engine reads one file instead of three. That proof is
+**split pruning**, and it's where nearly all the gain is.
 
-The second benefit is administrative and, for time-series data, often the bigger
+The second gain is admin and, for time-series data, often the bigger
 one. Deleting a year of orders with `DELETE` writes a row version per deleted
-row, generates enormous WAL traffic, and leaves the table bloated. `DROP TABLE
+row, makes huge WAL traffic, and leaves the table bloated. `DROP TABLE
 orders_2024` unlinks a file. Retention policies are the standard reason to
-partition.
+split.
 
 ## Hash partitioning
 
-Hash the key, take the remainder modulo the partition count, and store the row
-there. Rows spread evenly regardless of what the values look like.
+Hash the key, take the remainder modulo the split count, and store the row
+there. Rows spread evenly even so of what the values look like.
 
-This is the right choice when there is no natural ordering to exploit and the
-goal is to spread contention &mdash; many concurrent writers hitting one hot
-page, for instance.
+This is the right choice when there's no natural sorting to exploit and the
+goal is to spread contention. Many concurrent writers hitting one hot
+page, say.
 
-The trade-off is that **hash partitioning prunes only on equality**. A query for
-one `customer_id` reaches one partition; a query for a *range* of customer ids
-reaches all of them, because hashing destroys order. Range partitioning is the
+The trade-off is that **hash splitting prunes only on equality**. A query for
+one `customer_id` reaches one split. A query for a *range* of customer ids
+reaches all of them, because hashing destroys order. Range splitting is the
 opposite: it prunes ranges beautifully and can leave you with one very hot
-partition if recent data is where all the traffic goes.
+split if recent data is where all the traffic goes.
 
 | | Range | Hash |
 |---|---|---|
@@ -65,24 +61,24 @@ partition if recent data is where all the traffic goes.
 
 ## Choosing the key
 
-The partition key must appear in the `WHERE` clause of the queries you care
-about. This is the whole game, and it is where partitioning schemes go wrong.
+The split key must appear in the `WHERE` clause of the queries you care
+about. This is the whole game, and it's where splitting schemes go wrong.
 
-Partition by `order_date` and then run reports by `customer_id`, and every report
-reads every partition &mdash; you have added complexity and gained nothing. Worse
-than nothing: each partition has its own indexes, so a query that scans them all
+Split by `order_date` and then run reports by `customer_id`, and each report
+reads each split &mdash; you've added cost and gained nothing. Worse
+than nothing: each split has its own indexes. So A query that scans them all
 does more index work than it would have on a single table.
 
-A second constraint follows: a unique constraint has to include the partition
-key, because the engine cannot cheaply enforce uniqueness across pieces it is
+A second constraint follows: a unique constraint has to include the split
+key, because the engine can't cheaply enforce uniqueness across pieces it's
 trying not to read.
 
 ## What pruning is worth, and what caps it
 
-The payoff scales with how much the query skips, and that is just arithmetic.
-Take 120 million orders over five years, partitioned by month &mdash; 60
-partitions of two million rows each. A report over a single month, filtering on
-the partition key, prunes to one partition.
+The payoff scales with how much the query skips, and that is just math.
+Take 120 million orders over five years, split by month &mdash; 60
+splits of two million rows each. A report over a single month, filtering on
+the split key, prunes to one split:
 
 |query| rows the engine must touch |fraction of the table|
 |---|---|---|
@@ -90,17 +86,17 @@ the partition key, prunes to one partition.
 |one quarter|6,000,000|5.0% (3/60)|
 |no partition-key filter|120,000,000|100%|
 
-The single-month query does **60&times; less scanning** &mdash; and the number is
-exactly the partition count, because pruning reads one of 60 equal pieces. Finer
-partitions prune harder: weekly partitions would make that same month prune to a
+The single-month query does **60&times; less scanning**. And the number is
+just the split count, because pruning reads one of 60 equal pieces. Finer
+splits prune harder: weekly splits would make that same month prune to a
 quarter of the rows again.
 
 ## Sizing
 
-So why not partition into thousands of tiny pieces? Because pruning saves scan
-work and the planner spends it back. The planner evaluates every partition when it
-builds the plan, so planning cost grows roughly linearly with the partition count
-&mdash; a fixed overhead paid on every query whether or not pruning helps it.
+So why not split into thousands of tiny pieces? Because pruning saves scan
+work and the planner spends it back. The planner tests each split when it
+builds the plan, so planning cost grows roughly linearly with the split count
+&mdash; a fixed cost paid on each query whether or not pruning helps it:
 
 |partitions|rough planning overhead|
 |---|---|
@@ -109,42 +105,42 @@ builds the plan, so planning cost grows roughly linearly with the partition coun
 |5,000|can exceed the query's own runtime|
 
 For a lookup that executes in a couple of milliseconds, planning across thousands
-of partitions is the dominant cost, and the partitioning has made the query
-slower. That is the ceiling the two forces set between them: too few partitions
-and pruning barely helps; too many and planning overwhelms the saving. Somewhere
-between a few dozen and a few hundred is the usual advice, and monthly partitions
-over a couple of years land naturally in that band.
+of splits is the dominant cost, and the splitting has made the query
+slower. That is the ceiling the two forces set between them: too few splits
+and pruning barely helps. Too many and planning overwhelms the saving. a place
+between a few dozen and a few hundred is the usual advice, and monthly splits
+over a couple of years land on its own in that band.
 
-Partitions can also be **subpartitioned** &mdash; range by month, then hash by
+Splits can also be **subpartitioned**. Range by month, then hash by
 customer within each month &mdash; when both access patterns matter.
 
 ## Joins get a second, quieter benefit
 
-Pruning is the benefit everyone knows. The other one shows up when two tables are
-partitioned on the *same* key &mdash; orders and order-items both by `customer_id`,
+Pruning is the gain everyone knows. The other one shows up when two tables are
+split on the *same* key. Orders and order-items both by `customer_id`,
 say. A row in bucket `i` of one table can only match rows in bucket `i` of the
-other, so the engine performs a **partition-wise join**. It runs 60 small joins
-of aligned buckets rather than one join over the whole product.
+other, so the engine performs a **split-wise join**: 60 small joins of
+aligned buckets, rather than one join over the whole product.
 
-The arithmetic is the same shape as pruning. With 60 buckets a side, matched
-partitioning means 60 aligned partition-joins. Without matching, any bucket of one table
-could hold a match for any bucket of the other, which is 60 &times; 60 = 3,600
-partition-pairs to consider. And each aligned join is small enough that its hash
+The math is the same shape as pruning. With 60 buckets a side, matched
+splitting means 60 aligned split-joins. Unmatched, any bucket of one table
+could hold a match for any bucket of the other. This Is 60 &times; 60 = 3,600
+split-pairs to consider. And each aligned join is small enough that its hash
 table &mdash; two million rows, not 120 million &mdash; fits in memory instead of
-spilling to disk. This is why data warehouses partition fact and dimension tables
+spilling to disk. This is why data warehouses split fact and dim tables
 on the join key: the join, not just the scan, gets cut into pieces the engine can
 hold.
 
 ## Where it goes wrong
 
-**Partitioning a small table.** Under a few million rows, a good index is
-simpler and usually faster.
+**Splitting a small table.** Under a few million rows, a good index is
+simpler and often faster.
 
-**A partition key the queries do not filter on.** No pruning, more index
-overhead.
+**A split key the queries don't filter on.** No pruning, more index
+cost.
 
-**Hash partitioning then querying ranges.** Every partition, every time.
+**Hash splitting then querying ranges.** each split, each time.
 
-**Forgetting the default partition.** A row that matches no partition is an error
+**Losing the default split.** A row that matches no split is an error
 unless a catch-all exists, and a data-loading job that fails at midnight on New
 Year's Day is the classic version of this.

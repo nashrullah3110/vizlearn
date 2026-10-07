@@ -1,9 +1,9 @@
 title: Path Parameters: Values From the URL
-intro: One annotation gives you extraction, conversion, validation and documentation.
+intro: One annotation gives you extraction, conversion, check and docs.
 
 ## The mechanism
 
-A name in braces in the route path becomes an argument to your function:
+A name in braces in the route path turns an arg to your function:
 
 ```python
 @app.get("/modules/{module_id}")
@@ -11,27 +11,9 @@ def read(module_id: int):
     ...
 ```
 
-Three things happen from those two lines. The router matches the URL and pulls out the segment. Pydantic converts it according to the annotation. And the OpenAPI document records that this endpoint takes an integer path parameter.
+Three things happen from those two lines. The router matches the URL and pulls out the segment. Pydantic converts it per to the annotation. And the OpenAPI doc records that this endpoint takes an int path param.
 
-The name has to match. `{module_id}` in the path and `module_id` in the signature are connected by name, not position, and a mismatch is an error at import rather than at request time &mdash; which is the right moment to find out.
-
-The type annotation decides the conversion. `module_id: int` converts the URL segment to an integer. If the segment is `"abc"`, the conversion fails and FastAPI returns a 422 with a message naming the parameter and the expected type. The error response is automatic — no try/except in the handler.
-
-Multiple path parameters are declared the same way. `/tracks/{track_id}/modules/{module_id}` with `track_id: int` and `module_id: int` extracts both. The nesting reflects the resource hierarchy: a module belongs to a track.
-
-`Path(gt=0)` adds constraints. `module_id: int = Path(gt=0)` rejects zero and negative values. `Path(ge=1, le=1000)` accepts integers between 1 and 1000. The constraints appear in the OpenAPI schema, so generated clients and documentation reflect them.
-
-`Path(title="Module ID", description="The numeric identifier for the module")` improves the documentation. The title and description appear in the OpenAPI spec and in Swagger UI's parameter list.
-
-`Enum` restricts the accepted values. `track: TrackName` where `TrackName` is a `StrEnum` with members `MATHS`, `PYTHON`, `DSA` accepts only those values and documents them as an enum in the schema. A URL like `/tracks/physics` returns a 422 because `physics` is not in the enum.
-
-Route ordering matters. `/modules/latest` and `/modules/{module_id}` match the same URL pattern. If the parameterised route is registered first, `latest` is captured as `module_id` and fails conversion to `int` with a 422. The fix is to register `/modules/latest` before `/modules/{module_id}`. FastAPI matches routes in registration order, and the first match wins.
-
-`Path(alias="moduleId")` changes the parameter name in the documentation without changing the Python variable name. This is rarely needed for path parameters (unlike query parameters, path parameters do not have a strong naming convention) but exists for consistency with the rest of the parameter API.
-
-`{file_path:path}` captures the rest of the URL, including slashes. `/files/{file_path:path}` matches `/files/a/b/c.txt` and gives `file_path = "a/b/c.txt"`. This is the exception to the "one segment per parameter" rule, and it is how file-serving or proxy endpoints handle arbitrary paths.
-
-`UUID` as a type annotation validates and converts in one step. `module_id: UUID` accepts `123e4567-e89b-12d3-a456-426614174000` and rejects `not-a-uuid` with a 422. Any type that Pydantic can validate works as a path parameter type.
+The name has to match. `{module_id}` in the path and `module_id` in the signature are connected by name, not spot. A mismatch is an error at import rather than at request time. Which is the right moment to find out.
 
 
 ## A placeholder becomes an argument
@@ -183,33 +165,33 @@ print("/modules/oldest ->", r.status_code,
 ```
 ## They are always required
 
-There is no such thing as an optional path parameter, and the reason is structural: the parameter is part of the URL. A request that omits it is a request to a different URL, which either matches another route or does not match at all.
+There's no such thing as an optional path param. The reason is structural. The param is part of the URL. A request that omits it's a request to a other URL. This Either matches another route or doesn't match at all.
 
-So a default on a path parameter does nothing useful. If you want "with an id, or without", that is two routes: `/modules` and `/modules/{module_id}`.
+So a default on a path param does nothing handy. If you want "with an id, or without", that is two routes: `/modules` and `/modules/{module_id}`.
 
 ## Everything from the coercion rules applies
 
-The segment arrives as text &mdash; a URL has nothing else &mdash; and the annotation says what it should become. All the Pydantic rules hold: `"7"` becomes `7`, `"0042"` becomes `42`, and `"seven"` raises.
+The segment arrives as text. A URL has nothing else &mdash; and the annotation says what it should become. All the Pydantic rules hold: `"7"` turns `7`, `"0042"` turns `42`, and `"seven"` raises.
 
-`UUID` is worth annotating properly rather than leaving as `str`. A malformed identifier is then rejected at the door with a clear message, instead of reaching a database query as an arbitrary string. The same applies to `date`.
+`UUID` is worth annotating properly rather than leaving as `str`. A malformed identifier is then rejected at the door with a clear message, instead of reaching a DB query as an any string. The same applies to `date`.
 
 ## Reading the error
 
-A failure produces a 422 whose `loc` is `("path", "module_id")`.
+A failure makes a 422 whose `loc` is `("path", "module_id")`.
 
-That first element matters. A client receiving a 422 needs to know whether the problem is in the URL, the query string, a header or the body, and `loc[0]` says which. Code that only looks at `loc[-1]` throws that away.
+That first element matters. A client receiving a 422 needs to know whether the problem is in the URL, the query string, a header or the body. `loc[0]` says which. Code that only looks at `loc[-1]` throws that away.
 
 ## Constraints with Path()
 
-`Path()` carries the same arguments as Pydantic's `Field`:
+`Path()` carries the same args as Pydantic's `Field`:
 
 ```python
 module_id: int = Path(ge=1, le=9999, description="Identifier of the module.")
 ```
 
-`ge=1` is worth more than it looks. Without it, `/modules/-5` is a valid request that reaches your handler, and something downstream deals with a negative identifier. With it, the router rejects it and the documented minimum appears in the schema.
+`ge=1` is worth more than it looks. Without it, `/modules/-5` is a valid request that reaches your handler. A thing downstream deals with a minus identifier. With it, the router rejects it and the documented min appears in the schema.
 
-The same argument from the Pydantic track applies here: a constraint reaches the documentation and a validator does not. `Path(ge=1)` tells every consumer the floor; an `if module_id < 1` in the handler tells nobody.
+The same arg from the Pydantic track applies here. A constraint reaches the docs and a checker doesn't. `Path(ge=1)` tells each consumer the floor. An `if module_id < 1` in the handler tells no one.
 
 ## Enums for a closed set
 
@@ -221,15 +203,15 @@ class Track(str, Enum):
     PYTHON = "python"
 ```
 
-Three benefits. The error lists the permitted values instead of saying something vague. The schema contains an enumeration, so the docs render a dropdown and a generated client gets a real type. And inside your handler the value is an enum member, so comparisons are checked by your editor rather than being string equality you can typo.
+Three gains. The error lists the permitted values instead of saying a thing vague. The schema holds an enumeration. The docs render a dropdown and a made client gets a real type. And inside your handler the value is an enum member. So Checks are checked by your editor rather than being string equality you can typo.
 
-Inherit from `str` as well as `Enum`, for the reasons the Pydantic track set out: members then compare equal to their strings and serialise as plain text.
+Inherit from `str` and `Enum`, for the reasons the Pydantic track set out. Members then compare equal to their strings and serialise as plain text.
 
 ## Paths inside paths
 
-A parameter matches one segment. `/files/{name}` will not match `/files/og/maths.png`, because the slash ends the match.
+A param matches one segment. `/files/{name}` won't match `/files/og/maths.png`. The slash ends the match.
 
-When you genuinely want the rest of the URL &mdash; a file path, a nested key, a proxied route &mdash; the `:path` converter does it:
+When you truly want the rest of the URL. A file path, a nested key, a proxied route. The `:path` converter does it:
 
 ```python
 @app.get("/assets/{full_path:path}")
@@ -237,137 +219,137 @@ def serve(full_path: str):
     ...
 ```
 
-One warning that matters. A `:path` parameter can contain `..`, and using it to build a filesystem path without checking is a directory-traversal vulnerability. Resolve the path and confirm it is inside the directory you meant before opening anything. Validation says the value is a string; it says nothing about whether it is safe.
+One warning that matters. A `:path` param can hold `..`. Using it to build a filesystem path without checking is a folder-traversal vulnerability. Resolve the path and confirm it's inside the folder you meant before opening anything. check says the value is a string. It says nothing about whether it's safe.
 
 ## Ordering, again
 
-The rule from the previous module is felt most sharply here, because path parameters are where overlaps arise:
+The rule from the previous module is felt most sharply here. Path params are where shares arise:
 
 ```python
 @app.get("/modules/latest")        # must come first
 @app.get("/modules/{module_id}")
 ```
 
-Registered the other way round, `/modules/latest` matches the variable route and either 422s confusingly or, if the parameter is a `str`, succeeds with a lookup for a module called "latest".
+Registered the other way round, `/modules/latest` matches the var route and either 422s confusingly or, if the param is a `str`, succeeds with a lookup for a module called "latest".
 
-Annotating the parameter `int` limits the damage: a non-numeric segment then fails loudly rather than quietly. It is one more reason to be precise.
+Annotating the param `int` limits the damage: a non-numeric segment then fails loudly rather than quietly. It's one more reason to be precise.
 
 ## Designing them
 
-Path parameters identify a **thing**. Query parameters describe a **view** of a collection. That distinction resolves most design arguments about where a value belongs.
+Path params find a **thing**. Query params show a **view** of a set. That gap resolves most design args about where a value belongs.
 
-`/modules/7` identifies module seven. `/modules?track=maths` narrows a set. `/modules/7?verbose=true` identifies a thing and adjusts how it is presented. Putting `track` in the path would imply that a module belongs to exactly one track and can only be addressed through it, which may not be true.
+`/modules/7` finds module seven. `/modules?track=maths` narrows a set. `/modules/7?verbose=true` finds a thing and adjusts how it's presented. Putting `track` in the path would imply that a module belongs to just one track and can only be handled through it. This May not be true.
 
-Nest only for genuine ownership, and keep it shallow. `/modules/{id}/lessons` is reasonable. Four levels of nesting produces URLs nobody types correctly and routes nobody can maintain.
+Nest only for genuine ownership, and keep it shallow. `/modules/{id}/lessons` is fair. Four levels of nesting makes URLs no one types right and routes no one can maintain.
 
 ## Types worth annotating
 
-Beyond `int` and `str`, several standard types earn their place in a path.
+Beyond `int` and `str`, a few standard types earn their place in a path.
 
-**`UUID`** rejects a malformed identifier at the router rather than passing an arbitrary string to a database query. That is a genuine safety improvement when the id comes from a URL somebody can edit.
+**`UUID`** rejects a malformed identifier at the router rather than passing an any string to a DB query. That is a genuine safety gain when the id comes from a URL somebody can edit.
 
-**`date`** accepts `2026-08-26` and gives you a real `date`, so `/reports/{day}` needs no parsing in the handler.
+**`date`** accepts `2026-08-26` and gives you a real `date`. `/reports/{day}` needs no parsing in the handler.
 
 **`Enum`** for a closed set, as above.
 
-**`float`** exists and is usually wrong in a path. Identifiers are not floating point, and `/items/1.0` matching `/items/1` is rarely what anyone wants.
+**`float`** exists and is often wrong in a path. Identifiers aren't floating point. `/items/1.0` matching `/items/1` is rarely what anyone wants.
 
-The general rule is the same one from the Pydantic track: annotate as narrowly as the domain allows. Each narrowing removes a class of bad input at the door and documents itself in the schema.
+The general rule is the same one from the Pydantic track. Annotate as narrowly as the domain allows. Each narrowing drops a class of bad input at the door and docs itself in the schema.
 
 ## Multiple parameters and their order
 
-A route can have several placeholders, and the order in the *function signature* does not matter &mdash; matching is by name.
+A route can have a few placeholders. The order in the *function signature* doesn't matter. Matching is by name.
 
 ```python
 @app.get("/tracks/{track}/modules/{module_id}")
 def read(module_id: int, track: str):     # order differs, works fine
 ```
 
-That is worth knowing because it means you can order a signature for readability rather than to mirror the URL. Path parameters first, then query, then body, then dependencies is a common convention and none of it is required.
+That is worth knowing because it means you can order a signature for readability rather than to mirror the URL. Path params first, then query, then body, then dependencies is a common rule and none of it's needed.
 
 ## What a 404 means here
 
-A path that matches no route at all gives a 404 from the router, before any of your code runs. That is a different thing from a 404 you raise because a lookup found nothing, even though the status is the same.
+A path that matches no route at all gives a 404 from the router, before any of your code runs. That is a other thing from a 404 you raise because a lookup found nothing, though the status is the same.
 
-The distinction shows up in the response body: the router's 404 is `{"detail": "Not Found"}`, and yours is whatever you passed to `HTTPException`. If you are debugging and see the generic one, the request never matched a route &mdash; check the path, the method and the trailing slash before looking at your handler.
+The gap shows up in the response body. The router's 404 is `{"detail": "Not Found"}`. Yours is what you passed to `HTTPException`. If you're debugging and see the plain one, the request never matched a route. Check the path, the method and the trailing slash before looking at your handler.
 
 ## Encoding
 
-Path segments are URL-encoded, and FastAPI decodes them before you see them. A module titled `Vectors & Norms` reaches you as `Vectors & Norms`, not `Vectors%20%26%20Norms`.
+Path segments are URL-coded, and FastAPI decodes them before you see them. A module titled `Vectors & Norms` reaches you as `Vectors & Norms`, not `Vectors%20%26%20Norms`.
 
-That mostly just works. The case to be careful with is a value that can itself contain a slash &mdash; an encoded `%2F` is decoded to `/` and can change how the path is interpreted. For anything that might contain one, either use a `:path` parameter deliberately or move the value to the query string, where the ambiguity does not arise.
+That mostly just works. The case to be careful with is a value that can itself hold a slash. An coded `%2F` is decoded to `/` and can change how the path is read. For anything that might hold one, either use a `:path` param on purpose or move the value to the query string. Here The ambiguity doesn't arise.
 
 ## Summary
 
-A braces name in the path becomes an argument, converted by its annotation. Path parameters are always required, because they are part of the URL.
+A braces name in the path turns an arg, converted by its annotation. Path params are always needed. They're part of the URL.
 
-`Path()` adds constraints and metadata that reach the schema. Enums give closed sets a real type and a good error. `:path` matches across slashes, and needs care if it reaches a filesystem.
+`Path()` adds constraints and metadata that reach the schema. Enums give closed sets a real type and a good error. `:path` matches across slashes. Needs care if it reaches a filesystem.
 
-And the ordering rule, once more: fixed segments before variable ones.
+And the sorting rule, once more: fixed segments before var ones.
 
 
 ## Mistakes people make
 
-**Leaving an identifier as `str`.** A `UUID` or `int` annotation rejects malformed input at the router instead of passing an arbitrary string to a query.
+**Leaving an identifier as `str`.** A `UUID` or `int` annotation rejects malformed input at the router instead of passing an any string to a query.
 
-**No lower bound.** `/modules/{id}` with a plain `int` accepts `-5`, and something downstream deals with a negative identifier. `Path(ge=1)` costs one argument.
+**No lower bound.** `/modules/{id}` with a plain `int` accepts `-5`. A thing downstream deals with a minus identifier. `Path(ge=1)` costs one arg.
 
-**Building a filesystem path from a `:path` parameter.** It can contain `..`. Resolve it and confirm it is inside the directory you intended before opening anything &mdash; validation says it is a string, not that it is safe.
+**Building a filesystem path from a `:path` param.** It can hold `..`. Resolve it and confirm it's inside the folder you intended before opening anything. Check says it's a string, not that it's safe.
 
-**Expecting a plain parameter to match a slash.** It stops at the next segment; `:path` is the opt-in.
+**Expecting a plain param to match a slash.** It stops at the next segment. `:path` is the opt-in.
 
-**Confusing the two kinds of 404.** The router's generic `{"detail": "Not Found"}` means no route matched at all. Yours means the route matched and the lookup found nothing.
+**Confusing the two kinds of 404.** The router's plain `{"detail": "Not Found"}` means no route matched at all. Yours means the route matched and the lookup found nothing.
 
-**Putting a filter in the path.** `/modules/maths/vectors` implies a module can only be addressed through one track. If it is narrowing a set rather than identifying a thing, it belongs in the query string.
+**Putting a filter in the path.** `/modules/maths/vectors` implies a module can only be handled through one track. If it's narrowing a set rather than finding a thing, it belongs in the query string.
 
 ## Next
 
-Query parameters, which are the opposite in almost every respect: optional by default, unordered, and the place most of an API's flexibility lives.
+Query params, which are the opposite in almost each respect. Optional by default, unordered. The place most of an API's flexibility lives.
 
 ## What good path design buys
 
 A well-designed path is a promise about identity: this URL names this thing, and will keep naming it.
 
-That is what makes bookmarking, caching, linking and logging work. A URL that means something different depending on a query parameter, or that encodes a filter as a segment, breaks all four quietly.
+That is what makes bookmarking, caching, linking and logging work. A URL that means a thing other based on a query param, or that codes a filter as a segment, breaks all four quietly.
 
-The test is simple. Read the path aloud without the query string. If it names one identifiable thing, or one named collection, it is right. If you have to explain what it returns, something belonging in the query string has ended up in the path.
+The test is simple. Read the path aloud without the query string. If it names one identifiable thing, or one named set, it's right. If you've to explain what it returns, a thing belonging in the query string has ended up in the path.
 
 ## Versioning and stability
 
-Paths are the most public part of an API, and the hardest to change once anyone depends on them.
+Paths are the most public part of an API. The hardest to change once anyone depends on them.
 
-The common approach is a version prefix &mdash; `/v1/modules` &mdash; which is honest and coarse: it lets you make breaking changes by publishing a new version, at the cost of maintaining two.
+The common approach is a version prefix. `/v1/modules`. Which is honest and coarse. It lets you make breaking changes by publishing a new version, at the cost of keeping two.
 
-The alternative is to avoid breaking changes: add fields rather than removing them, add parameters rather than changing defaults, and deprecate before deleting. Most APIs need far fewer versions than they expect if they hold that line.
+The option is to avoid breaking changes: add fields rather than dropping them, add params rather than changing defaults. Deprecate before deleting. Most APIs need far fewer versions than they expect if they hold that line.
 
-What is worth deciding early is where the version lives, because retrofitting a prefix touches every route, every client and every piece of documentation. A router with `prefix="/v1"` costs nothing on day one.
+What is worth deciding early is where the version lives. Retrofitting a prefix touches each route, each client and each piece of docs. A router with `prefix="/v1"` costs nothing on day one.
 
 ## Identifiers people can see
 
-A last design note. Sequential integer ids in a public URL leak information: how many modules exist, roughly when one was created, and whether the id next to yours exists.
+A last design note. Sequential int ids in a public URL leak data. How many modules exist, roughly when one was created. Whether the id next to yours exists.
 
-For anything where that matters, a UUID or a short opaque id is worth the small inconvenience &mdash; and annotating it `UUID` gives you validation for free. For an internal API it rarely matters, and integers are easier to read in logs.
+For anything where that matters, a UUID or a short opaque id is worth the small inconvenience. And annotating it `UUID` gives you check for free. For an inner API it rarely matters. Ints are easier to read in logs.
 
 ## The one-line summary
 
-A path parameter identifies a thing, is always required, arrives as text and becomes whatever you annotate it as. Annotate it narrowly, constrain it with `Path()`, declare fixed routes before variable ones, and treat a `:path` value as untrusted the moment it touches a filesystem.
+A path param finds a thing, is always needed, arrives as text and turns what you annotate it as. Annotate it narrowly, constrain it with `Path()`, declare fixed routes before var ones. Treat a `:path` value as untrusted the moment it touches a filesystem.
 
 ## A closing thought
 
-The path is the part of an API that outlives everything else. Response shapes change, parameters come and go, but a URL somebody bookmarked, logged, cached or hard-coded is forever.
+The path is the part of an API that outlives all else. Response shapes change, params come and go. A URL somebody bookmarked, logged, cached or hard-coded is forever.
 
-That asymmetry is worth remembering when designing one. A few minutes deciding whether a value identifies a resource or merely filters a collection is cheap now and unrecoverable later.
+That skew is worth remembering when designing one. A few minutes deciding whether a value finds a resource or merely filters a set is cheap now and unrecoverable later.
 
 ## Two small conventions
 
-**Singular or plural.** Collections are plural &mdash; `/modules`, `/tracks` &mdash; and an item is that collection plus an identifier. Mixing `/module/7` and `/modules` in one API is the kind of inconsistency that costs a caller a request every time they guess wrong.
+**Singular or plural.** sets are plural. `/modules`, `/tracks`. And an item is that set plus an identifier. Mixing `/module/7` and `/modules` in one API is the kind of inconsistency that costs a caller a request each time they guess wrong.
 
-**Lower case, hyphens if needed.** Paths are case-sensitive in the standard and inconsistently handled in practice. Sticking to lower case removes a class of bug that only appears on somebody else's server.
+**Lower case, hyphens if needed.** Paths are case-sensitive in the standard and inconsistently handled . Sticking to lower case drops a class of bug that only appears on somebody else's server.
 
-Neither is enforced and both are worth deciding once, because the alternative is deciding per endpoint and getting it wrong somewhere.
+Neither is enforced and both are worth deciding once. The option is deciding per endpoint and getting it wrong one spot.
 
 ## Where this fits
 
-Path parameters are the smallest of the three input sources and the one with the least room for opinion: a segment of the URL, required, converted by annotation.
+Path params are the smallest of the three input sources and the one with the least room for view. A segment of the URL, needed, converted by annotation.
 
-That simplicity is why they are worth getting exactly right. There is nothing to configure and nothing to trade off &mdash; only the choice of how narrowly to annotate, and whether the value belongs in the path at all. Both decisions are made once per endpoint and last as long as the URL does.
+That simplicity is why they're worth getting just right. There's nothing to configure and nothing to trade off. Only the choice of how narrowly to annotate. Whether the value belongs in the path at all. Both choices are made once per endpoint and last if the URL does.

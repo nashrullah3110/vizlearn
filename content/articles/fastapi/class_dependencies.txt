@@ -1,8 +1,8 @@
 title: Class Dependencies
-intro: Anything callable works, which is how a dependency gets configuration of its own.
+intro: Anything callable works. This Is how a dependency gets config of its own.
 ## Callables, not functions
 
-`Depends` takes a callable. A function is the obvious one; a class is a callable too, because calling it constructs an instance.
+`Depends` takes a callable. A function is the obvious one. A class is a callable too. Calling it makes an instance.
 
 ```python
 class Pagination:
@@ -14,34 +14,13 @@ def list_modules(page: Pagination = Depends(Pagination)):
     ...
 ```
 
-FastAPI reads `__init__`'s signature exactly as it reads a function's: `limit` and `offset` become query parameters, validated and documented. The handler receives the instance.
+FastAPI reads `__init__`'s signature just as it reads a function's: `limit` and `offset` become query params, checked and documented. The handler receives the instance.
 
-Because the annotation and the callable are the same thing, there is a shorthand:
+Because the annotation and the callable are the same thing, there's a shorthand:
 
 ```python
 def list_modules(page: Pagination = Depends()):
 ```
-
-`Depends()` with no argument uses the type annotation as the callable. `page: Pagination = Depends()` is identical to `page: Pagination = Depends(Pagination)`. This is the idiomatic form when the annotation and the dependency are the same class.
-
-The instance carries state. `self.limit` and `self.offset` are attributes the handler reads — `page.limit`, `page.offset`. This is cleaner than a function dependency that returns a tuple or a dict, because the names are explicit and the IDE autocompletes them.
-
-`__init__` parameters become query (or path, or header) parameters, exactly as they would in a function dependency. `limit: int = Query(default=10, ge=1, le=100)` on `__init__` gives `limit` a constrained default with documentation — the same `Query` annotations that work on handlers work here.
-
-A class dependency can have methods. A `Pagination` class with a `.apply(query)` method that adds `.offset()` and `.limit()` to a SQLAlchemy query centralises pagination logic. The handler calls `page.apply(query)` instead of writing `.offset(page.offset).limit(page.limit)` in every endpoint.
-
-Inheritance works. A `StrictPagination(Pagination)` that overrides the default `limit` to 5 and the max to 20 is a dependency of its own. The handler declares `page: StrictPagination = Depends()` and gets the stricter version.
-
-A class with `__call__` is also a callable, which means an instance can be a dependency. `rate_limiter = RateLimiter(max_calls=100, period=60)` creates an instance with configuration, and `Depends(rate_limiter)` calls `rate_limiter.__call__()` on each request. This is how you give a dependency configuration that does not come from the request: the instance holds the config, and `__call__` receives the request parameters.
-
-The distinction between a class dependency and a `__call__` dependency is who provides the configuration. A class dependency's `__init__` parameters come from the request (query parameters, headers). A `__call__` dependency's instance attributes come from the developer (hardcoded or from settings). Both are valid patterns; the choice depends on where the configuration lives.
-
-Overriding a class dependency in tests is straightforward. `app.dependency_overrides[Pagination] = lambda: Pagination(limit=5, offset=0)` replaces the class with a lambda that returns a fixed instance. The handler receives the canned pagination without touching the query string.
-
-The documentation for a class dependency is generated from `__init__`'s signature, the same way a function dependency's documentation comes from its signature. `Query(description="...")` on an `__init__` parameter appears in the OpenAPI spec and in Swagger UI.
-
-A class dependency that opens a resource (a file, a connection) should use `yield` instead — or, if it must be a class, implement `__enter__` and `__exit__` and wrap it in a yield dependency. A class whose `__init__` opens a connection and has no `__del__` leaks the connection on every request.
-
 
 
 ## A class with __init__ is a dependency
@@ -241,15 +220,15 @@ print("Identical behaviour. Reach for the class when it holds something.")
 ```
 ## What a class buys
 
-Two things a function cannot easily give you.
+Two things a function can't easily give you.
 
-**Methods.** The instance can carry behaviour, not just data. `page.slice(rows)` keeps the pagination logic with the pagination parameters, rather than repeating the arithmetic in every handler.
+**Methods.** The instance can carry action, not just data. `page.slice(rows)` keeps the pagination logic with the pagination params, rather than repeating the math in each handler.
 
-**Configuration**, via `__call__`.
+**config**, via `__call__`.
 
 ## Configured instances
 
-This is the pattern worth knowing, and it is the main reason to reach for a class:
+This is the pattern worth knowing. It's the main reason to reach for a class:
 
 ```python
 class RequireRole:
@@ -263,9 +242,9 @@ require_admin = RequireRole("admin")
 require_reader = RequireRole("reader")
 ```
 
-Now `Depends(require_admin)` and `Depends(require_reader)` are two dependencies from one class. `__init__` takes your configuration; `__call__` takes the request parameters.
+Now `Depends(require_admin)` and `Depends(require_reader)` are two dependencies from one class. `__init__` takes your config. `__call__` takes the request params.
 
-The alternative with plain functions is a factory returning a closure, which works and reads less clearly:
+The option with plain functions is a factory returning a closure. This Works and reads less clearly:
 
 ```python
 def require_role(role):
@@ -274,7 +253,7 @@ def require_role(role):
     return dep
 ```
 
-Both are used in real code. The class version keeps the configuration visible as attributes and gives you somewhere to put related helpers.
+Both are used in real code. The class version keeps the config visible as fields and gives you one spot to put related helpers.
 
 ## When the construction happens
 
@@ -282,38 +261,38 @@ Worth being precise about, because it affects what belongs where.
 
 `RequireRole("admin")` runs **at import**, once. `__call__` runs **per request**.
 
-So expensive setup belongs in `__init__` &mdash; compiling a regular expression, loading a rules table, reading configuration. Per-request work belongs in `__call__`.
+So costly setup belongs in `__init__`. Compiling a regular formula, loading a rules table, reading config. Per-request work belongs in `__call__`.
 
-The instance is shared across requests, which means any state you keep on it is shared too. That is fine for configuration and a genuine hazard for anything mutable: a counter on the instance counts across all requests and all users, and in a multi-worker deployment counts per worker, which is almost never what someone wanted from a rate limiter.
+The instance is shared across requests. This Means any state you keep on it's shared too. That is fine for config and a genuine hazard for anything mutable. A counter on the instance counts across all requests and all users. In a multi-worker deployment counts per worker. This Is almost never what someone wanted from a rate limiter.
 
 If a dependency needs per-request state, return it from `__call__` rather than storing it on `self`.
 
 ## Returning a model
 
-A dependency's return value can be anything, and a Pydantic model is often the right choice for a group of filters:
+A dependency's return value can be anything. A Pydantic model is often the right choice for a group of filters:
 
 ```python
 def filters(q: str = Query(default=""), limit: int = Query(default=10, le=100)) -> Filters:
     return Filters(q=q, limit=limit)
 ```
 
-The handler then gets attribute access, editor completion and a typed object rather than a dictionary. The parameters are still declared individually, so they still appear in the documentation as query parameters &mdash; which is what a caller needs to see.
+The handler then gets field access, editor completion and a typed object rather than a dict. The params are still declared on their own. They still appear in the docs as query params. Which is what a caller needs to see.
 
-There is a temptation to annotate the parameter with the model directly and skip the function. Resist it: a model parameter means a request *body*, and on a GET that is not what you want.
+There's a temptation to annotate the param with the model right and skip the function. Resist it. A model param means a request *body*. On a GET that isn't what you want.
 
 ## Function or class?
 
 The question that settles it: **does it hold anything?**
 
-If the dependency is "read these parameters and hand them over", a function is plainer and shorter.
+If the dependency is "read these params and hand them over", a function is plainer and shorter.
 
-If it has configuration decided at import, methods worth keeping beside the data, or a family of related variants, a class earns its keep.
+If it has config decided at import, methods worth keeping beside the data, or a family of related variants, a class earns its keep.
 
-Most dependencies in most applications are functions. The class form is for the handful that are parameterised &mdash; permissions, rate limits, feature gates &mdash; and it is worth knowing precisely so you recognise the shape when you need it.
+Most dependencies in most uses are functions. The class form is for the handful that are parameterised. Permissions, rate limits, feature gates. And it's worth knowing just so you recognise the shape when you need it.
 
 ## With Annotated
 
-Everything here composes with the `Annotated` spelling:
+all here composes with the `Annotated` spelling:
 
 ```python
 AdminUser = Annotated[User, Depends(require_admin)]
@@ -322,24 +301,24 @@ def remove(i: int, user: AdminUser):
     ...
 ```
 
-The dependency becomes a named type, the signature reads as ordinary Python, and the requirement is stated in one place that every endpoint can reuse. For a codebase with several permission levels this is the tidiest form available.
+The dependency turns a named type, the signature reads as plain Python. The need is stated in one place that each endpoint can reuse. For a code with a few permission levels this is the tidiest form on hand.
 
 
 ## Mistakes people make
 
-**Keeping mutable state on the instance.** It is shared across every request, and in a multi-worker deployment it is per worker. A counter there counts something nobody wanted. Per-request state belongs in what `__call__` returns.
+**Keeping mutable state on the instance.** It's shared across each request. In a multi-worker deployment it's per worker. A counter there counts a thing no one wanted. Per-request state belongs in what `__call__` returns.
 
-**Expensive work in `__call__`.** That runs per request. Compiling a pattern or loading a table belongs in `__init__`, which runs once at import.
+**costly work in `__call__`.** That runs per request. Compiling a pattern or loading a table belongs in `__init__`. This Runs once at import.
 
-**Annotating the parameter with a Pydantic model directly.** A model annotation means a request *body*. For query filters, declare the parameters in a function and construct the model inside it.
+**Annotating the param with a Pydantic model right.** A model annotation means a request *body*. For query filters, declare the params in a function and make the model inside it.
 
-**A class with no configuration and no state.** That is a function with extra ceremony. Reach for the class when it holds something.
+**A class with no config and no state.** That is a function with extra ceremony. Reach for the class when it holds a thing.
 
-**Forgetting `__call__` and wondering why the instance is not a dependency.** `Depends(SomeClass)` calls the class; `Depends(some_instance)` calls the instance, and an instance is only callable if the class defines `__call__`.
+**Losing `__call__` and wondering why the instance isn't a dependency.** `Depends(SomeClass)` calls the class. `Depends(some_instance)` calls the instance. An instance is only callable if the class defines `__call__`.
 
 ## Factory function or class?
 
-Both produce configured dependencies, and both appear in real code.
+Both give configured dependencies, and both appear in real code.
 
 A **closure factory** is shorter for one small rule:
 
@@ -350,9 +329,9 @@ def require_role(role):
     return dep
 ```
 
-A **class** keeps the configuration visible as attributes, gives related helpers somewhere to live, and is easier to inspect in a debugger.
+A **class** keeps the config visible as fields, gives related helpers one spot to live. Is easier to inspect in a debugger.
 
-For one parameter and three lines, the closure. For a family of rules with shared helpers, the class.
+For one param and three lines, the closure. For a family of rules with shared helpers, the class.
 
 
 ## A worked family
@@ -374,104 +353,104 @@ read_modules = RequireScope("modules:read")
 write_modules = RequireScope("modules:read", "modules:write")
 ```
 
-One class, one rule, and as many configured dependencies as the application has permission levels. Each endpoint declares the one it needs, and the declaration is readable: `Depends(write_modules)` says what the endpoint requires without opening anything.
+One class, one rule, and as many configured dependencies as the use has permission levels. Each endpoint declares the one it needs, and the declaration is readable: `Depends(write_modules)` says what the endpoint needs without opening anything.
 
 Adding a scope is a new module-level name. Changing how scopes are checked is one method. Neither touches an endpoint.
 
 ## Instances are shared
 
-Because `read_modules` is created at import, it is one object shared by every request that reaches an endpoint declaring it.
+Because `read_modules` is created at import, it's one object shared by each request that reaches an endpoint declaring it.
 
-That is what makes it cheap, and it is the constraint to respect: the instance may hold configuration, and it must not hold anything about a particular request. If you find yourself assigning to `self` inside `__call__`, the value belongs in the return instead.
+That is what makes it cheap. It's the constraint to respect. The instance may hold config, and it must not hold anything about a given request. If you find yourself assigning to `self` inside `__call__`, the value belongs in the return instead.
 
-The same applies across workers. Each process has its own instance, so anything accumulated on `self` is per process rather than per application - which is why an instance attribute is the wrong place for a rate-limit counter, and a shared store is the right one.
+The same applies across workers. Each process has its own instance. Anything built up on `self` is per process rather than per use - which is why an instance field is the wrong place for a rate-limit counter. A shared store is the right one.
 
 ## Where the instance lives
 
-One more consequence of construction happening at import, because it decides where these belong in a project.
+One more result of build happening at import. It decides where these belong in a project.
 
-`require_admin = RequireRole("admin")` is a module-level name. It is created when the module is imported, shared by every request, and referenced by every endpoint that needs it. That makes `dependencies.py` its natural home, beside the plain functions.
+`require_admin = RequireRole("admin")` is a module-level name. It's created when the module is imported, shared by each request. Referenced by each endpoint that needs it. That makes `dependencies.py` its natural home, beside the plain functions.
 
-Two practical effects follow.
+Two hands-on effects follow.
 
-**Import order matters slightly.** Anything the constructor reads - a setting, an environment variable - must be available at import. If it is not, the failure is at startup rather than at request time, which is the better of the two, but it means configuration has to be loaded before dependencies are imported.
+**Import order matters slightly.** Anything the constructor reads - a setting, an setting var - must be on hand at import. If it isn't, the failure is at startup rather than at request time. This Is the better of the two. It means config has to be loaded before dependencies are imported.
 
-**Reloading in development recreates them.** With `--reload`, saving a file rebuilds the instances and discards whatever they held. That is invisible for configuration and confusing for anything stateful, which is one more argument for keeping state off `self`.
+**Reloading in development recreates them.** With `--reload`, saving a file rebuilds the instances and discards what they held. That is invisible for config and confusing for anything stateful. This Is one more arg for keeping state off `self`.
 
 ## When the parameters differ per endpoint
 
-A related pattern worth recognising: sometimes the configuration is not fixed at import but supplied per route.
+A related pattern worth recognising: at times the config isn't fixed at import but supplied per route.
 
-The class form handles it, because each endpoint can construct its own:
+The class form handles it, because each endpoint can make its own:
 
 ```python
 @app.get("/small", dependencies=[Depends(RateLimit(5))])
 @app.get("/large", dependencies=[Depends(RateLimit(500))])
 ```
 
-Each decorator builds an instance at import, one per route, which is exactly the same mechanism with a shorter lifetime for the name. It reads well for a rule that varies numerically across endpoints, and less well once the configuration is more than a value or two - at which point a named instance is clearer than an inline construction.
+Each decorator builds an instance at import, one per route. This Is just the same method with a shorter lifetime for the name. It reads well for a rule that varies by number across endpoints. Less well once the config is more than a value or two - at which point a named instance is clearer than an inline build.
 
 
 ## The three forms side by side
 
-All three produce a configured dependency. Choosing between them is mostly about how much the configuration carries.
+All three give a configured dependency. Choosing between them is mostly about how much the config carries.
 
-**A plain function**, when there is nothing to configure. `def pagination(limit: int = 10)` is the whole thing, and any other form is ceremony around it.
+**A plain function**, when there's nothing to configure. `def pagination(limit. Int = 10)` is the whole thing. Any other form is ceremony around it.
 
-**A closure factory**, when one small value varies. Short, and the configuration is a captured local nobody can inspect.
+**A closure factory**, when one small value varies. Short. The config is a captured local no one can inspect.
 
-**A class with `__call__`**, when the configuration is worth naming, several rules share helpers, or you want the instance to be inspectable. `RequireScope("modules:write").scopes` is readable in a debugger; a closure's captured variable is not.
+**A class with `__call__`**, when the config is worth naming, a few rules share helpers, or you want the instance to be inspectable. `RequireScope("modules:write").scopes` is readable in a debugger. A closure's captured var isn't.
 
-The progression is worth following in that order. Start with the function, reach for the factory when a value varies, and reach for the class when the factory starts growing a second function beside it.
+The progression is worth following in that order. Start with the function, reach for the factory when a value varies. Reach for the class when the factory starts growing a second function beside it.
 
 ## What a class must not do
 
-One rule, stated plainly, because breaking it produces bugs that only appear under load.
+One rule, stated plainly, because breaking it makes bugs that only appear under load.
 
-The instance is created once and shared by every request in that worker. Anything written to `self` during `__call__` is shared state across concurrent requests and separate state across workers.
+The instance is created once and shared by each request in that worker. Anything written to `self` during `__call__` is shared state across concurrent requests and split state across workers.
 
-For configuration that is exactly right - it is read-only and identical everywhere. For anything per-request it is wrong twice over: two requests interleave, and two workers disagree.
+For config that is just right - it's read-only and same all over. For anything per-request it's wrong twice over: two requests interleave, and two workers disagree.
 
-If `__call__` needs to produce something request-specific, it returns it. That is what the handler receives, and it is the only value with the right lifetime.
+If `__call__` needs to give a thing request-exact, it returns it. That is what the handler receives. It's the only value with the right lifetime.
 
 ## Summary
 
-`Depends` takes any callable, so a class is a dependency: FastAPI reads `__init__` for parameters and hands the handler the instance. `Depends()` with no argument uses the annotation.
+`Depends` takes any callable, so a class is a dependency: FastAPI reads `__init__` for params and hands the handler the instance. `Depends()` with no arg uses the annotation.
 
-Give the class `__call__` and its instances become configured dependencies - one class, a family of rules, each declared by name at the endpoints that need it. `__init__` runs once at import; `__call__` runs per request, and nothing request-specific should be stored on `self`.
+Give the class `__call__` and its instances become configured dependencies - one class, a family of rules, each declared by name at the endpoints that need it. `__init__` runs once at import. `__call__` runs per request. Nothing request-exact should be stored on `self`.
 
-Reach for a function when there is no configuration, no state and no behaviour to keep beside the data.
+Reach for a function when there's no config, no state and no action to keep beside the data.
 
 
 ## Summary, in one line
 
-Use a function until the dependency has configuration; then use a class whose `__init__` takes the configuration and whose `__call__` takes the request - remembering that the instance is built once and shared, so nothing about a single request may live on it.
+Use a function until the dependency has config. Then use a class whose `__init__` takes the config and whose `__call__` takes the request - remembering that the instance is built once and shared. Nothing about a single request may live on it.
 
 
 ## A closing thought
 
 The class form is the least-used part of this tier and the one worth recognising rather than reaching for.
 
-Most dependencies are functions and should stay functions. But when an application grows several variants of one rule - three permission levels, four rate limits, five feature gates - writing five near-identical functions is worse than writing one class and five names.
+Most dependencies are functions and should stay functions. But when an use grows a few variants of one rule - three permission levels, four rate limits, five feature gates - writing five near-same functions is worse than writing one class and five names.
 
 The signal is duplication with one value changed. That is what `__init__` is for.
 
 
 ## Two rules
 
-**Configuration in `__init__`, request handling in `__call__`.** The first runs once at import; the second runs per request.
+**config in `__init__`, request handling in `__call__`.** The first runs once at import. The second runs per request.
 
-**Nothing about a single request on `self`.** The instance is shared across every concurrent request in the worker and duplicated across workers, so anything stored there is both a race and a lie. Return it instead.
+**Nothing about a single request on `self`.** The instance is shared across each concurrent request in the worker and duplicated across workers. Anything stored there's both a race and a lie. Return it instead.
 
 
 ## Where it sits in the tier
 
-This is the smallest module of the five, and deliberately so.
+This is the smallest module of the five, and on purpose so.
 
-Function dependencies cover the overwhelming majority of real use. Sub-dependencies handle composition. `yield` handles lifetime. Router-level handles scope. Overrides handle testing.
+Function dependencies cover the overwhelming majority of real use. Sub-dependencies handle composition. `yield` handles lifetime. Router-level handles scope. replaces handle testing.
 
-The class form fills one specific gap: a rule that is the same shape at several settings. Recognising that gap - and not reaching for a class before you are in it - is the whole lesson.
+The class form fills one exact gap: a rule that is the same shape at a few settings. Recognising that gap - and not reaching for a class before you're in it - is the whole lesson.
 
 ## Next
 
-Applying a dependency to a whole router or the entire application, so that a section is protected without every endpoint repeating the declaration - and without a route added later quietly missing it.
+Applying a dependency to a whole router or the entire use. That a section is protected without each endpoint repeating the declaration - and without a route added later quietly missing it.

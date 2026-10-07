@@ -1,27 +1,18 @@
 title: loc and iloc
-intro: Label or position, and the endpoint rule that differs between them.
+intro: Label or spot, and the endpoint rule that differs between them.
 
 ## The distinction
 
 `.loc` selects by **label** &mdash; the values in the index.
 
-`.iloc` selects by **position** &mdash; where the row sits, from 0.
+`.iloc` selects by **spot** &mdash; where the row sits, from 0.
 
-On a freshly created frame the index is `0, 1, 2, ...`, so label and position are the same number and the two behave identically. That coincidence is why the difference goes unnoticed until something breaks it: a filter, a sort, a join, a `set_index`.
+On a freshly created frame the index is `0, 1, 2, ...`. Label and spot are the same number and the two behave the same way. That coincidence is why the gap goes unnoticed until a thing breaks it. A filter, a sort, a join, a `set_index`.
 
-After any of those, `df.loc[0]` and `df.iloc[0]` can refer to different rows &mdash; or `.loc[0]` can raise `KeyError` because no row is labelled 0 any more.
+After any of those, `df.loc[0]` and `df.iloc[0]` can refer to other rows. Or `.loc[0]` can raise `KeyError` because no row is labelled 0 any more.
 
-Writing `.loc` or `.iloc` explicitly, rather than bare `df[...]`, makes the choice visible. Bare brackets guess, and the guess changes with the argument type: `df["age"]` is a column, `df[0:2]` is rows by position, `df[mask]` is rows by condition. Three meanings for one syntax is a lot to hold, and the explicit accessors cost four characters.
+Writing `.loc` or `.iloc` by name, rather than bare `df[...]`, makes the choice visible. Bare brackets guess. The guess changes with the arg type: `df["age"]` is a column, `df[0:2]` is rows by spot, `df[mask]` is rows by rule. Three meanings for one syntax is a lot to hold. The clear accessors cost four characters.
 
-The endpoint rule is the other difference that matters. `.loc["a":"c"]` includes both endpoints: it returns rows labelled a, b and c. `.iloc[0:3]` excludes the stop, like Python slicing: it returns rows at positions 0, 1 and 2. The reason is that labels are not ordered integers &mdash; excluding the endpoint would mean the user has to know the next label after the one they want, which is often impossible.
-
-Both accept a single label or position, a list of them, a slice, or a boolean mask. `.loc` also accepts a callable that receives the frame and returns any of those, which is useful in method chains where you do not have the frame in a variable.
-
-Setting values follows the same syntax: `df.loc[mask, "score"] = 0` sets the score column to zero for rows matching the mask. The assignment goes through the accessor, so pandas knows exactly which cells are being changed. Chained indexing &mdash; `df[mask]["score"] = 0` &mdash; sometimes writes to a copy instead of the original, producing a `SettingWithCopyWarning` and silently losing the update. Using `.loc` for writes is the fix.
-
-`.at` and `.iat` are the scalar versions: `.at["row", "col"]` gets one value by label, `.iat[0, 1]` by position. They are faster than `.loc` and `.iloc` for single-cell access because they skip the overhead of handling slices and masks.
-
-The most common mistake is using `.iloc` with a label or `.loc` with a position after the index has been changed. Printing `df.index` before selecting makes the current state obvious, and resetting it with `df.reset_index(drop=True)` restores the 0-to-n alignment when label-based access is not needed.
 
 ## loc takes labels, iloc takes positions
 
@@ -166,17 +157,17 @@ print("loc call. Two sets of brackets is where trouble starts.")
 ```
 ## The endpoint rule
 
-This is the one that catches everyone.
+This is the one that catches all.
 
-`df.iloc[1:4]` gives positions 1, 2, 3 &mdash; the end is **excluded**, exactly like a list slice.
+`df.iloc[1:4]` gives spots 1, 2, 3. The end is **excluded**, just like a list slice.
 
-`df.loc["b":"d"]` gives labels b, c **and d** &mdash; the end is **included**.
+`df.loc["b":"d"]` gives labels b, c **and d**. The end is **included**.
 
-The reason is that labels have no natural "one past the end". With positions you can point at index 4 to mean "stop before here". With arbitrary labels &mdash; strings, dates, non-contiguous integers &mdash; there is no such thing as the label after `d`, so pandas includes it.
+labels have no natural "one past the end". With spots you can point at index 4 to mean "stop before here". With any labels. Strings, dates, non-contiguous ints. There's no such thing as the label after `d`, so pandas includes it.
 
-The practical consequence: on a default index, `df.loc[1:3]` returns **three** rows and `df.iloc[1:3]` returns **two**. Both look correct in isolation.
+The hands-on result: on a default index, `df.loc[1:3]` returns **three** rows and `df.iloc[1:3]` returns **two**. Both look correct in alone.
 
-Label slicing also requires a sorted index when the labels are not unique or not monotonic; otherwise it raises rather than guessing.
+Label slicing also needs a sorted index when the labels aren't unique or not monotonic. Else it raises rather than guessing.
 
 ## Two axes
 
@@ -188,85 +179,85 @@ Each part can be a single value, a list, a slice or (for `.loc`) a boolean mask.
 
 `df.loc[:, "age"]` is a whole column. `df.loc["r2"]` is a whole row, returned as a Series whose index is the column names.
 
-This two-axis form is the one to prefer, and not only for brevity. `df.loc[mask, "col"]` is a single indexing operation on a single object, which is what makes assignment through it reliable. `df[mask]["col"]` is two operations, the first of which may have produced a copy &mdash; and that is the subject of the next module.
+This two-axis form is the one to prefer. Not only for brevity. `df.loc[mask, "col"]` is a single indexing step on a single object. This Is what makes set through it solid. `df[mask]["col"]` is two steps, the first of which may have made a copy. And that is the subject of the next module.
 
 ## Boolean masks
 
-Masks go in `.loc`. `df.loc[df["age"] >= 25]` selects matching rows, and `df.loc[df["age"] >= 25, ["name", "city"]]` selects matching rows and named columns in one call.
+Masks go in `.loc`. `df.loc[df["age"] >= 25]` selects matching rows. `df.loc[df["age"] >= 25, ["name", "city"]]` selects matching rows and named columns in one call.
 
-`.iloc` does not accept a labelled boolean Series. It will take a plain list or array of booleans, but not a Series, because a Series carries an index and `.iloc` is defined to ignore labels &mdash; accepting one would be ambiguous. The error is deliberate.
+`.iloc` doesn't accept a labelled boolean Series. It will take a plain list or array of booleans. Not a Series. A Series carries an index and `.iloc` is defined to skip labels. Accepting one would be ambiguous. The error is deliberate.
 
 If you need to use a mask positionally, `.to_numpy()` on it strips the index.
 
 ## at and iat
 
-For a single cell, `.at` (label) and `.iat` (position) are faster than `.loc` and `.iloc`, because they skip the machinery that handles slices, lists and masks.
+For a single cell, `.at` (label) and `.iat` (spot) are faster than `.loc` and `.iloc`. They skip the machinery that handles slices, lists and masks.
 
-The difference is small for one call and substantial in a loop, as the fifth editor measures.
+The gap is small for one call and large in a loop, as the fifth editor measures.
 
-They also raise if you ask for more than one cell, which makes them self-documenting: seeing `.at` in code tells you the author meant exactly one value.
+They also raise if you ask for more than one cell. This Makes them self-documenting. Seeing `.at` in code tells you the author meant just one value.
 
-That said, a loop over cells is usually the wrong shape for the problem. `.at` makes a loop faster; removing the loop makes it unnecessary.
+That said, a loop over cells is often the wrong shape for the problem. `.at` makes a loop faster. Dropping the loop makes it not needed.
 
 ## Assignment
 
-The rule is short: **one `.loc` call, with both the row and column selection inside it**.
+The rule is short: **one `.loc` call, with both the row and column pick inside it**.
 
 ```python
 df.loc[df["age"] < 30, "age"] = 30
 ```
 
-pandas can see this is a single indexing operation on `df` itself, so it writes to `df`.
+pandas can see this is a single indexing step on `df` itself. It writes to `df`.
 
 ```python
 df[df["age"] < 30]["age"] = 30
 ```
 
-does not reliably work. The first bracket produces a new object, and the assignment may write to that temporary rather than to `df`. Historically this raised `SettingWithCopyWarning`; in current pandas it may silently do nothing.
+doesn't well work. The first bracket makes a new object. The set may write to that temporary rather than to `df`. Once this raised `SettingWithCopyWarning`. In current pandas it may silently do nothing.
 
-Assigning a column for a subset of rows fills the unselected rows with `NaN`, which is usually what you want and is worth expecting rather than discovering.
+Assigning a column for a subset of rows fills the unselected rows with `NaN`. This Is often what you want and is worth expecting rather than discovering.
 
 ## A working summary
 
-Use `.loc` when you mean labels, `.iloc` when you mean positions, and write one of them rather than bare brackets.
+Use `.loc` when you mean labels, `.iloc` when you mean spots. Write one of them rather than bare brackets.
 
-Remember that `.loc` slices include the endpoint.
+note that `.loc` slices include the endpoint.
 
-Put row and column selection in the same call.
+Put row and column pick in the same call.
 
-Use `.at`/`.iat` for a single cell if you are in a loop, and consider whether the loop should exist.
+Use `.at`/`.iat` for a single cell if you're in a loop. Consider whether the loop should exist.
 
-And after any filter or sort, be aware that positions and labels have parted company &mdash; which is the source of most of the confusion these two accessors exist to prevent.
+And after any filter or sort, be aware that spots and labels have parted company. Which is the source of most of the confusion these two accessors exist to prevent.
 
 ## What bare brackets do
 
-`df[...]` guesses from the argument, and the guess changes with the type:
+`df[...]` guesses from the arg, and the guess changes with the type:
 
 `df["age"]` &mdash; a **column**, returned as a Series.
 
-`df[["age", "city"]]` &mdash; several **columns**, returned as a DataFrame.
+`df[["age", "city"]]` &mdash; a few **columns**, returned as a DataFrame.
 
-`df[0:2]` &mdash; **rows** by position.
+`df[0:2]` &mdash; **rows** by spot.
 
 `df["a":"c"]` &mdash; **rows** by label.
 
-`df[mask]` &mdash; **rows** by condition.
+`df[mask]` &mdash; **rows** by rule.
 
-Five behaviours, two axes, one syntax. It reads well for the common case &mdash; selecting a column &mdash; and is a genuine source of confusion for everything else, because the same brackets sometimes mean rows and sometimes columns.
+Five actions, two axes, one syntax. It reads well for the common case. Selecting a column. And is a genuine source of confusion for all else. The same brackets at times mean rows and at times columns.
 
-`.loc` and `.iloc` remove the guessing. That is the argument for using them even where bare brackets would work.
+`.loc` and `.iloc` drop the guessing. That is the arg for using them even where bare brackets would work.
 
-One consequence worth knowing: on a Series, `s[0]` is ambiguous when the index is integers. Is `0` a label or a position? pandas treats it as a **label**, which raises if there is no label 0 even when there are plenty of rows. This ambiguity is why the positional-only accessor exists.
+One result worth knowing: on a Series, `s[0]` is ambiguous when the index is ints. Is `0` a label or a spot? pandas treats it as a **label**. This Raises if there's no label 0 even when there are plenty of rows. This ambiguity is why the spot-based-only accessor exists.
 
 ## Callable selection
 
-Both accessors accept a **function** that receives the object and returns a selection:
+Both accessors accept a **function** that receives the object and returns a pick:
 
 ```python
 df.loc[lambda d: d["age"] > 30]
 ```
 
-That looks like extra syntax for the same thing, and it earns its place in a chain, where `df` may not be the object being selected from:
+That looks like extra syntax for the same thing. It earns its place in a chain. Here `df` may not be the object being selected from:
 
 ```python
 (df.query("year == 2024")
@@ -274,25 +265,25 @@ That looks like extra syntax for the same thing, and it earns its place in a cha
    .loc[lambda d: d["total"] > 100])
 ```
 
-Without the lambda, the final `loc` would have to reference an intermediate that does not have a name.
+Without the lambda, the final `loc` would have to link an mid that doesn't have a name.
 
 ## Selecting columns by type or name pattern
 
-`df.select_dtypes(include="number")` picks columns by dtype, and `exclude=` is the inverse. This is how you apply an operation to every numeric column without listing them.
+`df.select_dtypes(include="number")` picks columns by dtype, and `exclude=` is the inverse. This is how you apply an step to each numeric column without listing them.
 
-`df.filter(like="date")` selects columns whose name contains a substring; `regex=` takes a pattern; `items=` takes an explicit list.
+`df.filter(like="date")` selects columns whose name holds a substring. `regex=` takes a pattern. `items=` takes an clear list.
 
-Both return a frame, so they compose with everything else. They are considerably more reliable than a hard-coded column list when the source data gains or loses columns.
+Both return a frame, so they compose with all else. They're a lot more robust than a hard-coded column list when the source data gains or loses columns.
 
 ## Setting values
 
-The rules for assignment through `.loc` are worth stating explicitly, because each has a failure mode.
+The rules for set through `.loc` are worth stating by name. Each has a failure mode.
 
 **A scalar broadcasts**: `df.loc[mask, "col"] = 0` fills every selected row.
 
-**A list or array must match the selection length exactly**, and goes in positionally.
+**A list or array must match the pick length just**, and goes in positionally.
 
-**A Series aligns on the index**, so labels that are not in the selection are ignored and labels missing from it become `NaN`.
+**A Series aligns on the index**. Labels that aren't in the pick are skipped and labels missing from it become `NaN`.
 
 **A new column created for a subset** leaves `NaN` in the unselected rows.
 
@@ -300,88 +291,88 @@ The rules for assignment through `.loc` are worth stating explicitly, because ea
 
 ## Enlargement
 
-`.loc` can create rows and columns that do not exist:
+`.loc` can create rows and columns that don't exist:
 
 `df.loc["new_row"] = [...]` adds a row. `df.loc[:, "new_col"] = ...` adds a column.
 
-`.iloc` **cannot** &mdash; a position that does not exist is an error, since there is no sensible position to create.
+`.iloc` **can't** &mdash; a spot that doesn't exist is an error. There's no sensible spot to create.
 
-Enlargement is convenient for one addition and is the quadratic anti-pattern in a loop. It is the mechanism behind `df.loc[len(df)] = row`, which is the slow way to build a frame.
+Enlargement is convenient for one addition and is the quadratic anti-pattern in a loop. It's the method behind `df.loc[len(df)] = row`. This Is the slow way to build a frame.
 
 ## A summary
 
-Use `.loc` for labels and `.iloc` for positions, and write one of them rather than relying on bare brackets to guess.
+Use `.loc` for labels and `.iloc` for spots. Write one of them rather than leaning on bare brackets to guess.
 
-Remember `.loc` slices include the endpoint and `.iloc` slices do not.
+note `.loc` slices include the endpoint and `.iloc` slices don't.
 
-Put both selections in one call, especially when assigning.
+Put both picks in one call, above all when assigning.
 
-Use `.at`/`.iat` for a single cell in a loop, and consider whether the loop is necessary.
+Use `.at`/`.iat` for a single cell in a loop. Consider whether the loop is needed.
 
 Use `select_dtypes` and `filter` instead of hard-coded column lists when the schema may change.
 
-And after any filter or sort, remember that labels and positions have parted company &mdash; which is the confusion these accessors exist to prevent.
+And after any filter or sort, note that labels and spots have parted company. Which is the confusion these accessors exist to prevent.
 
 ## Copy or view, briefly
 
-Whether `.loc` returns a view or a copy is deliberately unspecified, and depends on the internal block layout.
+Whether `.loc` returns a view or a copy is on purpose unspecified. Depends on the inner block layout.
 
-That is the whole reason the copy warning exists, and it is why the guidance in this module is phrased as "put both selections in one call" rather than "select and then assign".
+That is the whole reason the copy warning exists. It's why the guidance in this module is phrased as "put both picks in one call" rather than "select and then assign".
 
-Under copy-on-write, selections always behave as copies and the ambiguity disappears &mdash; but the one-call rule remains correct, because it is also clearer.
+Under copy-on-write, picks always behave as copies and the ambiguity disappears. But the one-call rule remains correct, because it's also clearer.
 
 ## Selecting a single row or column
 
-`df.loc["r2"]` returns a **Series** whose index is the column names. That means the row's values are forced into one dtype: a row containing an integer and a string comes back as `object`, and the integer is now an object.
+`df.loc["r2"]` returns a **Series** whose index is the column names. That means the row's values are forced into one dtype. A row holding an int and a string comes back as `object`. The int is now an object.
 
-That is a real hazard when iterating rows or passing a row to a function. It is the same problem `iterrows` has, for the same reason.
+That is a real hazard when iterating rows or passing a row to a function. It's the same problem `iterrows` has, for the same reason.
 
 `df.loc[["r2"]]` &mdash; a list rather than a scalar &mdash; returns a one-row **DataFrame** instead, preserving each column's dtype. When the dtypes matter, that is the form to use.
 
-The same distinction applies to columns: `df["a"]` is a Series, `df[["a"]]` is a one-column frame.
+The same gap applies to columns: `df["a"]` is a Series, `df[["a"]]` is a one-column frame.
 
 ## Common errors and what they mean
 
-**`KeyError`** on `.loc` &mdash; the label does not exist. Often because the frame was filtered and the labels changed, or because the key is a string where you passed an integer.
+**`KeyError`** on `.loc` &mdash; the label doesn't exist. Often because the frame was filtered and the labels changed, or because the key is a string where you passed an int.
 
-**`IndexError`** on `.iloc` &mdash; the position is out of range.
+**`IndexError`** on `.iloc` &mdash; the spot is out of range.
 
-**"Cannot mask with non-boolean array containing NA / NaN values"** &mdash; a `.str` predicate without `na=False`.
+**"Can't mask with non-boolean array holding NA / NaN values"**. A `.str` predicate without `na=False`.
 
-**"The truth value of a Series is ambiguous"** &mdash; `and`/`or` where `&`/`|` was needed, or a missing pair of parentheses.
+**"The truth value of a Series is ambiguous"**. `and`/`or` where `&`/`|` was needed, or a missing pair of parentheses.
 
-**"cannot reindex on an axis with duplicate labels"** &mdash; the index has repeats and the operation needs uniqueness.
+**"can't reindex on an axis with copy labels"**. The index has repeats and the step needs uniqueness.
 
-**`SettingWithCopyWarning`** &mdash; two indexing operations on the left of an assignment.
+**`SettingWithCopyWarning`** &mdash; two indexing steps on the left of an set.
 
-Each of these has one usual cause, and recognising them saves more time than any amount of general debugging.
+Each of these has one usual cause. Recognising them saves more time than any amount of general debugging.
 
 ## A short reference
 
 `df["col"]` &mdash; one column, as a Series.
 
-`df[["a", "b"]]` &mdash; several columns, as a frame.
+`df[["a", "b"]]` &mdash; a few columns, as a frame.
 
 `df.loc[rows, cols]` &mdash; by label, endpoint inclusive.
 
-`df.iloc[rows, cols]` &mdash; by position, endpoint exclusive.
+`df.iloc[rows, cols]` &mdash; by spot, endpoint exclusive.
 
 `df.at[row, col]` / `df.iat[i, j]` &mdash; one cell, fast.
 
-`df.loc[mask]` &mdash; rows by condition.
+`df.loc[mask]` &mdash; rows by rule.
 
-`df.loc[mask, "col"] = value` &mdash; the only assignment form worth using.
+`df.loc[mask, "col"] = value` &mdash; the only set form worth using.
 
 `df.select_dtypes(...)` / `df.filter(...)` &mdash; columns by type or name pattern.
 
 ## A closing note
 
-The distinction is small to state and causes a disproportionate amount of confusion, because on a freshly loaded frame label and position are the same number.
+The gap is small to state and causes a disproportionate amount of confusion. On a freshly loaded frame label and spot are the same number.
 
-They part company the first time anything filters, sorts, joins or reindexes &mdash; and from then on `df.loc[0]` and `df.iloc[0]` may be different rows, or `.loc[0]` may raise because no row is labelled 0 any more.
+They part company the first time anything filters, sorts, joins or reindexes. And from then on `df.loc[0]` and `df.iloc[0]` may be other rows, or `.loc[0]` may raise because no row is labelled 0 any more.
 
-Writing `.loc` or `.iloc` rather than bare brackets makes the choice explicit, which matters because bare brackets guess differently depending on what you hand them: a column for a string, rows for a slice, rows for a mask.
+Writing `.loc` or `.iloc` rather than bare brackets makes the choice clear. This Matters because bare brackets guess differently based on what you hand them. A column for a string, rows for a slice, rows for a mask.
 
-The endpoint rule is the other thing to carry: `.loc` slices include the last label, `.iloc` slices do not. On a default index the two forms differ by exactly one row, and both look correct.
+The endpoint rule is the other thing to carry: `.loc` slices include the last label, `.iloc` slices don't. On a default index the two forms differ by just one row, and both look correct.
 
-And for assignment there is only one form worth using &mdash; a single `.loc` with the rows and the column both inside it.
+And for set there's only one form worth using. A single `.loc` with the rows and the column both inside it.

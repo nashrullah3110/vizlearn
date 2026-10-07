@@ -1,36 +1,36 @@
 title: Harris Corners and Keypoints
-intro: What makes a point in an image worth remembering, and the determinant that measures it.
+intro: What makes a point in an image worth remembering. The determinant that measures it.
 
 ## The question behind the detector
 
-To match two photographs of the same scene, you need points you can recognise in
+To match two photos of the same scene, you need points you can recognise in
 both. Which points are those?
 
 The Harris insight is to ask what happens when you shift a small window slightly
-in every direction.
+in each direction.
 
-**Flat region.** Shift it anywhere and the contents barely change. There is
+**Flat region.** Shift it anywhere and the contents barely change. There's
 nothing to lock onto: this window could be almost anywhere.
 
-**Edge.** Shift it along the edge and nothing changes; shift it across and
-everything does. It is locatable in one direction and free to slide in the other
+**Edge.** Shift it along the edge and nothing changes. Shift it across and
+all does. It's locatable in one direction and free to slide in the other
 &mdash; the aperture problem.
 
 **Corner.** Shift it in any direction at all and the contents change. Its
-position is pinned in both directions, and that is exactly what a landmark needs
+spot is pinned in both directions, and that is just what a landmark needs
 to be.
 
 ## Making it arithmetic
 
-The change under a small shift is captured by how the image gradient behaves
-across the window. Collect the gradients into the **structure tensor**:
+The change under a small shift is captured by how the image grad behaves
+across the window. Collect the grads into the **structure tensor**:
 
 ```
 M  =  [ sum(Ix*Ix)   sum(Ix*Iy) ]
       [ sum(Ix*Iy)   sum(Iy*Iy) ]
 ```
 
-Its two eigenvalues say how strongly the intensity varies along the two principal
+Its two eigenvals say how strongly the intensity varies along the two principal
 directions:
 
 | &lambda;1 | &lambda;2 | Meaning |
@@ -39,7 +39,7 @@ directions:
 | large | small | edge |
 | large | large | **corner** |
 
-Computing eigenvalues at every pixel would be slow, so Harris uses a combination
+finding eigenvals at each pixel would be slow. So Harris uses a combination
 that behaves the same way without them:
 
 ```
@@ -47,59 +47,59 @@ R  =  det(M) - k * trace(M)^2
      =  (l1*l2) - k*(l1+l2)^2
 ```
 
-`R` is large and positive only when both eigenvalues are large, strongly negative
-at an edge, and near zero on flat ground. The determinant multiplies the
-eigenvalues, so one small eigenvalue kills it; the trace term subtracts a penalty
+`R` is large and plus only when both eigenvals are large, strongly minus
+at an edge, and near zero on flat ground. The determinant times the
+eigenvals, so one small eigenval kills it. The trace term subtracts a fine
 that grows when the two are unbalanced.
 
-`k` sets how strictly that balance is enforced &mdash; conventionally between
+`k` sets how strictly that balance is enforced &mdash; usually between
 0.04 and 0.06. Drag it high in the visualisation and detections thin out to the
-sharpest corners; drag it low and edges start to survive.
+sharpest corners. Drag it low and edges start to live.
 
 ## Reading the visualisation
 
 Highlighted pixels are those whose response clears the threshold.
 
-Set the threshold low and whole edges light up, which is the failure mode `R` is
-designed to avoid, appearing because the threshold is admitting weakly negative
+Set the threshold low and whole edges light up. This Is the failure mode `R` is
+designed to avoid, appearing because the threshold is admitting weakly minus
 and near-zero responses. Raise it and only the rectangle's four corners and the
-triangle's points remain &mdash; the genuinely distinctive positions.
+triangle's points remain &mdash; the truly distinctive spots.
 
-The window radius controls how much context each decision uses. A small window is
+The window radius controls how much context each choice uses. A small window is
 sensitive to noise and finds many tiny corners. A large one is stable but blurs
 nearby corners into a single response and misses fine structure.
 
 ## What it is and is not invariant to
 
-**Rotation: yes.** The eigenvalues of the structure tensor do not depend on the
-coordinate frame, so a rotated corner is still a corner with the same response.
-This is the property that makes Harris useful for matching.
+**Rotation: yes.** The eigenvals of the structure tensor don't depend on the
+coord frame, so a rotated corner is still a corner with the same response.
+This is the property that makes Harris handy for matching.
 
-**Illumination: mostly.** A constant brightness offset does not change gradients
-at all. A contrast scaling multiplies them, which scales `R`, so a relative
-threshold is needed rather than an absolute one.
+**Illumination: mostly.** A constant brightness offset doesn't change grads
+at all. A contrast scaling times them. This Scales `R`, so a scaled
+threshold is needed rather than an abs one.
 
-**Scale: no.** This is the significant gap. A corner viewed from twice as far is
+**Scale: no.** This is the major gap. A corner viewed from twice as far is
 a smaller corner, and a fixed window either sees only part of it or swamps it
 with context.
 
-That gap is what **SIFT** addressed, by searching over scales as well as
-positions and recording the scale at which each keypoint is most distinctive,
-then describing the local gradient pattern so keypoints can be matched rather
-than merely found. **ORB** does something similar much faster using FAST corners
+That gap is what **SIFT** handled, by searching over scales and
+spots and recording the scale at which each keypoint is most distinctive,
+then showing the local grad pattern so keypoints can be matched rather
+than merely found. **ORB** does a thing similar much faster using FAST corners
 and binary descriptors, which is why it turns up in real-time systems.
 
 ## Where corners are used
 
 Panorama stitching, structure from motion, visual SLAM, camera calibration and
-image registration all rest on finding the same physical points in several images
-and solving for the transform between them. Detection is the first step;
-[template matching](template_matching.html) is the alternative that does not
-survive rotation.
+image registration all rest on finding the same physical points in a few images
+and solving for the transform between them. Spotting is the first step;
+[template matching](template_matching.html) is the option that doesn't
+live rotation.
 
 ## Flat, edge, corner, by the numbers
 
-The whole detector reduces to the two eigenvalues of the structure tensor, and
+The whole finder reduces to the two eigenvals of the structure tensor, and
 Harris's shortcut `R = det(M) - k&middot;trace(M)&sup2;` reads them without solving
 for them. With `k = 0.04`:
 
@@ -109,46 +109,46 @@ for them. With `k = 0.04`:
 |edge|5.0|0.1|**&minus;0.54** (strongly negative)|
 |corner|5.0|4.0|**+16.76** (large positive)|
 
-The determinant multiplies the eigenvalues, so one small eigenvalue drags it toward
-zero; the trace term subtracts a penalty that grows when the two are unbalanced.
-The result is large and positive only when *both* eigenvalues are large &mdash; the
-corner case, where the intensity changes in two independent directions and the
+The determinant times the eigenvals. So One small eigenval drags it toward
+zero. The trace term subtracts a fine that grows when the two are unbalanced.
+The result is large and plus only when *both* eigenvals are large &mdash; the
+corner case, where the intensity changes in two free directions and the
 window can be pinned down. An edge changes in one direction only, so it comes out
-strongly negative and is rejected; a flat region changes in neither and sits near
-zero. That is why `R` separates corners from edges without ever computing an
-eigenvalue, and why `k` (0.04-0.06) tunes how strictly the balance is enforced. The
-eigenvalues are rotation-invariant, so a rotated corner scores the same &mdash; but
-not scale-invariant, which is the gap SIFT was built to close.
+strongly minus and is rejected. A flat region changes in neither and sits near
+zero. That is why `R` separates corners from edges without ever finding an
+eigenval, and why `k` (0.04-0.06) tunes how strictly the balance is enforced. The
+eigenvals are rotation-rule, so a rotated corner scores the same &mdash; but
+not scale-rule, which is the gap SIFT was built to close.
 
-What Harris is and is not invariant to decides where it can be used. Rotation: yes
-&mdash; the eigenvalues do not depend on the coordinate frame, so a rotated corner
+What Harris is and isn't rule to decides where it can be used. Rotation: yes
+&mdash; the eigenvals don't depend on the coord frame, so a rotated corner
 scores the same, which is what makes it usable for matching two views. Illumination:
-mostly &mdash; a brightness offset leaves gradients untouched, but a contrast scaling
-multiplies `R`, which is why the threshold must be relative to the image maximum
-rather than absolute. Scale: no &mdash; a corner seen from twice as far is a smaller
-corner a fixed window cannot capture. That gap is exactly what SIFT closed by
+mostly &mdash; a brightness offset leaves grads untouched, but a contrast scaling
+times `R`, which is why the threshold must be scaled to the image max
+rather than abs. Scale: no. A corner seen from twice as far is a smaller
+corner a fixed window can't capture, and that gap is just what SIFT closed by
 searching over scales and recording the one at which each keypoint is most
 distinctive. Corners feed panorama stitching, structure-from-motion, visual SLAM and
-calibration, all of which rest on finding the same physical point in several images.
+calibration, all of which rest on finding the same physical point in a few images.
 
 ## Where it goes wrong
 
-**An absolute threshold.** Response scales with contrast, so a threshold tuned on
-one image fails on a darker one. Threshold relative to the maximum, as this page
+**An abs threshold.** Response scales with contrast. So A threshold tuned on
+one image fails on a darker one. Threshold scaled to the max, as this page
 does.
 
-**No non-maximum suppression.** A corner produces a cluster of high responses,
+**No non-max suppression.** A corner makes a cluster of high responses,
 not one pixel.
 
-**Expecting scale invariance.** If the camera distance varies, use a
-scale-invariant detector.
+**Expecting scale steadiness.** If the camera distance varies, use a
+scale-rule finder.
 
-**Corners on a blurred image.** Blur destroys the gradients the whole method
+**Corners on a blurred image.** Blur destroys the grads the whole method
 depends on, so denoise gently or not at all before detecting.
 
 ## Two eigenvalues that tell an edge from a corner
 
-A corner is a place where the image changes in two independent directions, and that sentence turns directly into linear algebra. This builds the structure tensor, reads its eigenvalues, and shows why Harris uses a determinant-and-trace shortcut instead of computing them.
+A corner is a place where the image changes in two free directions. That sentence turns right into linear algebra. This builds the structure tensor, reads its eigenvals. Shows why Harris uses a determinant-and-trace shortcut instead of finding them.
 
 ```python-run
 import numpy as np

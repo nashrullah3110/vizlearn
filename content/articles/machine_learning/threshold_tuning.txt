@@ -1,39 +1,39 @@
 title: Threshold Tuning
-intro: Where 0.5 came from, why it is almost never right, and how to find the number that is.
+intro: Where 0.5 came from, why it's almost never right. How to find the number that is.
 
 ## Where 0.5 comes from
 
 It comes from the library. `predict()` calls `predict_proba()` and cuts at 0.5,
-because a default has to be something and 0.5 is the least arbitrary-looking
+because a default has to be a thing and 0.5 is the least any-looking
 choice available.
 
-It is optimal under two assumptions that are rarely true together: the classes
-are balanced, and the two kinds of mistake cost the same. Change either and 0.5
-stops being the right cut. Lowering the threshold catches more positives (higher recall) at the cost of more false alarms (lower precision); raising it does the reverse. The [precision-recall curve](precision_recall_and_f1.html) shows every possible tradeoff, and the right threshold is wherever your cost structure says the two kinds of mistake balance. For fraud detection, where missing a fraudulent transaction is far more expensive than investigating a legitimate one, the threshold might sit at 0.1; for spam filtering, where a false positive (blocking a real email) is worse than a false negative, it might sit at 0.9. This page walks through the curve, shows how to pick the threshold that maximises F1, and covers the Youden index and cost-weighted selection as alternatives.
+It's best under two assumptions that are rarely true together: the classes
+are weighed, and the two kinds of mistake cost the same. Change either and 0.5
+stops being the right cut.
 
 ## Put a price on each mistake
 
-The two sliders set what a false negative and a false positive cost. The curve
-is the **total cost** across every threshold, computed over 1,500 cases with 20%
-positives. The grey line marks 0.5; the orange line marks the cheapest
+The two sliders set what a false minus and a false plus cost. The curve
+is the **total cost** across each threshold, found over 1,500 cases with 20%
+positives. The grey line marks 0.5. The orange line marks the cheapest
 threshold.
 
 Start with a miss costing 20 and a false alarm costing 1 &mdash; a screening
 problem, where investigating a healthy person is cheap and letting a sick one
-through is not. The minimum sits well below 0.5. The model should flag
-generously, because the flags are cheap and the misses are not.
+through isn't. The min sits well below 0.5. The model should flag
+generously, because the flags are cheap and the misses aren't.
 
 Now reverse them: a miss at 1 and a false alarm at 50 &mdash; an automated
-account suspension, where a wrong suspension is expensive and a missed offender
-is dealt with later. The minimum moves above 0.5.
+account suspension, where a wrong suspension is costly and a missed offender
+is dealt with later. The min moves above 0.5.
 
-Set them equal and, with these class proportions, the minimum lands near 0.5 but
-not exactly on it, because the balance is 20/80 rather than 50/50.
+Set them equal and, with these class proportions, the min lands near 0.5 but
+not just on it, because the balance is 20/80 rather than 50/50.
 
 ## The arithmetic
 
-The expected cost of predicting positive on a case with predicted probability
-*p* is `(1 - p) x cost_FP`. Predicting negative costs `p x cost_FN`. Flagging is
+The expected cost of predicting plus on a case with predicted chance
+*p* is `(1 - p) x cost_FP`. Predicting minus costs `p x cost_FN`. Flagging is
 worth it when
 
 ```
@@ -46,51 +46,51 @@ which rearranges to
 p  >  cost_FP / (cost_FP + cost_FN)
 ```
 
-With equal costs that is 0.5, which is where the default comes from. With a miss
-ten times as expensive as a false alarm it is 1/11, about 0.09 &mdash; and a
+With equal costs that is 0.5. This Is where the default comes from. With a miss
+ten times as costly as a false alarm it's 1/11, about 0.09 &mdash; and a
 default of 0.5 is then five times too strict.
 
 That formula is worth carrying around. It gives a defensible starting threshold
-from two numbers a domain expert can usually supply, without any tuning at all.
+from two numbers a domain expert can often supply, without any tuning at all.
 
 ## When you cannot price the errors
 
-Often nobody can put a number on a miss. Three usable fallbacks:
+Often no one can put a number on a miss. Three usable fallbacks:
 
-**Maximise F1**, or F-beta if one error matters more. This is the least
-opinionated option and it is what most people do.
+**Raise F1**, or F-beta if one error matters more. This is the least
+opinionated option and it's what most people do.
 
 **Fix an operating constraint.** "The team can investigate 200 cases a day" sets
-the threshold directly: take the top 200 scores. "Precision must be at least
+the threshold right: take the top 200 scores. "Precision must be at least
 80%" does the same from the other side. These are often more honest than a
-metric, because they describe what will actually happen.
+metric, because they show what will really happen.
 
 **Choose from the curve.** Plot precision and recall against threshold and pick
-the point where the trade-off turns. It is a judgement, but an informed one.
+the point where the trade-off turns. It's a judgement, but an informed one.
 
 ## Two things that must be right
 
 **Tune on validation data.** Choosing the threshold on the test set and then
-reporting test performance is the same category of error as tuning
-hyperparameters there &mdash; the reported number includes the choice you made
-to maximise it.
+reporting test speed is the same category of error as tuning
+settings there &mdash; the reported number includes the choice you made
+to raise it.
 
-**Do not confuse this with calibration.** Threshold tuning takes the scores as
+**Don't confuse this with calibration.** Threshold tuning takes the scores as
 given and picks a cut. Calibration changes the scores so that a score of 0.8
-really means 80% of such cases are positive.
+really means 80% of such cases are plus.
 
-They are independent. A badly calibrated model can rank perfectly, and if the
+They're free. A badly calibrated model can rank just right, and if the
 ranking is right, a tuned threshold works fine. But if the threshold is being
 derived from the cost formula above, the *p* in it must mean an actual
-probability &mdash; and then calibration matters. Platt scaling and isotonic
+chance &mdash; and then calibration matters. Platt scaling and isotonic
 regression are the usual tools.
 
 ## The threshold the costs imply
 
-The optimal cut is not a matter of taste; it drops out of the two error costs.
-Flagging a case with predicted probability p is worth it when
-`(1 - p) &middot; cost_FP < p &middot; cost_FN`. That rearranges to a threshold of
-`cost_FP / (cost_FP + cost_FN)`.
+The best cut isn't a matter of taste. It drops out of the two error costs.
+Flagging a case with predicted chance p is worth it when
+`(1 - p) &middot; cost_FP < p &middot; cost_FN`. This Rearranges to a threshold of
+`cost_FP / (cost_FP + cost_FN)`:
 
 |a miss costs|a false alarm costs|optimal threshold|
 |---|---|---|
@@ -98,42 +98,42 @@ Flagging a case with predicted probability p is worth it when
 |1|1 (symmetric)|0.500|
 |1|50 (auto-suspension)|0.980|
 
-The familiar 0.5 is just the middle row &mdash; the special case where the two
-mistakes cost the same. Move to a screening problem, where missing a sick patient
+The familiar 0.5 is just the middle row. The special case where the two
+mistakes cost the same. Move to a screening problem. Here Missing a sick patient
 is twenty times worse than a needless second look, and the right cut falls to
-0.048: flag almost anything, because flags are cheap and misses are not, and the
+0.048: flag almost any of it. Flags are cheap and misses aren't, and the
 default of 0.5 is then more than ten times too strict. Reverse the costs and it
-climbs to 0.98. The formula needs only two numbers a domain expert can usually
+climbs to 0.98. The formula needs only two numbers a domain expert can often
 supply, and it gives a defensible threshold with no tuning at all &mdash; but the
-p in it must be an actual probability, which is why a cost-derived threshold is
-exactly the case where [calibration](probability_calibration.html) stops being
+p in it must be an actual chance. This Is why a cost-derived threshold is
+just the case where [calibration](probability_calibration.html) stops being
 optional.
 
-When nobody can price the errors, three fallbacks are honest. Maximise F1 (or
-F-beta if one error matters more), which is the least opinionated option. Fix an
+When no one can price the errors, three fallbacks are honest. Raise F1 (or
+F-beta if one error matters more). This Is the least opinionated option. Fix an
 operating constraint &mdash; "the team can investigate 200 cases a day" sets the
-threshold directly as the top 200 scores, and often describes reality better than
+threshold right as the top 200 scores, and often shows reality better than
 any metric. Or read the precision-recall trade-off off the curve and pick the knee.
 Whichever you use, tune it on validation data, never the test set: choosing the
-threshold to maximise a number and then reporting that number folds the choice into
-the result, exactly as tuning hyperparameters on the test set does.
+threshold to raise a number and then reporting that number folds the choice into
+the result, just as tuning settings on the test set does.
 
 ## Where it goes wrong
 
-**Reporting metrics at 0.5 and stopping.** The most common evaluation mistake
-after using accuracy.
+**Reporting metrics at 0.5 and stopping.** The most common test mistake
+after using fit.
 
-**Tuning on the test set.** Optimistic by exactly the amount you gained.
+**Tuning on the test set.** Optimistic by just the amount you gained.
 
-**Retuning per fold and averaging.** The thresholds are not comparable across
+**Retuning per fold and blending.** The thresholds aren't close across
 folds. Tune once on a held-out validation set.
 
-**Forgetting it drifts.** The optimal threshold depends on the class balance,
+**Losing it drifts.** The best threshold depends on the class balance,
 and that moves in production. It needs rechecking, not setting once.
 
 ## 0.5 is a default, not a decision
 
-The threshold is the one hyperparameter you can change after training, in production, in a config file. Here is what it costs and what it buys.
+The threshold is the one setting you can change after training, in production, in a config file. Here is what it costs and what it buys.
 
 ```python-run
 import numpy as np

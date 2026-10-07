@@ -1,99 +1,99 @@
 title: Isolation Forest
-intro: Anomaly detection that looks for what is easy to cut off, rather than modelling what is normal.
+intro: Outlier spotting that looks for what is easy to cut off, rather than modelling what is normal.
 
 ## Inverting the usual approach
 
-Most anomaly detection builds a model of normal &mdash; fit a distribution,
-estimate a density, learn a boundary &mdash; and flags whatever falls outside.
-That is hard work, and in high dimensions density estimation is very hard work.
+Most outlier spotting builds a model of normal &mdash; fit a spread,
+guess a density, learn a boundary. And flags what falls outside.
+That is hard work, and in high dims density estimation is very hard work.
 
-Isolation Forest asks a different question: **how much effort does it take to
-separate this point from everything else?**
+Alone Forest asks a different question: **how much effort does it take to
+separate this point from all else?**
 
-Pick a random feature, pick a random split value between its minimum and maximum,
-and divide the data. Repeat on each half until every point sits alone.
+Pick a random feature, pick a random split value between its min and max,
+and divide the data. Repeat on each half until each point sits alone.
 
-A point far from the rest gets cut off almost immediately &mdash; a single random
+A point far from the rest gets cut off almost right away &mdash; a single random
 split has a good chance of landing between it and the crowd. A point in the
-middle of a dense cluster survives many splits, because every cut has to be
+middle of a dense cluster lives many splits. Each cut has to be
 placed among tightly packed neighbours.
 
-**Path length is the anomaly measure**, and no model of normality was ever built.
+**Path length is the outlier measure**, and no model of normality was ever built.
 
 ## The score
 
-The raw quantity is the average path length across the forest. It is normalised
+The raw quantity is the mean path length across the forest. It's normed
 against the expected path length in a random binary tree of the same size,
-because deeper trees naturally have longer paths:
+because deeper trees on its own have longer paths:
 
 ```
 score = 2 ^ ( -avg_path / c(n) )
 ```
 
 The direction catches people out. A **short** path means easy to isolate, which
-means **anomalous**, which means a **high** score. Around 0.5 is unremarkable;
+means **anomalous**, which means a **high** score. Around 0.5 is plain;
 above about 0.6 on this page is worth a look.
 
 Drag the threshold and watch the count. The readout gives the range of scores
-present, so you can see where the population actually sits rather than guessing.
+present, so you can see where the group really sits rather than guessing.
 
 ## Subsampling, and why it helps
 
-Each tree is built from a small random subsample &mdash; 256 points by default in
-most libraries &mdash; and this is not only for speed.
+Each tree is built from a small random subsample. 256 points by default in
+most libraries &mdash; and this isn't only for speed.
 
-With the full dataset, a cluster of anomalies can be dense enough to look normal
-locally: its members shield each other and need several splits to separate. Take
-a small sample and those anomalies are usually alone in it, so they are isolated
-immediately. Subsampling reduces *swamping* (normal points looking anomalous
-because the data is crowded) and *masking* (anomalies hiding one another).
+With the full dataset, a cluster of outliers can be dense enough to look normal
+locally: its members shield each other and need a few splits to separate. Take
+a small sample and those outliers are often alone in it, so they're isolated
+right away. Subsampling reduces *swamping* (normal points looking anomalous
+because the data is crowded) and *masking* (outliers hiding one another).
 
 The trees control shows the other half of the picture. At five trees the flagged
-set jitters as you change the seed; at sixty it is stable. Path length from one
-random tree is nearly meaningless, and the average over many is not.
+set jitters as you change the seed. At sixty it's stable. Path length from one
+random tree is nearly meaningless, and the mean over many isn't.
 
-**Each tree is built from a sample and then used to score every point.** Building
-and scoring on the same subsample is a mistake worth naming. A point missing from
-a tree contributes nothing that round, its average path comes out short, and it
-looks like an outlier. Everything ends up flagged.
+**Each tree is built from a sample and then used to score each point.** Building
+and scoring on the same subsample is a mistake worth naming: a point missing from
+a tree adds nothing that round, its mean path comes out short, and it
+looks like an outlier. All ends up flagged.
 
 ## What it is good at
 
-**Speed.** Linear in the number of points, and the trees are shallow. It is one
-of the few anomaly detectors that is genuinely cheap on large data.
+**Speed.** Linear in the number of points, and the trees are shallow. It's one
+of the few outlier finders that is truly cheap on large data.
 
-**High dimensions.** No distance metric, so it avoids the concentration problem
+**High dims.** No distance metric, so it avoids the concentration problem
 that undoes k-nearest-neighbour approaches.
 
-**No labels.** Entirely unsupervised.
+**No labels.** fully unsupervised.
 
-**No distributional assumption.** Unlike a Gaussian-based detector, it does not
+**No distributional assumption.** Unlike a Gaussian-based finder, it doesn't
 care what shape normal is.
 
 ## What it is bad at
 
-**Local anomalies.** It finds points that are globally easy to separate. A point
-sitting in a *low-density gap between two dense clusters* may be perfectly normal
-globally and clearly anomalous locally. **Local Outlier Factor** compares each
+**Local outliers.** It finds points that are globally easy to separate. A point
+sitting in a *low-density gap between two dense clusters* may be just right normal
+globally and clearly anomalous locally. **Local Outlier Factor** checks each
 point's density to its neighbours' and catches these.
 
-**Axis-aligned splits.** Cuts are perpendicular to the axes, which produces
-artefacts along diagonals in correlated data. **Extended Isolation Forest** uses
+**Axis-aligned splits.** Cuts are at right angles to the axes, which makes
+artefacts along main-lines in linked data. **Extended Alone Forest** uses
 random hyperplanes instead.
 
-**Irrelevant features.** Random feature selection wastes splits on columns that
+**Irrelevant features.** Random feature pick wastes splits on columns that
 carry nothing.
 
-**The contamination parameter.** Libraries ask what fraction of the data is
-anomalous in order to place a threshold, and if you knew that you would be much
-further along. Prefer to look at the score distribution and choose a cut, which
+**The contamination param.** Libraries ask what fraction of the data is
+anomalous to place a threshold, and if you knew that you'd be much
+further along. Prefer to look at the score spread and choose a cut, which
 is what the slider here makes you do.
 
 ## The path-length score, worked
 
-The score turns an average path length into a number between 0 and 1, and working
-it shows why the direction is what it is. With a 256-point subsample the expected
-path in a random tree is `c(256) &asymp; 10.24`, and `score = 2^(-avg_path / c(n))`.
+The score turns an mean path length into a number between 0 and 1, and working
+it shows why the direction is what it's. With a 256-point subsample the expected
+path in a random tree is `c(256) &asymp; 10.24`, and `score = 2^(-avg_path / c(n))`:
 
 |average path to isolate the point|score|reading|
 |---|---|---|
@@ -102,41 +102,41 @@ path in a random tree is `c(256) &asymp; 10.24`, and `score = 2^(-avg_path / c(n
 
 A point far from the crowd is separated by one or two random splits &mdash; a
 single cut has a good chance of landing in the empty space around it &mdash; so its
-path is short, its score high, and it is flagged. A point buried in a dense cluster
-needs many splits to peel away from its neighbours, so its path is long and its
-score low. Short path, high score, anomalous: the relationship that catches people
+path is short, its score high. It's flagged. A point buried in a dense cluster
+needs many splits to peel away from its neighbours. Its path is long and its
+score low. Short path, high score, anomalous: the tie that catches people
 because it runs opposite to the intuition that a bigger number is safer. The
-256-point subsample is not only for speed &mdash; a small sample usually contains a
-would-be anomaly alone, so it isolates immediately, where in the full data a tight
-clump of anomalies can shield each other and survive several cuts (masking). And
-the average is over many trees for a reason: one tree's path length is nearly
-meaningless, and the flagged set only stabilises across dozens.
+256-point subsample isn't only for speed. A small sample often holds a
+would-be outlier alone, so it isolates right away. Here In the full data a tight
+clump of outliers can shield each other and live a few cuts (masking). And
+the mean is over many trees for a reason: one tree's path length is nearly
+meaningless, and the flagged set only settles across dozens.
 
-What Isolation Forest is good and bad at both follow from that random-split
-mechanism. It is fast &mdash; linear in the points, with shallow trees &mdash; and
+What Alone Forest is good and bad at both follow from that random-split
+mechanism. It's fast &mdash; linear in the points, with shallow trees &mdash; and
 indifferent to dimensionality, since it uses no distance metric and so escapes the
-concentration that undoes k-nearest-neighbour detectors, and it assumes nothing
+concentration that undoes k-nearest-neighbour finders, and it assumes nothing
 about the shape of "normal". But it finds only *globally* easy-to-separate points:
-a point sitting in a low-density gap between two dense clusters can be perfectly
-ordinary globally and clearly anomalous locally, which is what Local Outlier Factor
-catches by comparing each point's density to its neighbours'. And its
-`contamination` parameter, which asks what fraction of the data is anomalous, is a
-guess presented as a setting &mdash; better to read the score distribution and cut
+a point sitting in a low-density gap between two dense clusters can be just right
+plain globally and clearly anomalous locally. This Is what Local Outlier Factor
+catches by checking each point's density to its neighbours'. And its
+`contamination` param, which asks what fraction of the data is anomalous, is a
+guess presented as a setting. Better to read the score spread and cut
 it yourself.
 
 ## Where it goes wrong
 
 **Reading the score backwards.** High means anomalous.
 
-**Too few trees.** The estimate is noisy; check by changing the seed.
+**Too few trees.** The estimate is noisy. Check by changing the seed.
 
-**Trusting `contamination`.** It is a guess presented as a parameter.
+**Trusting `contamination`.** It's a guess presented as a param.
 
-**Expecting it to find local anomalies.** Use LOF for those.
+**Expecting it to find local outliers.** Use LOF for those.
 
 ## Finding outliers by how easy they are to separate
 
-Isolation Forest splits at random and counts how few cuts it takes to isolate a point. Anomalies fall out early, and that path length is the entire score.
+Alone Forest splits at random and counts how few cuts it takes to isolate a point. Outliers fall out early. That path length is the entire score.
 
 ```python-run
 import numpy as np

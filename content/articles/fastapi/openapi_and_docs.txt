@@ -1,28 +1,12 @@
 title: OpenAPI and the Docs
-intro: The document your annotations generate, and how much of an API's usability is decided by it.
+intro: The doc your annotations make. How much of an API's usability is decided by it.
 ## What is generated
 
-`app.openapi()` returns one OpenAPI document describing every route: paths, methods, parameters, request bodies, response shapes, status codes, descriptions and examples.
+`app.openapi()` returns one OpenAPI doc showing each route: paths, methods, params, request bodies, response shapes, status codes, descriptions and examples.
 
-It is assembled from things you already wrote &mdash; the path in the decorator, the parameters in the signature, the models, the constraints, the docstrings. There is no separate specification to maintain and no way for it to drift, because it *is* the code.
+It's assembled from things you already wrote. The path in the decorator, the params in the signature, the models, the constraints, the docstrings. There's no split specification to maintain and no way for it to drift. It *is* the code.
 
 FastAPI serves it at `/openapi.json`, renders it at `/docs` (Swagger UI) and `/redoc` (ReDoc).
-
-The document describes every route, its parameters, request body, response shape, status codes, and descriptions. A client generated from it — in TypeScript, Kotlin, Go, or any language with an OpenAPI codegen — matches the API exactly, because it was built from the same source. There is no separate specification file to maintain and no way for the spec to drift from the code.
-
-Path parameters, query parameters, headers, and cookies each appear in the right section of the document because FastAPI infers their location from the function signature. A parameter named `module_id` in a route `/modules/{module_id}` is documented as a path parameter. A parameter with a default value that is not in the path is documented as a query parameter. `Header(...)` and `Cookie(...)` mark their respective locations explicitly.
-
-`Field(description="...")` on a model field becomes the field's description in the schema. A docstring on the model class becomes the schema's top-level description. `Field(examples=[...])` adds example values that Swagger UI pre-fills in the "Try it out" form. `Field(title="...")` overrides the display name. These annotations cost seconds to write and save every consumer of the API the time of guessing what a field means.
-
-`response_model` on the decorator defines the documented response shape. Without it, the endpoint's return type is undocumented in the spec, which means generated clients treat the response as `Any` — typeless and unusable without manual casting. `response_model=ModuleOut` generates a complete schema for the response, filters out fields not in the model, and makes the endpoint self-documenting.
-
-`responses={404: {"description": "Module not found"}}` on the decorator documents error responses. The default documentation shows only the success response; adding error responses explicitly tells consumers what to expect when something goes wrong. `responses={404: {"model": ErrorOut}}` goes further, documenting the error body's shape.
-
-Tags organise endpoints in the documentation. `@app.get("/modules", tags=["modules"])` groups the endpoint under "modules" in Swagger UI and ReDoc. `APIRouter(tags=["modules"])` applies the tag to every route on that router. Without tags, all endpoints appear in one flat list, which is unnavigable for an API with more than a dozen routes.
-
-`app = FastAPI(title="My API", version="1.0.0", description="...")` sets the top-level metadata that appears at the top of the documentation page. The title and version are required by the OpenAPI spec; the description is rendered as Markdown, so you can include links, headings, and code blocks.
-
-Disabling the docs in production — `app = FastAPI(docs_url=None, redoc_url=None)` — hides the interactive documentation. The `/openapi.json` endpoint remains unless you also set `openapi_url=None`. This is a security consideration: the spec reveals every endpoint, parameter, and model, which is useful during development and informative to an attacker in production.
 
 
 ## The document, and where it comes from
@@ -207,67 +191,67 @@ for p in params:
         print("   ", p["name"], "- a Literal would document the options")
 ```
 
-The most practical use of this module. One line:
+The most hands-on use of this module. One line:
 
 ```python
 print(json.dumps(app.openapi(), indent=2))
 ```
 
-and you see exactly what your consumers see.
+and you see just what your consumers see.
 
-What it reliably surfaces: fields whose names are not self-explanatory and have no description; a `str` parameter where a `Literal` would have given clients a set of options; a rule enforced by a validator that appears nowhere; a required field you meant to default; an endpoint with no example.
+What it well surfaces: fields whose names aren't self-explanatory and have no description. A `str` param where a `Literal` would have given clients a set of options. A rule enforced by a checker that appears nowhere. A needed field you meant to default. An endpoint with no example.
 
-The last editor above automates two of those checks. It is worth running over a real model, because the results are usually uncomfortable and always cheap to fix.
+The last editor above automates two of those checks. It's worth running over a real model. The results are often uncomfortable and always cheap to fix.
 ## The header
 
-`FastAPI(title=..., version=..., description=...)` becomes the top of the document and the top of the docs page.
+`FastAPI(title=..., version=..., description=...)` turns the top of the doc and the top of the docs page.
 
-The `description` supports Markdown and is the one piece of genuine prose in the whole thing. It is worth writing: what the API is for, how authentication works, what the rate limits are, where to get a key. That is the first thing a new consumer reads, and the alternative is that they read nothing.
+The `description` supports Markdown and is the one piece of genuine prose in the whole thing. It's worth writing. What the API is for, how authentication works, what the rate limits are. Here To get a key. That is the first thing a new consumer reads. The option is that they read nothing.
 
 `version` should be your API's version, not your library's. Consumers pin against it.
 
 ## Tags
 
-Tags group endpoints into sections. On a router, `tags=["modules"]` applies to every route in it.
+Tags group endpoints into sections. On a router, `tags=["modules"]` applies to each route in it.
 
-`openapi_tags` on the app gives each tag a description, which becomes a paragraph above that section in the docs.
+`openapi_tags` on the app gives each tag a description. This Turns a paragraph above that section in the docs.
 
-For an API past a dozen routes this is the difference between a navigable document and a flat alphabetical list. It costs one argument per router.
+For an API past a dozen routes this is the gap between a navigable doc and a flat alphabetical list. It costs one arg per router.
 
 ## Examples are the highest-value addition
 
-Everything else in this module is worth doing. This is the one that changes whether people succeed.
+all else in this module is worth doing. This is the one that changes whether people succeed.
 
-A `Field(examples=[...])` or a model-level `json_schema_extra={"examples": [...]}` pre-fills the interactive form. A developer opens `/docs`, presses **Try it out**, and gets a request that works &mdash; instead of an empty box they have to guess at, with a 422 for their first three attempts.
+A `Field(examples=[...])` or a model-level `json_schema_extra={"examples": [...]}` pre-fills the interactive form. A developer opens `/docs`, presses **Try it out**. Gets a request that works. Instead of an empty box they've to guess at, with a 422 for their first three attempts.
 
-That difference is measurable in how many integrations get finished.
+That gap is measurable in how many integrations get finished.
 
-Write examples that are realistic rather than minimal. `"title": "string"` is what the generator produces without you; `"title": "Dot Product"` shows what the field is actually for.
+Write examples that are realistic rather than minimal. `"title": "string"` is what the gen makes without you. `"title": "Dot Product"` shows what the field is really for.
 
 ## Documenting failures
 
-`response_model` covers the success case. Everything else is undocumented unless you say so:
+`response_model` covers the success case. all else is undocumented unless you say so:
 
 ```python
 responses={404: {"model": Problem, "description": "No such module"}}
 ```
 
-Worth doing for the failures a caller is expected to handle. A generated client can then type its errors, and a human reading the docs knows what a rejection looks like before causing one.
+Worth doing for the failures a caller is expected to handle. A made client can then type its errors. A human reading the docs knows what a rejection looks like before causing one.
 
 ## Hiding endpoints
 
-`include_in_schema=False` keeps a route out of the document. Useful for internal endpoints, legacy paths kept for one client, and health checks that would only clutter the page.
+`include_in_schema=False` keeps a route out of the doc. handy for inner endpoints, legacy paths kept for one client. Health checks that would only clutter the page.
 
-One warning worth being explicit about: **this is not access control.** The endpoint still works, still accepts requests, and is exactly as reachable as before. It is invisible, not protected. If it should not be called, it needs a dependency, not a flag.
+One warning worth being clear about: **this isn't access control.** The endpoint still works, still accepts requests. Is just as reachable as before. It's invisible, not protected. If it shouldn't be called, it needs a dependency, not a flag.
 
-`deprecated=True` is the other half of retiring something: the endpoint keeps working and the docs show it as deprecated, which gives consumers a signal without breaking them.
+`deprecated=True` is the other half of retiring a thing. The endpoint keeps working and the docs show it as deprecated. This Gives consumers a signal without breaking them.
 ## What it feeds
 
-The document is read by more than the docs page, which is why its quality compounds.
+The doc is read by more than the docs page. This Is why its quality compounds.
 
-**Client generators** produce typed clients in a dozen languages from it. A vague schema produces a vague client, and every consumer then writes their own guesses.
+**Client gens** give typed clients in a dozen languages from it. A vague schema makes a vague client. Each consumer then writes their own guesses.
 
-**Contract tests** can assert that a change did not break the published shape.
+**Contract tests** can assert that a change didn't break the published shape.
 
 **API gateways** can validate requests before they reach you.
 
@@ -277,112 +261,112 @@ None of those read your source. All of them read this.
 
 ## The limits
 
-Some things cannot be expressed, and pretending otherwise misleads consumers.
+Some things can't be expressed, and pretending else misleads consumers.
 
-Validator logic, cross-field rules, anything requiring a lookup &mdash; none has a JSON Schema equivalent. Where a rule matters and cannot be declared, put it in the docstring or the model's description, so at least a human reading the documentation learns about it.
+checker logic, cross-field rules, anything needing a lookup. None has a JSON Schema equal. Where a rule matters and can't be declared, put it in the docstring or the model's description. At least a human reading the docs learns about it.
 
-An endpoint whose real constraints live in code the schema cannot see is an endpoint whose documentation is quietly incomplete.
+An endpoint whose real constraints live in code the schema can't see is an endpoint whose docs is quietly incomplete.
 
 
 ## Mistakes people make
 
-**Treating `include_in_schema=False` as security.** The endpoint still works and is exactly as reachable. Invisible is not protected.
+**Treating `include_in_schema=False` as security.** The endpoint still works and is just as reachable. Invisible isn't protected.
 
-**Leaving fields undescribed.** `weight` needs a description - of what, in what unit. A name that is not self-explanatory and has no description produces documentation that technically exists.
+**Leaving fields undescribed.** `weight` needs a description - of what, in what unit. A name that isn't self-explanatory and has no description makes docs that strictly exists.
 
-**No examples.** The generated placeholder is `"string"`. A caller's first three attempts then return 422, and some of them stop there.
+**No examples.** The made placeholder is `"string"`. A caller's first three attempts then return 422. Some of them stop there.
 
-**Documenting only success.** An endpoint that can 404 should say so, or a generated client has no type for failure.
+**Documenting only success.** An endpoint that can 404 should say so, or a made client has no type for failure.
 
-**Using `str` where a `Literal` belongs.** The schema then offers no options, so no client can render a choice and no consumer knows what is valid.
+**Using `str` where a `Literal` belongs.** The schema then offers no options. No client can render a choice and no consumer knows what is valid.
 
-**Never looking at it.** It is one line, and it is the only view of your model that matches what consumers receive.
+**Never looking at it.** It's one line. It's the only view of your model that matches what consumers receive.
 
 **Versioning it with the library version.** Consumers pin against your API's version, not your package's.
 
 ## The review worth doing
 
-Print the document for a model you have just written and read it as a stranger.
+Print the doc for a model you've just written and read it as a stranger.
 
-What it surfaces: required fields you meant to default, patterns that should have been enumerations, rules that live in validators and appear nowhere, endpoints with no summary, and fields whose names carry meaning only to whoever wrote them.
+What it surfaces: needed fields you meant to default, patterns that should have been enumerations, rules that live in checkers and appear nowhere, endpoints with no summary. Fields whose names carry meaning only to whoever wrote them.
 
-Every one of those is cheap to fix at that moment and expensive once clients exist, because by then the shape is a contract.
+each one of those is cheap to fix at that moment and costly once clients exist. By then the shape is a contract.
 
 ## Next
 
-Putting the pieces together: how a FastAPI project is laid out once it is more than one file.
+Putting the pieces together: how a FastAPI project is laid out once it's more than one file.
 
 
 ## What it costs to skip
 
-An API without a good document still works, and the cost is paid by everyone else.
+An API without a good doc still works. The cost is paid by all else.
 
-Every consumer writes their own guesses about shapes. Every generated client is untyped. Every question that could have been answered by reading becomes a message to whoever wrote it. And every change is potentially breaking, because nobody wrote down what the contract was.
+each consumer writes their own guesses about shapes. each made client is untyped. each question that could have been answered by reading turns a message to whoever wrote it. And each change is maybe breaking. No one wrote down what the contract was.
 
-The work to avoid that is small and front-loaded: a description on the app, tags on the routers, descriptions on the fields whose names are not obvious, one example per body model, and `responses=` on the failures a caller is expected to handle.
+The work to avoid that is small and front-loaded. A description on the app, tags on the routers, descriptions on the fields whose names aren't obvious, one example per body model. `responses=` on the failures a caller is expected to handle.
 
-An hour, once, and it is read by every person and tool that touches the API afterwards.
+An hour, once, and it's read by each person and tool that touches the API later.
 
 ## The chain it feeds
 
-Worth holding in mind, because it explains why small omissions matter.
+Worth holding in mind, because it shows why small omissions matter.
 
-Your models generate schemas. FastAPI assembles them into one document. That document is read by the interactive docs, by client generators in several languages, by API gateways, by contract-testing tools, and increasingly by LLM tooling deciding how to call you.
+Your models make schemas. FastAPI assembles them into one doc. That doc is read by the interactive docs, by client gens in a few languages, by API gateways, by contract-testing tools. Increasingly by LLM tooling deciding how to call you.
 
-A missing description is missing in all of them. So is a `str` that should have been a `Literal`. None of those tools read your source code, and none of them can ask.
+A missing description is missing in all of them. So is a `str` that should have been a `Literal`. None of those tools read your source code. None of them can ask.
 
 ## Summary
 
-The document is generated from your models, signatures, decorators and docstrings, and served at `/openapi.json`, `/docs` and `/redoc`.
+The doc is made from your models, signatures, decorators and docstrings. Served at `/openapi.json`, `/docs` and `/redoc`.
 
-Give the app a title, version and description; group routes with tags and describe the groups with `openapi_tags`; document failures with `responses=`; and write examples, which are the single highest-value addition because they turn a caller's first attempt from a guess into a working request.
+Give the app a title, version and description. Group routes with tags and show the groups with `openapi_tags`. Doc failures with `responses=`. And write examples. This Are the single highest-value addition because they turn a caller's first attempt from a guess into a working request.
 
-`include_in_schema=False` hides without protecting. And the fastest review available for any API model is printing the document and reading it as a stranger would.
+`include_in_schema=False` hides without protecting. And the fastest review on hand for any API model is printing the doc and reading it as a stranger would.
 
 ## The limits, stated plainly
 
-Some things cannot be expressed, and knowing which keeps the documentation honest.
+Some things can't be expressed, and knowing which keeps the docs honest.
 
-**Validator logic** has no schema equivalent. A rule enforced by a `field_validator` is invisible to every consumer.
+**checker logic** has no schema equal. A rule enforced by a `field_validator` is invisible to each consumer.
 
 **Cross-field rules** likewise. "End date must be after start date" appears nowhere.
 
-**Anything needing a lookup** - does this reference exist, is this name taken - is not expressible and should not be attempted.
+**Anything needing a lookup** - does this link exist, is this name taken - isn't expressible and shouldn't be attempted.
 
-**Custom serialisation** changes output without changing the schema unless `return_type` is set, which is how a document quietly starts describing something the endpoint no longer returns.
+**Custom output** changes output without changing the schema unless `return_type` is set. This Is how a doc quietly starts showing a thing the endpoint no longer returns.
 
-Where a rule matters and cannot be declared, put it in the model's docstring or the field's description. It will not be machine-readable, and a human reading the documentation will at least learn it exists rather than discovering it through a rejection.
+Where a rule matters and can't be declared, put it in the model's docstring or the field's description. It won't be machine-readable. A human reading the docs will at least learn it exists rather than discovering it through a rejection.
 
 
 ## Who reads it
 
 Worth being concrete, because the audience is larger than the docs page.
 
-**A developer integrating with you** opens `/docs`, presses Try it out, and either gets a working request or does not. That first minute decides how the rest goes.
+**A developer integrating with you** opens `/docs`, presses Try it out. Either gets a working request or doesn't. That first minute decides how the rest goes.
 
-**A client generator** turns the document into a typed library. Its quality is entirely your schema's quality.
+**A client gen** turns the doc into a typed library. Its quality is fully your schema's quality.
 
 **A gateway** may validate requests against it before they reach your process.
 
-**A contract test** can assert that today's document is compatible with yesterday's.
+**A contract test** can assert that today's doc is matching with yesterday's.
 
-**An LLM** increasingly reads it to decide how to call you, and reads only what is written.
+**An LLM** increasingly reads it to decide how to call you. Reads only what is written.
 
-None of them can ask a question, and none of them read your source. Everything they know is in the document, which is why the descriptions and examples are not decoration.
+None of them can ask a question. None of them read your source. all they know is in the doc. This Is why the descriptions and examples aren't decoration.
 
 
 ## A closing thought
 
-The generated document is the closest thing an API has to a public interface definition, and it is produced entirely as a side effect of writing types.
+The made doc is the closest thing an API has to a public interface meaning. It's made fully as a side effect of writing types.
 
-That is unusual and worth appreciating. In most stacks the specification is a separate artefact that somebody maintains, and it drifts from the implementation immediately because nothing forces them together.
+That is unusual and worth appreciating. In most stacks the specification is a split artefact that somebody keeps. It drifts from the setup at once because nothing forces them together.
 
-Here it cannot drift, because there is only one source. What varies is how much you put into that source - and the difference between a document consumers can build against and one they have to guess at is a handful of descriptions, one example per model, and a `Literal` where a `str` would have done.
+Here it can't drift, because there's only one source. What varies is how much you put into that source - and the gap between a doc consumers can build against and one they've to guess at is a handful of descriptions, one example per model. A `Literal` where a `str` would have done.
 
 ## In one line
 
-Your annotations already wrote your API documentation; the only question is how much you put into them, and the answer is decided by a handful of descriptions, one example per body model, and a `Literal` wherever a `str` would have left a consumer guessing.
+Your annotations already wrote your API docs. The only question is how much you put into them. The answer is decided by a handful of descriptions, one example per body model. A `Literal` wherever a `str` would have left a consumer guessing.
 
-And the cheapest habit available is to print the document once for every model you write. Five minutes, no tooling, and it shows you the API as a stranger receives it rather than as its author remembers it.
+And the cheapest habit on hand is to print the doc once for each model you write. Five minutes, no tooling. It shows you the API as a stranger receives it rather than as its author remembers it.
 
-One more habit worth the minute it costs: after adding an endpoint, open `/docs` and try it as a stranger would. If your own first attempt returns a 422, so will everybody else's, and you are the only person who can still fix it cheaply.
+One more habit worth the minute it costs. After adding an endpoint, open `/docs` and try it as a stranger would. If your own first attempt returns a 422. Will everybody else's. You're the only person who can still fix it cheaply.

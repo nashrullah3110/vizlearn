@@ -1,5 +1,5 @@
 title: EXISTS, IN and JOIN
-intro: Three ways to ask whether a related row exists, and the one that is quietly wrong.
+intro: Three ways to ask whether a related row exists. The one that is quietly wrong.
 
 ## The same question
 
@@ -7,36 +7,36 @@ intro: Three ways to ask whether a related row exists, and the one that is quiet
 or as a `JOIN`. Run the first three variants above and all three return Ada and
 Grace &mdash; except that the JOIN returns Ada twice.
 
-That difference is the first thing to understand, and the NULL behaviour of the
-fourth is the second. `EXISTS` tests for the presence of at least one matching row and stops as soon as it finds one, so it never produces duplicates and can short-circuit. `IN` collects a set of values from a subquery and tests membership, but a single NULL in that set poisons the entire check. `NOT IN` returns no rows at all, silently, which is one of SQL's most common silent-failure bugs. A `JOIN` pairs every matching row on both sides, so a customer with three orders appears three times &mdash; correct when you want the orders, a bug when you want the customers. This page shows all three side by side, demonstrates the NULL trap with a concrete example, and covers the performance differences in the query plan.
+That difference is the first thing to understand, and the NULL action of the
+fourth is the second.
 
 ## JOIN multiplies rows
 
-A join does not filter the left table. It pairs every row on the left with every
-matching row on the right, so a customer with three orders produces three
+A join doesn't filter the left table. It pairs each row on the left with each
+matching row on the right. So A customer with three orders makes three
 result rows.
 
-When you want the orders, that is exactly right. When you want the customers,
-it is a bug, and the usual patch is `DISTINCT`. That works, but it is worth
-knowing what it costs: the database produced the duplicate rows and then sorted
-or hashed them away. `EXISTS` never produces them in the first place.
+When you want the orders, that is just right. When you want the customers,
+it's a bug, and the usual patch is `DISTINCT`. That works, but it's worth
+knowing what it costs: the DB made the duplicate rows and then sorted
+or hashed them away. `EXISTS` never makes them in the first place.
 
 The rule of thumb: **join when you want columns from the other table, use
-EXISTS when you only want to know whether it is there**.
+EXISTS when you only want to know whether it's there**.
 
 ## EXISTS stops early
 
 `EXISTS (subquery)` is true if the subquery returns at least one row. Not how
 many, not which &mdash; just whether. That is why `SELECT 1` is the conventional
-body: nothing in the select list is ever read, so there is no reason to name a
+body: nothing in the select list is ever read. There's no reason to name a
 column.
 
 Because only existence matters, the engine can stop scanning the moment it finds
 one match. For a customer with ten thousand orders, `EXISTS` looks at one.
 
-`EXISTS` is also *correlated*: the subquery references `c.id` from the outer
-query, so it is conceptually re-evaluated per outer row. Planners rarely execute
-it that literally, but writing it that way is what makes the early exit
+`EXISTS` is also *linked*: the subquery refs `c.id` from the outer
+query, so it's conceptually re-tested per outer row. Planners rarely execute
+it that truly, but writing it that way is what makes the early exit
 available.
 
 ## Where NOT IN breaks
@@ -53,33 +53,33 @@ NULL, and the subquery returns the list `(1, 1, 2, NULL)`.
 c.id <> 1  AND  c.id <> 1  AND  c.id <> 2  AND  c.id <> NULL
 ```
 
-The final comparison is not false &mdash; it is **unknown**. Alan's id is 3, and
-whether 3 differs from an unknown value cannot be determined. `AND` with unknown
+The final check isn't false. It's **unknown**. Alan's id is 3, and
+whether 3 differs from an unknown value can't be found. `AND` with unknown
 gives unknown, `WHERE` keeps only rows that are definitely true, and so nothing
-survives. Every row is filtered out, for every customer, silently and without an
+lives. each row is filtered out, for each customer, silently and without an
 error.
 
-`NOT EXISTS` is unaffected because it never compares anything to NULL. It asks
-whether a matching row was found, and the answer to that is always yes or no.
+`NOT EXISTS` is unaffected because it never checks any of it to NULL. It asks
+whether a matching row was found. The answer to that is always yes or no.
 
-This is the practical rule, and it is worth committing to memory:
+This is the hands-on rule, and it's worth committing to memory:
 
 > **`NOT IN` with a nullable subquery column is a bug.** Use `NOT EXISTS`, or
-> add `WHERE customer_id IS NOT NULL` to the subquery.
+> add `WHERE customer_id Isn't NULL` to the subquery.
 
-The positive forms do not have this problem. `IN` returns true as soon as it
-finds a real match, and an unknown among the remaining comparisons cannot take
+The plus forms don't have this problem. `IN` returns true as soon as it
+finds a real match, and an unknown among the left checks can't take
 that away.
 
 ## What about performance
 
-Twenty years ago these three had genuinely different costs and the advice was
+Twenty years ago these three had truly different costs and the advice was
 elaborate. Modern planners in PostgreSQL, SQL Server and Oracle recognise all
-three shapes and frequently compile them to the same physical plan. The result
-is usually a semi-join &mdash; precisely "find whether a match exists, do not
+three shapes and often compile them to the same physical plan &mdash;
+often a semi-join, which is just "find whether a match exists, don't
 duplicate rows".
 
-So performance is rarely the reason to choose. The reasons that survive are:
+So speed is rarely the reason to choose. The reasons that live are:
 
 | Want | Use | Because |
 |---|---|---|
@@ -93,30 +93,30 @@ in ten seconds what a rule of thumb argues about indefinitely.
 
 ## The NOT IN failure, run in this engine
 
-The `NOT IN` trap is worth seeing execute rather than reasoning about, because it
-produces no error &mdash; only a wrong answer. Three customers, an orders table
+The `NOT IN` trap is worth seeing execute rather than thinking about, because it
+makes no error &mdash; only a wrong answer. Three customers, an orders table
 where one order is anonymous (a NULL `customer_id`), asked which customers never
-ordered.
+sorted:
 
 |query|result|
 |---|---|
 |`... WHERE id NOT IN (SELECT customer_id FROM orders)`|**zero rows**|
 |`... WHERE NOT EXISTS (SELECT 1 ...)`|**customer 3** (correct)|
 
-The single NULL in the subquery poisons the whole `NOT IN`. `3 <> NULL` is
+The single NULL in the subquery poisons the whole `NOT IN`: `3 <> NULL` is
 unknown, `AND` with unknown is unknown, and `WHERE` keeps only rows that are
-definitely true, so every customer is filtered out. `NOT EXISTS` never compares
-anything to NULL &mdash; it asks whether a matching row was found &mdash; so it
-returns the right answer on the same data. This is not a corner case to file away. A nullable column is the normal
-situation, which is why `NOT EXISTS` is the safe default and `NOT IN` earns its
-place only on a column that is provably `NOT NULL`.
+definitely true, so each customer is filtered out. `NOT EXISTS` never checks
+any of it to NULL. It asks whether a matching row was found &mdash; so it
+returns the right answer on the same data. This isn't a corner case to file away;
+a nullable column is the normal situation. This Is why `NOT EXISTS` is the safe
+default and `NOT IN` earns its place only on a column that is provably `NOT NULL`.
 
 ## EXISTS stops at the first match
 
-The early exit is the other reason to prefer `EXISTS`, and it is a real difference
+The early exit is the other reason to prefer `EXISTS`, and it's a real difference
 in work done. `EXISTS` is true the moment one matching row is found, so for a
-customer with ten thousand orders it examines one; `COUNT(*) > 0`, the common
-alternative, counts all ten thousand before comparing.
+customer with ten thousand orders it checks one. `COUNT(*) > 0`, the common
+option, counts all ten thousand before checking:
 
 |test|rows the subquery examines|
 |---|---|
@@ -124,18 +124,18 @@ alternative, counts all ten thousand before comparing.
 |`(SELECT COUNT(*) ...) > 0`|all of them|
 
 The two return the same answer and do wildly different amounts of work, and the
-gap grows with how many matches there are &mdash; exactly the case where you least
+gap grows with how many matches there are. Just the case where you least
 want to count them. So the habit worth forming is `EXISTS` for "is there at least
 one", never `COUNT(*) > 0`: the question is existence, and existence is answered
 by the first row, not the last.
 
 ## Where it goes wrong
 
-**`NOT IN` on anything nullable.** The query returns zero rows and looks like a
+**`NOT IN` on any of it nullable.** The query returns zero rows and looks like a
 data problem.
 
 **`SELECT *` inside `EXISTS`.** Harmless but misleading &mdash; it suggests the
 columns are read, and they never are.
 
-**`DISTINCT` as a reflex.** If a join is producing duplicates, ask whether you
+**`DISTINCT` as a reflex.** If a join is making duplicates, ask whether you
 wanted the join at all. `DISTINCT` hides the symptom and pays for the rows twice.

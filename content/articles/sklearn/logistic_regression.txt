@@ -1,13 +1,14 @@
 title: Logistic Regression: A Practical Guide
-intro: The classifier to try first, whatever the problem. It is fast, it produces probabilities rather than bare labels, and it gives every other model a number to beat.
+intro: The classifier to try first, what the problem. It's fast, it makes chances rather than bare labels. It gives every other model a number to beat.
 
 ## Why it is called regression
 
-The name is the first confusion and it has a real explanation. Logistic regression is a classifier &mdash; it predicts which class a sample belongs to &mdash; but the thing being fitted linearly is not the class.
+The name is the first confusion and it has a real explanation. Logistic regression is a classifier. It predicts which class a sample belongs to. But the thing being fitted linearly isn't the class.
 
-What it fits is the **log-odds**: the logarithm of the ratio between the probability of the positive class and the probability of the negative one. That quantity runs from minus infinity to plus infinity, which makes it something a linear model can predict sensibly. The logistic function then squashes it back into the range 0 to 1, giving a probability.
+What it fits is the **log-odds**: the logarithm of the ratio between the chance of the positive class and the chance of the minus one. That quantity runs from minus infinity to plus infinity. This Makes it a thing a linear model can predict sensibly. The logistic function then squashes it back into the range 0 to 1, giving a chance.
 
-So underneath it is a linear regression on a transformed target, and the transformation is what turns an unbounded prediction into a probability that cannot escape its bounds. Predicting the probability directly with linear regression would happily produce 1.4 or -0.3, which is why nobody does that. The model is fitted by maximising the log-likelihood of the observed labels given the predicted probabilities, which is equivalent to minimising the binary cross-entropy loss. There is no closed-form solution (unlike OLS), so the optimiser iterates &mdash; scikit-learn's default solver `lbfgs` converges in a few hundred iterations on most datasets. Regularisation is built in: the `C` parameter is the inverse of the penalty strength (small C means strong regularisation), and `penalty` controls whether it is L1, L2, or elastic net. L1 can zero out coefficients, effectively performing feature selection &mdash; useful when you have many features and suspect most are irrelevant. The coefficients are directly interpretable: `coef_[0][j]` is the change in log-odds per unit increase in feature j, holding everything else constant. `predict_proba` gives calibrated probabilities (or close to it), which is why logistic regression is the baseline for any classification task and the model that everything else is compared against. This page fits a logistic regression, prints the coefficients and their interpretation, plots the decision boundary, and shows how C controls the tradeoff between fit and regularisation.
+So underneath it's a linear regression on a transformed target. The change is what turns an unbounded guess into a chance that can't escape its bounds. Predicting the chance right with linear regression would happily give 1.4 or -0.3. This Is why no one does that.
+
 
 ## Fitting a classifier
 
@@ -154,107 +155,107 @@ print("which is exactly what logistic regression is limited to.")
 ```
 ## Probabilities, not just labels
 
-`predict` returns the class. `predict_proba` returns the probability of each class, as an array with one column per class in the order given by `classes_`.
+`predict` returns the class. `predict_proba` returns the chance of each class, as an array with one column per class in the order given by `classes_`.
 
-The second is almost always more useful, and the reason is that `predict` throws away information you needed. A prediction of "positive" with probability 0.51 and one with probability 0.99 are wildly different situations, and `predict` reports them identically.
+The second is almost always more handy. `predict` throws away info you needed. A guess of "plus" with chance 0.51 and one with chance 0.99 are wildly different situations, and `predict` reports them the same way.
 
-That matters wherever the two kinds of mistake have different costs. A medical screen that is 51% confident should probably be followed up; one that is 99% confident may warrant immediate action. A fraud check at 51% might ask for a second factor while one at 99% blocks the transaction. None of that is expressible if all you have is the label.
+That matters wherever the two kinds of mistake have different costs. A medical screen that is 51% confident should probably be followed up. One that is 99% confident may warrant immediate action. A fraud check at 51% might ask for a second factor while one at 99% blocks the transaction. None of that is expressible if all you've is the label.
 
-`predict` is exactly `predict_proba` with a threshold of 0.5, and 0.5 is a default rather than a principle. Choosing a different threshold is one of the highest-value adjustments available, and it gets its own module later in this track.
+`predict` is just `predict_proba` with a threshold of 0.5. 0.5 is a default rather than a principle. Choosing a different threshold is one of the highest-value adjustments available. It gets its own module later in this track.
 
 ## Reading the coefficients
 
-`coef_` has the same shape story as linear regression &mdash; one number per feature &mdash; but the units are different and the difference is the part people get wrong.
+`coef_` has the same shape story as linear regression. One number per feature. But the units are different and the difference is the part people get wrong.
 
-A coefficient is the change in log-odds for a one-unit increase in the feature, holding the others fixed. Log-odds are not intuitive, so the conventional move is to exponentiate: `exp(coef)` is an **odds ratio**, the factor by which the odds multiply per unit of the feature.
+A coeff is the change in log-odds for a one-unit grow in the feature, holding the others fixed. Log-odds aren't natural. The conventional move is to exponentiate: `exp(coef)` is an **odds ratio**, the factor by which the odds times per unit of the feature.
 
-A coefficient of 1.17, as in the editor above, means the odds multiply by about 3.2 for each step of one in that feature. That is a statement about odds, not about probability, and the two diverge: multiplying odds by 3.2 moves a probability of 0.1 to about 0.26, but moves 0.5 to about 0.76 and 0.9 to about 0.97. The same coefficient has a different effect on probability depending on where you start, which is the whole point of the logistic curve being a curve.
+A coeff of 1.17, as in the editor above, means the odds times by about 3.2 for each step of one in that feature. That is a statement about odds, not about chance. The two diverge. Timesing odds by 3.2 moves a chance of 0.1 to about 0.26. Moves 0.5 to about 0.76 and 0.9 to about 0.97. The same coeff has a different effect on chance based on where you start. This Is the whole point of the logistic curve being a curve.
 
-The scale caveat from linear regression applies with equal force. A coefficient's size depends on the feature's units, so coefficients are only comparable to each other when the features were standardised first &mdash; and since the model needs scaling anyway, this usually comes for free.
+The scale caveat from linear regression applies with equal force. A coeff's size depends on the feature's units. Coeffs are only close to each other when the features were standardised first. And since the model needs scaling anyway, this often comes for free.
 
 ## It has to be scaled
 
-Unlike ordinary linear regression, logistic regression is fitted by iterative optimisation. There is no formula; a solver takes steps towards a minimum and stops when it stops improving or when it runs out of iterations.
+Unlike plain linear regression, logistic regression is fitted by iterative optimisation. There's no formula. A solver takes steps towards a min and stops when it stops raising or when it runs out of iterations.
 
-Features on wildly different scales make that surface awkward to descend, so the solver takes far more steps and often hits `max_iter` first. When it does, scikit-learn issues a `ConvergenceWarning` and returns the half-finished model anyway &mdash; it does not raise, and the coefficients you get are simply wherever the solver had reached.
+Features on wildly different scales make that surface awkward to descend. The solver takes far more steps and often hits `max_iter` first. When it does, scikit-learn issues a `ConvergenceWarning` and returns the half-finished model anyway. It doesn't raise. The coeffs you get are simply wherever the solver had reached.
 
-The editor above shows both cases on the same data: unscaled and it warns, scaled and it converges comfortably within the same budget.
+The editor above shows both cases on the same data. Unscaled and it warns, scaled and it settles comfortably within the same budget.
 
-The right fix is `StandardScaler`, not a larger `max_iter`. Raising the iteration limit makes the warning go away by letting the solver grind to the same answer more slowly; scaling makes the problem easy. Raising `max_iter` is the correct response only when the features are already scaled and the model is genuinely large.
+The right fix is `StandardScaler`, not a larger `max_iter`. Raising the iteration limit makes the warning go away by letting the solver grind to the same answer more slowly. Scaling makes the problem easy. Raising `max_iter` is the correct response only when the features are already scaled and the model is truly large.
 
-There is a second reason scaling matters here: `LogisticRegression` applies L2 regularisation **by default**, controlled by `C`. A penalty on coefficient size is meaningless when the coefficients are in incomparable units, so an unscaled fit is regularised unevenly across features without saying so.
+There's a second reason scaling matters here: `LogisticRegression` applies L2 smoothing **by default**, controlled by `C`. A fine on coeff size is meaningless when the coeffs are in incomparable units. An unscaled fit is smoothed unevenly across features without saying so.
 
 ## C, and the regularisation nobody notices
 
-`LogisticRegression()` is regularised out of the box, which surprises people who expect a plain maximum-likelihood fit.
+`LogisticRegression()` is smoothed out of the box. This Surprises people who expect a plain max-likelihood fit.
 
-The strength is set by `C`, and the parameter is **inverted**: small `C` means strong regularisation, large `C` means weak. `C=1.0` is the default, `C=0.01` shrinks the coefficients hard, and `C=1000` is close to unregularised. The inversion catches everybody at least once, because every other penalty parameter in the library &mdash; `alpha` in Ridge and Lasso &mdash; runs the other way.
+The strength is set by `C`. The param is **inverted**. Small `C` means strong smoothing, large `C` means weak. `C=1.0` is the default, `C=0.01` shrinks the coeffs hard, and `C=1000` is close to unregularised. The inversion catches everybody at least once. Every other fine param in the library. `alpha` in Ridge and Lasso. Runs the other way.
 
-The default is usually reasonable, and `C` is one of the first things worth tuning. With many features it is often the only hyperparameter that matters.
+The default is often reasonable, and `C` is one of the first things worth tuning. With many features it's often the only setting that matters.
 
-`penalty="l1"` gives the Lasso-style behaviour of driving some coefficients to exactly zero, which selects features as it fits; it requires a compatible solver such as `liblinear` or `saga`.
+`fine="l1"` gives the Lasso-style action of driving some coeffs to just zero. This Selects features as it fits. It needs a compatible solver such as `liblinear` or `saga`.
 
 ## More than two classes
 
-Nothing changes at the call site. Fit on a target with three classes and `predict` returns one of the three, `predict_proba` returns three columns summing to one, and `coef_` gains a row per class.
+Nothing changes at the call site. Fit on a target with three classes and `predict` returns one of the three, `predict_proba` returns three columns summing to one. `coef_` gains a row per class.
 
-Underneath, recent versions fit a genuine multinomial model when the solver supports it, which estimates all the classes jointly rather than running a series of one-against-the-rest fits. The practical consequence is that the probabilities are properly normalised across classes rather than being separate binary probabilities rescaled afterwards.
+Underneath, recent versions fit a genuine multinomial model when the solver supports it. This Guesses all the classes jointly rather than running a series of one-against-the-rest fits. The hands-on consequence is that the chances are properly normed across classes rather than being separate binary chances rescaled afterwards.
 
-`classes_` is worth reading rather than assuming. It holds the classes in sorted order, and the columns of `predict_proba` follow it &mdash; so with string labels, `["cat", "dog", "fish"]`, column 0 is cat. Indexing that array the wrong way round is a quiet way to report the wrong probability.
+`classes_` is worth reading rather than given. It holds the classes in sorted order. The columns of `predict_proba` follow it. So with string labels, `["cat", "dog", "fish"]`, column 0 is cat. Indexing that array the wrong way round is a quiet way to report the wrong chance.
 
 ## What it cannot do
 
-The decision boundary is a straight line &mdash; a plane in higher dimensions &mdash; and no amount of tuning changes that.
+The choice boundary is a straight line. A plane in higher dims. And no amount of tuning changes that.
 
-For data that genuinely needs a curved boundary, the model will do its honest best and be beaten by anything that can bend. The editor above makes it concrete: on two interleaving crescents, logistic regression manages 0.84 and a decision tree 0.99, and the gap is entirely structural.
+For data that truly needs a curved boundary, the model will do its honest best and be beaten by any of it that can bend. The editor above makes it concrete. On two interleaving crescents, logistic regression manages 0.84 and a choice tree 0.99. The gap is fully structural.
 
-Two responses. Engineer features that make the problem linear &mdash; adding squares and products via `PolynomialFeatures` lets a linear boundary in the expanded space be a curved one in the original. Or use a model that finds the shape itself, which is what trees and their ensembles do and why they dominate on tabular data.
+Two responses. Engineer features that make the problem linear. Adding squares and products via `PolynomialFeatures` lets a linear boundary in the expanded space be a curved one in the first. Or use a model that finds the shape itself. This Is what trees and their ensembles do and why they dominate on tabular data.
 
-Neither makes logistic regression a poor first choice. It fits in milliseconds, needs almost no tuning, produces calibrated-ish probabilities and coefficients you can read, and tells you immediately whether the problem is easy. A gradient-boosted ensemble that beats it by two points may not be worth the complexity; one that beats it by thirty tells you the structure is genuinely non-linear.
+Neither makes logistic regression a poor first choice. It fits in milliseconds, needs almost no tuning, makes calibrated-ish chances and coeffs you can read. Tells you right away whether the problem is easy. A grad-boosted ensemble that beats it by two points may not be worth the cost. One that beats it by thirty tells you the structure is truly non-linear.
 
 ## Are the probabilities trustworthy?
 
-A model that outputs 0.7 is making a claim: among the cases it labels 0.7, about 70% should turn out positive. A model whose probabilities satisfy that is **calibrated**, and not every classifier is.
+A model that outputs 0.7 is making a claim. Among the cases it labels 0.7, about 70% should turn out plus. A model whose chances meet that is **calibrated**, and not each classifier is.
 
-Logistic regression is unusually good here. Because it is fitted by maximising the likelihood of the observed labels, well-calibrated probabilities are what it is directly optimising for, and on reasonable data it produces them. That is a real advantage over models that output a score which merely ranks correctly &mdash; a random forest's averaged votes and an SVM's distance from the boundary both rank well and are systematically off as probabilities, usually pushed towards the middle or the extremes.
+Logistic regression is unusually good here. Because it's fitted by raising the likelihood of the seen labels, well-calibrated chances are what it's right optimising for. On reasonable data it makes them. That is a real edge over models that output a score which merely ranks right. A random forest's averaged votes and an SVM's distance from the boundary both rank well and are systematically off as chances, often pushed towards the middle or the extremes.
 
-Two things spoil it even here. Heavy regularisation shrinks the coefficients and pulls the probabilities towards 0.5. And a badly imbalanced training set, or one resampled to fix imbalance, shifts them wholesale.
+Two things spoil it even here. Heavy smoothing shrinks the coeffs and pulls the chances towards 0.5. And a badly imbalanced training set, or one resampled to fix imbalance, shifts them wholesale.
 
-`CalibratedClassifierCV` wraps any classifier and fits a correction on held-out data, which is how you get usable probabilities out of a model that does not produce them naturally. Checking calibration is a matter of bucketing predictions and comparing the average predicted probability against the observed rate in each bucket &mdash; `calibration_curve` does it in a line, and it is worth doing whenever a probability is going to be used as a number rather than as a ranking.
+`CalibratedClassifierCV` wraps any classifier and fits a correction on held-out data. This Is how you get usable chances out of a model that doesn't give them on its own. Checking calibration is a matter of bucketing guesses and checking the mean predicted chance against the seen rate in each bucket. `calibration_curve` does it in a line. It's worth doing when a chance is going to be used as a number rather than as a ranking.
 
 ## Which solver, and when it matters
 
-`LogisticRegression` takes a `solver`, and the default handles most cases, but the choice becomes relevant in three situations.
+`LogisticRegression` takes a `solver`, and the default handles most cases. The choice turns relevant in three situations.
 
-`lbfgs` is the default: fast, handles multinomial fits directly, supports only L2 and no penalty. `liblinear` is the one to use for L1 on a small dataset, and it fits one-against-the-rest rather than a true multinomial. `saga` supports L1, L2 and ElasticNet, handles sparse data well, and is the one to reach for on large or high-dimensional problems &mdash; text, in particular. `newton-cholesky` is efficient when there are many samples and few features.
+`lbfgs` is the default: fast, handles multinomial fits right, supports only L2 and no fine. `liblinear` is the one to use for L1 on a small dataset. It fits one-against-the-rest rather than a true multinomial. `saga` supports L1, L2 and ElasticNet, handles sparse data well. Is the one to reach for on large or high-dimensional problems. Text, in given. `newton-cholesky` is fast when there are many samples and few features.
 
-The practical rule: leave it alone until something makes you change it. The two things that will are asking for a penalty the default cannot do, which raises a clear error naming the compatible solvers, and a fit that is slow on a large sparse matrix, where `saga` is the answer.
+The hands-on rule: leave it alone until a thing makes you change it. The two things that will are asking for a fine the default can't do. This Raises a clear error naming the compatible solvers. A fit that is slow on a large sparse mat. Here `saga` is the answer.
 
 <strong>Does it work with more than two classes?</strong> Yes, with no change at the call site. `coef_` gains a row per class and `predict_proba` gains a column, in `classes_` order.
 
-<strong>Can the target be strings?</strong> Yes. `classes_` holds them sorted, and predictions come back as the same strings.
+<strong>Can the target be strings?</strong> Yes. `classes_` holds them sorted. Guesses come back as the same strings.
 
-<strong>Why is my accuracy 0.99 and the model useless?</strong> Almost certainly imbalance - if 99% of rows are one class, predicting that class always scores 0.99. The classification metrics module covers what to use instead.
+<strong>Why is my fit 0.99 and the model useless?</strong> Almost certainly imbalance - if 99% of rows are one class, predicting that class always scores 0.99. The classification metrics module covers what to use instead.
 
 ## Where it sits among the alternatives
 
-Three models occupy nearly the same space, and knowing what separates them saves trying all three blindly.
+Three models occupy nearly the same space. Knowing what separates them saves trying all three blindly.
 
-**Linear SVM** draws a straight boundary too, and chooses it by maximising the margin between the classes rather than by maximising likelihood. It is often marginally more accurate and gives no probabilities without an extra calibration step, which is usually the deciding factor against it.
+**Linear SVM** draws a straight boundary too. Chooses it by raising the margin between the classes rather than by raising likelihood. It's often marginally more accurate and gives no chances without an extra calibration step. This Is often the deciding factor against it.
 
-**Naive Bayes** is faster still and makes a strong independence assumption between features. On text it works surprisingly well despite that assumption being obviously false, and it is the right first try for a bag-of-words problem.
+**Naive Bayes** is faster still and makes a strong freedom assumption between features. On text it works oddly well despite that assumption being obviously false. It's the right first try for a bag-of-words problem.
 
-**Gradient boosting** finds non-linear structure without being told where to look and generally wins on tabular data by a clear margin. It costs tuning time, fits slower, and gives up the readable coefficients.
+**Grad boosting** finds non-linear structure without being told where to look and often wins on tabular data by a clear margin. It costs tuning time, fits slower. Gives up the readable coeffs.
 
-The sequence worth following is: logistic regression first for the number to beat, gradient boosting second to find out whether the problem has structure a line cannot see, and anything else only if those two leave a specific gap.
+The sequence worth following is: logistic regression first for the number to beat, grad boosting second to find out whether the problem has structure a line can't see. Any of it else only if those two leave a exact gap.
 
 ## Things to try
 
-1. <strong>Look at the probabilities.</strong> In the second editor, find the rows nearest 0.5. Those are the ones where the label is close to arbitrary.
-2. <strong>Break convergence.</strong> In the fourth editor, drop `max_iter` to 20 on the scaled data and watch the warning return.
-3. <strong>Turn regularisation up.</strong> Fit with `C=0.001` and compare the coefficients to the default. They shrink towards zero together.
+1. <strong>Look at the chances.</strong> In the second editor, find the rows nearest 0.5. Those are the ones where the label is close to any.
+2. <strong>Break settling.</strong> In the fourth editor, drop `max_iter` to 20 on the scaled data and watch the warning return.
+3. <strong>Turn smoothing up.</strong> Fit with `C=0.001` and compare the coeffs to the default. They shrink towards zero together.
 4. <strong>Bend the boundary.</strong> In the last editor, wrap the logistic model in a pipeline with `PolynomialFeatures(degree=3)` and see how much of the gap closes.
 
 ## Where this leaves you
 
-A fast linear classifier that returns probabilities, needs its features scaled, is regularised by default with an inverted parameter, and draws a straight boundary. Fit it first on every classification problem, and treat its score as the number anything more complicated has to justify itself against.
+A fast linear classifier that returns chances, needs its features scaled, is smoothed by default with an inverted param. Draws a straight boundary. Fit it first on each classification problem. Treat its score as the number any of it more complicated has to justify itself against.

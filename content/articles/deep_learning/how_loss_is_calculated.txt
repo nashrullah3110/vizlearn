@@ -3,22 +3,22 @@ intro: The loss is the single number that training is allowed to care about. Eve
 
 ## What a loss function has to do
 
-A loss collapses a whole batch of predictions into one scalar, and it has to do so in a way that is differentiable &mdash; otherwise there is nothing to descend. Which function you pick depends on what you are predicting.
+A loss collapses a whole batch of predictions into one scalar. And it has to do so in a way that is differentiable. Otherwise there is nothing to descend. Which function you pick depends on what you are predicting.
 
 - <strong>Regression</strong> &mdash; mean squared error: <span class="mono-font">MSE = mean((y &minus; &#375;)<sup>2</sup>)</span>
-- <strong>Classification</strong> &mdash; cross-entropy: <span class="mono-font">&minus;&Sigma; y log(&#375;)</span>
+- <strong>Sorting</strong> &mdash; cross-entropy: <span class="mono-font">&minus;&Sigma; y log(&#375;)</span>
 
-MSE penalises large errors disproportionately because of the squaring: an error of 10 contributes 100, while two errors of 5 contribute only 50 combined. Cross-entropy penalises confident wrong predictions most: predicting 0.01 for a true class costs far more than predicting 0.4. Both are differentiable everywhere that matters, which is the non-negotiable requirement &mdash; accuracy (the fraction of correct predictions) is the number people care about, but its gradient is zero almost everywhere, so it cannot be used for training. The loss is computed per sample, then averaged over the batch; that average is the single scalar that [backpropagation](backpropagation.html) differentiates with respect to every parameter. For regression, [MAE and Huber loss](../sklearn/regression_metrics.html) are alternatives when outlier robustness matters. For classification with more than two classes, cross-entropy generalises naturally: the sum runs over all classes, and only the true class contributes (the rest have y=0). This page computes both losses on a small example, shows how each gradient changes as the prediction moves, and covers the relationship between cross-entropy and the softmax output.
+MSE penalises large errors disproportionately since of the squaring: an error of 10 adds 100, while two errors of 5 add just 50 mixed. Cross-entropy penalises confident wrong predictions most: predicting 0.01 for a true class costs far more than predicting 0.4. Both are differentiable all over that matters. It is the non-negotiable requirement. Score (the fraction of correct predictions) is the count people care about. But its gradient is zero almost all over. So it cannot be used for training. The loss is computed per sample, then averaged over the batch. That average is the single scalar that [backpropagation](backpropagation.html) differentiates with respect to each param. For regression, [MAE and Huber loss](../sklearn/regression_metrics.html) are options when outlier robustness matters. For sorting with more than two classes, cross-entropy transfers naturally: the sum runs over all classes. And just the true class adds (the rest have y=0). This page computes both losses on a small case, shows how each gradient changes as the prediction moves. And covers the relationship between cross-entropy and the softmax output.
 
-## Both, with real numbers
+## Both, with real counts
 
-<strong>MSE.</strong> Predictions <span class="mono-font">[2.5, 0.0, 2.0]</span> against targets <span class="mono-font">[3.0, &minus;0.5, 2.0]</span>. The errors are 0.5, 0.5 and 0. Squared: 0.25, 0.25, 0. Mean: <strong>0.167</strong>. Squaring means one error of 2.0 costs more than four errors of 0.5.<strong>Cross-entropy.</strong> If the model gives the correct class a probability of 0.7, the loss is <span class="mono-font">&minus;ln(0.7) = 0.357</span>. If it gives that class only 0.05, the loss is <span class="mono-font">&minus;ln(0.05) = 3.00</span> &mdash; roughly eight times worse. Being confidently wrong is punished far harder than being uncertain.
+<strong>MSE.</strong> Predictions <span class="mono-font">[2.5, 0.0, 2.0]</span> against targets <span class="mono-font">[3.0, &minus;0.5, 2.0]</span>. The errors are 0.5, 0.5 and 0. Squared: 0.25, 0.25, 0. Mean: <strong>0.167</strong>. Squaring means one error of 2.0 costs more than four errors of 0.5.<strong>Cross-entropy.</strong> If the net gives the correct class a chance of 0.7, the loss is <span class="mono-font">&minus;ln(0.7) = 0.357</span>. If it gives that class just 0.05, the loss is <span class="mono-font">&minus;ln(0.05) = 3.00</span>. Roughly eight times worse. Being confidently wrong is punished far harder than being uncertain.
 
-## One number that says how wrong the model is
+## One count that says how wrong the net is
 
-Training needs a single scalar to minimise. The loss function is what produces it: compare each prediction with its target, score the discrepancy, and average over the batch.
+Training needs a single scalar to minimise. The loss function is what gives it: check each prediction with its target, score the discrepancy. And average over the batch.
 
-Everything downstream depends on that one number. The gradient is its derivative, the optimiser follows the gradient, and the model becomes whatever minimises it. Choosing the loss is therefore choosing what the model will optimise for &mdash; a modelling decision, not a technical detail.
+All downstream depends on that one count. The gradient is its derivative, the solver follows the gradient. And the net turns whatever cuts it. Choosing the loss is therefore choosing what the net will tune for. A modelling decision, not a technical detail.
 
 The standard choices:
 
@@ -40,46 +40,46 @@ The standard choices:
 - Squared: 0.25, 0.25, 0.01 &rarr; MSE = 0.51/3 = <strong>0.17</strong>
 - Absolute: 0.5, 0.5, 0.1 &rarr; MAE = 1.1/3 = <strong>0.367</strong>
 
-<strong>Classification.</strong> Three samples, true classes 0, 1, 2, and the model gives the correct class probabilities 0.7, 0.2, 0.9:
+<strong>Sorting.</strong> Three samples, true classes 0, 1, 2. And the net gives the correct class chances 0.7, 0.2, 0.9:
 
 - Losses: &minus;log(0.7) = 0.357, &minus;log(0.2) = 1.609, &minus;log(0.9) = 0.105
 - Mean = <strong>0.690</strong>
 
-The second sample contributes most of the total, and that is deliberate. Cross-entropy punishes confident mistakes without limit, so the model's attention goes where it is most wrong.
+The second sample adds most of the total. And that is deliberate. Cross-entropy punishes confident mistakes without limit. So the net's attention goes where it is most wrong.
 
-A useful check: at initialisation, cross-entropy over C balanced classes should be about ln(C) &mdash; 2.30 for 10 classes. Seeing that in the first steps means the setup is sane.
+A useful check: at setup, cross-entropy over C balanced classes should be about ln(C). 2.30 for 10 classes. Seeing that in the first steps means the setup is sane.
 
 ## Choosing between squared and absolute error
 
-Both measure regression error and they encode different opinions about outliers.
+Both measure regression error and they encode other opinions about outliers.
 
-Squaring makes a single large miss dominate: an error of 10 contributes 100, while twenty errors of 1 contribute 20 in total. The fitted model will distort itself to reduce that one point.
+Squaring makes a single large miss dominate: an error of 10 adds 100, while twenty errors of 1 add 20 in total. The fitted net will distort it to reduce that one point.
 
-Absolute error treats every unit of error equally, so it is reliable &mdash; and it has a corner at zero, which makes its gradient constant in magnitude regardless of how close you are.
+Absolute error treats each unit of error equally. So it is reliable &mdash; and it has a corner at zero. It makes its gradient constant in magnitude no matter how close you are.
 
-<strong>Huber loss</strong> is the standard compromise: squared within a threshold &delta; of zero, linear beyond it. Smooth gradients near the optimum, bounded influence from outliers. It is the default regression loss in several detection frameworks for exactly this reason.
+<strong>Huber loss</strong> is the standard compromise: squared within a threshold &delta; of zero, linear beyond it. Smooth gradients near the optimum, bounded influence from outliers. It is the default regression loss in a few detection frameworks for just this reason.
 
-There is a deeper reading. Minimising squared error estimates the conditional <em>mean</em>; minimising absolute error estimates the conditional <em>median</em>. So the choice of loss is a choice about which summary of the target distribution you want predicted.
+There is a deeper reading. Cutting squared error estimates the conditional <em>mean</em>. Cutting absolute error estimates the conditional <em>median</em>. So the choice of loss is a choice about which summary of the target spread you want predicted.
 
 ## Try this above
 
 1. Raise <strong>Batch Size</strong> and watch the reported loss steady. Averaging over more samples reduces the sample-to-sample swing without changing what is being measured.
-2. Increase <strong>Dropout</strong> and note training loss climbing. That is expected &mdash; you are deliberately handicapping the network during training.
+2. Increase <strong>Dropout</strong> and note training loss climbing. That is expected &mdash; you are deliberately handicapping the network in training.
 3. Add hidden capacity with <strong>Hidden</strong> and watch how quickly loss falls across <strong>Epochs</strong>.
 
-## What usually goes wrong
+## What often goes wrong
 
-<strong>Comparing loss values that are not comparable.</strong> A loss summed over a batch and a loss averaged over a batch differ by a factor of the batch size. Two runs with different batch sizes or different reduction settings are not measuring the same thing, and neither is a run that changed loss function mid-experiment.<strong>MSE on a classifier.</strong> It technically works and trains badly. When the model is confidently wrong, cross-entropy produces a large gradient and MSE produces a small one, so the model is slowest to fix exactly the errors that matter most.<strong>Unscaled regression targets.</strong> Squared error on values around 300,000 produces enormous gradients. Scale the target, or the first update will destroy the weights.
+<strong>Checking loss vals that are not comparable.</strong> A loss summed over a batch and a loss averaged over a batch differ by a factor of the batch size. Two runs with other batch sizes or other reduction settings are not measuring the same thing. And neither is a run that changed loss function mid-test.<strong>MSE on a sorter.</strong> It technically works and trains badly. When the net is confidently wrong, cross-entropy gives a large gradient and MSE gives a small one. So the net is slowest to fix just the errors that matter most.<strong>Unscaled regression targets.</strong> Squared error on vals around 300,000 gives enormous gradients. Scale the target. Or the first update will destroy the weights.
 
 ## In one line
 
-The loss is the only thing the network is optimising &mdash; if it does not measure what you care about, nothing downstream can fix that.
+The loss is the just thing the network is tuning. If it does not measure what you care about, nothing downstream can fix that.
 
 ## Reduction, weighting and masking
 
-Three details of how a batch's losses are combined matter in practice.
+Three details of how a batch's losses are mixed matter in practice.
 
-<strong>Reduction.</strong> `mean` averages over the batch and is the default; `sum` totals them, which makes the effective learning rate depend on batch size; `none` returns per-example losses, which is what you need for custom weighting or for finding the hardest examples.
+<strong>Reduction.</strong> `mean` averages over the batch and is the default. `sum` totals them, which makes the effective learning rate depend on batch size. `none` returns per-case losses. It is what you need for custom weighting or for finding the hardest cases.
 
 <strong>Class weighting.</strong> On imbalanced data, weighting each class's contribution by the inverse of its frequency stops the majority class dominating the average:
 
@@ -88,27 +88,27 @@ weights = torch.tensor([1.0, 12.0])          # positive class is 12x rarer
 criterion = nn.CrossEntropyLoss(weight=weights)
 ```
 
-<strong>Masking.</strong> Padded positions in a sequence, and pixels marked "unlabelled" in a segmentation mask, must be excluded. `ignore_index` does this:
+<strong>Masking.</strong> Padded positions in a sequence. And pixels marked "unlabelled" in a segmentation mask, must be excluded. `ignore_index` does this:
 
 ```python
 criterion = nn.CrossEntropyLoss(ignore_index=-100)     # skip these positions
 ```
 
-Forgetting to mask is a real and quiet bug: the model spends a large share of its capacity learning to predict padding tokens, and the reported loss is not comparable to anyone else's.
+Forgetting to mask is a real and quiet bug: the net spends a large share of its capacity learning to predict padding tokens. And the reported loss is not comparable to anyone else's.
 
 ## Training loss versus the metric you report
 
-These are different things and should be allowed to differ.
+These are other things and should be let to differ.
 
-The loss must be differentiable so gradients exist. Accuracy, F1, IoU and mAP are not differentiable &mdash; they are step functions of the predictions, with zero gradient almost everywhere. You cannot optimise them directly.
+The loss must be differentiable so gradients exist. Score, F1, IoU and mAP are not differentiable. They are step functions of the predictions, with zero gradient almost all over. You cannot tune them right.
 
-So the standard arrangement is: <strong>train on a smooth surrogate, evaluate on the metric you care about</strong>. Train on cross-entropy, report F1. Train on Dice-plus-cross-entropy, report IoU.
+So the standard arrangement is: <strong>train on a smooth surrogate, test on the metric you care about</strong>. Train on cross-entropy, report F1. Train on Dice-plus-cross-entropy, report IoU.
 
-The two can disagree, and that is informative rather than alarming. Validation loss rising while accuracy stays flat usually means the model is becoming overconfident on the examples it already gets right &mdash; a calibration problem rather than a classification one. Early stopping on the metric you care about, rather than on the loss, is often the better choice.
+The two can disagree, and that is informative rather than alarming. Validation loss rising while score stays flat often means the net is turning too sure on the cases it now gets right. A tuning problem rather than a sorting one. Early stopping on the metric you care about, rather than on the loss, is often the better choice.
 
-Some metrics have differentiable relaxations &mdash; soft-Dice, soft-IoU, and the CIoU family for bounding boxes &mdash; and using them closes part of the gap between what you optimise and what you measure.
+Some metrics have differentiable relaxations &mdash; soft-Dice, soft-IoU. And the CIoU family for bounding boxes. And with them closes part of the gap between what you tune and what you measure.
 
-## Every loss, computed by hand
+## Each loss, computed by hand
 
 MSE, MAE, Huber, binary and categorical cross-entropy on the same predictions -- so you can see what each one punishes and how hard.
 
@@ -152,7 +152,7 @@ for p, t in ((0.01, 0), (0.50, 0), (0.99, 0)):
 print()
 ```
 
-Building on the same setup, the next block shows the remaining cases.
+Building on the same setup, the next block shows the left cases.
 
 ```python-run
 import numpy as np
@@ -193,22 +193,22 @@ print("are usually not the same function.")
 
 ## Questions people ask
 
-<strong>Why is my loss `NaN`?</strong> A `log(0)`, a division by zero, or a learning rate high enough to send the weights to infinity. Use the framework's fused losses, which guard the logarithm.
+<strong>Why is my loss `NaN`?</strong> A `log(0)`, a division by zero. Or a learning rate high enough to send the weights to infinity. Use the framework's fused losses, which guard the logarithm.
 
-<strong>Can I add several losses together?</strong> Yes, and it is common in multi-task models. Weight them, and be aware the weights matter: a term ten times larger dominates training regardless of importance.
+<strong>Can I add a few losses together?</strong> Yes. And it is common in multi-task nets. Weight them, and be aware the weights matter: a term ten times more dominates training no matter weight.
 
-<strong>Should the loss go to zero?</strong> Not on real data. Irreducible noise means there is a floor, and reaching zero on training data usually means memorisation.
+<strong>Should the loss go to zero?</strong> Not on real data. Irreducible noise means there is a floor. And reaching zero on training data often means memorisation.
 
-<strong>Why does my validation loss rise while accuracy holds?</strong> Growing overconfidence. Consider label smoothing, and stop on the metric rather than the loss.
+<strong>Why does my validation loss rise while score holds?</strong> Growing overconfidence. Consider label smoothing. And stop on the metric rather than the loss.
 
-<strong>How do I handle imbalanced classes?</strong> Class weights, or focal loss, which down-weights the easy examples the majority class provides.
+<strong>How do I handle imbalanced classes?</strong> Class weights. Or focal loss, which down-weights the easy cases the majority class gives.
 
 <strong>Do I apply softmax before the loss?</strong> No &mdash; pass logits. The fused loss applies it internally and stably. Applying it twice is a common silent bug.
 
 ## Recap in one screen
 
-- The loss reduces the whole batch to one number, and the model becomes whatever minimises it.
-- MSE for regression, cross-entropy for classification; Huber when outliers are present.
-- Squared error predicts the conditional mean; absolute error predicts the median.
-- Mask padded positions and weight rare classes, or the average is measuring the wrong thing.
-- Train on a differentiable surrogate, evaluate on the metric that matters, and expect them to disagree occasionally.
+- The loss reduces the whole batch to one count. And the net turns whatever cuts it.
+- MSE for regression, cross-entropy for sorting. Huber when outliers are present.
+- Squared error predicts the conditional mean. Absolute error predicts the median.
+- Mask padded positions and weight rare classes. Or the average is measuring the wrong thing.
+- Train on a differentiable surrogate, test on the metric that matters. And expect them to disagree at times.

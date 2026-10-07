@@ -1,11 +1,11 @@
 title: InceptionNet
-intro: Stop choosing a kernel size. Run several, concatenate, and use 1x1 convolutions to make that affordable.
+intro: Stop choosing a kernel size. Run a few, concatenate. Use 1x1 convolutions to make that affordable.
 
 ## The question the module answers
 
-Every convolutional layer forces a decision: 1&times;1, 3&times;3 or
-5&times;5? The right answer depends on how large the thing you are looking for
-is in that layer's units, which varies by image, by class and by depth. VGG
+each convolutional layer forces a choice: 1&times;1, 3&times;3 or
+5&times;5? The right answer depends on how large the thing you're looking for
+is in that layer's units. This Varies by image, by class and by depth. VGG
 answers it by fiat &mdash; always 3&times;3 &mdash; and gets the range of
 scales from depth.
 
@@ -14,17 +14,17 @@ pooling branch **in parallel on the same input**, and concatenate the results
 along the channel axis. The next layer then has all the scales available and
 learns which to weight.
 
-This only works because every branch is padded to preserve spatial size. A
+This only works because each branch is padded to preserve spatial size. A
 1&times;1 with no padding, a 3&times;3 with padding 1 and a 5&times;5 with
 padding 2 all leave a 28&times;28 map as 28&times;28, so their outputs stack
-cleanly. Concatenation along channels is otherwise impossible: you cannot
+cleanly. Concatenation along channels is or else hopeless: you can't
 concatenate a 28&times;28 map with a 26&times;26 one.
 
 ## The naive version is unaffordable
 
 Take module 3a, the first in GoogLeNet: 192 input channels at 28&times;28,
-producing 64 + 128 + 32 channels from the three convolutional branches plus
-whatever the pool passes through.
+making 64 + 128 + 32 channels from the three convolutional branches plus
+what the pool passes through.
 
 Turn the bottleneck **off** in the explorer and read the branch costs:
 
@@ -35,7 +35,7 @@ Turn the bottleneck **off** in the explorer and read the branch costs:
 | 5&times;5 &rarr; 32, reading all 192 channels | 120.4 M |
 | **Total** | **303 M** |
 
-Three hundred million multiply-accumulates for **one module**, and there are
+Three hundred million times-builds up for **one module**, and there are
 nine of them. Worse, the pooling branch passes its 192 input channels straight
 through, so the output has 64 + 128 + 32 + 192 = 416 channels &mdash; more than
 went in. Stack two of these and the third one is reading 416 channels, then
@@ -45,12 +45,12 @@ cost grows with the *square* of it.
 ## The 1x1 convolution is the fix
 
 A 1&times;1 convolution has no spatial extent at all. At each pixel it takes
-the vector of C input channels and applies a single learned matrix to produce
-C' outputs. It is a per-pixel linear map across channels &mdash; a change of
-basis in channel space, applied identically everywhere &mdash; and its cost is
+the vector of C input channels and applies a single learned mat to give
+C' outputs. It's a per-pixel linear map across channels &mdash; a change of
+basis in channel space, applied the same way all over. And its cost is
 C &times; C' per pixel.
 
-Put one in front of each expensive branch and the arithmetic collapses:
+Put one in front of each costly branch and the math merges:
 
 | Branch | Naive | With a reduction |
 |---|---|---|
@@ -58,7 +58,7 @@ Put one in front of each expensive branch and the arithmetic collapses:
 | 5&times;5 | 192&rarr;32 directly: 120.4 M | 192&rarr;16 then 16&rarr;32: 12.4 M |
 | pool | 192 passed through, 0 M | 192&rarr;32 projection: 4.8 M |
 
-The 5&times;5 branch drops by a factor of ten, because a 5&times;5 kernel over
+The 5&times;5 branch drops by a factor of ten. A 5&times;5 kernel over
 16 channels is a twelfth of the work of the same kernel over 192. And the pool
 branch now *shrinks* its channel count instead of growing it, so the module
 outputs 256 channels rather than 416 and the next module has less to read.
@@ -68,41 +68,41 @@ and watch both numbers move together.
 
 ## The whole network
 
-The full GoogLeNet stacks nine of these modules with two intermediate pools,
+The full GoogLeNet stacks nine of these modules with two mid pools,
 after a conventional 7&times;7 and 3&times;3 stem. The layer table in the
 explorer lists all nine with their real widths from table 1 of the paper.
 
-Two things stand out. The widths are not a pattern &mdash; module 4d puts 288
+Two things stand out. The widths aren't a pattern. Module 4d puts 288
 channels in its 3&times;3 branch and 64 in its 5&times;5, while 4e puts 320
 and 128 &mdash; because they were tuned rather than derived. And the whole
-network comes to **6.8 million parameters** against VGG-16's 138 million, on
-about 1.5 billion multiply-accumulates against VGG's 15.5 billion. It won
-ILSVRC 2014 classification; VGG came second.
+network comes to **6.8 million params** against VGG-16's 138 million, on
+about 1.5 billion times-builds up against VGG's 15.5 billion. It won
+ILSVRC 2014 classification. VGG came second.
 
-The head is the other half of that story. GoogLeNet ends with global average
+The head is the other half of that story. GoogLeNet ends with global mean
 pooling and one 1024&rarr;1000 layer, not with two 4096-wide dense layers. That
-choice alone accounts for most of the 20&times; parameter gap.
+choice alone accounts for most of the 20&times; param gap.
 
-The original also carried two **auxiliary classifiers** &mdash; extra softmax
+The first also carried two **auxiliary classifiers** &mdash; extra softmax
 heads hanging off the middle of the network during training, their losses
-added at weight 0.3 &mdash; to push gradient into the early layers of a network
-too deep to train otherwise. They were removed at inference. Within a year
+added at weight 0.3 &mdash; to push grad into the early layers of a network
+too deep to train or else. They were removed at inference. Within a year
 ResNet solved that problem properly with identity shortcuts, and later
-Inception versions dropped the auxiliary heads; the paper's own follow-up
-concluded they acted more as regularisers than as gradient highways.
+Inception versions dropped the auxiliary heads. The paper's own follow-up
+concluded they acted more as regularisers than as grad highways.
 
 ## What the family did next
 
 - **Inception-v2/v3** factorised the 5&times;5 into two 3&times;3s, then went
   further and factorised an n&times;n into an n&times;1 followed by a
-  1&times;n. It added batch normalisation and label smoothing. 
-- **Inception-v4 and Inception-ResNet** added residual connections, which
-  sped up training substantially without changing the accuracy ceiling much
-  &mdash; a useful data point about what residuals actually buy.
+  1&times;n. It added batch norming and label smoothing. 
+- **Inception-v4 and Inception-ResNet** added residual links, which
+  sped up training a lot without changing the fit ceiling much
+  &mdash; a handy data point about what residuals really buy.
 - **Xception** took the factorisation to its limit: if a 1&times;1 handles
   cross-channel mixing and the spatial kernel handles space, do them
-  completely separately. That is depthwise separable convolution, and it is the
-  basis of MobileNet and of most efficient architectures since.
+  fully apart. That is depthwise separable convolution, and it's the
+  basis of MobileNet and of most fast architectures since.
 
 ```python
 import torch
@@ -134,58 +134,58 @@ worth triggering once on purpose.
 
 ## What it costs to run four branches
 
-There is a cost to the parallel structure that the multiply-accumulate count
-does not show, and it is worth naming because it explains why inception-style
-modules fell out of fashion despite being efficient on paper.
+There's a cost to the parallel structure that the times-build up count
+doesn't show, and it's worth naming because it shows why inception-style
+modules fell out of fashion despite being fast on paper.
 
 Four branches means four separate convolution kernels, four separate memory
 allocations for their outputs, and a concatenation that has to gather them.
-On a GPU, a single large convolution saturates the hardware; four small ones
-launched in sequence each spend part of their time not doing arithmetic at all.
-The measured latency of an inception module is consistently worse than its
+On a GPU, a single large convolution saturates the hardware. Four small ones
+launched in sequence each spend part of their time not doing math at all.
+The measured latency of an inception module is always worse than its
 MAC count predicts, and the gap widens as hardware gets faster, because the
-fixed per-launch overhead does not shrink.
+fixed per-launch cost doesn't shrink.
 
-This is the general lesson about efficiency metrics. Parameters, MACs and
+This is the general lesson about speed metrics. Params, MACs and
 latency are three different budgets, and an architecture can win on the first
 two and lose on the third. Depthwise separable convolutions have the same
 problem in a more extreme form: they cut MACs by roughly eight or nine times
-and typically deliver two or three times the speed, because they are
-memory-bandwidth bound rather than arithmetic bound.
+and often deliver two or three times the speed, because they're
+memory-bandwidth bound rather than math bound.
 
-The practical rule that follows: **measure latency on the hardware you will
-deploy to**, and treat MAC counts as a rough guide rather than a prediction.
-Two networks with identical MAC counts can differ by a factor of three in
+The hands-on rule that follows: **measure latency on the hardware you'll
+deploy to**, and treat MAC counts as a rough guide rather than a guess.
+Two networks with the same MAC counts can differ by a factor of three in
 milliseconds.
 
 ## The idea to keep
 
-The 1&times;1 convolution is the transferable part. It is not a special case of
+The 1&times;1 convolution is the transferable part. It isn't a special case of
 a convolution so much as a distinct tool: **it changes the channel count at a
 cost linear in channels, without touching space**. Once you can do that
-cheaply, expensive operations become affordable by sandwiching them between a
-projection down and a projection back up. ResNet's bottleneck block is exactly
-that pattern. So is MobileNet's inverted residual, so is the feed-forward block
-of a transformer, and so is every "reduce, operate, expand" structure you will
+cheaply, costly ops become affordable by sandwiching them between a
+map down and a map back up. ResNet's bottleneck block is just
+that pattern. So is MobileNet's inverted residual. So Is the feed-forward block
+of a transformer, and so is each "reduce, operate, expand" structure you'll
 meet from here on.
 ## Questions people ask
 
-<strong>Why does a 1&times;1 convolution do anything at all?</strong> Because it is not spatial &mdash; it is a learned matrix applied to the channel vector at every pixel. With 192 inputs and 96 outputs it is a 192&times;96 change of basis performed identically everywhere, and it can discard, combine or duplicate channels. It only looks trivial if you picture convolution as something that happens in space.
+<strong>Why does a 1&times;1 convolution do any of it at all?</strong> Because it isn't spatial. It's a learned mat applied to the channel vector at each pixel. With 192 inputs and 96 outputs it's a 192&times;96 change of basis performed the same way all over. It can discard, combine or duplicate channels. It only looks trivial if you picture convolution as a thing that happens in space.
 
-<strong>Where do the per-branch channel counts come from?</strong> From tuning, not a formula. Table 1 of the paper lists them per module and they are not a pattern &mdash; 4d puts 288 channels in its 3&times;3 branch and 64 in its 5&times;5. This is the part of Inception that did not generalise, and the reason later architectures preferred one repeating block with a width multiplier.
+<strong>Where do the per-branch channel counts come from?</strong> From tuning, not a formula. Table 1 of the paper lists them per module and they aren't a pattern. 4d puts 288 channels in its 3&times;3 branch and 64 in its 5&times;5. This is the part of Inception that didn't generalise. The reason later architectures preferred one repeating block with a width multiplier.
 
-<strong>Is GoogLeNet the same thing as Inception-v1?</strong> Yes. GoogLeNet is the specific 22-layer ILSVRC 2014 entry; Inception is the module and the family. Inception-v3 is the version most people actually load, and it expects 299&times;299 input rather than 224.
+<strong>Is GoogLeNet the same thing as Inception-v1?</strong> Yes. GoogLeNet is the exact 22-layer ILSVRC 2014 entry. Inception is the module and the family. Inception-v3 is the version most people really load. It expects 299&times;299 input rather than 224.
 
-<strong>Why did the auxiliary classifiers go away?</strong> They existed to push gradient into the early layers of a network too deep to train otherwise. Batch normalisation and then residual connections solved that properly, and the paper's own follow-up concluded the auxiliary heads had acted as regularisers rather than gradient highways. Nothing replaced them because nothing needed to.
+<strong>Why did the auxiliary classifiers go away?</strong> They existed to push grad into the early layers of a network too deep to train or else. Batch norming and then residual links solved that properly. The paper's own follow-up concluded the auxiliary heads had acted as regularisers rather than grad highways. Nothing replaced them because nothing needed to.
 
-<strong>If it has 20&times; fewer parameters than VGG, why is it not 20&times; faster?</strong> Because parameters are not latency. Four branches mean four kernel launches, four output allocations and a gather, and the fixed cost per launch does not shrink as hardware gets faster &mdash; so measured latency is consistently worse than the MAC count predicts. Depthwise separable convolutions have the same problem more severely.
+<strong>If it has 20&times; fewer params than VGG, why is it not 20&times; faster?</strong> Because params aren't latency. Four branches mean four kernel launches, four output allocations and a gather. The fixed cost per launch doesn't shrink as hardware gets faster. So measured latency is always worse than the MAC count predicts. Depthwise separable convolutions have the same problem more severely.
 
-<strong>Should I use an Inception model today?</strong> For new work, no: a ResNet or a modern efficient network is easier to train and better supported. Inception-v3 still matters in one place, though &mdash; the Inception Score and FID are defined on its activations, so it remains load-bearing infrastructure for generative-model evaluation.
+<strong>Should I use an Inception model today?</strong> For new work, no. A ResNet or a modern fast network is easier to train and better supported. Inception-v3 still matters in one place, though. The Inception Score and FID are defined on its activations. It remains load-bearing infrastructure for generative-model test.
 
 ## Recap in one screen
 
-- The module runs 1&times;1, 3&times;3, 5&times;5 and a pool branch in parallel and concatenates along channels, so the next layer picks the scale.
-- Concatenation requires every branch to preserve spatial size, which is what the per-branch padding of 0, 1 and 2 is for.
-- A 1&times;1 reduction in front of the expensive branches cuts module 3a from 303 M to 128 M MACs *and* shrinks its output from 416 to 256 channels.
-- The pool branch's projection is what stops the channel count growing without bound as modules are stacked.
-- GoogLeNet is 6.8 M parameters against VGG's 138 M, mostly because it ends in global average pooling. The transferable idea is reduce, operate, expand.
+- The module runs 1&times;1, 3&times;3, 5&times;5 and a pool branch in parallel and concatenates along channels. The next layer picks the scale.
+- Concatenation needs each branch to preserve spatial size. This Is what the per-branch padding of 0, 1 and 2 is for.
+- A 1&times;1 reduction in front of the costly branches cuts module 3a from 303 M to 128 M MACs *and* shrinks its output from 416 to 256 channels.
+- The pool branch's map is what stops the channel count growing without bound as modules are stacked.
+- GoogLeNet is 6.8 M params against VGG's 138 M, mostly because it ends in global mean pooling. The transferable idea is reduce, operate, expand.

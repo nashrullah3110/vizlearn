@@ -1,5 +1,5 @@
 title: Pydantic or a Dataclass? A Question Worth Answering Properly
-intro: Both build a class from annotations. Only one checks anything, and that is the whole decision.
+intro: Both build a class from annotations. Only one checks anything. That is the whole choice.
 
 ## They look almost identical
 
@@ -14,23 +14,9 @@ class Module(BaseModel):
     minutes: int
 ```
 
-Two lines of difference, and both give you a constructor, a readable `repr`, equality by value and a way to get a dictionary out. It is entirely reasonable to wonder whether the choice matters.
+Two lines of gap, and both give you a constructor, a readable `repr`, equality by value and a way to get a dict out. It's fully fair to wonder whether the choice matters.
 
-It matters in exactly one place: what happens when the data is wrong.
-
-A dataclass stores whatever you pass, without checking. `Module(title=42, minutes="not a number")` builds an object with `title=42` and `minutes="not a number"`, and the type annotations are documentation only. A BaseModel refuses: it tries to coerce `42` to a string (which succeeds — you get `"42"`) and tries to parse `"not a number"` as an `int` (which fails with a `ValidationError` listing exactly what was wrong). That difference is the entire decision.
-
-If your data comes from the outside — a JSON request, a config file, a CSV, user input — validation is not optional. A wrong type four layers deep produces a `TypeError` far from the source, and the traceback names the symptom, not the cause. Pydantic catches it at the boundary, names the field and the value, and stops the bad data from entering the system.
-
-If your data comes from your own code — a return value you just computed, a named tuple you assembled — validation is overhead. A dataclass is lighter, faster to instantiate, and imposes no rules because none are needed. The code that builds the object already knows the types.
-
-Performance is the secondary difference. A dataclass constructor is a plain `__init__` — nearly free. A BaseModel constructor runs validation, coercion, and potentially custom validators on every field. For a model with five string fields, construction is roughly 5–10x slower than a dataclass. That does not matter for request handling (network latency dwarfs it), but it matters for inner loops that build millions of objects.
-
-Pydantic offers `pydantic.dataclasses.dataclass`, which is a dataclass that validates. It uses the `@dataclass` syntax but runs Pydantic validation under the hood. It is useful when you want dataclass compatibility — `asdict`, `astuple`, `fields` — with validation at construction. The tradeoff is that it does not support model methods like `.model_dump()` or `.model_json_schema()`, so it sits between the two rather than replacing either.
-
-Serialisation is the third difference. A BaseModel can produce JSON, a dict with aliased keys, and a JSON Schema. A dataclass can produce a dict with `asdict` and that is about it. If other systems need to consume your data shape — a frontend, a schema registry, an OpenAPI document — BaseModel gives you the output for free.
-
-The choice is almost always obvious once you ask the question: does this data arrive from code I control, or from somewhere I do not? Code I control: dataclass. Somewhere else: BaseModel.
+It matters in just one place: what happens when the data is wrong.
 
 
 ## Side by side
@@ -215,42 +201,42 @@ except ValidationError as e:
 ```
 ## What a dataclass actually does
 
-`@dataclass` reads the annotations to find out which fields exist and in what order, and then generates an `__init__` that assigns them. That is the extent of its interest in the types. The annotation `minutes: int` is used to decide that a field called `minutes` exists. Its being an `int` is never checked, tested or acted on.
+`@dataclass` reads the annotations to find out which fields exist and in what order. Then makes an `__init__` that assigns them. That is the extent of its interest in the types. The annotation `minutes. Int` is used to decide that a field called `minutes` exists. Its being an `int` is never checked, tested or acted on.
 
-So `Module(title=None, minutes=[1, 2, 3], published="perhaps")` constructs perfectly happily. Nothing is wrong until something downstream assumes the annotation was true &mdash; and then it fails somewhere else, with a traceback pointing at the innocent party.
+So `Module(title=None, minutes=[1, 2, 3], published="perhaps")` makes just right happily. Nothing is wrong until a thing downstream assumes the annotation was true. And then it fails one spot else, with a traceback pointing at the innocent party.
 
-This is not a flaw. A dataclass is a code-generation convenience, and it does what it advertises. It just does not do the thing people sometimes assume it does.
+This isn't a flaw. A dataclass is a code-making convenience. It does what it advertises. It just doesn't do the thing people at times assume it does.
 
-`NamedTuple` and `TypedDict` are in the same position, and it is worth saying because `TypedDict` in particular looks like it should be validating something. It is not. It is a description for static type checkers, invisible at runtime.
+`NamedTuple` and `TypedDict` are in the same spot. It's worth saying because `TypedDict` in given looks like it should be checking a thing. It isn't. It's a description for static type checkers, invisible at runtime.
 
 ## What that guarantee costs
 
-Validation is real work: reading a schema, checking each field, sometimes converting. It is not free, and any honest comparison has to say so.
+check is real work: reading a schema, checking each field, at times converting. It isn't free. Any honest compare has to say so.
 
-The timing in the third editor above is worth running. Pydantic 2's core is Rust, so the gap is far smaller than it was in v1, but a dataclass is still faster, for the simple reason that doing nothing is quicker than doing something.
+The timing in the third editor above is worth running. Pydantic 2's core is Rust. The gap is far smaller than it was in v1. But A dataclass is still faster, for the simple reason that doing nothing is quicker than doing a thing.
 
-Read the *ratio* rather than the seconds. Everything on this page runs on CPython compiled to WebAssembly, which is several times slower than a native interpreter. The relative comparison holds; the absolute numbers do not transfer to your laptop.
+Read the *ratio* rather than the seconds. all on this page runs on CPython compiled to WebAssembly. This Is a few times slower than a native interpreter. The scaled compare holds. The abs numbers don't transfer to your laptop.
 
-And put the ratio in context. A model that validates in a few microseconds is irrelevant next to a database query taking milliseconds, or a network call taking hundreds. Validation cost matters in tight loops over large collections, and almost nowhere else. Choosing a dataclass "for performance" in a request handler that then makes three SQL queries is optimising the wrong end.
+And put the ratio in context. A model that validates in a few microseconds is irrelevant next to a DB query taking milliseconds, or a network call taking hundreds. check cost matters in tight loops over large sets. Almost nowhere else. Choosing a dataclass "for speed" in a request handler that then makes three SQL queries is optimising the wrong end.
 
 ## The answer is usually both
 
-The instinct to pick one and use it everywhere is what makes this question feel harder than it is. The better framing is *where in the system am I*.
+The instinct to pick one and use it all over is what makes this question feel harder than it's. The better framing is *where in the system am I*.
 
-At the **boundary** &mdash; a request body, a config file, a CSV, another service's response &mdash; the data is a guess until proven otherwise. Validate. This is the whole point of the library, and the cost is paid once per item arriving.
+At the **boundary** &mdash; a request body, a config file, a CSV, another service's response &mdash; the data is a guess until proven else. Validate. This is the whole point of the library. The cost is paid once per item arriving.
 
-**Inside**, past that line, the data has already been checked. Re-validating it at every layer buys nothing: the same values, checked again, will pass again. If you have a hot loop over ten thousand records, a dataclass is a reasonable interior representation, and converting is one line:
+**Inside**, past that line, the data has already been checked. Re-checking it at each layer buys nothing. The same values, checked again, will pass again. If you've a hot loop over ten thousand records, a dataclass is a fair interior form, and converting is one line:
 
 ```python
 checked = ModuleIn.model_validate(raw)   # validate once
 module = Module(**checked.model_dump())  # then go cheap
 ```
 
-Be honest about whether you need that, though. For most applications, using models throughout is simpler, and simpler is worth more than a microsecond. The two-representation pattern earns its keep when profiling has actually pointed at validation.
+Be honest about whether you need that, though. For most uses, using models throughout is simpler. Simpler is worth more than a microsecond. The two-form pattern earns its keep when profiling has really pointed at check.
 
 ## The middle option
 
-If you like the dataclass API &mdash; or you have a codebase full of them &mdash; `pydantic.dataclasses.dataclass` is a drop-in replacement that validates:
+If you like the dataclass API. Or you've a code full of them. `pydantic.dataclasses.dataclass` is a drop-in swap that validates:
 
 ```python
 from pydantic.dataclasses import dataclass
@@ -261,61 +247,61 @@ class Module:
     minutes: int
 ```
 
-Same decorator shape, same `dataclasses.fields()` introspection, and now `minutes="eight"` raises. It is a good way to add checking to existing code without rewriting it into models.
+Same decorator shape, same `dataclasses.fields()` introspection. Now `minutes="eight"` raises. It's a good way to add checking to existing code without rewriting it into models.
 
 The trade is that you get less of Pydantic. `model_dump`, aliases, custom serialisers and the richer config surface belong to `BaseModel`. For anything that is going to be serialised, aliased or documented, a real model is the better home.
 
 ## Validating without a class at all
 
-`TypeAdapter` is the piece most people meet late and wish they had met early. It applies the whole validation machinery to any annotation, with no model in sight:
+`TypeAdapter` is the piece most people meet late and wish they had met early. It applies the whole check machinery to any annotation, with no model in sight:
 
 ```python
 TypeAdapter(List[int]).validate_python(["8", "12", 14.0])   # [8, 12, 14]
 ```
 
-That is genuinely useful. A JSON array of numbers has no natural model wrapped around it. Neither does a `Dict[str, float]` of settings, or the argument to a function you want to check at its edge. Building a one-field model to hold a list is a common workaround, and `TypeAdapter` is the thing it was working around.
+That is truly handy. A JSON array of numbers has no natural model wrapped around it. Neither does a `Dict[str, float]` of settings, or the arg to a function you want to check at its edge. Building a one-field model to hold a list is a common workaround. `TypeAdapter` is the thing it was working around.
 
-It gets a full module in the serialisation tier, because it also handles dumping and schema generation for bare types.
+It gets a full module in the output tier. It also handles dumping and schema making for bare types.
 
 ## A short decision list
 
-Reach for **`BaseModel`** when data crosses a boundary, when you need serialisation or aliases, or when the thing should appear in an API schema. This is most of the time.
+Reach for **`BaseModel`** when data crosses a boundary, when you need output or aliases, or when the thing should appear in an API schema. This is most of the time.
 
-Reach for **`@dataclass`** for internal values that never leave the process and never arrive from outside it &mdash; and where you have a reason beyond habit.
+Reach for **`@dataclass`** for inner values that never leave the process and never arrive from outside it. And where you've a reason beyond habit.
 
-Reach for **`pydantic.dataclasses.dataclass`** when you want validation on a dataclass that already exists.
+Reach for **`pydantic.dataclasses.dataclass`** when you want check on a dataclass that already exists.
 
-Reach for **`TypeAdapter`** when the thing you need to validate is not a class.
+Reach for **`TypeAdapter`** when the thing you need to validate isn't a class.
 
 ## The rest of the field
 
-Dataclasses are not the only alternative, and the others sit in predictable places.
+Dataclasses aren't the only option, and the others sit in predictable places.
 
-**`attrs`** is the library dataclasses were inspired by, and it is still ahead in features: converters, richer validators, better control over generated methods. It does validate, if you ask it to, and it is a reasonable choice for internal classes with complex construction. It is not aimed at the boundary and does not generate JSON Schema.
+**`attrs`** is the library dataclasses were inspired by. It's still ahead in features. Converters, richer checkers, better control over made methods. It does validate, if you ask it to. It's a fair choice for inner classes with complex build. It isn't aimed at the boundary and doesn't make JSON Schema.
 
-**`NamedTuple`** gives you an immutable, tuple-shaped record with named access. It checks nothing at runtime, and its tuple-ness is either the point or a trap depending on whether you wanted something you can unpack and compare positionally.
+**`NamedTuple`** gives you an immutable, tuple-shaped record with named access. It checks nothing at runtime. Its tuple-ness is either the point or a trap based on whether you wanted a thing you can unpack and compare positionally.
 
-**`TypedDict`** describes the shape of a dictionary for a static type checker. It is worth being clear about this one: at runtime, a `TypedDict` **is a plain dict**. There is no class, no checking, and no error if a key is missing or the wrong type. It is a comment mypy can read. Where people usually want a `TypedDict` and validation, what they want is a model.
+**`TypedDict`** shows the shape of a dict for a static type checker. It's worth being clear about this one. At runtime, a `TypedDict` **is a plain dict**. There's no class, no checking. No error if a key is missing or the wrong type. It's a comment mypy can read. Where people often want a `TypedDict` and check, what they want is a model.
 
-**`SQLModel`** joins Pydantic and SQLAlchemy so one class can be both a table and a validated model. It is convenient and it is a coupling: your API shape and your database schema become the same object, which is fine until they need to differ, which they eventually do.
+**`SQLModel`** joins Pydantic and SQLAlchemy so one class can be both a table and a checked model. It's convenient and it's a coupling. Your API shape and your DB schema become the same object. This Is fine until they need to differ. This They eventually do.
 
 ## Memory, and the shape of an instance
 
-A `BaseModel` instance stores its data in `__dict__` plus some bookkeeping &mdash; `__pydantic_fields_set__` for what was supplied, and a reference to the compiled validator on the class.
+A `BaseModel` instance stores its data in `__dict__` plus some bookkeeping. `__pydantic_fields_set__` for what was supplied. A link to the compiled checker on the class.
 
-A dataclass also uses `__dict__` unless you declare `slots=True`, which trades the ability to add attributes for a smaller, faster object. A `NamedTuple` is the smallest of the lot, being a tuple.
+A dataclass also uses `__dict__` unless you declare `slots=True`. This Trades the ability to add fields for a smaller, faster object. A `NamedTuple` is the smallest of the lot, being a tuple.
 
-For thousands of objects this is invisible. For millions it is not, and it is a real reason to use something leaner for the interior of a numerical or batch-processing system. It is also a reason not to worry about it before you have measured, because "millions of objects" is a specific situation rather than a general one.
+For thousands of objects this is invisible. For millions it isn't. It's a real reason to use a thing leaner for the interior of a numeric or batch-handling system. It's also a reason not to worry about it before you've measured. "millions of objects" is a exact situation rather than a general one.
 
 ## Moving between them
 
-Conversion is mechanical in every direction, which is what makes the boundary-then-interior pattern practical.
+Conversion is rote in each direction. This Is what makes the boundary-then-interior pattern hands-on.
 
 From model to dataclass: `Module(**checked.model_dump())`.
 
-From dataclass to model: `ModuleIn.model_validate(dataclasses.asdict(d))`, or `model_validate(d)` directly, since Pydantic can read attributes off arbitrary objects when the model sets `from_attributes=True`.
+From dataclass to model: `ModuleIn.model_validate(dataclasses.asdict(d))`, or `model_validate(d)` right. Pydantic can read fields off any objects when the model sets `from_attributes=True`.
 
-That last setting deserves a mention of its own. `from_attributes=True` lets a model validate from any object with matching attributes rather than requiring a dict:
+That last setting deserves a mention of its own. `from_attributes=True` lets a model validate from any object with matching fields rather than needing a dict:
 
 ```python
 class ModuleOut(BaseModel):
@@ -326,52 +312,52 @@ class ModuleOut(BaseModel):
 ModuleOut.model_validate(orm_row)
 ```
 
-This is how a model reads an ORM row, and it is the single most common reason to reach for it. In Pydantic v1 it was called `orm_mode`, which is the name most tutorials still use.
+This is how a model reads an ORM row. It's the single most common reason to reach for it. In Pydantic v1 it was called `orm_mode`. This Is the name most tutorials still use.
 
 ## When a model is genuinely too much
 
 A short list of cases where reaching for `BaseModel` is over-engineering.
 
-A function returning two values does not need a model. A tuple, or a `NamedTuple` if the names help, is fine.
+A function returning two values doesn't need a model. A tuple, or a `NamedTuple` if the names help, is fine.
 
-A short-lived internal structure that never leaves the function that built it does not need validation, because nothing untrusted can reach it.
+A short-lived inner structure that never leaves the function that built it doesn't need check. Nothing untrusted can reach it.
 
-A constant lookup table is a dict. Wrapping it in a model to get attribute access is a lot of ceremony for a dot.
+A constant lookup table is a dict. Wrapping it in a model to get field access is a lot of ceremony for a dot.
 
-And a value with one field is usually just that value. `class Slug(BaseModel): value: str` is a wrapper that every caller has to unwrap. If you want a validated string type, `Annotated[str, Field(pattern=...)]` gives you that without the box.
+And a value with one field is often just that value. `class Slug(BaseModel). Value: str` is a wrapper that each caller has to unwrap. If you want a checked string type, `Annotated[str, Field(pattern=...)]` gives you that without the box.
 
 ## The question to actually ask
 
-Not "which is faster" or "which is more modern", but: **does anything untrusted reach this object, and does it ever leave the process?**
+Not "which is faster" or "which is more modern", but: **does anything untrusted reach this object. Does it ever leave the process?**
 
-If untrusted data reaches it, you need validation, and `BaseModel` is the tool built for that.
+If untrusted data reaches it, you need check. `BaseModel` is the tool built for that.
 
-If it leaves the process &mdash; as JSON, in a response, in a schema &mdash; you want serialisation and documentation, and again that is `BaseModel`.
+If it leaves the process. As JSON, in a response, in a schema &mdash; you want output and docs, and again that is `BaseModel`.
 
-If neither is true, you have an internal value, and the lightest thing that expresses it well is the right answer. That will usually be a dataclass, and occasionally a tuple.
+If neither is true, you've an inner value. The lightest thing that expresses it well is the right answer. That will often be a dataclass, and at times a tuple.
 
-Most objects in most applications are at a boundary, which is why the honest general recommendation is to use models and stop worrying about it. The interesting cases are the exceptions, and now you can recognise them.
+Most objects in most uses are at a boundary. This Is why the honest general recommendation is to use models and stop worrying about it. The notable cases are the exceptions. Now you can recognise them.
 
 ## A note on migrating an existing codebase
 
-If you arrive at this with a project full of dataclasses, you do not have to choose in one go.
+If you arrive at this with a project full of dataclasses, you don't have to choose in one go.
 
-The cheapest first move is to convert only the classes that sit at a boundary &mdash; whatever parses your config, whatever accepts a request body, whatever reads a file. Those are where bad data enters, and they are usually a small fraction of the classes in a project. Everything else can stay exactly as it is.
+The cheapest first move is to convert only the classes that sit at a boundary. What parses your config, what accepts a request body, what reads a file. Those are where bad data enters. They're often a small fraction of the classes in a project. all else can stay just as it's.
 
-The second move, if you want checking without restructuring, is `pydantic.dataclasses.dataclass` on the classes that stay. It is a one-line change per class, keeps `dataclasses.fields()` working for anything that introspects them, and starts raising on wrong types immediately.
+The second move, if you want checking without restructuring, is `pydantic.dataclasses.dataclass` on the classes that stay. It's a one-line change per class, keeps `dataclasses.fields()` working for anything that introspects them. Starts raising on wrong types at once.
 
-What you should not do is convert everything to `BaseModel` mechanically. You will end up validating objects that were constructed by your own code from already-validated data, paying for checks that cannot fail, and the diff will be too large for anyone to review properly.
+What you shouldn't do is convert all to `BaseModel` mechanically. You'll end up checking objects that were made by your own code from already-checked data, paying for checks that can't fail. The diff will be too large for anyone to review properly.
 
 ## Summary
 
-A dataclass generates a class from annotations and never looks at the types again. A model generates a class from annotations and enforces them, converts what can be converted, produces structured errors, serialises in both directions and emits a schema.
+A dataclass makes a class from annotations and never looks at the types again. A model makes a class from annotations and enforces them, converts what can be converted, makes structured errors, serialises in both directions and emits a schema.
 
-The cost of all that is real and small, and it is paid where you decide to pay it. The discipline is the same one this whole tier has been building towards: know where your boundaries are, check there, and trust what you have checked.
+The cost of all that is real and small. It's paid where you decide to pay it. The discipline is the same one this whole tier has been building towards. Know where your boundaries are, check there, and trust what you've checked.
 
-Choose a dataclass for internal values that never meet the outside world. Choose a model for everything else. And when you are genuinely unsure, choose the model &mdash; a slightly over-validated program is a much smaller problem than one where nobody can say which values are guaranteed.
+Choose a dataclass for inner values that never meet the outside world. Choose a model for all else. And when you're truly unsure, choose the model. A slightly over-checked program is a much smaller problem than one where no one can say which values are sure.
 
 ## Where this leaves you
 
-That is tier one. You can define a model, predict exactly what it will convert, control what is required and what is merely nullable, narrow values to your domain with constraints, read the errors when data does not fit, and choose between a model and a plain class on grounds better than taste.
+That is tier one. You can define a model, predict just what it will convert, control what is needed and what is merely nullable, narrow values to your domain with constraints, read the errors when data doesn't fit. Choose between a model and a plain class on grounds better than taste.
 
-The next tier is about data with shape: models inside models, lists of them, unions that pick between alternatives, and the standard-library types &mdash; dates, UUIDs, decimals &mdash; that Pydantic already knows how to handle.
+The next tier is about data with shape. Models inside models, lists of them, unions that pick between options. The standard-library types. Dates, UUIDs, decimals. That Pydantic already knows how to handle.

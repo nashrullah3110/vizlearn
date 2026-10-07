@@ -1,29 +1,17 @@
 title: Performance
-intro: Where the time actually goes, in the order worth fixing it.
+intro: Where the time really goes, in the order worth fixing it.
 
 ## The order to work in
 
-Pandas performance work is unusually predictable. In descending order of payoff:
+Pandas speed work is unusually predictable. In descending order of payoff:
 
-1. **Remove per-row Python.** Worth 10&ndash;100x, and it is nearly always the whole problem.
-2. **Right-size the dtypes.** Halves or better on memory, and speeds up everything that touches the column.
+1. **Drop per-row Python.** Worth 10&ndash;100x, and it's nearly always the whole problem.
+2. **Right-size the dtypes.** Halves or better on memory. Speeds up all that touches the column.
 3. **Filter early.** Free, and often the largest structural win.
 4. **Reduce copies.** Worth a modest amount, and only in hot paths.
-5. **Reach past pandas.** When the data or the algorithm genuinely does not suit it.
+5. **Reach past pandas.** When the data or the method truly doesn't suit it.
 
 Working down that list in order means the large wins come first. Working up it means spending an afternoon on step 4 while a `apply(axis=1)` sits untouched.
-
-Per-row Python — `iterrows`, `apply(axis=1)`, a `for` loop over `df.values` — is the single most common performance problem. It is also the one with the largest payoff when fixed. A vectorised column operation runs in C at the array level; a Python loop runs one interpreter step per cell. On a million-row frame with ten columns, the difference is routinely 50–100x.
-
-The usual pattern is someone who learned Python before pandas writing `for i, row in df.iterrows()` to compute a new column. The fix is almost always a vectorised expression: `df["total"] = df["qty"] * df["price"]`. When the logic is conditional, `np.where` or `np.select` replaces the `if` inside the loop. When the logic is string manipulation, `.str` accessor methods replace character-by-character processing. When the logic is truly complex, writing a NumPy ufunc or using `numba.njit` keeps the speed without simplifying the logic.
-
-Dtype choices affect both memory and speed. An `object` column of strings that should be `category` wastes memory and slows every groupby and merge that touches it. A `float64` column of integers that could be `int32` wastes half its memory. `pd.to_numeric(col, downcast="integer")` and `.astype("category")` are the two fixes, and they often halve memory usage with no change to the results.
-
-Filtering early removes rows before expensive operations touch them. `df[df["year"] == 2024].groupby("city").sum()` groups only the relevant rows. `df.groupby("city").sum()` groups everything and then the caller discards what it does not need. The second form does the same work on more data, and the difference grows with the fraction filtered.
-
-Copies accumulate silently. `df.reset_index().sort_values("date").drop(columns=["temp"])` creates three intermediate DataFrames. Each is a full copy of the data. For a frame that fits comfortably in memory, this is fine. For one that occupies half of available RAM, the intermediate copies push into swap and the operation that should take seconds takes minutes.
-
-Profiling is how you know which step to take. `%timeit` on individual operations, `df.memory_usage(deep=True).sum()` for memory, and `line_profiler` for per-line timing are the three tools. Without measurement, performance work is guessing — and the guess is almost always wrong about where the time goes.
 
 
 ## Per-row Python is the whole story
@@ -207,197 +195,197 @@ print("Optimising the arithmetic would have gained nothing.")
 ```
 ## Per-row Python
 
-`df.apply(func, axis=1)`, `iterrows`, and a `for` loop over rows all do the same thing: call back into the interpreter once per row.
+`df.apply(func, axis=1)`, `iterrows`, and a `for` loop over rows all do the same thing. Call back into the interpreter once per row.
 
-The first editor measures four spellings of the same multiplication. The vectorised form is orders of magnitude faster than `apply(axis=1)`, and interestingly a plain `zip` over two columns beats `apply` comfortably &mdash; because `apply` also builds a Series object per row.
+The first editor measures four spellings of the same product. The vectorised form is orders of magnitude faster than `apply(axis=1)`. notably a plain `zip` over two columns beats `apply` comfortably. Because `apply` also builds a Series object per row.
 
-The practical rule: if a lambda indexes into a row, the operation is column arithmetic in disguise.
+The hands-on rule: if a lambda indexes into a row, the step is column math in disguise.
 
 ## iterrows
 
-Worth singling out because it is common and there is no situation where it is the right choice.
+Worth singling out because it's common and there's no situation where it's the right choice.
 
-It is much slower than `itertuples`, and it **converts each row to a Series**. A row containing an integer and a string becomes an `object` Series, so the integer arrives as an object. Code that then does arithmetic on it is slower again, and code that checks types breaks.
+It's much slower than `itertuples`, and it **converts each row to a Series**. A row holding an int and a string turns an `object` Series. The int arrives as an object. Code that then does math on it's slower again, and code that checks types breaks.
 
-`itertuples` is faster and preserves dtypes. If you must iterate, use that. Better still, do not iterate.
+`itertuples` is faster and preserves dtypes. If you must iterate, use that. Better still, don't iterate.
 
 ## dtypes
 
-Covered in its own module, and it belongs here too because memory and speed are the same problem: less data to move is less time spent moving it.
+Covered in its own module, and it belongs here too because memory and speed are the same problem. Less data to move is less time spent moving it.
 
-`category` for repeated text is the biggest single win on most real frames, and it speeds up group-by and comparison as well as saving memory. `to_numeric(downcast=...)` narrows numeric columns.
+`group` for repeated text is the biggest single win on most real frames. It speeds up group-by and compare and saving memory. `to_numeric(downcast=...)` narrows numeric columns.
 
 The third editor shows both applied to one frame.
 
 ## Filter early
 
-Every operation costs in proportion to the rows it touches. Filtering to 5% of the data before computing means every later step does 5% of the work.
+each step costs in proportion to the rows it touches. Filtering to 5% of the data before finding means each later step does 5% of the work.
 
-This is obvious stated plainly and routinely done backwards, because a filter reads more naturally at the end of a chain than in the middle of one. `df.assign(...).query(...)` computes for every row and then throws most of them away; `df.query(...).assign(...)` does not.
+This is obvious stated plainly and routinely done backwards. A filter reads more on its own at the end of a chain than in the middle of one. `df.assign(...).query(...)` finds for each row and then throws most of them away. `df.query(...).assign(...)` doesn't.
 
-The same applies to columns: `usecols` at read time, and dropping columns you will not use, both reduce everything downstream.
+The same applies to columns: `usecols` at read time. Dropping columns you won't use, both reduce all downstream.
 
 ## Copies
 
-Most pandas operations return a new object. A chain of three `assign` calls allocates three frames.
+Most pandas steps return a new object. A chain of three `assign` calls allocates three frames.
 
-That is usually the right trade &mdash; the chain is readable, does not mutate anything, and works well in a notebook. The cost only matters inside a loop or on a frame large enough that allocation dominates.
+That is often the right trade. The chain is readable, doesn't mutate anything. Works well in a notebook. The cost only matters inside a loop or on a frame large enough that allocation dominates.
 
-Two things to know rather than to apply everywhere: direct assignment (`df["b"] = ...`) modifies in place and skips the copy, and `inplace=True` on other methods generally does **not** avoid a copy despite its name, while breaking chaining and returning `None`. It is not the optimisation it appears to be.
+Two things to know rather than to apply all over. Direct set (`df["b"] = ...`) modifies in place and skips the copy. `inplace=True` on other methods often does **not** avoid a copy despite its name, while breaking chaining and returning `None`. It isn't the tuning it appears to be.
 
 ## Measure
 
-The last editor times four operations on the same frame. The ranking is not what most people would guess, and it changes with the data.
+The last editor times four steps on the same frame. The ranking isn't what most people would guess. It changes with the data.
 
-`%timeit` in a notebook, or `time.perf_counter` around a block, is enough for most decisions. Take the best of several runs rather than the mean, since the slow runs are measuring the machine.
+`%timeit` in a notebook, or `time.perf_counter` around a block, is enough for most choices. Take the best of a few runs rather than the mean. The slow runs are measuring the machine.
 
 Two rules that save the most wasted effort:
 
-**Profile the real workload.** A small sample has different characteristics &mdash; different memory pressure, different cache behaviour, sometimes a different code path.
+**Profile the real workload.** A small sample has other traits. Other memory pressure, other cache action, at times a other code path.
 
-**Fix the top item and measure again.** The bottleneck moves, and the second item on the original list is often no longer second.
+**Fix the top item and measure again.** The bottleneck moves. The second item on the first list is often no longer second.
 
-And keep the ceiling in view: an operation taking 5% of the runtime cannot give back more than 5%, however cleverly it is rewritten.
+And keep the ceiling in view: an step taking 5% of the runtime can't give back more than 5%. Cleverly it's rewritten.
 
 ## When to leave pandas
 
-pandas assumes the data fits in memory on one machine, and it is optimised for convenience rather than raw speed.
+pandas assumes the data fits in memory on one machine. It's optimised for convenience rather than raw speed.
 
 **Polars** is much faster on large joins and aggregations, with a similar model and a lazy engine.
 
-**DuckDB** runs SQL over frames and files, and is excellent for analytical queries larger than memory.
+**DuckDB** runs SQL over frames and files. Is great for analytical queries larger than memory.
 
-**Dask** partitions frames across cores or machines with a pandas-like API.
+**Dask** splits frames across cores or machines with a pandas-like API.
 
-**NumPy** directly, when the data is homogeneous and you do not need labels.
+**NumPy** right, when the data is homogeneous and you don't need labels.
 
-The signal that it is time is usually memory rather than speed: when a frame no longer fits, no amount of optimisation inside pandas fixes it.
+The signal that it's time is often memory rather than speed. When a frame no longer fits, no amount of tuning inside pandas fixes it.
 
 ## Profiling a pandas script
 
-`%timeit` in a notebook and `time.perf_counter` around a block cover most decisions.
+`%timeit` in a notebook and `time.perf_counter` around a block cover most choices.
 
-For a whole script, `cProfile` finds the hot function and `line_profiler` finds the line inside it. Array code often has one line taking most of the time, which line-level profiling shows immediately and function-level profiling hides.
+For a whole script, `cProfile` finds the hot function and `line_profiler` finds the line inside it. Array code often has one line taking most of the time. This Line-level profiling shows at once and function-level profiling hides.
 
 `df.info(memory_usage="deep")` and `memory_profiler` cover the memory side.
 
-Two rules save the most wasted effort. Profile the **real** workload, because a small sample has different cache behaviour and sometimes takes a different code path. And re-profile after each fix, because the bottleneck moves.
+Two rules save the most wasted effort. Profile the **real** workload. A small sample has other cache action and at times takes a other code path. And re-profile after each fix, because the bottleneck moves.
 
 ## Reducing before combining
 
-The largest structural wins usually come from doing less work rather than doing the same work faster.
+The largest structural wins often come from doing less work rather than doing the same work faster.
 
 **Read fewer columns** &mdash; `usecols` at read time.
 
 **Read fewer rows** &mdash; filter during the chunk loop rather than after.
 
-**Aggregate before joining** &mdash; joining two summaries is far cheaper than joining raw tables and summarising afterwards.
+**Aggregate before joining** &mdash; joining two summaries is far cheaper than joining raw tables and summarising later.
 
 **Select columns before merging** &mdash; carrying twenty unused columns through a join costs memory and time.
 
-Each of these changes the size of what everything downstream touches, which compounds through a pipeline in a way that micro-optimisation does not.
+Each of these changes the size of what all downstream touches. This Compounds through a pipeline in a way that micro-tuning doesn't.
 
 ## Categoricals as an optimisation
 
-Converting a repeated string column to `category` helps in four places at once:
+Converting a repeated string column to `group` helps in four places at once:
 
 Memory, often by an order of magnitude.
 
-Group-by, which then operates on integer codes.
+Group-by, which then operates on int codes.
 
-Merge, when both sides share the same categories.
+Merge, when both sides share the same groups.
 
-`.str` operations, which apply to the categories rather than to every row.
+`.str` steps, which apply to the groups rather than to each row.
 
-That last one is worth restating: `df["city"].str.upper()` on a million rows with four distinct cities does four operations when the column is categorical, and a million when it is `object`.
+That last one is worth restating: `df["city"].str.upper()` on a million rows with four distinct cities does four steps when the column is cat. A million when it's `object`.
 
-The cost is the conversion itself and the care needed when combining frames with different category sets.
+The cost is the conversion itself and the care needed when mixing frames with other group sets.
 
 ## Avoiding repeated work
 
 Two patterns that quietly dominate slow scripts:
 
-**Recomputing inside a loop.** A group statistic, a lookup table, a parsed date &mdash; computed once outside the loop rather than once per iteration.
+**Recomputing inside a loop.** A group statistic, a lookup table, a parsed date. Found once outside the loop rather than once per loop.
 
-**Repeated boolean masks.** Building the same mask several times to select different columns. Build it once, name it, reuse it.
+**Repeated boolean masks.** Building the same mask a few times to select other columns. Build it once, name it, reuse it.
 
-Both are ordinary programming discipline rather than anything pandas-specific, and both are easy to miss because each individual line looks cheap.
+Both are plain programming discipline rather than anything pandas-exact. Both are easy to miss because each single line looks cheap.
 
 ## The limits
 
-pandas is single-threaded for most operations, holds everything in memory, and is optimised for convenience.
+pandas is single-threaded for most steps, holds all in memory, and is optimised for convenience.
 
 A rough guide to when to look elsewhere:
 
-**Under a million rows** &mdash; pandas is comfortable; optimisation is rarely needed beyond removing loops.
+**Under a million rows** &mdash; pandas is comfortable. Tuning is rarely needed beyond dropping loops.
 
-**One to ten million** &mdash; dtypes and access patterns start to matter, and the techniques in this module earn their keep.
+**One to ten million** &mdash; dtypes and access patterns start to matter. The techniques in this module earn their keep.
 
-**Over ten million, or wider than memory** &mdash; the constraint is usually memory rather than speed, and Polars, DuckDB or Dask are the answer rather than a cleverer pandas expression.
+**Over ten million, or wider than memory**. The constraint is often memory rather than speed. Polars, DuckDB or Dask are the answer rather than a cleverer pandas formula.
 
-**Genuinely sequential algorithms** &mdash; Numba or a rewrite, at any size.
+**truly sequential methods** &mdash; Numba or a rewrite, at any size.
 
-Recognising which regime you are in prevents both premature optimisation and the opposite mistake of spending days making pandas do something it structurally cannot.
+Recognising which regime you're in blocks both premature tuning and the opposite mistake of spending days making pandas do a thing it structurally can't.
 
 ## A short checklist
 
-Is there a loop over rows? Remove it.
+Is there a loop over rows? Drop it.
 
 Is anything growing in a loop? Collect and combine once.
 
-Are the dtypes right? Categories for repeated text, narrow numerics where bounded.
+Are the dtypes right? groups for repeated text, narrow numerics where bounded.
 
 Is the filter as early as it can be?
 
 Have you measured, or are you guessing?
 
-The first two account for most real slowdowns, and neither requires knowing anything about pandas internals.
+The first two account for most real slowdowns. Neither needs knowing anything about pandas internals.
 
 ## A worked speed-up
 
-A slow script usually has one dominant problem, and the sequence for finding it is always the same.
+A slow script often has one dominant problem. The sequence for finding it's always the same.
 
 Time the whole thing. Time each stage. Find the stage taking most of it. Look at what that stage does per row.
 
-The fixes, in the order they usually apply:
+The fixes, in the order they often apply:
 
-A row-wise `apply` becomes column arithmetic or `np.select`.
+A row-wise `apply` turns column math or `np.select`.
 
-A loop building a frame becomes a list and one `concat`.
+A loop building a frame turns a list and one `concat`.
 
-A merge inside a loop becomes one merge outside it.
+A merge inside a loop turns one merge outside it.
 
-A repeated group statistic becomes one `transform`.
+A repeated group statistic turns one `transform`.
 
-An `object` column that should be a category becomes one.
+An `object` column that should be a group turns one.
 
 A filter at the end moves to the beginning.
 
-Each of those is a small edit with a large effect, and together they account for most of the difference between a script that takes minutes and one that takes seconds.
+Each of those is a small edit with a large effect. Together they account for most of the gap between a script that takes minutes and one that takes seconds.
 
 ## Memory, when the frame will not fit
 
-The techniques differ from the speed ones, because the constraint is different.
+The techniques differ from the speed ones, because the constraint is other.
 
-`usecols` at read time &mdash; never load what you will not use.
+`usecols` at read time &mdash; never load what you won't use.
 
-`dtype` at read time &mdash; categories and narrow numerics.
+`dtype` at read time &mdash; groups and narrow numerics.
 
 `chunksize` &mdash; process and reduce a piece at a time.
 
-`del` and `gc.collect()` &mdash; release intermediates explicitly in a long-running process.
+`del` and `gc.collect()` &mdash; release intermediates by name in a long-running process.
 
-Avoid keeping both a frame and a transformed copy alive; reassign rather than naming a new variable, when the old one is not needed.
+Avoid keeping both a frame and a transformed copy alive. Reassign rather than naming a new var, when the old one isn't needed.
 
-And check whether the operation needs the whole frame at all. Many aggregations can be computed chunk-wise and combined.
+And check whether the step needs the whole frame at all. Many aggregations can be found chunk-wise and mixed.
 
 ## What not to optimise
 
-Some things are already fast and are commonly rewritten for no gain:
+Some things are already fast and are often rewritten for no gain:
 
-**Column arithmetic** &mdash; already compiled.
+**Column math** &mdash; already compiled.
 
-**Boolean masking** &mdash; already compiled; the cost is the copy, not the comparison.
+**Boolean masking** &mdash; already compiled. The cost is the copy, not the compare.
 
 **`groupby` with a string aggregation** &mdash; already compiled.
 
@@ -405,34 +393,34 @@ Some things are already fast and are commonly rewritten for no gain:
 
 **Anything running once on a small frame.**
 
-Rewriting these produces less readable code and no measurable improvement, which is a bad trade. The measurement step exists to prevent exactly that.
+Rewriting these makes less readable code and no measurable gain. This Is a bad trade. The reading step exists to prevent just that.
 
 ## A summary
 
-Remove per-row Python first; it is usually the whole problem.
+Drop per-row Python first. It's often the whole problem.
 
 Never grow a frame in a loop.
 
-Right-size dtypes &mdash; categories and narrow numerics.
+Right-size dtypes &mdash; groups and narrow numerics.
 
-Filter early, so everything downstream does less.
+Filter early, so all downstream does less.
 
-`itertuples` if you must iterate; never `iterrows`.
+`itertuples` if you must iterate. Never `iterrows`.
 
-`inplace=True` is not an optimisation.
+`inplace=True` isn't an tuning.
 
 Measure the real workload, fix the top item, measure again.
 
-And know when the answer is a different tool &mdash; when the data does not fit, no pandas technique fixes it.
+And know when the answer is a other tool. When the data doesn't fit, no pandas technique fixes it.
 
 ## A closing note
 
-Pandas performance is unusually predictable, which makes it unusually easy to get right.
+Pandas speed is unusually predictable. This Makes it unusually easy to get right.
 
-Almost every slow script has the same cause: Python running once per row, spelled as `apply(axis=1)`, `iterrows`, or a loop. Removing it is worth one or two orders of magnitude, and nothing else on the list comes close.
+Almost each slow script has the same cause: Python running once per row, spelled as `apply(axis=1)`, `iterrows`, or a loop. Dropping it's worth one or two orders of magnitude. Nothing else on the list comes close.
 
-After that the wins are structural rather than clever &mdash; do not grow frames in loops, filter before computing rather than after, and give columns types that fit the data. None of these require knowing anything about pandas internals.
+After that the wins are structural rather than clever. Don't grow frames in loops, filter before finding rather than after. Give columns types that fit the data. None of these need knowing anything about pandas internals.
 
-What does require discipline is measuring. The bottleneck is regularly not where it feels like it is, and the operations people most often rewrite &mdash; column arithmetic, boolean masks, group-by with a string aggregation &mdash; are already compiled and already fast.
+What does need discipline is measuring. The bottleneck is regularly not where it feels like it's. The steps people most often rewrite. Column math, boolean masks, group-by with a string aggregation. Are already compiled and already fast.
 
-And there is a ceiling. When the data no longer fits in memory, no pandas technique fixes it, and the answer is Polars, DuckDB, Dask or a database.
+And there's a ceiling. When the data no longer fits in memory, no pandas technique fixes it. The answer is Polars, DuckDB, Dask or a DB.

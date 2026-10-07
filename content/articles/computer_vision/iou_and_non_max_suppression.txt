@@ -3,23 +3,23 @@ intro: Turning a pile of overlapping boxes into one box per object.
 
 ## The problem it solves
 
-A detector's region proposal stage doesn't stop at one box per object — it scores hundreds of candidate boxes and keeps every one above a confidence floor, which for a single real object usually means a cluster of overlapping, near-duplicate boxes. <strong>Intersection over Union (IoU)</strong> is the standard way to measure how much two boxes overlap: the area they share, divided by the total area either one covers. <code>IoU = 1</code> means identical boxes; <code>IoU = 0</code> means no overlap at all.
+A detector's region proposal stage doesn't stop at one box per object — it scores hundreds of candidate boxes and keeps each one above a confidence floor. It for a single real object often means a cluster of overlapping, near-duplicate boxes. <strong>Intersection over Union (IoU)</strong> is the standard way to measure how much two boxes overlap: the area they share, divided by the total area either one covers. <code>IoU = 1</code> means identical boxes. <code>IoU = 0</code> means no overlap at all.
 
-<strong>Non-Max Suppression (NMS)</strong> uses IoU to collapse each cluster into a single detection. Sort proposals by confidence, keep the most confident one, discard every remaining box whose IoU with it exceeds a threshold, and repeat with the next survivor. The threshold is the only knob: too low and nearby but distinct objects get merged; too high and duplicate boxes on the same object all survive. An IoU threshold of 0.5 is the traditional default for evaluation benchmarks like PASCAL VOC, while COCO uses multiple thresholds from 0.5 to 0.95 in steps of 0.05 to reward tighter localisation.
+<strong>Non-Max Suppression (NMS)</strong> uses IoU to collapse each cluster into a single detection. Sort proposals by confidence, keep the most confident one, discard each left box whose IoU with it exceeds a threshold. And repeat with the next survivor. The threshold is the just knob: too low and nearby but distinct objects get merged. Too high and duplicate boxes on the same object all survive. An IoU threshold of 0.5 is the traditional default for test benchmarks like PASCAL VOC, while COCO uses multiple thresholds from 0.5 to 0.95 in steps of 0.05 to reward tighter localisation.
 
-This page walks through the IoU formula with a worked numeric example, implements NMS step by step, and lets you drag boxes in the visualisation to watch IoU update in real time. The code blocks compute IoU from coordinates, run NMS on a set of proposals, and print which boxes survive at different thresholds. It also covers [Soft-NMS](downsampling_in_cnn.html), which decays confidence scores instead of hard-deleting boxes, reducing the risk of suppressing a valid detection in a crowded scene.
+This page walks through the IoU formula with a worked numeric case, builds NMS step by step. And lets you drag boxes in the visualisation to watch IoU update in real time. The code blocks compute IoU from coordinates, run NMS on a set of proposals. And print which boxes survive at other thresholds. It also covers [Soft-NMS](downsampling_in_cnn.html), which decays confidence scores instead of hard-deleting boxes, reducing the risk of suppressing a valid detection in a crowded scene.
 
 ## Non-Max Suppression
 
-NMS turns that overlap score into a cleanup rule. Sort every proposal by confidence, descending. Take the top one, keep it, and discard every remaining box whose IoU with it exceeds a threshold — those are treated as duplicate detections of the same object. Move to the next surviving box by confidence and repeat, until nothing is left to process. The threshold is the only knob: too low and boxes on genuinely different but nearby objects get merged into one; too high and duplicate boxes on the same object all survive.
+NMS turns that overlap score into a cleanup rule. Sort each proposal by confidence, descending. Take the top one, keep it. And discard each left box whose IoU with it exceeds a threshold — those are treated as duplicate detections of the same object. Move to the next surviving box by confidence and repeat, until nothing is left to process. The threshold is the just knob: too low and boxes on genuinely other but nearby objects get merged into one. Too high and duplicate boxes on the same object all survive.
 
-## Measuring overlap with one number
+## Measuring overlap with one count
 
-IoU compares two boxes by dividing the area they share by the area they cover together:
+IoU checks two boxes by dividing the area they share by the area they cover together:
 
 <p class="mono-font">IoU = intersection / union</p>
 
-Worked through. Box A spans (0, 0) to (100, 100); box B spans (50, 50) to (150, 150).
+Worked through. Box A spans (0, 0) to (100, 100). Box B spans (50, 50) to (150, 150).
 
 - Intersection: from (50, 50) to (100, 100) &mdash; 50 &times; 50 = <strong>2,500</strong>.
 - Union: 10,000 + 10,000 &minus; 2,500 = <strong>17,500</strong>.
@@ -35,7 +35,7 @@ Reading the scale:
 |&lt; 0.5|Usually counted as a miss|
 |0|No overlap at all|
 
-Two properties make it the standard measure. It is scale-invariant &mdash; a 20-pixel error on a small object scores the same as a proportionally similar error on a large one &mdash; and it is bounded, so it can be thresholded and averaged.
+Two properties make it the standard measure. It is scale-invariant &mdash; a 20-pixel error on a small object scores the same as a proportionally close error on a large one &mdash; and it is bounded. So it can be thresholded and averaged.
 
 ```python
 def iou(a, b):
@@ -47,27 +47,27 @@ def iou(a, b):
     return inter / (area_a + area_b - inter)
 ```
 
-The two `max(0, ...)` calls are what handle boxes that do not overlap; without them a negative width times a negative height produces a positive area and a nonsensical result.
+The two `max(0, ...)` calls are what handle boxes that do not overlap. Without them a negative width times a negative height gives a positive area and a nonsensical result.
 
-## Non-maximum suppression, step by step
+## Non-max suppression, step by step
 
-A detector fires at many nearby positions, so one object produces a cluster of boxes. NMS reduces each cluster to one.
+A detector fires at many nearby positions. So one object gives a cluster of boxes. NMS reduces each cluster to one.
 
-1. Discard every box below a confidence threshold.
+1. Discard each box below a confidence threshold.
 2. Sort the rest by confidence, highest first.
 3. Take the top box and keep it.
-4. Remove every remaining box whose IoU with it exceeds the NMS threshold.
+4. Remove each left box whose IoU with it exceeds the NMS threshold.
 5. Repeat from step 3 with what is left.
 
-Two thresholds control the outcome, and they do different jobs. The <strong>confidence threshold</strong> decides how sure the model must be before a box is considered at all &mdash; raise it for fewer false positives, lower it for better recall. The <strong>NMS IoU threshold</strong> decides how much overlap counts as a duplicate; 0.45&ndash;0.5 is typical.
+Two thresholds control the outcome, and they do other jobs. The <strong>confidence threshold</strong> decides how sure the net must be before a box is considered at all &mdash; raise it for fewer false positives, less it for better recall. The <strong>NMS IoU threshold</strong> decides how much overlap counts as a duplicate. 0.45&ndash;0.5 is typical.
 
-The failure mode is genuinely overlapping objects: two people standing close together produce boxes with high IoU, and standard NMS deletes one of them. <strong>Soft-NMS</strong> addresses this by reducing the confidence of overlapping boxes rather than deleting them outright, so a strong second detection can still survive.
+The failure mode is genuinely overlapping objects: two people standing close together give boxes with high IoU. And standard NMS deletes one of them. <strong>Soft-NMS</strong> addresses this by reducing the confidence of overlapping boxes rather than deleting them outright. So a strong second detection can still survive.
 
 Note also that NMS is applied <em>per class</em> in most implementations &mdash; a dog box and a person box overlapping heavily are not duplicates of each other.
 
 ## Scoring box overlap, then removing the duplicates
 
-Intersection over union is four max/min operations. Non-max suppression is a sort and a loop. Both are written out here, along with the two cases where each one behaves badly.
+Intersection over union is four max/min steps. Non-max suppression is a sort and a loop. Both are written out here, along with the two cases where each one behaves badly.
 
 ```python-run
 import numpy as np
@@ -107,7 +107,7 @@ print("   LEFTMOST of the two right edges. if that gives a negative width,")
 print("   the boxes do not overlap and the clamp to 0 handles it.")
 ```
 
-Next, slide two boxes of equal size apart to see how much overlap the 0.5 threshold actually requires.
+Next, slide two boxes of equal size apart to see how much overlap the 0.5 threshold really needs.
 
 ```python-run
 import numpy as np
@@ -129,7 +129,7 @@ print("   it sounds, which is why COCO reports mAP averaged over 0.5 to")
 print("   0.95 rather than at 0.5 alone.")
 ```
 
-With IoU defined, set up a cluster of seven overlapping proposals to test non-max suppression.
+With IoU set, set up a cluster of seven overlapping proposals to test non-max suppression.
 
 ```python-run
 import numpy as np
@@ -270,61 +270,61 @@ print("   most of its score and survives if it was confident enough.")
 
 ## Try it yourself
 
-1. <strong>Read the stage at the default threshold.</strong> Box A (confidence 0.95) is kept. Box D, a separate object with no real overlap with A, is also kept. Boxes B and C overlap A too heavily and are suppressed as duplicates.
-2. <strong>Lower the threshold toward 0.1.</strong> Nothing changes here — B and C already fail a much looser bar, so tightening it further has no effect on this particular layout.
-3. <strong>Raise the threshold past roughly 0.59.</strong> Box B's overlap with A no longer exceeds the (now looser) suppression bar, so B is kept as a second detection of what is really the same object.
-4. <strong>Raise it past roughly 0.81.</strong> Now C survives too — at this threshold NMS considers all four boxes different enough to keep, even though A, B and C clearly describe one dog.
+1. <strong>Read the stage at the default threshold.</strong> Box A (confidence 0.95) is kept. Box D, a split object with no real overlap with A, is also kept. Boxes B and C overlap A too heavily and are suppressed as duplicates.
+2. <strong>Less the threshold toward 0.1.</strong> Nothing changes here — B and C now fail a much looser bar. So tightening it more has no effect on this particular layout.
+3. <strong>Raise the threshold past roughly 0.59.</strong> Box B's overlap with A no longer exceeds the (now looser) suppression bar. So B is kept as a second detection of what is really the same object.
+4. <strong>Raise it past roughly 0.81.</strong> Now C survives too — at this threshold NMS considers all four boxes other enough to keep, still though A, B and C clearly describe one dog.
 
 ## The short of it
 
-IoU is a pure geometry calculation — it knows nothing about confidence or class. NMS is the policy layer that uses it: keep the most confident box, discard anything that overlaps it past a threshold, repeat. Set the threshold too low and it merges distinct nearby objects into one detection; set it too high and duplicate boxes on the same object all survive. Every object detector that outputs boxes runs some form of this after its raw proposals come out.
+IoU is a pure geometry math — it knows nothing about confidence or class. NMS is the policy layer that uses it: keep the most confident box, discard anything that overlaps it past a threshold, repeat. Set the threshold too low and it merges distinct nearby objects into one detection. Set it too high and duplicate boxes on the same object all survive. Each object detector that outputs boxes runs some form of this after its raw proposals come out.
 
 ## IoU as a loss function
 
-Since IoU is what evaluation measures, training directly on it is appealing &mdash; and it took several iterations to make it work.
+Since IoU is what test measures, training right on it is appealing &mdash; and it took a few iterations to make it work.
 
-Plain IoU has a fatal gradient problem: when two boxes do not overlap at all, IoU is 0 for every possible position, so there is no gradient telling the box which way to move. Three refinements fix it:
+Plain IoU has a fatal gradient problem: when two boxes do not overlap at all, IoU is 0 for each possible position. So there is no gradient telling the box which way to move. Three refinements fix it:
 
-- <strong>GIoU</strong> adds a penalty based on the smallest box enclosing both, so non-overlapping boxes still receive a useful gradient.
+- <strong>GIoU</strong> adds a cost based on the smallest box enclosing both. So non-overlapping boxes still get a useful gradient.
 - <strong>DIoU</strong> adds a term for the distance between the box centres, which converges faster.
-- <strong>CIoU</strong> adds an aspect-ratio term as well, and is the default regression loss in several modern detectors.
+- <strong>CIoU</strong> adds an aspect-ratio term as well. And is the default regression loss in a few modern detectors.
 
-The alternative, still widely used, is smooth L1 on the coordinates &mdash; simple and stable, but it optimises a proxy rather than the metric, and it treats a 10-pixel error the same on a small object as on a large one.
+The option, still widely used, is smooth L1 on the coordinates &mdash; simple and stable. But it optimises a proxy rather than the metric. And it treats a 10-pixel error the same on a small object as on a large one.
 
 ## Where IoU appears beyond detection
 
-- <strong>Assigning anchors during training.</strong> An anchor box is treated as a positive example if its IoU with a ground-truth box exceeds a threshold, and as background below a lower one. Anchors in between are ignored.
-- <strong>Segmentation.</strong> The same ratio computed over pixel masks rather than boxes is the Jaccard index, and mean IoU is the standard segmentation metric.
-- <strong>Tracking.</strong> Frame-to-frame association is usually IoU-based &mdash; a detection is matched to the track whose last box it overlaps most.
-- <strong>Evaluation at several thresholds.</strong> COCO's primary metric averages mAP over IoU thresholds from 0.5 to 0.95, which is what makes it reward tight boxes rather than approximate ones.
+- <strong>Giving anchors in training.</strong> An anchor box is treated as a positive case if its IoU with a ground-truth box exceeds a threshold. And as background below a less one. Anchors in between are ignored.
+- <strong>Segmentation.</strong> The same ratio computed over pixel masks rather than boxes is the Jaccard index. And mean IoU is the standard segmentation metric.
+- <strong>Tracking.</strong> Frame-to-frame association is often IoU-based &mdash; a detection is matched to the track whose last box it overlaps most.
+- <strong>Test at a few thresholds.</strong> COCO's primary metric averages mAP over IoU thresholds from 0.5 to 0.95. It is what makes it reward tight boxes rather than approximate ones.
 
 ## Common mistakes
 
 - <strong>Forgetting to clamp negative overlaps</strong>, giving a positive intersection for disjoint boxes.
-- <strong>Mixing box formats.</strong> Applying corner-format code to centre-format boxes produces plausible-looking nonsense.
-- <strong>Running NMS across classes</strong> when it should be per class, deleting legitimate detections of different objects.
-- <strong>An NMS threshold that is too low</strong>, which removes genuine nearby objects; or too high, which leaves duplicates.
+- <strong>Mixing box formats.</strong> Applying corner-format code to centre-format boxes gives plausible-looking nonsense.
+- <strong>Running NMS across classes</strong> when it should be per class, deleting legitimate detections of other objects.
+- <strong>An NMS threshold that is too low</strong>, which removes genuine nearby objects. Or too high, which leaves duplicates.
 - <strong>Tuning the confidence threshold on the test set</strong> rather than on validation data.
-- <strong>Assuming NMS is cheap.</strong> With tens of thousands of candidate boxes it can dominate inference time; batched GPU implementations exist for this reason.
+- <strong>Assuming NMS is cheap.</strong> With tens of thousands of candidate boxes it can dominate inference time. Batched GPU implementations exist for this reason.
 
 ## Questions people ask
 
-<strong>What IoU threshold means "correct"?</strong> 0.5 by the Pascal VOC convention. COCO averages from 0.5 to 0.95 in steps of 0.05, which is stricter and now more standard.
+<strong>What IoU threshold means "correct"?</strong> 0.5 by the Pascal VOC convention. COCO averages from 0.5 to 0.95 in steps of 0.05. It is stricter and now more standard.
 
 <strong>Can IoU exceed 1?</strong> No &mdash; the intersection can never exceed the union.
 
-<strong>Is NMS still needed?</strong> For most detectors, yes. DETR-style set-prediction models avoid it by design, which is one of their main attractions.
+<strong>Is NMS still needed?</strong> For most detectors, yes. DETR-style set-prediction nets avoid it by design, which is one of their main attractions.
 
-<strong>How do I handle heavily overlapping objects?</strong> Soft-NMS, a higher NMS threshold, or an architecture that predicts a set directly.
+<strong>How do I handle heavily overlapping objects?</strong> Soft-NMS, a more NMS threshold. Or an design that predicts a set right.
 
-<strong>Should I train with an IoU-based loss?</strong> CIoU or DIoU generally beats smooth L1 on localisation quality, and both are readily available in modern detection libraries.
+<strong>Should I train with an IoU-based loss?</strong> CIoU or DIoU generally beats smooth L1 on localisation quality. And both are readily on hand in modern detection libraries.
 
-<strong>Why is my mAP low despite good-looking boxes?</strong> Often the strict IoU thresholds: boxes that look right to a human may score 0.6, which passes at 0.5 and fails at 0.75.
+<strong>Why is my mAP low despite good-looking boxes?</strong> Often the strict IoU thresholds: boxes that look right to a human may score 0.6. It passes at 0.5 and fails at 0.75.
 
 ## Recap in one screen
 
 - IoU is overlap divided by union &mdash; scale-invariant, bounded between 0 and 1.
-- Clamp negative overlaps to zero, or disjoint boxes report a false positive area.
+- Clamp negative overlaps to zero. Or disjoint boxes report a false positive area.
 - NMS keeps the highest-confidence box and removes overlapping duplicates, per class.
 - Two thresholds matter: confidence (how sure) and NMS IoU (how much overlap is a duplicate).
 - GIoU, DIoU and CIoU make IoU usable as a training loss by supplying gradients when boxes do not overlap.

@@ -1,24 +1,15 @@
 title: Status Codes
-intro: Which number to return when, and why 200-for-everything discards information the client already understands.
+intro: Which number to return when, and why 200-for-all discards data the client already understands.
 ## The class matters more than the number
 
-Before the specific code, a client reads the class.
+Before the exact code, a client reads the class.
 
-**2xx** &mdash; it worked. **3xx** &mdash; look elsewhere. **4xx** &mdash; the caller must change something. **5xx** &mdash; the server must.
+**2xx** &mdash; it worked. **3xx** &mdash; look elsewhere. **4xx** &mdash; the caller must change a thing. **5xx** &mdash; the server must.
 
-That first digit drives real behaviour in code you did not write: HTTP libraries retry 5xx and not 4xx, caches store 2xx, monitoring alerts on 5xx, and a client's error handling branches on it before looking at anything else.
+That first digit drives real action in code you didn't write: HTTP libraries retry 5xx and not 4xx, caches store 2xx, monitoring alerts on 5xx. A client's error handling branches on it before looking at anything else.
 
-Returning 200 with `{"error": "not found"}` throws all of that away. Every caller now has to parse your body to discover something the protocol had a field for, retries do the wrong thing, and your error rate looks like zero on every dashboard.
+Returning 200 with `{"error": "not found"}` throws all of that away. each caller now has to parse your body to discover a thing the protocol had a field for, retries do the wrong thing. Your error rate looks like zero on each dashboard.
 
-FastAPI uses `status_code` on the decorator to set the default for a route, and the `status` module provides named constants: `status.HTTP_200_OK`, `status.HTTP_201_CREATED`, `status.HTTP_204_NO_CONTENT`, `status.HTTP_404_NOT_FOUND`. The constants are integers, but using the names makes the intent readable without memorising numbers.
-
-The common mistake on POST endpoints is returning 200 instead of 201. A `201 Created` tells the client that a new resource exists, and the `Location` header should point to it. Returning 200 says "it worked" without saying what happened, which forces the client to guess whether the resource was created or already existed.
-
-`204 No Content` is the correct response when the action succeeded but there is nothing to send back &mdash; a DELETE that removed a resource, or a PUT that updated one and the client does not need the updated version. Returning 200 with an empty body works technically but violates the contract: 200 implies a body, and some clients treat an empty 200 as an error.
-
-For validation errors, FastAPI returns 422 automatically when the request body does not match the Pydantic model. For business-logic errors &mdash; a duplicate email, an insufficient balance, a resource that does not exist &mdash; raise `HTTPException(status_code=404, detail="...")` or return a `JSONResponse` with the appropriate status code.
-
-`HTTPException` with `status_code=400` is the general-purpose client error. Use more specific codes when they fit: 401 for missing authentication, 403 for insufficient permissions, 404 for a resource that does not exist, 409 for a conflict (like a duplicate), and 429 for rate limiting. Each code triggers different behaviour in clients, proxies and monitoring.
 
 ## The route's default, and overriding it
 
@@ -190,166 +181,166 @@ print("documented responses:",
 ```
 ## The 2xx ones worth using
 
-**200 OK** for a successful read or update that returns something.
+**200 OK** for a good read or update that returns a thing.
 
-**201 Created** when something new exists. Conventionally with a `Location` header pointing at it.
+**201 Created** when a thing new exists. Usually with a `Location` header pointing at it.
 
-**202 Accepted** when you have taken the request but not finished it &mdash; a queued job. The body should say how to check on it.
+**202 Accepted** when you've taken the request but not finished it. A queued job. The body should say how to check on it.
 
-**204 No Content** for a success with nothing to say. A delete, usually.
+**204 No Content** for a success with nothing to say. A delete, often.
 
-204 has the one rule with teeth: **no body at all**. Declare `status_code=204` and return `None`. Returning a value produces a malformed response, and some clients will error on it while others silently ignore the body, which is worse.
+204 has the one rule with teeth: **no body at all**. Declare `status_code=204` and return `None`. Returning a value makes a malformed response. Some clients will error on it while others silently skip the body, which is worse.
 
 ## The 4xx ones worth distinguishing
 
-**400 Bad Request** &mdash; malformed in a way your own code determined.
+**400 Bad Request** &mdash; malformed in a way your own code found.
 
-**401 Unauthorized** &mdash; badly named: it means *unauthenticated*. I do not know who you are. Should carry a `WWW-Authenticate` header.
+**401 Unauthorized** &mdash; badly named: it means *unauthenticated*. I don't know who you're. Should carry a `WWW-Authenticate` header.
 
-**403 Forbidden** &mdash; I know who you are, and no.
+**403 Forbidden** &mdash; I know who you're, and no.
 
 **404 Not Found** &mdash; no such thing.
 
-**409 Conflict** &mdash; the request was fine and conflicts with current state: a duplicate, a version mismatch, an action already taken.
+**409 Conflict** &mdash; the request was fine and conflicts with current state: a copy, a version mismatch, an action already taken.
 
-**410 Gone** &mdash; it existed and deliberately does not any more. Rare, and useful when you want callers to stop asking.
+**410 Gone** &mdash; it existed and on purpose doesn't any more. Rare. Handy when you want callers to stop asking.
 
-**422 Unprocessable Entity** &mdash; well-formed and did not fit the declared shape. FastAPI produces this automatically and you rarely raise it.
+**422 Unprocessable Entity** &mdash; well-formed and didn't fit the declared shape. FastAPI makes this on its own and you rarely raise it.
 
 **429 Too Many Requests** &mdash; rate limited. Should carry `Retry-After`.
 
-The 401/403 distinction is the one most often collapsed, and it is worth keeping. A client seeing 401 should prompt for credentials or refresh a token; one seeing 403 should not, because retrying with the same identity will fail again. Collapsing them makes a login loop where there should be an error message.
+The 401/403 gap is the one most often merged. It's worth keeping. A client seeing 401 should prompt for credentials or refresh a token. One seeing 403 shouldn't. Retrying with the same identity will fail again. Merging them makes a login loop where there should be an error message.
 
-The 404/403 choice has a security dimension. Returning 403 for a resource that exists but is not yours confirms it exists. For anything sensitive, 404 for both is the safer answer &mdash; deliberately, and consistently, or the timing gives it away anyway.
+The 404/403 choice has a security dim. Returning 403 for a resource that exists but isn't yours confirms it exists. For anything sensitive, 404 for both is the safer answer. on purpose. Always, or the timing gives it away anyway.
 
 ## 422 versus 400 versus 409
 
-These three get confused, and the rule is about *who determined the problem*.
+These three get confused, and the rule is about *who found the problem*.
 
-**422** &mdash; validation determined it from your declared types and constraints. Automatic; you do not write it.
+**422** &mdash; check found it from your declared types and constraints. auto. You don't write it.
 
-**400** &mdash; your code determined the request was malformed in a way the schema could not express.
+**400** &mdash; your code found the request was malformed in a way the schema couldn't express.
 
-**409** &mdash; the request was entirely valid and the current state makes it impossible.
+**409** &mdash; the request was fully valid and the current state makes it hopeless.
 
-A duplicate slug is 409, not 422: nothing about the payload was wrong, and the same payload would have succeeded a minute earlier.
+A copy slug is 409, not 422: nothing about the payload was wrong. The same payload would have succeeded a minute earlier.
 
 ## Setting them
 
-`status_code=` on the decorator sets the route's default, and that default appears in the documentation.
+`status_code=` on the decorator sets the route's default, and that default appears in the docs.
 
-For one call to differ, declare a `Response` parameter and assign to `response.status_code`. That keeps serialisation and the response model, unlike returning a `Response` object.
+For one call to differ, declare a `Response` param and assign to `response.status_code`. That keeps output and the response model, unlike returning a `Response` object.
 
-`HTTPException(status_code, detail)` raises one, and it accepts `headers=` &mdash; which is how you attach `WWW-Authenticate` to a 401 or `Retry-After` to a 429.
+`HTTPException(status_code, detail)` raises one, and it accepts `headers=`. Which is how you attach `WWW-Authenticate` to a 401 or `Retry-After` to a 429.
 
-Use the `status` module rather than bare integers. `status.HTTP_409_CONFLICT` is readable and autocompleted; `409` requires the reader to know it.
+Use the `status` module rather than bare ints. `status.HTTP_409_CONFLICT` is readable and autocompleted. `409` needs the reader to know it.
 
 ## Documenting the failures
 
-`response_model` describes the success case only. Everything else is undocumented unless you say so:
+`response_model` shows the success case only. all else is undocumented unless you say so:
 
 ```python
 responses={404: {"model": Problem, "description": "No such module"}}
 ```
 
-Now the schema describes the error shape, and a generated client can type it. Without this, consumers know they will get *something* on failure and have to discover what by causing one.
+Now the schema shows the error shape. A made client can type it. Without this, consumers know they'll get *a thing* on failure and have to discover what by causing one.
 
-Worth doing for the failures a caller is expected to handle &mdash; 404 on a lookup, 409 on a create. Not worth doing for every conceivable code.
+Worth doing for the failures a caller is expected to handle. 404 on a lookup, 409 on a create. Not worth doing for each conceivable code.
 
 ## Mistakes people make
 
-**200 with an error body.** The one that costs most. Retries, caches, monitoring and every client's error handling branch on the status class, and a 200 tells all of them the call succeeded.
+**200 with an error body.** The one that costs most. Retries, caches, monitoring and each client's error handling branch on the status class. A 200 tells all of them the call succeeded.
 
-**A body on a 204.** Malformed. Some clients error, others silently ignore it, which is worse because it works until it does not.
+**A body on a 204.** Malformed. Some clients error, others silently skip it. This Is worse because it works until it doesn't.
 
-**Collapsing 401 and 403.** A client seeing 401 re-authenticates; seeing 403 it should not. Merging them produces a login loop where there should be a message.
+**Merging 401 and 403.** A client seeing 401 re-authenticates. Seeing 403 it shouldn't. Merging them makes a login loop where there should be a message.
 
 **422 for a missing resource.** The request was well-formed. Nothing with that id exists, which is 404.
 
-**422 for a duplicate.** The payload was valid and would have worked a minute earlier. That is 409.
+**422 for a copy.** The payload was valid and would have worked a minute earlier. That is 409.
 
-**500 for a caller's mistake.** If they could have avoided it, it is a 4xx. A 500 should mean your code failed, and should page somebody.
+**500 for a caller's mistake.** If they could have avoided it, it's a 4xx. A 500 should mean your code failed, and should page somebody.
 
-**Bare integers.** `409` requires the reader to know it; `status.HTTP_409_CONFLICT` does not, and your editor completes it.
+**Bare ints.** `409` needs the reader to know it. `status.HTTP_409_CONFLICT` doesn't, and your editor ends it.
 
 ## The header a status implies
 
-Several codes are incomplete without a header, and omitting it makes a technically-correct response practically useless.
+a few codes are incomplete without a header. Omitting it makes a strictly-correct response in practice useless.
 
 **401** should carry `WWW-Authenticate`, naming the scheme. Without it a client knows it must authenticate and not how.
 
-**429** should carry `Retry-After`. Without it a client's only strategy is guessing, which usually means retrying immediately and making things worse.
+**429** should carry `Retry-After`. Without it a client's only plan is guessing. This Often means retrying at once and making things worse.
 
 **405** should carry `Allow`, listing the methods that do work.
 
-**201** conventionally carries `Location`, pointing at what was created, so a client does not have to construct the URL itself.
+**201** usually carries `Location`, pointing at what was created. A client doesn't have to make the URL itself.
 
-`HTTPException` takes `headers=` for exactly this, and it is the sort of detail that separates an API somebody enjoys using from one they merely tolerate.
+`HTTPException` takes `headers=` for just this. It's the sort of detail that splits an API somebody enjoys using from one they merely handle.
 
 
 ## Choosing between 404 and 403
 
-A decision with a security dimension, worth making deliberately.
+A choice with a security dim, worth making on purpose.
 
-Returning 403 for a resource that exists but is not yours confirms that it exists. For a sequential id that is an enumeration oracle: a caller can walk the range and learn how many records you have and which ids are real.
+Returning 403 for a resource that exists but isn't yours confirms that it exists. For a sequential id that is an enumeration oracle. A caller can walk the range and learn how many records you've and which ids are real.
 
-Returning 404 for both cases hides that, at the cost of a slightly less helpful message for a legitimate user who has genuinely lost access.
+Returning 404 for both cases hides that, at the cost of a slightly less helpful message for a legitimate user who has truly lost access.
 
-For anything sensitive - other users' data, private documents, anything under a permissions model - 404 for both is the safer default. For an internal API where enumeration tells an attacker nothing they do not already have, 403 is friendlier.
+For anything sensitive - other users' data, private docs, anything under a permissions model - 404 for both is the safer default. For an inner API where enumeration tells an attacker nothing they don't already have, 403 is friendlier.
 
-Whichever you choose, be consistent. Returning 403 sometimes and 404 other times leaks exactly the information the 404 was meant to hide, and timing differences will give it away even if the status does not.
+Whichever you choose, be steady. Returning 403 at times and 404 other times leaks just the data the 404 was meant to hide. Timing differences will give it away even if the status doesn't.
 
 ## Redirects, briefly
 
 The 3xx codes come up less in an API than in a website, and two are worth recognising.
 
-**307** preserves the method and body; **308** is its permanent equivalent. These are the ones FastAPI uses for the trailing-slash redirect, and the reason it matters is that some clients still drop the body, turning a POST into an empty one.
+**307** preserves the method and body. **308** is its permanent equal. These are the ones FastAPI uses for the trailing-slash redirect. The reason it matters is that some clients still drop the body, turning a POST into an empty one.
 
-**301** and **302** historically allowed clients to change the method to GET on redirect, which is why they are the wrong choice for anything that is not a plain read.
+**301** and **302** once allowed clients to change the method to GET on redirect. This Is why they're the wrong choice for anything that isn't a plain read.
 
-If an API needs to move a resource permanently, 308 with a `Location` header is the honest answer. More often the better answer is to keep the old path working and document the new one.
+If an API needs to move a resource permanently, 308 with a `Location` header is the honest answer. More often the better answer is to keep the old path working and doc the new one.
 
 ## The ones you will not write
 
-Some codes exist and are produced by infrastructure rather than by your handlers.
+Some codes exist and are made by infrastructure rather than by your handlers.
 
 **502**, **503** and **504** come from a proxy or load balancer when your app is unreachable, overloaded or slow. Seeing them in production means the problem is in front of your code, not in it.
 
-**413** may be returned by a reverse proxy before a request reaches you, which is why an upload limit belongs there as well as in the handler.
+**413** may be returned by a reverse proxy before a request reaches you. This Is why an upload limit belongs there and in the handler.
 
-Knowing which layer produces which saves time when something breaks: a 500 is yours, a 502 is not.
+Knowing which layer makes which saves time when a thing breaks: a 500 is yours, a 502 isn't.
 
 ## A closing thought
 
 A status code is the smallest piece of an API and the one most consumed by machines.
 
-Every client library, cache, proxy, gateway and dashboard reads it, and none of them read your response body. Returning the accurate one costs a keyword argument and buys correct behaviour from all of them.
+each client library, cache, proxy, gateway and dashboard reads it. None of them read your response body. Returning the accurate one costs a keyword arg and buys correct action from all of them.
 
-Returning 200 for everything costs nothing to write and moves the work onto every caller, forever.
+Returning 200 for all costs nothing to write and moves the work onto each caller, forever.
 
 
 ## A short reference
 
-**Created** something: 201, with `Location`. **Deleted** something: 204, no body. **Queued** something: 202, with a way to check. **Read** something: 200.
+**Created** a thing: 201, with `Location`. **Deleted** a thing: 204, no body. **Queued** a thing: 202, with a way to check. **Read** a thing: 200.
 
-Caller sent nonsense: **422** if validation caught it, **400** if you did. Not signed in: **401** with `WWW-Authenticate`. Signed in, not allowed: **403** - or 404 if existence itself is sensitive. Not there: **404**. Conflicts with current state: **409**. Asking too often: **429** with `Retry-After`.
+Caller sent nonsense: **422** if check caught it, **400** if you did. Not signed in: **401** with `WWW-Authenticate`. Signed in, not allowed: **403** - or 404 if existence itself is sensitive. Not there: **404**. Conflicts with current state: **409**. Asking too often: **429** with `Retry-After`.
 
-Your code failed: **500**, logged in full, returned as a generic message with an id.
+Your code failed: **500**, logged in full, returned as a plain message with an id.
 
 ## Summary
 
-The class is what a client reads first, and it drives retries, caching and alerting in code you did not write. Returning 200 with an error body discards all of it.
+The class is what a client reads first. It drives retries, caching and alerting in code you didn't write. Returning 200 with an error body discards all of it.
 
-201 for created, 204 for done-with-nothing-to-say and no body, 202 for accepted-but-not-finished. 401 for unauthenticated and 403 for not-allowed - they are different questions and clients act on the difference. 404 for missing, 409 for a valid request that conflicts with current state, 422 for a payload that did not fit.
+201 for created, 204 for done-with-nothing-to-say and no body, 202 for accepted-but-not-finished. 401 for unauthenticated and 403 for not-allowed - they're other questions and clients act on the gap. 404 for missing, 409 for a valid request that conflicts with current state, 422 for a payload that didn't fit.
 
-Set the route default with `status_code=`, vary it through a `Response` parameter, attach the headers a status implies, and document the failures with `responses=`.
+Set the route default with `status_code=`, vary it through a `Response` param, attach the headers a status implies. Doc the failures with `responses=`.
 
 ## Next
 
-The mechanics behind most of the codes above: `HTTPException`, custom exception handlers, and the arrangement that keeps HTTP concerns out of the code that does the actual work.
+The mechanics behind most of the codes above: `HTTPException`, custom exception handlers. The setup that keeps HTTP concerns out of the code that does the actual work.
 
 ## A final note
 
-Status codes are also a form of documentation that nobody has to read.
+Status codes are also a form of docs that no one has to read.
 
-An endpoint returning 201 with a `Location` header has told a caller that something was created and where to find it, without a sentence of prose. One returning 200 with a body they must inspect has told them nothing, and the prose now has to exist.
+An endpoint returning 201 with a `Location` header has told a caller that a thing was created and where to find it, without a sentence of prose. One returning 200 with a body they must inspect has told them nothing. The prose now has to exist.

@@ -1,5 +1,5 @@
 title: groupby
-intro: Split, apply, combine - the operation that is the reason to use pandas.
+intro: Split, apply, combine - the step that is the reason to use pandas.
 
 ## The three steps
 
@@ -11,23 +11,7 @@ intro: Split, apply, combine - the operation that is the reason to use pandas.
 
 **Combine** the results into one object, one row per group.
 
-Almost every question about aggregated data has this shape, and recognising it is most of what makes pandas worth using. The alternative in plain Python &mdash; a dict, a loop, a decision about missing keys, another loop to compute the summary &mdash; is a dozen lines that this replaces with one.
-
-The key can be one column or several. `df.groupby("city")` groups by city. `df.groupby(["city", "year"])` groups by the unique combinations of city and year. The result has one row per unique key value (or key combination), with the aggregation applied to each group independently.
-
-`as_index=False` controls whether the group key becomes the index of the result. The default is `True`, which puts the key in the index — useful for further groupby operations but inconvenient when you want a flat DataFrame for plotting or export. `as_index=False` keeps the key as a regular column, which is usually what you want.
-
-Multiple aggregations on the same column use `.agg()`. `df.groupby("city")["sales"].agg(["sum", "mean", "count"])` returns a DataFrame with three columns — the sum, mean, and count of sales for each city. Named aggregations are clearer: `df.groupby("city").agg(total=("sales", "sum"), avg=("sales", "mean"))` names each output column explicitly.
-
-Different aggregations on different columns also use `.agg()`. `df.groupby("city").agg({"sales": "sum", "profit": "mean"})` sums sales and averages profit, per city. This is the form that answers "give me total revenue and average margin by region" in one call.
-
-`NaN` values in the group key are dropped by default. A row whose city is `NaN` belongs to no group and does not appear in the result. `dropna=False` includes `NaN` as a group, which is important when missing data is itself informative — "orders with no assigned region" is a group worth seeing.
-
-Sorting the result is automatic: groups appear in sorted key order. `sort=False` disables this and returns groups in the order they first appear, which is faster on large datasets and preferable when you are going to sort by value anyway.
-
-The `GroupBy` object itself is iterable. `for name, group in df.groupby("city")` yields each group as a (key, DataFrame) pair. This is rarely the right approach for aggregation — `.agg()` is faster and clearer — but it is useful for inspection, for applying a function that cannot be expressed as a single aggregation, or for saving each group to a separate file.
-
-`.size()` counts rows per group (including `NaN` values). `.count()` counts non-null values per group. `.nunique()` counts distinct values per group. These three answer different questions: "how many rows," "how many observations," and "how many distinct values."
+Almost each question about aggregated data has this shape. Recognising it's most of what makes pandas worth using. The option in plain Python. A dict, a loop, a choice about missing keys, another loop to find the summary. Is a dozen lines that this replaces with one.
 
 
 ## Split, apply, combine
@@ -172,60 +156,60 @@ print("nunique counts DISTINCT values:")
 print(df.groupby("city")["sales"].nunique())
 ```
 
-A distinction that matters exactly where the data is imperfect.
+A gap that matters just where the data is imperfect.
 
 `size()` counts **rows** in each group, including rows with missing values.
 
-`count()` counts **non-missing values**, per column, so a group of five rows with two gaps in a column reports three for that column.
+`count()` counts **non-missing values**, per column. A group of five rows with two gaps in a column reports three for that column.
 
 `nunique()` counts distinct values.
 
-Using `count` where you meant `size` undercounts wherever data is missing, which is precisely where you are least likely to notice.
+Using `count` where you meant `size` undercounts wherever data is missing. This Is just where you're least likely to notice.
 ## The keys become the index
 
-By default the group keys become the index of the result. That is convenient for lookup and for plotting, and it is a surprise if you expected a plain column.
+By default the group keys become the index of the result. That is convenient for lookup and for plotting. It's a surprise if you expected a plain column.
 
-`as_index=False` keeps them as ordinary columns, giving a result that looks more like a table. `reset_index()` afterwards does the same thing.
+`as_index=False` keeps them as plain columns, giving a result that looks more like a table. `reset_index()` later does the same thing.
 
-Which you want depends on what happens next. If the result feeds a merge or gets written to a file, the flat form is usually easier. If you are going to select groups by name, the index form is better.
+Which you want depends on what happens next. If the result feeds a merge or gets written to a file, the flat form is often easier. If you're going to select groups by name, the index form is better.
 
-Results come back **sorted by key**. `sort=False` skips that sort, which is faster on many groups and gives you the order of first appearance instead.
+Results come back **sorted by key**. `sort=False` skips that sort. This Is faster on many groups and gives you the order of first appearance instead.
 
 ## The object is lazy
 
-`df.groupby("city")` computes nothing. It returns an object that knows how the rows would be split.
+`df.groupby("city")` finds nothing. It returns an object that knows how the rows would be split.
 
-That is why you can inspect it cheaply: `ngroups` counts the groups, `size()` gives rows per group, `get_group(name)` pulls one out, and iterating yields `(name, subframe)` pairs.
+That is why you can inspect it cheaply: `ngroups` counts the groups, `size()` gives rows per group, `get_group(name)` pulls one out. Iterating yields `(name, subframe)` pairs.
 
-Iterating is legitimate for inspection and almost always the wrong way to compute something. The loop runs Python once per group, which is the same performance trap as `apply`. If you find yourself accumulating results in a list inside a groupby loop, there is nearly always an `agg` that does it in one call.
+Iterating is legitimate for inspection and almost always the wrong way to find a thing. The loop runs Python once per group. This Is the same speed trap as `apply`. If you find yourself building up results in a list inside a groupby loop, there's nearly always an `agg` that does it in one call.
 
 ## Several keys
 
 `df.groupby(["city", "year"])` gives one level of index per key, in the order named.
 
-The result is a Series or frame with a **MultiIndex**, which has its own module later. Two operations cover most immediate needs:
+The result is a Series or frame with a **MultiIndex**. This Has its own module later. Two steps cover most direct needs:
 
-`unstack()` moves the last index level into columns, turning a long result into a wide table &mdash; cities down the side, years across the top.
+`unstack()` moves the last index level into columns, turning a long result into a wide table. Cities down the side, years across the top.
 
-`reset_index()` flattens everything back into ordinary columns.
+`reset_index()` flattens all back into plain columns.
 
 ## Missing keys disappear
 
-This is the behaviour most likely to produce a wrong number quietly.
+This is the action most likely to give a wrong number quietly.
 
-Rows whose group key is `NaN` are **excluded** by default. They are not put in a separate group; they are dropped.
+Rows whose group key is `NaN` are **excluded** by default. They aren't put in a split group. They're dropped.
 
-The result is that group totals do not add up to the frame total, and nothing says so. On a frame where 5% of the key column is missing, every aggregate is quietly computed on 95% of the data.
+The result is that group totals don't add up to the frame total. Nothing says so. On a frame where 5% of the key column is missing, each aggregate is quietly found on 95% of the data.
 
 `dropna=False` keeps them as a group with a `NaN` key.
 
-The habit worth forming: after any group-by that matters, check that the total of the result matches the total of the input. It is one line and it catches this immediately.
+The habit worth forming: after any group-by that matters, check that the total of the result matches the total of the input. It's one line and it catches this at once.
 
 ## Aggregating
 
-`df.groupby("city").sum(numeric_only=True)` applies one function to every numeric column.
+`df.groupby("city").sum(numeric_only=True)` applies one function to each numeric column.
 
-`agg({"sales": "sum", "units": "mean"})` applies a different function per column.
+`agg({"sales": "sum", "units": "mean"})` applies a other function per column.
 
 **Named aggregation** is the clearest form and the one to prefer:
 
@@ -237,14 +221,14 @@ df.groupby("city").agg(
 )
 ```
 
-Each output column is named explicitly, several statistics can come from the same input column, and the result has flat column names rather than the MultiIndex that a dict-of-lists produces. That last point saves a cleanup step almost every time.
+Each output column is named by name, a few statistics can come from the same input column. The result has flat column names rather than the MultiIndex that a dict-of-lists makes. That last point saves a cleanup step almost each time.
 
-Functions can be strings (`"sum"`, `"mean"`, `"nunique"`), NumPy functions, or your own callables. The strings are fastest, because they dispatch to compiled implementations rather than calling back into Python.
+Functions can be strings (`"sum"`, `"mean"`, `"nunique"`), NumPy functions, or your own callables. The strings are fastest. They dispatch to compiled setups rather than calling back into Python.
 ## Grouping by something that is not a column
 
 `groupby` accepts more than a column name.
 
-**A Series** of the same length groups by its values, which is how you group by a derived value without adding a column:
+**A Series** of the same length groups by its values. This Is how you group by a derived value without adding a column:
 
 ```python
 df.groupby(df["date"].dt.year)["sales"].sum()
@@ -254,29 +238,29 @@ df.groupby(df["date"].dt.year)["sales"].sum()
 
 **A function** is applied to each index label and groups by the result.
 
-**`pd.Grouper`** handles time: `groupby(pd.Grouper(key="date", freq="ME"))` groups by month without needing a DatetimeIndex, which is what makes it useful alongside other keys.
+**`pd.Grouper`** handles time: `groupby(pd.Grouper(key="date", freq="ME"))` groups by month without needing a DatetimeIndex. This Is what makes it handy alongside other keys.
 
 **`level=`** groups by an index level rather than a column.
 
-That flexibility means most "I need to add a column just to group by it" situations do not need the column.
+That flexibility means most "I need to add a column just to group by it" situations don't need the column.
 
 ## as_index, sort and dropna
 
-Three arguments change the shape or content of the result, and all three are worth passing deliberately.
+Three args change the shape or content of the result. All three are worth passing on purpose.
 
-`as_index=False` keeps the keys as columns. The result looks like a table rather than an indexed Series, and it is usually what you want when the output feeds a merge or a file.
+`as_index=False` keeps the keys as columns. The result looks like a table rather than an indexed Series. It's often what you want when the output feeds a merge or a file.
 
-`sort=False` skips sorting the keys. On many groups that is a real saving, and it gives order of first appearance instead of sorted order.
+`sort=False` skips sorting the keys. On many groups that is a real saving. It gives order of first appearance instead of sorted order.
 
-`dropna=False` keeps rows whose key is missing. The default drops them, which is the behaviour most likely to produce a total that does not reconcile.
+`dropna=False` keeps rows whose key is missing. The default drops them. This Is the action most likely to give a total that doesn't merge.
 
-`observed=True` matters for categorical keys: without it, group-by produces a row for **every** category including absent ones, which fills the result with zeros.
+`seen=True` matters for cat keys: without it, group-by makes a row for **each** group including absent ones. This Fills the result with zeros.
 
 ## Aggregating strings and other non-numerics
 
-`sum` on a string column concatenates, which is occasionally useful and often an accident.
+`sum` on a string column concatenates. This Is at times handy and often an accident.
 
-The aggregations that actually make sense on text:
+The aggregations that really make sense on text:
 
 `"first"` / `"last"` &mdash; a representative value, skipping missing.
 
@@ -286,9 +270,9 @@ The aggregations that actually make sense on text:
 
 `lambda s: ", ".join(s)` &mdash; collect them into one string.
 
-`list` &mdash; collect them into a list, giving a column of lists. Convenient, and it makes the column `object`, so it is a display or export step rather than something to compute on.
+`list` &mdash; collect them into a list, giving a column of lists. Convenient. It makes the column `object`. It's a display or export step rather than a thing to find on.
 
-`numeric_only=True` on `sum` and `mean` skips non-numeric columns rather than doing something surprising with them. It is worth passing explicitly, since the default has changed across versions.
+`numeric_only=True` on `sum` and `mean` skips non-numeric columns rather than doing a thing surprising with them. It's worth passing by name. The default has changed across versions.
 
 ## Group-by is a split, and splits can be expensive
 
@@ -296,27 +280,27 @@ The cost of a group-by is roughly: hashing the keys, sorting or grouping the row
 
 Three things make it faster:
 
-**A categorical key.** Grouping on integer codes beats grouping on strings, often substantially.
+**A cat key.** Grouping on int codes beats grouping on strings, often much.
 
-**`sort=False`** when you do not need sorted output.
+**`sort=False`** when you don't need sorted output.
 
-**A string aggregation name** rather than a lambda. `"sum"` dispatches to compiled code; `lambda s: s.sum()` calls Python once per group.
+**A string aggregation name** rather than a lambda. `"sum"` dispatches to compiled code. `lambda s: s.sum()` calls Python once per group.
 
-That last one is the most common avoidable slowdown. `agg("sum")` and `agg(lambda s: s.sum())` produce identical results and differ by an order of magnitude on many groups.
+That last one is the most common avoidable slowdown. `agg("sum")` and `agg(lambda s. S.sum())` give same results and differ by an order of magnitude on many groups.
 
 ## Checking a group-by
 
 Two checks catch most errors:
 
-**Do the totals reconcile?** `result["sales"].sum()` against `df["sales"].sum()`. If they differ, a key was missing and the rows were dropped.
+**Do the totals merge?** `result["sales"].sum()` against `df["sales"].sum()`. If they differ, a key was missing and the rows were dropped.
 
-**Is the group count what you expect?** `df.groupby(k).ngroups` against `df[k].nunique()`. If the group count is larger, the key has variants you did not know about &mdash; whitespace, case, or a type mismatch.
+**Is the group count what you expect?** `df.groupby(k).ngroups` against `df[k].nunique()`. If the group count is larger, the key has variants you didn't know about. Whitespace, case, or a type mismatch.
 
-Both are one line, and both catch problems that otherwise surface as a number that is slightly wrong.
+Both are one line, and both catch problems that else surface as a number that is slightly wrong.
 
 ## Reading a group-by result
 
-The output shape depends on what you selected and how you aggregated, and knowing which of four shapes you have prevents most downstream confusion.
+The output shape depends on what you selected and how you aggregated. Knowing which of four shapes you've blocks most downstream confusion.
 
 `df.groupby("k")["v"].sum()` &mdash; a **Series**, indexed by key.
 
@@ -326,43 +310,43 @@ The output shape depends on what you selected and how you aggregated, and knowin
 
 `df.groupby(["k", "j"])["v"].sum()` &mdash; a Series with a **MultiIndex**.
 
-The double-bracket detail is the one people miss: selecting one column with `["v"]` gives a Series, and with `[["v"]]` gives a one-column frame. That difference propagates to everything after it.
+The double-bracket detail is the one people miss. Selecting one column with `["v"]` gives a Series. With `[["v"]]` gives a one-column frame. That gap passes to all after it.
 
 ## Aggregations worth knowing
 
 Beyond `sum`, `mean` and `count`:
 
-`nunique` &mdash; distinct values per group, which answers "how many different products did each customer buy".
+`nunique` &mdash; distinct values per group. This Answers "how many other products did each customer buy".
 
-`first` / `last` &mdash; skip missing values, so they combine partial records.
+`first` / `last` &mdash; skip missing values. So They combine partial records.
 
-`idxmax` / `idxmin` &mdash; the **label** of the extreme row, which is how you get "the best row per group" rather than just its value: `df.loc[df.groupby("k")["v"].idxmax()]`.
+`idxmax` / `idxmin` &mdash; the **label** of the extreme row. This Is how you get "the best row per group" rather than just its value: `df.loc[df.groupby("k")["v"].idxmax()]`.
 
 `agg(lambda s: ...)` &mdash; anything else, at the cost of a Python call per group.
 
-`describe()` &mdash; a full summary per group, useful for exploration and too wide for a report.
+`show()` &mdash; a full summary per group, handy for exploration and too wide for a report.
 
-That `idxmax` pattern is worth remembering; it comes up constantly and the obvious alternatives are all worse.
+That `idxmax` pattern is worth remembering. It comes up constantly and the obvious options are all worse.
 
 ## Empty groups and missing keys
 
-Two different things that both cause totals not to reconcile.
+Two other things that both cause totals not to merge.
 
 **Missing keys** &mdash; rows whose group key is `NaN` are dropped unless `dropna=False`.
 
-**Empty groups** &mdash; a categorical key produces a row for every category, including ones with no rows, unless `observed=True`.
+**Empty groups** &mdash; a cat key makes a row for each group, including ones with no rows, unless `seen=True`.
 
-The first loses data silently. The second adds rows of zeros that were never in the data. Both defaults have changed across versions, which is a reason to pass them explicitly rather than rely on the current behaviour.
+The first loses data silently. The second adds rows of zeros that were never in the data. Both defaults have changed across versions. This Is a reason to pass them by name rather than lean on the current action.
 
 ## A summary
 
-Split, apply, combine &mdash; and the group keys become the index unless you say otherwise.
+Split, apply, combine &mdash; and the group keys become the index unless you say else.
 
-The object is lazy; nothing runs until you aggregate.
+The object is lazy. Nothing runs until you aggregate.
 
 Missing keys are dropped by default.
 
-Named aggregation gives flat column names and lets one column feed several statistics.
+Named aggregation gives flat column names and lets one column feed a few statistics.
 
 `size` counts rows, `count` counts non-missing values.
 
@@ -370,28 +354,28 @@ String aggregation names are much faster than lambdas.
 
 `idxmax` plus `.loc` gets the whole extreme row per group.
 
-And check that the group total matches the frame total &mdash; one line that catches the most common silent error here.
+And check that the group total matches the frame total. One line that catches the most common silent error here.
 
 ## A closing note
 
-Group-by is what pandas is for, and most of its surprises are about what silently does not appear in the result.
+Group-by is what pandas is for. Most of its surprises are about what silently doesn't appear in the result.
 
-Rows whose key is missing are dropped. Categorical keys produce rows for categories that never occurred. `count` and `size` differ wherever data is missing. Each default is defensible on its own, and together they mean a group-by result can fail to reconcile with the frame it came from in several ways at once.
+Rows whose key is missing are dropped. cat keys give rows for groups that never occurred. `count` and `size` differ wherever data is missing. Each default is defensible on its own. Together they mean a group-by result can fail to merge with the frame it came from in a few ways at once.
 
-The check that catches all of them is one line: compare the total of the result against the total of the input. If they differ, something was excluded, and the reason will be one of the above.
+The check that catches all of them is one line. Compare the total of the result against the total of the input. If they differ, a thing was excluded. The reason will be one of the above.
 
-Beyond that, the practical advice is to prefer named aggregation, which produces flat column names and lets one input column feed several statistics, and to use string aggregation names rather than lambdas, which is the difference between compiled code and a Python call per group.
+Beyond that, the hands-on advice is to prefer named aggregation. This Makes flat column names and lets one input column feed a few statistics. To use string aggregation names rather than lambdas. This Is the gap between compiled code and a Python call per group.
 
 ## One more thing
 
-A groupby object supports `nth(0)`, which takes the nth row of each group and is not the same as `first()`: `first()` skips missing values and `nth(0)` does not. When a group's first row has a gap, the two give different answers, and which you want depends on whether "first" means the first row or the first available value.
+A groupby object supports `nth(0)`. This Takes the nth row of each group and isn't the same as `first()`: `first()` skips missing values and `nth(0)` doesn't. When a group's first row has a gap, the two give other answers. Which you want depends on whether "first" means the first row or the first on hand value.
 
-`ngroup()` numbers the groups, which is a compact way to turn a set of keys into a single integer label for indexing or plotting.
+`ngroup()` numbers the groups. This Is a compact way to turn a set of keys into a single int label for indexing or plotting.
 
 ## In summary
 
 Split, apply, combine &mdash; and the details that decide whether the answer reconciles.
 
-Missing keys are dropped unless you say otherwise. Categorical keys produce rows for categories that never appeared. `size` counts rows and `count` counts values, and they differ wherever data is missing.
+Missing keys are dropped unless you say else. cat keys give rows for groups that never appeared. `size` counts rows and `count` counts values. They differ wherever data is missing.
 
-Named aggregation is the clearest form and gives flat column names. String aggregation names are much faster than lambdas. And comparing the result's total against the input's total is one line that catches the most common silent failure.
+Named aggregation is the clearest form and gives flat column names. String aggregation names are much faster than lambdas. And checking the result's total against the input's total is one line that catches the most common silent failure.

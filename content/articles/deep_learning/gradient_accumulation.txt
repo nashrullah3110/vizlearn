@@ -1,19 +1,19 @@
 title: Gradient Accumulation
-intro: Getting the effect of a large batch out of a device that cannot hold one.
+intro: Getting the effect of a large batch out of a device that can't hold one.
 
 ## Why it works
 
 The loss over a batch is the mean of the per-example losses, and differentiation
-is linear. So the gradient of the batch is the mean of the per-example
-gradients.
+is linear. So the grad of the batch is the mean of the per-example
+grads.
 
 That means the sum can be built in pieces. Run a forward and backward pass on 16
-examples, keep the gradients, run another 16, add to them, and after 16 rounds
-you have exactly the gradient of a 256-example batch. Step the optimiser once.
+examples, keep the grads, run another 16, add to them, and after 16 rounds
+you've just the grad of a 256-example batch. Step the tuner once.
 
-**The resulting update is identical** &mdash; not similar, identical up to
-floating-point ordering &mdash; to what a single 256-example batch would have
-produced. This page shows the implementation in PyTorch, covers the interaction with learning rate scheduling, batch normalisation statistics, and mixed-precision training, and walks through the arithmetic that confirms the gradients match. The visualisation above lets you set the micro-batch size and accumulation steps and watch the effective batch size update.
+**The resulting update is the same**. Not similar, the same up to
+floating-point sorting &mdash; to what a single 256-example batch would have
+made.
 
 ## What actually consumes the memory
 
@@ -21,108 +21,108 @@ The bars separate the two cases at the memory budget you choose.
 
 Training memory is roughly:
 
-**Fixed costs.** Weights, their gradients, and the optimiser state. Adam keeps
-two extra tensors per parameter, so this is around four times the model size,
-and it does not depend on the batch at all.
+**Fixed costs.** Weights, their grads, and the tuner state. Adam keeps
+two extra tensors per param. So This is around four times the model size,
+and it doesn't depend on the batch at all.
 
-**Activations.** Every intermediate value from the forward pass has to be kept
+**Activations.** each mid value from the forward pass has to be kept
 for the backward pass. This scales linearly with the batch size, and for a deep
 model it dominates.
 
-Accumulation attacks only the second, which is why it works. Drag the
+Buildup attacks only the second. This Is why it works. Drag the
 micro-batch down and watch the second bar fall while the fixed part stays put.
 
 The dashed line is the budget. When the full batch crosses it and the micro-batch
-does not, that gap is the entire reason the technique exists.
+doesn't, that gap is the entire reason the technique exists.
 
 ## What it costs
 
-**Time.** Sixteen sequential passes take about as long as sixteen passes.
-Accumulation does not make anything faster; it makes something possible.
+**Time.** Sixteen sequential passes take about if sixteen passes.
+Buildup doesn't make any of it faster. It makes a thing possible.
 
-There is a small efficiency loss too, since very small micro-batches use the
-accelerator less well. A micro-batch of 1 is usually much less than a sixteenth
-as efficient as a micro-batch of 16.
+There's a small speed loss too, since very small micro-batches use the
+accelerator less well. A micro-batch of 1 is often much less than a sixteenth
+as fast as a micro-batch of 16.
 
 ## The one thing that is not identical
 
-**Batch normalisation.** Its statistics are computed over whatever is in the
-forward pass, which is the micro-batch, not the accumulated total.
+**Batch norming.** Its statistics are found over what is in the
+forward pass, which is the micro-batch, not the built up total.
 
 So a model with batch norm trained with a micro-batch of 4 behaves like one
-trained with a batch of 4, however many accumulation steps follow. The
-normalisation is noisier, and at very small micro-batches it degrades badly.
+trained with a batch of 4, but many buildup steps follow. The
+norming is noisier, and at very small micro-batches it degrades badly.
 
 This is a real reason to prefer
-[layer normalisation](layer_normalization.html) or group normalisation, both of
-which normalise per example and are indifferent to the batch. It is not a
+[layer norming](layer_normalization.html) or group norming, both of
+which norm per example and are indifferent to the batch. It isn't a
 coincidence that transformers use layer norm and are the architectures trained
-with the most aggressive accumulation.
+with the most aggressive buildup.
 
 ## Getting it right
 
 Two details cause most of the bugs.
 
-**Divide the loss by the number of accumulation steps** before the backward
-pass, or the accumulated gradient is a sum where the optimiser expects a mean,
-and your effective learning rate is multiplied by the step count.
+**Divide the loss by the number of buildup steps** before the backward
+pass, or the built up grad is a sum where the tuner expects a mean,
+and your effective learning rate is times'd by the step count.
 
-**Zero the gradients at the right time** &mdash; after the optimiser step, not
-after every backward pass. Zeroing every pass defeats the whole thing, and it
+**Zero the grads at the right time**. After the tuner step, not
+after each backward pass. Zeroing each pass defeats the whole thing, and it
 fails silently: training still runs, just with the small batch you were trying
 to avoid.
 
 ## Alongside
 
-**Activation checkpointing** trades compute for memory in the other direction:
+**Activation checkpointing** trades find for memory in the other direction:
 discard activations during the forward pass and recompute them in the backward
 pass, for roughly 30% more time and a large memory saving. The two combine.
 
-**Mixed precision** halves activation memory outright, and combines with both.
+**Mixed precision** halves activation memory outright, and mixes with both.
 
-**Model parallelism and ZeRO** attack the fixed costs, which accumulation cannot
-touch. When the weights alone do not fit, accumulation is not the answer.
+**Model parallelism and ZeRO** attack the fixed costs, which buildup can't
+touch. When the weights alone don't fit, buildup isn't the answer.
 
 ## Where the memory actually goes
 
-Accumulation works because it attacks the one cost that scales with the batch.
-Training memory splits in two. The fixed part &mdash; weights, their gradients, and
-the optimiser state &mdash; is about four times the model size for Adam.
-Activations, every intermediate value kept for the backward pass, grow
-linearly with the batch. Take a 1&nbsp;GB model on an 8&nbsp;GB budget.
+Buildup works because it attacks the one cost that scales with the batch.
+Training memory splits in two: a fixed part. Weights, their grads, and
+the tuner state, which for Adam is about four times the model size &mdash;
+and activations, each mid value kept for the backward pass, which grows
+linearly with the batch. Take a 1&nbsp;GB model on an 8&nbsp;GB budget:
 
 |batch|fixed (Adam ~4&times;)|activations|total|
 |---|---|---|---|
 |256 (wanted)|4.0 GB|~5.1 GB|9.1 GB &mdash; **over budget**|
 |16 (micro-batch)|4.0 GB|~0.3 GB|4.3 GB &mdash; fits|
 
-Run the micro-batch of 16 sixteen times, summing the gradients, and step once:
-the update is *identical* to the 256-batch, because the batch gradient is the mean
-of the per-example gradients and a mean can be built in pieces. The fixed 4&nbsp;GB
-never moves &mdash; accumulation cannot touch it, which is why it is no help when
-the weights alone do not fit. The activation term, the part that broke
+Run the micro-batch of 16 sixteen times, summing the grads, and step once:
+the update is *the same* to the 256-batch. The batch grad is the mean
+of the per-example grads and a mean can be built in pieces. The fixed 4&nbsp;GB
+never moves &mdash; buildup can't touch it. This Is why it's no help when
+the weights alone don't fit. But the activation term, the part that broke
 the budget, is now a sixteenth of its size. The cost is time: sixteen sequential
-passes take about as long as sixteen passes. It buys capability, not throughput,
-and the one thing it does *not* reproduce is batch-norm statistics, which are
-computed over the micro-batch and so behave like the small batch however many
-steps you accumulate.
+passes take about if sixteen passes. It buys capability, not throughput,
+and the one thing it does *not* copy is batch-norm statistics, which are
+found over the micro-batch and so behave like the small batch but many
+steps you build up.
 
-Two implementation details cause most accumulation bugs, and both fail quietly.
-The loss must be divided by the number of accumulation steps before the backward
-pass, or the accumulated gradient is a sum where the optimiser expects a mean and
-the effective learning rate is silently multiplied by the step count. And the
-gradients must be zeroed after the optimiser step, not after every backward pass.
-Zero them each pass and the technique is defeated with no error at all,
-training proceeding with exactly the small batch it was meant to escape.
+Two setup details cause most buildup bugs, and both fail quietly.
+The loss must be cut by the number of buildup steps before the backward
+pass, or the built up grad is a sum where the tuner expects a mean and
+the effective learning rate is silently times'd by the step count. And the
+grads must be zeroed after the tuner step, not after each backward pass
+&mdash; zero them each pass and the technique is defeated with no error at all,
+training proceeding with just the small batch it was meant to escape.
 Activation checkpointing and mixed precision attack the same activation memory
-from other angles and combine with it; model parallelism attacks the fixed part
-that accumulation cannot.
+from other angles and combine with it. Model parallelism attacks the fixed part
+that buildup can't.
 
 ## Where it goes wrong
 
-**Forgetting to divide the loss.** Silently multiplies the learning rate.
+**Losing to divide the loss.** Silently times the learning rate.
 
-**Zeroing gradients every pass.** Silently defeats the technique.
+**Zeroing grads each pass.** Silently defeats the technique.
 
 **Using it with batch norm at a tiny micro-batch.** Real quality loss.
 
@@ -130,7 +130,7 @@ that accumulation cannot.
 
 ## A large batch on a small GPU
 
-Accumulating gradients over several small batches before stepping is arithmetically identical to one large batch. This proves the identity, then shows the two things that are not identical.
+Building up grads over a few small batches before stepping is arithmetically the same to one large batch. This proves the identity, then shows the two things that aren't the same.
 
 ```python-run
 import numpy as np

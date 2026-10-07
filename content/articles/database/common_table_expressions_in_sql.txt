@@ -3,33 +3,33 @@ intro: A CTE does not make queries more powerful. It makes them readable &mdash;
 
 ## Quick Context
 
-A <strong>Common Table Expression</strong> is a named temporary result set defined with <span class="mono-font kw">WITH</span>, available only to the statement that follows it. Think of it as a variable for a query: compute something once, give it a name, then use that name.
+A <strong>Common Table Expression</strong> is a named temporary result set set with <span class="mono-font kw">WITH</span>, on hand just to the statement that follows it. Think of it as a var for a query: compute something once, give it a name, then use that name.
 
-A CTE starts with the keyword `WITH`, followed by a name, `AS`, and a parenthesised query. The main `SELECT` that comes after it can reference that name as if it were a table. Multiple CTEs can be chained with commas, each one building on the previous, which turns a deeply nested query into a sequence of named steps that read top to bottom.
+A CTE starts with the keyword `WITH`, followed by a name, `AS`. And a parenthesised query. The main `SELECT` that comes after it can reference that name as if it were a table. Multiple CTEs can be chained with commas, each one building on the last. It turns a deeply nested query into a sequence of named steps that read top to bottom.
 
-The most common use is readability. A three-level subquery is difficult to follow because you read it inside-out: the innermost query runs first, its result feeds the middle query, and that feeds the outer one. A CTE reverses the reading order to match the execution order, so each step has a name and the logic is visible without tracing parentheses.
+The most common use is readability. A three-level subquery is difficult to follow since you read it inside-out: the innermost query runs first, its result feeds the middle query. And that feeds the outer one. A CTE reverses the reading order to match the execution order. So each step has a name and the logic is visible without tracing parentheses.
 
-CTEs also enable recursion, which is something subqueries cannot do at all. A recursive CTE references itself, with a base case and a recursive step joined by `UNION ALL`. This is how you traverse trees and graphs in SQL: an org chart, a bill of materials, a category hierarchy. Without recursive CTEs, these queries require either application-level loops or database-specific extensions.
+CTEs also enable recursion, which is something subqueries cannot do at all. A recursive CTE references it, with a base case and a recursive step joined by `UNION ALL`. This is how you traverse trees and graphs in SQL: an org chart, a bill of materials, a category hierarchy. Without recursive CTEs, these queries need either application-level loops or database-set extensions.
 
-A CTE is not a stored view and is not materialised by default. It exists only for the duration of the statement it precedes, and the database is free to inline it like a subquery or materialise it as a temporary table, whichever the optimiser prefers. Some databases (PostgreSQL before version 12) always materialised CTEs, which made them slower than equivalent subqueries for certain patterns.
+A CTE is not a stored view and is not materialised by default. It exists just for the duration of the statement it precedes. And the database is free to inline it like a subquery or materialise it as a temporary table, whichever the optimiser prefers. Some databases (PostgreSQL before version 12) always materialised CTEs. It made them slower than equivalent subqueries for certain patterns.
 
 ## Why Not Just Nest Subqueries?
 
-You can &mdash; the nested example in this lab returns exactly the same rows. But compare how they read. A nested query is evaluated <strong>inside out</strong>, so you must find the innermost parenthesis and work outward, holding each layer in your head. A chain of CTEs reads <strong>top to bottom</strong>, like a recipe.
+You can &mdash; the nested case in this lab returns just the same rows. But check how they read. A nested query is tested <strong>inside out</strong>. So you must find the innermost parenthesis and work outward, holding each layer in your head. A chain of CTEs reads <strong>top to bottom</strong>, like a recipe.
 
-Each CTE can also reference the ones declared before it, which is what turns a tangle into a pipeline. And a CTE referenced twice is written once, rather than copy-pasted into two places that can drift apart.
+Each CTE can also reference the ones declared before it. It is what turns a tangle into a pipeline. And a CTE referenced twice is written once, rather than copy-pasted into two places that can drift apart.
 
 ## Recursive CTEs: The Real Superpower
 
-<p>This is the thing subqueries genuinely cannot do. A recursive CTE has two halves joined by <span class="mono-font kw">UNION ALL</span>:</p><ul><li>The <strong>anchor</strong> &mdash; a plain query producing the starting rows. It runs once.</li><li>The <strong>recursive member</strong> &mdash; a query that references the CTE itself. It runs repeatedly, each time seeing only the rows produced by the previous round, until a round returns nothing.</li></ul><p>Press <strong>Step</strong> in the recursive example and watch one level of the org chart appear per iteration. This is how you query hierarchies of unknown depth: reporting lines, folder trees, bill-of-materials, graph traversal, or simply generating a series of numbers or dates.</p><strong>Always ensure the recursion terminates.</strong> If the recursive member never stops producing new rows you have an infinite loop; most engines cap it, but a cycle in your data (A reports to B, B reports to A) will hit that cap rather than finish.
+<p>This is the thing subqueries genuinely cannot do. A recursive CTE has two halves joined by <span class="mono-font kw">UNION ALL</span>:</p><ul><li>The <strong>anchor</strong> &mdash; a plain query giving the starting rows. It runs once.</li><li>The <strong>recursive member</strong> &mdash; a query that references the CTE it. It runs repeatedly, each time seeing just the rows produced by the last round, until a round returns nothing.</li></ul><p>Press <strong>Step</strong> in the recursive case and watch one level of the org chart appear per iteration. This is how you query hierarchies of unknown depth: reporting lines, folder trees, bill-of-materials, graph traversal. Or simply making a series of counts or dates.</p><strong>Always ensure the recursion terminates.</strong> If the recursive member never stops giving new rows you have an infinite loop. Most engines cap it. But a cycle in your data (A reports to B, B reports to A) will hit that cap rather than finish.
 
 ## A Note on Performance
 
-Historically PostgreSQL treated CTEs as an <em>optimisation fence</em> &mdash; always materialised, never merged into the outer query, which sometimes made them slower than the equivalent subquery. Since version 12 it inlines them by default, with <span class="mono-font">MATERIALIZED</span> and <span class="mono-font">NOT MATERIALIZED</span> available to force the choice. Most other engines have always inlined them. Treat CTEs as free for readability, but check the plan if a query is unexpectedly slow.
+Historically PostgreSQL treated CTEs as an <em>optimisation fence</em> &mdash; always materialised, never merged into the outer query. It sometimes made them slower than the equivalent subquery. Since version 12 it inlines them by default, with <span class="mono-font">MATERIALIZED</span> and <span class="mono-font">NOT MATERIALIZED</span> on hand to force the choice. Most other engines have always inlined them. Treat CTEs as free for readability. But check the plan if a query is unexpectedly slow.
 
 ## Naming the steps of a query
 
-A CTE gives a name to an intermediate result, so a complicated query can be written as a sequence of readable steps instead of one deeply nested expression.
+A CTE gives a name to an intermediate result. So a complicated query can be written as a sequence of readable steps instead of one deeply nested expression.
 
 ```sql
 WITH monthly AS (
@@ -48,15 +48,15 @@ FROM   with_growth
 WHERE  prev IS NOT NULL;
 ```
 
-Three steps, each named, each readable on its own, and the final query is four lines. The nested-subquery version of the same logic is a single expression three levels deep that nobody enjoys editing six months later.
+Three steps, each named, each readable on its own. And the final query is four lines. The nested-subquery version of the same logic is a single expression three levels deep that nobody enjoys editing six months later.
 
-Two mechanical points: separate multiple CTEs with commas (only the first gets `WITH`), and later CTEs may reference earlier ones but not the other way round.
+Two mechanical points: split multiple CTEs with commas (just the first gets `WITH`). And later CTEs may reference earlier ones but not the other way round.
 
-## Recursion: the thing only CTEs can do
+## Recursion: the thing just CTEs can do
 
-`WITH RECURSIVE` lets a query refer to itself, which is how hierarchies and sequences are handled in SQL.
+`WITH RECURSIVE` lets a query refer to it. It is how hierarchies and sequences are handled in SQL.
 
-Every recursive CTE has exactly two halves joined by `UNION ALL`:
+Each recursive CTE has just two halves joined by `UNION ALL`:
 
 ```sql
 WITH RECURSIVE org AS (
@@ -75,26 +75,26 @@ WITH RECURSIVE org AS (
 SELECT * FROM org ORDER BY level;
 ```
 
-The anchor runs once and produces the starting rows. The recursive part then runs repeatedly, each time against the rows produced by the previous round, until a round produces nothing. Then all the results are unioned together.
+The anchor runs once and gives the starting rows. The recursive part then runs repeatedly, each time against the rows produced by the last round, until a round gives nothing. Then all the results are unioned together.
 
-This is how you walk an organisation chart, expand a bill of materials, trace a comment thread, find every descendant category, or generate a series of dates with no numbers table.
+This is how you walk an organisation chart, expand a bill of materials, trace a comment thread, find each descendant category. Or generate a series of dates with no counts table.
 
-The failure mode to guard against is a cycle. If employee A reports to B and B reports to A, the recursion never ends. Two defences: track the path visited so far and exclude rows already in it, or add a `WHERE level < 100` guard. PostgreSQL also offers a `CYCLE` clause that does the tracking for you.
+The failure mode to guard against is a cycle. If employee A reports to B and B reports to A, the recursion never ends. Two defences: track the path visited so far and exclude rows now in it. Or add a `WHERE level < 100` guard. PostgreSQL also offers a `CYCLE` clause that does the tracking for you.
 
 ## Where CTEs help and where they do not
 
-They help most when a query has repeated logic, several stages, or needs to be understood by someone else. They are the difference between a query a colleague can review and one they have to reverse-engineer.
+They help most when a query has repeated logic, a few stages. Or needs to be understood by someone else. They are the gap between a query a colleague can review and one they have to reverse-engineer.
 
-They do not, by themselves, make anything faster. On modern engines a CTE is inlined into the main query exactly as a derived table would be, so the plan is usually identical. Two exceptions worth knowing:
+They do not, by them, make anything faster. On modern engines a CTE is inlined into the main query just as a derived table would be. So the plan is often identical. Two exceptions worth knowing:
 
-- <strong>PostgreSQL before version 12</strong> materialised every CTE, which acted as an optimisation fence &mdash; sometimes helpful, often harmful. Since 12 they are inlined unless you write `MATERIALIZED`.
-- <strong>Deliberate materialisation</strong> is occasionally what you want: if a CTE is expensive and referenced three times, forcing it to be computed once can genuinely help.
+- <strong>PostgreSQL before version 12</strong> materialised each CTE. It acted as an optimisation fence &mdash; sometimes helpful, often harmful. Since 12 they are inlined unless you write `MATERIALIZED`.
+- <strong>Deliberate materialisation</strong> is at times what you want: if a CTE is costly and referenced three times, forcing it to be computed once can genuinely help.
 
 If a CTE result is used by many queries rather than one, you are looking at a view or a materialised view instead. A CTE lives and dies with its statement.
 
-## Naming the steps, and the one that names itself
+## Naming the steps, and the one that names it
 
-A CTE gives a subquery a name and puts it before the query instead of inside it. That is mostly a readability change -- and the recursive form is not, because it can express things no ordinary SELECT can.
+A CTE gives a subquery a name and puts it before the query instead of inside it. That is mostly a readability change -- and the recursive form is not, since it can express things no ordinary SELECT can.
 
 ```sql-run
 -- The same query written two ways. Compare them for readability, then
@@ -127,7 +127,7 @@ JOIN totals t ON t.customer_id = c.id
 ORDER BY t.gross DESC;
 ```
 
-The recursive form does something no subquery can: it refers to itself, walking a sequence or hierarchy of unknown depth.
+The recursive form does something no subquery can: it means it, walking a sequence or hierarchy of unknown depth.
 
 ```sql-run
 WITH RECURSIVE months(m) AS (
@@ -160,18 +160,18 @@ ORDER BY months.m;
 
 ## Guided experiments
 
-1. <strong>Start with the chained CTEs.</strong> Each named step shows its own output, so you can see the data narrowing at every stage.
+1. <strong>Start with the chained CTEs.</strong> Each named step shows its own output. So you can see the data narrowing at each stage.
 2. <strong>Switch to the nested subquery version.</strong> Identical result, one dense block, nesting depth 3 &mdash; and no way to inspect the middle.
-3. <strong>Open the recursive example and press Step.</strong> Iteration 1 finds the CEO, iteration 2 their direct reports, and so on down the tree.
+3. <strong>Open the recursive case and press Step.</strong> Iteration 1 finds the CEO, iteration 2 their direct reports. And so on down the tree.
 4. <strong>Keep stepping until it stops.</strong> The final iteration returns zero new rows &mdash; that empty result is the termination condition, not a row limit.
 
 ## Where that leaves you
 
-Use CTEs to turn one unreadable query into several named steps that a colleague can follow. Use <span class="mono-font">WITH RECURSIVE</span> when the data is a hierarchy and you do not know how deep it goes &mdash; that is a problem plain SQL simply cannot express.
+Use CTEs to turn one unreadable query into a few named steps that a colleague can follow. Use <span class="mono-font">WITH RECURSIVE</span> when the data is a hierarchy and you do not know how deep it goes &mdash; that is a problem plain SQL simply cannot express.
 
-## Practical patterns
+## Real patterns
 
-<strong>Generating a date series</strong>, so that days with no data still appear in a report:
+<strong>Making a date series</strong>, so that days with no data still appear in a report:
 
 ```sql
 WITH RECURSIVE dates AS (
@@ -184,11 +184,11 @@ FROM   dates LEFT JOIN orders o ON o.order_date = dates.d
 GROUP  BY dates.d ORDER BY dates.d;
 ```
 
-<strong>Splitting a data-cleaning pipeline into readable stages</strong>: one CTE to deduplicate, one to normalise values, one to join reference data, and a final `SELECT` that reads like a summary of the whole thing.
+<strong>Splitting a data-cleaning pipeline into readable stages</strong>: one CTE to deduplicate, one to normalise vals, one to join reference data. And a final `SELECT` that reads like a summary of the whole thing.
 
-<strong>Reusing an expensive filter</strong> that would otherwise be written twice in a `UNION` or a self-join.
+<strong>Reusing an costly filter</strong> that would otherwise be written twice in a `UNION` or a self-join.
 
-<strong>Writable CTEs</strong>, in PostgreSQL, where a CTE can contain `INSERT`, `UPDATE` or `DELETE` with `RETURNING` &mdash; the standard way to move rows between tables in a single statement:
+<strong>Writable CTEs</strong>, in PostgreSQL, where a CTE can hold `INSERT`, `UPDATE` or `DELETE` with `Giving` &mdash; the standard way to move rows between tables in a single statement:
 
 ```sql
 WITH moved AS (
@@ -199,22 +199,22 @@ INSERT INTO archived_orders SELECT * FROM moved;
 
 ## Questions people ask
 
-<strong>Are CTEs slower than subqueries?</strong> Not on current engines, where they are inlined. On PostgreSQL 11 and earlier, they could be either faster or slower because they were always materialised.
+<strong>Are CTEs slower than subqueries?</strong> Not on current engines, where they are inlined. On PostgreSQL 11 and earlier, they could be either faster or slower since they were always materialised.
 
-<strong>Can I use a CTE in an `INSERT` or `UPDATE`?</strong> Yes &mdash; `WITH ... UPDATE ...` and `WITH ... INSERT ...` are both valid, and useful for computing the rows to change in a readable way.
+<strong>Can I use a CTE in an `INSERT` or `UPDATE`?</strong> Yes &mdash; `WITH ... UPDATE ...` and `WITH ... INSERT ...` are both valid. And useful for computing the rows to change in a readable way.
 
-<strong>How many CTEs can I chain?</strong> No practical limit. Readability is the constraint; past six or seven stages, consider a view or a materialised table.
+<strong>How many CTEs can I chain?</strong> No real limit. Readability is the constraint. Past six or seven stages, consider a view or a materialised table.
 
-<strong>Can a CTE reference a later CTE?</strong> No &mdash; references only go backwards. Recursive CTEs reference themselves, which is the one exception.
+<strong>Can a CTE reference a later CTE?</strong> No &mdash; references just go backwards. Recursive CTEs reference them, which is the one exception.
 
-<strong>Do all databases support them?</strong> Yes in current versions: PostgreSQL, MySQL 8+, SQL Server, Oracle, SQLite 3.8.3+. Recursion is supported by all of those too, with minor syntax differences (Oracle and SQL Server omit the `RECURSIVE` keyword).
+<strong>Do all databases support them?</strong> Yes in current versions: PostgreSQL, MySQL 8+, SQL Server, Oracle, SQLite 3.8.3+. Recursion is supported by all of those too, with minor syntax gaps (Oracle and SQL Server omit the `RECURSIVE` keyword).
 
-<strong>When should I use a temporary table instead?</strong> When the intermediate result is large, used by several separate statements, or worth indexing. A CTE cannot be indexed and does not outlive its statement.
+<strong>When should I use a temporary table instead?</strong> When the intermediate result is large, used by a few split statements. Or worth indexing. A CTE cannot be indexed and does not outlive its statement.
 
 ## Recap in one screen
 
 - `WITH name AS (...)` names an intermediate result and makes multi-step queries readable.
-- Chain several with commas; each may reference the ones before it.
-- `WITH RECURSIVE` walks hierarchies and generates sequences &mdash; an anchor, `UNION ALL`, and a step that references the CTE itself.
+- Chain a few with commas. Each may reference the ones before it.
+- `WITH RECURSIVE` walks hierarchies and makes sequences &mdash; an anchor, `UNION ALL`. And a step that references the CTE it.
 - Guard recursion against cycles with a depth limit or a visited-path check.
-- CTEs are about clarity, not speed; on modern engines they are inlined like subqueries.
+- CTEs are about clarity, not speed. On modern engines they are inlined like subqueries.

@@ -1,34 +1,34 @@
 title: Constraints: UNIQUE, CHECK and NOT NULL
-intro: Rules written once in the schema, enforced against every client, forever.
+intro: Rules written once in the schema, enforced against each client, forever.
 
 ## Where a rule should live
 
 "Age must be at least 18" can be written in three places: the form in the
 browser, the service that handles the request, or the table itself.
 
-The first two are worth having and neither is sufficient. A browser check is a
-courtesy to the user and is bypassed by anything that is not a browser. A
+The first two are worth having and neither is enough. A browser check is a
+courtesy to the user and is bypassed by any of it that isn't a browser. A
 service check holds until someone writes a second service, a migration script,
-a bulk import or a manual fix at the console. Every one of those is written by
-someone who was not thinking about the rule at the time.
+a bulk import or a manual fix at the console. And each one of those is
+written by someone who wasn't thinking about the rule at the time.
 
 A constraint in the schema holds for all of them, including the ones that do
-not exist yet. It is checked on every write, by the one component every path
+not exist yet. It's checked on each write, by the one component each path
 must go through.
 
 ## The three, and what each says
 
-**NOT NULL** &mdash; the value must be known. NULL is not a value; it is the
-absence of one. Allowing it means allowing rows where the question was never
-answered, and every query that touches the column then has to decide what to do
+**NOT NULL** &mdash; the value must be known. NULL isn't a value. It's the
+lack of one. Allowing it means allowing rows where the question was never
+answered, and each query that touches the column then has to decide what to do
 about that.
 
-**UNIQUE** &mdash; no other row may hold this value. It is what stops two
-accounts sharing an email address without requiring a read-then-write in the
-application, which is a race condition even when it looks correct.
+**UNIQUE** &mdash; no other row may hold this value. It's what stops two
+accounts sharing an email address without needing a read-then-write in the
+use, which is a race rule even when it looks correct.
 
-**CHECK** &mdash; this expression must be true for every row. It is the general
-case that the other two are special instances of, and it takes ordinary SQL:
+**CHECK** &mdash; this formula must be true for each row. It's the general
+case that the other two are special instances of, and it takes plain SQL:
 
 ```
 CHECK (age >= 18)
@@ -39,12 +39,12 @@ CHECK (end_date IS NULL OR end_date > start_date)
 
 That last one is worth noticing. A constraint can relate two columns of the same
 row, so "an end date, if present, must come after the start date" is enforceable
-&mdash; a rule that is otherwise checked nowhere and violated eventually.
+&mdash; a rule that is or else checked nowhere and violated eventually.
 
 ## Read the error, not the row count
 
-Run each commented statement in turn. The value of doing so is that every one
-fails differently, and the message names the constraint that stopped it.
+Run each commented statement in turn. The value of doing so is that each one
+fails differently, and the message names the constraint that stopped it:
 
 | Attempt | Message |
 |---|---|
@@ -54,37 +54,37 @@ fails differently, and the message names the constraint that stopped it.
 | Grade `'boss'` | `CHECK constraint failed` |
 | Missing salary | `NOT NULL constraint failed: staff.salary` |
 
-Naming constraints explicitly &mdash; `CONSTRAINT staff_age_adult CHECK (...)`
-&mdash; makes those messages far more useful, because "CHECK constraint failed"
+Naming constraints by name &mdash; `CONSTRAINT staff_age_adult CHECK (...)`
+&mdash; makes those messages far more handy, because "CHECK constraint failed"
 tells you nothing when a table has six of them.
 
 ## The NULL subtlety in UNIQUE
 
-`UNIQUE` allows more than one NULL in almost every engine, and people are
-surprised by this until they see the reasoning.
+`UNIQUE` allows more than one NULL in almost each engine, and people are
+surprised by this until they see the thinking.
 
-`UNIQUE` forbids two rows being *equal*. Comparing NULL to NULL does not
-produce true; it produces NULL, because two unknown values are not known to be
-the same. So two NULLs are not equal, and the constraint has nothing to object
+`UNIQUE` forbids two rows being *equal*. Checking NULL to NULL doesn't
+give true. It makes NULL, because two unknown values aren't known to be
+the same. So two NULLs aren't equal, and the constraint has nothing to object
 to.
 
-The practical consequence is that `UNIQUE` on a nullable column does not
-guarantee one row per real-world thing &mdash; it guarantees one row per *known*
-value. If that is not what you meant, add `NOT NULL`.
+The hands-on consequence is that `UNIQUE` on a nullable column doesn't
+ensure one row per real-world thing. It ensures one row per *known*
+value. If that isn't what you meant, add `NOT NULL`.
 
 ## DEFAULT is not a constraint
 
 `DEFAULT 'junior'` supplies a value when the insert omits the column. It
-constrains nothing: an insert that explicitly passes NULL gets NULL, not the
+constrains nothing: an insert that by name passes NULL gets NULL, not the
 default, unless `NOT NULL` refuses it.
 
-Defaults and constraints are frequently paired for this reason. The default
+Defaults and constraints are often paired for this reason. The default
 handles the common case, and the constraint handles the case where someone was
-explicit about something they should not have been.
+clear about a thing they shouldn't have been.
 
 ## The NULL count that surprises people, measured
 
-`UNIQUE` allowing many NULLs is not a quirk to memorise but a consequence to see.
+`UNIQUE` allowing many NULLs isn't a quirk to store but a consequence to see.
 Because NULL = NULL is *unknown* rather than true, two NULLs are never "equal" and
 the constraint has nothing to reject. In the SQLite this page runs, a `UNIQUE`
 column happily accepts row after row of NULL:
@@ -96,19 +96,19 @@ INSERT INTO t VALUES ('a@x.com');
 INSERT INTO t VALUES ('a@x.com');              -- THIS one fails
 ```
 
-Three unknown emails coexist; the first repeated *known* value is refused. This is
-not even consistent across engines &mdash; SQL Server permits exactly one NULL in a
+Three unknown emails coexist. The first repeated *known* value is refused. This is
+not even steady across engines. SQL Server permits just one NULL in a
 unique column, while PostgreSQL, MySQL and SQLite permit many &mdash; so a schema
-that relies on either behaviour is not portable. If the rule you meant was "one row
-per real address", `UNIQUE` alone does not say it; `UNIQUE` plus `NOT NULL` does.
+that leans on either action isn't portable. If the rule you meant was "one row
+per real address", `UNIQUE` alone doesn't say it. `UNIQUE` plus `NOT NULL` does.
 
 ## Adding one to a large table is not free
 
-A constraint added at `CREATE TABLE` costs nothing; one added later has to be
-*proved* against every existing row before the database will accept it. Adding
+A constraint added at `CREATE TABLE` costs nothing. One added later has to be
+*proved* against each existing row before the DB will accept it. Adding
 `CHECK (age >= 18)` or a `NOT NULL` to a 50-million-row table means the engine
-reads all 50 million rows to confirm none already violates it. In most engines
-it holds a lock on the table while it does.
+reads all 50 million rows to confirm none already violates it, and in most engines
+it holds a lock on the table while it does:
 
 |constraint added|what the database must do|
 |---|---|
@@ -117,10 +117,11 @@ it holds a lock on the table while it does.
 
 So the same declaration is instant on an empty table and an outage on a full one.
 This is why constraints should encode what is *structurally* true &mdash; a
-salary is positive, an end date follows a start date &mdash; rather than current
-policy. A `CHECK` on this year's VAT rate has to be dropped and re-verified across
-every row each time the rate changes. Re-verifying a large table is the expensive
-operation above, paid on a schedule set by the tax authority rather than by you.
+salary is plus, an end date follows a start date &mdash; rather than current
+policy: a `CHECK` on this year's VAT rate has to be dropped and re-verified across
+each row each time the rate changes, and re-verifying a large table is the
+costly op above, paid on a schedule set by the tax authority rather
+than by you.
 
 ## Where it goes wrong
 
@@ -131,9 +132,9 @@ operation above, paid on a schedule set by the tax authority rather than by you.
 migrated when the rate changes, and migrating a constraint on a large table is
 not free. Constrain what is structurally true, not what is currently true.
 
-**Assuming UNIQUE means one per thing.** With NULLs allowed it means one per
+**given UNIQUE means one per thing.** With NULLs allowed it means one per
 known value.
 
-**Adding a constraint to a large live table without thinking.** The database has
-to verify every existing row before it can accept the constraint, and in most
+**Adding a constraint to a large live table without thinking.** The DB has
+to verify each existing row before it can accept the constraint, and in most
 engines that takes a lock while it does.

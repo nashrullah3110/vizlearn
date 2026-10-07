@@ -6,24 +6,9 @@ intro: Adding rows or columns from another frame.
 
 `pd.concat([a, b], axis=1)` stacks **columns**: the result is wider.
 
-Which axis you are joining along decides which axis does the *aligning*, and that is the part worth being deliberate about.
+Which axis you're joining along decides which axis does the *aligning*. That is the part worth being deliberate about.
 
 Stacking rows aligns the **columns** by name. Stacking columns aligns the **index** by label.
-
-`join="outer"` (the default) keeps all columns, filling missing values with `NaN`. `join="inner"` keeps only the columns that appear in every frame. The outer join is forgiving — nothing is lost — but it silently introduces `NaN` in columns that existed in one frame but not another. The inner join is strict — no `NaN`, but columns are quietly dropped.
-
-`ignore_index=True` resets the index to 0, 1, 2, ... after stacking. Without it, the result keeps the original indices, which usually means duplicates: two rows labelled 0, two labelled 1. Those duplicates are not an error — pandas allows them — but they break `.loc[0]`, which then returns two rows instead of one.
-
-`keys=["a", "b"]` adds a level to the index, labelling which frame each row came from. The result has a MultiIndex: the first level is the key, the second is the original index. This is how you stack monthly files and still know which month each row belongs to.
-
-`verify_integrity=True` raises if the result has duplicate index values. It is a safety check: if you expect the indices to be unique after stacking, this catches the case where they are not, rather than leaving it as a silent data error downstream.
-
-`pd.concat` accepts any number of DataFrames in a list. `pd.concat([jan, feb, mar, apr])` stacks four frames at once. There is no two-at-a-time limit, and passing a list of hundreds of small frames is a common pattern for reading a directory of CSV files.
-
-The difference between `concat` and `merge` is the question being answered. `concat` asks "put these frames next to each other or on top of each other." `merge` asks "match rows by a shared key." If two frames have the same columns and each row is independent, `concat`. If two frames share a key column and you want to join on it, `merge`.
-
-Column-stacking (`axis=1`) is the other direction: the result is wider, and alignment happens on the index rather than on column names. `pd.concat([names, scores], axis=1)` puts the two frames side by side, matching rows by their index values. Rows whose index appears in one frame but not the other get `NaN` in the missing columns.
-
 
 ## Stacking rows
 
@@ -47,17 +32,17 @@ print("A repeated index is legal and breaks later lookups, so renumber")
 print("unless the labels mean something.")
 ```
 
-The default keeps both frames' index labels, so the result can have repeated labels &mdash; two rows both labelled 0.
+The default keeps both frames' index labels. The result can have repeated labels. Two rows both labelled 0.
 
-That is legal, and it breaks things later: `.loc[0]` returns two rows instead of one, and code expecting a scalar fails. It is also invisible until something depends on it.
+That is legal, and it breaks things later: `.loc[0]` returns two rows instead of one, and code expecting a scalar fails. It's also invisible until a thing depends on it.
 
 `ignore_index=True` renumbers from 0. Pass it unless the index labels carry meaning you need to keep.
 
-Columns are matched **by name**. A column present in one frame and not the other is filled with `NaN` for the missing rows, and the result has the union of all columns. `join="inner"` keeps only columns present in every frame.
+Columns are matched **by name**. A column present in one frame and not the other is filled with `NaN` for the missing rows. The result has the union of all columns. `join="inner"` keeps only columns present in each frame.
 
-The name-matching is a feature: two frames with the same columns in different orders line up correctly. It is also a trap when a column has been misspelled in one source, because you get two columns each half-full rather than an error.
+The name-matching is a feature: two frames with the same columns in other orders line up right. It's also a trap when a column has been misspelled in one source. You get two columns each half-full rather than an error.
 
-Checking `result.columns` and the `isna()` counts after a concat catches that immediately.
+Checking `result.columns` and the `isna()` counts after a concat catches that at once.
 
 ## Columns are matched by name
 
@@ -177,9 +162,9 @@ print("it is worse than just collecting a list.")
 
 `axis=1` puts frames side by side, aligning on the index.
 
-If the two frames have different labels, the union is used and gaps become `NaN`. If they have the same labels in a different order, pandas reorders to match &mdash; which is correct and is not what positional intuition expects.
+If the two frames have other labels, the union is used and gaps become `NaN`. If they've the same labels in a other order, pandas reorders to match. Which is correct and isn't what spot-based intuition expects.
 
-The common mistake is concatenating two frames that *should* correspond row-for-row but whose indexes have drifted apart, usually because one of them was filtered. The result is a frame with far more rows than either input, mostly `NaN`.
+The common mistake is concatenating two frames that *should* match row-for-row but whose indexes have drifted apart, often because one of them was filtered. The result is a frame with far more rows than either input, mostly `NaN`.
 
 If you mean "these are the same rows in the same order", reset both indexes first:
 
@@ -187,7 +172,7 @@ If you mean "these are the same rows in the same order", reset both indexes firs
 pd.concat([a.reset_index(drop=True), b.reset_index(drop=True)], axis=1)
 ```
 
-That makes the positional intent explicit rather than relying on labels that may not match.
+That makes the spot-based intent clear rather than leaning on labels that may not match.
 
 `join="inner"` keeps only rows present in both.
 
@@ -195,13 +180,13 @@ That makes the positional intent explicit rather than relying on labels that may
 
 `pd.concat([jan, feb], keys=["jan", "feb"])` adds an outer index level recording which frame each row came from.
 
-This is how you combine monthly files, or results from several runs, without losing track of the source. `out.loc["jan"]` selects one back out, and `reset_index(level=0)` turns the label into an ordinary column.
+This is how you combine monthly files, or results from a few runs, without losing track of the source. `out.loc["jan"]` selects one back out. `reset_index(level=0)` turns the label into an plain column.
 
-Without `keys`, that information is gone the moment the frames are stacked, and reconstructing it means remembering how many rows each contributed.
+Without `keys`, that data is gone the moment the frames are stacked. Rebuilding it means remembering how many rows each contributed.
 
 ## Never concat in a loop
 
-`pd.concat` allocates a new frame and copies everything into it. Inside a loop that is quadratic, and it is one of the most common performance mistakes in pandas.
+`pd.concat` allocates a new frame and copies all into it. Inside a loop that is quadratic. It's one of the most common speed mistakes in pandas.
 
 Collect the pieces in a Python list and call `concat` **once**:
 
@@ -210,17 +195,17 @@ frames = [process(f) for f in files]
 out = pd.concat(frames, ignore_index=True)
 ```
 
-The last-but-one editor measures the difference. It grows with the number of iterations, so a pattern that seems fine on ten files becomes unusable on a thousand.
+The last-but-one editor measures the gap. It grows with the number of loops. A pattern that seems fine on ten files turns unusable on a thousand.
 
 ## Dtypes shift
 
-When frames disagree about a column's type, the result is promoted to something that holds both: `int` plus `float` gives `float`, and anything plus a string gives `object`.
+When frames disagree about a column's type, the result is promoted to a thing that holds both: `int` plus `float` gives `float`. Anything plus a string gives `object`.
 
-There is a specific version of this worth knowing: starting with an **empty** frame and concatenating into it. An empty column has no meaningful dtype, and combining it with real data can widen the result to `object` &mdash; at which point the column is slow and no longer numeric.
+There's a exact version of this worth knowing. Starting with an **empty** frame and concatenating into it. An empty column has no real dtype. Mixing it with real data can widen the result to `object`. At which point the column is slow and no longer numeric.
 
-That is another reason the list-then-concat pattern is better: there is no empty seed frame to poison the types.
+That is another reason the list-then-concat pattern is better: there's no empty seed frame to poison the types.
 
-After any concat that combines sources, `result.dtypes` is worth a glance for exactly this.
+After any concat that mixes sources, `result.dtypes` is worth a glance for just this.
 
 ## Combining files
 
@@ -235,55 +220,55 @@ for path in sorted(glob.glob("data/*.csv")):
 df = pd.concat(frames, ignore_index=True)
 ```
 
-Three details make this reliable.
+Three details make this robust.
 
-**Tag the source** before appending, so a row can be traced back to its file. `keys=` does the same thing through the index if you prefer.
+**Tag the source** before appending. So A row can be traced back to its file. `keys=` does the same thing through the index if you prefer.
 
-**Sort the paths**, so the result is deterministic rather than depending on filesystem order.
+**Sort the paths**, so the result is fixed rather than based on filesystem order.
 
 **Concat once**, outside the loop.
 
-The frequent surprise is that the files do not agree: a column renamed halfway through the year, an extra column in later exports. Concat unions the columns and fills the gaps with `NaN`, silently. Checking `df.isna().mean()` afterwards shows immediately which columns are only present in some files.
+The frequent surprise is that the files don't agree. A column renamed halfway through the year, an extra column in later exports. Concat unions the columns and fills the gaps with `NaN`, silently. Checking `df.isna().mean()` later shows at once which columns are only present in some files.
 
 ## verify_integrity and sort
 
-`verify_integrity=True` raises if the result would contain duplicate index labels. It costs a check and prevents a duplicated index propagating silently.
+`verify_integrity=True` raises if the result would hold copy index labels. It costs a check and blocks a duplicated index passing silently.
 
-`sort=True` sorts the columns alphabetically when frames have different sets. The default leaves them in order of first appearance, which is usually more readable.
+`sort=True` sorts the columns alphabetically when frames have other sets. The default leaves them in order of first appearance. This Is often more readable.
 
 ## What concat cannot do
 
 `concat` aligns on labels. It does **not** join on values.
 
-Combining two frames on a shared **key column** is `merge`, not `concat(axis=1)`. Using `concat` for that works only if the key happens to be the index of both frames and both are sorted the same way, which is a coincidence rather than a design.
+Mixing two frames on a shared **key column** is `merge`, not `concat(axis=1)`. Using `concat` for that works only if the key happens to be the index of both frames and both are sorted the same way. This Is a coincidence rather than a design.
 
-The tell is `axis=1` on frames whose indexes were not deliberately made to correspond. If you find yourself resetting indexes to make a `concat` line up, you probably wanted `merge`.
+The tell is `axis=1` on frames whose indexes weren't on purpose made to match. If you find yourself resetting indexes to make a `concat` line up, you probably wanted `merge`.
 
 ## Memory during a concat
 
-`concat` allocates a frame the size of all the inputs combined, and the inputs stay alive until it returns. Peak memory is therefore roughly twice the final size.
+`concat` allocates a frame the size of all the inputs mixed. The inputs stay alive until it returns. Peak memory is so roughly twice the final size.
 
-On a large combine that is the binding constraint, and there are two ways around it.
+On a large combine that is the binding constraint. There are two ways around it.
 
-**Process and reduce each piece before combining** &mdash; filter, select columns, aggregate. Concatenating summaries is far cheaper than concatenating raw data.
+**Process and reduce each piece before mixing**. Filter, select columns, aggregate. Concatenating summaries is far cheaper than concatenating raw data.
 
-**Delete the list afterwards** &mdash; `del frames` releases the inputs, which otherwise stay referenced.
+**Delete the list later** &mdash; `del frames` releases the inputs. This Else stay referenced.
 
-For files larger than memory in total, the answer is not pandas: read in chunks and aggregate incrementally, or use Dask, DuckDB or Polars, all of which are built for it.
+For files larger than memory in total, the answer isn't pandas. Read in chunks and aggregate incrementally, or use Dask, DuckDB or Polars, all of which are built for it.
 
 ## A summary
 
 **Same columns, more rows** &mdash; `concat([a, b], ignore_index=True)`.
 
-**Same rows, more columns, aligned by label** &mdash; `concat([a, b], axis=1)`, only when the indexes genuinely correspond.
+**Same rows, more columns, aligned by label**. `concat([a, b], axis=1)`, only when the indexes truly match.
 
 **Joining on a key** &mdash; `merge`, not concat.
 
 **Many files** &mdash; a list comprehension and one concat, with a source tag.
 
-**Recording provenance** &mdash; `keys=`, or an explicit column.
+**Recording provenance** &mdash; `keys=`, or an clear column.
 
-And afterwards, three checks: the row count, `dtypes`, and `isna().mean()`. Between them they catch the mismatched columns, the promoted types and the frames that were not what you assumed.
+And later, three checks: the row count, `dtypes`. `isna().mean()`. Between them they catch the mismatched columns, the promoted types and the frames that weren't what you assumed.
 
 ## Concat versus merge, decided
 
@@ -291,15 +276,15 @@ The question that settles it: are you adding **rows of the same kind**, or **col
 
 Same kind of rows &mdash; this month's data added to last month's &mdash; is `concat`.
 
-Columns about the same rows, matched on a key &mdash; adding customer details to orders &mdash; is `merge`.
+Columns about the same rows, matched on a key. Adding customer details to orders &mdash; is `merge`.
 
-`concat(axis=1)` looks like the second but matches on the **index**, not on a key column. It is right only when the indexes were deliberately made to correspond, which is rarer than it looks.
+`concat(axis=1)` looks like the second but matches on the **index**, not on a key column. It's right only when the indexes were on purpose made to match. This Is rarer than it looks.
 
-If you find yourself resetting indexes so a `concat(axis=1)` lines up, the operation you wanted was a merge.
+If you find yourself resetting indexes so a `concat(axis=1)` lines up, the step you wanted was a merge.
 
 ## Checking after a concat
 
-Three lines, and each catches a different failure:
+Three lines, and each catches a other failure:
 
 ```python
 len(out) == sum(len(f) for f in frames)   # nothing lost or duplicated
@@ -313,7 +298,7 @@ The third is the one that finds a column renamed partway through a series of fil
 
 `keys=["jan", "feb"]` adds an index level naming the source.
 
-`names=["month"]` names that level, so `reset_index` produces a sensible column name rather than `level_0`.
+`names=["month"]` names that level, so `reset_index` makes a sensible column name rather than `level_0`.
 
 For a flat result, a column is simpler:
 
@@ -321,31 +306,31 @@ For a flat result, a column is simpler:
 frames = [d.assign(source=name) for name, d in items]
 ```
 
-Either way, recording where a row came from is worth doing at the moment of combining, because afterwards the information is gone and reconstructing it means remembering row counts.
+Either way, recording where a row came from is worth doing at the moment of mixing. Later the data is gone and rebuilding it means remembering row counts.
 
 ## A closing note
 
 `concat` is simple enough that its failures are all about expectations rather than mechanics.
 
-The row-stacking case is nearly always right, and the two things to remember are `ignore_index=True` and that columns match by name, so a renamed column in one file becomes two half-full columns rather than an error.
+The row-stacking case is nearly always right. The two things to note are `ignore_index=True` and that columns match by name. A renamed column in one file turns two half-full columns rather than an error.
 
-The column-stacking case is the one to be suspicious of. It aligns on the index, and indexes drift apart the moment anything is filtered. If the frames should correspond row for row, reset both indexes and say so; if they should be matched on a key, the operation is a merge.
+The column-stacking case is the one to be suspicious of. It aligns on the index. Indexes drift apart the moment anything is filtered. If the frames should match row for row, reset both indexes and say so. If they should be matched on a key, the step is a merge.
 
-And the loop rule applies here as everywhere: collect the pieces, combine once. It is the same lesson as `np.append` and `df.loc[len(df)]`, and it is the single most common avoidable slowdown in code that reads many files.
+And the loop rule applies here as all over. Collect the pieces, combine once. It's the same lesson as `np.append` and `df.loc[len(df)]`. It's the single most common avoidable slowdown in code that reads many files.
 
 ## Two more things worth knowing
 
-`pd.concat` accepts a **dict** as well as a list, in which case the keys become the outer index level automatically: `pd.concat({"jan": a, "feb": b})` is the same as passing `keys=`. That reads well when the pieces already live in a dict keyed by their source.
+`pd.concat` accepts a **dict** and a list, in which case the keys become the outer index level on its own: `pd.concat({"jan": a, "feb": b})` is the same as passing `keys=`. That reads well when the pieces already live in a dict keyed by their source.
 
-The `axis` argument also accepts the string names `"index"` and `"columns"`, which are harder to misread than `0` and `1` in code someone else will maintain.
+The `axis` arg also accepts the string names `"index"` and `"columns"`. This Are harder to misread than `0` and `1` in code someone else will maintain.
 
-And one behaviour worth expecting: concatenating frames whose columns are in different orders produces the union in order of first appearance, not sorted, unless you pass `sort=True`. Two files exported months apart with the columns reordered will therefore combine correctly but present in an order that matches neither, which is harmless and briefly confusing.
+And one action worth expecting: concatenating frames whose columns are in other orders makes the union in order of first appearance, not sorted, unless you pass `sort=True`. Two files exported months apart with the columns reordered will so combine right but present in an order that matches neither. This Is harmless and briefly confusing.
 
 ## Combining results, not raw data
 
 The most scalable use of `concat` is on **summaries** rather than on source data.
 
-Reading a hundred files and concatenating them raw builds one frame holding everything, and peak memory is roughly twice its final size because the pieces stay alive until the concat returns. Reading each file, reducing it to what the question needs, and concatenating the small results costs a fraction of that and scales to more files than fit in memory.
+Reading a hundred files and concatenating them raw builds one frame holding all. Peak memory is roughly twice its final size because the pieces stay alive until the concat returns. Reading each file, reducing it to what the question needs. Concatenating the small results costs a fraction of that and scales to more files than fit in memory.
 
 ```python
 parts = []
@@ -355,14 +340,14 @@ for path in paths:
 out = pd.concat(parts, ignore_index=True).groupby("city", as_index=False).sum()
 ```
 
-The double aggregation is the pattern: reduce per file, combine, reduce again. It works for sums, counts and maxima &mdash; anything associative &mdash; and not for medians or exact distinct counts, which need the whole dataset at once.
+The double aggregation is the pattern: reduce per file, combine, reduce again. It works for sums, counts and maxima. Anything associative. And not for medians or exact distinct counts. This Need the whole dataset at once.
 
-That distinction, between aggregations that decompose and those that do not, is worth knowing before designing a pipeline around chunked reading.
+That gap, between aggregations that break down and those that don't, is worth knowing before designing a pipeline around chunked reading.
 
 ## In summary
 
-Row stacking aligns columns by name; column stacking aligns the index by label. Knowing which axis you are joining along tells you which axis is doing the matching, and that predicts every surprise this function produces.
+Row stacking aligns columns by name. Column stacking aligns the index by label. Knowing which axis you're joining along tells you which axis is doing the matching. That predicts each surprise this function makes.
 
-Pass `ignore_index=True` unless the labels mean something, record provenance with `keys=` or an explicit column, and never call it inside a loop.
+Pass `ignore_index=True` unless the labels mean a thing, record provenance with `keys=` or an clear column. Never call it inside a loop.
 
-Afterwards, check the row count, the dtypes and the missingness &mdash; between them they catch the mismatched columns, the promoted types, and the file whose schema quietly changed.
+later, check the row count, the dtypes and the missingness. Between them they catch the mismatched columns, the promoted types. The file whose schema quietly changed.

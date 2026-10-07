@@ -3,20 +3,20 @@ intro: Train the same model twice on the same data and you get two different res
 
 ## Where the randomness comes from
 
-Neural network training is randomised in at least four independent places, and every one of them changes the final weights:
+Neural network training is randomised in at least four independent places. And each one of them changes the final weights:
 
-- <strong>Weight initialisation.</strong> Every weight starts as a random draw. Different draws land the optimiser in different basins of the loss surface.
-- <strong>Data shuffling.</strong> Mini-batches are formed from a shuffled dataset, so a different order means different gradients at every step.
-- <strong>Dropout.</strong> Which units are zeroed is resampled on every forward pass during training.
-- <strong>Augmentation.</strong> Random crops, flips and noise mean the model literally never sees the same input twice.
+- <strong>Weight initialisation.</strong> Each weight starts as a random draw. Other draws land the optimiser in other basins of the loss surface.
+- <strong>Data shuffling.</strong> Mini-batches are formed from a shuffled dataset. So a other order means other gradients at each step.
+- <strong>Dropout.</strong> Which units are zeroed is resampled on each forward pass in training.
+- <strong>Augmentation.</strong> Random crops, flips and noise mean the net literally never sees the same input twice.
 
-None of these is a defect &mdash; each is deliberately there to improve generalisation. But they mean “the model” is a sample from a distribution of models, not a fixed object.
+None of these is a defect &mdash; each is deliberately there to improve generalisation. But they mean “the net” is a sample from a distribution of nets, not a fixed object.
 
-This page shows how to seed each source of randomness in PyTorch, NumPy, and Python's `random` module so that a training run is deterministic, what the `CUBLAS_WORKSPACE_CONFIG` environment variable does and why deterministic mode has a real performance cost, and how to measure the variance across seeds so you know whether a 0.3% improvement is a real gain or a lucky draw. The code blocks below train the same small network five times and print the spread, which on most hardware is larger than people expect.
+This page shows how to seed each source of randomness in PyTorch, NumPy. And Python's `random` module so that a training run is deterministic, what the `CUBLAS_WORKSPACE_CONFIG` environment var does and why deterministic mode has a real performance cost. And how to measure the variance across seeds so you know whether a 0.3% improvement is a real gain or a lucky draw. The code blocks below train the same small network five times and print the spread. It on most hardware is more than people expect.
 
-## Seeding, and what a seed actually fixes
+## Seeding, and what a seed really fixes
 
-These are all <em>pseudo</em>-random: a deterministic sequence generated from a starting value called the seed. Fix the seed and the sequence is identical every run.
+These are all <em>pseudo</em>-random: a deterministic sequence made from a starting value called the seed. Fix the seed and the sequence is identical each run.
 
 
 ```python
@@ -26,11 +26,11 @@ torch.manual_seed(42) # PyTorch, CPU and GPU
 ```
 
 
-The catch is that these are separate generators. Seeding NumPy does nothing for PyTorch’s dropout, and seeding PyTorch does nothing for a shuffle done with Python’s <span class="mono-font">random</span>. Every library that draws a random number needs its own seed, and missing one is the usual reason a “seeded” run is still not reproducible.
+The catch is that these are split generators. Seeding NumPy does nothing for PyTorch’s dropout. And seeding PyTorch does nothing for a shuffle done with Python’s <span class="mono-font">random</span>. Each library that draws a random count needs its own seed. And missing one is the usual reason a “seeded” run is still not reproducible.
 
-## Why the same code gives different numbers
+## Why the same code gives other counts
 
-Run the same training script twice and the results differ. Five sources of randomness are involved, and each has to be pinned separately.
+Run the same training script twice and the results differ. Five sources of randomness are involved. And each has to be pinned apart.
 
 |Source|What varies|
 |---|---|
@@ -40,9 +40,9 @@ Run the same training script twice and the results differ. Five sources of rando
 |Augmentation|The random transformations applied|
 |GPU kernels|Floating-point summation order|
 
-The first four are ordinary pseudo-random number generators and can be seeded. The fifth is different in kind: many GPU operations sum values in a non-deterministic order, and floating-point addition is not associative, so `(a + b) + c` and `a + (b + c)` can differ in the last bits. Those differences amplify over thousands of steps.
+The first four are ordinary pseudo-random count generators and can be seeded. The fifth is other in kind: many GPU steps sum vals in a non-deterministic order. And floating-point addition is not associative. So `(a + b) + c` and `a + (b + c)` can differ in the last bits. Those gaps amplify over thousands of steps.
 
-Seeding gets you most of the way; full determinism costs a little speed.
+Seeding gets you most of the way. Full determinism costs a little speed.
 
 ## Pinning it down
 
@@ -64,9 +64,9 @@ torch.backends.cudnn.benchmark = False
 torch.use_deterministic_algorithms(True)
 ```
 
-Two additional details that are easy to miss.
+Two extra details that are easy to miss.
 
-<strong>Data loader workers need their own seeding.</strong> Each worker process inherits a different base seed, and without `worker_init_fn` several workers can generate identical augmentation sequences &mdash; or different ones between runs.
+<strong>Data loader workers need their own seeding.</strong> Each worker process inherits a other base seed. And without `worker_init_fn` a few workers can generate identical augmentation sequences &mdash; or other ones between runs.
 
 ```python
 def seed_worker(worker_id):
@@ -77,71 +77,71 @@ loader = DataLoader(ds, worker_init_fn=seed_worker,
                     generator=torch.Generator().manual_seed(42))
 ```
 
-<strong>`cudnn.benchmark = True` is non-deterministic by design.</strong> It profiles several convolution algorithms and picks the fastest, which can differ between runs. Leaving it on is often worth 10&ndash;20% speed; turning it off is required for bit-exact reproducibility.
+<strong>`cudnn.benchmark = True` is non-deterministic by design.</strong> It profiles a few convolution algorithms and picks the fastest. It can differ between runs. Leaving it on is often worth 10&ndash;20% speed. Turning it off is needed for bit-exact reproducibility.
 
 ## Reproducibility is more than the seed
 
 A fixed seed makes one script repeatable on one machine. Reproducing a result months later, or on someone else's machine, needs more.
 
-<strong>Pin the environment.</strong> Library versions change numerical behaviour and occasionally defaults. Record exact versions &mdash; `requirements.txt` with pinned versions, a lock file, or a container image.
+<strong>Pin the environment.</strong> Library versions change numerical behaviour and at times defaults. Record exact versions &mdash; `requirements.txt` with pinned versions, a lock file. Or a container pic.
 
 <strong>Version the data.</strong> "The dataset" is a moving target if it is a folder someone adds files to. Record a hash, a snapshot, or use a data-versioning tool.
 
-<strong>Log the configuration.</strong> Every hyperparameter, the seed, the git commit, and the command line. A result you cannot map back to its settings is not a result.
+<strong>Log the setup.</strong> Each hyperparameter, the seed, the git commit. And the command line. A result you cannot map back to its settings is not a result.
 
 <strong>Save checkpoints with their config.</strong> A weights file alone does not tell you what preprocessing it expects.
 
-Tools such as MLflow, Weights & Biases and DVC exist to automate this, and a disciplined text log plus git tags covers most of it.
+Tools such as MLflow, Weights & Biases and DVC exist to automate this. And a disciplined text log plus git tags covers most of it.
 
 ## Interactive Exploration Guide
 
-1. <strong>Fix the seed and repeat.</strong> Enter a seed value and press <strong>Apply Seed &amp; Init</strong>, note the initial weights, then press it again with the same seed. Identical values &mdash; the initialisation is fully determined by that number.
-2. <strong>Change one digit.</strong> Change the seed and re-initialise. Every weight is different. The seed is not a setting with a meaningful scale; it just selects an arbitrary point in the sequence.
-3. <strong>Watch the sequence advance.</strong> Press <strong>Next Sample</strong> several times. Each draw differs, but the whole run of draws replays identically after re-applying the same seed &mdash; that is what pseudo-random means.
+1. <strong>Fix the seed and repeat.</strong> Enter a seed value and press <strong>Apply Seed &amp; Init</strong>, note the initial weights, then press it again with the same seed. Identical vals &mdash; the initialisation is fully found by that count.
+2. <strong>Change one digit.</strong> Change the seed and re-initialise. Each weight is other. The seed is not a setting with a meaningful scale. It just selects an arbitrary point in the sequence.
+3. <strong>Watch the sequence advance.</strong> Press <strong>Next Sample</strong> a few times. Each draw differs, but the whole run of draws replays identically after re-applying the same seed &mdash; that is what pseudo-random means.
 4. <strong>Stream without reseeding.</strong> Press <strong>Auto Stream</strong> and let it run, then re-apply the seed. The stream restarts from the beginning of the same sequence, not from where it stopped.
 
 ## Why the GPU can still be non-deterministic
 
-Seeding every generator can still leave runs that differ, and the reason is floating-point arithmetic rather than randomness. GPU kernels parallelise reductions across thousands of threads, and the order in which partial sums combine varies between runs. Floating-point addition is not associative &mdash; <span class="mono-font">(a + b) + c</span> can differ from <span class="mono-font">a + (b + c)</span> in the last bits &mdash; so identical inputs can give slightly different outputs.
+Seeding each generator can still leave runs that differ. And the reason is floating-point arithmetic rather than randomness. GPU kernels parallelise reductions across thousands of threads. And the order in which partial sums mix varies between runs. Floating-point addition is not associative &mdash; <span class="mono-font">(a + b) + c</span> can differ from <span class="mono-font">a + (b + c)</span> in the last bits &mdash; so identical inputs can give slightly other outputs.
 
-Those differences are around 10<sup>&minus;7</sup>, but training amplifies them: a tiny gradient difference changes the next weights, which changes the next gradient, and after thousands of steps the runs have visibly diverged. Frameworks offer deterministic modes (<span class="mono-font">torch.use_deterministic_algorithms(True)</span>) that force reproducible kernels, typically at a real cost in speed.
+Those gaps are around 10<sup>&minus;7</sup>. But training amplifies them: a tiny gradient gap changes the next weights. It changes the next gradient. And after thousands of steps the runs have visibly diverged. Frameworks offer deterministic modes (<span class="mono-font">torch.use_deterministic_algorithms(True)</span>) that force reproducible kernels, often at a real cost in speed.
 
-## What usually goes wrong
+## What often goes wrong
 
 - <strong>Seeding one library and assuming it covers the rest.</strong> Python, NumPy and the framework each need seeding, plus <span class="mono-font">PYTHONHASHSEED</span> if set ordering matters.
 - <strong>Treating the seed as a hyperparameter.</strong> Searching for a good seed is fitting to noise. If results depend heavily on it, the finding is fragile, not tuned.
-- <strong>Reporting a single run.</strong> A one-run comparison between two methods is uninterpretable when seed variance alone can move accuracy a point or more. Report mean and spread over several seeds.
+- <strong>Reporting a single run.</strong> A one-run comparison between two ways is uninterpretable when seed variance alone can move accuracy a point or more. Report mean and spread over a few seeds.
 - <strong>Expecting reproducibility across machines.</strong> A fixed seed reproduces a run on the same hardware, library versions and thread count. Change the GPU or the cuDNN version and results move again.
 
 ## Key takeaway
 
-Training draws randomness from initialisation, shuffling, dropout and augmentation, each from its own generator, so reproducibility means seeding all of them rather than one. Even then GPU reductions are non-deterministic at the level of floating-point rounding, and training amplifies those differences over thousands of steps. Seed to make a run repeatable for debugging &mdash; and report results over several seeds, because a single run tells you as much about the seed as about the method.
+Training draws randomness from initialisation, shuffling, dropout and augmentation, each from its own generator. So reproducibility means seeding all of them rather than one. Still then GPU reductions are non-deterministic at the level of floating-point rounding. And training amplifies those gaps over thousands of steps. Seed to make a run repeatable for debugging &mdash; and report results over a few seeds, since a single run tells you as much about the seed as about the way.
 
 ## Seed variance is a measurement, not a nuisance
 
-Here is the more useful framing: instead of trying to eliminate run-to-run variation, <em>measure</em> it.
+Here is the more useful framing: instead of trying to remove run-to-run variation, <em>measure</em> it.
 
-Train the same configuration with five different seeds and record the spread. On many tasks that spread is one or two percent &mdash; which means any improvement smaller than that is indistinguishable from luck.
+Train the same setup with five other seeds and record the spread. On many tasks that spread is one or two percent &mdash; which means any improvement less than that is indistinguishable from luck.
 
-That has a direct consequence for how results are reported. A single run showing 91.2% against a baseline's 90.8% demonstrates nothing if the seed variance is &plusmn;0.8%. Reporting the mean and standard deviation over several seeds is the honest alternative, and it is what prevents a project from chasing noise for weeks.
+That has a direct consequence for how results are reported. A single run showing 91.2% against a baseline's 90.8% shows nothing if the seed variance is &plusmn;0.8%. Reporting the mean and standard deviation over a few seeds is the honest option. And it is what stops a project from chasing noise for weeks.
 
-It also changes how you choose: a configuration that is slightly worse on average but far more stable across seeds is often the better one to ship.
+It also changes how you choose: a setup that is slightly worse on average but far more stable across seeds is often the better one to ship.
 
 ## Determinism at inference
 
-Serving has its own reproducibility requirements, and they are usually easier.
+Serving has its own reproducibility requirements, and they are often easier.
 
-<strong>Call `model.eval()`.</strong> This disables dropout and switches batch normalisation to its running statistics. Without it, predictions vary between calls and depend on what else is in the batch &mdash; the same input genuinely gives different answers.
+<strong>Call `net.eval()`.</strong> This disables dropout and switches batch normalisation to its running statistics. Without it, predictions vary between calls and depend on what else is in the batch &mdash; the same input genuinely gives other answers.
 
-<strong>Fix the preprocessing.</strong> Ship the fitted scaler, the tokeniser and the exact resizing and normalisation constants alongside the weights. A mismatch here is the most common cause of a model that scored well in training and behaves oddly in production.
+<strong>Fix the preprocessing.</strong> Ship the fitted scaler, the tokeniser and the exact resizing and normalisation constants alongside the weights. A mismatch here is the most common cause of a net that scored well in training and behaves oddly in production.
 
-<strong>Beware batch effects.</strong> Even in eval mode, some operations produce marginally different results depending on batch composition due to floating-point summation order. For most applications the difference is irrelevant; for anything audited, it is worth knowing about.
+<strong>Beware batch effects.</strong> Still in eval mode, some steps give marginally other results depending on batch composition due to floating-point summation order. For most applications the gap is irrelevant. For anything audited, it is worth knowing about.
 
-<strong>Pin the runtime.</strong> A model exported to ONNX or TorchScript and run on a different runtime version can differ in the last decimal places.
+<strong>Pin the runtime.</strong> A net exported to ONNX or TorchScript and run on a other runtime version can differ in the last decimal places.
 
-## The same code, twice, with different answers
+## The same code, twice, with other answers
 
-Five separate sources of randomness sit between your script and your weights. Each is demonstrated and then pinned down, in the order they bite.
+Five split sources of randomness sit between your script and your weights. Each is showed and then pinned down, in the order they bite.
 
 ```python-run
 import numpy as np
@@ -173,7 +173,7 @@ print("   one extra draw from the first, and they diverge forever:")
 print("     ", (r1.random(6) > 0.5).astype(int), (r2.random(6) > 0.5).astype(int))
 ```
 
-Floating-point order is the source that surprises people, because addition is not associative in finite precision.
+Floating-point order is the source that surprises people, since addition is not associative in finite precision.
 
 ```python-run
 import numpy as np
@@ -198,7 +198,7 @@ print("   changes summation order without changing your code.")
 print("   this source you cannot fix with a seed, only with a lockfile.")
 ```
 
-Given all those sources, here is what to do in practice, and why statistical reproducibility matters more than bit-exact.
+Given all those sources, here is what to do in practice. And why statistical reproducibility matters more than bit-exact.
 
 ```python-run
 import numpy as np
@@ -230,22 +230,22 @@ print("   from seed noise on this model.")
 
 ## Questions people ask
 
-<strong>Why is 42 the conventional seed?</strong> Cultural, from <em>The Hitchhiker's Guide to the Galaxy</em>. Any fixed value works; the point is that it is fixed.
+<strong>Why is 42 the conventional seed?</strong> Cultural, from <em>The Hitchhiker's Guide to the Galaxy</em>. Any fixed value works. The point is that it is fixed.
 
-<strong>Does setting a seed guarantee identical results?</strong> On the same machine with the same library versions and deterministic algorithms enabled, yes. Across different hardware, not necessarily.
+<strong>Does setting a seed guarantee identical results?</strong> On the same machine with the same library versions and deterministic algorithms enabled, yes. Across other hardware, not necessarily.
 
-<strong>How much does deterministic mode cost?</strong> Typically 10&ndash;20% throughput, mostly from disabling `cudnn.benchmark`. Some operations have no deterministic implementation and will raise an error instead.
+<strong>How much does deterministic mode cost?</strong> Often 10&ndash;20% throughput, mostly from disabling `cudnn.benchmark`. Some steps have no deterministic build and will raise an error instead.
 
-<strong>Should I always train deterministically?</strong> No &mdash; use it when debugging or when a result must be exactly reproducible. For ordinary training, seed everything and accept small variation.
+<strong>Should I always train deterministically?</strong> No &mdash; use it when debugging or when a result must be just reproducible. For ordinary training, seed all and accept small variation.
 
-<strong>How many seeds should I run?</strong> Three to five for a paper or an important decision. One is fine for iteration, as long as you do not over-interpret small differences.
+<strong>How many seeds should I run?</strong> Three to five for a paper or an key decision. One is fine for iteration, as long as you do not over-interpret small gaps.
 
-<strong>Why do my results differ between my laptop and the server?</strong> Different hardware, different library versions, different numbers of data loader workers. All three change the arithmetic or the batch composition.
+<strong>Why do my results differ between my laptop and the server?</strong> Other hardware, other library versions, other counts of data loader workers. All three change the arithmetic or the batch composition.
 
 ## Recap in one screen
 
 - Five sources of randomness: initialisation, shuffling, dropout, augmentation and GPU kernel order.
 - Seed Python, NumPy and Torch, and seed the data loader workers individually.
 - Full determinism needs `cudnn.deterministic` and no benchmarking, at 10&ndash;20% of throughput.
-- Reproducibility also requires pinned library versions, versioned data and logged configuration.
-- Measure the seed variance, and treat any improvement smaller than it as noise.
+- Reproducibility also needs pinned library versions, versioned data and logged setup.
+- Measure the seed variance. And treat any improvement less than it as noise.

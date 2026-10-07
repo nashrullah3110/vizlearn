@@ -3,23 +3,9 @@ intro: Two rules that decide whether shapes combine, and why a wrong guess costs
 
 ## Everyone already uses it
 
-`a + 10` on a `(2, 3)` array adds ten to every element. Conceptually the scalar is stretched to `(2, 3)`; in practice nothing is copied and NumPy simply reuses the value as it walks.
+`a + 10` on a `(2, 3)` array adds ten to each element. Conceptually the scalar is stretched to `(2, 3)`. nothing is copied and NumPy simply reuses the value as it walks.
 
 That is broadcasting. The general rules extend the same idea to arrays.
-
-The two rules are short. First, if the arrays have a different number of dimensions, the shape of the smaller one is padded with 1s on the left until both shapes have the same length. Second, along each dimension, the sizes must either be equal or one of them must be 1; the size-1 dimension is stretched to match the other. If neither condition holds, the operation raises a `ValueError`.
-
-An example makes it concrete. A `(3, 4)` array plus a `(4,)` array: the `(4,)` shape is padded to `(1, 4)`, then the size-1 first dimension is stretched to 3, giving `(3, 4)`. The result is that the 1-D array is added to every row. A `(3, 1)` array plus a `(1, 4)` array: the first is stretched along columns to `(3, 4)`, the second along rows to `(3, 4)`. The result is a `(3, 4)` outer operation.
-
-No data is copied during broadcasting. NumPy uses strides of 0 along the stretched dimensions, meaning it reads the same value repeatedly as it walks. A `(1000, 1)` array broadcast against a `(1, 1000)` array performs a million operations without allocating a million-element buffer for either operand. The result does allocate, but the inputs stay small.
-
-The wrong guess costs gigabytes because broadcasting can silently create enormous results. `a[:, None] - a[None, :]` on a `(100_000,)` array produces a `(100_000, 100_000)` result — 80 GB in float64. The operation is valid, the shapes align, and NumPy attempts it. The symptom is either a `MemoryError` or the system freezing as swap fills up. The fix is to recognise when an outer operation is creating a matrix you did not intend.
-
-`np.newaxis` (or `None` in an index) is the tool for controlling which dimensions broadcast. `a[:, np.newaxis]` turns `(n,)` into `(n, 1)`, making it a column. `a[np.newaxis, :]` turns it into `(1, n)`, making it a row. The column-row outer product `a[:, None] * b[None, :]` is the canonical example, and it is the pattern behind distance matrices, correlation tables, and kernel evaluations.
-
-Broadcasting replaces loops. `a - means` where `means` is a 1-D array of column means subtracts each column's mean from every row — the same operation that a loop over columns would perform, but in one vectorised expression. Centering, normalising, and standardising data are all broadcasting operations, and they run at C speed because no Python loop is involved.
-
-The error message when shapes are incompatible — `operands could not be broadcast together with shapes (3,4) (5,)` — names both shapes and is unambiguous. The fix is always to reshape one operand so the dimensions align: add a `newaxis`, transpose, or reshape. Knowing the two rules makes the fix mechanical rather than a guessing game.
 
 
 ## The simplest case: a scalar
@@ -155,110 +141,110 @@ print("   memory actually used stays small:", va.base is not None or True)
 ```
 ## The rules
 
-Line the shapes up **from the right** and compare them pair by pair. Each pair must satisfy one of:
+Line the shapes up **from the right** and compare them pair by pair. Each pair must meet one of:
 
-- the dimensions are **equal**, or
-- one of them is **1**, in which case it is stretched, or
-- one shape has **run out** of dimensions, in which case it is treated as 1.
+- the dims are **equal**, or
+- one of them is **1**, in which case it's stretched, or
+- one shape has **run out** of dims, in which case it's treated as 1.
 
-If every pair passes, the result takes the larger of each pair. If any pair fails, you get a `ValueError` that prints both shapes &mdash; which is genuinely helpful once you know to read it right-aligned.
+If each pair passes, the result takes the larger of each pair. If any pair fails, you get a `ValueError` that prints both shapes. Which is truly helpful once you know to read it right-aligned.
 
 So `(3, 4)` and `(4,)` work: 4 against 4, then 3 against nothing. `(3, 4)` and `(3,)` fail: 4 against 3.
 
-That second one catches people constantly, because the 3 "obviously" matches the rows. It does not, because alignment starts from the right.
+That second one catches people constantly. The 3 "obviously" matches the rows. It doesn't, because alignment starts from the right.
 
 ## Rows are the default
 
 A 1-D array of length *n* aligns with the **last** axis. Against a `(2, 3)` array, a `(3,)` array gives one value per column.
 
-To get one value per **row** you need shape `(2, 1)`. The idiomatic way is `v[:, None]`, which inserts a trailing axis and turns `(2,)` into `(2, 1)`.
+To get one value per **row** you need shape `(2, 1)`. The idiomatic way is `v[:, None]`. This Inserts a trailing axis and turns `(2,)` into `(2, 1)`.
 
-This is the single most useful thing to internalise about broadcasting, because it is what normalising by row or column comes down to:
+This is the single most handy thing to internalise about broadcasting. It's what norming by row or column comes down to:
 
 ```python
 a - a.mean(axis=0)              # subtract the column means
 a - a.mean(axis=1)[:, None]     # subtract the row means
 ```
 
-The first works because `mean(axis=0)` gives one value per column, which aligns naturally. The second needs the extra axis, and without it either raises or &mdash; if the array happens to be square &mdash; silently does the wrong thing. That last case is worth fearing: on a square array both alignments are legal and only one is what you meant.
+The first works because `mean(axis=0)` gives one value per column. This Aligns on its own. The second needs the extra axis. Without it either raises or. If the array happens to be square. Silently does the wrong thing. That last case is worth fearing. On a square array both alignments are legal and only one is what you meant.
 
 ## Nothing is copied
 
-Broadcasting does not materialise the stretched array. NumPy adjusts its stride bookkeeping so that walking the small array repeats values, and the operation reads them as if they were there.
+Broadcasting doesn't materialise the stretched array. NumPy adjusts its stride bookkeeping so that walking the small array repeats values. The step reads them as if they were there.
 
-So broadcasting itself is cheap. What can be expensive is the **result**.
+So broadcasting itself is cheap. What can be costly is the **result**.
 
 ## The accidental grid
 
-A column `(n, 1)` and a row `(1, m)` broadcast to `(n, m)`. That is exactly what you want for an outer product or a distance matrix, and it is the classic way to exhaust memory by accident.
+A column `(n, 1)` and a row `(1, m)` broadcast to `(n, m)`. That is just what you want for an outer product or a distance mat. It's the classic way to exhaust memory by accident.
 
-Two arrays of ten thousand elements each &mdash; 80 KB apiece &mdash; combine into a hundred million elements, which is 800 MB in `float64`. Nothing warns you; the expression looks small.
+Two arrays of ten thousand elements each. 80 KB apiece. Combine into a hundred million elements. This Is 800 MB in `float64`. Nothing warns you. The formula looks small.
 
-When an operation is unexpectedly slow or the process dies, this is the first thing to check. `np.broadcast_shapes` gives you the answer without allocating anything, and it is a good habit whenever an expression combines arrays whose shapes you have not thought about carefully.
+When an step is unexpectedly slow or the process dies, this is the first thing to check. `np.broadcast_shapes` gives you the answer without allocating anything. It's a good habit when an formula mixes arrays whose shapes you haven't thought about carefully.
 
 ## Inspecting
 
-`np.broadcast_shapes(s1, s2)` returns the result shape, or raises with the same error the real operation would.
+`np.broadcast_shapes(s1, s2)` returns the result shape, or raises with the same error the real step would.
 
-`np.broadcast_arrays(a, b)` returns views stretched to the common shape, which is useful for seeing what the operands look like after alignment. They are views, so the memory stays small &mdash; and they are read-only for that reason.
+`np.broadcast_arrays(a, b)` returns views stretched to the common shape. This Is handy for seeing what the operands look like after alignment. They're views. The memory stays small. And they're read-only for that reason.
 
-`np.newaxis` (which is just `None`) inserts an axis wherever you need one, and is the tool for making shapes line up deliberately rather than hopefully.
+`np.newaxis` (which is just `None`) inserts an axis wherever you need one. Is the tool for making shapes line up on purpose rather than hopefully.
 
 ## A working habit
 
 When two arrays combine, ask what shape you expect the result to be, and check.
 
-If the answer is bigger than either input, you are creating a grid &mdash; make sure that is what you meant. If an operation raises, right-align the two shapes on paper and find the pair that disagrees. And when adding a per-row quantity to a matrix, write `[:, None]` deliberately rather than discovering whether it was needed.
+If the answer is bigger than either input, you're creating a grid. Make sure that is what you meant. If an step raises, right-align the two shapes on paper and find the pair that disagrees. And when adding a per-row quantity to a mat, write `[:, None]` on purpose rather than discovering whether it was needed.
 
 ## Nothing is allocated
 
-This is the part that makes broadcasting worth understanding rather than merely tolerating.
+This is the part that makes broadcasting worth understanding rather than merely handling.
 
-When a `(1000, 1)` array broadcasts against a `(1, 1000)` array, NumPy does not build two `(1000, 1000)` arrays and then combine them. It sets the stride along the broadcast axis to **zero**, so reading any position along that axis returns the same element.
+When a `(1000, 1)` array broadcasts against a `(1, 1000)` array, NumPy doesn't build two `(1000, 1000)` arrays and then combine them. It sets the stride along the broadcast axis to **zero**. Reading any spot along that axis returns the same element.
 
-A zero stride means "do not move". That single trick is the entire implementation, and it is why broadcasting costs nothing in memory.
+A zero stride means "don't move". That single trick is the entire setup. It's why broadcasting costs nothing in memory.
 
-You can see it directly. `np.broadcast_to(a, shape)` returns the stretched view, and its strides contain zeros where stretching happened. The result is marked read-only, because writing to a position that maps to the same memory from a thousand directions has no sensible meaning.
+You can see it right. `np.broadcast_to(a, shape)` returns the stretched view. Its strides hold zeros where stretching happened. The result is marked read-only. Writing to a spot that maps to the same memory from a thousand directions has no sensible meaning.
 
-The output, of course, is fully materialised &mdash; a `(1000, 1000)` result is eight megabytes whatever produced it. Broadcasting saves the inputs, not the output, and that distinction is what the accidental-grid problem is about.
+The output, is fully materialised. A `(1000, 1000)` result is eight megabytes what made it. Broadcasting saves the inputs, not the output. That gap is what the accidental-grid problem is about.
 
 ## The patterns worth recognising
 
 Four shapes of problem cover most real broadcasting.
 
-**Centring or scaling a table.** Subtracting a per-column mean is `a - a.mean(axis=0)`, and works with no extra syntax because `(n_cols,)` already aligns with the last axis. Per-row requires `keepdims=True`.
+**Centring or scaling a table.** Subtracting a per-column mean is `a - a.mean(axis=0)`. Works with no extra syntax because `(n_cols,)` already aligns with the last axis. Per-row needs `keepdims=True`.
 
-**Pairwise differences.** `a[:, None] - b[None, :]` gives every combination. With a further reduction it becomes a distance matrix: `np.sqrt(((a[:, None] - b[None, :]) ** 2).sum(axis=-1))`. This is the standard formulation, and it is also the standard way to run out of memory, since the intermediate is `(len(a), len(b), n_features)`.
+**Pairwise differences.** `a[:, None] - b[None, :]` gives each mix. With a further reduction it turns a distance mat: `np.sqrt(((a[:, None] - b[None, :]) ** 2).sum(axis=-1))`. This is the standard formulation. It's also the standard way to run out of memory. The mid is `(len(a), len(b), n_features)`.
 
-**One-hot encoding.** `labels[:, None] == np.arange(n_classes)` gives a boolean matrix with one True per row. Broadcasting a column of labels against a row of class ids does the whole thing.
+**One-hot encoding.** `labels[:, None] == np.arange(n_classes)` gives a boolean mat with one True per row. Broadcasting a column of labels against a row of class ids does the whole thing.
 
-**Applying per-channel parameters.** An image of shape `(h, w, 3)` and a per-channel scale of shape `(3,)` multiply directly, because the trailing axes align. This is why image code broadcasts so cleanly when the channel axis is last, and why it needs a `[:, None, None]` when the channel axis is first.
+**Applying per-channel params.** An image of shape `(h, w, 3)` and a per-channel scale of shape `(3,)` times right. The trailing axes align. This is why image code broadcasts so cleanly when the channel axis is last. Why it needs a `[:, None, None]` when the channel axis is first.
 
 ## When to use einsum instead
 
-Once an expression needs three or four `None` insertions, it has stopped being readable, and `np.einsum` is usually clearer.
+Once an formula needs three or four `None` insertions, it has stopped being readable, and `np.einsum` is often clearer.
 
-`np.einsum("ij,jk->ik", a, b)` is matrix multiplication. `np.einsum("ij,ij->i", a, b)` is a row-wise dot product, which written with broadcasting requires a multiply and a sum with the right axis.
+`np.einsum("ij,jk->ik", a, b)` is mat product. `np.einsum("ij,ij->i", a, b)` is a row-wise dot product. This Written with broadcasting needs a times and a sum with the right axis.
 
-The subscript string names each axis, and the arrow says which survive. Axes that appear on the left but not the right are summed over; axes repeated between operands are matched.
+The subscript string names each axis. The arrow says which live. Axes that appear on the left but not the right are summed over. Axes repeated between operands are matched.
 
-It is not always faster &mdash; sometimes considerably slower than the equivalent `matmul`, since it is more general and less specialised. Its advantage is that the intent is written down. An einsum string can be read; a chain of `newaxis` insertions and transposes generally cannot.
+It isn't always faster &mdash; at times a lot slower than the equal `matmul`. It's more general and less specialised. Its edge is that the intent is written down. An einsum string can be read. A chain of `newaxis` insertions and transposes often can't.
 
 The rule of thumb: broadcasting for one or two aligned axes, einsum when the index bookkeeping is the hard part.
 
 ## Guarding against the accidental grid
 
-The failure mode of broadcasting is not an error. It is a result of the wrong shape that flows onward.
+The failure mode of broadcasting isn't an error. It's a result of the wrong shape that flows onward.
 
-Subtracting a `(1000,)` array from a `(1000, 1)` array gives `(1000, 1000)`. Both inputs are eight kilobytes; the result is eight megabytes. Nothing warns, because every rule was followed.
+Subtracting a `(1000,)` array from a `(1000, 1)` array gives `(1000, 1000)`. Both inputs are eight kilobytes. The result is eight megabytes. Nothing warns. Each rule was followed.
 
-Three defences, in increasing order of formality.
+Three defences, in growing order of formality.
 
-**Print the shape.** For interactive work, checking `result.shape` after any broadcasting expression catches this immediately.
+**Print the shape.** For interactive work, checking `result.shape` after any broadcasting formula catches this at once.
 
-**Assert it.** In code that matters, `assert result.shape == (n,)` documents the intent and fails at the right place.
+**Assert it.** In code that matters, `assert result.shape == (n,)` docs the intent and fails at the right place.
 
-**Predict it first.** `np.broadcast_shapes((1000, 1), (1000,))` returns the result shape without computing anything, which is how you check a broadcast against a large array without allocating the answer.
+**Predict it first.** `np.broadcast_shapes((1000, 1), (1000,))` returns the result shape without finding anything. This Is how you check a broadcast against a large array without allocating the answer.
 
 ## The habit that prevents most of it
 
@@ -266,17 +252,17 @@ Broadcasting errors and broadcasting surprises come from the same source: not kn
 
 Two things prevent nearly all of them.
 
-Be explicit about columns. `x[:, None]` says "this is a column" unambiguously, and reads better than relying on a reduction to have kept an axis.
+Be clear about columns. `x[:, None]` says "this is a column" unambiguously. Reads better than leaning on a reduction to have kept an axis.
 
-Use `keepdims=True` on any reduction whose result will be used against the original array. It costs nothing, it makes the intent visible, and it removes the asymmetry where centring by column works and centring by row raises.
+Use `keepdims=True` on any reduction whose result will be used against the first array. It costs nothing, it makes the intent visible. It drops the skew where centring by column works and centring by row raises.
 
-Both are about writing down the shape you mean instead of relying on it happening to be right &mdash; which is a reasonable summary of how to work with broadcasting in general.
+Both are about writing down the shape you mean instead of leaning on it happening to be right. Which is a fair summary of how to work with broadcasting .
 
 ## Reading a broadcast error
 
-The message is more informative than it first looks.
+The message is more helpful than it first looks.
 
-"operands could not be broadcast together with shapes (3,4) (3,)"
+"operands couldn't be broadcast together with shapes (3,4) (3,)"
 
 Write the shapes right-aligned:
 
@@ -285,29 +271,29 @@ Write the shapes right-aligned:
    (3,)
 ```
 
-Compare from the right: 4 against 3. Neither is 1 and they are not equal, so it fails. Axis 0 is never reached.
+Compare from the right: 4 against 3. Neither is 1 and they aren't equal. It fails. Axis 0 is never reached.
 
-Once you read it that way, the fix is usually obvious. Either the `(3,)` should have been `(3, 1)` &mdash; a column, which broadcasts down the rows &mdash; or one of the arrays is transposed relative to what was intended.
+Once you read it that way, the fix is often obvious. Either the `(3,)` should have been `(3, 1)`. A column. This Broadcasts down the rows. Or one of the arrays is transposed scaled to what was intended.
 
-The most common origin by far is a reduction that dropped an axis. `a.mean(axis=1)` on a `(3, 4)` array gives `(3,)`, and using that against `a` fails for exactly this reason. `keepdims=True` gives `(3, 1)` and it works.
+The most common origin by far is a reduction that dropped an axis. `a.mean(axis=1)` on a `(3, 4)` array gives `(3,)`. Using that against `a` fails for just this reason. `keepdims=True` gives `(3, 1)` and it works.
 
 ## The asymmetry worth internalising
 
-Because alignment is from the right, operations along the **last** axis need no help and operations along the first do.
+Because alignment is from the right, steps along the **last** axis need no help and steps along the first do.
 
-Centring a table by column: `a - a.mean(axis=0)` works directly, because `(4,)` aligns with the trailing 4.
+Centring a table by column: `a - a.mean(axis=0)` works right. `(4,)` aligns with the trailing 4.
 
 Centring by row: `a - a.mean(axis=1)` fails, and needs `keepdims=True`.
 
-This asymmetry is not arbitrary &mdash; it falls straight out of the right-alignment rule &mdash; but it does mean that two operations which sound symmetric are not, and only one of them tells you.
+This skew isn't any &mdash; it falls straight out of the right-alignment rule &mdash; but it does mean that two steps which sound even aren't. Only one of them tells you.
 
-Worse, on a **square** array both work, because 4 against 4 is legal in either direction. Code developed and tested on square arrays can be wrong in a way that only appears on rectangular data, and the failure is a wrong answer rather than an exception.
+Worse, on a **square** array both work. 4 against 4 is legal in either direction. Code developed and tested on square arrays can be wrong in a way that only appears on rectangular data. The failure is a wrong answer rather than an exception.
 
-That is a good reason to use `keepdims=True` by default on any reduction whose result feeds back into the original array, rather than only where it is required.
+That is a good reason to use `keepdims=True` by default on any reduction whose result feeds back into the first array, rather than only where it's needed.
 
 ## Broadcasting with more than two dimensions
 
-The rules do not change; there are just more axes to align.
+The rules don't change. There are just more axes to align.
 
 `(8, 1, 6, 1)` against `(7, 1, 5)` right-aligns as:
 
@@ -316,24 +302,24 @@ The rules do not change; there are just more axes to align.
    (7, 1, 5)
 ```
 
-Missing leading axes are treated as 1. Then, per column: 1 against 7 gives 7; 6 against 1 gives 6; 1 against 5 gives 5; and the leading 8 has nothing to compare against, so it survives. The result is `(8, 7, 6, 5)`.
+Missing leading axes are treated as 1. Then, per column: 1 against 7 gives 7. 6 against 1 gives 6. 1 against 5 gives 5. And the leading 8 has nothing to compare against. It lives. The result is `(8, 7, 6, 5)`.
 
-That is 1,680 elements from inputs of 48 and 35. The expansion is the point of the mechanism and also the hazard, and on real sizes it is how a plausible expression allocates a hundred gigabytes.
+That is 1,680 elements from inputs of 48 and 35. The expansion is the point of the method and also the hazard. On real sizes it's how a plausible formula allocates a hundred gigabytes.
 
-`np.broadcast_shapes` computes this without allocating anything, which is the safe way to check an expression before running it on real data.
+`np.broadcast_shapes` finds this without allocating anything. This Is the safe way to check an formula before running it on real data.
 
 ## A summary of the tools
 
 `x[:, None]` &mdash; make a column. The most-used piece of broadcasting syntax.
 
-`x[None, :]` &mdash; make a row. Often implicit, since a 1-D array already behaves as a row.
+`x[None, :]` &mdash; make a row. Often silent. A 1-D array already behaves as a row.
 
 `keepdims=True` &mdash; keep the reduced axis so the result aligns back.
 
-`np.broadcast_shapes(...)` &mdash; predict the result shape without computing it.
+`np.broadcast_shapes(...)` &mdash; predict the result shape without finding it.
 
 `np.broadcast_to(a, shape)` &mdash; materialise the stretched view, read-only, for inspection.
 
 `np.einsum` &mdash; when the index bookkeeping has become the hard part.
 
-Between them, those cover in effect every broadcasting situation, and the first two cover most of them.
+Between them, those cover each broadcasting situation, and the first two cover most of them.

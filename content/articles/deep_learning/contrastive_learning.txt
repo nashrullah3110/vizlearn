@@ -1,103 +1,103 @@
 title: Contrastive and Self-Supervised Learning
-intro: Getting a useful representation out of unlabelled data by turning the data into its own supervision.
+intro: Getting a handy form out of untagged data by turning the data into its own oversight.
 
 ## The pretext
 
-Labels are expensive and unlabelled data is not. Self-supervised learning
-invents a task from the data itself, so that solving it requires understanding
+Labels are costly and untagged data isn't. Self-taught learning
+invents a task from the data itself. So That solving it needs understanding
 the content.
 
-The contrastive version is stark: take an image, produce two augmented views,
-and require their representations to be close. Require every other image's views
+The contrastive version is stark: take an image, give two boosted views,
+and need their forms to be close. Need every other image's views
 to be far away.
 
 If a model can recognise that a crop and a colour-jittered version of the same
-photograph belong together, while distinguishing them from a thousand other
-photographs, it has had to learn what the photograph is *of*. The resulting encoder maps semantically similar inputs close together in embedding space without any human-provided labels. Fine-tuning on even a small labelled set then outperforms training from scratch on a much larger one, because the hard part &mdash; learning what matters in the image &mdash; is already done. This page covers the SimCLR framework, the InfoNCE loss that drives contrastive training, the choice of augmentations that determines what the model learns to ignore, and the collapse failure mode where the encoder maps everything to the same point.
+photo belong together, while distinguishing them from a thousand other
+photos, it has had to learn what the photo is *of*.
 
 ## InfoNCE
 
-The loss is a softmax over similarities:
+The loss is a softmax over likenesses:
 
 ```
 loss  =  -log[  exp(sim(a, p) / tau)
               / ( exp(sim(a, p) / tau) + sum over negatives exp(sim(a, n) / tau) ) ]
 ```
 
-It is exactly cross-entropy, where the classes are "which of these candidates is
-the match" and the correct answer is the positive. That framing is worth
-keeping: everything you know about cross-entropy applies here.
+It's just cross-entropy, where the classes are "which of these picks is
+the match" and the correct answer is the plus. That framing is worth
+keeping: all you know about cross-entropy applies here.
 
-The visualisation puts the anchor and its positive on the unit circle with the
-negatives scattered around, and computes the real loss. Move the jitter control
-and the positive drifts from the anchor &mdash; more aggressive augmentation
+The visualisation puts the anchor and its plus on the unit circle with the
+negatives scattered around, and finds the real loss. Move the jitter control
+and the plus drifts from the anchor &mdash; more aggressive boost
 makes the task harder, and the loss rises.
 
 ## Temperature
 
-`tau` is small and it matters more than anything else in the loss.
+`tau` is small and it matters more than any of it else in the loss.
 
-**Low temperature** sharpens the softmax, so the sum is dominated by the single
-most similar negative. The gradient concentrates on the hardest case, which
+**Low temperature** sharpens the softmax. So The sum is dominated by the single
+most similar minus. The grad focuses on the hardest case, which
 learns fine distinctions quickly and is unstable.
 
-**High temperature** flattens everything until all negatives count about the
-same, and the loss stops discriminating.
+**High temperature** flattens all until all negatives count about the
+same, and the loss stops telling apart.
 
 Drag it across its range and watch the loss move by an order of magnitude with
 no change to the geometry at all.
 
 ## Negatives, and doing without them
 
-More negatives generally means better representations &mdash; the task is
-harder, so the answer is more informative. The readout shows the loss rising
-with the count for exactly that reason.
+More negatives often means better forms &mdash; the task is
+harder, so the answer is more helpful. The readout shows the loss rising
+with the count for just that reason.
 
-That created an engineering problem, since negatives usually come from the
+That created an engineering problem, since negatives often come from the
 batch and batches have limits. **SimCLR** used very large batches. **MoCo** kept
-a queue of representations from previous batches with a slowly-updated encoder.
+a queue of forms from previous batches with a slowly-updated encoder.
 
-Then a second family showed negatives were not required at all. **BYOL** and
-**SimSiam** use only positive pairs, avoiding the collapse everyone expected
-&mdash; where the encoder maps everything to one point and scores perfectly
-&mdash; through an asymmetry: a predictor head on one branch and a stop-gradient
+Then a second family showed negatives weren't needed at all. **BYOL** and
+**SimSiam** use only plus pairs, avoiding the collapse everyone expected
+&mdash; where the encoder maps all to one point and scores just right
+&mdash; through an skew: a predictor head on one branch and a stop-grad
 on the other. **Barlow Twins** and **VICReg** instead add a term that decorrelates
-the representation's dimensions.
+the form's dims.
 
 That negatives turned out to be optional was a genuine surprise, and why it
 works is still argued over.
 
 ## Augmentation is the design
 
-The augmentations decide what the model learns to ignore, and therefore what it
+The boosts decide what the model learns to skip, and so what it
 learns.
 
-Colour jitter teaches colour invariance &mdash; excellent for object recognition
+Colour jitter teaches colour steadiness &mdash; great for object spotting
 and wrong for a task where colour is the label. Random cropping teaches that
-parts imply the whole, which is most of what makes contrastive learning work on
+parts imply the whole. This Is most of what makes contrastive learning work on
 images and is also why it can learn to match textures rather than objects.
 
-SimCLR's ablations found the augmentation choice mattered more than the
+SimCLR's drop-tests found the boost choice mattered more than the
 architecture, which is an unusual finding and a durable one.
 
 ## Where it is used
 
-**Pretraining** on unlabelled data, then fine-tuning on a small labelled set.
-This is the main use, and it is why the field cared.
+**Pretraining** on untagged data, then fine-tuning on a small labelled set.
+This is the main use, and it's why the field cared.
 
 **CLIP** contrasts images against their captions rather than against other
-views, which is what produced a model that can be prompted in language.
+views, which is what made a model that can be prompted in language.
 
 **Sentence embeddings.** SimCSE contrasts a sentence against itself under
 dropout.
 
-**Recommendation and retrieval**, where "these two things go together" is the
+**Recommendation and lookup**, where "these two things go together" is the
 native form of the data.
 
 ## InfoNCE by hand, and why temperature dominates
 
-The contrastive loss is ordinary cross-entropy over "which candidate is the
-match", so it is worth evaluating once. Anchor similarity to its positive 0.9,
+The contrastive loss is plain cross-entropy over "which pick is the
+match", so it's worth testing once. Anchor likeness to its plus 0.9,
 to four negatives 0.85 (one hard), 0.2, 0.1, 0.3, loss
 `-log[ exp(0.9/tau) / (exp(0.9/tau) + &Sigma; exp(neg/tau)) ]`:
 
@@ -107,45 +107,45 @@ to four negatives 0.85 (one hard), 0.2, 0.1, 0.3, loss
 |0.10|0.48|0.62|
 |0.50|0.98|0.38|
 
-Same geometry, same similarities &mdash; only `tau` changed &mdash; and the loss
+Same geometry, same likenesses &mdash; only `tau` changed &mdash; and the loss
 moves by a factor of three. Low temperature sharpens the softmax so the hard
-negative at 0.85 dominates the denominator and the gradient concentrates on the
+minus at 0.85 dominates the denominator and the grad focuses on the
 single most confusable case: fast, fine distinctions, and unstable. High
-temperature flattens the candidates until they count about equally and the loss
-stops discriminating. That is why temperature is tuned before anything
-architectural, and why SimCLR's ablations found it and the augmentation choice
+temperature flattens the picks until they count about equally and the loss
+stops telling apart. That is why temperature is tuned before any of it
+architectural, and why SimCLR's drop-tests found it and the boost choice
 mattered more than the encoder. More negatives raise the loss for the right
-reason &mdash; a harder task is more informative. That pressure pushed the
+reason &mdash; a harder task is more helpful &mdash; which is what pushed the
 field to large batches and memory queues, before BYOL and SimSiam showed the
-negatives could be dropped entirely given the right asymmetry.
+negatives could be dropped fully given the right skew.
 
-The augmentations are not a preprocessing detail; they *are* the design, because
+The boosts aren't a prep detail. They *are* the design, because
 they decide what the model learns to treat as irrelevant. Colour jitter teaches
-colour invariance, which is exactly right for object recognition and exactly wrong
+colour steadiness, which is just right for object spotting and just wrong
 for a task where colour is the label. Random cropping teaches that a part implies
 the whole, which is most of why contrastive learning works on images. The other
 standing risk is false negatives: two different photos of the same class are
 pushed apart by a loss that has no labels to know they belong together, a real
-cost that supervised contrastive learning removes when labels happen to be
+cost that guided contrastive learning drops when labels happen to be
 available. CLIP is the variant that contrasts images against their captions
-instead of against other views, which is what produced a model steerable by
+instead of against other views. This Is what made a model steerable by
 language.
 
 ## Where it goes wrong
 
-**Augmentations that destroy the label.** Colour jitter on a task about colour.
+**Boosts that destroy the label.** Colour jitter on a task about colour.
 
-**Temperature left at a default.** Tune it; it does more than the architecture.
+**Temperature left at a default.** Tune it. It does more than the architecture.
 
 **Too few negatives** without one of the methods designed to work that way.
 
 **False negatives.** Two different images of the same class are pushed apart by
-the loss, which is a real cost of not having labels, and what supervised
+the loss, which is a real cost of not having labels, and what guided
 contrastive learning fixes when labels are available.
 
 ## Learn what is similar without a single label
 
-Contrastive learning pulls two views of the same thing together and pushes everything else apart. Here is the InfoNCE loss computed by hand, then trained -- and the class structure that appears without any class labels.
+Contrastive learning pulls two views of the same thing together and pushes all else apart. Here is the InfoNCE loss found by hand, then trained -- and the class structure that appears without any class labels.
 
 ```python-run
 import numpy as np

@@ -1,134 +1,134 @@
 title: Seq2seq and Beam Search
-intro: How a model that emits one token at a time chooses a whole sequence, and why the obvious method is not the best one.
+intro: How a model that emits one token at a time chooses a whole sequence. Why the obvious method isn't the best one.
 
 ## The architecture
 
 Encoder-decoder handles the case where input and output are both sequences and
 their lengths differ &mdash; translation, summarisation, speech to text.
 
-The **encoder** reads the input and produces a representation. The **decoder**
-emits output tokens one at a time, each conditioned on the representation and on
-everything it has emitted so far.
+The **encoder** reads the input and makes a form. The **decoder**
+emits output tokens one at a time, each conditioned on the form and on
+all it has emitted so far.
 
-The original version compressed the whole input into a single fixed vector,
+The first version compressed the whole input into a single fixed vector,
 which became the bottleneck that motivated
-[attention](../natural_language_processing/attention_mechanism.html): let the
-decoder look back at every input position rather than at one summary. That is
+[focus](../natural_language_processing/attention_mechanism.html): let the
+decoder look back at each input spot rather than at one summary. That is
 the change the field turned on, and the transformer is its conclusion.
 
-Autoregressive decoding is not specific to that architecture. Any model that
-emits one token at a time faces the same question: at each step you have a
-probability over the vocabulary, and you have to choose.
+Autoregressive decoding isn't exact to that architecture. Any model that
+emits one token at a time faces the same question: at each step you've a
+chance over the vocab, and you've to choose.
 
 ## Greedy decoding, and its regret
 
 Take the most probable token each time.
 
 Fast, simple, and it optimises the wrong thing. You want the most probable
-*sequence*, and the highest-probability first token can lead into a region where
-everything that follows is bad.
+*sequence*, and the highest-chance first token can lead into a region where
+all that follows is bad.
 
-The chart shows the cumulative log probability of the beam's paths. With the
-width at 1 you get greedy decoding, and the readout compares it against the best
-sequence a wider beam found. It is frequently worse, and the reason is always
-the same: it committed early to something that looked good and did not pay off.
+The chart shows the cumulative log chance of the beam's paths. With the
+width at 1 you get greedy decoding, and the readout checks it against the best
+sequence a wider beam found. It's often worse, and the reason is always
+the same: it committed early to a thing that looked good and didn't pay off.
 
 ## Beam search
 
 Keep the `k` best partial sequences. At each step, expand all of them, score
-every continuation, keep the best `k` overall, and continue. At the end, take
+each continuation, keep the best `k` total, and continue. At the end, take
 the best complete sequence.
 
 Drag the width from 1 upward and watch the best score improve.
 
-It is still a heuristic. It does **not** find the globally best sequence &mdash;
-that would require searching an exponentially large tree &mdash; and a path
+It's still a heuristic. It does **not** find the globally best sequence &mdash;
+that would need searching an exponentially large tree &mdash; and a path
 discarded early because it looked weak can never come back, even if it led
-somewhere excellent. Beam search only reduces how often that happens.
+a place great. Beam search only reduces how often that happens.
 
 ## The length problem
 
-Sequence probability is a product of per-token probabilities, so every extra
-token multiplies by something less than 1. Longer sequences have lower
-probability, always, and unnormalised beam search therefore has a systematic
+Sequence chance is a product of per-token chances, so each extra
+token times by a thing less than 1. Longer sequences have lower
+chance, always, and unnormalised beam search so has a systematic
 bias toward stopping early.
 
-The standard fix divides the log probability by the length, sometimes raised to
-a tunable power. It is a correction with no principled derivation, it is
-necessary, and every production decoder has one.
+The standard fix cuts the log chance by the length, at times raised to
+a tunable power. It's a correction with no principled derivation, it's
+needed, and each production decoder has one.
 
 ## Wider is not always better
 
 Raise the width past about 5 and translation quality often *falls*. This is
-called the **beam search curse**, and it is well documented.
+called the **beam search curse**, and it's well documented.
 
-The explanation is that a wider beam finds sequences the model genuinely
-considers more probable, and the model's notion of probable is not the same as
-good. Very high-probability text is bland: it is the safe, generic continuation.
-A wider search is a more faithful search of a flawed objective.
+The explanation is that a wider beam finds sequences the model truly
+considers more probable, and the model's notion of probable isn't the same as
+good. Very high-chance text is bland: it's the safe, plain continuation.
+A wider search is a more faithful search of a flawed goal.
 
-That is also why open-ended generation abandons beam search entirely. Sampling
-methods &mdash; temperature, top-k, nucleus &mdash; deliberately do not take the
+That is also why open-ended generation abandons beam search fully. Sampling
+methods &mdash; temperature, top-k, nucleus &mdash; on purpose don't take the
 most probable path, because for creative text the most probable path is the
-boring one. Beam search survives where there is a right answer: translation,
-speech recognition, constrained generation.
+boring one. Beam search lives where there's a right answer: translation,
+speech spotting, constrained generation.
 
 ## Where greedy loses, on a tree you can check
 
 The claim that greedy decoding optimises the wrong thing is a two-step example
-away. Suppose the first token is A with probability 0.6 or B with 0.4, and the
-best continuation after each is shown below.
+away. Suppose the first token is A with chance 0.6 or B with 0.4, and the
+best continuation after each is:
 
 |first token|P(first)|best P(second)|sequence probability|
 |---|---|---|---|
 |A|0.6|0.5|0.30|
 |B|0.4|0.9|**0.36**|
 
-Greedy takes A, because 0.6 beats 0.4, and lands on a sequence of probability
+Greedy takes A, because 0.6 beats 0.4, and lands on a sequence of chance
 0.30. Beam search with width 2 keeps both A and B alive, discovers that B leads
 to a 0.9 continuation, and returns the 0.36 sequence &mdash; the more probable
 *sequence*, which the greedy first choice ruled out at step one. That is the
-entire argument for beam search: the highest-probability first token can open
-into a region where everything after it is worse.
+entire arg for beam search: the highest-chance first token can open
+into a region where all after it's worse.
 
-It is still a heuristic, not a global search, and it has its own trap. Sequence
-probability is a product of per-token terms, so every extra token multiplies by
-something below 1 and longer sequences score lower automatically &mdash; which is
-why unnormalised beam search truncates, and why every production decoder divides
-the log-probability by length. Widen the beam too far and quality can even fall,
-because a more faithful search of the model's probability finds the blandest,
-safest text; that is the beam-search curse, and it is why open-ended generation
+It's still a heuristic, not a global search, and it has its own trap. Sequence
+chance is a product of per-token terms. So Each extra token times by
+a thing below 1 and longer sequences score lower automatically &mdash; which is
+why unnormalised beam search truncates, and why each production decoder cuts
+the log-chance by length. Widen the beam too far and quality can even fall,
+because a more faithful search of the model's chance finds the blandest,
+safest text. That is the beam-search curse, and it's why open-ended generation
 samples instead.
 
 The deeper reason open-ended generation abandons beam search is that the model's
-notion of probable is not the same as good. A more faithful search of the
-probability surface converges on the safe, generic continuation &mdash; the blandest
-text is often the most probable &mdash; so past a beam width of about five,
+notion of probable isn't the same as good. A more faithful search of the
+chance surface settles on the safe, plain continuation &mdash; the blandest
+text is often the most probable. So past a beam width of about five,
 translation and summarisation quality can fall rather than rise. Beam search earns
-its place only where there is a genuinely correct answer to find: translation,
-speech recognition, constrained decoding. For creative text, temperature, top-k
-and nucleus sampling deliberately avoid the most probable path, because that path
-is exactly the one worth leaving.
+its place only where there's a truly correct answer to find: translation,
+speech spotting, constrained decoding. For creative text, temperature, top-k
+and nucleus sampling on purpose avoid the most probable path, because that path
+is just the one worth leaving.
 
-And the cost is not free. A beam of width `k` multiplies both computation and
-memory by `k`, which for a large model is usually the binding constraint long
-before quality is. The width is chosen against a hardware budget as much as
+And the cost isn't free: a beam of width `k` times both work and
+memory by `k`, which for a large model is often the binding constraint long
+before quality is, so the width is chosen against a hardware budget as much as
 against the translation it buys.
 
 ## Where it goes wrong
 
-**No length normalisation.** Everything comes out truncated.
+**No length norming.** All comes out truncated.
 
 **A very wide beam on open-ended text.** Blander, not better.
 
 **Using beam search for creative generation.** Use sampling.
 
-**Forgetting the cost.** Width `k` multiplies both computation and memory by
+**Losing the cost.** Width `k` times both work and memory by
 `k`, and for a large model that is the binding constraint.
 
 ## Greedy decoding, and the sentence it cannot find
 
-At each step a decoder picks a token. Taking the most likely one every time is not the same as finding the most likely sentence -- here is a case where it demonstrably is not.
+At each step a decoder picks a token. Taking the most likely one each time isn't the same as finding the most likely sentence -- here is a case where it demonstrably isn't.
 
 ```python-run
 import numpy as np

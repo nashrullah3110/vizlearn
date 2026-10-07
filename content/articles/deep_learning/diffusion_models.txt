@@ -1,26 +1,26 @@
 title: Diffusion Models
-intro: Learning to reverse a process that is trivial to run forwards, and why that turned out to work so much better than the alternatives.
+intro: Learning to reverse a process that is trivial to run forwards. Why that turned out to work so much better than the options.
 
 ## Forwards is free
 
 Take data and add a little Gaussian noise. Repeat. After enough steps nothing of
-the original remains and you have pure noise.
+the first remains and you've pure noise.
 
-This **forward process** has no parameters and nothing to learn. Better still, it
-has a closed form: you can jump straight to any step without simulating the ones
+This **forward process** has no params and nothing to learn. Better still, it
+has a closed form: you can jump straight to any step without modelling the ones
 before it.
 
 ```
 x_t  =  sqrt(abar_t) * x_0  +  sqrt(1 - abar_t) * epsilon
 ```
 
-`abar_t` is the fraction of the original signal still present, and it decreases monotonically
+`abar_t` is the fraction of the first signal still present, and it falls
 along a fixed **schedule**. The second panel plots the cosine schedule used
-here, and the readout gives the signal and noise proportions at whatever step
+here, and the readout gives the signal and noise proportions at what step
 you select.
 
-That closed form is why training is efficient: pick a random `t`, jump there
-directly, and train the denoiser on that one step. No sequential simulation required.
+That closed form is why training is cheap: pick a random `t`, jump there
+right, and train on that one step. No modelling.
 
 ## Backwards is the model
 
@@ -30,46 +30,46 @@ step at a time until an image appears.
 Each reverse step needs to know what noise was added, and that is the entire
 learned component. The network takes `x_t` and `t` and predicts `epsilon`.
 
-Given the noise, recovering the original is rearranging the equation above.
+Given the noise, getting back the first is rearranging the equation above:
 
 ```
 x_0  =  ( x_t  -  sqrt(1 - abar_t) * epsilon )  /  sqrt(abar_t)
 ```
 
-The demonstration does exactly this with the *true* noise &mdash; the target the
-model is trained on &mdash; and the readout gives the recovery error, which is
-in effect zero at every step. **The forward process is exactly invertible if
-you know the noise.** Predicting it is the whole job, and it is why the loss is
-a plain squared error on a noise vector rather than anything adversarial.
+The demo does just this with the *true* noise &mdash; the target the
+model is trained on &mdash; and the readout gives the getting back error, which is
+zero at each step. **The forward process is just invertible if
+you know the noise.** Predicting it's the whole job, and it's why the loss is
+a plain squared error on a noise vector rather than any of it rival.
 
 ## Why this beats what came before
 
-**A stable objective.** Predicting noise is ordinary supervised regression. No
-minimax game, no [discriminator to balance](generative_adversarial_networks.html),
+**A stable goal.** Predicting noise is plain guided regression. No
+minimax game, no [critic to balance](generative_adversarial_networks.html),
 no mode collapse. Training a diffusion model is boring in a way GAN training
-never was. That is the point.
+never was, and that is the point.
 
-**Coverage.** GANs can ignore parts of the distribution. A diffusion model is
-trained to denoise every example, so it cannot quietly drop a mode.
+**Coverage.** GANs can skip parts of the spread. A diffusion model is
+trained to denoise each example. So It can't quietly drop a mode.
 
-**Sharpness.** Unlike a [VAE](variational_autoencoders.html), there is no
-pixel-averaging term rewarding a blurred hedge.
+**Sharpness.** Unlike a [VAE](variational_autoencoders.html), there's no
+pixel-blending term rewarding a blurred hedge.
 
 The cost is **sampling speed**. Generation is many sequential passes &mdash;
-originally a thousand, now often ten to fifty with a better sampler &mdash;
+at first a thousand, now often ten to fifty with a better sampler &mdash;
 where a GAN needs one. DDIM and distillation methods have shortened this
-considerably, and it remains the main disadvantage.
+a lot, and it remains the main disadvantage.
 
 ## The schedule matters
 
-Drag `t` from 0 to 60 and watch how quickly the signal disappears. The original
-DDPM used a linear schedule, which destroys the signal too fast at the end
+Drag `t` from 0 to 60 and watch how quickly the signal disappears. The first
+DDPM used a linear schedule. This Destroys the signal too fast at the end
 &mdash; the last steps are all noise and contribute nothing to learning. The
 cosine schedule shown here keeps more signal for longer and trains better.
 
-Schedule design is a real part of the field, and so is the choice of what the
-model predicts: the noise, the original, or a mixture called `v`, all of which
-are algebraically equivalent and behave differently in practice.
+Schedule design is a real part of the field. So is the choice of what the
+model predicts: the noise, the first, or a mixture called `v`, all of which
+are algebraically equal and behave differently .
 
 ## In practice
 
@@ -78,20 +78,20 @@ are algebraically equivalent and behave differently in practice.
 cutting the cost enormously. Stable Diffusion is this.
 
 **Classifier-free guidance** trains the model both with and without a text
-condition, then extrapolates away from the unconditioned prediction at sampling
-time. It is what makes prompts actually steer the output, and turning it up
-trades diversity for prompt adherence.
+rule, then extrapolates away from the unconditioned guess at sampling
+time. It's what makes prompts really steer the output, and turning it up
+trades range for prompt adherence.
 
 ## The closed form that makes training cheap
 
 The reason diffusion training is cheap is one equation: the forward process has a
-closed form, so you can jump to any noise level without simulating the steps
+closed form, so you can jump to any noise level without modelling the steps
 before it.
 
 `x_t = sqrt(abar_t) &middot; x_0 + sqrt(1 - abar_t) &middot; epsilon`
 
-`abar_t` is the fraction of the original signal still present, falling along a
-fixed schedule. On the cosine schedule over 60 steps.
+`abar_t` is the fraction of the first signal still present, falling along a
+fixed schedule. On the cosine schedule over 60 steps:
 
 |step t|signal kept, sqrt(abar)|noise, sqrt(1-abar)|
 |---|---|---|
@@ -103,46 +103,46 @@ fixed schedule. On the cosine schedule over 60 steps.
 
 Training picks a random `t`, jumps straight there with one draw of `epsilon`, and
 asks the network to predict that `epsilon` &mdash; a plain squared-error
-regression, no simulation, no adversary. And the forward step is exactly
+regression, no modelling, no adversary. And the forward step is just
 invertible if you know the noise: rearranging the equation recovers `x_0` from
-`x_t` and `epsilon` with in effect zero error, so predicting the noise is the
-whole job. The cosine schedule above is chosen over the original linear one
-precisely because linear destroys the signal too fast. Its final steps are
+`x_t` and `epsilon` with zero error. So Predicting the noise is the
+whole job. The cosine schedule above is chosen over the first linear one
+just because linear destroys the signal too fast. Its final steps are
 nearly pure noise and teach almost nothing, while the cosine keeps signal alive
 longer and trains better.
 
-Everything that made diffusion win over GANs follows from that squared-error
-objective. Predicting noise is ordinary supervised regression, so there is no
-minimax game to balance and no mode collapse &mdash; the model is trained to
-denoise *every* example, so it cannot quietly drop part of the distribution the
+All that made diffusion win over GANs follows from that squared-error
+goal. Predicting noise is plain guided regression, so there's no
+minimax game to balance and no mode collapse. The model is trained to
+denoise *each* example, so it can't quietly drop part of the spread the
 way a GAN can. The price is sampling speed: generation is many sequential denoise
-steps, originally a thousand and now often ten to fifty with a better sampler,
+steps, at first a thousand and now often ten to fifty with a better sampler,
 where a GAN needs one forward pass. Latent diffusion cuts the cost by running the
-whole process in a VAE's latent space rather than in pixels, which is what Stable
-Diffusion is, and classifier-free guidance is what lets a text prompt actually
+whole process in a VAE's latent space rather than in pixels. This Is what Stable
+Diffusion is, and classifier-free guidance is what lets a text prompt really
 steer the result.
 
 One last point of confusion worth heading off: most diffusion models predict the
-*noise*, not the image, and some predict the original or a mixture called `v`. The
-three are algebraically equivalent but behave differently in training, and
-assuming the network outputs the picture rather than the noise makes the sampling
+*noise*, not the image, and some predict the first or a mixture called `v`. The
+three are algebraically equal but behave differently in training, and
+given the network outputs the picture rather than the noise makes the sampling
 code nonsense.
 
 ## Where it goes wrong
 
-**Expecting fast sampling.** It is the known weakness.
+**Expecting fast sampling.** It's the known weakness.
 
 **A schedule that destroys the signal too early.** Wasted steps.
 
-**Guidance turned up too high.** Saturated, oversimplified images and collapsed
-diversity.
+**Guidance turned up too high.** Saturated, oversimplified images and merged
+range.
 
-**Assuming the model predicts the image.** Most predict the noise, and confusing
+**given the model predicts the image.** Most predict the noise, and confusing
 the two makes the sampling code nonsense.
 
 ## Destroy the data, then learn to undo it one step at a time
 
-Diffusion adds noise on a schedule until nothing is left, then trains a model to remove a little of it. Both directions are run here on 1-D data, including the closed form that makes training cheap.
+Diffusion adds noise on a schedule until nothing is left, then trains a model to drop a little of it. Both directions are run here on 1-D data, including the closed form that makes training cheap.
 
 ```python-run
 import numpy as np

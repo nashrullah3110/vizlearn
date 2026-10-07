@@ -1,28 +1,17 @@
 title: Form Data and File Uploads
-intro: What a browser form actually sends, and why it is neither JSON nor a query string.
+intro: What a browser form really sends. Why it's neither JSON nor a query string.
 ## Three body formats
 
-An HTTP request has one body, and for an API there are three ways it is commonly encoded.
+An HTTP request has one body. For an API there are three ways it's often coded.
 
-**JSON** (`application/json`) is what a JavaScript client or another service sends. A Pydantic model parameter reads it.
+**JSON** (`use/json`) is what a JavaScript client or another service sends. A Pydantic model param reads it.
 
-**URL-encoded form** (`application/x-www-form-urlencoded`) is what a plain HTML `<form>` posts. It looks like a query string in the body: `username=ada&password=hunter2`.
+**URL-coded form** (`use/x-www-form-urlencoded`) is what a plain HTML `<form>` posts. It looks like a query string in the body: `username=ada&password=hunter2`.
 
-**Multipart** (`multipart/form-data`) is what a form with a file input sends. It carries several named parts, each with its own headers, which is how a file and its metadata travel together.
+**Multipart** (`multipart/form-data`) is what a form with a file input sends. It carries a few named parts, each with its own headers. This Is how a file and its metadata travel together.
 
-FastAPI needs to be told which. A model parameter means JSON; `Form()` means one of the form encodings; `UploadFile` means a file part in a multipart body.
+FastAPI needs to be told which. A model param means JSON. `Form()` means one of the form encodings. `UploadFile` means a file part in a multipart body.
 
-`Form()` annotates a parameter to read it from form data instead of JSON. The parameter name must match the form field name. Multiple `Form()` parameters in the same function read multiple fields from the same form submission.
-
-`UploadFile` gives you a file-like object with `.filename`, `.content_type`, `.read()`, `.seek()` and `.close()`. It spools small files in memory and large files to disk automatically, so you do not need to manage temporary files yourself. `await file.read()` gets the bytes; for large files, read in chunks with a loop over `await file.read(8192)`.
-
-Mixing `Form()` and `UploadFile` in the same endpoint handles the common case of a form that submits both text fields and a file. The browser sends this as `multipart/form-data`, and FastAPI parses each part according to its annotation.
-
-You cannot mix `Form()` or `UploadFile` with a JSON body parameter in the same endpoint. The HTTP specification allows only one content type per request, and a form submission is not JSON. If you need structured metadata alongside a file, send the metadata as a `Form()` field containing a JSON string and parse it manually, or use a separate endpoint.
-
-`python-multipart` must be installed for form and file handling to work. It is not a FastAPI dependency by default, and the error message when it is missing names the package. Installing it once is the usual resolution for a first-time "form data requires python-multipart" error.
-
-For multiple file uploads, annotate the parameter as `list[UploadFile]` and use `<input type="file" multiple>` on the form. Each file arrives as a separate `UploadFile` in the list.
 
 ## Form() reads a form field
 
@@ -172,25 +161,25 @@ for label, spec in [
 def login(username: str = Form(), password: str = Form()):
 ```
 
-Without `Form()`, a plain `username: str` parameter would be read as a **query parameter**, and the request would fail with a confusing 422 about a missing query field while the value sits in the body.
+Without `Form()`, a plain `username: str` param would be read as a **query param**. The request would fail with a confusing 422 about a missing query field while the value sits in the body.
 
-That is the one thing to remember here. The marker is not decoration; it is what tells FastAPI where to look.
+That is the one thing to note here. The marker isn't decoration. It's what tells FastAPI where to look.
 
-Everything else behaves as it does elsewhere: constraints, defaults, required-ness and the 422 all work the same way, with `loc[0] == "body"` because a form *is* the body.
+all else behaves as it does elsewhere: constraints, defaults, needed-ness and the 422 all work the same way, with `loc[0] == "body"` because a form *is* the body.
 
 ## One body, one content type
 
-A request cannot be both JSON and a form. Declaring a model parameter alongside a `Form()` parameter is a contradiction, and the resulting error does not always say so clearly.
+A request can't be both JSON and a form. Declaring a model param alongside a `Form()` param is a clash. The resulting error doesn't always say so clearly.
 
-Pick the encoding your client actually sends. If it is a browser form, use `Form()`. If it is JavaScript, it is almost certainly sending JSON, and a model is simpler and better documented.
+Pick the encoding your client really sends. If it's a browser form, use `Form()`. If it's JavaScript, it's almost certainly sending JSON. A model is simpler and better documented.
 
-A common middle case: an HTML form that you would rather receive as a model. The clean answer is to have the front end send JSON. Failing that, a dependency can assemble a model from form fields, which keeps the handler tidy.
+A common middle case: an HTML form that you'd rather receive as a model. The clean answer is to have the front end send JSON. Failing that, a dependency can assemble a model from form fields. This Keeps the handler tidy.
 
 ## python-multipart
 
-Form and file endpoints require the `python-multipart` package. Without it FastAPI raises at startup, and the message names the package rather than the endpoint &mdash; which is helpful once you know, and puzzling the first time.
+Form and file endpoints need the `python-multipart` package. Without it FastAPI raises at startup. The message names the package rather than the endpoint. Which is helpful once you know, and puzzling the first time.
 
-It is a runtime dependency of the framework's form support rather than something FastAPI bundles, so it has to be installed explicitly.
+It's a runtime dependency of the framework's form support rather than a thing FastAPI bundles. It has to be installed by name.
 
 ## UploadFile
 
@@ -201,121 +190,121 @@ def upload(file: UploadFile):
 
 `UploadFile` gives you three things: `filename`, `content_type`, and `file`, a file-like object.
 
-The important property is that a large upload is **spooled to disk** rather than held in memory. A `bytes` parameter would read the whole thing into RAM, which is fine for a small avatar and a denial-of-service vector for anything else. `UploadFile` is the right default.
+The key property is that a large upload is **spooled to disk** rather than held in memory. A `bytes` param would read the whole thing into RAM. This Is fine for a small avatar and a denial-of-service vector for anything else. `UploadFile` is the right default.
 
-It also offers `async` methods &mdash; `await file.read()` &mdash; for use in `async def` endpoints, so a slow upload does not block the event loop.
+It also offers `async` methods. `await file.read()` &mdash; for use in `async def` endpoints. A slow upload doesn't block the event loop.
 
 ## What the framework does not check
 
 This is the part worth taking seriously, because the defaults are permissive.
 
-**Size is unlimited.** Nothing caps an upload. Check it in the handler by reading with a limit rather than reading everything and then measuring &mdash; and set a limit in whatever sits in front of the app too, since by the time your code runs the bytes have already arrived.
+**Size is unlimited.** Nothing caps an upload. Check it in the handler by reading with a limit rather than reading all and then measuring. And set a limit in what sits in front of the app too. By the time your code runs the bytes have already arrived.
 
-**`content_type` is a claim.** It comes from the client and can say anything. If the type matters, check the actual content: magic bytes for images, parsing for structured formats.
+**`content_type` is a claim.** It comes from the client and can say anything. If the type matters, check the actual content. Magic bytes for images, parsing for structured formats.
 
-**`filename` is attacker-controlled.** It can contain `..`, absolute paths, null bytes and characters your filesystem treats specially. **Never build a path from it.** Generate your own name &mdash; a UUID &mdash; and keep the original only as metadata if you need it for display.
+**`filename` is attacker-controlled.** It can hold `..`, abs paths, null bytes and characters your filesystem treats specially. **Never build a path from it.** make your own name. A UUID. And keep the first only as metadata if you need it for display.
 
-**The content is unexamined.** An uploaded file is arbitrary bytes. If it will be served back to browsers, serve it from a separate domain or with `Content-Disposition: attachment` and a restrictive `Content-Type`, so an HTML file cannot execute in your origin.
+**The content is unexamined.** An uploaded file is any bytes. If it will be served back to browsers, serve it from a split domain or with `Content-Disposition. Attachment` and a restrictive `Content-Type`. An HTML file can't execute in your origin.
 
 ## Documenting them
 
-Form and file endpoints appear in the OpenAPI document, and the interactive docs render a file picker for `UploadFile`, which makes them genuinely testable from the browser.
+Form and file endpoints appear in the OpenAPI doc. The interactive docs render a file picker for `UploadFile`. This Makes them truly testable from the browser.
 
-`Form()` takes `description` like every other parameter, and it is worth writing &mdash; a form field's name is often shorter and less obvious than a JSON key.
+`Form()` takes `description` like every other param. It's worth writing. A form field's name is often shorter and less obvious than a JSON key.
 
 ## When to use which
 
-Reach for **JSON** by default. It is better documented, better validated, nests properly, and every client can produce it.
+Reach for **JSON** by default. It's better documented, better checked, nests properly. Each client can give it.
 
-Reach for **form data** when a browser form posts directly to your API without JavaScript, or when an existing client already sends it.
+Reach for **form data** when a browser form posts right to your API without JavaScript, or when an existing client already sends it.
 
-Reach for **multipart** when files are involved. That is what it is for, and it is the only one of the three that carries binary content alongside fields.
+Reach for **multipart** when files are involved. That is what it's for. It's the only one of the three that carries binary content alongside fields.
 
-For anything large, consider not uploading through your API at all: a pre-signed URL to object storage moves the bytes directly and keeps them out of your request path entirely. That is more moving parts, and it is the standard answer once files get big.
+For anything large, consider not uploading through your API at all. A pre-signed URL to object storage moves the bytes right and keeps them out of your request path fully. That is more moving parts. It's the standard answer once files get big.
 
 
 ## Mistakes people make
 
-**Forgetting `Form()`.** A plain parameter is read as a query parameter, so the request 422s about a missing query field while the value sits in the body. The marker is what tells FastAPI where to look.
+**Losing `Form()`.** A plain param is read as a query param. The request 422s about a missing query field while the value sits in the body. The marker is what tells FastAPI where to look.
 
-**Mixing a model and form fields.** One request, one body, one content type. Declaring both is a contradiction, and the resulting error does not say so clearly.
+**Mixing a model and form fields.** One request, one body, one content type. Declaring both is a clash. The resulting error doesn't say so clearly.
 
-**Missing `python-multipart`.** FastAPI raises at startup and names the package rather than the endpoint - obvious afterwards, puzzling the first time.
+**Missing `python-multipart`.** FastAPI raises at startup and names the package rather than the endpoint - obvious later, puzzling the first time.
 
 **Reading an upload as `bytes`.** Fine for an avatar, a denial-of-service vector for anything larger. `UploadFile` spools to disk.
 
-**Building a path from `filename`.** It is attacker-controlled and can contain `..`, absolute paths, and characters your filesystem treats specially. Generate your own name.
+**Building a path from `filename`.** It's attacker-controlled and can hold `..`, abs paths. Characters your filesystem treats specially. make your own name.
 
-**Trusting `content_type`.** It is a claim from the client. If the type matters, check the bytes.
+**Trusting `content_type`.** It's a claim from the client. If the type matters, check the bytes.
 
-**No size limit.** Nothing caps an upload by default, and the bytes arrive before your handler runs - so cap it in the handler *and* in whatever sits in front of the app.
+**No size limit.** Nothing caps an upload by default. The bytes arrive before your handler runs - so cap it in the handler *and* in what sits in front of the app.
 
 ## Serving uploads back
 
 A related risk that is easy to miss.
 
-If uploaded files are served back to browsers from your own domain, an uploaded HTML file executes in your origin - which means it can read cookies, call your API as the viewer, and generally behave as your own page.
+If uploaded files are served back to browsers from your own domain, an uploaded HTML file runs in your origin - which means it can read cookies, call your API as the viewer. Often behave as your own page.
 
-The mitigations, in rough order of preference: serve user content from a separate domain; send `Content-Disposition: attachment` so it downloads rather than renders; and set a restrictive `Content-Type` rather than echoing the one the client claimed.
+The mitigations, in rough order of preference: serve user content from a split domain. Send `Content-Disposition: attachment` so it downloads rather than renders. And set a restrictive `Content-Type` rather than echoing the one the client claimed.
 
-For anything at scale, uploading directly to object storage with a pre-signed URL avoids the problem and keeps the bytes out of your request path entirely.
+For anything at scale, uploading right to object storage with a pre-signed URL avoids the problem and keeps the bytes out of your request path fully.
 
 
 ## Getting a model out of a form
 
-A recurring want: a browser posts a form, and you would rather work with a Pydantic model than six `Form()` parameters.
+A recurring want: a browser posts a form. You'd rather work with a Pydantic model than six `Form()` params.
 
-There is no built-in switch for it, because a model parameter means JSON by definition. The usual answers, in order of how much they cost:
+There's no built-in switch for it. A model param means JSON by meaning. The usual answers, in order of how much they cost:
 
-**Have the front end send JSON.** A few lines of JavaScript, and everything downstream becomes simpler - validation, nesting, documentation and error shapes all improve.
+**Have the front end send JSON.** A few lines of JavaScript. All downstream turns simpler - check, nesting, docs and error shapes all improve.
 
-**Build the model in the handler.** `ModuleIn(**{"title": title, "minutes": minutes})` after declaring the fields as `Form()`. Honest, and repetitive across several endpoints.
+**Build the model in the handler.** `ModuleIn(**{"title": title, "minutes": minutes})` after declaring the fields as `Form()`. Honest. Repetitive across a few endpoints.
 
-**A dependency that assembles it.** The tidy version: one function declaring the form fields and returning the model, then `module: ModuleIn = Depends(as_form)`. Handlers stay clean and the assembly lives in one place. That is the next tier's material.
+**A dependency that assembles it.** The tidy version. One function declaring the form fields and returning the model, then `module: ModuleIn = Depends(as_form)`. Handlers stay clean and the assembly lives in one place. That is the next tier's material.
 
-What to avoid is a decorator that inspects a model and generates form parameters by reflection. Several exist, they work, and they make the endpoint's signature something a reader cannot see.
+What to avoid is a decorator that inspects a model and makes form params by reflection. a few exist, they work. They make the endpoint's signature a thing a reader can't see.
 
 ## Multiple files
 
-`files: List[UploadFile]` accepts several parts under the same name, which is what a multi-select file input sends.
+`files: List[UploadFile]` accepts a few parts under the same name. This Is what a multi-select file input sends.
 
-Two cautions with it. The size limit now applies to the total as well as each item, so a hundred small files can be as expensive as one large one - cap the count with `max_length` as well. And validating each file means doing the work per item, so a slow check multiplies.
+Two cautions with it. The size limit now applies to the total and each item. A hundred small files can be as costly as one large one - cap the count with `max_length` as well. And checking each file means doing the work per item. So A slow check times.
 
-For anything where the count could be large, an endpoint that accepts one file and is called repeatedly is easier to reason about, easier to retry, and gives the client better progress reporting.
+For anything where the count could be large, an endpoint that accepts one file and is called again and again is easier to reason about, easier to retry. Gives the client better progress reporting.
 
 ## A closing thought
 
-Uploads are the part of an API where the defaults are most permissive and the consequences most physical - disk filling, memory exhausting, files being served back and executing in your origin.
+Uploads are the part of an API where the defaults are most permissive and the results most physical - disk filling, memory exhausting, files being served back and running in your origin.
 
-None of that is exotic, and none of it is handled for you. A size cap, a type check on the bytes rather than the claim, a generated filename, and a decision about where the file is served from cover nearly all of it.
+None of that is exotic, and none of it's handled for you. A size cap, a type check on the bytes rather than the claim, a made filename, and a choice about where the file is served from cover nearly all of it.
 
-Four small pieces of care, on the one endpoint type where their absence is genuinely dangerous.
+Four small pieces of care, on the one endpoint type where their lack is truly dangerous.
 
 
 ## Where uploads should go
 
 A last architectural note, because the default path is rarely the right one at scale.
 
-Uploading through your API means the bytes travel into your process, through whatever sits in front of it, and often out again to storage. That consumes request capacity, occupies a worker for the duration of a slow connection, and puts a size limit on something that has no natural one.
+Uploading through your API means the bytes travel into your process, through what sits in front of it. Often out again to storage. That consumes request room, occupies a worker for the duration of a slow link. Puts a size limit on a thing that has no natural one.
 
-The alternative is a pre-signed URL: your API issues a short-lived credential, the client uploads directly to object storage, and then tells your API the key. The bytes never touch your application.
+The option is a pre-signed URL: your API issues a short-lived credential, the client uploads right to object storage. Then tells your API the key. The bytes never touch your use.
 
-It is more moving parts and it is what most systems end up doing, because the failure mode of the simple approach is a worker pool full of slow uploads.
+It's more moving parts and it's what most systems end up doing. The failure mode of the simple approach is a worker pool full of slow uploads.
 
 ## Summary
 
-`Form()` marks a field as coming from a form-encoded body; without it the parameter is read from the query string. A request has one body, so form fields and a JSON model cannot coexist.
+`Form()` marks a field as coming from a form-coded body. Without it the param is read from the query string. A request has one body. Form fields and a JSON model can't coexist.
 
-`UploadFile` gives a filename, a declared content type and a file-like object, spooled to disk rather than held in memory. Both the filename and the content type come from the client and neither can be trusted; nothing limits the size unless you do.
+`UploadFile` gives a filename, a declared content type and a file-like object, spooled to disk rather than held in memory. Both the filename and the content type come from the client and neither can be trusted. Nothing limits the size unless you do.
 
-Prefer JSON where you have the choice, use multipart when files are involved, and for anything large consider uploading straight to object storage instead of through your API.
+Prefer JSON where you've the choice, use multipart when files are involved. For anything large consider uploading straight to object storage instead of through your API.
 
 ## Next
 
-Status codes: which number to return when, why the class matters more than the number, and how returning 200 for everything throws away information that clients, caches and monitoring all already know how to use.
+Status codes: which number to return when, why the class matters more than the number. How returning 200 for all throws away data that clients, caches and monitoring all already know how to use.
 
 ## A final note
 
-If one thing survives this module, make it the filename rule.
+If one thing lives this module, make it the filename rule.
 
-Every other risk here degrades gracefully - a large upload is slow, a wrong content type is a bad thumbnail. Building a path from a client-supplied filename is the one that writes a file where you did not intend, and it is a single line to avoid.
+Every other risk here degrades gracefully - a large upload is slow, a wrong content type is a bad thumbnail. Building a path from a client-supplied filename is the one that writes a file where you didn't intend. It's a single line to avoid.
