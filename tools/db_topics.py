@@ -462,8 +462,8 @@ it holds a lock on the table while it does:
 So the same declaration is instant on an empty table and an outage on a full one.
 This is why constraints should encode what is *structurally* true &mdash; a
 salary is plus, an end date follows a start date &mdash; rather than current
-policy: a `CHECK` on this year's VAT rate has to be dropped and re-verified across
-each row each time the rate changes, and re-verifying a large table is the
+policy. A `CHECK` on this year's VAT rate has to be dropped and re-verified across
+each row each time the rate changes. Re-verifying a large table is the
 costly op above, paid on a schedule set by the tax authority rather
 than by you.
 
@@ -481,7 +481,8 @@ known value.
 
 **Adding a constraint to a large live table without thinking.** The DB has
 to verify each existing row before it can accept the constraint, and in most
-engines that takes a lock while it does.
+engines that takes a lock while it does. Plan the migration during a low-traffic
+window so it does not block other writes.
 """,
     check=[
         {"q": "Why does UNIQUE usually permit several NULLs?",
@@ -1223,7 +1224,7 @@ table and someone is about to add a fifth, it wants to be recursive.
 
 **Leaving the join column unindexed.** A self-join reads the table twice. On a
 large table with no index on `manager_id`, that is two full scans and a hash in
-between.
+between. Add the index before the table grows.
 """,
     check=[
         {"q": "Why does an inner self-join drop the top of a hierarchy?",
@@ -1430,7 +1431,7 @@ All above assumes the data is a tree. If someone turns their own
 manager's manager, the step never returns empty and the query runs until the
 server stops it.
 
-Real data acquires cycles. The defences, in growing order of robustness:
+Real data acquires cycles. The defences, in growing order of strength:
 
 - Carry a depth column and add `WHERE level < 50` to the step.
 - Carry the path and add `WHERE instr(path, e.name) = 0` to refuse revisiting.
@@ -1636,9 +1637,9 @@ change. The result doesn't change. The work changed from thousands of row reads
 to a handful.
 
 That contrast is the whole skill: **look for SCAN on a large table where you
-expected a lookup.** Other engines use different words &mdash; PostgreSQL says
+expected a lookup.** Other engines use different words. PostgreSQL says
 `Seq Scan` against `Index Scan`, MySQL fills in a `type` column with `ALL`
-against `ref` &mdash; but the gap is the same all over.
+against `ref`. The gap is the same all over.
 
 ## The index it will not use
 
@@ -1650,8 +1651,8 @@ values of the column, in order. It doesn't store values of *expressions over*
 the column, so the moment the column is wrapped in any of it, the sorting the
 index gives no longer matches to what the query is asking about.
 
-This is the most common way a just right good index goes unused, and it hides
-inside plain-looking SQL:
+This is the most common way a good index goes unused, and it hides
+inside plain-looking SQL.
 
 | Written | Problem | Instead |
 |---|---|---|
@@ -1728,8 +1729,8 @@ row. So there's a crossover in selectivity:
 Fetching 60% of a table one row at a time through an index costs more than reading
 the whole table sequentially and discarding 40%, because random reads dominate the
 bill. This is why the tuner's choice depends on the *statistics*, not just the
-SQL &mdash; and why a query that used the index in staging, against a few hundred
-rows, can right switch to a scan in production, against millions with a
+SQL. A query that used the index in staging, against a few hundred
+rows, can right switch to a scan in production against millions with a
 different spread. The plan changing under you is the tuner doing its
 job, not misbehaving.
 
@@ -1975,7 +1976,7 @@ serves a multi-column filter well.
 that matches the sorting drops the sort step fully.
 
 **Leaving redundant indexes in place.** If `(a, b)` exists, `(a)` is almost
-certainly dead weight.
+certainly dead weight. Drop it and reclaim the write cost.
 """,
     check=[
         {"q": "An index on (status, customer_id) exists. Which query can use it for a seek?",
@@ -2646,7 +2647,8 @@ error surfaces as a lock wait or a serialisation failure.
 keeping up, and adding disk hides it rather than fixing it.
 
 **Counting rows to check for bloat.** The row count is right. The file size is
-the thing that grew.
+the thing that grew. Compare `pg_total_relation_size` before and after vacuum to
+see whether the cleanup actually freed space.
 """,
     [
         {"q": "What does a write do under MVCC?",
@@ -3350,6 +3352,10 @@ behind. Track both.
 
 **Using replicas for locking or counters.** any of it read-then-write must go to
 the main, or two clients read the same stale value.
+
+**No read-your-writes routing.** After a user writes, their next read should go to
+the main for a few seconds, or they see stale data and file a bug that is
+hard to trace.
 """,
     [
         {"q": "Why does a user sometimes not see their own change after saving?",

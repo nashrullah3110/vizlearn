@@ -2001,7 +2001,7 @@ limiting spreads.
 
 **Skipping dependence.** The classical version needs free draws. Time
 series data often isn't free, and the effective sample size is
-smaller than the count.
+smaller than the row count suggests.
 
 ## Watch it happen
 
@@ -2102,7 +2102,7 @@ data into four equal groups. **Deciles** cut into ten.
 ## Why not just use the mean
 
 A mean is a balance point. It moves when any of it moves. A quantile depends
-only on **order**, and that makes it robust.
+only on **order**, and that makes it solid.
 
 Add a single huge value to a dataset and the mean shifts, possibly a lot.
 The median barely moves at all. The new value is simply "one more above
@@ -2155,7 +2155,7 @@ when the cost of over- and under-guess differ, or when you want a
 guess interval right.
 
 **Quantile binning** turns a smooth feature into equal-sized buckets, which
-is robust to skew in a way that equal-width binning isn't.
+is solid to skew in a way that equal-width binning isn't.
 
 **Feature scaling.** `QuantileTransformer` maps a feature to a uniform or normal
 spread through its quantiles, and is unaffected by outliers in a way
@@ -2445,6 +2445,10 @@ time-series data has a smaller effective `n`.
 question, and bias doesn't shrink with `n`.
 
 **Using the formula for statistics that don't have one.** Bootstrap instead.
+
+**Confusing the spread of the data with the spread of the statistic.** The
+data can be wildly scattered and the mean can still be pinned down tightly, as
+long as the sample is large enough. The two spreads answer different questions.
 
 ## The distribution of a statistic, not of the data
 

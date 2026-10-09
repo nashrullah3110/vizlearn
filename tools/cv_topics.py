@@ -3869,7 +3869,7 @@ whose output is an image. Uses it for the same reason segmentation does.
 The whole point is receptive field without downsampling, and the math shows
 how fast it grows. A dilated `k&times;k` kernel spans `k + (k-1)(d-1)`, and stacked
 layers build up `(k-1)&middot;d` at each step. Take four 3&times;3 layers at the
-standard rising rates 1, 2, 4, 8:
+standard rising rates 1, 2, 4, 8.
 
 |layer|dilation|reach added|running receptive field|
 |---|---|---|---|
@@ -6050,8 +6050,8 @@ the spot-based embeddings. Which is why the first ViT needed 300 million
 pre-training images to beat a ResNet that had locality for free.
 
 Focus is permutation-rule &mdash; shuffle the tokens and the output is
-shuffled the same way &mdash; so without spot-based embeddings a ViT truly can't
-tell a photo from a jigsaw of itself, and the fix, a learned vector per
+shuffled the same way. Without spot-based embeddings a ViT truly can't
+tell a photo from a jigsaw of itself. The fix, a learned vector per
 spot, is strikingly weak next to convolution: the model is told "this is spot
 37" and must learn from data that 37 sits beside 36 and above 23. That missing
 inductive bias is why the plain ViT needed huge pre-training, and why two

@@ -250,7 +250,7 @@ the right trade at scale.
 GANs remain the right tool where a single forward pass is needed: real-time
 super-detail, image-to-image translation, on-device generation. And the
 rival idea itself long outgrew image synthesis &mdash; domain-rival
-training, rival robustness and the critic in a visual loss are
+training, rival strength and the critic in a visual loss are
 all this page's structure, applied to a thing else.
 ## Questions people ask
 
@@ -264,7 +264,7 @@ all this page's structure, applied to a thing else.
 
 <strong>Should I train the critic more than the gen?</strong> The first method allows k critic steps per gen step and used k = 1. A stronger critic gives a better grad *direction* and a vanished one under the saturating loss. The two networks are often kept close in room. With WGAN-GP extra critic steps truly help. This Is a consequence of the different distance rather than a general rule.
 
-<strong>Are GANs still worth learning now that diffusion has won?</strong> For two reasons. A GAN makes in a single forward pass. This Still decides the matter for real-time super-detail, image-to-image translation and on-device generation. And the rival structure long outgrew image synthesis. Domain-rival training, rival robustness and the critic inside a visual loss are all this page applied elsewhere.
+<strong>Are GANs still worth learning now that diffusion has won?</strong> For two reasons. A GAN makes in a single forward pass. This Still decides the matter for real-time super-detail, image-to-image translation and on-device generation. And the rival structure long outgrew image synthesis. Domain-rival training, rival strength and the critic inside a visual loss are all this page applied elsewhere.
 
 ## Recap in one screen
 

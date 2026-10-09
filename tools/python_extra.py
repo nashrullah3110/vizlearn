@@ -7815,7 +7815,7 @@ except ValueError:
 
 That pattern &mdash; log with the traceback, then skip this item and carry on
 &mdash; is the correct shape for batch work. Here One bad record shouldn't
-end a run over ten thousand. The crucial part is `logging.exception` rather
+end a run over ten thousand. The critical part is `logging.exception` rather
 than `logging.error`, because the first includes the traceback and the second
 throws it away.
 

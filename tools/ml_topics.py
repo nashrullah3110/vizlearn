@@ -664,7 +664,7 @@ single column is present.
 Select **Mean**, then **Median**. Both put a spike at a single value in the
 middle of the spread, and both leave the mean below the truth.
 
-They differ in robustness. The mean is dragged by extreme values. The median is
+They differ in strength. The mean is dragged by extreme values. The median is
 not. For a skewed column. Income, house prices, time-to-event &mdash; the
 median is the better default, and for a roughly even column the two are
 close enough that it rarely matters.
@@ -950,7 +950,7 @@ and the reader is entitled to know which they've.
 
 ## Ways to be less fragile
 
-**Robust loss.** Huber loss is squared for small residuals and linear for large
+**Solid loss.** Huber loss is squared for small residuals and linear for large
 ones, so a distant point pulls hard but not as n&sup2; hard. RANSAC fits on
 random subsets and keeps the consensus.
 
@@ -1229,7 +1229,7 @@ the object can do.
 ## The three other things it buys
 
 **Setting search over prep.** Because the steps are part of one
-estimator, a grid can range over them:
+estimator, a grid can range over them.
 
 ```
 {"impute__strategy": ["mean", "median"],
@@ -1281,9 +1281,9 @@ those labels too, so each fold is scored on features chosen partly *because* the
 match its answers. Nothing errors, and the inflation &mdash; fifteen points here,
 more with more pick features. Can't be guessed after the fact,
 because it depends on data the leak already consumed. The pipeline makes the
-correct order the only order the object can execute: each fold fits the selector,
+correct order the only order the object can execute. Each fold fits the selector,
 the scaler and the model on its own training rows and merely transforms the
-validation rows, so the number it reports is an guess of a thing real.
+validation rows. The number it reports is a real guess.
 
 Beyond stopping the leak, the pipeline buys three things that are awkward by hand.
 Setting search can range over the prep &mdash; whether the median
@@ -2880,7 +2880,8 @@ gives a defensible value.
 
 **Expecting it to work on varying density.** Reach for HDBSCAN instead.
 
-**Reading noise as failure.** Labelling outliers as noise is the feature.
+**Reading noise as failure.** Labelling outliers as noise is the feature, not a
+bug to fix.
 
 ## Clusters by density, and the points left over
 
@@ -4776,7 +4777,7 @@ Drag the temperature control and watch the curve deform. That control performs
 Cutting by a number less than one sharpens each score toward 0 or 1. Cutting
 by a number greater than one flattens them toward 0.5.
 
-Crucially, this is a **monotonic** change. It never changes the order of
+Critically, this is a **monotonic** change. It never changes the order of
 any two guesses. each ranking metric &mdash; AUC, mean precision,
 any of it based on sorting. Is **the same at each setting of that
 slider**, while the trust curve swings from badly too sure to badly
@@ -5393,7 +5394,7 @@ true.
 
 ## Getting stacking right
 
-The essential detail is how the meta-learner's training data is made.
+The key detail is how the meta-learner's training data is made.
 
 Training the base models and then feeding their guesses **on the same data**
 to the meta-learner leaks badly. A model that overfits its training set makes

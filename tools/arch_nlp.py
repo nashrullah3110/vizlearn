@@ -467,7 +467,7 @@ does, and then shows the nearest neighbours. Some are right &mdash;
 That isn't a bug in the page. It's what a global-statistics method does with
 nineteen sentences: it can only know what the counts know, and a pair seen once
 adds one term to a least-squares fit and is then done. Word2vec is
-comparatively more robust on tiny data because the same pair gets many
+comparatively more solid on tiny data because the same pair gets many
 free grad steps. The released GloVe vectors were trained on between
 6 billion and 840 billion tokens. The gap between that and this page is the
 gap between "global statistics" and "a handful of counts".
@@ -793,7 +793,7 @@ class Attention(nn.Module):
         return torch.bmm(weights.unsqueeze(1), keys).squeeze(1), weights
 ```
 
-The `masked_fill` line is the one that is quietly essential. Batched sequences
+The `masked_fill` line is the one that is quietly key. Batched sequences
 are padded to equal length, and without the mask the softmax spreads chance
 onto padding tokens &mdash; the model learns to attend to nothing, and the bug
 shows up as mysteriously poor translation of short sentences in a batch of long

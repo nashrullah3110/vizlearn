@@ -9030,7 +9030,7 @@ Both are conversions at an edge. Both work best when they convert to a thing *ne
 
 A custom serialiser that formats for a human breaks that symmetry. It takes a value with one meaning and makes one with a presentation baked in. This The next layer has to undo before it can do anything else.
 
-That is the underlying reason the advice in this module runs against its own subject. The feature is well designed and at times essential. It's just that most of the reasons people reach for it are reasons to do the work one spot else.
+That is the underlying reason the advice in this module runs against its own subject. The feature is well designed and at times key. It's just that most of the reasons people reach for it are reasons to do the work one spot else.
 ''',
     [
         {"q": "Does a `@field_serializer` change what the field holds in memory?",
@@ -10670,7 +10670,7 @@ print("the string 8 became an int before the handler ran")'''),
 
         ("Validation failures become 422",
          "A <code>ValidationError</code> on a request body is turned into a 422 whose "
-         "body is essentially <code>errors()</code>.",
+         "body is really just <code>errors()</code>.",
          '''from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
@@ -10800,7 +10800,7 @@ for name, prop in schema["properties"].items():
     ],
     [
         "A parameter annotated with a model <em>is</em> the request body. FastAPI parses the JSON and validates it before your handler runs.",
-        "A <code>ValidationError</code> becomes a 422 whose <code>detail</code> is essentially <code>e.errors()</code> &mdash; the shape you already know how to read.",
+        "A <code>ValidationError</code> becomes a 422 whose <code>detail</code> is really just <code>e.errors()</code> &mdash; the shape you already know how to read.",
         "Path and query parameters are validated by the same rules, and <code>loc</code> starts with <code>path</code>, <code>query</code> or <code>body</code>.",
         "<code>response_model</code> validates <em>and filters</em> the output, so a field it does not declare cannot leak from a handler that returned too much.",
         "Use separate <code>Create</code>, <code>Update</code> and <code>Out</code> models. One model with everything optional documents nothing.",

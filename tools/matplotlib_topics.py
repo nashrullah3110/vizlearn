@@ -2270,7 +2270,7 @@ Two lines, and the chart reads like a thing published rather than a thing export
 
 ## Labels that fix themselves
 
-The most robust label is one found from the data rather than typed:
+The most solid label is one found from the data rather than typed:
 
 ```python
 ax.set_title("Peak %s: %.0f" % (months[i], y[i]))
@@ -3164,7 +3164,7 @@ On their own trivial. Together they're the gap between a grid that reads as one 
 
 ## Building a grid programmatically
 
-Most real grids are made from data rather than written out. A few patterns make that robust.
+Most real grids are made from data rather than written out. A few patterns make that solid.
 
 Find the grid size from the number of items:
 
@@ -3608,7 +3608,7 @@ Three checks, none of which needs a tool.
 
 **Print.** A projector and a printer both compress the range. Colours that differ on a monitor often don't live either.
 
-Passing all three often means the encoding is robust. Failing any of them is fixed the same way: vary luminance, and vary a second channel.
+Passing all three often means the encoding is solid. Failing any of them is fixed the same way: vary luminance, and vary a second channel.
 
 ## Colour with meaning
 
@@ -8732,7 +8732,7 @@ Insets suit a long series with an notable short window. A scatter with a dense c
 
 Hand-tuned spacing breaks when the data changes: a longer label, an extra group, a bigger number needing more room.
 
-Three habits keep a layout robust.
+Three habits keep a layout solid.
 
 **Prefer `constrained_layout`** over hand-set `subplots_adjust`, because it recomputes rather than remembering.
 

@@ -794,7 +794,7 @@ A random split doesn't ensure the two halves look alike. On a dataset with three
 
 `stratify=y` fixes this by sampling within each class. Both halves carry the same proportions as the first. The cost is nothing. For classification it should be the default rather than an option you note on hard datasets.
 
-Where it turns essential is imbalance. With 1% positives and a 20% test set, an unstratified split has a real chance of putting so few positives in the test set that the metric found from them is noise. Stratifying ensures the proportion. This Is the min needed for the number to mean any of it.
+Where it turns key is imbalance. With 1% positives and a 20% test set, an unstratified split has a real chance of putting so few positives in the test set that the metric found from them is noise. Stratifying ensures the proportion. This Is the min needed for the number to mean any of it.
 
 You can stratify on a thing other than the target by passing a different array. A group label, say. Which is at times what you want when the target is smooth but some cat variable must stay weighed.
 
@@ -1338,7 +1338,7 @@ Its great virtue is that it's expressed in the units of the target. If you're pr
 
 That is a truly key property. Most of the value of a model is decided by a person who has to judge whether the errors are tolerable. They can't judge that from a unitless number. MAE is the default worth reaching for when the answer will be reported to anyone.
 
-It's also robust: a single wild outlier moves it by its own size and no more.
+It's also solid: a single wild outlier moves it by its own size and no more.
 
 ## RMSE: the same idea, with big errors amplified
 
@@ -6558,7 +6558,7 @@ Imbalance doesn't affect each estimator equally, and knowing the pattern saves s
 
 **k-NN** is affected geometrically: with 98% negatives, the nearest neighbours of almost any point are minus. A minority point has to be in a very pure pocket to be found. Lowering `n_neighbors` helps, and `weights="distance"` helps more.
 
-**Naive Bayes** is fairly robust. It models each class apart and the prior can simply be adjusted.
+**Naive Bayes** is fairly solid. It models each class apart and the prior can simply be adjusted.
 
 The general rule: the more a model means across all rows at once, the more the rare class is drowned out. The more a weight helps.
 

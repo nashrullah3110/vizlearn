@@ -410,7 +410,7 @@ Those four explain most of what surprises people, and each has a module here.
 
 The methods, by contrast, are searchable. No one remembers the arg order of `merge` or the exact spelling of each rate alias, and no one needs to.
 
-So the handy thing to take from this track isn't coverage but a set of instincts. Check `dtypes` after loading, check row counts after joining, know whether you're holding a copy. Stay out of per-row Python.
+So the handy thing to take from this track isn't coverage but a set of instincts. Check `dtypes` after loading, check row counts after joining, know if you are holding a copy. Stay out of per-row Python.
 ''',
     [
         {"q": "What is the main structural difference between a DataFrame and a 2-D NumPy array?",
@@ -1855,7 +1855,7 @@ Without the lambda, the final `loc` would have to link an mid that doesn't have 
 
 `df.filter(like="date")` selects columns whose name holds a substring. `regex=` takes a pattern. `items=` takes an clear list.
 
-Both return a frame, so they compose with all else. They're a lot more robust than a hard-coded column list when the source data gains or loses columns.
+Both return a frame, so they compose with all else. They're a lot more solid than a hard-coded column list when the source data gains or loses columns.
 
 ## Setting values
 
@@ -3026,7 +3026,7 @@ The right-hand side must have the same number of columns as the left, and the in
 
 Column order is insertion order, and there's no `reorder` method.
 
-Three ways, in growing robustness:
+Three ways, in growing strength:
 
 `df[["b", "a", "c"]]` &mdash; select in the order you want. Fails loudly if a name is wrong. This Is often a feature.
 
@@ -3750,7 +3750,7 @@ The code is easy. The choice is a statistical choice, and it isn't neutral.
 
 **The mean** preserves the mean by build and **shrinks the variance**. You're adding points with no spread. Anything downstream that cares about dispersion. A standard deviation, a trust interval, a model that weights by variance. Is then quietly wrong. The fourth editor measures this.
 
-**The median** is more robust to outliers and has the same variance problem.
+**The median** is more solid to outliers and has the same variance problem.
 
 **A sentinel** like `-1` is honest for cat codes but must be documented, or someone will mean it.
 
@@ -3851,7 +3851,7 @@ Whether you added an indicator.
 
 a filled value is the same from a measured one once it's in the frame. Six months later, no one can tell which numbers were seen and which were invented. The analysis can't be copied or corrected.
 
-A frame with an `x_imputed` boolean column carries that data with the data. This Is more robust than a comment.
+A frame with an `x_imputed` boolean column carries that data with the data. This Is more solid than a comment.
 
 ## The order to work in
 
@@ -5001,7 +5001,7 @@ Adding a **calendar** period uses `pd.DateOffset(months=1)`. The gap matters. A 
 
 ## DatetimeIndex
 
-Putting the dates in the index unlocks the time-aware pick that makes pandas pleasant for time series.
+Putting the dates in the index opens up the time-aware pick that makes pandas pleasant for time series.
 
 `s["2024-02"]` selects the whole of February. `s["2024"]` selects the year. This is **partial string indexing**. It works because pandas understands the index is a timeline.
 
@@ -5342,7 +5342,7 @@ The result is a **new** frame carrying the first index labels. If downstream cod
 
 ## Missing values sort last
 
-`NaN` goes to the **end** in both ascending and descending order. It isn't treated as very large or very small. It's simply put aside.
+`NaN` goes to the **end** in both ascending and descending order. It isn't treated as very large or very small. It's in short aside.
 
 The result catches people: reversing an ascending sort is **not** the same as sorting descending. The NaNs move scaled to all else.
 
@@ -5544,7 +5544,7 @@ And sorting is costly &mdash; do it once, late. Only when the order is part of t
 
 Sorting is costly and often not needed. This Makes it worth asking what the order is for.
 
-If the answer is "to find the largest", a reduction does it in one pass. If it's "to find the top ten", `nlargest` does it without sorting the rest. If it's "so deduplication keeps the right row", the sort is essential and skipping it makes the result any. If it's "because the output is a report", the sort is the deliverable and its cost is the point.
+If the answer is "to find the largest", a reduction does it in one pass. If it's "to find the top ten", `nlargest` does it without sorting the rest. If it's "so deduplication keeps the right row", the sort is key and skipping it makes the result any. If it's "because the output is a report", the sort is the deliverable and its cost is the point.
 
 Ranking is the same step asked differently. Its only real subtlety is ties. The default means them. This Makes fractional ranks and surprises people expecting ints. Leaderboards often want `min`, and bands often want `dense`.
 
@@ -7401,7 +7401,7 @@ for path in sorted(glob.glob("data/*.csv")):
 df = pd.concat(frames, ignore_index=True)
 ```
 
-Three details make this robust.
+Three details make this solid.
 
 **Tag the source** before appending. So A row can be traced back to its file. `keys=` does the same thing through the index if you prefer.
 

@@ -1782,7 +1782,7 @@ print("strict :", r.status_code, r.json()["detail"][0]["loc"],
     ],
     [
         "A parameter annotated with a Pydantic model is the request body. FastAPI parses the JSON and validates it before your handler runs.",
-        "The 422's <code>detail</code> is essentially <code>e.errors()</code>, with <code>loc</code> beginning <code>body</code> so a caller knows which part of the request failed.",
+        "The 422's <code>detail</code> is really just <code>e.errors()</code>, with <code>loc</code> beginning <code>body</code> so a caller knows which part of the request failed.",
         "Nesting works to any depth, and the error path names the exact item: <code>('body', 'lessons', 1, 'minutes')</code>.",
         "A handler can take path, query and body parameters together &mdash; FastAPI decides each by where its name appears and what it is annotated as.",
         "Two model parameters are nested under their names in the body rather than merged.",
@@ -2432,7 +2432,7 @@ topic(
          _box(14, 60, 132, 14, S) + _txt(80, 70, "type  -  which rule", M, 7)),
     [
         ("It is a Pydantic error in an HTTP envelope",
-         "The <code>detail</code> list is essentially <code>e.errors()</code>, with "
+         "The <code>detail</code> list is really just <code>e.errors()</code>, with "
          "one addition: <code>loc</code> starts with the part of the request.",
          '''import json
 from fastapi import FastAPI

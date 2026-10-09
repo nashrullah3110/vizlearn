@@ -2208,10 +2208,10 @@ runs the layer as an indexed table lookup, with a backward pass that
 scatters grads only to the rows a batch really used &mdash; which means the
 table is a huge param tensor that sits almost fully idle on any given step.
 The table itself is `vocab &times; dim = 25.6 million` params, often the
-largest single component of a model, and the two standard economies both attack
-that: weight tying reuses the input table as the output layer (halving the token
-params and often raising quality, since both are learning what tokens
-mean), and subword tokenisation keeps the vocab in the tens of thousands
+largest single component of a model. Two economies attack that size. Weight
+tying reuses the input table as the output layer, halving the token
+params and often raising quality since both are learning what tokens
+mean. Subword tokenisation keeps the vocab in the tens of thousands
 rather than the millions a word-level scheme would need. The geometry the rows
 end up with &mdash; king &minus; man + woman landing near queen &mdash; is never
 imposed. It falls out of the training goal. This Also means it inherits the
@@ -2528,7 +2528,7 @@ gain little, which is why the speed-up is real but never uniform across a model.
 mysterious NaNs.
 
 **given a speed-up.** It comes from the tensor cores. Layers that are
-memory-bound rather than find-bound gain little.
+memory-bound rather than find-bound gain little. Profile before expecting a win.
 
 ## Half the bits, and the two things that break
 
@@ -3111,10 +3111,10 @@ depends on.
 **Applying it to regression.** It's a change to a cat target and has no
 meaning without one.
 
-**Expecting it to fix a badly calibrated model on its own.** It helps. Clear
-[temperature
+**Expecting it to fix a badly calibrated model on its own.** It helps, but it is
+not a full fix on its own. Clear [temperature
 scaling](../machine_learning/probability_calibration.html) on a validation set
-helps more, and the two combine.
+helps more, and the two combine well together.
 
 ## Tell the model it might be wrong
 

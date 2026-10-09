@@ -3759,7 +3759,7 @@ The goal isn't to copy defensively all over. That would discard the main gain. B
 
 **Usually a view**: `reshape`, `ravel`. Both fall back to copying when the requested layout cannot be strided over the existing memory &mdash; typically after a transpose.
 
-**Always a copy**: boolean masking, fancy indexing, `flatten`, `copy`, `astype`, `np.array(x)` by default, and essentially every function returning a computed result.
+**Always a copy**: boolean masking, fancy indexing, `flatten`, `copy`, `astype`, `np.array(x)` by default, and nearly every function returning a computed result.
 
 **Neither**: in-place operations, which return nothing and modify the buffer.
 
@@ -6258,7 +6258,7 @@ The code is easy. The choice isn't. It's a choice about the data rather than abo
 
 **How much is missing?** A handful of rows out of a hundred thousand can be dropped without much thought. Thirty percent can't. The choice of imputation turns a modelling choice that should be stated.
 
-**What does downstream care about?** A mean is robust to mean-imputation by build. A variance isn't. Filling with the mean shrinks it. Anything leaning on spread will be quietly wrong.
+**What does downstream care about?** A mean is solid to mean-imputation by build. A variance isn't. Filling with the mean shrinks it. Anything leaning on spread will be quietly wrong.
 
 **Is the missingness itself helpful?** Often it's. Adding a boolean "was missing" column preserves that data rather than discarding it.
 

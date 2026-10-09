@@ -1323,7 +1323,7 @@ output pixel is found from a zone that was fully present in the
 input. There are no border pixels whose context was invented by zero-padding.
 For a network run on tiles of a much larger microscopy image, that matters: the
 paper's "share-tile" strategy feeds shared tiles and keeps only the
-valid central output of each. So A large image is segmented seamlessly with no
+valid central output of each. So A large image is segmented smoothly with no
 edge artefacts at the tile joins.
 
 Almost each setup since uses `padding=1` instead, so input and output
@@ -1439,7 +1439,7 @@ still that a plain U-Net, configured well, is hard to beat.
 
 <strong>Why 572&times;572 and not 512?</strong> Because unpadded convolutions shrink the map and each pooling step still has to divide evenly. 572 is chosen so the math lives four levels down and back. With `padding=1` the constraint relaxes to "divisible by 2<sup>levels</sup>". This Is why modern setups use round numbers.
 
-<strong>Valid or same padding?</strong> Same (`padding=1`) unless you're tiling a larger image. Valid convolutions ensure each output pixel had genuine context. This Is what makes the share-tile strategy seamless. Same padding needs no cropping and costs you a thin border predicted partly from zeros.
+<strong>Valid or same padding?</strong> Same (`padding=1`) unless you're tiling a larger image. Valid convolutions ensure each output pixel had genuine context. This Is what makes the share-tile strategy smooth. Same padding needs no cropping and costs you a thin border predicted partly from zeros.
 
 <strong>Transposed convolution or upsample-then-convolve?</strong> Either works. Transposed convolutions can give checkerboard artefacts when the kernel size isn't divisible by the stride. Bilinear upsampling followed by a 3&times;3 avoids that and carries fewer params. This Is why most current setups choose it.
 
