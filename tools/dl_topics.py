@@ -582,9 +582,7 @@ A VAE is an autoencoder whose code is a spread rather than a point. That one cha
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(0)
-
 print("a plain autoencoder maps x to a POINT. a VAE maps x to a mean and a")
 print("variance, then samples from it:")
 mu, logvar = np.array([0.6, -1.2]), np.array([-2.0, -0.5])
@@ -603,11 +601,8 @@ print("  z depends on mu and sigma by plain arithmetic, so d z / d mu = 1")
 print("  and d z / d sigma = eps. the gradient flows; eps is just a constant")
 print("  that happens to be random.")
 print()
-
 def kl(mu, logvar):
-    # KL( N(mu, sigma^2) || N(0, 1) ), per dimension
     return 0.5 * (np.exp(logvar) + mu ** 2 - 1 - logvar)
-
 print("the second loss term is a KL divergence pulling that distribution")
 print("toward a standard normal. it is zero only when mu=0 and var=1:")
 print("%10s %10s %14s" % ("mu", "sigma", "KL"))
@@ -618,11 +613,15 @@ print("read the last row: a code that is confidently far from the origin is")
 print("expensive. that is the term stopping the encoder from doing what a")
 print("plain autoencoder does -- scattering each input to its own private")
 print("corner with near-zero variance.")
-print()
+```
 
-print("and here is why that matters. build two 1-D codebooks for 5 inputs:")
-plain = np.array([-9.4, -4.8, 3.7, 7.2, 11.6])      # a plain AE's codes
-vae = np.array([-1.3, -0.6, 0.05, 0.7, 1.4])        # a VAE's codes
+The next block compares a plain autoencoder's codes against a VAE's to show why only one of them can generate.
+
+```python-run
+import numpy as np
+print("build two 1-D codebooks for 5 inputs:")
+plain = np.array([-9.4, -4.8, 3.7, 7.2, 11.6])
+vae = np.array([-1.3, -0.6, 0.05, 0.7, 1.4])
 print("  plain autoencoder codes:", plain)
 print("  VAE codes              :", vae)
 print()
@@ -642,8 +641,14 @@ print()
 print("that is the entire difference between an autoencoder and a GENERATIVE")
 print("model: not the architecture, but whether the space between the codes")
 print("decodes to anything sensible.")
-print()
+```
 
+The last block shows the beta dial, posterior collapse, and why VAE samples look soft.
+
+```python-run
+import numpy as np
+def kl(mu, logvar):
+    return 0.5 * (np.exp(logvar) + mu ** 2 - 1 - logvar)
 print("the balance between the two terms is a real dial:")
 print("%10s %28s %26s" % ("beta", "what wins", "what you get"))
 rows = [(0.0, "reconstruction only", "a plain autoencoder"),
@@ -2836,24 +2841,20 @@ Building up grads over a few small batches before stepping is arithmetically the
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(0)
 N, D = 64, 5
 X = rng.normal(size=(N, D))
 w_true = rng.normal(size=D)
 y = X @ w_true + rng.normal(0, 0.3, N)
 w = np.zeros(D)
-
 def grad(Xb, yb, wv):
     return 2 * Xb.T @ (Xb @ wv - yb) / len(Xb)
-
 print("64 rows. compute the gradient two ways.")
 print()
 big = grad(X, y, w)
 print("one batch of 64:")
 print("  ", np.round(big, 8))
 print()
-
 acc = np.zeros(D)
 STEPS = 4
 for i in range(STEPS):
@@ -2867,7 +2868,6 @@ print("identical. that is the whole technique: the mean over 64 rows is the")
 print("mean of four means over 16 rows, as long as the batches are equal")
 print("sized and you divide by the number of accumulation steps.")
 print()
-
 print("the division is the part people get wrong. without it:")
 wrong = sum(grad(X[i * 16:(i + 1) * 16], y[i * 16:(i + 1) * 16], w)
             for i in range(STEPS))
@@ -2875,18 +2875,22 @@ print("  summed without dividing:", np.round(wrong[:3], 4), "...")
 print("  correct:                ", np.round(big[:3], 4), "...")
 print("  ratio: %.1f -- you have silently multiplied your learning rate by %d."
       % (np.abs(wrong).mean() / np.abs(big).mean(), STEPS))
-print()
+```
 
-print("what it buys, in memory terms. activation memory scales with batch")
-print("size; gradient memory does not:")
+The next block shows what accumulation buys in memory, and the two things it does not preserve.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+X = rng.normal(size=(64, 5))
+print("what accumulation buys, in memory terms. activation memory scales with")
+print("batch size; gradient memory does not:")
 print("%14s %18s %18s" % ("micro-batch", "activations held", "effective batch"))
 for micro in (64, 16, 8, 4, 1):
-    print("%14d %18s %18d"
-          % (micro, "%dx" % micro, 64))
+    print("%14d %18s %18d" % (micro, "%dx" % micro, 64))
 print("  the gradient buffer is the same size in every row -- one number per")
 print("  parameter. only the activations kept for the backward pass shrink.")
 print()
-
 print("and now the two things that are NOT identical.")
 print()
 print("1. BatchNorm. its statistics come from the micro-batch, not the")
@@ -2904,8 +2908,12 @@ print()
 print("2. speed. four passes of 16 do the same arithmetic as one pass of 64,")
 print("   but with four times the kernel launches and less parallelism. you")
 print("   are trading wall-clock time for memory, not getting both.")
-print()
+```
 
+Finally, the standard accumulation loop in pseudocode.
+
+```python-run
+ACCUM = 4
 print("the loop, written out, because the off-by-one is easy:")
 print("    optimizer.zero_grad()")
 print("    for i, batch in enumerate(loader):")
@@ -2921,7 +2929,7 @@ print("-- if the loader ends mid-accumulation those gradients are discarded.")
 print()
 print("and if you use a learning rate schedule, step it once per OPTIMIZER")
 print("step, not once per micro-batch, or your schedule runs %d times too fast."
-      % STEPS)
+      % ACCUM)
 ```
 
 """,
@@ -3122,26 +3130,20 @@ Replacing a target of 1.0 with 0.9 changes what the loss is minimised by. This f
 
 ```python-run
 import numpy as np
-
 K = 5           # classes
 EPS = 0.1       # smoothing strength
-
 hard = np.zeros(K); hard[0] = 1.0
 soft = np.full(K, EPS / K); soft[0] += 1 - EPS
-
 print("a %d-class problem, true class 0." % K)
 print("  hard target  :", np.round(hard, 4))
 print("  smoothed 0.1 :", np.round(soft, 4), " sums to", round(soft.sum(), 6))
 print("  the formula is (1 - eps) * onehot + eps / K.")
 print()
-
 def softmax(z):
     e = np.exp(z - z.max())
     return e / e.sum()
-
 def ce(z, target):
     return -(target * np.log(softmax(z))).sum() + 0.0
-
 print("what each target is minimised BY. the loss against a hard target")
 print("keeps falling as the true logit grows, forever:")
 print("%14s %14s %16s" % ("logit gap", "hard loss", "smoothed loss"))
@@ -3161,15 +3163,26 @@ print()
 print("so smoothing does not merely 'soften' the target -- it gives the model")
 print("a finite target to aim for. without it the optimum is at infinity, and")
 print("the weights grow without bound trying to reach it.")
-print()
+```
 
+The next block sweeps epsilon to show the confidence each value targets, and the cost of smoothing on a certain example.
+
+```python-run
+import numpy as np
+K = 5
+EPS = 0.1
+def softmax(z):
+    e = np.exp(z - z.max())
+    return e / e.sum()
+def ce(z, target):
+    return -(target * np.log(softmax(z))).sum() + 0.0
+best = np.log((1 - EPS + EPS / K) / (EPS / K))
 z_at_best = np.r_[best, np.zeros(K - 1)]
-print("the confidence that corresponds to that optimum:")
+print("the confidence that corresponds to the optimal logit gap:")
 print("  probabilities:", np.round(softmax(z_at_best), 4))
 print("  the model's best possible answer is %.4f, not 1.0000."
       % softmax(z_at_best)[0])
 print()
-
 print("smoothing strength against the confidence it targets:")
 print("%10s %16s %16s" % ("eps", "optimal gap", "peak probability"))
 for eps in (0.0, 0.01, 0.05, 0.1, 0.2, 0.5):
@@ -3183,7 +3196,8 @@ print("  eps=0.5 targets only %.2f confidence, which is barely a decision."
       % softmax(np.r_[np.log((1 - 0.5 + 0.5 / K) / (0.5 / K)), np.zeros(K - 1)])[0])
 print("  0.1 is the usual choice and 0.2 is about as far as anyone goes.")
 print()
-
+hard = np.zeros(K); hard[0] = 1.0
+soft = np.full(K, EPS / K); soft[0] += 1 - EPS
 print("and what it costs. a genuinely certain example is now penalised:")
 z_sure = np.r_[12.0, np.zeros(K - 1)]
 print("  a model that is right and certain (p=%.6f):" % softmax(z_sure)[0])
@@ -3193,8 +3207,7 @@ print("    smoothed loss %.6f  <- it is being pushed back down"
 print()
 print("that is the trade. label smoothing buys better-calibrated confidence")
 print("and slightly better accuracy, and costs you the ability to be certain")
-print("about anything. if your downstream system reads the probability as a")
-print("probability, measure the calibration before and after -- do not assume.")
+print("about anything. measure the calibration before and after -- do not assume.")
 ```
 
 """,

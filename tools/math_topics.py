@@ -719,12 +719,10 @@ The Jacobian collects each first partial deriv of a vector function. The Hessian
 
 ```python-run
 import numpy as np
-
 # f: R^2 -> R^3
 def f(v):
     x, y = v
     return np.array([x ** 2 * y, 5 * x + np.sin(y), x * y ** 3])
-
 def jacobian(fn, v, h=1e-6):
     base = fn(v)
     cols = []
@@ -732,23 +730,16 @@ def jacobian(fn, v, h=1e-6):
         step = np.zeros_like(v); step[i] = h
         cols.append((fn(v + step) - base) / h)
     return np.column_stack(cols)
-
 p = np.array([2.0, 1.0])
 print("Jacobian of f at (2, 1) -- 3 outputs by 2 inputs")
 print(np.round(jacobian(f, p), 4))
-print()
 x, y = p
-print("by hand:")
-print(np.round(np.array([[2 * x * y, x ** 2],
-                         [5.0,       np.cos(y)],
-                         [y ** 3,    3 * x * y ** 2]]), 4))
-print()
-
+print("\nby hand:")
+print(np.round(np.array([[2*x*y, x**2], [5.0, np.cos(y)], [y**3, 3*x*y**2]]), 4))
 # g: R^2 -> R
 def g(v):
     x, y = v
     return x ** 3 + 2 * x * y ** 2 + y ** 3
-
 def hessian(fn, v, h=1e-4):
     n = len(v)
     H = np.zeros((n, n))
@@ -758,17 +749,14 @@ def hessian(fn, v, h=1e-4):
             a[i] = h; b[j] = h
             H[i, j] = (fn(v + a + b) - fn(v + a) - fn(v + b) + fn(v)) / (h * h)
     return H
-
 H = hessian(g, p)
 print("Hessian of g at (2, 1)")
 print(np.round(H, 3))
 print("it is symmetric:", np.allclose(H, H.T, atol=1e-3))
 print()
-print("its eigenvalues say what kind of point this is:")
-print("  eigenvalues", np.round(np.linalg.eigvalsh(H), 4))
-print("  all positive -> a bowl (local minimum)")
-print("  all negative -> a dome (local maximum)")
-print("  mixed signs  -> a saddle, which is what most 'stuck' training is")
+eigs = np.round(np.linalg.eigvalsh(H), 4)
+print("eigenvalues %s -> %s" % (eigs,
+      "bowl (minimum)" if all(eigs > 0) else "saddle or dome"))
 ```
 
 """,
@@ -971,55 +959,41 @@ The same tuner, the same settings, run from many starting points on a convex fun
 
 ```python-run
 import numpy as np
-
 def descend(f, grad, x0, lr=0.05, steps=2000):
     x = float(x0)
     for _ in range(steps):
         x -= lr * grad(x)
     return x
-
 # convex: one bowl
 f1    = lambda x: (x - 3.0) ** 2 + 2.0
 grad1 = lambda x: 2 * (x - 3.0)
-
 # non-convex: a bowl with ripples
 f2    = lambda x: 0.15 * (x - 3.0) ** 2 + 3.0 * np.sin(2.0 * x)
 grad2 = lambda x: 0.30 * (x - 3.0) + 6.0 * np.cos(2.0 * x)
-
 starts = [-10.0, -5.0, -1.0, 0.0, 2.0, 6.0, 11.0]
-
 print("convex  f(x) = (x-3)^2 + 2")
 for s in starts:
     x = descend(f1, grad1, s)
     print("  start %6.1f -> x %8.4f   f %9.4f" % (s, x, f1(x)))
 print("  every start lands in the same place.")
 print()
-
 print("non-convex  f(x) = 0.15(x-3)^2 + 3 sin(2x)")
 found = []
 for s in starts:
     x = descend(f2, grad2, s)
     found.append(round(x, 3))
     print("  start %6.1f -> x %8.4f   f %9.4f" % (s, x, f2(x)))
-print("  %d different minima from %d starts." % (len(set(found)), len(starts)))
 best = min(found, key=lambda x: f2(x))
-print("  best found f = %.4f at x = %.3f; the worst was f = %.4f"
-      % (f2(best), best, max(f2(x) for x in found)))
+print("  %d distinct minima.  best f=%.4f at x=%.3f" % (len(set(found)), f2(best), best))
 print()
-print("a convex function has one minimum and every downhill path finds it.")
-print("that is why linear and logistic regression train reproducibly, and")
-print("why a neural network gives you a different answer every restart.")
-print()
-print("the test: a function is convex if the line between any two points on")
-print("it never dips below the function.")
-for f, name in ((f1, "convex"), (f2, "non-convex")):
-    a, b = -2.0, 8.0
-    mids = np.linspace(0.05, 0.95, 19)
-    chord = [(1 - t) * f(a) + t * f(b) for t in mids]
-    curve = [f((1 - t) * a + t * b) for t in mids]
-    viol = sum(c < v - 1e-9 for c, v in zip(chord, curve))
-    print("  %-11s chord dips below the curve at %d of %d points"
-          % (name, viol, len(mids)))
+print("convex: one minimum, every path finds it. non-convex: many.")
+print("test: the chord between any two points never dips below the curve.")
+mids = np.linspace(0.05, 0.95, 19)
+for fn, name in ((f1, "convex"), (f2, "non-convex")):
+    chord = [(1-t)*fn(-2)+t*fn(8) for t in mids]
+    curve = [fn((1-t)*-2+t*8) for t in mids]
+    viol = sum(c < v-1e-9 for c, v in zip(chord, curve))
+    print("  %-11s chord below curve at %d of %d points" % (name, viol, len(mids)))
 ```
 
 """,
@@ -2702,22 +2676,18 @@ Build a trust interval a thousand times from a known group and count how often i
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(0)
 TRUE_MEAN, TRUE_SD, N = 100.0, 15.0, 40
-
 def interval(sample):
     se = sample.std(ddof=1) / np.sqrt(len(sample))
     half = 1.96 * se
     return sample.mean() - half, sample.mean() + half
-
 print("one sample of %d from a population with mean %.0f:" % (N, TRUE_MEAN))
 s = rng.normal(TRUE_MEAN, TRUE_SD, N)
 lo, hi = interval(s)
 print("  sample mean %.2f, 95%% interval (%.2f, %.2f)" % (s.mean(), lo, hi))
 print("  contains the true mean:", lo <= TRUE_MEAN <= hi)
 print()
-
 hits = 0
 trials = 10_000
 widths = []
@@ -2730,14 +2700,10 @@ print("%d intervals built the same way:" % trials)
 print("  %.2f%% of them contained the true mean" % (100 * hits / trials))
 print("  average width %.2f" % np.mean(widths))
 print()
-print("that is the whole claim. any single interval either contains the mean")
-print("or it does not -- there is no 95 percent about it once computed.")
-print()
-print("it came out a little under 95%. the 1.96 multiplier assumes you know")
-print("the population sd; estimating it from 40 points costs you some coverage.")
-print("the t distribution corrects exactly that:")
-t39 = 2.0227                                   # t multiplier, 39 degrees of freedom
-hits_t = 0
+print("any single interval contains the mean or it does not -- no 95%% about")
+print("it once computed. the 1.96 multiplier assumes a known sd; estimating")
+print("it from %d points costs coverage. the t distribution corrects that:" % N)
+t39, hits_t = 2.0227, 0
 for _ in range(trials):
     s2 = rng.normal(TRUE_MEAN, TRUE_SD, N)
     half = t39 * s2.std(ddof=1) / np.sqrt(N)
@@ -2988,38 +2954,31 @@ A p-value found by modelling rather than looked up in a table, then the same tes
 ```python-run
 import numpy as np
 import math
-
 rng = np.random.default_rng(0)
-
 control = rng.normal(0.1000, 0.02, 300)
 variant = rng.normal(0.1045, 0.02, 300)
 observed = variant.mean() - control.mean()
 print("A/B test: control %.4f, variant %.4f, difference %+.4f"
       % (control.mean(), variant.mean(), observed))
 print()
-
 # the null hypothesis says the labels do not matter. so shuffle them.
 pool = np.concatenate([control, variant])
 null_diffs = np.empty(20_000)
 for i in range(20_000):
     rng.shuffle(pool)
     null_diffs[i] = pool[300:].mean() - pool[:300].mean()
-
 p = (np.abs(null_diffs) >= abs(observed)).mean()
 print("shuffling the labels 20,000 times, so no real effect can survive:")
 print("  the shuffled differences spread out to sd %.5f" % null_diffs.std())
 print("  %.2f%% of them were at least as big as the one we measured" % (100 * p))
 print("  that fraction is the p-value: %.4f" % p)
 print()
-print("it is NOT the probability the null is true. it is the probability of")
-print("data at least this extreme IF the null were true.")
-print()
-
+print("it is NOT the chance the null is true; it is the chance of data this")
+print("extreme IF the null were true.")
 def p_value(a, b):
     d = b.mean() - a.mean()
     se = np.sqrt(a.var(ddof=1) / len(a) + b.var(ddof=1) / len(b))
     return 2 * (1 - 0.5 * (1 + math.erf(abs(d / se) / np.sqrt(2))))
-
 print("now the failure mode. 1000 tests, no effect in any of them:")
 ps = np.array([p_value(rng.normal(0.1, 0.02, 300), rng.normal(0.1, 0.02, 300))
                for _ in range(1000)])
@@ -3027,13 +2986,9 @@ hits = (ps < 0.05).sum()
 print("  %d of 1000 came out under 0.05, from pure noise." % hits)
 print("  expected: 1000 * 0.05 = 50.0")
 print()
-print("the smallest few p-values in that batch of nothing:")
-for v in np.sort(ps)[:5]:
-    print("    %.4f" % v)
+print("smallest from that batch:", " ".join("%.4f" % v for v in np.sort(ps)[:5]))
 print()
-print("a 5 percent threshold lets one test in twenty clear it by chance. run")
-print("enough metrics and you will always find a winner. that is why the")
-print("threshold has to be tightened when you test many things at once:")
+print("a 5%% threshold lets one in twenty through by chance. tighten it")
 print("  Bonferroni for 1000 tests: %.7f" % (0.05 / 1000))
 print("  tests still under it: %d" % (ps < 0.05 / 1000).sum())
 ```
@@ -4005,27 +3960,16 @@ The closest point on a line to the origin, found three ways. By brute force, by 
 
 ```python-run
 import numpy as np
-
 # minimise x^2 + y^2  subject to  3x + 4y = 25
 def f(x, y):     return x ** 2 + y ** 2
 def g(x, y):     return 3 * x + 4 * y - 25
-
 print("brute force along the constraint line:")
 xs = np.linspace(-5, 12, 400_001)
-ys = (25 - 3 * xs) / 4
-vals = f(xs, ys)
-i = vals.argmin()
+ys = (25 - 3 * xs) / 4; vals = f(xs, ys); i = vals.argmin()
 print("  best point (%.4f, %.4f)   f = %.4f" % (xs[i], ys[i], vals[i]))
-print()
-
-print("by substitution, then calculus:")
-# f(x) = x^2 + ((25-3x)/4)^2
-#   df/dx = 2x - 3(25-3x)/8 = 0  ->  16x = 75 - 9x  ->  25x = 75
-x_star = 75.0 / 25.0
-y_star = (25 - 3 * x_star) / 4
+print("by substitution: df/dx = 0 -> x = 3")
+x_star, y_star = 3.0, (25 - 9) / 4
 print("  x = %.4f, y = %.4f   f = %.4f" % (x_star, y_star, f(x_star, y_star)))
-print()
-
 print("by Lagrange: grad f = lam * grad g, plus the constraint.")
 # grad f = (2x, 2y);  grad g = (3, 4)
 #   2x = 3 lam ,  2y = 4 lam ,  3x + 4y = 25
@@ -4037,24 +3981,19 @@ x_l, y_l, lam = np.linalg.solve(A, b)
 print("  x = %.4f, y = %.4f, lambda = %.4f" % (x_l, y_l, lam))
 print("  constraint satisfied: g = %.10f" % g(x_l, y_l))
 print()
-print("at the solution the two gradients are parallel:")
-print("  grad f = %s" % np.round([2 * x_l, 2 * y_l], 4))
-print("  grad g = %s   ratio %.4f, %.4f"
-      % ([3, 4], 2 * x_l / 3, 2 * y_l / 4))
-print()
-print("lambda is the price of the constraint -- move the line by one unit")
-print("and the optimum value changes by about lambda:")
+print("gradients are parallel: grad f = %s, grad g = %s"
+      % (np.round([2*x_l, 2*y_l], 4).tolist(), [3, 4]))
+print("lambda is the price of the constraint:")
 mins = []
 for c in (24.0, 25.0, 26.0):
     xs2 = np.linspace(-5, 12, 200_001)
     best = f(xs2, (c - 3 * xs2) / 4).min()
     mins.append(best)
     print("  3x + 4y = %.0f  ->  minimum f = %.4f" % (c, best))
-print("  it went up by %.4f then %.4f; lambda is %.4f"
+print("  delta: %.4f then %.4f; lambda is %.4f"
       % (mins[1] - mins[0], mins[2] - mins[1], lam))
-print()
-print("that is what a multiplier is for: it tells you how much a constraint")
-print("is costing you, which is often more useful than the optimum itself.")
+print("lambda tells you what the constraint costs -- often more useful than")
+print("the optimum itself.")
 ```
 
 """,
@@ -4791,9 +4730,7 @@ each rule here is checked by number rather than quoted. These four cover most of
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(0)
-
 def num_grad(fn, x, h=1e-6):
     g = np.zeros_like(x)
     it = np.nditer(x, flags=["multi_index"])
@@ -4804,12 +4741,10 @@ def num_grad(fn, x, h=1e-6):
         g[i] = (fn(up) - fn(dn)) / (2 * h)
         it.iternext()
     return g
-
 x = rng.normal(size=4)
 a = rng.normal(size=4)
 A = rng.normal(size=(4, 4))
 A = A + A.T                      # symmetric, so the quadratic rule is clean
-
 checks = [
     ("d(a.T x)/dx = a",
      lambda v: a @ v,            lambda v: a),
@@ -4820,27 +4755,18 @@ checks = [
     ("d(||x||)/dx = x/||x||",
      lambda v: np.linalg.norm(v), lambda v: v / np.linalg.norm(v)),
 ]
-
 for name, fn, closed in checks:
     n, c = num_grad(fn, x), closed(x)
     print("%-38s max diff %.2e" % (name, np.abs(n - c).max()))
-print()
-
-print("the one that matters most: a linear layer's weight gradient.")
-W = rng.normal(size=(3, 4))
-inp = rng.normal(size=4)
-target = rng.normal(size=3)
-
+print("now the one that matters: a linear layer's weight gradient.")
+W, inp, target = rng.normal(size=(3,4)), rng.normal(size=4), rng.normal(size=3)
 def loss(Wm):
     return ((Wm @ inp - target) ** 2).sum()
-
 err = W @ inp - target
-closed = 2 * np.outer(err, inp)        # dL/dW
+closed_w = 2 * np.outer(err, inp)
 print("  numeric vs outer(2*error, input): max diff %.2e"
-      % np.abs(num_grad(loss, W) - closed).max())
-print()
-print("that outer product is why the weight gradient has the same shape as W,")
-print("and why a layer needs both its input and its incoming error to update.")
+      % np.abs(num_grad(loss, W) - closed_w).max())
+print("the gradient has the same shape as W because it is outer(error, input).")
 ```
 
 """,

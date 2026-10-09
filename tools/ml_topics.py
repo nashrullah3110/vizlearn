@@ -247,7 +247,7 @@ import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
@@ -257,8 +257,7 @@ from sklearn.ensemble import RandomForestClassifier
 X, y = make_classification(n_samples=1500, n_features=8, n_informative=4,
                            random_state=0)
 X_big = X.copy()
-X_big[:, 0] *= 10_000          # one column measured in a different unit
-
+X_big[:, 0] *= 10_000
 print("column 0 now has sd %.0f; the rest are near 1.0" % X_big[:, 0].std())
 print()
 print("%-24s %12s %12s %10s" % ("model", "raw", "scaled", "change"))
@@ -279,34 +278,43 @@ print("the other seven columns stop counting.")
 print()
 print("trees split one column at a time and never compare across columns,")
 print("so a change of unit is invisible to them. that is exact, not approximate.")
-print()
-print("logistic regression is the subtle one -- the accuracy barely moved,")
-print("but look at what it had to do to the coefficients:")
+```
+
+The next block shows how scaling changes the coefficients of logistic regression, and how the three common scalers handle a column with one outlier.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+
+X, y = make_classification(n_samples=1500, n_features=8, n_informative=4,
+                           random_state=0)
+X_big = X.copy()
+X_big[:, 0] *= 10_000
 raw_c = LogisticRegression(max_iter=5000).fit(X_big, y).coef_[0]
 sc_c = LogisticRegression(max_iter=5000).fit(StandardScaler().fit_transform(X_big), y).coef_[0]
-print("  unscaled coefficients:", np.round(raw_c[:4], 6), "...")
-print("  scaled coefficients:  ", np.round(sc_c[:4], 6), "...")
-print()
-print("the first coefficient is %.0fx smaller than the others just to undo the"
+print("logistic regression barely lost accuracy, but look at the coefficients:")
+print("  unscaled:", np.round(raw_c[:4], 6), "...")
+print("  scaled:  ", np.round(sc_c[:4], 6), "...")
+print("the first coefficient is %.0fx smaller just to undo the unit."
       % (abs(sc_c[0]) / abs(raw_c[0])))
-print("unit. the L2 penalty charges by coefficient size, so it is now charging")
-print("that column almost nothing and the rest full price. the fit survived; the")
-print("regularisation stopped meaning what you think it means.")
+print("the L2 penalty charges by coefficient size, so it is now charging")
+print("that column almost nothing and the rest full price.")
 print()
-
-print("the three scalers, on a column with one outlier:")
 col = np.concatenate([np.random.default_rng(0).normal(50, 5, 200),
                       [400.0]]).reshape(-1, 1)
+print("the three scalers, on a column with one outlier:")
 for name, sc in (("StandardScaler", StandardScaler()),
                  ("MinMaxScaler",   MinMaxScaler()),
                  ("RobustScaler",   RobustScaler())):
     out = sc.fit_transform(col).ravel()
-    print("  %-15s the 200 normal rows land in [%7.3f, %7.3f], the outlier at %8.3f"
+    print("  %-15s normal rows in [%7.3f, %7.3f], outlier at %8.3f"
           % (name, out[:200].min(), out[:200].max(), out[-1]))
 print()
-print("MinMaxScaler squeezes every real row into 6% of its range because one")
-print("point defines the other end. that is the argument for RobustScaler when")
-print("outliers are part of the data rather than a mistake.")
+print("MinMaxScaler squeezes every real row into 6%% of its range because one")
+print("point defines the other end. RobustScaler uses the median and IQR,")
+print("so a single extreme value does not distort the rest.")
 print()
 print("and always fit the scaler inside a pipeline -- fitting it on all the data")
 print("before splitting leaks the test set's mean and sd into training.")
@@ -516,7 +524,6 @@ from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 
 rng = np.random.default_rng(0)
 # 3000 columns of noise, a coin-flip label. there is nothing to learn here.
@@ -767,7 +774,6 @@ y = 5 * X[:, 0] + 2 * X[:, 1] - X[:, 2] + rng.normal(0, 2.0, n)
 print("feature 0 is the dominant predictor. with no gaps at all: R2 %.4f"
       % cross_val_score(Ridge(), X, y, cv=5).mean())
 print()
-
 print("CASE 1 -- missing completely at random (a sensor dropped packets).")
 Xa = X.copy()
 Xa[rng.random(Xa.shape) < 0.30] = np.nan
@@ -790,8 +796,21 @@ print("  sample. it is just wasteful, and it gets worse as columns multiply:")
 for cols in (6, 12, 25, 50):
     print("     %2d columns at 30%% missing -> %.1f%% of rows survive intact"
           % (cols, 100 * 0.7 ** cols))
-print()
+```
 
+The next block shows what happens when the data is missing for a reason, and why a missing-value indicator flag is the only thing that recovers the lost signal.
+
+```python-run
+import numpy as np
+from sklearn.linear_model import Ridge
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import cross_val_score
+from sklearn.pipeline import make_pipeline
+
+rng = np.random.default_rng(0)
+n = 700
+X = rng.normal(size=(n, 6))
+y = 5 * X[:, 0] + 2 * X[:, 1] - X[:, 2] + rng.normal(0, 2.0, n)
 print("CASE 2 -- missing for a reason (high earners skip the income question).")
 Xb = X.copy()
 hide = X[:, 0] > np.percentile(X[:, 0], 65)
@@ -3434,10 +3453,8 @@ from sklearn.datasets import make_blobs
 from sklearn.metrics import (silhouette_score, calinski_harabasz_score,
                              davies_bouldin_score)
 from sklearn.mixture import GaussianMixture
-
 TRUE_K = 5
 KS = range(2, 11)
-
 def survey(X, label):
     rows = []
     for k in KS:
@@ -3461,43 +3478,51 @@ def survey(X, label):
     print("  the truth is k=%d. agreed: %d of 4."
           % (TRUE_K, sum(v == TRUE_K for v in picks.values())))
     print()
-    return rows
-
 clean, _ = make_blobs(n_samples=900, centers=TRUE_K, cluster_std=0.55,
                       random_state=0)
-rows = survey(clean, "WELL SEPARATED blobs (cluster_std 0.55)")
-
+survey(clean, "WELL SEPARATED blobs (cluster_std 0.55)")
 messy, _ = make_blobs(n_samples=900, centers=TRUE_K, cluster_std=1.6,
                       random_state=0)
 survey(messy, "OVERLAPPING blobs (cluster_std 1.6), same 5 centres")
+print("when the structure is obvious the scores agree and you did not need")
+print("them. when it is not, they disagree -- and that disagreement is")
+print("information: there is no single k that is clearly right.")
+```
 
-print("that is the honest picture. when the structure is obvious the scores")
-print("agree and you did not need them. when it is not, they disagree -- and")
-print("that disagreement is information: it means there is no single k that")
-print("is clearly right, because the clusters genuinely bleed into each other.")
-print()
+The next block shows why inertia alone cannot pick k and what happens on pure noise.
 
+```python-run
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.datasets import make_blobs
+from sklearn.metrics import silhouette_score
+TRUE_K = 5
+KS = range(2, 11)
+clean, _ = make_blobs(n_samples=900, centers=TRUE_K, cluster_std=0.55,
+                      random_state=0)
+rows = []
+for k in KS:
+    km = KMeans(n_clusters=k, n_init=10, random_state=0).fit(clean)
+    rows.append((k, km.inertia_, silhouette_score(clean, km.labels_)))
 print("why inertia is not on the picks list -- it falls no matter what:")
 print("%6s %14s %14s" % ("k", "inertia", "drop"))
 for i, r in enumerate(rows):
     d = "%14.1f" % (rows[i - 1][1] - r[1]) if i else "%14s" % "-"
     print("%6d %14.1f %s" % (r[0], r[1], d))
 print("  at k = n every point is its own cluster and inertia is exactly 0.")
-print("  'lowest inertia' would always answer n. the elbow method is really")
-print("  asking where the DROPS stop being dramatic, by eye.")
+print("  the elbow method asks where the DROPS stop being dramatic, by eye.")
 print()
-
-print("and the check nobody runs -- on data with no clusters at all:")
+print("the check nobody runs -- on data with no clusters at all:")
 Xr = np.random.default_rng(0).uniform(size=(900, 2))
 scores = {k: silhouette_score(Xr, KMeans(n_clusters=k, n_init=10,
                                          random_state=0).fit(Xr).labels_)
           for k in KS}
 bk = max(scores, key=scores.get)
+best_clean = max(r[2] for r in rows)
 print("  900 uniform random points: best silhouette is k=%d at %.4f"
       % (bk, scores[bk]))
-print("  the clean blobs scored %.4f. every one of these methods returns an"
-      % max(r[2] for r in rows))
-print("  answer whether or not there is anything there. the SIZE of the score")
+print("  the clean blobs scored %.4f. every method returns an answer" % best_clean)
+print("  whether or not there is anything there. the SIZE of the score")
 print("  is what tells you it was worth asking.")
 print()
 print("so: run several, check they agree, check the winner is meaningfully")
@@ -4288,13 +4313,10 @@ from sklearn.datasets import make_classification
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
 from sklearn.model_selection import train_test_split
-
 rng = np.random.default_rng(0)
 X, y = make_classification(n_samples=3000, n_features=6, n_informative=3,
                            n_redundant=0, flip_y=0.08, shuffle=False,
                            random_state=0)
-# shuffle=False keeps the informative columns first, so these names are real.
-# then add a column of pure noise and an exact copy of an informative one.
 X = np.column_stack([X, rng.normal(size=len(X)), X[:, 0]])
 names = ["real_0", "real_1", "real_2", "filler_3", "filler_4", "filler_5",
          "pure_noise", "copy_of_real_0"]
@@ -4302,7 +4324,6 @@ Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
 rf = RandomForestClassifier(n_estimators=250, random_state=0).fit(Xtr, ytr)
 print("baseline test accuracy %.4f" % rf.score(Xte, yte))
 print()
-
 print("do it by hand on one column -- shuffle it and re-score:")
 col = 0
 scores = []
@@ -4315,7 +4336,6 @@ print("  shuffling %s ten times: accuracy %.4f +/- %.4f"
 print("  the drop is %.4f. that is its permutation importance."
       % (rf.score(Xte, yte) - np.mean(scores)))
 print()
-
 r = permutation_importance(rf, Xte, yte, n_repeats=10, random_state=0)
 print("%-16s %12s %10s %14s" % ("feature", "permutation", "sd", "tree built-in"))
 order = np.argsort(-r.importances_mean)
@@ -4324,39 +4344,50 @@ for i in order:
           % (names[i], r.importances_mean[i], r.importances_std[i],
              rf.feature_importances_[i]))
 print()
-print("filler_3 through filler_5 and pure_noise carry nothing. the tree's")
-print("built-in importance still hands them non-zero scores, because a")
-print("continuous column offers many places to split and some of those")
-print("splits help by luck on the training rows. permutation importance,")
-print("measured on held-out rows, puts them at zero where they belong.")
-print()
+print("filler columns and pure_noise carry nothing. the tree's built-in")
+print("importance still scores them above zero because a continuous column")
+print("offers many split points. permutation importance, on held-out rows,")
+print("puts them at zero where they belong.")
+```
 
-print("now the trap. real_0 and copy_of_real_0 are the same column:")
+The next block shows how correlated features split their importance and how to read the result honestly.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import permutation_importance
+from sklearn.model_selection import train_test_split
+rng = np.random.default_rng(0)
+X, y = make_classification(n_samples=3000, n_features=6, n_informative=3,
+                           n_redundant=0, flip_y=0.08, shuffle=False,
+                           random_state=0)
+X = np.column_stack([X, rng.normal(size=len(X)), X[:, 0]])
+names = ["real_0", "real_1", "real_2", "filler_3", "filler_4", "filler_5",
+         "pure_noise", "copy_of_real_0"]
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+rf = RandomForestClassifier(n_estimators=250, random_state=0).fit(Xtr, ytr)
+r = permutation_importance(rf, Xte, yte, n_repeats=10, random_state=0)
+print("the trap. real_0 and copy_of_real_0 are the same column:")
 for i in (0, 7):
     print("  %-16s permutation %.4f" % (names[i], r.importances_mean[i]))
-print("  each scores about 0.09 -- third and fourth on the list. neither looks")
-print("  like a headline feature, because shuffling one leaves the other")
-print("  standing and the forest reads that instead.")
+print("  each scores about half. shuffling one leaves the other standing.")
 print()
 print("drop the copy and refit:")
 keep = [i for i in range(8) if i != 7]
 rf2 = RandomForestClassifier(n_estimators=250, random_state=0).fit(Xtr[:, keep], ytr)
 r2 = permutation_importance(rf2, Xte[:, keep], yte, n_repeats=10, random_state=0)
-print("  real_0 permutation importance is now %.4f, up from %.4f."
+print("  real_0 importance is now %.4f, up from %.4f."
       % (r2.importances_mean[0], r.importances_mean[0]))
-print("  the column did not become more useful. it stopped sharing the credit.")
-print("  the pair was worth ~%.2f all along, split roughly in half."
-      % r2.importances_mean[0])
+print("  the column did not become more useful. it stopped sharing credit.")
 print()
-print("so: correlated features SPLIT their importance, and a zero here means")
-print("'the model can get by without it', not 'this column is useless'. that")
-print("distinction is the difference between dropping a redundant column and")
-print("dropping a predictive one.")
+print("correlated features SPLIT their importance. a zero means 'the model")
+print("can get by without it', not 'this column is useless'.")
 print()
-print("two practical notes. measure it on held-out data -- on training rows it")
-print("rewards memorisation. and use the metric you actually care about:")
+print("measure on held-out data and use the metric you care about:")
 r3 = permutation_importance(rf, Xte, yte, n_repeats=10, random_state=0,
                             scoring="roc_auc")
+order = np.argsort(-r.importances_mean)
 print("  scored by ROC AUC instead of accuracy:")
 for i in order[:4]:
     print("    %-16s %.4f" % (names[i], r3.importances_mean[i]))
@@ -5481,15 +5512,12 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
-from sklearn.ensemble import VotingClassifier, StackingClassifier
-from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-
 X, y = make_classification(n_samples=4000, n_features=15, n_informative=6,
                            n_clusters_per_class=2, flip_y=0.12, random_state=0)
 Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
-
 base = [
     ("logistic", make_pipeline(StandardScaler(), LogisticRegression(max_iter=3000))),
     ("tree",     DecisionTreeClassifier(max_depth=8, random_state=0)),
@@ -5501,7 +5529,6 @@ for name, m in base:
     preds[name] = m.fit(Xtr, ytr).predict(Xte)
     print("%-10s accuracy %.4f" % (name, (preds[name] == yte).mean()))
 print()
-
 print("how often each PAIR gets a row wrong at the same time:")
 names = list(preds)
 wrong = {n: preds[n] != yte for n in names}
@@ -5512,46 +5539,58 @@ for a in names:
         both = (wrong[a] & wrong[b]).sum() / max(wrong[a].sum(), 1)
         row += "%10.3f" % both
     print("%-10s %s" % (a, row))
-print("  (read: of the rows THIS model got wrong, what fraction did that one")
-print("   also get wrong. 1.000 on the diagonal, by definition.)")
+print("  (of rows THIS model got wrong, what fraction did THAT one also miss.)")
 print()
 any_right = (~np.all([wrong[n] for n in names], axis=0)).mean()
 all_wrong = np.all([wrong[n] for n in names], axis=0).mean()
 print("  at least one model is right on %.4f of rows." % any_right)
 print("  all four are wrong together on %.4f." % all_wrong)
-print("  that first number is the ceiling any combiner can reach. the gap")
-print("  between it and the best single model is what there is to win.")
-print()
+print("  that first number is the ceiling any combiner can reach.")
+```
 
+The next block compares hard voting, soft voting and stacking on the same data.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import VotingClassifier, StackingClassifier
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+X, y = make_classification(n_samples=4000, n_features=15, n_informative=6,
+                           n_clusters_per_class=2, flip_y=0.12, random_state=0)
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
+base = [
+    ("logistic", make_pipeline(StandardScaler(), LogisticRegression(max_iter=3000))),
+    ("tree",     DecisionTreeClassifier(max_depth=8, random_state=0)),
+    ("knn",      make_pipeline(StandardScaler(), KNeighborsClassifier(15))),
+    ("bayes",    GaussianNB()),
+]
+names = [n for n, _ in base]
 hard = VotingClassifier(base, voting="hard")
 soft = VotingClassifier(base, voting="soft")
-stack = StackingClassifier(base, final_estimator=LogisticRegression(max_iter=3000), cv=5)
+stack = StackingClassifier(base,
+    final_estimator=LogisticRegression(max_iter=3000), cv=5)
 for name, m in (("hard voting (majority)", hard),
-                ("soft voting (average probability)", soft),
-                ("stacking (a model on the outputs)", stack)):
-    print("%-36s cv %.4f" % (name, cross_val_score(m, X, y, cv=5).mean()))
-print("%-36s cv %.4f"
+                ("soft voting (avg probability)", soft),
+                ("stacking (model on outputs)", stack)):
+    print("%-34s cv %.4f" % (name, cross_val_score(m, X, y, cv=5).mean()))
+print("%-34s cv %.4f"
       % ("best single model",
          max(cross_val_score(m, X, y, cv=5).mean() for _, m in base)))
 print()
-
 stack.fit(Xtr, ytr)
 print("what stacking learned about which model to trust:")
 for name, w in zip(names, stack.final_estimator_.coef_[0]):
     print("   %-10s weight %+7.4f" % (name, w))
-print("  a negative weight is not a bug -- it means that model's mistakes are")
-print("  informative, so the combiner leans against it in some regions.")
+print("  a negative weight means the combiner leans against that model.")
 print()
-print("soft voting usually beats hard voting because a 0.51 and a 0.99 are")
-print("different amounts of evidence, and hard voting throws that away.")
-print()
-print("stacking needs cross-validated predictions to train its combiner, or")
-print("the base models' training-set optimism leaks straight into it. that is")
-print("what the cv=5 above is doing, and it is not optional.")
-print()
-print("the honest caveat: ensembles buy small gains for a large cost in")
-print("latency and explainability. four models to serve, four to monitor. use")
-print("one when the gain is worth that, and not because it sounds thorough.")
+print("soft beats hard because 0.51 and 0.99 carry different evidence.")
+print("stacking needs cv predictions or training optimism leaks in.")
 ```
 
 """,

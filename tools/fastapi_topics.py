@@ -2975,7 +2975,6 @@ DB, NEXT = {}, {"id": 1}
 
 class ModuleIn(BaseModel):
     title: str = Field(min_length=3)
-
 class ModuleOut(ModuleIn):
     id: int
 
@@ -3000,7 +2999,6 @@ def remove(i: int):
     if i not in DB:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Module not found")
     del DB[i]
-    return None
 
 c = TestClient(app)
 print("create :", c.post("/modules", json={"title": "Vectors"}).status_code)
@@ -4331,7 +4329,6 @@ async def taken(request, exc):
 # The service layer: no HTTP anywhere in it.
 def get_module(i):
     raise ModuleNotFound(i)
-
 def create_module(slug):
     raise SlugTaken(slug)
 
@@ -9997,23 +9994,19 @@ for r in app.routes:
          "from the framework.",
          '''from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
-
 # services/modules.py - no fastapi import anywhere in here
 class ModuleNotFound(Exception):
     def __init__(self, i): self.i = i
-
 DB = {1: {"id": 1, "title": "Vectors"}}
 
 def get_module(i: int) -> dict:
     if i not in DB:
         raise ModuleNotFound(i)
     return DB[i]
-
 def create_module(title: str) -> dict:
     i = max(DB) + 1
     DB[i] = {"id": i, "title": title}
     return DB[i]
-
 # schemas/modules.py
 class ModuleIn(BaseModel):
     title: str = Field(min_length=3)
@@ -10031,11 +10024,9 @@ def read(i: int):
         return get_module(i)
     except ModuleNotFound:
         raise HTTPException(404, "No module %d" % i)
-
 @router.post("", response_model=ModuleOut, status_code=201)
 def create(body: ModuleIn):
     return create_module(body.title)
-
 app = FastAPI(); app.include_router(router)
 c = TestClient(app)
 print(c.post("/modules", json={"title": "Norms"}).json())
@@ -10059,7 +10050,6 @@ DB, TITLES = {1: "Vectors"}, {"Vectors"}
 def get_module(i):
     if i not in DB: raise ModuleNotFound(i)
     return {"id": i, "title": DB[i]}
-
 def create_module(title):
     if title in TITLES: raise TitleTaken(title)
     TITLES.add(title); return {"id": 2, "title": title}
@@ -10068,7 +10058,6 @@ router = APIRouter(prefix="/modules")
 
 @router.get("/{i}")
 def read(i: int): return get_module(i)          # no try/except
-
 @router.post("")
 def create(title: str): return create_module(title)
 
@@ -10160,12 +10149,10 @@ print("open  :", c.request("GET", "/account", headers={"x-token": "tok"}).json()
          '''from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-
 # --- settings ------------------------------------------------------------
 class Settings(BaseModel):
     page_size: int = Field(default=2, ge=1, le=100)
 settings = Settings()
-
 # --- domain --------------------------------------------------------------
 class NotFound(Exception): pass
 STORE = {1: "Vectors", 2: "Norms", 3: "Loops"}
@@ -10173,35 +10160,27 @@ def list_modules(limit): return list(STORE.items())[:limit]
 def get_module(i):
     if i not in STORE: raise NotFound()
     return {"id": i, "title": STORE[i]}
-
 # --- schemas -------------------------------------------------------------
 class ModuleOut(BaseModel):
     id: int
     title: str
-
 # --- dependencies --------------------------------------------------------
 def page_limit(limit: int = None):
     return limit or settings.page_size
-
 # --- routers -------------------------------------------------------------
 router = APIRouter(prefix="/modules", tags=["modules"])
-
 @router.get("")
 def index(limit: int = Depends(page_limit)):
     return [{"id": i, "title": t} for i, t in list_modules(limit)]
-
 @router.get("/{i}", response_model=ModuleOut)
 def read(i: int):
     return get_module(i)
-
 # --- assembly ------------------------------------------------------------
 app = FastAPI(title="VizLearn API", version="1.0.0")
 app.include_router(router)
-
 @app.exception_handler(NotFound)
 async def nf(r: Request, e: NotFound):
     return JSONResponse(status_code=404, content={"detail": "Not found"})
-
 c = TestClient(app)
 print(c.get("/modules").json())
 print(c.get("/modules?limit=3").json())

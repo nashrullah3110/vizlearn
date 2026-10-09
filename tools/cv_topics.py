@@ -271,14 +271,11 @@ A convolution is a weighted sum repeated at each spot. Six classic kernels are a
 
 ```python-run
 import numpy as np
-
-# a small image: a bright square on a dark background, with a diagonal edge
 img = np.zeros((9, 9))
 img[2:7, 2:7] = 200.0
 img[0:3, 6:9] = 120.0
 img += np.random.default_rng(0).normal(0, 4, img.shape)
 img = np.clip(img, 0, 255)
-
 SHADE = " .:-=+*#%@"
 def show(a, label, lo=None, hi=None):
     lo = a.min() if lo is None else lo
@@ -288,10 +285,8 @@ def show(a, label, lo=None, hi=None):
     for row in a:
         print("      " + "".join(SHADE[int(np.clip((v - lo) / rng_, 0, 1) * 9)]
                                  for v in row))
-
 show(img, "the image (%dx%d, values 0-255):" % img.shape)
 print()
-
 def convolve(a, k):
     kh, kw = k.shape
     ph, pw = kh // 2, kw // 2
@@ -301,80 +296,124 @@ def convolve(a, k):
         for j in range(a.shape[1]):
             out[i, j] = (padded[i:i + kh, j:j + kw] * k).sum()
     return out
-
-print("ONE OUTPUT PIXEL, written out. take the 3x3 patch at (4,4) and a")
-print("simple averaging kernel:")
+print("ONE OUTPUT PIXEL, written out. take the 3x3 patch at (4,4):")
 patch = img[3:6, 3:6]
 box = np.ones((3, 3)) / 9
 print("   patch:")
 for r in patch:
     print("      %s" % np.round(r, 1))
-print("   kernel:")
+print("   kernel (box blur):")
 for r in box:
     print("      %s" % np.round(r, 4))
-print("   multiply elementwise and sum:")
 terms = (patch * box).ravel()
+print("   multiply elementwise and sum:")
 print("      %s" % "  ".join("%.1f" % t for t in terms[:5]))
 print("      + ... = %.4f" % terms.sum())
 print("   that one number is the output at (4,4). repeat for every pixel.")
-print()
+```
 
+Six classic kernels are applied to the same image, and the kernel sum reveals the filter family.
+
+```python-run
+import numpy as np
+img = np.zeros((9, 9))
+img[2:7, 2:7] = 200.0
+img[0:3, 6:9] = 120.0
+img += np.random.default_rng(0).normal(0, 4, img.shape)
+img = np.clip(img, 0, 255)
+SHADE = " .:-=+*#%@"
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip((v - a.min()) / max(a.max() - a.min(), 1e-9), 0, 1) * 9)]
+                                 for v in row))
+def convolve(a, k):
+    kh, kw = k.shape
+    padded = np.pad(a, ((kh//2, kh//2), (kw//2, kw//2)), mode="edge")
+    out = np.zeros_like(a, dtype=float)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            out[i, j] = (padded[i:i+kh, j:j+kw] * k).sum()
+    return out
 kernels = {
-    "identity":        np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]], float),
-    "box blur":        np.ones((3, 3)) / 9,
-    "sharpen":         np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], float),
-    "sobel x (vert.)": np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], float),
-    "sobel y (horiz.)": np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], float),
-    "laplacian":       np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], float),
+    "identity":        np.array([[0,0,0],[0,1,0],[0,0,0]], float),
+    "box blur":        np.ones((3,3)) / 9,
+    "sharpen":         np.array([[0,-1,0],[-1,5,-1],[0,-1,0]], float),
+    "sobel x (vert.)": np.array([[-1,0,1],[-2,0,2],[-1,0,1]], float),
+    "sobel y (horiz.)": np.array([[-1,-2,-1],[0,0,0],[1,2,1]], float),
+    "laplacian":       np.array([[0,1,0],[1,-4,1],[0,1,0]], float),
 }
-
 print("SIX KERNELS on the same image:")
 for name, k in kernels.items():
     out = convolve(img, k)
-    print()
-    print("   %-18s kernel sum %+.1f   output range %+8.1f to %+8.1f"
-          % (name, k.sum(), out.min(), out.max()))
-    show(np.abs(out) if k.sum() == 0 else out, "")
-print()
-
-print("READ THE KERNEL SUMS. that one number tells you what a kernel does:")
-for name, k in kernels.items():
     s = k.sum()
-    kind = ("preserves brightness" if abs(s - 1) < 1e-9
-            else "detects change (flat areas -> 0)" if abs(s) < 1e-9
-            else "scales brightness by %.1f" % s)
-    print("   %-18s sum %+5.1f  %s" % (name, s, kind))
-print()
-flat = np.full((9, 9), 100.0)
-print("   proof: run each kernel on a completely flat image of 100s:")
-for name, k in kernels.items():
-    print("      %-18s -> centre pixel %+8.2f" % (name, convolve(flat, k)[4, 4]))
-print("   the edge detectors return 0 because there is no edge. that is not")
-print("   a coincidence -- a kernel summing to zero cannot respond to a")
-print("   constant, only to a difference.")
-print()
+    kind = ("preserves" if abs(s-1)<1e-9 else "detects change" if abs(s)<1e-9
+            else "scales by %.1f" % s)
+    print()
+    print("   %-18s sum %+.1f  %s  range %+.1f to %+.1f"
+          % (name, s, kind, out.min(), out.max()))
+    show(np.abs(out) if s == 0 else out, "")
+```
 
-print("THE TWO SOBELS TOGETHER give gradient magnitude, which is edge")
-print("strength regardless of direction:")
-gx = convolve(img, kernels["sobel x (vert.)"])
-gy = convolve(img, kernels["sobel y (horiz.)"])
-mag = np.sqrt(gx ** 2 + gy ** 2)
+Combining the two Sobel directions gives edge strength regardless of orientation, which is what a CNN's early layers learn to compute.
+
+```python-run
+import numpy as np
+def convolve(a, k):
+    kh, kw = k.shape
+    padded = np.pad(a, ((kh//2, kh//2), (kw//2, kw//2)), mode="edge")
+    out = np.zeros_like(a, dtype=float)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            out[i, j] = (padded[i:i+kh, j:j+kw] * k).sum()
+    return out
+kernels = {
+    "identity":  np.array([[0,0,0],[0,1,0],[0,0,0]], float),
+    "box blur":  np.ones((3,3)) / 9,
+    "sharpen":   np.array([[0,-1,0],[-1,5,-1],[0,-1,0]], float),
+    "sobel x":   np.array([[-1,0,1],[-2,0,2],[-1,0,1]], float),
+    "sobel y":   np.array([[-1,-2,-1],[0,0,0],[1,2,1]], float),
+    "laplacian": np.array([[0,1,0],[1,-4,1],[0,1,0]], float),
+}
+flat = np.full((9, 9), 100.0)
+print("each kernel on a completely flat image of 100s:")
+for name, k in kernels.items():
+    print("   %-10s -> centre pixel %+8.2f" % (name, convolve(flat, k)[4, 4]))
+print("   edge detectors return 0 because there is no edge.")
+```
+
+Combining the two Sobel directions gives gradient magnitude — the strength of an edge regardless of its orientation.
+
+```python-run
+import numpy as np
+SHADE = " .:-=+*#%@"
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip((v-a.min())/max(a.max()-a.min(),1e-9),0,1)*9)] for v in row))
+def convolve(a, k):
+    kh, kw = k.shape
+    padded = np.pad(a, ((kh//2,kh//2),(kw//2,kw//2)), mode="edge")
+    out = np.zeros_like(a, dtype=float)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            out[i, j] = (padded[i:i+kh, j:j+kw] * k).sum()
+    return out
+img = np.zeros((9,9)); img[2:7,2:7] = 200.0; img[0:3,6:9] = 120.0
+img += np.random.default_rng(0).normal(0, 4, img.shape)
+img = np.clip(img, 0, 255)
+gx = convolve(img, np.array([[-1,0,1],[-2,0,2],[-1,0,1]], float))
+gy = convolve(img, np.array([[-1,-2,-1],[0,0,0],[1,2,1]], float))
+mag = np.sqrt(gx**2 + gy**2)
 show(mag, "gradient magnitude:")
-print("   the bright ring is the boundary of the square. the interior is")
-print("   dark because the interior is flat.")
-print()
-print("and the angle tells you which way the edge runs:")
+print("   the bright ring is the boundary of the square.")
 ang = np.degrees(np.arctan2(gy, gx))
 strong = mag > mag.max() * 0.5
-print("   strongest edge pixels and their orientations:")
+print("strongest edge pixels and their orientations:")
 for (i, j) in list(zip(*np.where(strong)))[:6]:
-    print("      (%d,%d) magnitude %7.1f, angle %+7.1f degrees"
-          % (i, j, mag[i, j], ang[i, j]))
-print()
-print("a CNN does not use these. it LEARNS its kernels -- but the early")
-print("layers of a trained network reliably rediscover edge and blob")
-print("detectors that look very much like the ones above, because those are")
-print("what the data rewards.")
+    print("   (%d,%d) mag %7.1f, angle %+7.1f deg" % (i, j, mag[i,j], ang[i,j]))
+print("a CNN learns its kernels, but early layers rediscover edge")
+print("detectors like these because the data rewards them.")
 ```
 
 """,
@@ -1246,9 +1285,7 @@ Gaussian, median and bilateral filtering on the same noisy image. Each drops a d
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(0)
-
 H, W = 11, 22
 clean = np.full((H, W), 60.0)
 clean[:, 11:] = 200.0                      # a hard vertical edge
@@ -1257,23 +1294,14 @@ sp = noisy.copy()                          # plus salt-and-pepper
 for _ in range(14):
     r, c = rng.integers(0, H), rng.integers(0, W)
     sp[r, c] = 255.0 if rng.random() < 0.5 else 0.0
-
 SHADE = " .:-=+*#%@"
 def show(a, label):
     print("   %s" % label)
     for row in a:
         print("      " + "".join(SHADE[int(np.clip(v / 255.0, 0, 1) * 9)] for v in row))
-
 show(clean, "the clean image: dark left, bright right")
 show(sp, "with gaussian noise AND salt-and-pepper specks")
 print()
-
-def neighbourhood(a, i, j, k):
-    p = k // 2
-    r0, r1 = max(0, i - p), min(a.shape[0], i + p + 1)
-    c0, c1 = max(0, j - p), min(a.shape[1], j + p + 1)
-    return a[r0:r1, c0:c1]
-
 def gaussian_blur(a, k=5, sigma=1.5):
     ax = np.arange(k) - k // 2
     g = np.exp(-(ax ** 2) / (2 * sigma ** 2))
@@ -1284,14 +1312,70 @@ def gaussian_blur(a, k=5, sigma=1.5):
         for j in range(a.shape[1]):
             out[i, j] = (p[i:i + k, j:j + k] * g).sum()
     return out
+show(gaussian_blur(sp), "gaussian 5x5")
+print("   the speckles are dimmed but NOT gone -- gaussian averaging")
+print("   spreads each outlier over the window rather than removing it.")
+```
 
+The median filter sorts each neighbourhood and picks the middle value, which drops outliers entirely.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+H, W = 11, 22
+clean = np.full((H, W), 60.0)
+clean[:, 11:] = 200.0
+noisy = clean + rng.normal(0, 12, (H, W))
+sp = noisy.copy()
+for _ in range(14):
+    r, c = rng.integers(0, H), rng.integers(0, W)
+    sp[r, c] = 255.0 if rng.random() < 0.5 else 0.0
+SHADE = " .:-=+*#%@"
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip(v / 255.0, 0, 1) * 9)] for v in row))
+def neighbourhood(a, i, j, k):
+    p = k // 2
+    r0, r1 = max(0, i - p), min(a.shape[0], i + p + 1)
+    c0, c1 = max(0, j - p), min(a.shape[1], j + p + 1)
+    return a[r0:r1, c0:c1]
 def median_blur(a, k=5):
     out = np.zeros_like(a)
     for i in range(a.shape[0]):
         for j in range(a.shape[1]):
             out[i, j] = np.median(neighbourhood(a, i, j, k))
     return out
+show(median_blur(sp), "median 5x5")
+print()
+win = np.array([60., 62., 255., 58., 61., 59., 60., 63., 57.])
+print("   why it works -- a salt speck of 255 among neighbours of 60:")
+print("      window %s" % win.astype(int))
+print("      mean   %.1f  <- the speck pulled it up by %.1f" % (win.mean(), win.mean() - 60))
+print("      median %.1f  <- the speck is simply not the middle value" % np.median(win))
+print("   a median is a RANK statistic. an outlier cannot drag the answer")
+print("   toward itself the way a mean can. that is why median filtering is")
+print("   the standard tool for impulse noise.")
+```
 
+Bilateral filtering weights neighbours by both distance and similarity, so it smooths within a region but refuses to cross a boundary.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+H, W = 11, 22
+clean = np.full((H, W), 60.0)
+clean[:, 11:] = 200.0
+noisy = clean + rng.normal(0, 12, (H, W))
+sp = noisy.copy()
+for _ in range(14):
+    r, c = rng.integers(0, H), rng.integers(0, W)
+    sp[r, c] = 255.0 if rng.random() < 0.5 else 0.0
+SHADE = " .:-=+*#%@"
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip(v / 255.0, 0, 1) * 9)] for v in row))
 def bilateral(a, k=5, sigma_s=1.5, sigma_r=25.0):
     ax = np.arange(k) - k // 2
     gs = np.exp(-(ax ** 2) / (2 * sigma_s ** 2))
@@ -1305,92 +1389,62 @@ def bilateral(a, k=5, sigma_s=1.5, sigma_r=25.0):
             w = gs * gr
             out[i, j] = (win * w).sum() / w.sum()
     return out
-
-results = [("gaussian 5x5", gaussian_blur(sp)),
-           ("median 5x5", median_blur(sp)),
-           ("bilateral 5x5", bilateral(sp))]
-for name, out in results:
-    show(out, name)
+show(bilateral(sp), "bilateral 5x5")
 print()
-
-def edge_sharpness(a):
-    # how abrupt is the transition across the boundary at column 11
-    return abs(a[:, 12].mean() - a[:, 9].mean())
-
-def flat_noise(a):
-    # residual noise in the two flat regions
-    return (a[:, 1:9].std() + a[:, 14:21].std()) / 2
-
-print("MEASURED, on TWO different noises -- because the filters disagree")
-print("about which is which.")
-print()
-for src, label in ((noisy, "gaussian noise only"), (sp, "gaussian + specks")):
-    print("   %s" % label)
-    print("%22s %16s %16s %18s"
-          % ("", "noise in flat", "worst speck", "edge sharpness"))
-    print("%22s %16.3f %16.1f %18.1f"
-          % ("input", flat_noise(src), abs(src[:, 1:9] - 60).max(),
-             edge_sharpness(src)))
-    for name, fn in (("gaussian 5x5", gaussian_blur),
-                     ("median 5x5", median_blur),
-                     ("bilateral 5x5", bilateral)):
-        o = fn(src)
-        print("%22s %16.3f %16.1f %18.1f"
-              % (name, flat_noise(o), abs(o[:, 1:9] - 60).max(),
-                 edge_sharpness(o)))
-    print("%22s %16.3f %16.1f %18.1f"
-          % ("(clean original)", flat_noise(clean), 0.0, edge_sharpness(clean)))
-    print()
-
-print("READ IT COLUMN BY COLUMN.")
-print()
-print("   NOISE IN FLAT AREAS -- all three reduce it. gaussian is a weighted")
-print("   average, so averaging %d samples cuts random noise by about"
-      % 25)
-print("   sqrt(%d) = %.1f, which is what it is for." % (25, np.sqrt(25)))
-print()
-print("   WORST SPECK -- this is where they separate. a salt speck of 255")
-print("   among neighbours of 60:")
-win = np.array([60., 62., 255., 58., 61., 59., 60., 63., 57.])
-print("      window %s" % win.astype(int))
-print("      mean   %.1f  <- the speck pulled it up by %.1f"
-      % (win.mean(), win.mean() - 60))
-print("      median %.1f  <- the speck is simply not the middle value"
-      % np.median(win))
-print("   a median is a RANK statistic. an outlier changes which value is")
-print("   in the middle by at most one position; it cannot drag the answer")
-print("   toward itself the way a mean can. that is why median filtering is")
-print("   the standard tool for impulse noise.")
-print()
-print("   AND LOOK AT BILATERAL IN THE SECOND TABLE. it barely touches the")
-print("   specks -- its worst speck is almost unchanged. that is not a bug,")
-print("   it is the same mechanism that preserves edges: a speck of 255")
-print("   among neighbours of 60 differs by 195, so the range weights of")
-print("   all its neighbours collapse to")
-print("      exp(-195^2 / (2*25^2)) = %.2e" % np.exp(-195 ** 2 / (2 * 25 ** 2)))
-print("   and the pixel is averaged with essentially nothing but itself.")
-print("   bilateral filtering cannot distinguish 'an impulse' from 'a very")
-print("   small object', so it keeps both. run a median first if you have")
-print("   impulse noise, then a bilateral pass.")
-print()
-print("   EDGE SHARPNESS -- gaussian blurs the edge because it averages")
-print("   across it without knowing it is there. bilateral does not:")
 i, j = 5, 11
 p = np.pad(sp, 2, mode="edge")
 win = p[i:i + 5, j:j + 5]
 gr = np.exp(-((win - sp[i, j]) ** 2) / (2 * 25.0 ** 2))
-print("      at a pixel ON the edge, the bilateral RANGE weights are:")
+print("   at a pixel ON the edge, the bilateral RANGE weights are:")
 for r in np.round(gr, 3):
-    print("         %s" % r)
-print("      neighbours with a similar value get weight near 1; those on")
-print("      the other side of the edge get near 0. so the average is taken")
-print("      only over pixels that were probably the same surface.")
+    print("      %s" % r)
+print("   similar neighbours get weight near 1; those on the other side")
+print("   of the edge get near 0. the average stays on one surface.")
+```
+
+Running all three filters on both noise types shows the quantitative separation between them.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+H, W = 11, 22
+clean = np.full((H, W), 60.0)
+clean[:, 11:] = 200.0
+noisy = clean + rng.normal(0, 12, (H, W))
+sp = noisy.copy()
+for _ in range(14):
+    r, c = rng.integers(0, H), rng.integers(0, W)
+    sp[r, c] = 255.0 if rng.random() < 0.5 else 0.0
+def gauss(a, k=5, s=1.5):
+    ax = np.arange(k)-k//2; g = np.outer(np.exp(-ax**2/(2*s**2)), np.exp(-ax**2/(2*s**2))); g /= g.sum(); p = np.pad(a, k//2, mode="edge")
+    return np.array([[float((p[i:i+k,j:j+k]*g).sum()) for j in range(a.shape[1])] for i in range(a.shape[0])])
+def med(a, k=5):
+    h = k//2
+    return np.array([[float(np.median(a[max(0,i-h):min(a.shape[0],i+h+1), max(0,j-h):min(a.shape[1],j+h+1)])) for j in range(a.shape[1])] for i in range(a.shape[0])])
+def bilat(a, k=5, ss=1.5, sr=25.0):
+    ax = np.arange(k)-k//2; gs = np.outer(np.exp(-ax**2/(2*ss**2)), np.exp(-ax**2/(2*ss**2)))
+    p = np.pad(a, k//2, mode="edge"); out = np.zeros_like(a)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            w = gs*np.exp(-((p[i:i+k,j:j+k]-a[i,j])**2)/(2*sr**2)); out[i,j] = (p[i:i+k,j:j+k]*w).sum()/w.sum()
+    return out
+def edge_sharpness(a):
+    return abs(a[:, 12].mean() - a[:, 9].mean())
+def flat_noise(a):
+    return (a[:, 1:9].std() + a[:, 14:21].std()) / 2
+print("MEASURED, on TWO different noises:")
 print()
-print("that is the whole idea of an edge-preserving filter: weight by")
-print("distance AND by similarity, so smoothing never crosses a boundary.")
-print("the cost is that it is far slower -- the weights depend on the pixel")
-print("values, so they must be recomputed at every position rather than")
-print("applied as one fixed kernel.")
+for src, label in ((noisy, "gaussian noise only"), (sp, "gaussian + specks")):
+    print("   %s" % label)
+    print("%22s %16s %16s %18s" % ("", "noise in flat", "worst speck", "edge sharpness"))
+    print("%22s %16.3f %16.1f %18.1f" % ("input", flat_noise(src), abs(src[:, 1:9] - 60).max(), edge_sharpness(src)))
+    for name, fn in (("gaussian 5x5", gauss), ("median 5x5", med), ("bilateral 5x5", bilat)):
+        o = fn(src)
+        print("%22s %16.3f %16.1f %18.1f" % (name, flat_noise(o), abs(o[:, 1:9] - 60).max(), edge_sharpness(o)))
+    print("%22s %16.3f %16.1f %18.1f" % ("(clean original)", flat_noise(clean), 0.0, edge_sharpness(clean)))
+    print()
+print("   gaussian blurs specks into the area. median removes them cleanly.")
+print("   bilateral keeps edges but keeps specks too. median first, then bilateral.")
 ```
 
 """,
@@ -1947,8 +2001,6 @@ byte, not 0-359. Half of each published threshold is wrong for this reason.
 RGB says how much of each light. HSV says which colour, how vivid, how bright. Converting between them by hand shows why one is right for displays and the other for finding a coloured object.
 
 ```python-run
-import numpy as np
-
 def rgb_to_hsv(r, g, b):
     r, g, b = r / 255.0, g / 255.0, b / 255.0
     mx, mn = max(r, g, b), min(r, g, b)
@@ -1963,12 +2015,10 @@ def rgb_to_hsv(r, g, b):
         h = 60 * ((r - g) / d) + 240
     s = 0.0 if mx == 0 else d / mx
     return h, s, mx
-
 swatches = [("pure red", (255, 0, 0)), ("dark red", (128, 0, 0)),
             ("pink", (255, 128, 128)), ("pure green", (0, 255, 0)),
             ("sky blue", (100, 180, 255)), ("white", (255, 255, 255)),
             ("grey", (128, 128, 128)), ("black", (0, 0, 0))]
-
 print("%12s %18s %10s %10s %10s"
       % ("colour", "RGB", "hue (deg)", "sat", "value"))
 for name, (r, g, b) in swatches:
@@ -1983,24 +2033,34 @@ for name in ("pure red", "dark red", "pink"):
     h, s, v = rgb_to_hsv(r, g, b)
     print("   %-10s hue %3.0f, saturation %.2f, value %.2f" % (name, h, s, v))
 print("   that is the property the whole colour space exists for.")
-print()
+```
 
+Hue is an angle on a colour wheel, and lighting changes barely move it, which is why HSV makes colour segmentation practical.
+
+```python-run
+import numpy as np
+def rgb_to_hsv(r, g, b):
+    r, g, b = r / 255.0, g / 255.0, b / 255.0
+    mx, mn = max(r, g, b), min(r, g, b)
+    d = mx - mn
+    if d == 0: h = 0.0
+    elif mx == r: h = (60 * ((g - b) / d)) % 360
+    elif mx == g: h = 60 * ((b - r) / d) + 120
+    else: h = 60 * ((r - g) / d) + 240
+    return h, (0.0 if mx == 0 else d / mx), mx
 print("HUE IS AN ANGLE, so the colours wrap:")
 for deg, name in ((0, "red"), (60, "yellow"), (120, "green"),
                   (180, "cyan"), (240, "blue"), (300, "magenta"), (360, "red again")):
     print("   %3d degrees -> %s" % (deg, name))
-print("   which means hue arithmetic is circular. the distance between 350")
-print("   and 10 degrees is 20, not 340, and code that forgets this splits")
-print("   red into two separate ranges:")
+print("   hue arithmetic is circular. the distance between 350 and 10")
+print("   degrees is 20, not 340:")
 for a, b in ((350, 10), (10, 350), (100, 200)):
     naive = abs(a - b)
     circ = min(naive, 360 - naive)
     print("      |%3d - %3d|: naive %3d, circular %3d %s"
           % (a, b, naive, circ, "  <- wrong" if naive != circ else ""))
 print()
-
-print("WHY THIS MATTERS FOR SEGMENTING BY COLOUR. take a red object")
-print("photographed under three lighting conditions:")
+print("WHY THIS MATTERS: take a red object under three lighting conditions:")
 lit = [("bright sun", (255, 40, 40)), ("indoors", (150, 25, 25)),
        ("shadow", (70, 12, 12))]
 print("%14s %18s %28s" % ("condition", "RGB", "HSV"))
@@ -2017,41 +2077,47 @@ print("      HSV: H varies by %.1f, S by %.3f, V by %.3f"
       % tuple(hsvs.max(0) - hsvs.min(0)))
 print("   the hue barely moves. an RGB threshold has to cover a large")
 print("   3-D box to catch all three; a hue threshold is one narrow band.")
-print()
+```
 
-print("   a red detector in each space, tested on the three lit versions")
-print("   plus some things that are NOT the object:")
+A red detector built on hue handles lighting changes that break the same detector built on RGB thresholds.
+
+```python-run
+def rgb_to_hsv(r, g, b):
+    r, g, b = r / 255.0, g / 255.0, b / 255.0
+    mx, mn = max(r, g, b), min(r, g, b)
+    d = mx - mn
+    if d == 0: h = 0.0
+    elif mx == r: h = (60 * ((g - b) / d)) % 360
+    elif mx == g: h = 60 * ((b - r) / d) + 120
+    else: h = 60 * ((r - g) / d) + 240
+    return h, (0.0 if mx == 0 else d / mx), mx
+lit = [("bright sun", (255, 40, 40)), ("indoors", (150, 25, 25)),
+       ("shadow", (70, 12, 12))]
 others = [("skin", (230, 180, 150)), ("orange", (255, 140, 0)),
           ("grey wall", (150, 150, 150)), ("dark blue", (20, 20, 90))]
 print("%14s %18s %14s %14s" % ("sample", "RGB", "RGB rule", "hue rule"))
 for name, (r, g, b) in lit + others:
     h, s, v = rgb_to_hsv(r, g, b)
-    rgb_hit = r > 120 and g < 80 and b < 80          # tuned for bright sun
+    rgb_hit = r > 120 and g < 80 and b < 80
     hue_hit = (h < 15 or h > 345) and s > 0.5 and v > 0.03
     print("%14s %18s %14s %14s"
           % (name, str((r, g, b)),
              "MATCH" if rgb_hit else "-", "MATCH" if hue_hit else "-"))
-print("   the RGB rule was tuned on the bright sample. it survives the")
-print("   indoor one and loses the object entirely in shadow, because its")
-print("   'R > 120' test is really a brightness test wearing a colour")
-print("   costume. the hue rule catches all three appearances of the same")
-print("   object and still rejects skin, orange, grey and blue.")
+print("   the RGB rule loses the object in shadow, because 'R > 120' is")
+print("   really a brightness test. the hue rule catches all three.")
 print()
-
 print("THE PRACTICAL SPLIT:")
 print("   RGB  -- what a display emits and a sensor records. correct for")
 print("           storage, transmission and as a neural network's input.")
 print("   HSV  -- separates WHAT COLOUR from HOW BRIGHT, which is what you")
 print("           want for thresholding, chroma keying and colour tracking.")
-print("   and one caveat: hue is undefined when saturation is 0. a grey")
-print("   pixel has no colour to name:")
+print("   caveat: hue is undefined when saturation is 0:")
+greys = {"white": (255, 255, 255), "grey": (128, 128, 128), "black": (0, 0, 0)}
 for name in ("white", "grey", "black"):
-    r, g, b = dict(swatches)[name]
+    r, g, b = greys[name]
     h, s, v = rgb_to_hsv(r, g, b)
-    print("      %-8s saturation %.2f -> hue reported as %.0f, and it means"
-          % (name, s, h))
-    print("      %-8s nothing" % "")
-print("   so always gate a hue test on a minimum saturation, or grey pixels")
+    print("      %-8s saturation %.2f -> hue %.0f, meaningless" % (name, s, h))
+print("   always gate a hue test on a minimum saturation, or grey pixels")
 print("   will match whatever colour you were looking for.")
 ```
 
@@ -3314,18 +3380,15 @@ A 1x1 kernel has no spatial extent at all. This Sounds useless. It's a per-pixel
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(0)
-
 H, W, C = 4, 4, 6
 x = rng.normal(0, 1.0, (H, W, C))
 print("a feature map: %dx%d positions, %d channels each." % (H, W, C))
 print("   the vector at position (0,0): %s" % np.round(x[0, 0], 3))
 print()
-
 COUT = 3
 W1 = rng.normal(0, 0.4, (C, COUT))
-out = x @ W1                     # that is the entire operation
+out = x @ W1
 print("a 1x1 convolution with %d output channels is a %dx%d matrix applied"
       % (COUT, C, COUT))
 print("to every position independently:")
@@ -3335,7 +3398,6 @@ print("   shape %s -> %s" % (x.shape, out.shape))
 print("   the spatial dimensions are untouched. only the channel count")
 print("   changed, which is the whole purpose.")
 print()
-
 print("IT IS A DENSE LAYER, SHARED ACROSS POSITIONS. proof -- shuffle the")
 print("positions and the outputs follow exactly:")
 flat = x.reshape(-1, C)
@@ -3345,8 +3407,12 @@ b = flat[perm] @ W1
 print("   identical: %s" % np.allclose(a, b))
 print("   so it cannot mix information between positions. a 3x3 convolution")
 print("   can; this cannot. it only mixes CHANNELS.")
-print()
+```
 
+The two main practical uses are cutting parameter counts and building bottleneck blocks.
+
+```python-run
+import numpy as np
 print("USE 1 -- CHANGING THE CHANNEL COUNT CHEAPLY. compare the cost of")
 print("reducing 256 channels to 64:")
 for kh in (1, 3, 5):
@@ -3355,7 +3421,6 @@ for kh in (1, 3, 5):
 print("   the 1x1 does the same job for a ninth of a 3x3's cost, because")
 print("   there is no spatial window to weight.")
 print()
-
 print("USE 2 -- THE BOTTLENECK BLOCK, which is what ResNet-50 is built from.")
 print("a 3x3 convolution on 256 channels, done two ways:")
 direct = 3 * 3 * 256 * 256
@@ -3376,8 +3441,17 @@ print("   channels instead of 256 -- a %.0fx saving on that layer alone."
 print()
 print("   and it is still non-linear: there is a ReLU after each of the")
 print("   three, so the block is not equivalent to one big convolution.")
-print()
+```
 
+A 1x1 convolution also serves as a cross-channel mixer and turns a classifier into a fully convolutional segmenter.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+C, COUT = 6, 3
+W1 = rng.normal(0, 0.4, (C, COUT))
+_ = rng.normal(0, 1.0, (4, 4, C))  # advance RNG to match earlier state
+_ = rng.permutation(16)
 print("USE 3 -- CROSS-CHANNEL MIXING. each output channel is a learned")
 print("combination of all input channels. here is what one output channel")
 print("is made of:")
@@ -3390,7 +3464,6 @@ print("   a 3x3 convolution also mixes channels, but it spends 9 weights per")
 print("   pair doing it. if the mixing is all you need, 8 of those 9 are")
 print("   wasted.")
 print()
-
 print("USE 4 -- MAKING A NETWORK FULLY CONVOLUTIONAL. a dense layer needs a")
 print("fixed input size; a 1x1 convolution does not:")
 for size in (7, 14, 28):
@@ -3402,7 +3475,6 @@ print("   that is how a classifier becomes a segmenter: replace the final")
 print("   dense layer with a 1x1 convolution and it outputs a class map")
 print("   instead of a class, at whatever resolution you feed it.")
 print()
-
 print("the summary in one line: a 1x1 convolution is the cheapest way to")
 print("change how many channels you have, and the only convolution that")
 print("does nothing spatial at all.")
