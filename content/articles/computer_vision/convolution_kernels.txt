@@ -162,14 +162,11 @@ A convolution is a weighted sum repeated at each spot. Six classic kernels are a
 
 ```python-run
 import numpy as np
-
-# a small image: a bright square on a dark background, with a diagonal edge
 img = np.zeros((9, 9))
 img[2:7, 2:7] = 200.0
 img[0:3, 6:9] = 120.0
 img += np.random.default_rng(0).normal(0, 4, img.shape)
 img = np.clip(img, 0, 255)
-
 SHADE = " .:-=+*#%@"
 def show(a, label, lo=None, hi=None):
     lo = a.min() if lo is None else lo
@@ -179,10 +176,8 @@ def show(a, label, lo=None, hi=None):
     for row in a:
         print("      " + "".join(SHADE[int(np.clip((v - lo) / rng_, 0, 1) * 9)]
                                  for v in row))
-
 show(img, "the image (%dx%d, values 0-255):" % img.shape)
 print()
-
 def convolve(a, k):
     kh, kw = k.shape
     ph, pw = kh // 2, kw // 2
@@ -192,78 +187,122 @@ def convolve(a, k):
         for j in range(a.shape[1]):
             out[i, j] = (padded[i:i + kh, j:j + kw] * k).sum()
     return out
-
-print("ONE OUTPUT PIXEL, written out. take the 3x3 patch at (4,4) and a")
-print("simple averaging kernel:")
+print("ONE OUTPUT PIXEL, written out. take the 3x3 patch at (4,4):")
 patch = img[3:6, 3:6]
 box = np.ones((3, 3)) / 9
 print("   patch:")
 for r in patch:
     print("      %s" % np.round(r, 1))
-print("   kernel:")
+print("   kernel (box blur):")
 for r in box:
     print("      %s" % np.round(r, 4))
-print("   multiply elementwise and sum:")
 terms = (patch * box).ravel()
+print("   multiply elementwise and sum:")
 print("      %s" % "  ".join("%.1f" % t for t in terms[:5]))
 print("      + ... = %.4f" % terms.sum())
 print("   that one number is the output at (4,4). repeat for every pixel.")
-print()
+```
 
+Six classic kernels are applied to the same image, and the kernel sum reveals the filter family.
+
+```python-run
+import numpy as np
+img = np.zeros((9, 9))
+img[2:7, 2:7] = 200.0
+img[0:3, 6:9] = 120.0
+img += np.random.default_rng(0).normal(0, 4, img.shape)
+img = np.clip(img, 0, 255)
+SHADE = " .:-=+*#%@"
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip((v - a.min()) / max(a.max() - a.min(), 1e-9), 0, 1) * 9)]
+                                 for v in row))
+def convolve(a, k):
+    kh, kw = k.shape
+    padded = np.pad(a, ((kh//2, kh//2), (kw//2, kw//2)), mode="edge")
+    out = np.zeros_like(a, dtype=float)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            out[i, j] = (padded[i:i+kh, j:j+kw] * k).sum()
+    return out
 kernels = {
-    "identity":        np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]], float),
-    "box blur":        np.ones((3, 3)) / 9,
-    "sharpen":         np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], float),
-    "sobel x (vert.)": np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], float),
-    "sobel y (horiz.)": np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], float),
-    "laplacian":       np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], float),
+    "identity":        np.array([[0,0,0],[0,1,0],[0,0,0]], float),
+    "box blur":        np.ones((3,3)) / 9,
+    "sharpen":         np.array([[0,-1,0],[-1,5,-1],[0,-1,0]], float),
+    "sobel x (vert.)": np.array([[-1,0,1],[-2,0,2],[-1,0,1]], float),
+    "sobel y (horiz.)": np.array([[-1,-2,-1],[0,0,0],[1,2,1]], float),
+    "laplacian":       np.array([[0,1,0],[1,-4,1],[0,1,0]], float),
 }
-
 print("SIX KERNELS on the same image:")
 for name, k in kernels.items():
     out = convolve(img, k)
-    print()
-    print("   %-18s kernel sum %+.1f   output range %+8.1f to %+8.1f"
-          % (name, k.sum(), out.min(), out.max()))
-    show(np.abs(out) if k.sum() == 0 else out, "")
-print()
-
-print("READ THE KERNEL SUMS. that one number tells you what a kernel does:")
-for name, k in kernels.items():
     s = k.sum()
-    kind = ("preserves brightness" if abs(s - 1) < 1e-9
-            else "detects change (flat areas -> 0)" if abs(s) < 1e-9
-            else "scales brightness by %.1f" % s)
-    print("   %-18s sum %+5.1f  %s" % (name, s, kind))
-print()
-flat = np.full((9, 9), 100.0)
-print("   proof: run each kernel on a completely flat image of 100s:")
-for name, k in kernels.items():
-    print("      %-18s -> centre pixel %+8.2f" % (name, convolve(flat, k)[4, 4]))
-print("   the edge detectors return 0 because there is no edge. that is not")
-print("   a coincidence -- a kernel summing to zero cannot respond to a")
-print("   constant, only to a difference.")
-print()
+    kind = ("preserves" if abs(s-1)<1e-9 else "detects change" if abs(s)<1e-9
+            else "scales by %.1f" % s)
+    print()
+    print("   %-18s sum %+.1f  %s  range %+.1f to %+.1f"
+          % (name, s, kind, out.min(), out.max()))
+    show(np.abs(out) if s == 0 else out, "")
+```
 
-print("THE TWO SOBELS TOGETHER give gradient magnitude, which is edge")
-print("strength regardless of direction:")
-gx = convolve(img, kernels["sobel x (vert.)"])
-gy = convolve(img, kernels["sobel y (horiz.)"])
-mag = np.sqrt(gx ** 2 + gy ** 2)
+Combining the two Sobel directions gives edge strength regardless of orientation, which is what a CNN's early layers learn to compute.
+
+```python-run
+import numpy as np
+def convolve(a, k):
+    kh, kw = k.shape
+    padded = np.pad(a, ((kh//2, kh//2), (kw//2, kw//2)), mode="edge")
+    out = np.zeros_like(a, dtype=float)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            out[i, j] = (padded[i:i+kh, j:j+kw] * k).sum()
+    return out
+kernels = {
+    "identity":  np.array([[0,0,0],[0,1,0],[0,0,0]], float),
+    "box blur":  np.ones((3,3)) / 9,
+    "sharpen":   np.array([[0,-1,0],[-1,5,-1],[0,-1,0]], float),
+    "sobel x":   np.array([[-1,0,1],[-2,0,2],[-1,0,1]], float),
+    "sobel y":   np.array([[-1,-2,-1],[0,0,0],[1,2,1]], float),
+    "laplacian": np.array([[0,1,0],[1,-4,1],[0,1,0]], float),
+}
+flat = np.full((9, 9), 100.0)
+print("each kernel on a completely flat image of 100s:")
+for name, k in kernels.items():
+    print("   %-10s -> centre pixel %+8.2f" % (name, convolve(flat, k)[4, 4]))
+print("   edge detectors return 0 because there is no edge.")
+```
+
+Combining the two Sobel directions gives gradient magnitude — the strength of an edge regardless of its orientation.
+
+```python-run
+import numpy as np
+SHADE = " .:-=+*#%@"
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip((v-a.min())/max(a.max()-a.min(),1e-9),0,1)*9)] for v in row))
+def convolve(a, k):
+    kh, kw = k.shape
+    padded = np.pad(a, ((kh//2,kh//2),(kw//2,kw//2)), mode="edge")
+    out = np.zeros_like(a, dtype=float)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            out[i, j] = (padded[i:i+kh, j:j+kw] * k).sum()
+    return out
+img = np.zeros((9,9)); img[2:7,2:7] = 200.0; img[0:3,6:9] = 120.0
+img += np.random.default_rng(0).normal(0, 4, img.shape)
+img = np.clip(img, 0, 255)
+gx = convolve(img, np.array([[-1,0,1],[-2,0,2],[-1,0,1]], float))
+gy = convolve(img, np.array([[-1,-2,-1],[0,0,0],[1,2,1]], float))
+mag = np.sqrt(gx**2 + gy**2)
 show(mag, "gradient magnitude:")
-print("   the bright ring is the boundary of the square. the interior is")
-print("   dark because the interior is flat.")
-print()
-print("and the angle tells you which way the edge runs:")
+print("   the bright ring is the boundary of the square.")
 ang = np.degrees(np.arctan2(gy, gx))
 strong = mag > mag.max() * 0.5
-print("   strongest edge pixels and their orientations:")
+print("strongest edge pixels and their orientations:")
 for (i, j) in list(zip(*np.where(strong)))[:6]:
-    print("      (%d,%d) magnitude %7.1f, angle %+7.1f degrees"
-          % (i, j, mag[i, j], ang[i, j]))
-print()
-print("a CNN does not use these. it LEARNS its kernels -- but the early")
-print("layers of a trained network reliably rediscover edge and blob")
-print("detectors that look very much like the ones above, because those are")
-print("what the data rewards.")
+    print("   (%d,%d) mag %7.1f, angle %+7.1f deg" % (i, j, mag[i,j], ang[i,j]))
+print("a CNN learns its kernels, but early layers rediscover edge")
+print("detectors like these because the data rewards them.")
 ```

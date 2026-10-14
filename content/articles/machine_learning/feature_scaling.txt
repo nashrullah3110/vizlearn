@@ -152,7 +152,7 @@ import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
@@ -162,8 +162,7 @@ from sklearn.ensemble import RandomForestClassifier
 X, y = make_classification(n_samples=1500, n_features=8, n_informative=4,
                            random_state=0)
 X_big = X.copy()
-X_big[:, 0] *= 10_000          # one column measured in a different unit
-
+X_big[:, 0] *= 10_000
 print("column 0 now has sd %.0f; the rest are near 1.0" % X_big[:, 0].std())
 print()
 print("%-24s %12s %12s %10s" % ("model", "raw", "scaled", "change"))
@@ -184,34 +183,43 @@ print("the other seven columns stop counting.")
 print()
 print("trees split one column at a time and never compare across columns,")
 print("so a change of unit is invisible to them. that is exact, not approximate.")
-print()
-print("logistic regression is the subtle one -- the accuracy barely moved,")
-print("but look at what it had to do to the coefficients:")
+```
+
+The next block shows how scaling changes the coefficients of logistic regression, and how the three common scalers handle a column with one outlier.
+
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+
+X, y = make_classification(n_samples=1500, n_features=8, n_informative=4,
+                           random_state=0)
+X_big = X.copy()
+X_big[:, 0] *= 10_000
 raw_c = LogisticRegression(max_iter=5000).fit(X_big, y).coef_[0]
 sc_c = LogisticRegression(max_iter=5000).fit(StandardScaler().fit_transform(X_big), y).coef_[0]
-print("  unscaled coefficients:", np.round(raw_c[:4], 6), "...")
-print("  scaled coefficients:  ", np.round(sc_c[:4], 6), "...")
-print()
-print("the first coefficient is %.0fx smaller than the others just to undo the"
+print("logistic regression barely lost accuracy, but look at the coefficients:")
+print("  unscaled:", np.round(raw_c[:4], 6), "...")
+print("  scaled:  ", np.round(sc_c[:4], 6), "...")
+print("the first coefficient is %.0fx smaller just to undo the unit."
       % (abs(sc_c[0]) / abs(raw_c[0])))
-print("unit. the L2 penalty charges by coefficient size, so it is now charging")
-print("that column almost nothing and the rest full price. the fit survived; the")
-print("regularisation stopped meaning what you think it means.")
+print("the L2 penalty charges by coefficient size, so it is now charging")
+print("that column almost nothing and the rest full price.")
 print()
-
-print("the three scalers, on a column with one outlier:")
 col = np.concatenate([np.random.default_rng(0).normal(50, 5, 200),
                       [400.0]]).reshape(-1, 1)
+print("the three scalers, on a column with one outlier:")
 for name, sc in (("StandardScaler", StandardScaler()),
                  ("MinMaxScaler",   MinMaxScaler()),
                  ("RobustScaler",   RobustScaler())):
     out = sc.fit_transform(col).ravel()
-    print("  %-15s the 200 normal rows land in [%7.3f, %7.3f], the outlier at %8.3f"
+    print("  %-15s normal rows in [%7.3f, %7.3f], outlier at %8.3f"
           % (name, out[:200].min(), out[:200].max(), out[-1]))
 print()
-print("MinMaxScaler squeezes every real row into 6% of its range because one")
-print("point defines the other end. that is the argument for RobustScaler when")
-print("outliers are part of the data rather than a mistake.")
+print("MinMaxScaler squeezes every real row into 6%% of its range because one")
+print("point defines the other end. RobustScaler uses the median and IQR,")
+print("so a single extreme value does not distort the rest.")
 print()
 print("and always fit the scaler inside a pipeline -- fitting it on all the data")
 print("before splitting leaks the test set's mean and sd into training.")

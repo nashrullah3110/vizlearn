@@ -140,26 +140,20 @@ Replacing a target of 1.0 with 0.9 changes what the loss is minimised by. This f
 
 ```python-run
 import numpy as np
-
 K = 5           # classes
 EPS = 0.1       # smoothing strength
-
 hard = np.zeros(K); hard[0] = 1.0
 soft = np.full(K, EPS / K); soft[0] += 1 - EPS
-
 print("a %d-class problem, true class 0." % K)
 print("  hard target  :", np.round(hard, 4))
 print("  smoothed 0.1 :", np.round(soft, 4), " sums to", round(soft.sum(), 6))
 print("  the formula is (1 - eps) * onehot + eps / K.")
 print()
-
 def softmax(z):
     e = np.exp(z - z.max())
     return e / e.sum()
-
 def ce(z, target):
     return -(target * np.log(softmax(z))).sum() + 0.0
-
 print("what each target is minimised BY. the loss against a hard target")
 print("keeps falling as the true logit grows, forever:")
 print("%14s %14s %16s" % ("logit gap", "hard loss", "smoothed loss"))
@@ -179,15 +173,26 @@ print()
 print("so smoothing does not merely 'soften' the target -- it gives the model")
 print("a finite target to aim for. without it the optimum is at infinity, and")
 print("the weights grow without bound trying to reach it.")
-print()
+```
 
+The next block sweeps epsilon to show the confidence each value targets, and the cost of smoothing on a certain example.
+
+```python-run
+import numpy as np
+K = 5
+EPS = 0.1
+def softmax(z):
+    e = np.exp(z - z.max())
+    return e / e.sum()
+def ce(z, target):
+    return -(target * np.log(softmax(z))).sum() + 0.0
+best = np.log((1 - EPS + EPS / K) / (EPS / K))
 z_at_best = np.r_[best, np.zeros(K - 1)]
-print("the confidence that corresponds to that optimum:")
+print("the confidence that corresponds to the optimal logit gap:")
 print("  probabilities:", np.round(softmax(z_at_best), 4))
 print("  the model's best possible answer is %.4f, not 1.0000."
       % softmax(z_at_best)[0])
 print()
-
 print("smoothing strength against the confidence it targets:")
 print("%10s %16s %16s" % ("eps", "optimal gap", "peak probability"))
 for eps in (0.0, 0.01, 0.05, 0.1, 0.2, 0.5):
@@ -201,7 +206,8 @@ print("  eps=0.5 targets only %.2f confidence, which is barely a decision."
       % softmax(np.r_[np.log((1 - 0.5 + 0.5 / K) / (0.5 / K)), np.zeros(K - 1)])[0])
 print("  0.1 is the usual choice and 0.2 is about as far as anyone goes.")
 print()
-
+hard = np.zeros(K); hard[0] = 1.0
+soft = np.full(K, EPS / K); soft[0] += 1 - EPS
 print("and what it costs. a genuinely certain example is now penalised:")
 z_sure = np.r_[12.0, np.zeros(K - 1)]
 print("  a model that is right and certain (p=%.6f):" % softmax(z_sure)[0])
@@ -211,6 +217,5 @@ print("    smoothed loss %.6f  <- it is being pushed back down"
 print()
 print("that is the trade. label smoothing buys better-calibrated confidence")
 print("and slightly better accuracy, and costs you the ability to be certain")
-print("about anything. if your downstream system reads the probability as a")
-print("probability, measure the calibration before and after -- do not assume.")
+print("about anything. measure the calibration before and after -- do not assume.")
 ```

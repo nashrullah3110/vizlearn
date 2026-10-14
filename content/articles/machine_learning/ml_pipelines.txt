@@ -153,23 +153,19 @@ prep outside the pipeline scores higher and is a lie. Here are both versions sid
 
 ```python-run
 import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline, make_pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.model_selection import cross_val_score, StratifiedKFold, GridSearchCV
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import cross_val_score, StratifiedKFold
 
 rng = np.random.default_rng(0)
-X = rng.normal(size=(200, 800))         # 800 columns of noise
-y = rng.integers(0, 2, 200)             # a coin-flip label
+X = rng.normal(size=(200, 800))
+y = rng.integers(0, 2, 200)
 cv = StratifiedKFold(5, shuffle=True, random_state=0)
 print("200 rows, 800 noise columns, a random label. nothing is learnable.")
 print()
 
-# the wrong way -- every step fitted on all the data before scoring
 Xs = StandardScaler().fit_transform(X)
 Xk = SelectKBest(f_classif, k=25).fit_transform(Xs, y)
 print("preprocessing first, then cross-validating the model:")
@@ -190,8 +186,25 @@ print("a Pipeline is just a list of (name, step) pairs:")
 for name, step in pipe.steps:
     print("   %-16s %s" % (name, type(step).__name__))
 print("  every step but the last needs fit_transform. the last needs fit.")
-print()
+```
 
+The next block shows how to tune parameters through a pipeline and how ColumnTransformer handles mixed column types.
+
+```python-run
+import numpy as np
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import StratifiedKFold, GridSearchCV
+rng = np.random.default_rng(0)
+X = rng.normal(size=(200, 800))
+y = rng.integers(0, 2, 200)
+cv = StratifiedKFold(5, shuffle=True, random_state=0)
+pipe = make_pipeline(StandardScaler(), SelectKBest(f_classif, k=25),
+                     LogisticRegression(max_iter=2000))
 print("you can reach into it to tune any step's parameters:")
 grid = GridSearchCV(pipe, {"selectkbest__k": [5, 25, 100],
                            "logisticregression__C": [0.01, 1.0]},
@@ -201,23 +214,19 @@ print("  best params:", grid.best_params_)
 print("  best cv score: %.4f  <- still noise, as it should be" % grid.best_score_)
 print("  the double underscore is 'step name, then parameter name'.")
 print()
-
-print("ColumnTransformer handles the realistic case of mixed column types.")
-print("columns 0-2 are numeric with holes; column 3 is a category code:")
+print("ColumnTransformer handles mixed column types.")
 data = np.column_stack([rng.normal(size=(300, 3)),
                         rng.integers(0, 3, 300).astype(float)])
-data[rng.random(300) < 0.08, 0] = np.nan            # holes in column 0 only
-
+data[rng.random(300) < 0.08, 0] = np.nan
 pre = ColumnTransformer([
     ("numbers", make_pipeline(SimpleImputer(), StandardScaler()), [0, 1, 2]),
     ("category", OneHotEncoder(handle_unknown="ignore"), [3]),
 ])
 out = pre.fit_transform(data)
 print("  %d input columns -> %d output columns" % (data.shape[1], out.shape[1]))
-print("  the numeric three were imputed and scaled; the category became three")
-print("  indicator columns. each transformer only ever touches its own columns.")
-print("  and all of it is refit inside every fold, because it is still a step.")
+print("  numeric: imputed and scaled. category: three indicator columns.")
+print("  each transformer only touches its own columns.")
 print()
-print("one object holds the whole recipe, so the thing you cross-validate is")
-print("the thing you deploy. that is the argument -- not tidiness.")
+print("one object holds the whole recipe, so the thing you cross-validate")
+print("is the thing you deploy. that is the argument -- not tidiness.")
 ```

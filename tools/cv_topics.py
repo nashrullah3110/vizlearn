@@ -616,7 +616,6 @@ def show(a, label):
         print("      " + "".join(SHADE[int(np.clip((v - lo) / max(hi - lo, 1e-9), 0, 1) * 9)]
                                  for v in row))
 
-# a document-like image: dark text on a light page, with uneven lighting
 H, W = 12, 24
 page = np.full((H, W), 200.0)
 text = [(2, 3), (2, 4), (2, 5), (3, 3), (4, 3), (4, 4), (4, 5),
@@ -625,7 +624,6 @@ text = [(2, 3), (2, 4), (2, 5), (3, 3), (4, 3), (4, 4), (4, 5),
         (8, 4), (8, 5), (9, 4), (9, 5)]
 for r, c in text:
     page[r, c] = 40.0
-# a lighting gradient: bright on the left, dim on the right
 page = page * np.linspace(1.0, 0.13, W)[None, :]
 page = np.clip(page + rng.normal(0, 3, page.shape), 0, 255)
 
@@ -645,7 +643,22 @@ for i, count in enumerate(hist):
     if count:
         print("      %3.0f-%3.0f %5d %s"
               % (edges[i], edges[i + 1], count, "#" * int(40 * count / hist.max())))
-print()
+```
+
+The next block implements Otsu's method, which picks the threshold automatically by maximising the between-class variance, then compares global and adaptive thresholding on the unevenly lit page.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+H, W = 12, 24
+page = np.full((H, W), 200.0)
+text = [(2,3),(2,4),(2,5),(3,3),(4,3),(4,4),(4,5),(6,12),(6,13),(7,12),
+        (8,12),(8,13),(2,18),(3,18),(4,18),(4,19),(4,20),(8,4),(8,5),(9,4),(9,5)]
+for r, c in text:
+    page[r, c] = 40.0
+page = page * np.linspace(1.0, 0.13, W)[None, :]
+page = np.clip(page + rng.normal(0, 3, page.shape), 0, 255)
 
 def otsu(a, bins=64):
     hist_, edges_ = np.histogram(a, bins=bins, range=(0, 256))
@@ -669,7 +682,28 @@ print("OTSU'S METHOD searches every threshold and keeps the one that")
 print("maximises the variance BETWEEN the two groups -- equivalently, the")
 print("one that minimises the variance within them:")
 print("   chosen threshold: %.1f" % t_otsu)
-print()
+```
+
+The next block applies global and adaptive thresholding side by side, then measures each against the known ink positions.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+H, W = 12, 24
+page = np.full((H, W), 200.0)
+text = [(2,3),(2,4),(2,5),(3,3),(4,3),(4,4),(4,5),(6,12),(6,13),(7,12),
+        (8,12),(8,13),(2,18),(3,18),(4,18),(4,19),(4,20),(8,4),(8,5),(9,4),(9,5)]
+for r, c in text:
+    page[r, c] = 40.0
+page = page * np.linspace(1.0, 0.13, W)[None, :]
+page = np.clip(page + rng.normal(0, 3, page.shape), 0, 255)
+SHADE = " .:-=+*#%@"
+
+def show(a, label):
+    print("   %s" % label)
+    lo, hi = a.min(), a.max()
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip((v-lo)/max(hi-lo,1e-9),0,1)*9)] for v in row))
 
 def apply_global(a, t):
     return (a < t).astype(float)
@@ -686,63 +720,58 @@ def adaptive(a, block=7, offset=8.0):
 truth = np.zeros((H, W))
 for r, c in text:
     truth[r, c] = 1.0
-
-results = [("global, threshold 100", apply_global(page, 100.0)),
-           ("global, Otsu %.0f" % t_otsu, apply_global(page, t_otsu)),
-           ("adaptive, 7x7 local mean", adaptive(page))]
-for name, out in results:
+for name, out in [("global, threshold 100", apply_global(page, 100.0)),
+                  ("global, Otsu 36", apply_global(page, 36.0)),
+                  ("adaptive, 7x7 local mean", adaptive(page))]:
     show(out, name)
-    tp = int((out * truth).sum())
-    fp = int((out * (1 - truth)).sum())
-    fn = int(((1 - out) * truth).sum())
-    print("      found %d of %d marks, with %d false positives"
-          % (tp, int(truth.sum()), fp))
+    tp, fp = int((out * truth).sum()), int((out * (1 - truth)).sum())
+    print("      found %d of %d marks, with %d false positives" % (tp, int(truth.sum()), fp))
     print()
+```
 
-print("READ THE GLOBAL RESULTS. whatever single number you pick:")
+The next block sweeps through several global thresholds to show the precision-recall trade-off, then demonstrates how adaptive thresholding sidesteps it entirely.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+H, W = 12, 24
+page = np.full((H, W), 200.0)
+text = [(2,3),(2,4),(2,5),(3,3),(4,3),(4,4),(4,5),(6,12),(6,13),(7,12),
+        (8,12),(8,13),(2,18),(3,18),(4,18),(4,19),(4,20),(8,4),(8,5),(9,4),(9,5)]
+for r, c in text:
+    page[r, c] = 40.0
+page = page * np.linspace(1.0, 0.13, W)[None, :]
+page = np.clip(page + rng.normal(0, 3, page.shape), 0, 255)
+truth = np.zeros((H, W))
+for r, c in text:
+    truth[r, c] = 1.0
+
+def apply_global(a, t):
+    return (a < t).astype(float)
+
+def adaptive(a, block=7, offset=8.0):
+    p = np.pad(a, block // 2, mode="edge")
+    out = np.zeros_like(a)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            out[i, j] = 1.0 if a[i, j] < p[i:i+block, j:j+block].mean() - offset else 0.0
+    return out
+
+print("SWEEP OF GLOBAL THRESHOLDS:")
 print("%16s %10s %10s %10s" % ("threshold", "found", "missed", "false pos"))
-for t in (15, 22, 30, 60, 100, t_otsu):
+for t in (15, 22, 30, 60, 100, 36):
     out = apply_global(page, t)
     print("%16.0f %10d %10d %10d"
-          % (t, int((out * truth).sum()), int(((1 - out) * truth).sum()),
-             int((out * (1 - truth)).sum())))
-print("   read it as a trade with no good corner. a low threshold keeps the")
-print("   page clean and MISSES ink; raising it recovers the ink and starts")
-print("   calling the dim page ink too. the two classes overlap once the")
-print("   lighting is folded in:")
-ink_vals = [page[r, c] for r, c in text]
-pg = np.array([page[i, j] for i in range(H) for j in range(W)
-               if truth[i, j] == 0])
-print("      ink ranges  %.0f to %.0f" % (min(ink_vals), max(ink_vals)))
-print("      page ranges %.0f to %.0f" % (pg.min(), pg.max()))
-print("      those ranges overlap, and no threshold can undo that.")
+          % (t, int((out*truth).sum()), int(((1-out)*truth).sum()), int((out*(1-truth)).sum())))
+print("   ink and page brightness ranges overlap, and no threshold fixes that.")
 print()
-
-out_a = adaptive(page)
-print("ADAPTIVE THRESHOLDING compares each pixel to its own neighbourhood")
-print("rather than to a global constant:")
-print("   found %d of %d, %d false positives"
-      % (int((out_a * truth).sum()), int(truth.sum()), int((out_a * (1 - truth)).sum())))
-print("   it works because 'darker than the page around me' is true for ink")
-print("   everywhere, while 'darker than 100' is only true on the left.")
-print()
-print("   the two parameters matter:")
+print("ADAPTIVE compares each pixel to its own neighbourhood:")
 for block in (3, 7, 15):
     o = adaptive(page, block)
     print("      block %2d: found %2d, false positives %2d"
           % (block, int((o * truth).sum()), int((o * (1 - truth)).sum())))
-print("   the marks here are one or two pixels wide, so even a 3x3 block")
-print("   still sees page around them. with thicker strokes a small block")
-print("   sits entirely INSIDE the mark, the local mean becomes the ink")
-print("   itself, and the middle of the stroke is classified as background")
-print("   -- hollow letters. going the other way, a block large enough to")
-print("   span the whole lighting gradient degenerates back into a global")
-print("   threshold, which is what the rising false positives above show.")
-print()
-print("the general lesson is not about thresholds. it is that a global")
-print("statistic fails whenever the thing you are measuring varies across")
-print("the image -- which is also why normalisation layers exist, and why")
-print("illumination correction is a standard first step in classical vision.")
+print("   a global statistic fails whenever the thing you measure varies across")
+print("   the image -- also why normalisation layers exist.")
 ```
 
 """,
@@ -941,14 +970,11 @@ A histogram throws away each bit of spatial info and keeps only how often each b
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(11)
 H, W = 40, 60
 yy, xx = np.mgrid[0:H, 0:W]
-scene = (90 + 40 * np.sin(xx / 7.0) * np.cos(yy / 9.0)
-         + 25 * ((xx // 12 + yy // 10) % 2))
+scene = 90 + 40*np.sin(xx/7.0)*np.cos(yy/9.0) + 25*((xx//12 + yy//10) % 2)
 scene += rng.normal(0, 4, (H, W))
-# a badly exposed camera: everything squeezed into a narrow band
 img = np.clip(60 + (scene - scene.mean()) * 0.28, 0, 255).astype(int)
 
 def hist(a, bins=16):
@@ -961,99 +987,99 @@ def draw(h, label, width=44):
     for b in range(len(h)):
         lo = b * 256 // len(h)
         n = int(round(width * h[b] / top)) if top else 0
-        print("      %3d-%3d |%-44s %5d" % (lo, lo + 255 // len(h),
-                                            "#" * n, h[b]))
+        print("      %3d-%3d |%-44s %5d" % (lo, lo+255//len(h), "#"*n, h[b]))
 
-print("THE IMAGE is under-exposed: %d..%d out of 0..255."
-      % (img.min(), img.max()))
+print("THE IMAGE is under-exposed: %d..%d out of 0..255." % (img.min(), img.max()))
 print("   mean %.1f, std %.1f" % (img.mean(), img.std()))
 draw(hist(img), "histogram, 16 bins")
 used = int((hist(img, 256) > 0).sum())
-print("      only %d of the 256 available levels are used at all." % used)
-print("      the picture is fine -- the camera wasted %.0f%% of its range."
-      % (100 * (1 - used / 256.0)))
+print("      only %d of 256 levels are used." % used)
 print()
 
-print("FIRST TRY -- CONTRAST STRETCHING. a straight line that maps the")
-print("darkest pixel to 0 and the brightest to 255:")
+print("CONTRAST STRETCHING -- map darkest to 0 and brightest to 255:")
 lo, hi = img.min(), img.max()
 stretched = np.round((img - lo) * 255.0 / (hi - lo)).astype(int)
 draw(hist(stretched), "after stretching")
 print("      range %d..%d, std %.1f (was %.1f)."
       % (stretched.min(), stretched.max(), stretched.std(), img.std()))
-print("      better. but look at the SHAPE -- it is the same lumpy curve,")
-print("      just wider. the levels are spread out but still bunched in the")
-print("      middle, because a linear map cannot change a distribution's")
-print("      shape, only its scale.")
 print("      distinct levels used: %d of 256."
       % int((hist(stretched, 256) > 0).sum()))
-print()
+```
 
-print("SECOND TRY -- EQUALISATION. the goal is a FLAT histogram: every")
-print("brightness equally common. the trick is a fact from probability --")
-print("if you push any random variable through its own CDF, the result is")
-print("uniform. so the lookup table IS the cumulative histogram:")
+The next block builds the equalisation lookup table from the cumulative histogram and compares it against stretching.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(11)
+H, W = 40, 60
+yy, xx = np.mgrid[0:H, 0:W]
+scene = 90 + 40*np.sin(xx/7.0)*np.cos(yy/9.0) + 25*((xx//12 + yy//10) % 2)
+img = np.clip(60 + ((scene + rng.normal(0, 4, (H, W))) - scene.mean()) * 0.28, 0, 255).astype(int)
+
+def hist(a, bins=16):
+    h, _ = np.histogram(a, bins=bins, range=(0, 256))
+    return h
+
+def draw(h, label, width=44):
+    print("   %s" % label)
+    top = h.max()
+    for b in range(len(h)):
+        lo = b * 256 // len(h)
+        print("      %3d-%3d |%-44s %5d" % (lo, lo+255//len(h),
+              "#"*int(round(width*h[b]/top)) if top else "", h[b]))
+
+lo, hi = img.min(), img.max()
+stretched = np.round((img - lo) * 255.0 / (hi - lo)).astype(int)
 counts = hist(img, 256)
 cdf = np.cumsum(counts).astype(float)
 cdf_min = cdf[cdf > 0][0]
-lut = np.round((cdf - cdf_min) / (img.size - cdf_min) * 255).astype(int)
-lut = np.clip(lut, 0, 255)
+lut = np.clip(np.round((cdf - cdf_min) / (img.size - cdf_min) * 255), 0, 255).astype(int)
 eq = lut[img]
-print("      a few entries of the lookup table:")
+
+print("EQUALISATION -- the lookup table IS the cumulative histogram:")
 print("%14s %14s %14s" % ("input level", "cumulative count", "output level"))
-for v in range(img.min(), img.max() + 1, max(1, (img.max() - img.min()) // 6)):
+for v in range(img.min(), img.max()+1, max(1, (img.max()-img.min())//6)):
     print("%14d %14d %14d" % (v, int(cdf[v]), lut[v]))
-print("      steep where pixels are common, flat where they are rare. the")
-print("      table spends output range in proportion to how many pixels")
-print("      actually need it.")
 draw(hist(eq), "after equalisation")
 print("      range %d..%d, std %.1f." % (eq.min(), eq.max(), eq.std()))
 print()
-
-print("HOW FLAT IS FLAT? measure the spread of the 16 bin counts --")
-print("perfectly flat would be 0:")
+print("HOW FLAT IS FLAT?")
 print("%-24s %14s %14s" % ("", "bin std", "levels used"))
-for name, a in (("original", img), ("stretched", stretched),
-                ("equalised", eq)):
+for name, a in (("original", img), ("stretched", stretched), ("equalised", eq)):
     h = hist(a).astype(float)
-    print("%-24s %14.1f %14d"
-          % (name, h.std(), int((hist(a, 256) > 0).sum())))
+    print("%-24s %14.1f %14d" % (name, h.std(), int((hist(a, 256) > 0).sum())))
 print("   equalisation flattens the histogram that stretching only widened.")
-print()
+```
 
-print("BUT NOTICE THE LEVEL COUNT: %d after equalisation against %d after"
-      % (int((hist(eq, 256) > 0).sum()), int((hist(stretched, 256) > 0).sum())))
-print("stretching. equalisation cannot ADD levels -- it only redistributes")
-print("the ones already there, and it can LOSE some, because the lookup")
-print("table is a function on integers and two nearby inputs can round to")
-print("the same output:")
-collisions = [v for v in range(255) if counts[v] > 0 and counts[v + 1] > 0
-              and lut[v] == lut[v + 1]]
-if collisions:
-    v = collisions[0]
-    print("      %d such collision%s here -- levels %d and %d both become %d,"
-          % (len(collisions), "" if len(collisions) == 1 else "s", v, v + 1,
-             lut[v]))
-    print("      and no inverse can separate them again.")
-else:
-    print("      none happened to occur here, but they are common in")
-    print("      images with a strong peak.")
-print("   so equalisation is not free. it is a one-way map that trades")
-print("   fidelity in the crowded part of the range for visibility in the")
-print("   empty part -- which is a good trade for looking at a picture and")
-print("   a bad one if you intend to measure the pixel values afterwards.")
-print()
+The next block shows equalisation's real failure mode: a large dark region elsewhere in the frame drags the global table and crushes the subject's contrast.
 
-print("AND THE REAL FAILURE MODE. equalisation is global -- ONE table for")
-print("the whole frame -- so a large dark region drags the table for")
-print("everything else. paste a dark strip over a third of the frame and")
-print("re-equalise, then look only at the part that did not change:")
+```python-run
+import numpy as np
+rng = np.random.default_rng(11)
+H, W = 40, 60
+yy, xx = np.mgrid[0:H, 0:W]
+scene = 90 + 40*np.sin(xx/7.0)*np.cos(yy/9.0) + 25*((xx//12 + yy//10) % 2)
+scene += rng.normal(0, 4, (H, W))
+img = np.clip(60 + (scene - scene.mean()) * 0.28, 0, 255).astype(int)
+
+def hist(a, bins=16):
+    h, _ = np.histogram(a, bins=bins, range=(0, 256))
+    return h
+
+counts = hist(img, 256)
+cdf = np.cumsum(counts).astype(float)
+cdf_min = cdf[cdf > 0][0]
+lut = np.clip(np.round((cdf - cdf_min) / (img.size - cdf_min) * 255), 0, 255).astype(int)
+eq = lut[img]
+
+print("THE REAL FAILURE MODE. equalisation is global -- ONE table for")
+print("the whole frame. paste a dark strip and re-equalise:")
 bordered = img.copy()
 bordered[:, :20] = np.clip(rng.normal(12, 5, (H, 20)), 0, 255).astype(int)
 c2 = hist(bordered, 256)
 cd2 = np.cumsum(c2).astype(float)
 m2 = cd2[cd2 > 0][0]
-lut2 = np.clip(np.round((cd2 - m2) / (bordered.size - m2) * 255), 0, 255).astype(int)
+lut2 = np.clip(np.round((cd2-m2) / (bordered.size-m2) * 255), 0, 255).astype(int)
 eq2 = lut2[bordered]
 region = (slice(None), slice(20, None))
 print("%-30s %12s %12s" % ("", "std, no border", "std, border"))
@@ -1061,19 +1087,12 @@ print("%-30s %12.1f %12.1f"
       % ("the subject region only", eq[region].std(), eq2[region].std()))
 print("%-30s %12d %12d"
       % ("output range it occupies",
-         int(eq[region].max() - eq[region].min()),
-         int(eq2[region].max() - eq2[region].min())))
+         int(eq[region].max()-eq[region].min()), int(eq2[region].max()-eq2[region].min())))
 print("      the same pixels, the same operation, %.0f%% less contrast."
       % (100 * (1 - eq2[region].std() / eq[region].std())))
-print("      the subject did not change at all -- the DISTRIBUTION did. a")
-print("      third of the frame now sits at the bottom of the histogram, so")
-print("      the CDF has already climbed a third of the way up before it")
-print("      reaches the first subject pixel, and the subject is left with")
-print("      only the top of the output range to spread across.")
 print("      the fix is CLAHE: equalise small tiles independently, clip the")
 print("      histogram before accumulating so no single level can dominate,")
-print("      and interpolate between neighbouring tiles' tables. same idea,")
-print("      applied locally, which is what almost every real pipeline uses.")
+print("      and interpolate between neighbouring tiles' tables.")
 ```
 
 """,
@@ -1658,109 +1677,107 @@ Erosion takes the min over a zone, dilation the max. Two ops. Every other morpho
 
 ```python-run
 import numpy as np
-
 W, H = 26, 11
 img = np.zeros((H, W), int)
-img[2:8, 2:9] = 1                      # block one
-img[4:6, 5:9] = 0                      # a notch cut into its right side
-img[4:6, 9:14] = 1                     # a thin bridge, only 2 pixels tall
-img[2:8, 14:21] = 1                    # block two
-img[5, 17] = 0                         # a 1-pixel hole inside block two
+img[2:8, 2:9] = 1; img[4:6, 5:9] = 0; img[4:6, 9:14] = 1
+img[2:8, 14:21] = 1; img[5, 17] = 0
 for r, c in ((0, 23), (9, 3), (1, 12), (6, 22)):
-    img[r, c] = 1                      # isolated specks
-
-SPECKS = [(0, 23), (9, 3), (1, 12), (6, 22)]
-HOLE = (5, 17)
-BLOCK2 = (slice(2, 8), slice(14, 21))
+    img[r, c] = 1
 
 def show(a, label):
     print("   %s" % label)
     for row in a:
         print("      " + "".join("#" if v else "." for v in row))
 
-show(img, "input: two blocks joined by a 2-pixel-tall bridge")
-print("      block one has a notch, block two has a 1-pixel hole,")
-print("      and there are 4 isolated specks. %d foreground pixels." % img.sum())
-print()
-
 def erode(a, k=3):
     p = k // 2
     q = np.pad(a, p, mode="constant", constant_values=1)
-    return np.array([[q[i:i + k, j:j + k].min()
+    return np.array([[q[i:i+k, j:j+k].min()
                       for j in range(a.shape[1])] for i in range(a.shape[0])])
 
 def dilate(a, k=3):
     p = k // 2
     q = np.pad(a, p, mode="constant", constant_values=0)
-    return np.array([[q[i:i + k, j:j + k].max()
+    return np.array([[q[i:i+k, j:j+k].max()
                       for j in range(a.shape[1])] for i in range(a.shape[0])])
 
-print("EROSION -- each pixel becomes the MINIMUM of its 3x3 neighbourhood,")
-print("so it survives only if every one of its 8 neighbours is foreground:")
+show(img, "input: two blocks joined by a 2-pixel-tall bridge")
+print("      block one has a notch, block two has a 1-pixel hole,")
+print("      and there are 4 isolated specks. %d foreground pixels." % img.sum())
+print()
 e = erode(img)
-show(e, "eroded once")
+show(e, "EROSION -- min of each 3x3 neighbourhood")
 print("      %d -> %d pixels (%.0f%% removed)"
       % (img.sum(), e.sum(), 100 * (1 - e.sum() / img.sum())))
-print("      every speck is gone. the bridge is gone too, and not because")
-print("      it was thinned -- it is 2 pixels tall, so a 3x3 element cannot")
-print("      fit inside it ANYWHERE. erosion deletes whatever is narrower")
-print("      than the structuring element, in one pass.")
-print("      block one is eaten from its outer edge AND from the notch at")
-print("      once, which leaves a single surviving column.")
+print("      every speck and the bridge are gone.")
 print()
-
-print("DILATION -- the MAXIMUM instead. a pixel turns on if ANY neighbour")
-print("is foreground:")
 d = dilate(img)
-show(d, "dilated once")
+show(d, "DILATION -- max of each 3x3 neighbourhood")
 print("      %d -> %d pixels (%.0f%% added)"
       % (img.sum(), d.sum(), 100 * (d.sum() / img.sum() - 1)))
-print("      the specks became 3x3 blobs, the hole and the notch are")
-print("      filled, and the two blocks now touch solidly.")
-print()
+print("      the specks became 3x3 blobs, the hole and notch are filled.")
+```
 
-print("THEY ARE NOT INVERSES. running one after the other does not return")
-print("the input -- it returns something more useful.")
-opened = dilate(erode(img))
-closed = erode(dilate(img))
+The next block shows opening and closing -- compositions of erosion and dilation -- and measures what each one preserves and destroys.
+
+```python-run
+import numpy as np
+W, H = 26, 11
+img = np.zeros((H, W), int)
+img[2:8, 2:9] = 1; img[4:6, 5:9] = 0; img[4:6, 9:14] = 1
+img[2:8, 14:21] = 1; img[5, 17] = 0
+for r, c in ((0,23),(9,3),(1,12),(6,22)):
+    img[r, c] = 1
+SPECKS = [(0,23),(9,3),(1,12),(6,22)]; HOLE = (5, 17)
+
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join("#" if v else "." for v in row))
+
+def erode(a, k=3):
+    p = np.pad(a, k//2, mode="constant", constant_values=1)
+    return np.array([[p[i:i+k, j:j+k].min()
+                      for j in range(a.shape[1])] for i in range(a.shape[0])])
+
+def dilate(a, k=3):
+    p = np.pad(a, k//2, mode="constant", constant_values=0)
+    return np.array([[p[i:i+k, j:j+k].max()
+                      for j in range(a.shape[1])] for i in range(a.shape[0])])
+
+e, d = erode(img), dilate(img)
+opened, closed = dilate(erode(img)), erode(dilate(img))
 show(opened, "OPENING (erode, then dilate)")
 print("      %d pixels, against %d in the input" % (opened.sum(), img.sum()))
-print("      the specks are gone for good: erosion deleted them and")
-print("      dilation has nothing left to grow them back from.")
-print("      block one loses far more than its outline: the 2-pixel-tall")
-print("      arms above and below the notch were thin, so they went the")
-print("      way of the specks. that is the whole point of opening -- it")
-print("      keeps whatever the element fits inside and discards the rest.")
-print("      block two survives nearly whole, %d pixels of its original %d,"
-      % (int(opened[BLOCK2].sum()), int(img[BLOCK2].sum())))
-print("      and the 2 it lost are worth chasing down. they are at the")
-print("      hole: erosion cleared a 3x3 patch around it, and dilation")
-print("      could only grow back from what survived, so a 1-pixel hole")
-print("      reopened as a 3-pixel slit. opening does not leave holes")
-print("      alone -- it WIDENS them. which is precisely why closing has")
-print("      to exist as a separate operation.")
+print("      specks are gone for good.")
 print()
 show(closed, "CLOSING (dilate, then erode)")
-print("      %d pixels" % closed.sum())
-print("      the hole and the notch are filled and stay filled, and all")
-print("      4 specks survived -- dilation grew them, erosion shrank them")
-print("      again. the specks near the frame edge come back as short")
-print("      streaks rather than single pixels, because erosion here pads")
-print("      the outside with foreground: a pixel on the last row has no")
-print("      neighbour below to be eroded against. every library makes")
-print("      some choice here, and it is always visible at the border.")
+print("      %d pixels. hole and notch are filled and stay filled." % closed.sum())
 print()
-
-print("MEASURED on the specks and the hole specifically:")
+print("MEASURED on the specks and the hole:")
 print("%-12s %18s %16s" % ("", "specks remaining", "hole filled?"))
 for name, out in (("input", img), ("erosion", e), ("dilation", d),
                   ("opening", opened), ("closing", closed)):
     n = sum(int(out[r, c]) for r, c in SPECKS)
     print("%-12s %18d %16s" % (name, n, "yes" if out[HOLE] else "no"))
-print("   opening is the speck remover, closing is the hole filler, and")
-print("   neither does the other's job. erosion and dilation each do half")
-print("   of one job while wrecking the size of everything else.")
-print()
+print("   opening is the speck remover, closing is the hole filler.")
+```
+
+The next block shows how the structuring element shape changes what erosion keeps, and why a horizontal element preserves the bridge that a square one destroyed.
+
+```python-run
+import numpy as np
+W, H = 26, 11
+img = np.zeros((H, W), int)
+img[2:8, 2:9] = 1; img[4:6, 5:9] = 0; img[4:6, 9:14] = 1
+img[2:8, 14:21] = 1; img[5, 17] = 0
+for r, c in ((0, 23), (9, 3), (1, 12), (6, 22)):
+    img[r, c] = 1
+
+def show(a, label):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join("#" if v else "." for v in row))
 
 print("%-10s %-44s %s" % ("operation", "what it removes", "shape size"))
 for r in (("erosion", "specks, thin parts, 1 pixel of every edge", "smaller"),
@@ -1769,16 +1786,13 @@ for r in (("erosion", "specks, thin parts, 1 pixel of every edge", "smaller"),
           ("closing", "holes and thin gaps", "preserved")):
     print("%-10s %-44s %s" % r)
 print()
-
-print("THE STRUCTURING ELEMENT decides what 'neighbourhood' means, and it")
-print("does not have to be a square:")
+print("THE STRUCTURING ELEMENT does not have to be a square:")
 print("      3x3 square      3x3 cross       1x5 horizontal")
 for r in range(3):
     cross = "# # #" if r == 1 else ". # ."
     horiz = "# # # # #" if r == 1 else ""
     print("      %-16s%-16s%s" % ("# # #", cross, horiz))
 print()
-
 wide = np.zeros_like(img)
 padded = np.pad(img, ((0, 0), (2, 2)), mode="constant", constant_values=1)
 for i in range(H):
@@ -1786,17 +1800,9 @@ for i in range(H):
         wide[i, j] = padded[i, j:j + 5].min()
 show(wide, "eroded with a 1x5 horizontal element")
 print("      %d pixels survive, and the bridge is among them." % wide.sum())
-print("      the bridge is 2 tall and 5 wide, so a 1x5 horizontal window")
-print("      fits inside it where a 3x3 square could not. the same image,")
-print("      the same operation, a different element, opposite answer.")
-print("      that is how you strip vertical rules off a scanned table")
-print("      while keeping the horizontal ones -- the element, not the")
-print("      operation, is where you encode what you are looking for.")
-print()
-print("and the reason this still earns its place next to a segmentation")
-print("network: these are exact, fast, and need no training. an opening")
-print("followed by a closing removes most of the obvious defects in a")
-print("binary mask in two lines, whatever produced the mask.")
+print("      a 1x5 horizontal window fits inside the bridge where a 3x3")
+print("      square could not. the element, not the operation, is where you")
+print("      encode what you are looking for.")
 ```
 
 """,
@@ -2326,31 +2332,102 @@ Resizing asks for pixel values at coords that don't exist. Each method is a gues
 ```python-run
 import numpy as np
 
-# a smooth ground truth we can sample at any real coordinate, which is
-# what lets us score every method instead of just eyeballing it
 def f(y, x):
-    return (128 + 90 * np.sin(x * 0.55) * np.cos(y * 0.42)
-            + 20 * np.sin(x * 0.2 + y * 0.3))
+    return 128 + 90*np.sin(x*0.55)*np.cos(y*0.42) + 20*np.sin(x*0.2 + y*0.3)
 
-H, W = 8, 10
-src = f(*np.mgrid[0:H, 0:W])
-print("SOURCE %dx%d, sampled from a function we can evaluate anywhere," % (H, W))
-print("which means we can score every method against the truth.")
-print("   " + " ".join("%5.0f" % v for v in src[3]) + "   <- row 3")
-print()
-
-SY, SX = 3, 3                          # upscale factor
+H, W, SY, SX = 8, 10, 3, 3
 OH, OW = H * SY, W * SX
+src = f(*np.mgrid[0:H, 0:W])
 
-# output index -> source coordinate, aligning pixel CENTRES
 def coords(o, s, scale):
     return (np.arange(o) + 0.5) / scale - 0.5
 
 def nearest(a, oh, ow):
+    yy = np.clip(np.round(coords(oh, a.shape[0], SY)).astype(int), 0, a.shape[0]-1)
+    xx = np.clip(np.round(coords(ow, a.shape[1], SX)).astype(int), 0, a.shape[1]-1)
+    return a[np.ix_(yy, xx)]
+
+def bilinear(a, oh, ow):
+    cy = np.clip(coords(oh, a.shape[0], SY), 0, a.shape[0]-1)
+    cx = np.clip(coords(ow, a.shape[1], SX), 0, a.shape[1]-1)
+    y0 = np.floor(cy).astype(int); y1 = np.minimum(y0+1, a.shape[0]-1)
+    x0 = np.floor(cx).astype(int); x1 = np.minimum(x0+1, a.shape[1]-1)
+    wy = (cy - y0)[:, None]; wx = (cx - x0)[None, :]
+    top = a[np.ix_(y0, x0)]*(1-wx) + a[np.ix_(y0, x1)]*wx
+    bot = a[np.ix_(y1, x0)]*(1-wx) + a[np.ix_(y1, x1)]*wx
+    return top*(1-wy) + bot*wy
+
+truth = f(*np.meshgrid(coords(OH, H, SY), coords(OW, W, SX), indexing="ij"))
+print("UPSCALING %dx%d -> %dx%d, nearest vs bilinear:" % (H, W, OH, OW))
+print("%-16s %12s %12s %14s" % ("method", "mean err", "worst err", "cost/pixel"))
+for name, fn, cost in (("nearest", nearest, "1 read"),
+                       ("bilinear", bilinear, "4 reads")):
+    out = fn(src, OH, OW)
+    e = np.abs(out - truth)
+    print("%-16s %12.2f %12.2f %14s" % (name, e.mean(), e.max(), cost))
+print("   bilinear cuts the mean error by a large factor, for 4x the reads.")
+```
+
+Bicubic interpolation fits a cubic curve through four neighbours instead of blending two. It costs 16 reads per pixel but halves bilinear's error.
+
+```python-run
+import numpy as np
+def f(y, x):
+    return 128 + 90*np.sin(x*0.55)*np.cos(y*0.42) + 20*np.sin(x*0.2 + y*0.3)
+H, W, SY, SX = 8, 10, 3, 3
+src = f(*np.mgrid[0:H, 0:W]); OH, OW = H*SY, W*SX
+def coords(o, s, scale):
+    return (np.arange(o) + 0.5) / scale - 0.5
+def bilinear(a, oh, ow):
+    cy = np.clip(coords(oh, a.shape[0], SY), 0, a.shape[0]-1)
+    cx = np.clip(coords(ow, a.shape[1], SX), 0, a.shape[1]-1)
+    y0 = np.floor(cy).astype(int); y1 = np.minimum(y0+1, a.shape[0]-1)
+    x0 = np.floor(cx).astype(int); x1 = np.minimum(x0+1, a.shape[1]-1)
+    wy = (cy - y0)[:, None]; wx = (cx - x0)[None, :]
+    top = a[np.ix_(y0, x0)]*(1-wx) + a[np.ix_(y0, x1)]*wx
+    bot = a[np.ix_(y1, x0)]*(1-wx) + a[np.ix_(y1, x1)]*wx
+    return top*(1-wy) + bot*wy
+def cubic_w(t):
+    t = np.abs(t)
+    return np.where(t <= 1, 1.5*t**3 - 2.5*t**2 + 1,
+                    np.where(t < 2, -0.5*t**3 + 2.5*t**2 - 4*t + 2, 0))
+def bicubic(a, oh, ow):
+    def axis(a, o, scale, ax):
+        c = coords(o, a.shape[ax], scale)
+        base = np.floor(c).astype(int)
+        out = np.zeros([o if i == ax else a.shape[i] for i in range(2)])
+        for k in range(-1, 3):
+            idx = np.clip(base + k, 0, a.shape[ax] - 1)
+            w = cubic_w(c - (base + k))
+            out += np.take(a, idx, axis=ax) * (w[:, None] if ax == 0 else w[None, :])
+        return out
+    return axis(axis(a, oh, SY, 0), ow, SX, 1)
+truth = f(*np.meshgrid(coords(OH, H, SY), coords(OW, W, SX), indexing="ij"))
+b_err = np.abs(bilinear(src, OH, OW) - truth)
+c_err = np.abs(bicubic(src, OH, OW) - truth)
+print("BICUBIC vs BILINEAR on %dx%d -> %dx%d upscale:" % (H, W, OH, OW))
+print("%-12s %10s %10s %12s" % ("method", "mean err", "max err", "cost/pixel"))
+print("%-12s %10.2f %10.2f %12s" % ("bilinear", b_err.mean(), b_err.max(), "4 reads"))
+print("%-12s %10.2f %10.2f %12s" % ("bicubic", c_err.mean(), c_err.max(), "16 reads"))
+print("   bicubic halves bilinear's error, for 4x the memory reads.")
+```
+
+The next block examines what nearest and bilinear actually produce per-pixel, showing how nearest repeats values while bilinear smooths between them.
+
+```python-run
+import numpy as np
+def f(y, x):
+    return (128 + 90 * np.sin(x * 0.55) * np.cos(y * 0.42)
+            + 20 * np.sin(x * 0.2 + y * 0.3))
+H, W, SY, SX = 8, 10, 3, 3
+OH, OW = H * SY, W * SX
+src = f(*np.mgrid[0:H, 0:W])
+def coords(o, s, scale):
+    return (np.arange(o) + 0.5) / scale - 0.5
+def nearest(a, oh, ow):
     yy = np.clip(np.round(coords(oh, a.shape[0], SY)).astype(int), 0, a.shape[0] - 1)
     xx = np.clip(np.round(coords(ow, a.shape[1], SX)).astype(int), 0, a.shape[1] - 1)
     return a[np.ix_(yy, xx)]
-
 def bilinear(a, oh, ow):
     cy = np.clip(coords(oh, a.shape[0], SY), 0, a.shape[0] - 1)
     cx = np.clip(coords(ow, a.shape[1], SX), 0, a.shape[1] - 1)
@@ -2360,103 +2437,50 @@ def bilinear(a, oh, ow):
     top = a[np.ix_(y0, x0)] * (1 - wx) + a[np.ix_(y0, x1)] * wx
     bot = a[np.ix_(y1, x0)] * (1 - wx) + a[np.ix_(y1, x1)] * wx
     return top * (1 - wy) + bot * wy
-
-# Catmull-Rom: passes through the samples, and is C1 continuous
-def cubic_w(t):
-    t = np.abs(t)
-    return np.where(t <= 1, 1.5 * t ** 3 - 2.5 * t ** 2 + 1,
-                    np.where(t < 2, -0.5 * t ** 3 + 2.5 * t ** 2 - 4 * t + 2, 0))
-
-def bicubic(a, oh, ow):
-    def axis(a, o, scale, ax):
-        c = coords(o, a.shape[ax], scale)
-        base = np.floor(c).astype(int)
-        out = np.zeros([o if i == ax else a.shape[i] for i in range(2)])
-        for k in range(-1, 3):
-            idx = np.clip(base + k, 0, a.shape[ax] - 1)
-            w = cubic_w(c - (base + k))
-            taken = np.take(a, idx, axis=ax)
-            out += taken * (w[:, None] if ax == 0 else w[None, :])
-        return out
-    return axis(axis(a, oh, SY, 0), ow, SX, 1)
-
 truth = f(*np.meshgrid(coords(OH, H, SY), coords(OW, W, SX), indexing="ij"))
-
-print("UPSCALING %dx%d -> %dx%d. every output pixel lands between source"
-      % (H, W, OH, OW))
-print("samples, so every method has to invent something. scored against the")
-print("function that generated the source:")
-print("%-16s %12s %12s %14s" % ("method", "mean err", "worst err", "cost/pixel"))
-results, errs = {}, {}
-for name, fn, cost in (("nearest", nearest, "1 read"),
-                       ("bilinear", bilinear, "4 reads"),
-                       ("bicubic", bicubic, "16 reads")):
-    out = fn(src, OH, OW)
-    results[name] = out
-    e = np.abs(out - truth)
-    errs[name] = e
-    print("%-16s %12.2f %12.2f %14s" % (name, e.mean(), e.max(), cost))
-print("   bilinear cuts nearest's MEAN error by about %.0fx; bicubic halves"
-      % (errs["nearest"].mean() / errs["bilinear"].mean()))
-print("   it again, for 4x the memory reads. big gain then diminishing --")
-print("   which is why bilinear is the default almost everywhere.")
-print()
-print("   but look at the WORST errors: nearest and bilinear tie at %.2f."
-      % errs["bilinear"].max())
-wr, wc = np.unravel_index(errs["bilinear"].argmax(), errs["bilinear"].shape)
-print("   that is output pixel (%d, %d), which maps to source coordinate"
-      % (wr, wc))
-print("   (%.2f, %.2f) -- outside the source grid entirely, beyond the"
-      % (coords(OH, H, SY)[wr], coords(OW, W, SX)[wc]))
-print("   outermost sample centres. there is no second sample on that side")
-print("   to interpolate WITH, so bilinear clamps and degenerates to")
-print("   nearest exactly there. every resize has a one-pixel border where")
-print("   it is really doing extrapolation, and no scheme fixes that.")
-print()
-
+n_out = nearest(src, OH, OW)
+b_out = bilinear(src, OH, OW)
 print("WHAT NEAREST ACTUALLY DOES. one output row, upscaled 3x:")
-print("   nearest:  " + " ".join("%4.0f" % v for v in results["nearest"][9][:12]))
-print("   bilinear: " + " ".join("%4.0f" % v for v in results["bilinear"][9][:12]))
+print("   nearest:  " + " ".join("%4.0f" % v for v in n_out[9][:12]))
+print("   bilinear: " + " ".join("%4.0f" % v for v in b_out[9][:12]))
 print("   truth:    " + " ".join("%4.0f" % v for v in truth[9][:12]))
 print("   nearest repeats each value 3 times -- those flat runs are the")
-print("   blocky squares you see when a thumbnail is blown up. bilinear")
-print("   ramps between them.")
-print()
+print("   blocky squares you see when a thumbnail is blown up.")
+```
 
-print("A PROPERTY WORTH KNOWING: bilinear is not linear in the coordinates.")
-print("along either axis alone it is a straight line, but the wx*wy term")
-print("curves the surface in between. evaluate it directly at any real")
-print("coordinate to see this:")
+The next block shows that bilinear interpolation is not truly linear along a diagonal -- it is linear in each axis separately, which makes a curved surface.
 
+```python-run
+import numpy as np
+def f(y, x):
+    return (128 + 90 * np.sin(x * 0.55) * np.cos(y * 0.42)
+            + 20 * np.sin(x * 0.2 + y * 0.3))
+src = f(*np.mgrid[0:8, 0:10])
 def bilerp_at(a, y, x):
     y0, x0 = int(np.floor(y)), int(np.floor(x))
     wy, wx = y - y0, x - x0
     return ((a[y0, x0] * (1 - wx) + a[y0, x0 + 1] * wx) * (1 - wy)
             + (a[y0 + 1, x0] * (1 - wx) + a[y0 + 1, x0 + 1] * wx) * wy)
-
-corners = (src[2, 3], src[2, 4], src[3, 3], src[3, 4])
-print("   the 4 corners of one source square: %.1f %.1f %.1f %.1f" % corners)
-print("   at the exact centre (2.5, 3.5):")
-print("      mean of the 4 corners:  %.3f" % np.mean(corners))
-print("      bilinear:               %.3f" % bilerp_at(src, 2.5, 3.5))
-print("   identical, as it must be -- all four weights are 1/4 there.")
-print("   now walk the diagonal from corner (2,3) to corner (3,4), and")
-print("   compare bilinear against the straight line joining those two:")
+print("BILINEAR IS NOT LINEAR IN THE COORDINATES. walk the diagonal")
+print("from corner (2,3) to corner (3,4):")
 print("%8s %14s %14s %10s" % ("t", "bilinear", "straight line", "gap"))
 for t in (0.0, 0.25, 0.5, 0.75, 1.0):
     b = bilerp_at(src, 2 + t, 3 + t)
     line = src[2, 3] * (1 - t) + src[3, 4] * t
     print("%8.2f %14.3f %14.3f %10.3f" % (t, b, line, b - line))
-print("   the endpoints agree and the middle does not. a plane through")
-print("   4 arbitrary corners does not exist unless they happen to be")
-print("   coplanar -- 'bilinear' means linear in each variable SEPARATELY,")
-print("   which is a curved surface, not a flat one.")
-print()
+print("   the endpoints agree and the middle does not. 'bilinear' means")
+print("   linear in each variable SEPARATELY, which is a curved surface.")
+```
 
-print("NOW THE FAILURE. DOWNSCALING. take a fine stripe pattern:")
+The next block demonstrates the downscaling failure: subsampling a stripe pattern causes aliasing, while averaging first preserves the correct brightness.
+
+```python-run
+import numpy as np
+
 FH, FW = 6, 48
 stripes = np.where((np.arange(FW) // 2) % 2 == 0, 220.0, 40.0)
 stripes = np.tile(stripes, (FH, 1))
+print("DOWNSCALING FAILURE. take a fine stripe pattern:")
 print("   input row (every 2 columns alternate light/dark):")
 print("   " + "".join("#" if v > 128 else "." for v in stripes[0]))
 print("   the true average brightness is %.0f." % stripes.mean())
@@ -2464,19 +2488,16 @@ print()
 print("   shrink 4x by just taking every 4th column -- what 'nearest' is:")
 sub = stripes[:, ::4]
 print("   " + "".join("#" if v > 128 else "." for v in sub[0]))
-print("   mean %.0f, and every stripe is GONE -- the result is a flat" % sub.mean())
-print("   field of the wrong colour. the pattern repeats every 4 columns")
-print("   and we sampled every 4 columns, so we hit the same phase each")
-print("   time. that is ALIASING, and no interpolation between the")
-print("   surviving samples can recover what was never sampled.")
+print("   mean %.0f, and every stripe is GONE. the pattern repeats every 4"
+      % sub.mean())
+print("   columns and we sampled every 4 columns, so we hit the same phase")
+print("   each time. that is ALIASING.")
 print()
 print("   now average each 4-wide block instead -- BLUR, THEN SAMPLE:")
 area = stripes.reshape(FH, FW // 4, 4).mean(axis=2)
 print("   " + " ".join("%3.0f" % v for v in area[0][:12]))
-print("   mean %.0f, matching the input's %.0f. the stripes are gone here"
+print("   mean %.0f, matching the input's %.0f."
       % (area.mean(), stripes.mean()))
-print("   too -- they have to be, there is no room for them -- but their")
-print("   ENERGY is preserved as the correct grey.")
 print()
 print("%-34s %12s" % ("4x downscale of the stripes", "result mean"))
 print("%-34s %12.1f" % ("true input mean", stripes.mean()))
@@ -2486,12 +2507,8 @@ print()
 print("SO THE RULE SPLITS IN TWO:")
 print("   UPSCALING is an interpolation problem -- use bilinear or bicubic.")
 print("   DOWNSCALING is a filtering problem -- low-pass first, THEN")
-print("   sample, which is what area averaging does in one step. reaching")
-print("   for bilinear to shrink an image by 4x still reads only 4 of every")
-print("   16 pixels and still aliases. this is the single most common")
-print("   resizing bug, and it silently corrupts training data: your")
-print("   augmentation pipeline shrinks images, the fine texture aliases")
-print("   into false patterns, and the model learns them.")
+print("   sample. this is the single most common resizing bug, and it")
+print("   silently corrupts training data.")
 ```
 
 """,
@@ -2716,19 +2733,12 @@ each geometric transform that keeps straight lines straight is one 2x3 mat. Know
 import numpy as np
 
 def affine(a=0.0, sx=1.0, sy=1.0, shx=0.0, tx=0.0, ty=0.0):
-    # rotation by a (radians), then scale, then shear, then translate
     c, s = np.cos(a), np.sin(a)
     R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
     S = np.array([[sx, 0, 0], [0, sy, 0], [0, 0, 1]])
     H = np.array([[1, shx, 0], [0, 1, 0], [0, 0, 1]])
     T = np.array([[1, 0, tx], [0, 1, ty], [0, 0, 1]])
     return T @ H @ S @ R
-
-print("A POINT BECOMES THREE NUMBERS: (x, y) -> (x, y, 1). that third 1 is")
-print("the whole trick -- it lets TRANSLATION be a matrix multiply too,")
-print("which a 2x2 matrix can never express, because a linear map always")
-print("fixes the origin.")
-print()
 
 print("THE FIVE BUILDING BLOCKS, applied to the unit square's corners:")
 square = np.array([[0., 1, 1, 0], [0, 0, 1, 1], [1, 1, 1, 1]])
@@ -2742,10 +2752,7 @@ for name, M in cases:
     p = M @ square
     print("%-22s %s" % (name, "  ".join("(%5.2f,%5.2f)" % (p[0, i], p[1, i])
                                         for i in range(4))))
-print("   parallel edges stay parallel in every one of them. that is what")
-print("   'affine' means, and it is why an affine transform can never")
-print("   produce perspective -- railway tracks converging needs the")
-print("   bottom row of the matrix to stop being [0 0 1].")
+print("   parallel edges stay parallel in every one of them.")
 print()
 
 print("PROPERTIES EACH ONE PRESERVES:")
@@ -2759,16 +2766,23 @@ for name, M in cases:
     print("%-18s %8s %8s %8s %8s"
           % (name, "yes" if lengths else "no", "yes" if angles else "no",
              "yes" if abs(abs(det) - 1) < 1e-9 else "no", "yes"))
-print("   the determinant IS the area scale factor, exactly:")
+print("   the determinant IS the area scale factor:")
 for name, M in cases:
     print("      %-22s det = %6.2f" % (name, np.linalg.det(M[:2, :2])))
-print("   'scale x2, y0.5' has determinant 1, so it preserves area while")
-print("   changing every length -- stretched one way and squashed the")
-print("   other by compensating amounts. 'scale x2 uniformly' has")
-print("   determinant 4 and preserves shape while quadrupling area. that")
-print("   is why 'preserves area' and 'preserves shape' have to be")
-print("   separate columns: neither one implies the other.")
-print()
+```
+
+The next block shows that composition order matters and demonstrates rotation about an arbitrary centre point.
+
+```python-run
+import numpy as np
+
+def affine(a=0.0, sx=1.0, sy=1.0, shx=0.0, tx=0.0, ty=0.0):
+    c, s = np.cos(a), np.sin(a)
+    R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+    S = np.array([[sx, 0, 0], [0, sy, 0], [0, 0, 1]])
+    H = np.array([[1, shx, 0], [0, 1, 0], [0, 0, 1]])
+    T = np.array([[1, 0, tx], [0, 1, ty], [0, 0, 1]])
+    return T @ H @ S @ R
 
 print("COMPOSITION IS MATRIX MULTIPLICATION, AND IT DOES NOT COMMUTE:")
 Rot = affine(a=np.radians(90))
@@ -2779,14 +2793,11 @@ print("   rotate 90, THEN translate x+3:  (%.2f, %.2f)"
       % tuple((Tr @ Rot @ pt)[:2]))
 print("   translate x+3, THEN rotate 90:  (%.2f, %.2f)"
       % tuple((Rot @ Tr @ pt)[:2]))
-print("   different answers. and note the ORDER in the expression: the")
-print("   matrix applied FIRST is written on the RIGHT, next to the point.")
-print("   'rotate then translate' is written T @ R. reading these")
-print("   right-to-left is not a convention you can opt out of.")
+print("   different answers. the matrix applied FIRST is written on the")
+print("   RIGHT, next to the point. reading right-to-left is not optional.")
 print()
-print("   this is also how you rotate about a point that is not the")
-print("   origin: translate the centre to the origin, rotate, translate")
-print("   back. three matrices, one product, one pass over the image:")
+print("   rotate about a point that is not the origin: translate the centre")
+print("   to the origin, rotate, translate back:")
 cx, cy = 4.0, 3.0
 about = affine(tx=cx, ty=cy) @ affine(a=np.radians(90)) @ affine(tx=-cx, ty=-cy)
 centre = np.array([cx, cy, 1.0])
@@ -2794,20 +2805,26 @@ print("      the centre maps to (%.2f, %.2f) -- it does not move."
       % tuple((about @ centre)[:2]))
 print("      a point 2 to its right maps to (%.2f, %.2f)."
       % tuple((about @ np.array([cx + 2, cy, 1.0]))[:2]))
-print()
+```
 
-print("NOW THE PART THAT SURPRISES PEOPLE: TO APPLY A TRANSFORM TO AN")
-print("IMAGE, YOU RUN IT BACKWARDS.")
+The next block applies a transform to an image both forwards and backwards, showing why backward mapping avoids holes.
+
+```python-run
+import numpy as np
+def affine(a=0.0, sx=1.0, sy=1.0, shx=0.0, tx=0.0, ty=0.0):
+    c, s = np.cos(a), np.sin(a)
+    R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+    S = np.array([[sx, 0, 0], [0, sy, 0], [0, 0, 1]])
+    H = np.array([[1, shx, 0], [0, 1, 0], [0, 0, 1]])
+    T = np.array([[1, 0, tx], [0, 1, ty], [0, 0, 1]])
+    return T @ H @ S @ R
 H, W = 7, 11
 img = np.zeros((H, W))
-img[1:4, 1:5] = 1.0
-img[5, 7:10] = 1.0
-
+img[1:4, 1:5] = 1.0; img[5, 7:10] = 1.0
 def show(a, label):
     print("   %s" % label)
     for row in a:
         print("      " + "".join("#" if v > 0.5 else "." for v in row))
-
 show(img, "input")
 M = affine(a=np.radians(20), tx=1.0)
 forward = np.zeros_like(img)
@@ -2819,14 +2836,8 @@ for y in range(H):
             if 0 <= xi < W and 0 <= yi < H:
                 forward[yi, xi] = 1.0
 show(forward, "FORWARD mapping: push each input pixel to its new place")
-print("      %d pixels went in and %d came out."
+print("      %d pixels went in and %d came out -- holes appear."
       % (int((img > 0.5).sum()), int((forward > 0.5).sum())))
-print("      look at the gaps inside the block. two input pixels can round")
-print("      to the SAME output pixel, and some output pixels are hit by")
-print("      none at all -- so the result comes out with holes in it.")
-print("      there is no way to avoid this: the map is continuous and the")
-print("      grid is not.")
-print()
 Minv = np.linalg.inv(M)
 backward = np.zeros_like(img)
 for y in range(H):
@@ -2836,24 +2847,14 @@ for y in range(H):
         if 0 <= xi < W and 0 <= yi < H:
             backward[y, x] = img[yi, xi]
 show(backward, "BACKWARD mapping: for each OUTPUT pixel, ask where it came from")
-print("      %d pixels this time, and the block is solid: no holes, because"
+print("      %d pixels, no holes. every output pixel is visited exactly once."
       % int((backward > 0.5).sum()))
-print("      every output pixel is visited exactly once and asks a question")
-print("      that always has an answer.")
-print("      both versions lost the short bar that was at row 5. that is")
-print("      not a mapping artefact -- the rotation genuinely carried it")
-print("      past the bottom edge, to y = %.2f in a %d-row image. rotating"
-      % ((M @ np.array([8.0, 5.0, 1.0]))[1], H))
-print("      an image about its origin moves content out of frame, which")
-print("      is why real code rotates about the CENTRE and often enlarges")
-print("      the canvas to fit the result.")
-print("      this is why every library's warpAffine takes the INVERSE")
-print("      internally, and why the interpolation happens on the input")
-print("      side: the fractional coordinate lands in the source image,")
-print("      where there are real neighbours to interpolate between.")
-print()
+print("      this is why every library's warpAffine takes the INVERSE.")
+```
 
-print("SIX NUMBERS, AND WHAT THEY BUY:")
+The next block shows the family of geometric transforms, from a 2-parameter translation up to an 8-parameter homography, and where spatial transformer networks fit.
+
+```python-run
 print("%-24s %10s %s" % ("family", "params", "what it can do"))
 for name, n, what in (("translation", 2, "shift only"),
                       ("rigid (Euclidean)", 3, "+ rotation"),
@@ -2861,11 +2862,8 @@ for name, n, what in (("translation", 2, "shift only"),
                       ("affine", 6, "+ shear, non-uniform scale"),
                       ("homography", 8, "+ perspective")):
     print("%-24s %10d %s" % (name, n, what))
-print("   each row adds freedom and needs more point correspondences to")
-print("   solve for: affine needs 3 matched points, a homography needs 4.")
 print("   in a spatial transformer network those 6 numbers are the output")
-print("   of a small subnetwork, so the model learns which crop and")
-print("   rotation to apply -- the transform becomes a layer.")
+print("   of a small subnetwork -- the transform becomes a layer.")
 ```
 
 """,
@@ -3073,17 +3071,13 @@ A single neuron deep in a network reacts to a patch of the first image. finding 
 
 ```python-run
 import numpy as np
-
 print("the recurrence, and it is the whole calculation:")
 print("    RF_out = RF_in + (kernel - 1) * jump_in")
 print("    jump_out = jump_in * stride")
-print("where 'jump' is how far apart two adjacent output pixels are, in")
-print("input pixels.")
 print()
-
 def trace(layers, label):
     rf, jump = 1, 1
-    print("%s" % label)
+    print(label)
     print("%8s %10s %8s %8s %14s %12s"
           % ("layer", "type", "kernel", "stride", "receptive field", "jump"))
     print("%8s %10s %8s %8s %14d %12d" % ("input", "-", "-", "-", rf, jump))
@@ -3092,62 +3086,49 @@ def trace(layers, label):
         jump = jump * s
         print("%8d %10s %8d %8d %14d %12d" % (i, kind, k, s, rf, jump))
     return rf
-
 rf = trace([("conv", 3, 1)] * 8, "EIGHT 3x3 CONVOLUTIONS, stride 1:")
-print("   each layer adds exactly 2. after 8 layers a neuron sees %dx%d."
-      % (rf, rf))
-print("   growth is LINEAR in depth, which is slow -- to see a 224-pixel")
-print("   image you would need %d layers." % ((224 - 1) // 2))
+print("   each layer adds 2. after 8 layers a neuron sees %dx%d." % (rf, rf))
+print("   growth is LINEAR -- to see 224 pixels you need %d layers."
+      % ((224 - 1) // 2))
 print()
-
 rf = trace([("conv", 3, 1), ("conv", 3, 1), ("pool", 2, 2),
             ("conv", 3, 1), ("conv", 3, 1), ("pool", 2, 2),
             ("conv", 3, 1), ("conv", 3, 1), ("pool", 2, 2)],
-           "THE VGG PATTERN -- two convs then a pool, three times:")
-print("   %dx%d from 9 layers, against %dx%d from 8 layers without pooling."
-      % (rf, rf, 17, 17))
-print("   the stride is what accelerates it: after a stride-2 layer every")
-print("   subsequent kernel step covers TWICE as much input, so growth")
-print("   becomes geometric rather than arithmetic.")
-print()
+           "VGG PATTERN -- two convs then a pool, three times:")
+print("   %dx%d from 9 layers, against 17x17 from 8 without pooling."
+      % (rf, rf))
+print("   stride-2 layers make growth geometric rather than arithmetic.")
+```
 
-print("TWO 3x3 CONVOLUTIONS vs ONE 5x5. same receptive field, and this is")
-print("why 3x3 won:")
+Stacking small kernels matches the receptive field of a large one for fewer parameters, and dilation grows the field without any downsampling.
+
+```python-run
+import numpy as np
+print("TWO 3x3 CONVOLUTIONS vs ONE 5x5 -- same receptive field:")
 for label, layers in (("one 5x5", [("conv", 5, 1)]),
                       ("two 3x3", [("conv", 3, 1), ("conv", 3, 1)])):
-    rf_, jump_ = 1, 1
-    params = 0
+    rf_, jump_, params = 1, 1, 0
     for _, k, s in layers:
-        rf_ += (k - 1) * jump_
-        jump_ *= s
-        params += k * k * 64 * 64
-    print("   %-10s receptive field %dx%d, %s parameters (64->64 channels)"
+        rf_ += (k - 1) * jump_; jump_ *= s; params += k * k * 64 * 64
+    print("   %-10s field %dx%d, %s params (64->64 ch)"
           % (label, rf_, rf_, "{:,}".format(params)))
-print("   the same field for %.0f percent of the parameters -- and two"
+print("   same field for %.0f%% of the parameters, and two non-linearities."
       % (100 * (2 * 9) / 25))
-print("   non-linearities instead of one, which is the other half of the")
-print("   argument.")
 print()
 for label, layers in (("one 7x7", [("conv", 7, 1)]),
                       ("three 3x3", [("conv", 3, 1)] * 3)):
     rf_, jump_, params = 1, 1, 0
     for _, k, s in layers:
-        rf_ += (k - 1) * jump_
-        jump_ *= s
-        params += k * k * 64 * 64
-    print("   %-10s receptive field %dx%d, %s parameters"
+        rf_ += (k - 1) * jump_; jump_ *= s; params += k * k * 64 * 64
+    print("   %-10s field %dx%d, %s params"
           % (label, rf_, rf_, "{:,}".format(params)))
 print()
-
 print("DILATION grows the field without adding parameters or losing")
 print("resolution. a dilated kernel has gaps:")
 for d in (1, 2, 4):
     eff = 3 + (3 - 1) * (d - 1)
-    row = []
-    for i in range(eff):
-        row.append("x" if i % d == 0 else ".")
-    print("   dilation %d: 3 weights spanning %d pixels   %s"
-          % (d, eff, " ".join(row)))
+    row = " ".join("x" if i % d == 0 else "." for i in range(eff))
+    print("   dilation %d: 3 weights spanning %d pixels   %s" % (d, eff, row))
 print()
 rf_, jump_ = 1, 1
 print("   a stack with doubling dilation, all stride 1:")
@@ -3156,15 +3137,18 @@ for i, d in enumerate((1, 2, 4, 8, 16), 1):
     eff = 3 + (3 - 1) * (d - 1)
     rf_ += (eff - 1) * jump_
     print("%8d %10d %16d" % (i, d, rf_))
-print("   %d pixels from 5 layers and %d weights, with no downsampling at"
+print("   %d pixels from 5 layers and %d weights, no downsampling."
       % (rf_, 5 * 9))
-print("   all. that is why dilation is the standard tool for segmentation,")
-print("   where you need context AND per-pixel output resolution.")
-print()
+print("   that is why dilation is the standard tool for segmentation.")
+```
 
-print("THE EFFECTIVE FIELD IS SMALLER THAN THE THEORETICAL ONE. not every")
-print("input pixel contributes equally -- the centre is reached by many")
-print("paths and the corners by one:")
+The effective receptive field is much smaller than the theoretical one because corner pixels contribute far less than centre pixels.
+
+```python-run
+import numpy as np
+print("THE EFFECTIVE FIELD IS SMALLER THAN THE THEORETICAL ONE.")
+print("not every input pixel contributes equally -- the centre is reached")
+print("by many paths and the corners by one:")
 w = np.array([[1.0]])
 for layer in range(4):
     k = np.ones((3, 3))
@@ -3174,18 +3158,17 @@ for layer in range(4):
             new[i:i + 3, j:j + 3] += w[i, j] * k
     w = new
 w = w / w.max()
-print("   contribution weight after 4 layers of 3x3 (theoretical field %dx%d):"
-      % w.shape)
+print("   contribution weight after 4 layers of 3x3 (field %dx%d):" % w.shape)
 for r in w:
     print("      " + "".join("%6.2f" % v for v in r))
 centre = w[w.shape[0] // 2, w.shape[1] // 2]
 corner = w[0, 0]
-print("   the centre pixel has weight %.2f; the corner has %.4f -- a factor"
-      % (centre, corner))
-print("   of %.0f. the field is gaussian-ish, not a flat square, so the" % (centre / corner))
-print("   EFFECTIVE field is roughly the square root of the theoretical one.")
-print("   that is a large part of why very deep networks still benefit from")
-print("   explicit long-range mechanisms rather than depth alone.")
+print("   centre weight %.2f; corner %.4f -- a factor of %.0f."
+      % (centre, corner, centre / corner))
+print("   the field is gaussian-ish, not a flat square, so the EFFECTIVE")
+print("   field is roughly the square root of the theoretical one.")
+print("   that is why very deep networks still benefit from explicit")
+print("   long-range mechanisms rather than depth alone.")
 ```
 
 """,
@@ -3686,54 +3669,40 @@ A normal convolution mixes space and channels at once. Doing those apart costs a
 
 ```python-run
 import numpy as np
-
-rng = np.random.default_rng(0)
-
-def standard(kh, cin, cout):
-    return kh * kh * cin * cout
-
-def depthwise(kh, cin):
-    return kh * kh * cin          # one kernel per input channel, no mixing
-
-def pointwise(cin, cout):
-    return 1 * 1 * cin * cout     # mixes channels, no spatial extent
-
+def standard(kh, cin, cout): return kh * kh * cin * cout
+def depthwise(kh, cin): return kh * kh * cin
+def pointwise(cin, cout): return cin * cout
 print("a standard convolution does two jobs in one operation:")
 print("   1. combine a spatial neighbourhood  (the kxk window)")
 print("   2. combine the channels             (sum over c_in)")
 print("and it pays kh*kw*cin*cout weights to do both together.")
-print()
 print("separating them:")
-print("   DEPTHWISE   -- one kxk kernel per input channel, applied to that")
-print("                  channel only. no channel mixing at all.")
-print("   POINTWISE   -- a 1x1 convolution. all the channel mixing, no")
-print("                  spatial extent.")
+print("   DEPTHWISE -- one kxk kernel per input channel only.")
+print("   POINTWISE -- a 1x1 convolution, all channel mixing.")
 print()
-
 print("THE SAVING. a 3x3 convolution, various channel counts:")
-print("%12s %12s %16s %16s %12s %10s"
-      % ("in", "out", "standard", "depthwise+point", "ratio", "1/ratio"))
+print("%12s %12s %16s %16s %12s" % ("in", "out", "standard", "dw+pw", "ratio"))
 for cin, cout in ((3, 32), (32, 64), (64, 128), (256, 256), (512, 512)):
     s = standard(3, cin, cout)
     d = depthwise(3, cin) + pointwise(cin, cout)
-    print("%12d %12d %16s %16s %12.2fx %10.3f"
-          % (cin, cout, "{:,}".format(s), "{:,}".format(d), s / d, d / s))
+    print("%12d %12d %16s %16s %12.2fx"
+          % (cin, cout, "{:,}".format(s), "{:,}".format(d), s / d))
 print()
-print("   the ratio converges on 1/(kh*kw) + 1/cout. for a 3x3 with many")
-print("   channels that is close to 1/9:")
+print("   the ratio converges on 1/9 + 1/cout for a 3x3:")
 for cout in (32, 128, 512, 4096):
     r = 1 / 9 + 1 / cout
-    print("      cout=%5d -> %.4f of the standard cost (limit %.4f)"
-          % (cout, r, 1 / 9))
-print("   so a 3x3 depthwise-separable convolution costs roughly one ninth")
-print("   of a normal one, and a 5x5 roughly one twenty-fifth.")
-print()
+    print("      cout=%5d -> %.4f (limit %.4f)" % (cout, r, 1 / 9))
+print("   so a 3x3 depthwise-separable costs roughly one ninth of normal.")
+```
 
+The next block runs both a standard and a depthwise-separable convolution on the same input, comparing output shapes and weight counts.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
 H, W, CIN, COUT = 5, 5, 4, 3
 x = rng.normal(0, 1.0, (H, W, CIN))
-
 def conv_standard(x, k):
-    # k: (3, 3, cin, cout)
     p = np.pad(x, ((1, 1), (1, 1), (0, 0)), mode="constant")
     out = np.zeros((x.shape[0], x.shape[1], k.shape[3]))
     for i in range(x.shape[0]):
@@ -3742,9 +3711,7 @@ def conv_standard(x, k):
             for o in range(k.shape[3]):
                 out[i, j, o] = (win * k[:, :, :, o]).sum()
     return out
-
 def conv_depthwise(x, kd):
-    # kd: (3, 3, cin) -- one kernel per channel
     p = np.pad(x, ((1, 1), (1, 1), (0, 0)), mode="constant")
     out = np.zeros_like(x)
     for c in range(x.shape[2]):
@@ -3752,11 +3719,9 @@ def conv_depthwise(x, kd):
             for j in range(x.shape[1]):
                 out[i, j, c] = (p[i:i + 3, j:j + 3, c] * kd[:, :, c]).sum()
     return out
-
 k_std = rng.normal(0, 0.3, (3, 3, CIN, COUT))
 k_dw = rng.normal(0, 0.3, (3, 3, CIN))
 k_pw = rng.normal(0, 0.3, (CIN, COUT))
-
 out_std = conv_standard(x, k_std)
 out_sep = conv_depthwise(x, k_dw) @ k_pw
 print("RUN BOTH on a %dx%dx%d input, %d output channels:" % (H, W, CIN, COUT))
@@ -3765,42 +3730,38 @@ print("   depthwise + 1x1   -> %s, %d + %d = %d weights"
       % (out_sep.shape, k_dw.size, k_pw.size, k_dw.size + k_pw.size))
 print("   same output shape, %.1fx fewer weights."
       % (k_std.size / (k_dw.size + k_pw.size)))
-print()
+```
 
-print("WHAT IT GIVES UP. a standard convolution has an independent kxk")
-print("kernel for EVERY (input channel, output channel) pair:")
+The next block reveals the capacity each version gets: the standard convolution has full-rank spatial kernels per channel pair, while the separable version is always rank 1.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+CIN, COUT = 4, 3
+_ = rng.normal(0, 1.0, (5, 5, CIN))  # advance rng to match
+k_std = rng.normal(0, 0.3, (3, 3, CIN, COUT))
+k_dw = rng.normal(0, 0.3, (3, 3, CIN))
+k_pw = rng.normal(0, 0.3, (CIN, COUT))
+def depthwise(kh, cin): return kh * kh * cin
+def pointwise(cin, cout): return cin * cout
+def standard(kh, cin, cout): return kh * kh * cin * cout
+print("WHAT IT GIVES UP:")
 print("   standard 3x3, %d->%d: %d distinct spatial kernels"
       % (CIN, COUT, CIN * COUT))
-print("   depthwise 3x3, %d channels: %d distinct spatial kernels"
-      % (CIN, CIN))
-print("   so the separable version cannot learn 'detect a horizontal edge in")
-print("   channel 2 but a vertical one in channel 2 for a different output'.")
-print("   each input channel gets ONE spatial filter, and the pointwise layer")
-print("   can only reweight the results.")
-print()
-print("   measured directly. for ONE input channel, collect the 3x3 kernel")
-print("   it uses toward each output channel, as a 9 x %d matrix:" % COUT)
+print("   depthwise 3x3, %d channels: %d spatial kernels" % (CIN, CIN))
 print("%22s %14s %14s" % ("input channel", "standard rank", "separable rank"))
 for c in range(CIN):
     m_std = k_std[:, :, c, :].reshape(9, COUT)
     m_sep = k_dw[:, :, c].reshape(9, 1) * k_pw[c][None, :]
     print("%22d %14d %14d"
           % (c, np.linalg.matrix_rank(m_std), np.linalg.matrix_rank(m_sep)))
-print("   the separable column is 1 every time, and that is the constraint")
-print("   stated exactly: every output channel sees the SAME spatial")
-print("   pattern from a given input channel, scaled by a single number.")
-print("   the standard version gets an independent pattern for each pair.")
+print("   separable is always rank 1: same spatial pattern for every output.")
 print()
-print("SO THE TRADE IS CAPACITY FOR COST, and in practice it is a good one:")
-print("   MobileNetV1 traded about %.0f%% of the parameters for a few points"
-      % 90)
-print("   of ImageNet accuracy, which is exactly the deal you want on a")
-print("   phone. the usual repair is to make the network WIDER with the")
-print("   savings, which buys much of the accuracy back:")
+print("SO THE TRADE IS CAPACITY FOR COST. the usual repair is to go WIDER:")
 for width in (1.0, 1.5, 2.0):
     cin, cout = int(256 * width), int(256 * width)
     d = depthwise(3, cin) + pointwise(cin, cout)
-    print("      width x%.1f: %s parameters against a standard 256->256's %s"
+    print("   width x%.1f: %s params vs standard 256->256's %s"
           % (width, "{:,}".format(d), "{:,}".format(standard(3, 256, 256))))
 ```
 
@@ -3994,9 +3955,8 @@ A dilated convolution reads the same number of weights from a wider spread of sp
 
 ```python-run
 import numpy as np
-
-print("A 3x3 KERNEL reads 9 positions. WHERE those positions are is set by")
-print("the dilation rate:")
+print("A 3x3 KERNEL reads 9 positions. WHERE those positions are is set")
+print("by the dilation rate:")
 for d in (1, 2, 3):
     span = 2 * d + 1
     grid = [["." for _ in range(span)] for _ in range(span)]
@@ -4008,49 +3968,38 @@ for d in (1, 2, 3):
         print("      " + " ".join(row))
 print("   the weight count never changes. the SPAN does.")
 print()
-
-print("RECEPTIVE FIELD -- how much of the input one output cell depends on.")
-print("stack layers and track it. for 3x3 kernels, stride 1:")
+print("RECEPTIVE FIELD -- stack layers and track it. 3x3, stride 1:")
 print("%-10s %14s %16s %18s"
-      % ("layer", "dilation", "RF (stacked 3x3)", "RF (doubling)"))
+      % ("layer", "dilation", "RF (plain 3x3)", "RF (doubling)"))
 rf_plain, rf_dil, d = 1, 1, 1
 for layer in range(1, 7):
-    rf_plain += 2                       # each plain 3x3 adds 2
-    rf_dil += 2 * d                      # a dilated 3x3 adds 2*d
+    rf_plain += 2; rf_dil += 2 * d
     print("%-10d %14d %16d %18d" % (layer, d, rf_plain, rf_dil))
     d *= 2
-print("   six plain layers reach %d pixels; six doubling-dilation layers"
-      % rf_plain)
-print("   reach %d, using exactly the same %d weights per layer." % (rf_dil, 9))
-print("   the plain stack grows LINEARLY in depth, the dilated stack grows")
-print("   EXPONENTIALLY, and neither one costs a parameter more than the")
-print("   other.")
+print("   six plain layers reach %d; six doubling-dilation reach %d."
+      % (rf_plain, rf_dil))
+print("   same %d weights per layer. plain grows LINEARLY, dilated" % 9)
+print("   grows EXPONENTIALLY.")
 print()
-
-print("THE ALTERNATIVE WAYS to get a big receptive field, and what each")
-print("one costs:")
 print("%-30s %14s %14s %16s" % ("method", "RF", "params", "output size"))
-print("%-30s %14d %14d %16s" % ("one 3x3", 3, 9, "unchanged"))
-print("%-30s %14d %14d %16s" % ("one 9x9", 9, 81, "unchanged"))
-print("%-30s %14d %14d %16s" % ("4 stacked 3x3", 9, 36, "unchanged"))
-print("%-30s %14d %14d %16s" % ("3x3, dilation 4", 9, 9, "unchanged"))
-print("%-30s %14d %14d %16s" % ("3x3 after 2 poolings", 12, 9, "quartered"))
-print("   pooling gets there cheaply too, but it throws the resolution")
-print("   away, and for segmentation the output has to be per-pixel. that")
-print("   single constraint -- big context, full resolution -- is what")
-print("   dilation was invented for.")
-print()
+for r in (("one 3x3", 3, 9, "unchanged"), ("one 9x9", 9, 81, "unchanged"),
+          ("4 stacked 3x3", 9, 36, "unchanged"),
+          ("3x3, dilation 4", 9, 9, "unchanged"),
+          ("3x3 after 2 poolings", 12, 9, "quartered")):
+    print("%-30s %14d %14d %16s" % r)
+print("   pooling gets there but throws resolution away. dilation was")
+print("   invented for the constraint: big context, full resolution.")
+```
 
-print("NOW WATCH IT WORK. a signal with one spike, convolved with a 3-tap")
-print("averaging kernel at several dilations:")
+Applying a dilated convolution to a signal with one spike shows how the response spreads, and what happens when the same dilation is repeated.
+
+```python-run
+import numpy as np
 N = 25
-sig = np.zeros(N)
-sig[12] = 9.0
+sig = np.zeros(N); sig[12] = 9.0
 k = np.ones(3) / 3.0
-
 def dconv(x, k, d):
     out = np.zeros_like(x)
-    r = (len(k) - 1) * d // 2
     for i in range(len(x)):
         acc = 0.0
         for t, w in enumerate(k):
@@ -4059,45 +4008,37 @@ def dconv(x, k, d):
                 acc += w * x[j]
         out[i] = acc
     return out
-
 print("   input:        " + "".join("#" if v > 0 else "." for v in sig))
 for d in (1, 2, 4):
     o = dconv(sig, k, d)
     print("   dilation %d:   " % d
           + "".join("#" if v > 0 else "." for v in o)
           + "   touches %d positions" % int((o > 0).sum()))
-print("   at dilation 4 the response appears at positions 8, 12 and 16 --")
-print("   and NOTHING at 9, 10, 11. the kernel never looked there.")
+print("   at dilation 4 the kernel never looked at positions 9, 10, 11.")
 print()
-
-print("THAT IS THE GRIDDING ARTEFACT, and stacking makes it worse. two")
-print("layers both at dilation 2 only ever touch even offsets:")
+print("THAT IS THE GRIDDING ARTEFACT. two layers both at dilation 2")
+print("only ever touch even offsets:")
 two_same = dconv(dconv(sig, k, 2), k, 2)
-print("   d=2 then d=2:  " + "".join("#" if v > 1e-9 else "." for v in two_same))
+print("   d=2,d=2:  " + "".join("#" if v > 1e-9 else "." for v in two_same))
 covered = set(np.where(two_same > 1e-9)[0])
 gaps = [i for i in range(min(covered), max(covered) + 1) if i not in covered]
-print("      reaches %d..%d but MISSES %s"
-      % (min(covered), max(covered), str(gaps)))
-print("      every missed index is odd. the two layers share a common")
-print("      factor of 2, so no path through them can ever land on an odd")
-print("      offset. in 2D the reachable offsets are (even, even), which")
-print("      is one cell in four -- so THREE QUARTERS of the input inside")
-print("      the receptive field is not merely down-weighted, it is never")
-print("      read at all.")
+print("      reaches %d..%d but MISSES %s" % (min(covered), max(covered), str(gaps)))
+print("      every missed index is odd -- THREE QUARTERS of the input")
+print("      inside the receptive field is never read at all in 2D.")
 print()
 print("   now make the rates COPRIME -- 1, then 2, then 3:")
 mixed = dconv(dconv(dconv(sig, k, 1), k, 2), k, 3)
 cov2 = set(np.where(mixed > 1e-9)[0])
 gaps2 = [i for i in range(min(cov2), max(cov2) + 1) if i not in cov2]
-print("   d=1,2,3:       " + "".join("#" if v > 1e-9 else "." for v in mixed))
+print("   d=1,2,3:  " + "".join("#" if v > 1e-9 else "." for v in mixed))
 print("      reaches %d..%d and misses %s"
       % (min(cov2), max(cov2), str(gaps2) if gaps2 else "nothing"))
-print("      full coverage, same 9 weights per layer, same cost. the fix")
-print("      for gridding is arithmetic, not architecture: choose rates")
-print("      with no common factor. this is why real designs use rate")
-print("      sequences like 1,2,5 or 1,2,3 rather than 2,4,8.")
-print()
+print("      full coverage, same cost. choose rates with no common factor.")
+```
 
+Real architectures use dilation wherever downsampling is unacceptable, such as per-pixel labelling or audio waveform generation.
+
+```python-run
 print("WHERE YOU MEET IT:")
 print("%-26s %s" % ("DeepLab (ASPP)", "parallel branches at 6, 12, 18"))
 print("%-26s %s" % ("WaveNet", "1,2,4,...,512 over raw audio"))
@@ -4301,82 +4242,65 @@ Global mean pooling merges a whole feature map to a single number per channel. I
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(2)
-C, H, W = 8, 6, 6                      # 8 channels of 6x6
-
-def make(kind):
-    a = np.zeros((C, H, W))
-    for c in range(C):
-        a[c] = rng.normal(0.2, 0.15, (H, W)).clip(0)
-    return a
-
-fmap = make("x")
-fmap[2, 1:3, 1:3] = 3.4                # channel 2 fires strongly, top-left
-fmap[5, 4:6, 3:5] = 3.1                # channel 5 fires strongly, bottom-right
-
+C, H, W = 8, 6, 6
+fmap = np.abs(rng.normal(0.2, 0.15, (C, H, W)))
+fmap[2, 1:3, 1:3] = 3.4
+fmap[5, 4:6, 3:5] = 3.1
 print("A FEATURE MAP with %d channels of %dx%d." % (C, H, W))
-print("GAP takes the mean over the two SPATIAL axes and leaves the channel")
-print("axis alone: (%d, %d, %d) -> (%d,)." % (C, H, W, C))
+print("GAP takes the mean over the spatial axes: (%d,%d,%d) -> (%d,)."
+      % (C, H, W, C))
 gap = fmap.mean(axis=(1, 2))
 print("%-12s %12s %12s %12s" % ("channel", "GAP", "max", "where max is"))
 for c in range(C):
     r, cc = np.unravel_index(fmap[c].argmax(), (H, W))
     print("%-12d %12.4f %12.4f %12s" % (c, gap[c], fmap[c].max(),
                                         "(%d,%d)" % (r, cc)))
-print("   channels 2 and 5 stand out. the vector says WHAT was found and")
-print("   says nothing whatsoever about WHERE -- that column is printed")
-print("   from the feature map, not from the GAP output.")
+print("   channels 2 and 5 stand out. the vector says WHAT, not WHERE.")
 print()
-
-print("THE PARAMETER ARGUMENT, which is the one usually given:")
 NCLASS = 10
 flat_params = C * H * W * NCLASS + NCLASS
 gap_params = C * NCLASS + NCLASS
+print("THE PARAMETER ARGUMENT:")
 print("%-40s %14s" % ("head design", "parameters"))
-print("%-40s %14d" % ("flatten (%d) -> dense(%d)" % (C * H * W, NCLASS),
-                      flat_params))
-print("%-40s %14d" % ("GAP (%d) -> dense(%d)" % (C, NCLASS), gap_params))
+print("%-40s %14d" % ("flatten (%d)->dense(%d)" % (C*H*W, NCLASS), flat_params))
+print("%-40s %14d" % ("GAP (%d)->dense(%d)" % (C, NCLASS), gap_params))
 print("%-40s %14.1fx" % ("ratio", flat_params / gap_params))
-print("   and that is a toy. for a real backbone the gap is enormous:")
-print("%-24s %10s %14s %14s" % ("backbone", "final map", "flatten head",
-                                "GAP head"))
+print("   for a real backbone the gap is enormous:")
+print("%-24s %10s %14s %14s" % ("backbone", "final map", "flatten", "GAP"))
 for name, c, h, w in (("VGG-16", 512, 7, 7), ("ResNet-50", 2048, 7, 7),
                       ("MobileNetV2", 1280, 7, 7)):
     print("%-24s %10s %14s %14s"
           % (name, "%dx%dx%d" % (c, h, w),
-             "{:,}".format(c * h * w * 1000 + 1000),
-             "{:,}".format(c * 1000 + 1000)))
-print("   VGG-16's FIRST dense layer alone is 25088 x 4096, about 103")
-print("   million parameters. its three dense layers together come to")
-print("   roughly 124 million of the network's 138 million total: the")
-print("   classifier head outweighed every convolution in the network")
-print("   put together. GAP deletes almost all of it.")
-print()
+             "{:,}".format(c*h*w*1000+1000), "{:,}".format(c*1000+1000)))
+print("   GAP deletes almost all of VGG-16's 124M classifier parameters.")
+```
 
-print("THE ARGUMENT THAT MATTERS MORE -- INPUT SIZE. a flatten head is")
-print("wired to one exact spatial size. feed it anything else and the")
-print("matrix multiply does not typecheck:")
-print("%-22s %14s %18s %14s" % ("input image", "final map", "flatten gives",
-                                "GAP gives"))
+The next block shows the argument that matters more: a GAP head accepts any input resolution, while a flatten head is wired to exactly one spatial size.
+
+```python-run
+C, H, W = 8, 6, 6
+print("INPUT SIZE. a flatten head is wired to one spatial size:")
+print("%-22s %14s %18s %14s" % ("input image", "final map", "flatten", "GAP"))
 for side in (192, 224, 288, 384):
     h = side // 32
     print("%-22s %14s %18d %14d"
           % ("%dx%d" % (side, side), "%dx%dx%d" % (C, h, h), C * h * h, C))
-print("   the flatten column changes with every input size; the GAP column")
-print("   never does. that single fact is why GAP is in every modern")
-print("   backbone: the same trained head works on any input resolution,")
-print("   which is what makes multi-scale training and test-time resizing")
-print("   possible at all.")
-print()
+print("   the flatten column changes with every size; GAP never does.")
+print("   the same trained head works on any resolution -- that is why")
+print("   GAP is in every modern backbone.")
+```
 
-print("AND THE ARGUMENT THAT IS EASIEST TO MISS -- WHAT IT DOES TO")
-print("TRAINING. a flatten head can memorise position. build two examples")
-print("of the SAME class where the evidence sits in different corners:")
+The next block demonstrates what GAP does to training: it enforces translation invariance so that the same object in two different corners produces identical representations.
+
+```python-run
+import numpy as np
+C, H, W = 8, 6, 6
 a_left = np.zeros((C, H, W)); a_left[2, 0:2, 0:2] = 3.0
 a_right = np.zeros((C, H, W)); a_right[2, 4:6, 4:6] = 3.0
-print("   example A: channel 2 fires in the top-left corner")
-print("   example B: channel 2 fires in the bottom-right corner")
+print("TRANSLATION INVARIANCE. same class, different corners:")
+print("   example A: channel 2 fires top-left")
+print("   example B: channel 2 fires bottom-right")
 fa, fb = a_left.reshape(-1), a_right.reshape(-1)
 ga, gb = a_left.mean(axis=(1, 2)), a_right.mean(axis=(1, 2))
 def cos(u, v):
@@ -4384,18 +4308,18 @@ def cos(u, v):
 print("%-34s %14s" % ("representation", "cosine similarity"))
 print("%-34s %14.4f" % ("flattened (%d numbers)" % fa.size, cos(fa, fb)))
 print("%-34s %14.4f" % ("after GAP (%d numbers)" % ga.size, cos(ga, gb)))
-print("   to a flatten head these two examples are ORTHOGONAL -- as")
-print("   unrelated as two random inputs. it has to learn the class twice,")
-print("   once per position, and it needs training examples in every")
-print("   corner to do it.")
-print("   after GAP they are identical. translation invariance is not")
-print("   something GAP encourages; it is something GAP enforces, for")
-print("   free, before any weight is learned. that is a strong structural")
-print("   prior, and it is why GAP heads generalise from less data.")
-print()
+print("   to a flatten head these are ORTHOGONAL -- it has to learn the")
+print("   class twice, once per position.")
+print("   after GAP they are identical. invariance is enforced for free,")
+print("   and that is why GAP heads generalise from less data.")
+```
 
-print("THE PRICE, stated plainly. GAP cannot represent position, so it")
-print("cannot be used where position is the answer:")
+The next block covers the price: GAP cannot represent position, so it fails at tasks that need coordinates or counts.
+
+```python-run
+import numpy as np
+C, H, W = 8, 6, 6
+print("THE PRICE. GAP cannot represent position:")
 print("%-36s %s" % ("task", "GAP as the head?"))
 for task, ok in (("image classification", "yes -- the standard choice"),
                  ("object detection", "no -- boxes need coordinates"),
@@ -4404,34 +4328,20 @@ for task, ok in (("image classification", "yes -- the standard choice"),
                  ("pose estimation", "no -- position IS the label")):
     print("%-36s %s" % (task, ok))
 print()
-print("that counting row is the subtle one, and the obvious argument for")
-print("it is actually wrong. GAP is a mean, so you might expect two")
-print("objects to give the same value as one. watch what really happens:")
+print("the counting row is subtle. watch what actually happens:")
 one = np.zeros((C, H, W)); one[2, 1:3, 1:3] = 3.0
 two = np.zeros((C, H, W)); two[2, 1:3, 1:3] = 3.0; two[2, 4:6, 3:5] = 3.0
-print("   one object  -> channel 2 GAP = %.4f" % one.mean(axis=(1, 2))[2])
-print("   two objects -> channel 2 GAP = %.4f" % two.mean(axis=(1, 2))[2])
-print("   it DOUBLES. the mean rose because the denominator -- %d cells --"
-      % (H * W))
-print("   is fixed while the numerator grew, so GAP does carry some count")
-print("   information after all.")
-print("   the reason you still cannot count with it is worse than 'the")
-print("   information is gone'. make one object twice as large instead:")
 big = np.zeros((C, H, W)); big[2, 1:3, 1:5] = 3.0
-print("      one object, %d cells   -> %.4f"
-      % (int((one[2] > 0).sum()), one.mean(axis=(1, 2))[2]))
-print("      two objects, %d cells  -> %.4f"
-      % (int((two[2] > 0).sum()), two.mean(axis=(1, 2))[2]))
-print("      ONE object, %d cells   -> %.4f"
-      % (int((big[2] > 0).sum()), big.mean(axis=(1, 2))[2]))
-print("   the last two are identical, and they are different scenes. count")
-print("   is confounded with SIZE, and no downstream layer can separate")
-print("   them, because the distinction was destroyed before the layer saw")
-print("   the number. that is the real failure: not lost precision, but an")
-print("   ambiguity baked into the representation.")
-print("   if the task needs a count or a location, the spatial axes have to")
-print("   survive to the output -- which is exactly what detection and")
-print("   segmentation architectures are built to do.")
+print("   one object  -> GAP = %.4f" % one.mean(axis=(1, 2))[2])
+print("   two objects -> GAP = %.4f" % two.mean(axis=(1, 2))[2])
+print("   one BIGGER  -> GAP = %.4f" % big.mean(axis=(1, 2))[2])
+print("   the last two are identical: count is confounded with SIZE.")
+print("   no downstream layer can separate them, because the distinction")
+print("   was destroyed. that is the real failure -- an ambiguity baked")
+print("   into the representation.")
+print("   if a task needs count or location, the spatial axes must")
+print("   survive to the output, which is what detection and segmentation")
+print("   architectures are built to do.")
 ```
 
 """,
@@ -4637,9 +4547,7 @@ An anchor is a box the finder guesses before seeing the image. The network predi
 
 ```python-run
 import numpy as np
-
 IMG = 64
-
 def build(stride, scales, ratios):
     shapes = [(s * np.sqrt(r), s / np.sqrt(r)) for s in scales for r in ratios]
     n = IMG // stride
@@ -4648,196 +4556,134 @@ def build(stride, scales, ratios):
         for j in range(n):
             cy, cx = stride * (i + 0.5), stride * (j + 0.5)
             for w, h in shapes:
-                out.append((cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2))
+                out.append((cx - w/2, cy - h/2, cx + w/2, cy + h/2))
     return np.array(out), shapes, n * n
-
 def iou_many(box, boxes):
     x1 = np.maximum(box[0], boxes[:, 0]); y1 = np.maximum(box[1], boxes[:, 1])
     x2 = np.minimum(box[2], boxes[:, 2]); y2 = np.minimum(box[3], boxes[:, 3])
     inter = np.clip(x2 - x1, 0, None) * np.clip(y2 - y1, 0, None)
-    a = (box[2] - box[0]) * (box[3] - box[1])
-    b = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+    a = (box[2]-box[0])*(box[3]-box[1]); b = (boxes[:,2]-boxes[:,0])*(boxes[:,3]-boxes[:,1])
     return inter / (a + b - inter)
-
 A0, shapes0, nc0 = build(16, [16.0, 32.0], [0.5, 1.0, 2.0])
-print("THE GRID: a %dx%d image, one anchor centre every 16 pixels, and at"
-      % (IMG, IMG))
-print("each centre a fixed set of %d shapes:" % len(shapes0))
-print("%-24s %9s %9s %9s %9s" % ("", "width", "height", "area", "aspect"))
+print("THE GRID: %dx%d image, one centre every 16 px, %d shapes each:" % (IMG, IMG, len(shapes0)))
+print("%-24s %9s %9s %9s" % ("", "width", "height", "aspect"))
 for (w, h), (s, r) in zip(shapes0,
                           [(s, r) for s in [16, 32] for r in [0.5, 1.0, 2.0]]):
-    print("%-24s %9.1f %9.1f %9.0f %9.2f"
-          % ("scale %d, ratio %.1f" % (s, r), w, h, w * h, w / h))
-print("   %d centres x %d shapes = %d anchors, every one of them fixed"
+    print("%-24s %9.1f %9.1f %9.2f"
+          % ("scale %d, ratio %.1f" % (s, r), w, h, w / h))
+print("   %d centres x %d shapes = %d anchors, all fixed before any image."
       % (nc0, len(shapes0), len(A0)))
-print("   BEFORE any image is seen. they depend on the architecture alone.")
-print()
+```
 
-OBJECTS = [("a mid-size square", (20., 20., 50., 50.)),
-           ("a wide, flat object", (10., 22., 54., 44.)),
-           ("a tall, thin object", (26., 10., 42., 54.)),
-           ("a very small object", (30., 30., 38., 38.)),
-           ("an extreme 6:1 letterbox", (2., 30., 62., 40.))]
+The next block tests how well different anchor configurations cover a set of objects with varied shapes and sizes.
 
-print("ASSIGNMENT: an anchor is a POSITIVE for an object if their IoU is at")
-print("least 0.5. below 0.4 it is trained as background; in between it is")
-print("ignored entirely, because it is genuinely ambiguous.")
-print()
-
-CONFIGS = [("stride 16, 6 shapes", 16, [16.0, 32.0], [0.5, 1.0, 2.0]),
-           ("stride 8, 6 shapes", 8, [16.0, 32.0], [0.5, 1.0, 2.0]),
-           ("stride 8, 15 shapes", 8, [8.0, 16.0, 32.0],
-            [0.25, 0.5, 1.0, 2.0, 4.0])]
-
+```python-run
+import numpy as np
+IMG = 64
+def bld(st,sc,ra):
+    sh=[(s*np.sqrt(r),s/np.sqrt(r)) for s in sc for r in ra]; n=IMG//st
+    return np.array([(st*(j+.5)-w/2,st*(i+.5)-h/2,st*(j+.5)+w/2,st*(i+.5)+h/2) for i in range(n) for j in range(n) for w,h in sh]),sh,n*n
+def iou_m(b,B):
+    i=np.clip(np.minimum(b[2],B[:,2])-np.maximum(b[0],B[:,0]),0,None)*np.clip(np.minimum(b[3],B[:,3])-np.maximum(b[1],B[:,1]),0,None)
+    return i/((b[2]-b[0])*(b[3]-b[1])+(B[:,2]-B[:,0])*(B[:,3]-B[:,1])-i)
+OBJ=[("mid-sq",(20.,20.,50.,50.)),("wide",(10.,22.,54.,44.)),("tall",(26.,10.,42.,54.)),
+     ("tiny",(30.,30.,38.,38.)),("6:1",(2.,30.,62.,40.))]
+CFG=[("s16-6",16,[16.,32.],[.5,1.,2.]),("s8-6",8,[16.,32.],[.5,1.,2.]),
+     ("s8-15",8,[8.,16.,32.],[.25,.5,1.,2.,4.])]
 best = {}
-for label, st, sc, ra in CONFIGS:
-    A, sh, nc = build(st, sc, ra)
-    best[label] = {name: iou_many(np.array(b), A).max()
-                   for name, b in OBJECTS}
+for label,st,sc,ra in CFG:
+    A,_,_ = bld(st,sc,ra)
+    best[label] = {n: iou_m(np.array(b),A).max() for n,b in OBJ}
     best[label]["__n"] = len(A)
+print("%-12s %10s %10s %10s" % ("object","s16-6sh","s8-6sh","s8-15sh"))
+for name,_ in OBJ:
+    print("%-12s %10.3f %10.3f %10.3f" % (name,best[CFG[0][0]][name],best[CFG[1][0]][name],best[CFG[2][0]][name]))
+print("%-12s %10d %10d %10d" % ("anchors",best[CFG[0][0]]["__n"],best[CFG[1][0]]["__n"],best[CFG[2][0]]["__n"]))
+c0,c1,c2 = CFG[0][0],CFG[1][0],CFG[2][0]
+m0=[n for n,_ in OBJ if best[c0][n]>=0.5]
+m1=[n for n,_ in OBJ if best[c1][n]>=0.5]
+m2=[n for n,_ in OBJ if best[c2][n]>=0.5]
+print("   matched at 0.5: %d, then %d, then %d of %d." % (len(m0),len(m1),len(m2),len(OBJ)))
+```
 
-print("%-28s %14s %14s %14s"
-      % ("object", "stride 16", "stride 8", "stride 8"))
-print("%-28s %14s %14s %14s" % ("", "6 shapes", "6 shapes", "15 shapes"))
-for name, _ in OBJECTS:
-    print("%-28s %14.3f %14.3f %14.3f"
-          % (name, best[CONFIGS[0][0]][name], best[CONFIGS[1][0]][name],
-             best[CONFIGS[2][0]][name]))
-print("%-28s %14d %14d %14d"
-      % ("total anchors", best[CONFIGS[0][0]]["__n"],
-         best[CONFIGS[1][0]]["__n"], best[CONFIGS[2][0]]["__n"]))
-print()
+The next block analyses why a finer stride helps more than extra shapes: the first two columns use identical shapes, so all gains come from centre placement alone.
 
-c0, c1, c2 = (c[0] for c in CONFIGS)
-m0 = [n for n, _ in OBJECTS if best[c0][n] >= 0.5]
-m1 = [n for n, _ in OBJECTS if best[c1][n] >= 0.5]
-m2 = [n for n, _ in OBJECTS if best[c2][n] >= 0.5]
-print("   matched at 0.5:  %d, then %d, then %d of %d objects."
-      % (len(m0), len(m1), len(m2), len(OBJECTS)))
-print()
-# which object gained most from centres alone, with the shapes unchanged?
-gains = sorted(((best[c1][n] - best[c0][n], n) for n, _ in OBJECTS),
-               reverse=True)
-gain, who = gains[0]
-wbox = dict(OBJECTS)[who]
-print("   READ THE FIRST TWO COLUMNS TOGETHER. they use the IDENTICAL %d"
-      % len(shapes0))
-print("   shapes. the only difference between them is how many centres")
-print("   there are, and %s gained %.3f IoU from that alone:" % (who, gain))
-print("      it is %.0f x %.0f, centred at (%.0f, %.0f)."
-      % (wbox[2] - wbox[0], wbox[3] - wbox[1],
-         (wbox[0] + wbox[2]) / 2, (wbox[1] + wbox[3]) / 2))
-print("      at stride 16 the centres sit at 8, 24, 40, 56 -- the nearest")
-print("      is %.0f pixels away. at stride 8 they sit at 4, 12, 20, 28,"
-      % min(abs((wbox[0] + wbox[2]) / 2 - c) for c in (8, 24, 40, 56)))
-print("      36, ... and the nearest is %.0f away."
-      % min(abs((wbox[0] + wbox[2]) / 2 - c) for c in range(4, 64, 8)))
-print("      no width and no height can repair being in the wrong PLACE.")
-print("   matched at 0.5 went from %d to %d on centres alone."
-      % (len(m0), len(m1)))
-print("   anchor coverage is three-dimensional -- POSITION, scale, aspect")
-print("   ratio -- and when coverage is poor the instinct is to add")
-print("   shapes, while the answer is often a finer grid.")
-print()
-newly = [n for n in m2 if n not in m1]
-still = [n for n, _ in OBJECTS if best[c2][n] < 0.5]
-print("   THE THIRD COLUMN is where extra shapes do earn their place:")
+```python-run
+import numpy as np
+IMG = 64
+def bld(st,sc,ra):
+    sh=[(s*np.sqrt(r),s/np.sqrt(r)) for s in sc for r in ra]; n=IMG//st
+    return np.array([(st*(j+.5)-w/2,st*(i+.5)-h/2,st*(j+.5)+w/2,st*(i+.5)+h/2) for i in range(n) for j in range(n) for w,h in sh]),sh,n*n
+def iou_m(b,B):
+    i=np.clip(np.minimum(b[2],B[:,2])-np.maximum(b[0],B[:,0]),0,None)*np.clip(np.minimum(b[3],B[:,3])-np.maximum(b[1],B[:,1]),0,None)
+    return i/((b[2]-b[0])*(b[3]-b[1])+(B[:,2]-B[:,0])*(B[:,3]-B[:,1])-i)
+OBJ=[("mid-sq",(20.,20.,50.,50.)),("wide",(10.,22.,54.,44.)),("tall",(26.,10.,42.,54.)),
+     ("tiny",(30.,30.,38.,38.)),("6:1",(2.,30.,62.,40.))]
+CFG=[("s16-6",16,[16.,32.],[.5,1.,2.]),("s8-6",8,[16.,32.],[.5,1.,2.]),
+     ("s8-15",8,[8.,16.,32.],[.25,.5,1.,2.,4.])]
+best = {}
+for label,st,sc,ra in CFG:
+    A,_,_ = bld(st,sc,ra)
+    best[label] = {n: iou_m(np.array(b),A).max() for n,b in OBJ}
+c0,c1,c2 = CFG[0][0],CFG[1][0],CFG[2][0]
+gains = sorted(((best[c1][n]-best[c0][n],n) for n,_ in OBJ), reverse=True)
+gain,who = gains[0]; wbox = dict(OBJ)[who]
+print("SAME SHAPES, FINER GRID. %s gained %.3f from centres alone:" % (who,gain))
+print("   stride 16: nearest centre %.0f px away." % min(abs((wbox[0]+wbox[2])/2-c) for c in (8,24,40,56)))
+print("   stride  8: nearest centre %.0f px away." % min(abs((wbox[0]+wbox[2])/2-c) for c in range(4,64,8)))
+print("   no shape can repair being in the wrong PLACE.")
+newly = [n for n in [x for x,_ in OBJ if best[c2][x]>=0.5] if best[c1][n]<0.5]
+print("WHERE EXTRA SHAPES HELP:")
 if newly:
     for n in newly:
-        print("      %-28s %.3f -> %.3f" % (n, best[c1][n], best[c2][n]))
-    print("      those needed a scale or a ratio the 6-shape set simply did")
-    print("      not contain, and no number of extra centres would have")
-    print("      produced one.")
+        print("   %-16s %.3f -> %.3f" % (n, best[c1][n], best[c2][n]))
+    print("   those needed a ratio the 6-shape set lacked.")
 else:
-    print("      nothing new matched, so on these objects the shape set was")
-    print("      never the binding constraint.")
-print()
+    print("   nothing new matched -- shapes not the binding constraint.")
+still = [n for n,_ in OBJ if best[c2][n]<0.5]
 if still:
-    shapes2 = [(sc * np.sqrt(r), sc / np.sqrt(r))
-               for sc in [8.0, 16.0, 32.0]
-               for r in [0.25, 0.5, 1.0, 2.0, 4.0]]
-    print("   AND ONE IS STILL UNMATCHED: %s." % ", ".join(still))
-    print("   is that the shapes, or the grid again? test it directly --")
-    print("   place the best available shape EXACTLY on the object's centre")
-    print("   and see what IoU is achievable in principle:")
-    print("%-28s %14s %16s" % ("object", "best actual", "best if centred"))
-    for n in still:
-        bx = dict(OBJECTS)[n]
-        ccx, ccy = (bx[0] + bx[2]) / 2, (bx[1] + bx[3]) / 2
-        ideal = np.array([(ccx - w / 2, ccy - h / 2, ccx + w / 2, ccy + h / 2)
-                          for w, h in shapes2])
-        v = iou_many(np.array(bx), ideal).max()
-        print("%-28s %14.3f %16.3f" % (n, best[c2][n], v))
-        if v >= 0.5:
-            print("      the shape set CAN cover it -- %.3f if an anchor were" % v)
-            print("      centred on it. so this is a position failure too, and")
-            print("      it is worth seeing why it hits the small object")
-            print("      hardest: the object is %.0f x %.0f, and the grid can"
-                  % (bx[2] - bx[0], bx[3] - bx[1]))
-            print("      be off by up to 4 pixels. four pixels is a rounding")
-            print("      error for a 45-pixel box and half the width of this")
-            print("      one. the SAME absolute misalignment is a far larger")
-            print("      relative error for small objects, which is most of")
-            print("      why small-object detection is hard, and why feature")
-            print("      pyramids put the small-object head on a")
-            print("      high-resolution feature map with a fine stride.")
-        else:
-            print("      even perfectly centred it only reaches %.3f, so this" % v)
-            print("      one really is outside what the shapes can express.")
-    print("   either way, an object you cannot assign is an object you")
-    print("   cannot learn: it contributes no positive example, and the")
-    print("   detector will never find one like it however long you train.")
-print()
-print("NOW THE COST. every anchor that is not a positive is a negative:")
-print("%-28s %12s %12s %14s"
-      % ("configuration", "anchors", "positives", "ratio"))
-for label, st, sc, ra in CONFIGS:
-    A, _, _ = build(st, sc, ra)
-    pos = sum(int((iou_many(np.array(b), A) >= 0.5).sum())
-              for _, b in OBJECTS)
-    print("%-28s %12d %12d %14s"
-          % (label, len(A), pos,
-             "1 : %.0f" % (len(A) / max(pos, 1))))
-print("   the finer grid that fixed coverage also multiplied the negatives.")
-print("   train on that directly with plain cross-entropy and the model")
-print("   learns to answer 'background' to everything, because that answer")
-print("   is right almost every time. the three standard repairs:")
-print("%-26s %s" % ("hard negative mining", "keep only the worst negatives"))
-print("%-26s %s" % ("fixed 1:3 sampling", "3 negatives per positive"))
-print("%-26s %s" % ("focal loss", "down-weight easy examples smoothly"))
-print("   RetinaNet's contribution was the last one, and its finding was")
-print("   that a one-stage detector matches a two-stage one as soon as the")
-print("   imbalance is handled -- so the accuracy gap had never really")
-print("   been about one stage versus two.")
-print()
+    print("STILL UNMATCHED: %s." % ", ".join(still))
+    print("   small objects suffer most: the grid offset is a much larger")
+    print("   relative error for an 8px box than a 45px one.")
+    print("   that is why feature pyramids use a fine stride for small objects.")
+```
 
-print("WHAT THE NETWORK ACTUALLY PREDICTS: not the box, the OFFSET from its")
-print("anchor, in a parameterisation that does not depend on scale:")
-anchor = (16., 16., 48., 48.)
-truth = (20., 24., 52., 40.)
-aw, ah = anchor[2] - anchor[0], anchor[3] - anchor[1]
-acx, acy = anchor[0] + aw / 2, anchor[1] + ah / 2
-gw, gh = truth[2] - truth[0], truth[3] - truth[1]
-gcx, gcy = truth[0] + gw / 2, truth[1] + gh / 2
-t = ((gcx - acx) / aw, (gcy - acy) / ah, np.log(gw / aw), np.log(gh / ah))
-print("   anchor:  %s" % str(anchor))
-print("   truth:   %s" % str(truth))
+The next block measures the positive-to-negative imbalance that results from a dense anchor grid, and how the network's predictions are encoded as offsets.
+
+```python-run
+import numpy as np
+IMG = 64
+def bld(st,sc,ra):
+    sh=[(s*np.sqrt(r),s/np.sqrt(r)) for s in sc for r in ra]; n=IMG//st
+    return np.array([(st*(j+.5)-w/2,st*(i+.5)-h/2,st*(j+.5)+w/2,st*(i+.5)+h/2) for i in range(n) for j in range(n) for w,h in sh]),sh,n*n
+def iou_m(b,B):
+    i=np.clip(np.minimum(b[2],B[:,2])-np.maximum(b[0],B[:,0]),0,None)*np.clip(np.minimum(b[3],B[:,3])-np.maximum(b[1],B[:,1]),0,None)
+    return i/((b[2]-b[0])*(b[3]-b[1])+(B[:,2]-B[:,0])*(B[:,3]-B[:,1])-i)
+OBJ=[("mid-sq",(20.,20.,50.,50.)),("wide",(10.,22.,54.,44.)),("tall",(26.,10.,42.,54.)),
+     ("tiny",(30.,30.,38.,38.)),("6:1",(2.,30.,62.,40.))]
+CFG=[("s16-6",16,[16.,32.],[.5,1.,2.]),("s8-6",8,[16.,32.],[.5,1.,2.]),
+     ("s8-15",8,[8.,16.,32.],[.25,.5,1.,2.,4.])]
+print("THE COST. every non-positive anchor is a negative:")
+print("%-18s %8s %8s %10s" % ("config","anchors","pos","ratio"))
+for label,st,sc,ra in CFG:
+    A,_,_ = bld(st,sc,ra)
+    pos = sum(int((iou_m(np.array(b),A)>=0.5).sum()) for _,b in OBJ)
+    print("%-18s %8d %8d %10s" % (label,len(A),pos,"1:%.0f"%(len(A)/max(pos,1))))
+print("   standard repairs: hard neg mining, 1:3 sampling, focal loss.")
+print()
+print("WHAT THE NETWORK PREDICTS: offsets from its anchor:")
+anchor=(16.,16.,48.,48.); truth=(20.,24.,52.,40.)
+aw,ah = anchor[2]-anchor[0],anchor[3]-anchor[1]
+acx,acy = anchor[0]+aw/2,anchor[1]+ah/2
+gw,gh = truth[2]-truth[0],truth[3]-truth[1]
+gcx,gcy = truth[0]+gw/2,truth[1]+gh/2
+t = ((gcx-acx)/aw,(gcy-acy)/ah,np.log(gw/aw),np.log(gh/ah))
+print("   anchor: %s   truth: %s" % (str(anchor),str(truth)))
 print("   targets: tx %.4f  ty %.4f  tw %.4f  th %.4f" % t)
-print("      tx and ty are shifts measured in ANCHOR WIDTHS, so the same")
-print("      target number means the same thing for an 8px anchor and a")
-print("      32px one -- one head can serve every scale.")
-print("      tw and th are LOGS of the size ratio. that makes doubling and")
-print("      halving symmetric (+0.69 and -0.69) and makes a negative")
-print("      width impossible whatever the network outputs.")
-bcx, bcy = t[0] * aw + acx, t[1] * ah + acy
-bw, bh = np.exp(t[2]) * aw, np.exp(t[3]) * ah
-rec = (bcx - bw / 2, bcy - bh / 2, bcx + bw / 2, bcy + bh / 2)
-print("   decoding those targets returns (%.1f, %.1f, %.1f, %.1f)," % rec)
-print("   with a maximum error of %.1e against the truth. the encoding"
-      % max(abs(a - b) for a, b in zip(rec, truth)))
-print("   loses nothing, and all the network has to learn is a small")
-print("   correction to a guess that was already close -- a far easier")
-print("   regression than producing four coordinates out of nothing.")
+print("   tx,ty shift in anchor widths; tw,th are log size ratios.")
+bcx,bcy = t[0]*aw+acx,t[1]*ah+acy; bw,bh = np.exp(t[2])*aw,np.exp(t[3])*ah
+rec = (bcx-bw/2,bcy-bh/2,bcx+bw/2,bcy+bh/2)
+print("   decoded: (%.1f,%.1f,%.1f,%.1f), error %.1e -- lossless." % (rec+(max(abs(a-b) for a,b in zip(rec,truth)),)))
 ```
 
 """,
@@ -5035,187 +4881,182 @@ thresholds isn't the one you ship.
 mAP is the standard score for spotting. It's assembled from parts that each discard a thing. This builds it from raw detections upward -- ranking, matching, precision and recall, interpolation, the class mean -- so that when a number comes back low you know which stage to look at.
 
 ```python-run
-import numpy as np
-
-# ground truth boxes, per image: (image_id, x1, y1, x2, y2)
-GT = [(0, 10, 10, 50, 50), (0, 60, 60, 90, 90), (1, 20, 20, 60, 60),
-      (1, 70, 10, 95, 40), (2, 30, 30, 70, 70)]
-# detections: (image_id, x1, y1, x2, y2, confidence)
-DETS = [(0, 12, 12, 52, 48, 0.95),     # good match, gt 0
-        (1, 22, 18, 58, 62, 0.91),     # good match, gt 2
-        (0, 15, 15, 45, 45, 0.88),     # ALSO overlaps gt 0 -- duplicate
-        (2, 33, 28, 68, 72, 0.80),     # good match, gt 4
-        (1, 10, 70, 40, 95, 0.75),     # nothing there -- false positive
-        (0, 58, 62, 88, 92, 0.62),     # good match, gt 1
-        (2, 60, 10, 80, 30, 0.55),     # false positive
-        (1, 68, 12, 92, 38, 0.40)]     # good match, gt 3 -- low confidence
-
+GT = [(0,10,10,50,50),(0,60,60,90,90),(1,20,20,60,60),(1,70,10,95,40),(2,30,30,70,70)]
+DETS = [(0,12,12,52,48,0.95),(1,22,18,58,62,0.91),(0,15,15,45,45,0.88),
+        (2,33,28,68,72,0.80),(1,10,70,40,95,0.75),(0,58,62,88,92,0.62),
+        (2,60,10,80,30,0.55),(1,68,12,92,38,0.40)]
 def iou(a, b):
-    x1, y1 = max(a[0], b[0]), max(a[1], b[1])
-    x2, y2 = min(a[2], b[2]), min(a[3], b[3])
-    inter = max(0, x2 - x1) * max(0, y2 - y1)
-    aa = (a[2] - a[0]) * (a[3] - a[1])
-    bb = (b[2] - b[0]) * (b[3] - b[1])
-    return inter / float(aa + bb - inter)
-
-print("%d ground-truth boxes and %d detections." % (len(GT), len(DETS)))
+    x1, y1 = max(a[0],b[0]), max(a[1],b[1])
+    x2, y2 = min(a[2],b[2]), min(a[3],b[3])
+    inter = max(0,x2-x1)*max(0,y2-y1)
+    return inter / float((a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-inter)
+print("%d ground-truth boxes, %d detections." % (len(GT), len(DETS)))
+print("STEP 1 -- SORT BY CONFIDENCE. ranking matters: a detector that ranks")
+print("badly scores badly even if it found everything.")
 print()
-print("STEP 1 -- SORT BY CONFIDENCE, HIGHEST FIRST. this is not a detail:")
-print("every number below depends on the order, and a detector that ranks")
-print("its own outputs badly scores badly even if it found everything.")
-print()
-
 def evaluate(thresh):
     order = sorted(range(len(DETS)), key=lambda i: -DETS[i][5])
-    used = set()
-    rows = []
+    used, rows = set(), []
     for rank, i in enumerate(order):
-        d = DETS[i]
-        best, best_j = 0.0, -1
+        d = DETS[i]; best, best_j = 0.0, -1
         for j, g in enumerate(GT):
-            if g[0] != d[0]:
-                continue
+            if g[0] != d[0]: continue
             v = iou(d[1:5], g[1:5])
-            if v > best:
-                best, best_j = v, j
+            if v > best: best, best_j = v, j
         if best >= thresh and best_j not in used:
-            used.add(best_j)
-            verdict, note = "TP", "matches gt %d" % best_j
+            used.add(best_j); verdict, note = "TP", "gt %d" % best_j
         elif best >= thresh:
-            verdict, note = "FP", "gt %d already taken" % best_j
+            verdict, note = "FP", "gt %d taken" % best_j
         else:
-            verdict, note = "FP", "best IoU only %.2f" % best
-        rows.append((rank + 1, d[5], best, verdict, note))
+            verdict, note = "FP", "IoU %.2f" % best
+        rows.append((rank+1, d[5], best, verdict, note))
     return rows
-
-THR = 0.5
-rows = evaluate(THR)
-print("STEP 2 -- MATCH EACH DETECTION TO GROUND TRUTH, IN THAT ORDER.")
-print("a detection is a true positive if its IoU with some unclaimed box is")
-print("at least %.1f. once a box is claimed it cannot be claimed again:" % THR)
-print("%-6s %8s %10s %8s  %s"
-      % ("rank", "conf", "best IoU", "result", "why"))
+rows = evaluate(0.5)
+print("STEP 2 -- MATCH. TP if IoU >= 0.5 with an unclaimed box:")
+print("%-6s %8s %8s %6s  %s" % ("rank", "conf", "IoU", "type", "why"))
 for rank, conf, best, verdict, note in rows:
-    print("%-6d %8.2f %10.2f %8s  %s" % (rank, conf, best, verdict, note))
-print("   rank 3 is the one to look at. it overlaps a real object well, and")
-print("   it is still counted as a FALSE POSITIVE, because the higher-")
-print("   confidence detection at rank 1 already claimed that box.")
-print("   that rule is what makes duplicate boxes cost you, and it is why")
-print("   non-max suppression runs before evaluation rather than after.")
-print()
+    print("%-6d %8.2f %8.2f %6s  %s" % (rank, conf, best, verdict, note))
+print("   rank 3 overlaps gt 0 well but gt 0 was already claimed at rank 1.")
+print("   duplicates cost you; that is why NMS runs before evaluation.")
+```
 
-print("STEP 3 -- WALK DOWN THE LIST ACCUMULATING PRECISION AND RECALL.")
-print("both are recomputed after every single detection:")
-print("      precision = TP / (TP + FP)   -- of what I said, how much was right")
-print("      recall    = TP / (all GT)    -- of what exists, how much I found")
-tp = fp = 0
-P, R = [], []
-print("%-6s %6s %8s %8s %12s %12s"
-      % ("rank", "type", "TP", "FP", "precision", "recall"))
-for rank, conf, best, verdict, note in rows:
-    if verdict == "TP":
-        tp += 1
-    else:
-        fp += 1
-    p, r = tp / float(tp + fp), tp / float(len(GT))
-    P.append(p)
-    R.append(r)
-    print("%-6d %6s %8d %8d %12.4f %12.4f" % (rank, verdict, tp, fp, p, r))
-print("   recall only ever rises. precision jitters -- it falls at every")
-print("   false positive and recovers at every true one. that saw-tooth is")
-print("   the reason the curve has to be interpolated before anyone")
-print("   computes an area under it.")
-print()
+The next block walks down the ranked list accumulating precision and recall at each step.
 
-print("STEP 4 -- INTERPOLATE. replace precision at each recall by the BEST")
-print("precision achieved at that recall OR ANY HIGHER ONE:")
-Pi = np.array(P, float).copy()
-for i in range(len(Pi) - 2, -1, -1):
-    Pi[i] = max(Pi[i], Pi[i + 1])
-print("%-10s %12s %14s %12s" % ("recall", "precision", "interpolated", "change"))
+```python-run
+GT = [(0,10,10,50,50),(0,60,60,90,90),(1,20,20,60,60),(1,70,10,95,40),(2,30,30,70,70)]
+DETS = [(0,12,12,52,48,0.95),(1,22,18,58,62,0.91),(0,15,15,45,45,0.88),
+        (2,33,28,68,72,0.80),(1,10,70,40,95,0.75),(0,58,62,88,92,0.62),
+        (2,60,10,80,30,0.55),(1,68,12,92,38,0.40)]
+def iou(a, b):
+    x1, y1 = max(a[0],b[0]), max(a[1],b[1])
+    x2, y2 = min(a[2],b[2]), min(a[3],b[3])
+    inter = max(0,x2-x1)*max(0,y2-y1)
+    return inter / float((a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-inter)
+def evaluate(thresh):
+    order = sorted(range(len(DETS)), key=lambda i: -DETS[i][5])
+    used, rows = set(), []
+    for rank, i in enumerate(order):
+        d = DETS[i]; best, best_j = 0.0, -1
+        for j, g in enumerate(GT):
+            if g[0] != d[0]: continue
+            v = iou(d[1:5], g[1:5])
+            if v > best: best, best_j = v, j
+        if best >= thresh and best_j not in used:
+            used.add(best_j); verdict = "TP"
+        else: verdict = "FP"
+        rows.append((rank+1, d[5], verdict))
+    return rows
+rows = evaluate(0.5)
+print("STEP 3 -- PRECISION AND RECALL after each detection:")
+print("   precision = TP/(TP+FP)   recall = TP/all_GT")
+tp = fp = 0; P, R = [], []
+print("%-6s %6s %6s %6s %10s %10s" % ("rank","type","TP","FP","prec","recall"))
+for rank, conf, verdict in rows:
+    if verdict == "TP": tp += 1
+    else: fp += 1
+    p, r = tp/float(tp+fp), tp/float(len(GT))
+    P.append(p); R.append(r)
+    print("%-6d %6s %6d %6d %10.4f %10.4f" % (rank, verdict, tp, fp, p, r))
+print("   recall only rises. precision jitters at every FP -- that is why")
+print("   the curve must be interpolated before computing area under it.")
+```
+
+The next block interpolates the precision-recall curve and computes AP as the area under it, comparing the all-points and 11-point methods.
+
+```python-run
+import numpy as np
+P = [1.0, 1.0, 0.6667, 0.75, 0.6, 0.6667, 0.5714, 0.625]
+R = [0.2, 0.4, 0.4, 0.6, 0.6, 0.8, 0.8, 1.0]
+print("STEP 4 -- INTERPOLATE. replace each precision by the best at that")
+print("recall or higher:")
+Pi = np.array(P).copy()
+for i in range(len(Pi)-2, -1, -1):
+    Pi[i] = max(Pi[i], Pi[i+1])
+print("%-10s %10s %12s %10s" % ("recall", "prec", "interpolated", "change"))
 for i in range(len(P)):
-    print("%-10.4f %12.4f %14.4f %12s"
-          % (R[i], P[i], Pi[i], "" if abs(Pi[i] - P[i]) < 1e-9 else "raised"))
-print("   this removes the dips. the justification is operational: you")
-print("   would never deploy at a threshold whose precision is beaten by a")
-print("   MORE permissive threshold, so those points are not choices any")
-print("   sensible person would make, and the curve should not be scored")
-print("   on them.")
+    print("%-10.4f %10.4f %12.4f %10s"
+          % (R[i], P[i], Pi[i], "" if abs(Pi[i]-P[i])<1e-4 else "raised"))
+print("   this removes dips. you would never deploy at a threshold whose")
+print("   precision is beaten by a more permissive one.")
 print()
-
-print("STEP 5 -- AREA UNDER THE INTERPOLATED CURVE. that area is AP:")
-ap = 0.0
-prev_r = 0.0
+print("STEP 5 -- AP = area under the interpolated curve:")
+ap, prev_r = 0.0, 0.0
 for i in range(len(R)):
-    ap += (R[i] - prev_r) * Pi[i]
-    prev_r = R[i]
-print("      AP at IoU %.1f = %.4f" % (THR, ap))
-print("   the 'all-points' method, which is what COCO and modern VOC use.")
-print("   older VOC sampled 11 fixed recall points instead:")
+    ap += (R[i]-prev_r)*Pi[i]; prev_r = R[i]
+print("   AP at IoU 0.5 = %.4f (all-points method, used by COCO)." % ap)
 ap11 = 0.0
 for t in np.arange(0, 1.01, 0.1):
     at = [Pi[i] for i in range(len(R)) if R[i] >= t]
     ap11 += (max(at) if at else 0.0) / 11.0
-print("      AP, 11-point method       = %.4f" % ap11)
-print("   %.4f against %.4f on identical detections. AP numbers from"
-      % (ap11, ap))
-print("   different papers are not comparable unless they used the same")
-print("   method, the same IoU threshold and the same dataset.")
-print()
+print("   AP, 11-point method = %.4f" % ap11)
+print("   AP numbers from different papers are not comparable unless they")
+print("   use the same method, threshold and dataset.")
+```
 
-print("STEP 6 -- THE THRESHOLD IS A CHOICE, SO SWEEP IT. COCO averages AP")
-print("over IoU thresholds from 0.50 to 0.95 in steps of 0.05:")
-print("%-14s %10s %10s %12s" % ("IoU thresh", "TP", "FP", "AP"))
+The next block sweeps the IoU threshold from 0.50 to 0.95 the way COCO does, then averages the column to get the headline COCO AP.
+
+```python-run
+import numpy as np
+GT = [(0,10,10,50,50),(0,60,60,90,90),(1,20,20,60,60),(1,70,10,95,40),(2,30,30,70,70)]
+DETS = [(0,12,12,52,48,0.95),(1,22,18,58,62,0.91),(0,15,15,45,45,0.88),
+        (2,33,28,68,72,0.80),(1,10,70,40,95,0.75),(0,58,62,88,92,0.62),
+        (2,60,10,80,30,0.55),(1,68,12,92,38,0.40)]
+def iou(a, b):
+    x1, y1 = max(a[0],b[0]), max(a[1],b[1])
+    x2, y2 = min(a[2],b[2]), min(a[3],b[3])
+    inter = max(0,x2-x1)*max(0,y2-y1)
+    return inter / float((a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-inter)
+def evaluate(thresh):
+    order = sorted(range(len(DETS)), key=lambda i: -DETS[i][5])
+    used, rows = set(), []
+    for rank, i in enumerate(order):
+        d = DETS[i]; best, best_j = 0.0, -1
+        for j, g in enumerate(GT):
+            if g[0] != d[0]: continue
+            v = iou(d[1:5], g[1:5])
+            if v > best: best, best_j = v, j
+        if best >= thresh and best_j not in used:
+            used.add(best_j); rows.append("TP")
+        else: rows.append("FP")
+    return rows
+print("STEP 6 -- SWEEP THE THRESHOLD. COCO averages AP from 0.50 to 0.95:")
+print("%-12s %8s %8s %10s" % ("IoU", "TP", "FP", "AP"))
 aps = []
 for t in np.arange(0.5, 0.96, 0.05):
-    rs = evaluate(t)
-    ntp = sum(1 for r in rs if r[3] == "TP")
-    t_, f_, PP, RR = 0, 0, [], []
-    for _, _, _, v, _ in rs:
-        if v == "TP":
-            t_ += 1
-        else:
-            f_ += 1
-        PP.append(t_ / float(t_ + f_))
-        RR.append(t_ / float(len(GT)))
+    rs = evaluate(t); ntp = rs.count("TP")
+    tp_, fp_, PP, RR = 0, 0, [], []
+    for v in rs:
+        if v == "TP": tp_ += 1
+        else: fp_ += 1
+        PP.append(tp_/float(tp_+fp_)); RR.append(tp_/float(len(GT)))
     Q = np.array(PP)
-    for i in range(len(Q) - 2, -1, -1):
-        Q[i] = max(Q[i], Q[i + 1])
+    for i in range(len(Q)-2,-1,-1): Q[i] = max(Q[i], Q[i+1])
     a, pr = 0.0, 0.0
-    for i in range(len(RR)):
-        a += (RR[i] - pr) * Q[i]
-        pr = RR[i]
+    for i in range(len(RR)): a += (RR[i]-pr)*Q[i]; pr = RR[i]
     aps.append(a)
-    print("%-14.2f %10d %10d %12.4f"
-          % (t, ntp, len(rs) - ntp, a))
-print("      COCO AP (the average of that column) = %.4f" % np.mean(aps))
-print("   the column collapses as the threshold rises: boxes that were")
-print("   'correct' at 0.5 are wrong at 0.8. a headline AP@0.5 of %.2f"
-      % aps[0])
-print("   becomes %.2f once you demand tight boxes, and the gap between"
-      % np.mean(aps))
-print("   those two numbers is a direct measure of how well the model")
-print("   localises rather than merely detects.")
-print()
+    print("%-12.2f %8d %8d %10.4f" % (t, ntp, len(rs)-ntp, a))
+print("   COCO AP = %.4f -- gap to AP@0.5 measures localisation." % np.mean(aps))
+```
 
-print("STEP 7 -- THE 'm'. everything above was ONE class. mAP is the plain")
-print("unweighted mean of AP over classes:")
-print("%-16s %10s %14s" % ("class", "instances", "AP"))
+The next block shows the 'm' in mAP: the unweighted average over classes, which gives rare classes equal weight.
+
+```python-run
+import numpy as np
+print("STEP 7 -- THE 'm'. mAP is the unweighted mean of AP over classes:")
+print("%-16s %10s %10s" % ("class", "instances", "AP"))
 demo = [("person", 10777, 0.62), ("car", 1918, 0.55), ("toaster", 9, 0.05)]
 for name, n, a in demo:
-    print("%-16s %10d %14.2f" % (name, n, a))
-print("%-16s %10s %14.4f"
-      % ("mAP", "--", np.mean([a for _, _, a in demo])))
-weighted = (sum(n * a for _, n, a in demo) / sum(n for _, n, _ in demo))
-print("   note that mAP is UNWEIGHTED: toaster, with %d instances, counts"
+    print("%-16s %10d %10.2f" % (name, n, a))
+mAP = np.mean([a for _, _, a in demo])
+weighted = sum(n*a for _, n, a in demo) / sum(n for _, n, _ in demo)
+print("%-16s %10s %10.4f" % ("mAP", "--", mAP))
+print("   mAP is UNWEIGHTED: toaster (%d instances) counts as much as"
       % demo[2][1])
-print("   as much as person with %d. weighting by instance count would"
-      % demo[0][1])
-print("   give %.4f instead of %.4f." % (weighted, np.mean([a for _, _, a in demo])))
-print("   that is deliberate -- it stops a model looking good by being")
-print("   excellent at the common classes alone -- but it does mean a")
-print("   single rare, hard class can dominate your headline number, and")
-print("   that chasing mAP can send you optimising for toasters.")
+print("   person (%d). weighting would give %.4f instead of %.4f."
+      % (demo[0][1], weighted, mAP))
+print("   that is deliberate -- it stops a model looking good by acing")
+print("   common classes alone -- but a single rare hard class can")
+print("   dominate your headline number.")
 ```
 
 """,
@@ -5422,173 +5263,156 @@ Template matching is the simplest possible finder: slide a patch over the image 
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(7)
 H, W = 16, 34
 img = rng.normal(70, 6, (H, W))
-
-# the thing we are looking for: a small plus sign
-tpl = np.array([[20., 90., 20.],
-                [90., 140., 90.],
-                [20., 90., 20.]])
-
+tpl = np.array([[20., 90., 20.], [90., 140., 90.], [20., 90., 20.]])
 def paste(a, t, r, c, gain=1.0, offset=0.0):
-    a[r:r + t.shape[0], c:c + t.shape[1]] = t * gain + offset
-
-paste(img, tpl, 3, 5)                      # the exact target
-paste(img, tpl, 9, 20, gain=0.45, offset=85)   # same shape, dimmer + brighter
-img[6:11, 27:32] = 240.0                   # a big bright blob: no plus at all
+    a[r:r+t.shape[0], c:c+t.shape[1]] = t * gain + offset
+paste(img, tpl, 3, 5)
+paste(img, tpl, 9, 20, gain=0.45, offset=85)
+img[6:11, 27:32] = 240.0
 img = np.clip(img, 0, 255)
-
+ramp = " .:-=+*#%@"
 def show(a, label, hi=255):
-    ramp = " .:-=+*#%@"
     print("   %s" % label)
     for row in a:
-        print("      " + "".join(ramp[min(9, int(9 * max(0, v) / hi))] for v in row))
-
+        print("      " + "".join(ramp[min(9, int(9*max(0,v)/hi))] for v in row))
 show(img, "the image")
-print("      there are TWO plus signs: an exact copy at (3,5), and a low")
-print("      contrast one at (9,20). there is also a big bright blob at")
-print("      (6,27) which is not a plus at all.")
+print("   two plus signs: exact at (3,5), faint at (9,20). bright blob at (6,27).")
 print()
-
 th, tw = tpl.shape
-positions = [(r, c) for r in range(H - th + 1) for c in range(W - tw + 1)]
-
 def score_map(fn):
-    m = np.full((H - th + 1, W - tw + 1), -np.inf)
-    for r, c in positions:
-        m[r, c] = fn(img[r:r + th, c:c + tw])
+    m = np.full((H-th+1, W-tw+1), -np.inf)
+    for r in range(H-th+1):
+        for c in range(W-tw+1):
+            m[r,c] = fn(img[r:r+th, c:c+tw])
     return m
-
 print("METHOD 1 -- RAW CORRELATION: sum(patch * template).")
-raw = score_map(lambda p: float((p * tpl).sum()))
-best = np.unravel_index(raw.argmax(), raw.shape)
-print("      best match at %s, score %.0f" % (str(best), raw.max()))
+raw = score_map(lambda p: float((p*tpl).sum()))
 print("      scores at the three interesting places:")
-for label, (r, c) in (("exact plus", (3, 5)), ("faint plus", (9, 20)),
-                      ("bright blob", (6, 28))):
+for label, (r, c) in (("exact plus",(3,5)),("faint plus",(9,20)),("bright blob",(6,28))):
     print("%20s  %12.0f" % (label, raw[r, c]))
-print("      the blob WINS, and it is not even the right shape. raw")
-print("      correlation rewards brightness: the blob is 240 everywhere,")
-print("      so multiplying it by anything positive gives a big number.")
-print("      a matched filter with no normalisation is a brightness")
-print("      detector with extra steps.")
-print()
+print("   the blob WINS. raw correlation rewards brightness: 240 everywhere")
+print("   times any positive template gives a big number. it is a")
+print("   brightness detector with extra steps.")
+```
 
-print("METHOD 2 -- SUM OF SQUARED DIFFERENCES: sum((patch - template)^2),")
-print("and now SMALL is good.")
-ssd = score_map(lambda p: -float(((p - tpl) ** 2).sum()))
-print("      scores (negated, so bigger is still better):")
-for label, (r, c) in (("exact plus", (3, 5)), ("faint plus", (9, 20)),
-                      ("bright blob", (6, 28))):
+The next block tries sum of squared differences, which fixes the brightness bug but fails on a faint copy of the same shape.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(7)
+H, W = 16, 34
+img = rng.normal(70, 6, (H, W))
+tpl = np.array([[20., 90., 20.], [90., 140., 90.], [20., 90., 20.]])
+def paste(a, t, r, c, gain=1.0, offset=0.0):
+    a[r:r+t.shape[0], c:c+t.shape[1]] = t * gain + offset
+paste(img, tpl, 3, 5)
+paste(img, tpl, 9, 20, gain=0.45, offset=85)
+img[6:11, 27:32] = 240.0; img = np.clip(img, 0, 255)
+th, tw = tpl.shape
+def score_map(fn):
+    m = np.full((H-th+1, W-tw+1), -np.inf)
+    for r in range(H-th+1):
+        for c in range(W-tw+1):
+            m[r,c] = fn(img[r:r+th, c:c+tw])
+    return m
+print("METHOD 2 -- SUM OF SQUARED DIFFERENCES (negated, bigger=better):")
+ssd = score_map(lambda p: -float(((p-tpl)**2).sum()))
+for label, (r,c) in (("exact plus",(3,5)),("faint plus",(9,20)),("bright blob",(6,28))):
     print("%20s  %12.0f" % (label, ssd[r, c]))
 bg_mask = np.ones_like(ssd, bool)
-bg_mask[2:5, 4:7] = False
-bg_mask[8:11, 19:22] = False
-bg_mask[5:12, 26:33] = False
-best_bg = ssd[bg_mask].max()
-print("%20s  %12.0f" % ("best background", best_bg))
-print("      the exact copy wins, correctly -- its SSD is essentially 0,")
-print("      and the blob is rejected hard. so SSD fixed the brightness")
-print("      bug. but look at the faint plus: %.0f, which is WORSE than"
-      % ssd[9, 20])
-print("      the best patch of pure background at %.0f. a real target" % best_bg)
-print("      now ranks below noise.")
-print("      SSD compares absolute values, so it is asking 'are these the")
-print("      same pixels?' rather than 'are these the same shape?'. the")
-print("      faint plus is the identical shape at 0.45x contrast on a")
-print("      brighter background -- exactly what a different exposure")
-print("      produces -- and SSD scores it as a non-match. that is the")
-print("      same failure as raw correlation, seen from the other side.")
-print()
+bg_mask[2:5, 4:7] = False; bg_mask[8:11, 19:22] = False; bg_mask[5:12, 26:33] = False
+print("%20s  %12.0f" % ("best background", ssd[bg_mask].max()))
+print("   the exact copy wins and the blob is rejected. but the faint plus")
+print("   at %.0f is WORSE than best background at %.0f."
+      % (ssd[9, 20], ssd[bg_mask].max()))
+print("   SSD asks 'same pixels?' not 'same shape?'. a different exposure")
+print("   produces the same shape at different values, and SSD rejects it.")
+```
 
-print("METHOD 3 -- NORMALISED CROSS-CORRELATION. subtract each patch's own")
-print("mean, divide by its own standard deviation, and do the same to the")
-print("template. what is left is pure SHAPE:")
+The next block applies normalised cross-correlation, which strips out brightness and contrast and measures pure shape.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(7)
+H, W = 16, 34
+img = rng.normal(70, 6, (H, W))
+tpl = np.array([[20., 90., 20.], [90., 140., 90.], [20., 90., 20.]])
+def paste(a, t, r, c, gain=1.0, offset=0.0):
+    a[r:r+t.shape[0], c:c+t.shape[1]] = t * gain + offset
+paste(img, tpl, 3, 5)
+paste(img, tpl, 9, 20, gain=0.45, offset=85)
+img[6:11, 27:32] = 240.0; img = np.clip(img, 0, 255)
+th, tw = tpl.shape
 t0 = (tpl - tpl.mean()) / tpl.std()
-
 def ncc(p):
     s = p.std()
-    if s < 1e-9:
-        return 0.0
+    if s < 1e-9: return 0.0
     return float((((p - p.mean()) / s) * t0).sum() / t0.size)
-
+def score_map(fn):
+    m = np.full((H-th+1, W-tw+1), -np.inf)
+    for r in range(H-th+1):
+        for c in range(W-tw+1):
+            m[r,c] = fn(img[r:r+th, c:c+tw])
+    return m
 nc = score_map(ncc)
-print("%20s  %12s" % ("", "NCC"))
-for label, (r, c) in (("exact plus", (3, 5)), ("faint plus", (9, 20)),
-                      ("bright blob", (6, 28))):
-    print("%20s  %12.3f" % (label, nc[r, c]))
-print("      both plus signs score %.3f -- not approximately, EXACTLY,"
-      % min(nc[3, 5], nc[9, 20]))
-print("      to floating-point precision.")
-print("      the blob scores %.3f, but for a duller reason than you might"
-      % nc[6, 28])
-print("      hope: it is perfectly uniform, so its standard deviation is 0")
-print("      and the correlation is undefined. the convention is to return")
-print("      0, which is the right answer -- a patch with no variation has")
-print("      no shape to match.")
-print("      the faint plus was pasted at 0.45x contrast with +85 added,")
-print("      and NCC does not care: subtracting the patch's own mean")
-print("      cancels the +85, dividing by its own std cancels the 0.45. it is")
-print("      invariant to any change of the form a*x + b, which is exactly")
-print("      the set of changes a camera's exposure and gain produce.")
-print()
-
-show((nc > 0.75).astype(float) * 255, "everywhere NCC > 0.75")
-print("      %d positions, and here are their scores:"
-      % int((nc > 0.75).sum()))
-for r, c in zip(*np.where(nc > 0.75)):
-    tag = "  <- a real plus" if (r, c) in ((3, 5), (9, 20)) else ""
-    print("         (%2d,%2d)  %.3f%s" % (r, c, nc[r, c], tag))
+print("METHOD 3 -- NORMALISED CROSS-CORRELATION:")
+print("%20s  %8s" % ("", "NCC"))
+for label, (r,c) in (("exact plus",(3,5)),("faint plus",(9,20)),("bright blob",(6,28))):
+    print("%20s  %8.3f" % (label, nc[r, c]))
+print("   both plus signs score 1.000 EXACTLY. the blob scores 0: its")
+print("   std is 0, so no shape to match.")
+print("   NCC is invariant to a*x + b -- exactly what exposure and gain do.")
+print("   the faint plus was 0.45x contrast + 85 offset, and NCC does not")
+print("   care: subtracting the mean cancels +85, dividing by std cancels 0.45.")
+bg_mask = np.ones_like(nc, bool)
+bg_mask[2:5, 4:7] = False; bg_mask[8:11, 19:22] = False; bg_mask[5:12, 26:33] = False
 bg_nc = nc[bg_mask]
-print("      the two real ones score 1.000 and the false positives sit")
-print("      around 0.78 -- a wide margin, but they are THERE, on nothing")
-print("      but noise. %.1f%% of pure-background positions clear 0.75."
+print("   but %.1f%% of pure-background positions clear NCC > 0.75."
       % (100.0 * (bg_nc > 0.75).mean()))
-print("      that is the cost of a 3x3 template: it has only 9 numbers, so")
-print("      random noise reproduces its shape by chance often enough to")
-print("      matter. NCC's reliability comes from template SIZE -- a 15x15")
-print("      template has 225 constraints and false positives at 0.78")
-print("      become vanishingly rare. small templates are fast and")
-print("      untrustworthy, and that trade is the whole tuning problem.")
-print()
+print("   a 3x3 template has only 9 numbers, so noise matches by chance.")
+print("   NCC reliability comes from template SIZE: a 15x15 template has")
+print("   225 constraints and false positives become vanishingly rare.")
+```
 
-print("NOW THE LIMITS, which no normalisation fixes. transform the")
-print("template and re-score it against the exact match at (3,5):")
-print("%-34s %10s" % ("template variant", "NCC"))
-variants = [("as given", tpl),
-            ("rotated 90 degrees", np.rot90(tpl)),
-            ("transposed", tpl.T),
-            ("inverted (dark on light)", 160 - tpl)]
+The next block tests the limits no normalisation can fix: rotation, scale and perspective all break template matching entirely.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(7)
+H, W = 16, 34
+img = rng.normal(70, 6, (H, W))
+tpl = np.array([[20., 90., 20.], [90., 140., 90.], [20., 90., 20.]])
+def paste(a, t, r, c, gain=1.0, offset=0.0):
+    a[r:r+t.shape[0], c:c+t.shape[1]] = t * gain + offset
+paste(img, tpl, 3, 5)
+img = np.clip(img, 0, 255)
 patch = img[3:6, 5:8]
+print("THE LIMITS. transform the template, re-score against the exact match:")
+print("%-34s %8s" % ("template variant", "NCC"))
+variants = [("as given", tpl), ("rotated 90 degrees", np.rot90(tpl)),
+            ("transposed", tpl.T), ("inverted (dark on light)", 160 - tpl)]
 for name, t in variants:
     tt = (t - t.mean()) / (t.std() + 1e-9)
     pp = (patch - patch.mean()) / (patch.std() + 1e-9)
-    print("%-34s %10.3f" % (name, float((pp * tt).sum() / tt.size)))
-print("   the plus is 4-fold symmetric, so rotating it changes nothing --")
-print("   that is a property of THIS template, not of the method.")
-print("   inverting it flips the sign to exactly -1: NCC measures")
-print("   correlation, and a perfect negative is as informative as a")
-print("   perfect positive, if you remember to take the absolute value.")
+    print("%-34s %8.3f" % (name, float((pp * tt).sum() / tt.size)))
+print("   rotation leaves 1.000 only because THIS template is symmetric.")
+print("   inversion gives -1.000: NCC measures correlation, not similarity.")
 print()
-print("%-34s %10s" % ("what changes in the image", "does NCC survive it?"))
-for k, v in (("brightness / exposure", "yes, exactly"),
-             ("contrast / gain", "yes, exactly"),
+print("%-30s %s" % ("image change", "does NCC survive?"))
+for k, v in (("brightness / exposure", "yes"),
+             ("contrast / gain", "yes"),
              ("additive noise", "degrades smoothly"),
-             ("rotation", "no -- unless symmetric"),
-             ("scale", "no"),
-             ("perspective", "no"),
-             ("non-rigid deformation", "no")):
-    print("%-34s %10s" % (k, v))
+             ("rotation", "no"), ("scale", "no"),
+             ("perspective", "no"), ("non-rigid deformation", "no")):
+    print("%-30s %s" % (k, v))
 print()
-print("and that table is the whole reason the field moved on. template")
-print("matching is exact, needs no training, and runs in microseconds, so")
-print("it still owns the jobs where the appearance really is fixed --")
-print("factory inspection, GUI automation, aligning two frames from a")
-print("locked-down camera. the moment the object can turn, or move nearer,")
-print("you need features that survive those changes, which is what SIFT")
-print("was built for and what a convolutional network learns.")
+print("that table is why the field moved on. template matching still owns")
+print("jobs where appearance is fixed -- factory inspection, GUI automation.")
+print("the moment the object can turn or move nearer, you need features")
+print("that survive those changes: SIFT, or a convolutional network.")
 ```
 
 """,
@@ -5806,155 +5630,138 @@ A corner is a place where the image changes in two free directions. That sentenc
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(6)
 H, W = 14, 20
 img = np.full((H, W), 50.0)
-img[3:10, 3:9] = 200.0                 # a square: 4 corners
-img[:, 14:16] = 200.0                  # a vertical strip: edges, no corners
+img[3:10, 3:9] = 200.0; img[:, 14:16] = 200.0
 img += rng.normal(0, 2.0, (H, W))
-
 ramp = " .:-=+*#%@"
 def show(a, label, hi=None):
     hi = a.max() if hi is None else hi
     print("   %s" % label)
     for row in a:
-        print("      " + "".join(ramp[min(9, int(9 * max(0.0, v) / (hi + 1e-9)))]
-                                 for v in row))
-
+        print("      " + "".join(ramp[min(9, int(9*max(0.,v)/(hi+1e-9)))] for v in row))
 show(img, "the image", 255)
-print("      a solid square (4 corners) and a vertical strip (edges only).")
+print("   a solid square (4 corners) and a vertical strip (edges only).")
 print()
-
-def sobel(a):
-    KX = np.array([[-1., 0, 1], [-2, 0, 2], [-1, 0, 1]]) / 8.0
-    p = np.pad(a, 1, mode="edge")
-    gx = np.array([[float((p[i:i + 3, j:j + 3] * KX).sum())
-                    for j in range(W)] for i in range(H)])
-    gy = np.array([[float((p[i:i + 3, j:j + 3] * KX.T).sum())
-                    for j in range(W)] for i in range(H)])
-    return gx, gy
-
-gx, gy = sobel(img)
-
-print("THE IDEA. slide a small window over the image and ask: as the window")
-print("moves, how much does the content inside it change? that depends on")
-print("the DIRECTION you move it, and the answer for all directions at once")
-print("is packed into a 2x2 matrix -- the structure tensor:")
-print("      M = sum over the window of  [ gx*gx   gx*gy ]")
-print("                                  [ gx*gy   gy*gy ]")
-print("   it is a sum of outer products, so it is symmetric and positive")
-print("   semi-definite. that guarantees two real, non-negative eigenvalues.")
-print()
-
+KX = np.array([[-1., 0, 1], [-2, 0, 2], [-1, 0, 1]]) / 8.0
+p = np.pad(img, 1, mode="edge")
+gx = np.array([[float((p[i:i+3, j:j+3]*KX).sum()) for j in range(W)] for i in range(H)])
+gy = np.array([[float((p[i:i+3, j:j+3]*KX.T).sum()) for j in range(W)] for i in range(H)])
+print("THE STRUCTURE TENSOR at each pixel is a 2x2 matrix:")
+print("   M = sum over window of [[gx*gx, gx*gy], [gx*gy, gy*gy]]")
+print("   its two eigenvalues tell you: flat, edge, or corner.")
 def tensor(r, c, win=3):
     h = win // 2
-    r0, r1 = max(0, r - h), min(H, r + h + 1)
-    c0, c1 = max(0, c - h), min(W, c + h + 1)
+    r0, r1 = max(0, r-h), min(H, r+h+1)
+    c0, c1 = max(0, c-h), min(W, c+h+1)
     a, b = gx[r0:r1, c0:c1].reshape(-1), gy[r0:r1, c0:c1].reshape(-1)
-    return np.array([[float(a @ a), float(a @ b)], [float(a @ b), float(b @ b)]])
-
-probes = [("flat interior", 6, 5),
-          ("flat background", 12, 10),
-          ("a straight vertical edge", 6, 3),
-          ("a straight horizontal edge", 3, 6),
-          ("the strip's edge", 6, 14),
-          ("the square's top-left corner", 3, 3),
-          ("the square's bottom-right", 9, 8)]
-
-print("%-30s %10s %10s %14s" % ("location", "lambda1", "lambda2",
-                                "interpretation"))
+    return np.array([[float(a@a), float(a@b)], [float(a@b), float(b@b)]])
+probes = [("flat interior", 6, 5), ("flat background", 12, 10),
+          ("vertical edge", 6, 3), ("horizontal edge", 3, 6),
+          ("strip's edge", 6, 14), ("top-left corner", 3, 3),
+          ("bottom-right corner", 9, 8)]
+print("%-26s %8s %8s %10s" % ("location", "l1", "l2", "type"))
 for label, r, c in probes:
     ev = np.sort(np.linalg.eigvalsh(tensor(r, c)))[::-1]
-    if ev[0] < 200:
-        kind = "flat"
-    elif ev[1] < ev[0] * 0.15:
-        kind = "edge"
-    else:
-        kind = "CORNER"
-    print("%-30s %10.0f %10.0f %14s" % (label, ev[0], ev[1], kind))
-print()
-print("   READ THE TWO NUMBERS AS A SHAPE:")
-print("      both small          -> nothing here. the window can slide")
-print("                             anywhere without the content changing.")
-print("      one large, one tiny -> an edge. sliding ALONG it changes")
-print("                             nothing; sliding across it changes a")
-print("                             lot. one direction of variation.")
-print("      both large          -> a corner. every direction changes the")
-print("                             content, so the window is pinned.")
-print("   that last property is exactly what 'trackable' means, which is")
-print("   why corners and not edges are what optical flow and structure-")
-print("   from-motion track.")
-print()
+    if ev[0] < 200: kind = "flat"
+    elif ev[1] < ev[0] * 0.15: kind = "edge"
+    else: kind = "CORNER"
+    print("%-26s %8.0f %8.0f %10s" % (label, ev[0], ev[1], kind))
+print("   both small = flat; one large = edge; both large = CORNER.")
+```
 
-print("HARRIS'S SHORTCUT. computing eigenvalues per pixel was expensive in")
-print("1988, and it turns out you never need them. for a 2x2 matrix:")
-print("      det(M)   = lambda1 * lambda2")
-print("      trace(M) = lambda1 + lambda2")
-print("   det is two multiplies and a subtraction; trace is one addition.")
-print("   no square roots, no iteration -- which is what an eigenvalue")
-print("   solver needs even for a 2x2. so score each pixel with")
-print("      R = det(M) - k * trace(M)^2,      k about 0.04 to 0.06")
+The next block shows Harris's shortcut: instead of computing eigenvalues, score each pixel with det(M) - k * trace(M)^2, which separates the three cases by sign alone.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(6)
+H, W = 14, 20
+img = np.full((H, W), 50.0)
+img[3:10, 3:9] = 200.0; img[:, 14:16] = 200.0
+img += rng.normal(0, 2.0, (H, W))
+KX = np.array([[-1., 0, 1], [-2, 0, 2], [-1, 0, 1]]) / 8.0
+p = np.pad(img, 1, mode="edge")
+gx = np.array([[float((p[i:i+3, j:j+3]*KX).sum()) for j in range(W)] for i in range(H)])
+gy = np.array([[float((p[i:i+3, j:j+3]*KX.T).sum()) for j in range(W)] for i in range(H)])
+def tensor(r, c, win=3):
+    h = win // 2
+    r0, r1 = max(0, r-h), min(H, r+h+1)
+    c0, c1 = max(0, c-h), min(W, c+h+1)
+    a, b = gx[r0:r1, c0:c1].reshape(-1), gy[r0:r1, c0:c1].reshape(-1)
+    return np.array([[float(a@a), float(a@b)], [float(a@b), float(b@b)]])
 K = 0.05
-print("   check that the shortcut agrees with the eigenvalues:")
-print("%-30s %14s %14s %14s" % ("location", "l1*l2", "det(M)", "R"))
-for label, r, c in probes[2:]:
+print("HARRIS'S SHORTCUT: R = det(M) - k * trace(M)^2")
+print("   det(M) = l1*l2, trace(M) = l1+l2. no square roots needed.")
+print("%-26s %12s %12s %12s" % ("location", "l1*l2", "det(M)", "R"))
+probes = [("vertical edge", 6, 3), ("horizontal edge", 3, 6),
+          ("strip's edge", 6, 14), ("top-left corner", 3, 3),
+          ("bottom-right corner", 9, 8)]
+for label, r, c in probes:
     M = tensor(r, c)
     ev = np.sort(np.linalg.eigvalsh(M))[::-1]
-    R = np.linalg.det(M) - K * np.trace(M) ** 2
-    print("%-30s %14.4g %14.4g %14.4g" % (label, ev[0] * ev[1],
-                                          np.linalg.det(M), R))
-print("   det matches the eigenvalue product to full precision, because it")
-print("   IS the product -- no approximation anywhere.")
-print()
-print("   and R has the sign structure you want:")
-print("      an edge has one eigenvalue near 0, so det is near 0 while")
-print("      trace^2 is large -- R goes strongly NEGATIVE.")
-print("      a corner has both large, so det grows faster than k*trace^2")
-print("      -- R goes strongly POSITIVE.")
-print("      flat has both near 0, so R is near 0.")
-print("   one number, three cases, distinguished by SIGN. that is the")
-print("   whole of the Harris response.")
-print()
+    R = np.linalg.det(M) - K * np.trace(M)**2
+    print("%-26s %12.4g %12.4g %12.4g" % (label, ev[0]*ev[1], np.linalg.det(M), R))
+print("   det matches the eigenvalue product exactly.")
+print("   R's sign: edge -> negative, corner -> positive, flat -> near 0.")
+print("   one number, three cases, distinguished by SIGN.")
+```
 
+The next block computes the full Harris response map, thresholds it and extracts local maxima to find the four corners of the square.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(6)
+H, W = 14, 20
+img = np.full((H, W), 50.0)
+img[3:10, 3:9] = 200.0; img[:, 14:16] = 200.0
+img += rng.normal(0, 2.0, (H, W))
+KX = np.array([[-1., 0, 1], [-2, 0, 2], [-1, 0, 1]]) / 8.0
+p = np.pad(img, 1, mode="edge")
+gx = np.array([[float((p[i:i+3, j:j+3]*KX).sum()) for j in range(W)] for i in range(H)])
+gy = np.array([[float((p[i:i+3, j:j+3]*KX.T).sum()) for j in range(W)] for i in range(H)])
+def tensor(r, c, win=3):
+    h = win // 2
+    r0, r1 = max(0, r-h), min(H, r+h+1)
+    c0, c1 = max(0, c-h), min(W, c+h+1)
+    a, b = gx[r0:r1, c0:c1].reshape(-1), gy[r0:r1, c0:c1].reshape(-1)
+    return np.array([[float(a@a), float(a@b)], [float(a@b), float(b@b)]])
+K = 0.05
 Rmap = np.zeros((H, W))
 for r in range(H):
     for c in range(W):
         M = tensor(r, c)
-        Rmap[r, c] = np.linalg.det(M) - K * np.trace(M) ** 2
-print("THE RESPONSE MAP. positive values only:")
-show(np.maximum(Rmap, 0), "R where R > 0")
-print("      the four corners of the square light up and the long edges do")
-print("      not -- neither the square's sides nor the strip, which has no")
-print("      corners at all inside the frame.")
-thr = Rmap.max() * 0.25
-peaks = []
-for r in range(1, H - 1):
-    for c in range(1, W - 1):
-        if Rmap[r, c] > thr and Rmap[r, c] >= Rmap[r - 1:r + 2, c - 1:c + 2].max():
+        Rmap[r, c] = np.linalg.det(M) - K * np.trace(M)**2
+ramp = " .:-=+*#%@"
+print("THE RESPONSE MAP (positive values only):")
+for row in np.maximum(Rmap, 0):
+    print("   " + "".join(ramp[min(9, int(9*max(0.,v)/(Rmap.max()+1e-9)))] for v in row))
+print("   four corners light up; edges and the strip do not.")
+thr = Rmap.max() * 0.25; peaks = []
+for r in range(1, H-1):
+    for c in range(1, W-1):
+        if Rmap[r,c] > thr and Rmap[r,c] >= Rmap[r-1:r+2, c-1:c+2].max():
             peaks.append((r, c, Rmap[r, c]))
-print("      after thresholding at %.0f%% of the maximum and keeping only"
-      % 25)
-print("      local maxima, %d points survive:" % len(peaks))
+print("   %d local maxima above 25%% of max:" % len(peaks))
 for r, c, v in peaks:
-    print("         (%2d,%2d)  R = %.4g" % (r, c, v))
-print("      the square's corners are at (3,3), (3,8), (9,3) and (9,8).")
-print()
+    print("      (%2d,%2d)  R = %.4g" % (r, c, v))
+```
 
-print("WHAT IT IS AND IS NOT INVARIANT TO:")
-print("%-28s %s" % ("change", "does R survive?"))
-for k, v in (("translation", "yes -- it is computed locally"),
+The next block summarises what the Harris response is and is not invariant to, and why SIFT was invented to fix the scale gap.
+
+```python-run
+print("WHAT HARRIS IS AND IS NOT INVARIANT TO:")
+print("%-26s %s" % ("change", "does R survive?"))
+for k, v in (("translation", "yes -- computed locally"),
              ("rotation", "yes -- det and trace are rotation invariant"),
              ("brightness (+b)", "yes -- gradients ignore a constant"),
              ("contrast (*a)", "NO -- R scales as a^4"),
              ("scale (zoom)", "NO -- a corner becomes a curve")):
-    print("%-28s %s" % (k, v))
-print("   the contrast row is why R is always thresholded relative to the")
-print("   image's own maximum rather than at a fixed value.")
-print("   the scale row is the serious one, and it is what SIFT was")
-print("   invented to fix: search over scales as well as positions, and")
-print("   keep the scale at which the response peaks. Harris finds WHERE;")
-print("   scale-space finds where AND how big.")
+    print("%-26s %s" % (k, v))
+print("   contrast: R is thresholded relative to the image's own maximum.")
+print("   scale: SIFT was invented to fix this -- search over scales as")
+print("   well as positions. Harris finds WHERE; scale-space finds where")
+print("   AND how big.")
 ```
 
 """,
@@ -6152,12 +5959,10 @@ A vision transformer starts by chopping the image into patches and flattening ea
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(0)
-IMG, P = 12, 4                          # 12x12 image, 4x4 patches
+IMG, P = 12, 4
 img = np.arange(IMG * IMG).reshape(IMG, IMG) % 10
-
-print("THE IMAGE, %dx%d, with a %dx%d patch grid drawn on it:" % (IMG, IMG, P, P))
+print("THE IMAGE, %dx%d, with a %dx%d patch grid:" % (IMG, IMG, P, P))
 for i in range(IMG):
     if i % P == 0:
         print("   " + "+----" * (IMG // P) + "+")
@@ -6167,150 +5972,114 @@ for i in range(IMG):
     print("   " + row + "|")
 print("   " + "+----" * (IMG // P) + "+")
 n = (IMG // P) ** 2
-print("   %d patches of %dx%d = %d pixels each." % (n, P, P, P * P))
-print()
-
 patches = []
 for i in range(0, IMG, P):
     for j in range(0, IMG, P):
-        patches.append(img[i:i + P, j:j + P].reshape(-1))
+        patches.append(img[i:i+P, j:j+P].reshape(-1))
 patches = np.array(patches, float)
-print("EACH PATCH IS FLATTENED INTO A VECTOR of %d numbers:" % (P * P))
+print("   %d patches of %dx%d = %d pixels each." % (n, P, P, P*P))
+print("EACH PATCH IS FLATTENED INTO A VECTOR:")
 print("   patch 0: %s" % " ".join("%.0f" % v for v in patches[0]))
 print("   patch 1: %s" % " ".join("%.0f" % v for v in patches[1]))
-print("   the sequence is now %s -- %d tokens of %d dimensions, exactly"
-      % (str(patches.shape), n, P * P))
-print("   the shape a text transformer expects. that is the whole trick:")
-print("   turn the image into a sentence and the rest of the architecture")
-print("   is unchanged.")
-print()
+print("   shape %s -- %d tokens of %d dims, exactly what a text" % (str(patches.shape), n, P*P))
+print("   transformer expects. turn the image into a sentence.")
+```
 
-D = 8
-E = rng.normal(0, 0.3, (P * P, D))
+The next block shows that the patch-flatten-project step is identical to a convolution with kernel size and stride equal to the patch size.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+IMG, P, D = 12, 4, 8
+img = np.arange(IMG*IMG).reshape(IMG, IMG) % 10
+patches = []
+for i in range(0, IMG, P):
+    for j in range(0, IMG, P):
+        patches.append(img[i:i+P, j:j+P].reshape(-1))
+patches = np.array(patches, float)
+E = rng.normal(0, 0.3, (P*P, D))
 tokens = patches @ E
-print("A LINEAR PROJECTION maps each %d-vector to the model width D=%d:"
-      % (P * P, D))
-print("   tokens = patches @ E, with E of shape %s -> %s"
-      % (str(E.shape), str(tokens.shape)))
-print("   and here is a fact worth pausing on: 'cut into patches, flatten,")
-print("   multiply by E' is EXACTLY a convolution with kernel size %d and"
-      % P)
-print("   stride %d. check it against a real convolution:" % P)
+print("LINEAR PROJECTION: patches @ E, E is %s -> %s" % (str(E.shape), str(tokens.shape)))
+print("   'cut, flatten, multiply by E' IS a conv with kernel=%d, stride=%d." % (P, P))
 K = E.T.reshape(D, P, P)
-conv_out = np.zeros((D, IMG // P, IMG // P))
+conv_out = np.zeros((D, IMG//P, IMG//P))
 for d in range(D):
     for a, i in enumerate(range(0, IMG, P)):
         for b, j in enumerate(range(0, IMG, P)):
-            conv_out[d, a, b] = (img[i:i + P, j:j + P] * K[d]).sum()
-print("      max difference: %.2e"
+            conv_out[d, a, b] = (img[i:i+P, j:j+P] * K[d]).sum()
+print("   max difference from a real convolution: %.2e"
       % np.abs(conv_out.reshape(D, -1).T - tokens).max())
-print("   identical, and every ViT implementation does it that way --")
-print("   nn.Conv2d(3, D, kernel_size=%d, stride=%d) IS the patch embedding."
-      % (P, P))
-print()
+print("   identical. every ViT uses nn.Conv2d(3, D, %d, %d) for this." % (P, P))
 
-print("NOW THE PROBLEM. a transformer's attention is PERMUTATION")
-print("EQUIVARIANT: shuffle the tokens and the outputs shuffle with them,")
-print("unchanged. that is right for a set and wrong for an image. check")
-print("what the token set knows about position:")
+```
+
+The next block demonstrates the permutation problem: without position embeddings, shuffling the patches produces the same token set, so the model cannot tell a scrambled image from the original.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+IMG, P, D = 12, 4, 8
+img = np.arange(IMG*IMG).reshape(IMG, IMG) % 10
+n = (IMG // P) ** 2
+patches = []
+for i in range(0, IMG, P):
+    for j in range(0, IMG, P):
+        patches.append(img[i:i+P, j:j+P].reshape(-1))
+patches = np.array(patches, float)
+E = rng.normal(0, 0.3, (P*P, D))
+tokens = patches @ E
 perm = rng.permutation(n)
-print("   original token order:  %s" % " ".join(str(i) for i in range(n)))
-print("   shuffled token order:  %s" % " ".join(str(i) for i in perm))
-print("   as SETS these are identical, so any function that treats them as")
-print("   a set gives the same answer for the image and for the image cut")
-print("   up and rearranged. the model literally cannot tell them apart.")
-print()
-
-print("SO POSITION IS ADDED, not inferred. the standard sinusoidal scheme:")
 pos = np.zeros((n, D))
 for k in range(n):
     for d in range(0, D, 2):
         w = 1.0 / (10000 ** (d / float(D)))
-        pos[k, d] = np.sin(k * w)
-        pos[k, d + 1] = np.cos(k * w)
-print("%-10s %s" % ("token", "  ".join("dim %d" % d for d in range(D))))
-for k in (0, 1, 2, 8):
-    print("%-10d %s" % (k, "  ".join("%5.2f" % v for v in pos[k])))
-print("   every token gets a different vector, so after adding it the")
-print("   tokens are no longer interchangeable. the shuffle test now:")
-def as_multiset(M):
-    # sort the ROWS, so two arrays match only if they hold the same vectors
-    return M[np.lexsort(M.T[::-1])]
+        pos[k, d] = np.sin(k * w); pos[k, d+1] = np.cos(k * w)
+print("POSITION EMBEDDING. without it, attention is permutation equivariant:")
+def as_multiset(M): return M[np.lexsort(M.T[::-1])]
+def same(A, B): return "identical" if np.allclose(as_multiset(A), as_multiset(B)) else "DIFFERENT"
+print("   without position: tokens vs tokens[perm] -> %s" % same(tokens, tokens[perm]))
+print("   with position:    t+pos vs t[perm]+pos   -> %s" % same(tokens+pos, tokens[perm]+pos))
+print("   position is the only thing that breaks the symmetry.")
+print("   most modern ViTs use a LEARNED position embedding -- a plain")
+print("   lookup table trained with the rest. the model must learn from")
+print("   data that patch 0 is next to patch 1; a CNN has that built in.")
+```
 
-def same(A, B):
-    return "identical" if np.allclose(as_multiset(A), as_multiset(B)) else "DIFFERENT"
+The next block tabulates the attention cost as the patch size shrinks, then shows that a patch is the smallest unit the model can reason about.
 
-print("   shuffle the patches and compare what the model receives.")
-print("   note that the position vectors stay attached to the SLOT, not to")
-print("   the patch -- slot 0 always gets pos[0]:")
-print("%-42s %s" % ("without position: tokens vs tokens[perm]",
-                    same(tokens, tokens[perm])))
-print("%-42s %s" % ("with position:    t+pos vs t[perm]+pos",
-                    same(tokens + pos, tokens[perm] + pos)))
-print("   without position the two are the same multiset of vectors, so")
-print("   nothing downstream can distinguish them. with position added")
-print("   they are not, because each patch now carries where it sat.")
-print("   that is the whole job of a position embedding: it is the only")
-print("   thing standing between a vision transformer and a bag of")
-print("   patches.")
-print()
-print("   most modern ViTs use a LEARNED position embedding instead -- a")
-print("   plain lookup table, one vector per patch index, trained with the")
-print("   rest. which means the model has to learn from data that patch 0")
-print("   is next to patch 1 and above patch 3. a CNN never learns that;")
-print("   it is built into the shape of the convolution.")
-print()
-
-print("WHAT THE PATCH SIZE COSTS. attention is quadratic in the token")
-print("count, and the token count is quadratic in 1/patch_size:")
-print("%-14s %10s %14s %20s"
-      % ("patch size", "tokens", "attention ops", "relative cost"))
-base = None
+```python-run
+import numpy as np
+print("PATCH SIZE COST. attention is quadratic in the token count:")
+print("%-12s %8s %14s %14s" % ("patch", "tokens", "attn ops", "relative"))
 for p in (32, 16, 14, 8, 4):
-    t = (224 // p) ** 2
-    ops = t * t
-    base = ops if base is None else base
-    print("%-14d %10d %14s %19.1fx"
-          % (p, t, "{:,}".format(ops), ops / float((224 // 32) ** 4)))
-print("   for a 224x224 image. going from 32x32 patches to 4x4 multiplies")
-print("   the attention cost by %d. THAT is why ViT-B/16 exists and"
-      % int(((224 // 4) ** 4) / ((224 // 32) ** 4)))
-print("   ViT-B/2 does not, and why every efficient variant since --")
-print("   Swin's windows, hierarchical pooling, linear attention -- is an")
-print("   attempt to escape this table.")
+    t = (224 // p) ** 2; ops = t * t
+    print("%-12d %8d %14s %13.1fx"
+          % (p, t, "{:,}".format(ops), ops / float((224//32)**4)))
+print("   32->4 multiplies cost by %d. that is why ViT-B/16 exists"
+      % int(((224//4)**4)/((224//32)**4)))
+print("   and ViT-B/2 does not.")
 print()
-
-print("AND WHAT IT COSTS IN RESOLUTION. a %dx%d patch is ONE token: the" % (P, P))
-print("model has no representation of anything smaller.")
-flat = patches[0].copy()
-scrambled = flat.copy()
-rng.shuffle(scrambled)
-print("   patch 0 as given:    %s" % " ".join("%.0f" % v for v in flat))
-print("   its pixels shuffled: %s" % " ".join("%.0f" % v for v in scrambled))
-pa = patches[0] @ E
-pb = scrambled @ E
-print("   these are different images, and after the projection they do")
-print("   give different vectors -- the two differ by %.2f in norm, so"
+rng = np.random.default_rng(0)
+P, D = 4, 8
+img = np.arange(144).reshape(12, 12) % 10
+patches = np.array([img[i:i+P, j:j+P].reshape(-1)
+                    for i in range(0,12,P) for j in range(0,12,P)], float)
+E = rng.normal(0, 0.3, (P*P, D))
+flat = patches[0].copy(); scrambled = flat.copy(); rng.shuffle(scrambled)
+pa, pb = patches[0] @ E, scrambled @ E
+print("RESOLUTION LIMIT. a %dx%d patch is ONE token." % (P, P))
+print("   shuffling its pixels changes the vector by %.2f in norm."
       % np.linalg.norm(pa - pb))
-print("   nothing was lost. the limit is not information, it is ADDRESSING:")
-print("   attention operates on tokens, so a patch is the smallest thing")
-print("   the model can attend TO, point at, or reason about separately.")
-print("   whatever structure exists inside a patch has to survive as a")
-print("   single vector among %d others." % (n - 1))
-print("   real ViTs make D large enough that the projection loses nothing")
-print("   -- ViT-B/16 maps 16*16*3 = 768 inputs to D = 768, an exactly")
-print("   square matrix. the resolution limit is the patch grid itself,")
-print("   not the width of the embedding, which is why halving the patch")
-print("   size is the only way to see finer detail, and why the table")
-print("   above is the wall every ViT variant runs into.")
+print("   information is preserved, but ADDRESSING is not: a patch is the")
+print("   smallest thing attention can point at.")
+print("   ViT-B/16 maps 768 inputs to D=768, losing nothing. the limit")
+print("   is the patch grid itself, so halving patch size is the only way")
+print("   to see finer detail -- and the cost table above is the wall.")
 print()
-print("which is the honest summary of the whole design: a ViT trades the")
-print("CNN's built-in assumption that nearby pixels belong together for")
-print("the freedom to relate any patch to any other in one step. it gives")
-print("up a prior and buys reach. that trade is why ViTs need far more")
-print("data than CNNs to reach the same accuracy -- with enough of it they")
-print("learn the prior, and beyond that point they exceed what the prior")
-print("would have allowed.")
+print("THE DESIGN TRADE: a ViT gives up the CNN's spatial prior for the")
+print("freedom to relate any patch to any other in one step. that is why")
+print("ViTs need far more data to match a CNN, and why with enough data")
+print("they exceed what the prior would have allowed.")
 ```
 
 """,
@@ -6515,151 +6284,110 @@ Grad-CAM makes a heatmap over the image for a chosen class. Each step of it's ma
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(21)
-C, H, W = 6, 5, 5                      # last conv layer: 6 channels of 5x5
-
-# hand-built feature maps so we know what each channel means
+C, H, W = 6, 5, 5
 fmap = np.abs(rng.normal(0, 0.15, (C, H, W)))
-fmap[0, 0:2, 0:2] += 2.2               # channel 0: something in the TOP-LEFT
-fmap[1, 3:5, 3:5] += 2.0               # channel 1: something BOTTOM-RIGHT
-fmap[2, 2, :] += 1.6                   # channel 2: a horizontal band
-fmap[3, :, 2] += 1.5                   # channel 3: a vertical band
-
-NAMES = ["top-left blob", "bottom-right blob", "horizontal band",
-         "vertical band", "noise", "noise"]
-print("THE LAST CONVOLUTIONAL LAYER: %d channels of %dx%d." % (C, H, W))
-print("%-10s %-22s %10s %14s" % ("channel", "what it responds to", "max",
-                                 "where"))
+fmap[0, 0:2, 0:2] += 2.2; fmap[1, 3:5, 3:5] += 2.0
+fmap[2, 2, :] += 1.6; fmap[3, :, 2] += 1.5
+NAMES = ["top-left blob", "bot-right blob", "horiz band",
+         "vert band", "noise", "noise"]
+print("LAST CONV LAYER: %d channels of %dx%d." % (C, H, W))
+print("%-8s %-18s %8s %10s" % ("ch", "responds to", "max", "where"))
 for c in range(C):
     r, k = np.unravel_index(fmap[c].argmax(), (H, W))
-    print("%-10d %-22s %10.2f %14s" % (c, NAMES[c], fmap[c].max(),
-                                       "(%d,%d)" % (r, k)))
+    print("%-8d %-18s %8.2f %10s" % (c, NAMES[c], fmap[c].max(), "(%d,%d)" % (r, k)))
 print()
-
-# a linear classifier on the pooled features: 2 classes
 gap = fmap.mean(axis=(1, 2))
 Wc = np.zeros((2, C))
-Wc[0] = [5.0, -0.5, 0.3, 0.1, 0.0, 0.0]     # class A likes channel 0
-Wc[1] = [-0.4, 1.6, 0.2, 0.1, 0.0, 0.0]     # class B likes channel 1
+Wc[0] = [5.0, -0.5, 0.3, 0.1, 0.0, 0.0]
+Wc[1] = [-0.4, 1.6, 0.2, 0.1, 0.0, 0.0]
 logits = Wc @ gap
-print("THE HEAD: global average pool, then one linear layer to 2 classes.")
-print("%-10s %10s %14s" % ("channel", "GAP value", "in the logits"))
-for c in range(C):
-    print("%-10d %10.3f   A:%+.2f  B:%+.2f" % (c, gap[c], Wc[0, c], Wc[1, c]))
-print("   logits:  class A %.4f   class B %.4f" % (logits[0], logits[1]))
-p = np.exp(logits - logits.max())
-p = p / p.sum()
-print("   softmax: class A %.4f   class B %.4f" % (p[0], p[1]))
-print("   the model says %s." % ("A" if p[0] > p[1] else "B"))
-print()
+p = np.exp(logits - logits.max()); p = p / p.sum()
+print("HEAD: GAP then linear to 2 classes.")
+print("   logits: A=%.4f  B=%.4f" % (logits[0], logits[1]))
+print("   softmax: A=%.4f  B=%.4f  -> model says %s."
+      % (p[0], p[1], "A" if p[0] > p[1] else "B"))
+```
 
-print("GRAD-CAM, STEP BY STEP. pick a class, get the gradient of its logit")
-print("with respect to the feature maps, and use it to weight them.")
-print()
-print("STEP 1 -- the gradient. because the head is GAP then linear, the")
-print("gradient of logit_k with respect to every cell of channel c is the")
-print("same number: W[k,c] / (H*W). no autograd needed here, but the same")
-print("quantity is what .backward() would hand you.")
-print()
+The next block runs Grad-CAM step by step for both classes, showing how the weighted sum of feature maps produces a different heatmap for each class.
 
+```python-run
+import numpy as np
+rng = np.random.default_rng(21)
+C, H, W = 6, 5, 5
+fmap = np.abs(rng.normal(0, 0.15, (C, H, W)))
+fmap[0, 0:2, 0:2] += 2.2; fmap[1, 3:5, 3:5] += 2.0
+fmap[2, 2, :] += 1.6; fmap[3, :, 2] += 1.5
+NAMES = ["top-left blob", "bot-right blob", "horiz band",
+         "vert band", "noise", "noise"]
+Wc = np.zeros((2, C))
+Wc[0] = [5.0, -0.5, 0.3, 0.1, 0.0, 0.0]
+Wc[1] = [-0.4, 1.6, 0.2, 0.1, 0.0, 0.0]
 def gradcam(k):
-    grads = np.zeros((C, H, W))
-    for c in range(C):
-        grads[c] = Wc[k, c] / float(H * W)
-    alpha = grads.mean(axis=(1, 2))                 # STEP 2
-    cam = np.tensordot(alpha, fmap, axes=(0, 0))    # STEP 3
-    return alpha, cam, np.maximum(cam, 0)           # STEP 4
-
+    alpha = np.array([Wc[k, c] / float(H*W) for c in range(C)])
+    cam = np.tensordot(alpha, fmap, axes=(0, 0))
+    return alpha, cam, np.maximum(cam, 0)
+ramp = " .:-=+*#%@"
 for k, cname in ((0, "A"), (1, "B")):
     alpha, cam, cam_relu = gradcam(k)
-    print("FOR CLASS %s:" % cname)
-    print("   STEP 2 -- average each channel's gradient into ONE weight:")
-    print("      alpha = " + "  ".join("%+.4f" % v for v in alpha))
-    print("      that average is the whole reason the map is coarse. a")
-    print("      channel gets one number, so Grad-CAM can say WHICH")
-    print("      feature mattered and cannot say which part of it did.")
-    print("   STEP 3 -- weighted sum of the feature maps:")
-    for row in cam:
-        print("      " + " ".join("%7.3f" % v for v in row))
-    print("   STEP 4 -- ReLU, because negative evidence is evidence for")
-    print("   some OTHER class, not for this one:")
-    ramp = " .:-=+*#%@"
+    print("CLASS %s:" % cname)
+    print("   alpha (channel weights): " + " ".join("%+.4f" % v for v in alpha))
     hi = cam_relu.max() + 1e-9
     for row in cam_relu:
-        print("      " + "".join(ramp[min(9, int(9 * v / hi))] * 2 for v in row))
+        print("   " + "".join(ramp[min(9, int(9*v/hi))]*2 for v in row))
     r, c_ = np.unravel_index(cam_relu.argmax(), (H, W))
-    print("      peak at (%d,%d), and %d of %d cells were zeroed by the ReLU."
+    print("   peak at (%d,%d), %d/%d cells zeroed by ReLU."
           % (r, c_, int((cam <= 0).sum()), cam.size))
-    print()
-
-print("THE TEST THAT MATTERS: DOES THE MAP DEPEND ON THE CLASS?")
-_, _, camA = gradcam(0)
-_, _, camB = gradcam(1)
+_, _, camA = gradcam(0); _, _, camB = gradcam(1)
 ra, ca = np.unravel_index(camA.argmax(), (H, W))
 rb, cb = np.unravel_index(camB.argmax(), (H, W))
-print("   class A peaks at (%d,%d) -- the %s." % (ra, ca, NAMES[0]))
-print("   class B peaks at (%d,%d) -- the %s." % (rb, cb, NAMES[1]))
 def norm(a):
-    v = a.reshape(-1) - a.mean()
-    return v / (np.linalg.norm(v) + 1e-12)
-print("   correlation between the two maps: %.4f" % float(norm(camA) @ norm(camB)))
-print("   they are genuinely different, and that is the property that")
-print("   makes Grad-CAM worth anything. a saliency method whose output")
-print("   barely moves when you change the class is telling you about the")
-print("   IMAGE, not about the DECISION -- and several published methods")
-print("   have failed exactly that test.")
-print()
+    v = a.reshape(-1)-a.mean(); return v/(np.linalg.norm(v)+1e-12)
+print("CLASS TEST: A peaks at (%d,%d)=%s, B at (%d,%d)=%s."
+      % (ra, ca, NAMES[0], rb, cb, NAMES[1]))
+print("   correlation: %.4f -- genuinely different maps." % float(norm(camA)@norm(camB)))
+print("   a method whose map barely changes with the class tells you about")
+print("   the IMAGE, not the DECISION.")
+```
 
-print("HOW BIG IS THE MAP, REALLY. it is computed at the resolution of the")
-print("last conv layer and then upsampled to the image:")
-print("%-24s %14s %16s %16s"
-      % ("backbone", "input", "last conv map", "upsample factor"))
-for name, side, grid in (("VGG-16", 224, 14), ("ResNet-50", 224, 7),
-                         ("this toy", 40, 5)):
-    print("%-24s %14s %16s %16s"
-          % (name, "%dx%d" % (side, side), "%dx%d" % (grid, grid),
-             "%dx" % (side // grid)))
-print("   a ResNet-50 Grad-CAM map has %d values, blown up to %d pixels."
-      % (7 * 7, 224 * 224))
-print("   every smooth blob you see in a published Grad-CAM figure is")
-print("   bilinear interpolation between %d numbers. it cannot localise" % (7 * 7))
-print("   to a pixel, and a figure that looks like it does is showing you")
-print("   the interpolation, not the evidence.")
-print()
+The next block shows how coarse the map really is, and warns that Grad-CAM explains the class you ask for even when the model rejected it.
 
-print("AND THE WARNING THAT USUALLY GETS LEFT OFF. Grad-CAM explains the")
-print("class you ASK for, whether or not the model predicted it:")
-print("%-30s %14s %14s" % ("", "class A", "class B"))
-print("%-30s %14.4f %14.4f" % ("model's probability", p[0], p[1]))
-print("%-30s %14s %14s"
-      % ("Grad-CAM peak",
-         "(%d,%d)" % (ra, ca), "(%d,%d)" % (rb, cb)))
-print("%-30s %14.3f %14.3f" % ("peak strength", camA.max(), camB.max()))
+```python-run
+import numpy as np
+rng = np.random.default_rng(21)
+C, H, W = 6, 5, 5
+fmap = np.abs(rng.normal(0, 0.15, (C, H, W)))
+fmap[0, 0:2, 0:2] += 2.2; fmap[1, 3:5, 3:5] += 2.0
+fmap[2, 2, :] += 1.6; fmap[3, :, 2] += 1.5
+Wc = np.zeros((2, C))
+Wc[0] = [5.0, -0.5, 0.3, 0.1, 0.0, 0.0]
+Wc[1] = [-0.4, 1.6, 0.2, 0.1, 0.0, 0.0]
+gap = fmap.mean(axis=(1, 2)); logits = Wc @ gap
+p = np.exp(logits - logits.max()); p = p / p.sum()
+def gradcam(k):
+    alpha = np.array([Wc[k, c] / float(H*W) for c in range(C)])
+    cam = np.tensordot(alpha, fmap, axes=(0, 0))
+    return np.maximum(cam, 0)
+camA, camB = gradcam(0), gradcam(1)
+print("HOW BIG IS THE MAP, REALLY:")
+print("%-20s %10s %12s %12s" % ("backbone", "input", "conv map", "upsample"))
+for name, side, grid in (("VGG-16",224,14),("ResNet-50",224,7),("this toy",40,5)):
+    print("%-20s %10s %12s %12s"
+          % (name, "%dx%d"%(side,side), "%dx%d"%(grid,grid), "%dx"%(side//grid)))
+print("   ResNet-50: 49 values blown up to 50176 pixels.")
+print()
+print("THE WARNING. Grad-CAM explains ANY class, even a rejected one:")
+print("%-24s %12s %12s" % ("", "class A", "class B"))
+print("%-24s %12.4f %12.4f" % ("probability", p[0], p[1]))
+print("%-24s %12.3f %12.3f" % ("peak strength", camA.max(), camB.max()))
 loser = 1 if p[0] > p[1] else 0
-print("   the model gives class %s a probability of %.4f -- it has all"
-      % ("AB"[loser], p[loser]))
-print("   but rejected it. Grad-CAM still returns a clean, well-localised")
-print("   map for it, peaking on exactly the right feature.")
-print("   the raw peaks do differ: %.3f against %.3f. but NOBODY EVER SEES"
-      % (max(camA.max(), camB.max()), min(camA.max(), camB.max())))
-print("   THE RAW VALUES -- every Grad-CAM figure is min-max normalised to")
-print("   0..1 before it is coloured, because the raw scale is arbitrary.")
-print("   after that step:")
-for label, cam in (("class A (p=%.2f)" % p[0], camA),
-                   ("class B (p=%.2f)" % p[1], camB)):
-    nm = cam / (cam.max() + 1e-12)
-    print("      %-20s normalised peak %.3f, mean %.3f"
-          % (label, nm.max(), nm.mean()))
-print("   the two pictures are indistinguishable in intensity. every trace")
-print("   of the model's 86-to-14 preference was divided out by the")
-print("   colour mapping.")
-print("   so the heatmap is")
-print("   not a confidence measure and never was -- it answers 'if this")
-print("   were the answer, what would have supported it?', which has a")
-print("   perfectly good answer even when the model disagrees.")
-print("   so always report the class and its probability alongside the")
-print("   picture. a map without them is an illustration, not evidence.")
+print("   class %s has p=%.4f but a clean heatmap." % ("AB"[loser], p[loser]))
+print("   after min-max normalisation (which every figure uses):")
+for label, cam in (("A (p=%.2f)"%p[0], camA), ("B (p=%.2f)"%p[1], camB)):
+    nm = cam / (cam.max()+1e-12)
+    print("      %-16s peak %.3f, mean %.3f" % (label, nm.max(), nm.mean()))
+print("   the two are indistinguishable. the heatmap is not a confidence")
+print("   measure -- always report the class and probability alongside it.")
 ```
 
 """,
@@ -6877,99 +6605,92 @@ Semantic, instance and panoptic segmentation give pictures that look alike and a
 
 ```python-run
 import numpy as np
-
 H, W = 8, 22
-# ground truth: class id per pixel, and instance id per pixel
-cls = np.zeros((H, W), int)            # 0 = background
+cls = np.zeros((H, W), int)
 inst = np.zeros((H, W), int)
-CLASSES = {0: "background", 1: "person", 2: "car", 3: "road"}
-
-cls[6:, :] = 3                         # road is STUFF: no instance id
-cls[2:6, 2:6] = 1; inst[2:6, 2:6] = 1  # person A
-cls[2:6, 7:11] = 1; inst[2:6, 7:11] = 2   # person B, touching-ish
-cls[3:6, 14:21] = 2; inst[3:6, 14:21] = 3  # a car
-
-def show(a, label, glyphs):
+CLASSES = {0: "bg", 1: "person", 2: "car", 3: "road"}
+cls[6:, :] = 3
+cls[2:6, 2:6] = 1; inst[2:6, 2:6] = 1
+cls[2:6, 7:11] = 1; inst[2:6, 7:11] = 2
+cls[3:6, 14:21] = 2; inst[3:6, 14:21] = 3
+def show(a, label, g):
     print("   %s" % label)
     for row in a:
-        print("      " + "".join(glyphs.get(v, "?") for v in row))
-
-show(cls, "SEMANTIC: one CLASS label per pixel",
-     {0: ".", 1: "P", 2: "C", 3: "="})
-print("      . background   P person   C car   = road")
+        print("      " + "".join(g.get(v, "?") for v in row))
+show(cls, "SEMANTIC: one CLASS label per pixel", {0:".",1:"P",2:"C",3:"="})
+print("      . bg   P person   C car   = road")
+show(inst, "INSTANCE: one OBJECT id per pixel, countable things only", {0:".",1:"1",2:"2",3:"3"})
+print("      road is BLANK: it is stuff, not a countable thing.")
+show(np.where(inst>0,inst,np.where(cls==3,9,0)), "PANOPTIC: every pixel gets both", {0:".",1:"1",2:"2",3:"3",9:"="})
 print()
-show(inst, "INSTANCE: one OBJECT id per pixel, countable things only",
-     {0: ".", 1: "1", 2: "2", 3: "3"})
-print("      the road is BLANK here -- it is 'stuff', not a countable")
-print("      thing, and instance segmentation has nothing to say about it.")
-print()
-show(np.where(inst > 0, inst, np.where(cls == 3, 9, 0)),
-     "PANOPTIC: every pixel gets both, things numbered and stuff labelled",
-     {0: ".", 1: "1", 2: "2", 3: "3", 9: "="})
-print()
-
 print("THE QUESTION EACH ONE CAN ANSWER:")
 qs = [("what class is pixel (4, 3)?", "yes", "yes", "yes"),
       ("how many people are there?", "NO", "yes", "yes"),
       ("how much of the frame is road?", "yes", "NO", "yes"),
       ("which pixels belong to person B?", "NO", "yes", "yes"),
       ("is every pixel labelled?", "yes", "NO", "yes")]
-print("%-34s %10s %10s %10s"
-      % ("question", "semantic", "instance", "panoptic"))
+print("%-34s %8s %8s %8s" % ("question","sem","inst","pan"))
 for q in qs:
-    print("%-34s %10s %10s %10s" % q)
-print("   answer the first row from the arrays: pixel (4,3) is class %d,"
-      % cls[4, 3])
-print("   which is '%s', and it belongs to instance %d."
-      % (CLASSES[cls[4, 3]], inst[4, 3]))
-print("   semantic segmentation knows the first fact and not the second.")
-print("   count the people: semantic records %d pixels labelled 'person'"
-      % int((cls == 1).sum()))
-print("   and has no field anywhere in which to write how many people")
-print("   that is. instance stores %d distinct ids, so it can."
-      % len(set(inst[cls == 1].tolist())))
-print("   and counting connected blobs in the semantic mask is not a way")
-print("   out: two people standing shoulder to shoulder form one blob,")
-print("   which is exactly the case the next section measures.")
-print()
+    print("%-34s %8s %8s %8s" % q)
+print("   pixel (4,3) is class %d (%s), instance %d." % (cls[4,3], CLASSES[cls[4,3]], inst[4,3]))
+print("   semantic knows the class, not the instance.")
+print("   %d pixels labelled person, but no field records how many" % int((cls==1).sum()))
+print("   people that is. instance stores %d distinct ids." % len(set(inst[cls==1].tolist())))
+print("   counting blobs in the semantic mask fails: two people shoulder")
+print("   to shoulder form one blob -- the next section measures that.")
+```
 
-print("NOW A PREDICTION, and what each metric makes of it. a model that")
-print("finds both people but MERGES them into one blob:")
-pred_cls = cls.copy()
-pred_cls[2:6, 6] = 1                   # bridges the gap between them
+The next block builds a prediction where the model finds both people but merges them into one blob, and scores that prediction with the semantic metric.
+
+```python-run
+import numpy as np
+H, W = 8, 22
+cls = np.zeros((H, W), int); inst = np.zeros((H, W), int)
+CLASSES = {0: "bg", 1: "person", 2: "car", 3: "road"}
+cls[6:, :] = 3
+cls[2:6, 2:6] = 1; inst[2:6, 2:6] = 1
+cls[2:6, 7:11] = 1; inst[2:6, 7:11] = 2
+cls[3:6, 14:21] = 2; inst[3:6, 14:21] = 3
+def show(a, label, g):
+    print("   %s" % label)
+    for row in a:
+        print("      " + "".join(g.get(v, "?") for v in row))
+print("A PREDICTION: the model finds both people but MERGES them:")
+pred_cls = cls.copy(); pred_cls[2:6, 6] = 1
 pred_inst = np.zeros((H, W), int)
-pred_inst[2:6, 2:11] = 1               # ONE instance covering both people
-pred_inst[3:6, 14:21] = 3
-show(pred_cls, "predicted classes", {0: ".", 1: "P", 2: "C", 3: "="})
-show(pred_inst, "predicted instances", {0: ".", 1: "1", 3: "3"})
+pred_inst[2:6, 2:11] = 1; pred_inst[3:6, 14:21] = 3
+show(pred_cls, "predicted classes", {0:".",1:"P",2:"C",3:"="})
+show(pred_inst, "predicted instances", {0:".",1:"1",3:"3"})
 print()
-
-print("SEMANTIC METRIC -- mean IoU, computed per class then averaged:")
-print("%-16s %10s %10s %10s %10s"
-      % ("class", "truth px", "pred px", "intersect", "IoU"))
+print("SEMANTIC METRIC -- mean IoU, per class then averaged:")
+print("%-12s %8s %8s %8s %8s" % ("class","truth","pred","inter","IoU"))
 ious = []
 for c in sorted(CLASSES):
-    t, p = (cls == c), (pred_cls == c)
-    inter = int((t & p).sum())
-    union = int((t | p).sum())
-    v = inter / float(union) if union else 1.0
-    ious.append(v)
-    print("%-16s %10d %10d %10d %10.4f"
-          % (CLASSES[c], int(t.sum()), int(p.sum()), inter, v))
-print("%-16s %43.4f" % ("mean IoU", float(np.mean(ious))))
-print("   %.4f. the merge cost it %d pixels out of %d, and semantic IoU"
-      % (np.mean(ious), int((pred_cls == 1).sum() - (cls == 1).sum()),
-         int((cls == 1).sum())))
-print("   is close to perfect -- because from its point of view the model")
-print("   was asked 'which pixels are person?' and got almost all of them")
-print("   right. it was never asked how many people there were.")
-print()
+    t, p = (cls==c), (pred_cls==c)
+    inter = int((t&p).sum()); union = int((t|p).sum())
+    v = inter/float(union) if union else 1.0; ious.append(v)
+    print("%-12s %8d %8d %8d %8.4f" % (CLASSES[c],int(t.sum()),int(p.sum()),inter,v))
+print("%-12s %35.4f" % ("mean IoU", float(np.mean(ious))))
+print("   %.4f. the merge cost %d pixels out of %d, but semantic IoU" % (np.mean(ious), int((pred_cls==1).sum()-(cls==1).sum()), int((cls==1).sum())))
+print("   is near perfect -- it asked 'which pixels are person?' and got")
+print("   almost all right. it never asked how many people there were.")
+```
 
-print("INSTANCE METRIC -- match predicted instances to true ones by IoU,")
-print("with a 0.5 threshold, exactly as detection does:")
-true_ids = [1, 2, 3]
-pred_ids = [1, 3]
-print("%-14s %-14s %10s %12s" % ("pred inst", "best true", "IoU", "matched?"))
+The next block scores the same prediction with the instance metric: match predicted instances to ground truth by IoU.
+
+```python-run
+import numpy as np
+H, W = 8, 22
+cls = np.zeros((H, W), int); inst = np.zeros((H, W), int)
+cls[6:, :] = 3
+cls[2:6, 2:6] = 1; inst[2:6, 2:6] = 1
+cls[2:6, 7:11] = 1; inst[2:6, 7:11] = 2
+cls[3:6, 14:21] = 2; inst[3:6, 14:21] = 3
+pred_inst = np.zeros((H, W), int)
+pred_inst[2:6, 2:11] = 1; pred_inst[3:6, 14:21] = 3
+print("INSTANCE METRIC -- match predicted to true instances by IoU >= 0.5:")
+true_ids, pred_ids = [1, 2, 3], [1, 3]
+print("%-12s %-12s %8s %10s" % ("pred","best true","IoU","match?"))
 matched = set()
 for pid in pred_ids:
     pm = (pred_inst == pid)
@@ -6978,51 +6699,63 @@ for pid in pred_ids:
         tm = (inst == tid)
         u = int((pm | tm).sum())
         v = int((pm & tm).sum()) / float(u) if u else 0.0
-        if v > best:
-            best, bid = v, tid
+        if v > best: best, bid = v, tid
     ok = best >= 0.5 and bid not in matched
-    if ok:
-        matched.add(bid)
-    print("%-14d %-14s %10.4f %12s"
-          % (pid, "inst %d" % bid, best, "yes" if ok else "NO"))
-print("   found %d of the %d true instances." % (len(matched), len(true_ids)))
+    if ok: matched.add(bid)
+    print("%-12d %-12s %8.4f %10s" % (pid, "inst %d"%bid, best, "yes" if ok else "NO"))
+print("   found %d of %d true instances." % (len(matched), len(true_ids)))
 missed = [t for t in true_ids if t not in matched]
-print("   missed: %s." % ", ".join("instance %d" % m for m in missed))
+print("   missed: %s." % ", ".join("instance %d"%m for m in missed))
 blob = (pred_inst == 1)
 for tid in (1, 2):
     tm = (inst == tid)
-    print("   the merged blob's IoU with true instance %d is %.4f"
-          % (tid, int((blob & tm).sum()) / float(int((blob | tm).sum()))))
-print("   it overlaps both and clears 0.5 against neither, so BOTH people")
-print("   count as missed AND the blob counts as a false positive. one")
-print("   merge, three errors.")
-print()
+    print("   merged blob IoU with true %d: %.4f" % (tid, int((blob&tm).sum())/float(int((blob|tm).sum()))))
+print("   overlaps both, clears 0.5 against neither: BOTH people")
+print("   missed AND the blob is a false positive. one merge, three errors.")
+```
 
-print("%-30s %14s %14s" % ("", "semantic mIoU", "instance recall"))
-print("%-30s %14.4f %14.4f"
-      % ("this prediction", float(np.mean(ious)),
-         len(matched) / float(len(true_ids))))
-print("   the SAME prediction, scored two ways: %.2f and %.2f. neither"
-      % (np.mean(ious), len(matched) / float(len(true_ids))))
-print("   number is wrong. they are answers to different questions, and a")
-print("   model reported as '%.0f%% accurate' without saying which"
-      % (100 * np.mean(ious)))
-print("   question it answered has told you nothing.")
-print()
+The final block puts both metrics side by side for the same prediction and lists which task fits which problem.
 
-print("WHICH ONE YOUR PROBLEM NEEDS, decided by one test -- does the")
-print("answer involve counting or separating individuals?")
-print("%-34s %s" % ("medical: tumour area", "semantic"))
-print("%-34s %s" % ("medical: count the cells", "instance"))
-print("%-34s %s" % ("self-driving: drivable surface", "semantic"))
-print("%-34s %s" % ("self-driving: track each car", "instance"))
-print("%-34s %s" % ("photo editing: replace the sky", "semantic"))
-print("%-34s %s" % ("scene understanding, everything", "panoptic"))
-print("   and the practical consequence: they need different LABELS. a")
-print("   semantic dataset cannot be used to train an instance model, no")
-print("   matter how much of it there is, because the information that")
-print("   separates two touching people was never recorded. that is a far")
-print("   more expensive mistake than choosing the wrong architecture.")
+```python-run
+import numpy as np
+H, W = 8, 22
+cls = np.zeros((H, W), int); inst = np.zeros((H, W), int)
+CLASSES = {0: "bg", 1: "person", 2: "car", 3: "road"}
+cls[6:, :] = 3
+cls[2:6, 2:6] = 1; inst[2:6, 2:6] = 1
+cls[2:6, 7:11] = 1; inst[2:6, 7:11] = 2
+cls[3:6, 14:21] = 2; inst[3:6, 14:21] = 3
+pred_cls = cls.copy(); pred_cls[2:6, 6] = 1
+pred_inst = np.zeros((H, W), int)
+pred_inst[2:6, 2:11] = 1; pred_inst[3:6, 14:21] = 3
+ious = []
+for c in sorted(CLASSES):
+    t, p = (cls==c), (pred_cls==c)
+    inter = int((t&p).sum()); union = int((t|p).sum())
+    ious.append(inter/float(union) if union else 1.0)
+true_ids = [1, 2, 3]; matched = set()
+for pid in [1, 3]:
+    pm = (pred_inst==pid); best, bid = 0.0, None
+    for tid in true_ids:
+        tm = (inst==tid); u = int((pm|tm).sum())
+        v = int((pm&tm).sum())/float(u) if u else 0.0
+        if v > best: best, bid = v, tid
+    if best >= 0.5 and bid not in matched: matched.add(bid)
+miou, irec = float(np.mean(ious)), len(matched)/float(len(true_ids))
+print("%-28s %12s %12s" % ("","semantic mIoU","inst recall"))
+print("%-28s %12.4f %12.4f" % ("this prediction", miou, irec))
+print("   same prediction: %.2f and %.2f. neither is wrong -- they answer" % (miou, irec))
+print("   different questions. '%.0f%% accurate' without naming the" % (100*miou))
+print("   question tells you nothing.")
+print()
+print("WHICH ONE YOUR PROBLEM NEEDS:")
+for task, ans in [("tumour area","semantic"),("count cells","instance"),
+                  ("drivable surface","semantic"),("track each car","instance"),
+                  ("replace sky","semantic"),("everything","panoptic")]:
+    print("%-28s %s" % (task, ans))
+print("   they need different LABELS. a semantic dataset cannot train an")
+print("   instance model: the info separating two touching people was")
+print("   never recorded. more expensive than choosing the wrong architecture.")
 ```
 
 """,

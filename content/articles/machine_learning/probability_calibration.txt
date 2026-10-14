@@ -158,21 +158,17 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
+from sklearn.calibration import calibration_curve
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, brier_score_loss, log_loss
-
 X, y = make_classification(n_samples=12000, n_features=15, n_informative=6,
                            flip_y=0.12, random_state=0)
 Xtr, Xrest, ytr, yrest = train_test_split(X, y, test_size=0.5, random_state=0)
-Xcal, Xte, ycal, yte = train_test_split(Xrest, yrest, test_size=0.5, random_state=0)
-
-models = {
-    "logistic regression": LogisticRegression(max_iter=3000),
-    "random forest":       RandomForestClassifier(n_estimators=200, random_state=0),
-    "naive bayes":         GaussianNB(),
-    "SVM (rbf)":           SVC(probability=True, random_state=0),
-}
+_, Xte, _, yte = train_test_split(Xrest, yrest, test_size=0.5, random_state=0)
+models = {"logistic regression": LogisticRegression(max_iter=3000),
+          "random forest": RandomForestClassifier(n_estimators=200, random_state=0),
+          "naive bayes": GaussianNB(),
+          "SVM (rbf)": SVC(probability=True, random_state=0)}
 print("%-22s %9s %9s %10s" % ("", "ROC AUC", "Brier", "log loss"))
 probs = {}
 for name, m in models.items():
@@ -181,11 +177,10 @@ for name, m in models.items():
           % (name, roc_auc_score(yte, probs[name]),
              brier_score_loss(yte, probs[name]), log_loss(yte, probs[name])))
 print()
-print("ROC AUC only cares about the ORDER. Brier and log loss care about the")
-print("numbers themselves, and that is where these models separate.")
+print("ROC AUC only cares about the ORDER. Brier and log loss care about")
+print("the numbers themselves.")
 print()
-
-print("the reliability table -- group predictions by confidence, then check:")
+print("the reliability table -- group predictions by confidence:")
 for name in ("logistic regression", "naive bayes"):
     print("  %s" % name)
     frac, mean_pred = calibration_curve(yte, probs[name], n_bins=8, strategy="quantile")
@@ -193,51 +188,50 @@ for name in ("logistic regression", "naive bayes"):
     for mp, fp in zip(mean_pred, frac):
         print("     %12.4f %14.4f %+10.4f" % (mp, fp, fp - mp))
     print()
+print("a perfectly calibrated model has zeros in that last column.")
+```
 
-print("a perfectly calibrated model has zeros in that last column: of the rows")
-print("where it said 0.30, exactly 30 in every 100 turned out positive.")
-print("naive bayes is off by up to %.4f -- it says 0.70 for groups that come"
-      % max(abs(calibration_curve(yte, probs["naive bayes"], n_bins=8,
-                                  strategy="quantile")[0]
-                - calibration_curve(yte, probs["naive bayes"], n_bins=8,
-                                    strategy="quantile")[1])))
-print("in at 0.59. that is the multiplied-independence assumption showing.")
-print()
+The next block fixes the miscalibration two different ways and shows the reliability table after.
 
-print("two ways to fix it, both fitted on a held-out calibration split:")
+```python-run
+import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.naive_bayes import GaussianNB
+from sklearn.calibration import CalibratedClassifierCV, calibration_curve
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, brier_score_loss
+X, y = make_classification(n_samples=12000, n_features=15, n_informative=6,
+                           flip_y=0.12, random_state=0)
+Xtr, Xrest, ytr, yrest = train_test_split(X, y, test_size=0.5, random_state=0)
+Xcal, Xte, ycal, yte = train_test_split(Xrest, yrest, test_size=0.5, random_state=0)
 raw = GaussianNB().fit(Xtr, ytr)
-print("  %-26s Brier %.4f" % ("naive bayes, raw", brier_score_loss(yte, probs["naive bayes"])))
+raw_p = raw.predict_proba(Xte)[:, 1]
+print("two ways to fix it, both on a held-out calibration split:")
+print("  %-26s Brier %.4f" % ("naive bayes, raw", brier_score_loss(yte, raw_p)))
 for method in ("sigmoid", "isotonic"):
     cal = CalibratedClassifierCV(raw, method=method, cv="prefit")
     cal.fit(Xcal, ycal)
     p = cal.predict_proba(Xte)[:, 1]
     print("  %-26s Brier %.4f   AUC %.4f"
-          % ("naive bayes + " + method, brier_score_loss(yte, p), roc_auc_score(yte, p)))
+          % ("naive bayes + " + method, brier_score_loss(yte, p),
+             roc_auc_score(yte, p)))
 print()
-print("and the reliability table after sigmoid calibration:")
+print("reliability table after sigmoid calibration:")
 cal = CalibratedClassifierCV(raw, method="sigmoid", cv="prefit").fit(Xcal, ycal)
 pc = cal.predict_proba(Xte)[:, 1]
 frac, mean_pred = calibration_curve(yte, pc, n_bins=8, strategy="quantile")
 print("     %12s %14s %10s" % ("said", "actually was", "error"))
 for mp, fp in zip(mean_pred, frac):
     print("     %12.4f %14.4f %+10.4f" % (mp, fp, fp - mp))
-f0, m0 = calibration_curve(yte, probs["naive bayes"], n_bins=8, strategy="quantile")
+f0, m0 = calibration_curve(yte, raw_p, n_bins=8, strategy="quantile")
 print("  worst error: %.4f before, %.4f after"
       % (np.abs(f0 - m0).max(), np.abs(frac - mean_pred).max()))
 print()
-print("the Brier score moved only a little because most of it is irreducible")
-print("-- the data is genuinely noisy. the reliability table is the thing that")
-print("moved, and it is the thing you were trying to fix.")
+print("sigmoid (Platt) fits a one-parameter squash -- needs little data.")
+print("isotonic fits any increasing function, more prone to overfit.")
+print("the AUC barely moves: calibration is monotone, so it relabels")
+print("confidence without changing the ranking.")
 print()
-print("sigmoid (Platt scaling) fits a one-parameter squash -- it needs little")
-print("data and assumes the distortion has a particular shape. isotonic fits")
-print("any increasing function, which is more flexible and more prone to")
-print("overfitting on a small calibration set.")
-print()
-print("notice the AUC barely moves. calibration is a monotone transform, so it")
-print("cannot change the ranking -- it only relabels the confidence.")
-print()
-print("this matters whenever the number leaves the model: a threshold chosen")
-print("on 'p > 0.8', an expected-value calculation, a risk score shown to a")
-print("human. if you only ever take argmax, calibration is free to ignore.")
+print("this matters when the number leaves the model: thresholds, risk")
+print("scores, expected-value calculations. argmax users can ignore it.")
 ```

@@ -136,7 +136,6 @@ import numpy as np
 # a tiny decoder: at each step, the probability of the next token given the
 # sequence so far. three tokens: A, B, and <end>.
 TOK = ["A", "B", "."]
-
 TABLE = {
     ():            [0.55, 0.45, 0.00],   # A looks better than B here
     ("A",):        [0.30, 0.30, 0.40],   # ...but every path out of A is poor
@@ -156,7 +155,6 @@ p0 = probs([])
 for t, p in zip(TOK, p0):
     print("   P(%s) = %.2f" % (t, p))
 print()
-
 print("GREEDY decoding takes the argmax at every step:")
 seq, logp = [], 0.0
 while True:
@@ -171,20 +169,32 @@ while True:
 greedy_seq, greedy_logp = list(seq), logp
 print("   result: %s   log-probability %.4f (p = %.4f)"
       % (" ".join(greedy_seq), greedy_logp, np.exp(greedy_logp)))
-print()
+```
 
-def enumerate_all(seq=(), logp=0.0, out=None):
+The next block exhaustively enumerates every sequence and shows which one is actually the most probable.
+
+```python-run
+import numpy as np
+
+TOK = ["A", "B", "."]
+T = {(): [.55,.45,0], ("A",): [.3,.3,.4], ("B",): [.01,.01,.98], ("A","A"): [.05,.05,.9],
+     ("A","B"): [.05,.05,.9], ("B","A"): [.05,.05,.9], ("B","B"): [.05,.05,.9]}
+def probs(s): return np.array(T.get(tuple(s), [0.,0.,1.]))
+seq, lp = [], 0.0
+while len(seq) < 6:
+    p = probs(seq); i = int(p.argmax()); lp += np.log(p[i])
+    seq.append(TOK[i])
+    if TOK[i] == ".": break
+greedy_seq, greedy_lp = list(seq), lp
+def enum_all(s=(), lp=0.0, out=None):
     out = [] if out is None else out
-    if seq and seq[-1] == "." or len(seq) > 4:
-        out.append((list(seq), logp))
-        return out
-    p = probs(list(seq))
+    if s and s[-1] == "." or len(s) > 4:
+        out.append((list(s), lp)); return out
+    p = probs(list(s))
     for i, t in enumerate(TOK):
-        if p[i] > 0:
-            enumerate_all(tuple(seq) + (t,), logp + np.log(p[i]), out)
+        if p[i] > 0: enum_all(s+(t,), lp+np.log(p[i]), out)
     return out
-
-everything = sorted(enumerate_all(), key=lambda kv: -kv[1])
+everything = sorted(enum_all(), key=lambda kv: -kv[1])
 print("but here is EVERY sequence this decoder can produce, ranked:")
 print("%22s %16s %14s" % ("sequence", "log-probability", "probability"))
 for s, lp in everything[:6]:
@@ -192,37 +202,51 @@ for s, lp in everything[:6]:
     print("%22s %16.4f %14.4f%s" % (" ".join(s), lp, np.exp(lp), mark))
 print()
 best_seq, best_lp = everything[0]
-print("the most likely sequence is '%s' at p=%.4f." % (" ".join(best_seq), np.exp(best_lp)))
+print("the most likely sequence is '%s' at p=%.4f."
+      % (" ".join(best_seq), np.exp(best_lp)))
 print("greedy decoding returned '%s' at p=%.4f -- it is %.1fx less likely."
-      % (" ".join(greedy_seq), np.exp(greedy_logp), np.exp(best_lp - greedy_logp)))
+      % (" ".join(greedy_seq), np.exp(greedy_lp), np.exp(best_lp - greedy_lp)))
 print()
+p0 = probs([])
 print("greedy went wrong at the very first step. A looked better than B")
 print("(%.2f against %.2f), and it is -- for one token. but every path out"
       % (p0[0], p0[1]))
 print("of A is mediocre, while B has one strong ending. a locally optimal")
 print("choice, globally wrong, and greedy has no way to find that out")
 print("because it never looks past the token in front of it.")
-print()
+```
 
+The next block runs beam search and shows how widening the beam finds the better sequence.
+
+```python-run
+import numpy as np
+
+TOK = ["A", "B", "."]
+T = {(): [.55,.45,0], ("A",): [.3,.3,.4], ("B",): [.01,.01,.98], ("A","A"): [.05,.05,.9],
+     ("A","B"): [.05,.05,.9], ("B","A"): [.05,.05,.9], ("B","B"): [.05,.05,.9]}
+def probs(s): return np.array(T.get(tuple(s), [0.,0.,1.]))
 def beam_search(k):
-    beams = [([], 0.0)]
-    finished = []
+    beams, finished = [([], 0.0)], []
     for _ in range(5):
         cand = []
         for seq, lp in beams:
             if seq and seq[-1] == ".":
-                finished.append((seq, lp))
-                continue
+                finished.append((seq, lp)); continue
             p = probs(seq)
             for i, t in enumerate(TOK):
-                if p[i] > 0:
-                    cand.append((seq + [t], lp + np.log(p[i])))
-        if not cand:
-            break
+                if p[i] > 0: cand.append((seq+[t], lp+np.log(p[i])))
+        if not cand: break
         beams = sorted(cand, key=lambda kv: -kv[1])[:k]
-    finished += beams
-    return sorted(finished, key=lambda kv: -kv[1])[0]
-
+    return sorted(finished + beams, key=lambda kv: -kv[1])[0]
+def enum_all(s=(), lp=0.0, out=None):
+    out = [] if out is None else out
+    if s and s[-1] == "." or len(s) > 4:
+        out.append((list(s), lp)); return out
+    p = probs(list(s))
+    for i, t in enumerate(TOK):
+        if p[i] > 0: enum_all(s+(t,), lp+np.log(p[i]), out)
+    return out
+best_lp = sorted(enum_all(), key=lambda kv: -kv[1])[0][1]
 print("BEAM SEARCH keeps the k best partial sequences instead of one:")
 print("%8s %22s %16s" % ("beam k", "result", "log-probability"))
 for k in (1, 2, 3, 5):
@@ -231,13 +255,30 @@ for k in (1, 2, 3, 5):
           % (k, " ".join(s), lp, "  <- optimal" if abs(lp - best_lp) < 1e-9 else ""))
 print("  k=1 IS greedy decoding -- that is the definition. widening the beam")
 print("  to 2 is enough to find the answer here.")
-print()
 print("beam search is still not guaranteed to find the best sequence. it is")
-print("a heuristic: it explores k times as much and can still prune the")
-print("winner early. exhaustive search is the only guarantee, and it costs")
-print("|vocab| ^ length -- for a 50,000 token vocabulary and 20 tokens that")
-print("is 10^94 sequences.")
-print()
+print("a heuristic that explores k times as much and can still prune the")
+print("winner early. for a 50,000 token vocabulary and 20 tokens, exhaustive")
+print("search would take 10^94 sequences.")
+```
+
+The next block shows why beam search needs length normalisation.
+
+```python-run
+import numpy as np
+
+TOK = ["A", "B", "."]
+T = {(): [.55,.45,0], ("A",): [.3,.3,.4], ("B",): [.01,.01,.98], ("A","A"): [.05,.05,.9],
+     ("A","B"): [.05,.05,.9], ("B","A"): [.05,.05,.9], ("B","B"): [.05,.05,.9]}
+def probs(s): return np.array(T.get(tuple(s), [0.,0.,1.]))
+def enum_all(s=(), lp=0.0, out=None):
+    out = [] if out is None else out
+    if s and s[-1] == "." or len(s) > 4:
+        out.append((list(s), lp)); return out
+    p = probs(list(s))
+    for i, t in enumerate(TOK):
+        if p[i] > 0: enum_all(s+(t,), lp+np.log(p[i]), out)
+    return out
+everything = sorted(enum_all(), key=lambda kv: -kv[1])
 print("one practical wrinkle: longer sequences have lower probability, always,")
 print("because you multiply by another number below 1 at every step:")
 for s, lp in everything[:5]:

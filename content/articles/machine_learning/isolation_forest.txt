@@ -141,18 +141,12 @@ Alone Forest splits at random and counts how few cuts it takes to isolate a poin
 ```python-run
 import numpy as np
 from sklearn.ensemble import IsolationForest
-from sklearn.svm import OneClassSVM
-from sklearn.neighbors import LocalOutlierFactor
-from sklearn.covariance import EllipticEnvelope
-
 rng = np.random.default_rng(0)
 normal = rng.normal(0, 1, (960, 2))
 weird = rng.uniform(-6, 6, (40, 2))
 X = np.vstack([normal, weird])
-truth = np.r_[np.ones(960), -np.ones(40)]       # 1 = normal, -1 = anomaly
-print("960 normal points and %d scattered ones. no labels are used to fit."
-      % len(weird))
-print()
+truth = np.r_[np.ones(960), -np.ones(40)]
+print("960 normal points and %d scattered ones. no labels." % len(weird))
 
 iso = IsolationForest(contamination=0.04, random_state=0).fit(X)
 pred = iso.predict(X)
@@ -181,9 +175,23 @@ for lo, hi in ((0, 1), (1, 2), (2, 3), (3, 8)):
     if m.any():
         print("  %d-%d sd from centre: %4d points, mean score %.4f, flagged %d"
               % (lo, hi, m.sum(), s[m].mean(), (pred[m] == -1).sum()))
-print("  no distance was ever computed. random splits isolate far-out points")
+print("  no distance was computed. random splits isolate far-out points")
 print("  in fewer cuts, and that is all the algorithm knows.")
-print()
+```
+
+The next block shows how the contamination parameter works and compares Isolation Forest against the other unsupervised detectors.
+
+```python-run
+import numpy as np
+from sklearn.ensemble import IsolationForest
+from sklearn.svm import OneClassSVM
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.covariance import EllipticEnvelope
+rng = np.random.default_rng(0)
+normal = rng.normal(0, 1, (960, 2))
+weird = rng.uniform(-6, 6, (40, 2))
+X = np.vstack([normal, weird])
+truth = np.r_[np.ones(960), -np.ones(40)]
 
 print("contamination is not a threshold on weirdness -- it is a quota:")
 for c in (0.01, 0.04, 0.10, 0.25):
@@ -204,9 +212,8 @@ for name, m in (("Isolation Forest", IsolationForest(contamination=0.04, random_
           % (name, ((p == -1) & (truth == -1)).sum(), (truth == -1).sum(),
              ((p == -1) & (truth == 1)).sum()))
 print()
-print("Isolation Forest is the usual first choice because it is linear in the")
-print("number of rows, needs no distance metric, and survives high dimensions")
-print("better than anything that measures distance. Elliptic Envelope assumes")
-print("your normal data is one gaussian blob -- fast and exact when that is")
+print("Isolation Forest is the usual first choice: linear in the number")
+print("of rows, needs no distance metric, survives high dimensions.")
+print("Elliptic Envelope assumes one gaussian blob -- fast when that is")
 print("true, useless when it is not.")
 ```

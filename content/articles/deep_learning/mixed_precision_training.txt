@@ -156,12 +156,16 @@ for v in (1e-4, 1e-5, 1e-6, 1e-7, 3e-8, 1e-8):
              "   <- gone" if np.float16(v) == 0 else ""))
 print()
 print("that bottom edge is the problem: gradients routinely live there.")
-print()
+```
 
-print("watch a realistic gradient distribution meet it:")
+The next block shows what happens when a realistic gradient distribution meets that floor, and how loss scaling fixes it.
+
+```python-run
+import numpy as np
+
 rng = np.random.default_rng(0)
 grads = np.abs(rng.lognormal(mean=-17.5, sigma=1.6, size=200_000))
-tiny16 = np.finfo(np.float16).tiny
+print("a realistic gradient distribution meets float16:")
 print("  gradient magnitudes: median %.3e, 5th percentile %.3e"
       % (np.median(grads), np.percentile(grads, 5)))
 lost = (grads.astype(np.float16) == 0).mean()
@@ -170,7 +174,6 @@ print("  fraction that become EXACTLY ZERO when cast to float16: %.1f%%"
 print("  those gradients are not small any more. they are gone, and the")
 print("  weights they belonged to will not update at all.")
 print()
-
 print("LOSS SCALING is the fix, and it is almost embarrassingly simple:")
 print("multiply the loss by a large constant before the backward pass, then")
 print("divide the gradients by the same constant before the update.")
@@ -189,16 +192,20 @@ print("so it costs no precision at all:")
 x = np.float16(0.000123)
 print("  0.000123 as float16          : %.9f" % float(x))
 print("  x * 1024 / 1024 back again   : %.9f" % float(np.float16(x * 1024) / 1024))
-print()
+```
 
-print("but too large a scale overflows, which is why the scale is DYNAMIC:")
+The next block shows why the scale must be dynamic, and the second failure mode: accumulation.
+
+```python-run
+import numpy as np
+
+print("too large a scale overflows, which is why the scale is DYNAMIC:")
 print("  start high (2^16), and on any step that produces inf or nan:")
 print("     skip the update entirely, halve the scale")
 print("  after N good steps in a row: double it")
 print("  the scale ends up tracking the largest value your gradients")
 print("  currently reach, and it moves as training changes them.")
 print()
-
 print("the second thing that breaks is accumulation. adding many small")
 print("numbers to a large one in float16 loses them completely:")
 acc16 = np.float16(1024.0)
@@ -218,7 +225,12 @@ print("that is why mixed precision keeps a MASTER COPY of the weights in")
 print("float32. the forward and backward passes run in float16 for speed;")
 print("the optimiser update -- which is exactly this kind of accumulation --")
 print("happens in float32, and the float16 weights are refreshed from it.")
-print()
+```
+
+The next block shows how bfloat16 sidesteps the range problem entirely.
+
+```python-run
+import numpy as np
 
 print("bfloat16 solves the range problem differently -- same 16 bits, more")
 print("of them spent on the exponent:")

@@ -134,24 +134,20 @@ Building up grads over a few small batches before stepping is arithmetically the
 
 ```python-run
 import numpy as np
-
 rng = np.random.default_rng(0)
 N, D = 64, 5
 X = rng.normal(size=(N, D))
 w_true = rng.normal(size=D)
 y = X @ w_true + rng.normal(0, 0.3, N)
 w = np.zeros(D)
-
 def grad(Xb, yb, wv):
     return 2 * Xb.T @ (Xb @ wv - yb) / len(Xb)
-
 print("64 rows. compute the gradient two ways.")
 print()
 big = grad(X, y, w)
 print("one batch of 64:")
 print("  ", np.round(big, 8))
 print()
-
 acc = np.zeros(D)
 STEPS = 4
 for i in range(STEPS):
@@ -165,7 +161,6 @@ print("identical. that is the whole technique: the mean over 64 rows is the")
 print("mean of four means over 16 rows, as long as the batches are equal")
 print("sized and you divide by the number of accumulation steps.")
 print()
-
 print("the division is the part people get wrong. without it:")
 wrong = sum(grad(X[i * 16:(i + 1) * 16], y[i * 16:(i + 1) * 16], w)
             for i in range(STEPS))
@@ -173,18 +168,22 @@ print("  summed without dividing:", np.round(wrong[:3], 4), "...")
 print("  correct:                ", np.round(big[:3], 4), "...")
 print("  ratio: %.1f -- you have silently multiplied your learning rate by %d."
       % (np.abs(wrong).mean() / np.abs(big).mean(), STEPS))
-print()
+```
 
-print("what it buys, in memory terms. activation memory scales with batch")
-print("size; gradient memory does not:")
+The next block shows what accumulation buys in memory, and the two things it does not preserve.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+X = rng.normal(size=(64, 5))
+print("what accumulation buys, in memory terms. activation memory scales with")
+print("batch size; gradient memory does not:")
 print("%14s %18s %18s" % ("micro-batch", "activations held", "effective batch"))
 for micro in (64, 16, 8, 4, 1):
-    print("%14d %18s %18d"
-          % (micro, "%dx" % micro, 64))
+    print("%14d %18s %18d" % (micro, "%dx" % micro, 64))
 print("  the gradient buffer is the same size in every row -- one number per")
 print("  parameter. only the activations kept for the backward pass shrink.")
 print()
-
 print("and now the two things that are NOT identical.")
 print()
 print("1. BatchNorm. its statistics come from the micro-batch, not the")
@@ -202,8 +201,12 @@ print()
 print("2. speed. four passes of 16 do the same arithmetic as one pass of 64,")
 print("   but with four times the kernel launches and less parallelism. you")
 print("   are trading wall-clock time for memory, not getting both.")
-print()
+```
 
+Finally, the standard accumulation loop in pseudocode.
+
+```python-run
+ACCUM = 4
 print("the loop, written out, because the off-by-one is easy:")
 print("    optimizer.zero_grad()")
 print("    for i, batch in enumerate(loader):")
@@ -219,5 +222,5 @@ print("-- if the loader ends mid-accumulation those gradients are discarded.")
 print()
 print("and if you use a learning rate schedule, step it once per OPTIMIZER")
 print("step, not once per micro-batch, or your schedule runs %d times too fast."
-      % STEPS)
+      % ACCUM)
 ```

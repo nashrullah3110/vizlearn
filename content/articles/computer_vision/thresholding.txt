@@ -138,7 +138,6 @@ def show(a, label):
         print("      " + "".join(SHADE[int(np.clip((v - lo) / max(hi - lo, 1e-9), 0, 1) * 9)]
                                  for v in row))
 
-# a document-like image: dark text on a light page, with uneven lighting
 H, W = 12, 24
 page = np.full((H, W), 200.0)
 text = [(2, 3), (2, 4), (2, 5), (3, 3), (4, 3), (4, 4), (4, 5),
@@ -147,7 +146,6 @@ text = [(2, 3), (2, 4), (2, 5), (3, 3), (4, 3), (4, 4), (4, 5),
         (8, 4), (8, 5), (9, 4), (9, 5)]
 for r, c in text:
     page[r, c] = 40.0
-# a lighting gradient: bright on the left, dim on the right
 page = page * np.linspace(1.0, 0.13, W)[None, :]
 page = np.clip(page + rng.normal(0, 3, page.shape), 0, 255)
 
@@ -167,7 +165,22 @@ for i, count in enumerate(hist):
     if count:
         print("      %3.0f-%3.0f %5d %s"
               % (edges[i], edges[i + 1], count, "#" * int(40 * count / hist.max())))
-print()
+```
+
+The next block implements Otsu's method, which picks the threshold automatically by maximising the between-class variance, then compares global and adaptive thresholding on the unevenly lit page.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(0)
+H, W = 12, 24
+page = np.full((H, W), 200.0)
+text = [(2,3),(2,4),(2,5),(3,3),(4,3),(4,4),(4,5),(6,12),(6,13),(7,12),
+        (8,12),(8,13),(2,18),(3,18),(4,18),(4,19),(4,20),(8,4),(8,5),(9,4),(9,5)]
+for r, c in text:
+    page[r, c] = 40.0
+page = page * np.linspace(1.0, 0.13, W)[None, :]
+page = np.clip(page + rng.normal(0, 3, page.shape), 0, 255)
 
 def otsu(a, bins=64):
     hist_, edges_ = np.histogram(a, bins=bins, range=(0, 256))
@@ -191,7 +204,28 @@ print("OTSU'S METHOD searches every threshold and keeps the one that")
 print("maximises the variance BETWEEN the two groups -- equivalently, the")
 print("one that minimises the variance within them:")
 print("   chosen threshold: %.1f" % t_otsu)
-print()
+```
+
+The next block applies global and adaptive thresholding side by side, then measures each against the known ink positions.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+H, W = 12, 24
+page = np.full((H, W), 200.0)
+text = [(2,3),(2,4),(2,5),(3,3),(4,3),(4,4),(4,5),(6,12),(6,13),(7,12),
+        (8,12),(8,13),(2,18),(3,18),(4,18),(4,19),(4,20),(8,4),(8,5),(9,4),(9,5)]
+for r, c in text:
+    page[r, c] = 40.0
+page = page * np.linspace(1.0, 0.13, W)[None, :]
+page = np.clip(page + rng.normal(0, 3, page.shape), 0, 255)
+SHADE = " .:-=+*#%@"
+
+def show(a, label):
+    print("   %s" % label)
+    lo, hi = a.min(), a.max()
+    for row in a:
+        print("      " + "".join(SHADE[int(np.clip((v-lo)/max(hi-lo,1e-9),0,1)*9)] for v in row))
 
 def apply_global(a, t):
     return (a < t).astype(float)
@@ -208,61 +242,56 @@ def adaptive(a, block=7, offset=8.0):
 truth = np.zeros((H, W))
 for r, c in text:
     truth[r, c] = 1.0
-
-results = [("global, threshold 100", apply_global(page, 100.0)),
-           ("global, Otsu %.0f" % t_otsu, apply_global(page, t_otsu)),
-           ("adaptive, 7x7 local mean", adaptive(page))]
-for name, out in results:
+for name, out in [("global, threshold 100", apply_global(page, 100.0)),
+                  ("global, Otsu 36", apply_global(page, 36.0)),
+                  ("adaptive, 7x7 local mean", adaptive(page))]:
     show(out, name)
-    tp = int((out * truth).sum())
-    fp = int((out * (1 - truth)).sum())
-    fn = int(((1 - out) * truth).sum())
-    print("      found %d of %d marks, with %d false positives"
-          % (tp, int(truth.sum()), fp))
+    tp, fp = int((out * truth).sum()), int((out * (1 - truth)).sum())
+    print("      found %d of %d marks, with %d false positives" % (tp, int(truth.sum()), fp))
     print()
+```
 
-print("READ THE GLOBAL RESULTS. whatever single number you pick:")
+The next block sweeps through several global thresholds to show the precision-recall trade-off, then demonstrates how adaptive thresholding sidesteps it entirely.
+
+```python-run
+import numpy as np
+rng = np.random.default_rng(0)
+H, W = 12, 24
+page = np.full((H, W), 200.0)
+text = [(2,3),(2,4),(2,5),(3,3),(4,3),(4,4),(4,5),(6,12),(6,13),(7,12),
+        (8,12),(8,13),(2,18),(3,18),(4,18),(4,19),(4,20),(8,4),(8,5),(9,4),(9,5)]
+for r, c in text:
+    page[r, c] = 40.0
+page = page * np.linspace(1.0, 0.13, W)[None, :]
+page = np.clip(page + rng.normal(0, 3, page.shape), 0, 255)
+truth = np.zeros((H, W))
+for r, c in text:
+    truth[r, c] = 1.0
+
+def apply_global(a, t):
+    return (a < t).astype(float)
+
+def adaptive(a, block=7, offset=8.0):
+    p = np.pad(a, block // 2, mode="edge")
+    out = np.zeros_like(a)
+    for i in range(a.shape[0]):
+        for j in range(a.shape[1]):
+            out[i, j] = 1.0 if a[i, j] < p[i:i+block, j:j+block].mean() - offset else 0.0
+    return out
+
+print("SWEEP OF GLOBAL THRESHOLDS:")
 print("%16s %10s %10s %10s" % ("threshold", "found", "missed", "false pos"))
-for t in (15, 22, 30, 60, 100, t_otsu):
+for t in (15, 22, 30, 60, 100, 36):
     out = apply_global(page, t)
     print("%16.0f %10d %10d %10d"
-          % (t, int((out * truth).sum()), int(((1 - out) * truth).sum()),
-             int((out * (1 - truth)).sum())))
-print("   read it as a trade with no good corner. a low threshold keeps the")
-print("   page clean and MISSES ink; raising it recovers the ink and starts")
-print("   calling the dim page ink too. the two classes overlap once the")
-print("   lighting is folded in:")
-ink_vals = [page[r, c] for r, c in text]
-pg = np.array([page[i, j] for i in range(H) for j in range(W)
-               if truth[i, j] == 0])
-print("      ink ranges  %.0f to %.0f" % (min(ink_vals), max(ink_vals)))
-print("      page ranges %.0f to %.0f" % (pg.min(), pg.max()))
-print("      those ranges overlap, and no threshold can undo that.")
+          % (t, int((out*truth).sum()), int(((1-out)*truth).sum()), int((out*(1-truth)).sum())))
+print("   ink and page brightness ranges overlap, and no threshold fixes that.")
 print()
-
-out_a = adaptive(page)
-print("ADAPTIVE THRESHOLDING compares each pixel to its own neighbourhood")
-print("rather than to a global constant:")
-print("   found %d of %d, %d false positives"
-      % (int((out_a * truth).sum()), int(truth.sum()), int((out_a * (1 - truth)).sum())))
-print("   it works because 'darker than the page around me' is true for ink")
-print("   everywhere, while 'darker than 100' is only true on the left.")
-print()
-print("   the two parameters matter:")
+print("ADAPTIVE compares each pixel to its own neighbourhood:")
 for block in (3, 7, 15):
     o = adaptive(page, block)
     print("      block %2d: found %2d, false positives %2d"
           % (block, int((o * truth).sum()), int((o * (1 - truth)).sum())))
-print("   the marks here are one or two pixels wide, so even a 3x3 block")
-print("   still sees page around them. with thicker strokes a small block")
-print("   sits entirely INSIDE the mark, the local mean becomes the ink")
-print("   itself, and the middle of the stroke is classified as background")
-print("   -- hollow letters. going the other way, a block large enough to")
-print("   span the whole lighting gradient degenerates back into a global")
-print("   threshold, which is what the rising false positives above show.")
-print()
-print("the general lesson is not about thresholds. it is that a global")
-print("statistic fails whenever the thing you are measuring varies across")
-print("the image -- which is also why normalisation layers exist, and why")
-print("illumination correction is a standard first step in classical vision.")
+print("   a global statistic fails whenever the thing you measure varies across")
+print("   the image -- also why normalisation layers exist.")
 ```
