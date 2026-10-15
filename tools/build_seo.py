@@ -18,7 +18,7 @@ import re
 
 import indexing
 from lib_catalog import ROOT, SITE, counts, modules, page_description
-from lib_pages import (is_tool_page, tool_page,
+from lib_pages import (CONTACT_EMAIL, is_tool_page, tool_page,
                        DIR_TO_TOPIC, STATIC_LD_TYPE, STATIC_PAGES, STATIC_TITLES,
                        TOPICS, first_published, is_static_page, is_topic_page,
                        last_modified, page_url, topic_url)
@@ -69,6 +69,7 @@ SITE_ORG_LD = {
     "logo": SITE + "/assets/icon-512.png",
     "description": ("Free interactive visual explainers for machine learning, deep "
                     "learning, algorithms and the mathematics underneath them."),
+    "email": CONTACT_EMAIL,
     "founder": AUTHOR_LD,
 }
 

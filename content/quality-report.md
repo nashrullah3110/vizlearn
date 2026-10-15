@@ -93,10 +93,10 @@ Headings inside the article that appear on more than 5% of modules:
 | Pages | Paragraph (start) |
 |---|---|
 | 8 | Then stop. The commonest failure on a question like this is answering it correctly in one sentence and then ta... |
-| 4 | All four of these read the same object: an ordered list of retrieved results, with each one labelled relevant ... |
 | 4 | The labels are the expensive part. A relevance judgement per query-document pair is human work, and an evaluat... |
 | 4 | These four are usually measured with an LLM as judge: a strong model is shown the question, the retrieved cont... |
 | 4 | Two habits make judge scores trustworthy. Ask for a decision and a justification, so a human can audit disagre... |
+| 4 | All four of these read the same object: an ordered list of retrieved results, with each one labelled relevant ... |
 | 3 | These editors run inside a browser event loop that is already going, so the examples finish with . In a standa... |
 
 ### 5. What comes before the article
@@ -104,7 +104,7 @@ Headings inside the article that appear on more than 5% of modules:
 Median: 362 words of text before the article starts, 15% of them on 1-3 word lines
 (control labels, readouts, key hints, the table of contents). 2 modules are at 50% or more.
 
-634 modules mark their controls and readouts `data-nosnippet`: 89494 words in all that a
+634 modules mark their controls and readouts `data-nosnippet`: 89497 words in all that a
 search snippet may not quote. (A snippet hint only - the text is still read and indexed.)
 
 ### 6. Dates
@@ -115,7 +115,7 @@ No date in the future, unparseable, or modified-before-published, on any page.
 
 9 pages threw an error only because the scan could not load their library from a CDN
 (Chart.js, three.js, MathJax - this sandbox's network blocks those hosts). Not a site bug;
-listed so a rerun on an open network can confirm: `computer_vision/cnn.html`, `deep_learning/activation_functions.html`, `deep_learning/gradient_descent_batch_processing.html`, `deep_learning/learning_rate_scheduling.html`, `deep_learning/model_training_curve.html`, `deep_learning/overfitting_vs_underfitting.html`, `deep_learning/optimizers_in_3d.html`, `machine_learning/bias_vs_variance.html`, `natural_language_processing/rnn.html`.
+listed so a rerun on an open network can confirm: `computer_vision/cnn.html`, `deep_learning/activation_functions.html`, `deep_learning/gradient_descent_batch_processing.html`, `deep_learning/learning_rate_scheduling.html`, `deep_learning/model_training_curve.html`, `deep_learning/optimizers_in_3d.html`, `deep_learning/overfitting_vs_underfitting.html`, `machine_learning/bias_vs_variance.html`, `natural_language_processing/rnn.html`.
 
 - `html-lab/index.html`: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.
 
@@ -151,10 +151,10 @@ listed so a rerun on an open network can confirm: `computer_vision/cnn.html`, `d
 | `sql-lab/index.html` | lab | 655 | 38 | 3 | noindex, follow | no |
 | `404.html` | system | 81 | 9 | 0 | noindex, follow | no |
 | `offline.html` | system | 41 | 1 | 0 | noindex | no |
-| `about.html` | trust | 607 | 48 | 6 | - | no |
-| `author.html` | trust | 1039 | 48 | 10 | - | no |
-| `contact.html` | trust | 723 | 58 | 6 | - | no |
-| `privacy.html` | trust | 1021 | 59 | 4 | - | no |
+| `about.html` | trust | 741 | 49 | 8 | - | no |
+| `author.html` | trust | 1050 | 48 | 10 | - | no |
+| `contact.html` | trust | 730 | 58 | 6 | - | no |
+| `privacy.html` | trust | 1104 | 60 | 4 | - | no |
 | `terms.html` | trust | 626 | 47 | 4 | - | no |
 | `glossary/index.html` | utility | 1545 | 104 | 0 | noindex, follow | no |
 | `map/index.html` | utility | 2658 | 700 | 0 | noindex, follow | no |
@@ -164,10 +164,10 @@ listed so a rerun on an open network can confirm: `computer_vision/cnn.html`, `d
 
 Structured data on the trust pages and homepage:
 
-- `about.html`: AboutPage, BreadcrumbList, ListItem, Organization, WebSite
+- `about.html`: AboutPage, BreadcrumbList, CollegeOrUniversity, EducationalOrganization, ListItem, Organization, Person, WebSite
 - `author.html`: BreadcrumbList, ListItem, Organization, ProfilePage, WebSite
 - `contact.html`: BreadcrumbList, ContactPage, ListItem, Organization, WebSite
-- `index.html`: EntryPoint, Organization, SearchAction, WebSite
+- `index.html`: CollegeOrUniversity, EducationalOrganization, EntryPoint, Organization, Person, SearchAction, WebSite
 - `privacy.html`: BreadcrumbList, ListItem, Organization, PrivacyPolicyPage, WebSite
 - `terms.html`: BreadcrumbList, ListItem, Organization, WebPage, WebSite
 
@@ -466,8 +466,8 @@ Tier 2 on length alone and within 150 words of the cut. Each is a short expansio
 | `dsa/counting_sort.html` | 1671 | 3 / 5 / 1 |
 | `database/joins_in_sql.html` | 1669 | 1 / 8 / 0 |
 | `gen_ai/retrieval_evaluation_metrics.html` | 1667 | 5 / 3 / 1 |
-| `gen_ai/scann_index.html` | 1660 | 0 / 2 / 0 |
 | `gen_ai/structure_aware_chunking.html` | 1660 | 2 / 4 / 2 |
+| `gen_ai/scann_index.html` | 1660 | 0 / 2 / 0 |
 | `natural_language_processing/glove.html` | 1658 | 1 / 4 / 0 |
 | `computer_vision/mask_rcnn.html` | 1656 | 0 / 2 / 0 |
 | `dsa/a_star.html` | 1652 | 3 / 4 / 1 |
@@ -651,8 +651,8 @@ Tier 2 on length alone and within 150 words of the cut. Each is a short expansio
 | `deep_learning/perceptron.html` | 1176 | 2 / 3 / 2 |
 | `interview/sliding-window-maximum.html` | 1173 | 2 / 12 / 0 |
 | `natural_language_processing/why_text_encoding_is_needed_in_nlp.html` | 1168 | 1 / 4 / 0 |
-| `deep_learning/layer_normalization.html` | 1160 | 2 / 4 / 11 |
 | `deep_learning/learning_rate_scheduling.html` | 1160 | 3 / 4 / 2 |
+| `deep_learning/layer_normalization.html` | 1160 | 2 / 4 / 11 |
 | `interview/find-the-duplicate-number.html` | 1153 | 2 / 18 / 0 |
 | `natural_language_processing/text_encoding_techniques_in_nlp.html` | 1151 | 2 / 4 / 1 |
 | `interview/what-does-yield-actually-do.html` | 1149 | 0 / 9 / 0 |
