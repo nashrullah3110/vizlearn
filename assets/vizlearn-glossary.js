@@ -92,23 +92,35 @@
     span.tabIndex = 0;
     span.setAttribute('role', 'button');
     span.setAttribute('aria-label', word + ' - show definition');
-    // The card is the term's description rather than a second unrelated
-    // label, so a screen reader announces the definition when the term takes
-    // focus instead of reading it inline as part of the sentence.
-    span.setAttribute('aria-describedby', cardId);
     span.textContent = word;
     span.dataset.slug = entry.t.slug;
 
-    var card = document.createElement('span');
-    card.className = 'vz-term-card';
-    card.id = cardId;
-    card.setAttribute('role', 'tooltip');
-    var body = '<b>' + entry.t.term + '</b>' + entry.t.def;
-    if (entry.t.where && entry.t.where !== prefix.path) {
-      body += '<a href="' + prefix.up + entry.t.where + '">Open the module &rarr;</a>';
+    // The card is built on first hover, focus or tap, not here. Built eagerly
+    // it sat inside the sentence as hidden text, so anything reading the
+    // page's text - a crawler, reader mode, copy and paste - got
+    // "overfitoverfittingLearning noise...Open the module" in place of
+    // "overfit". Once built it stays, so the CSS hover/focus rules work as
+    // before.
+    function open() {
+      if (span.querySelector('.vz-term-card')) return;
+      var card = document.createElement('span');
+      card.className = 'vz-term-card';
+      card.id = cardId;
+      card.setAttribute('role', 'tooltip');
+      var body = '<b>' + entry.t.term + '</b>' + entry.t.def;
+      if (entry.t.where && entry.t.where !== prefix.path) {
+        body += '<a href="' + prefix.up + entry.t.where + '">Open the module &rarr;</a>';
+      }
+      card.innerHTML = body;
+      span.appendChild(card);
+      // The card is the term's description rather than a second unrelated
+      // label, so a screen reader announces the definition when the term
+      // takes focus instead of reading it inline as part of the sentence.
+      span.setAttribute('aria-describedby', cardId);
     }
-    card.innerHTML = body;
-    span.appendChild(card);
+    span.addEventListener('mouseenter', open);
+    span.addEventListener('focus', open);
+    span.addEventListener('touchstart', open, { passive: true });
 
     node.parentNode.insertBefore(span, after);
     return true;

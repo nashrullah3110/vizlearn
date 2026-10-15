@@ -350,6 +350,11 @@
         var answer = $('.vz-q-answer', q);
         reveal.addEventListener('click', function () {
           var open = answer.hidden;
+          // The answer ships in an attribute, not as text (see check_markup
+          // in tools/build_labs.py); fill it in the first time it is opened.
+          if (open && !answer.textContent && answer.hasAttribute('data-vz-answer')) {
+            answer.textContent = answer.getAttribute('data-vz-answer');
+          }
           answer.hidden = !open;
           reveal.textContent = open ? 'Hide answer' : 'Show answer';
           if (open && !q.dataset.vzSeen) {

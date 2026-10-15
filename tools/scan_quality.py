@@ -340,7 +340,9 @@ def write_report(scored, rows_by_path, heading_pages, boiler, shared, today):
     a("")
     a("%d of %d modules (%s) carry hidden glossary cards inside the article - %d cards," % (
         len(g), n, pct(len(g), n), sum(mods[p]["glossaryCards"] for p in g)))
-    a("%d characters of definition text in total. Read as page text, a sentence becomes:" % sum(mods[p]["glossaryHiddenChars"] for p in g))
+    a("%d characters of definition text in total.%s" % (
+        sum(mods[p]["glossaryHiddenChars"] for p in g),
+        " Read as page text, a sentence becomes:" if g else ""))
     a("")
     for p in g[:1]:
         for s in rows_by_path[p].get("bleedSamples", [])[:2]:

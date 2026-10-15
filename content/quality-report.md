@@ -17,9 +17,9 @@ Every page was rendered in Chromium, so these numbers include what the scripts a
 | trust pages | 5 |
 | system pages | 2 |
 | Failed to load | 0 |
-| **Tier 1 modules** (index + ads during review) | **595** |
-| Tier 2 modules (noindex during review) | 42 |
-| of which borderline (650-799 prose words) | 40 |
+| **Tier 1 modules** (index + ads during review) | **598** |
+| Tier 2 modules (noindex during review) | 39 |
+| of which borderline (650-799 prose words) | 37 |
 
 Tier 1 rule: at least 800 words of article prose (code, tables, the code lab and
 glossary cards excluded), at least one table, code block or worked formula, and no more
@@ -32,49 +32,46 @@ top of the script; change them and rerun with `--reuse`.
 |---|---|
 | 0-399 | 2 |
 | 400-649 | 0 |
-| 650-799 | 40 |
-| 800-1199 | 146 |
-| 1200-1999 | 446 |
-| 2000+ | 3 |
+| 650-799 | 37 |
+| 800-1199 | 149 |
+| 1200-1999 | 445 |
+| 2000+ | 4 |
 
 ### By track
 
 | Track | Modules | Tier 1 | Tier 2 | Median prose words |
 |---|---|---|---|---|
-| Interview | 71 | 52 | 19 | 881 |
-| Gen AI | 52 | 52 | 0 | 1533 |
-| Computer Vision | 47 | 44 | 3 | 1270 |
-| Maths | 47 | 39 | 8 | 1325 |
-| Deep Learning | 46 | 45 | 1 | 1368 |
-| Python | 46 | 46 | 0 | 1757 |
-| Machine Learning | 45 | 43 | 2 | 1446 |
-| Database | 42 | 34 | 8 | 1026 |
-| Algorithms | 41 | 41 | 0 | 1432 |
-| NLP | 41 | 40 | 1 | 1406 |
+| Interview | 71 | 53 | 18 | 887 |
+| Gen AI | 52 | 52 | 0 | 1544 |
+| Computer Vision | 47 | 45 | 2 | 1284 |
+| Maths | 47 | 39 | 8 | 1339 |
+| Deep Learning | 46 | 45 | 1 | 1381 |
+| Python | 46 | 46 | 0 | 1764 |
+| Machine Learning | 45 | 43 | 2 | 1451 |
+| Database | 42 | 35 | 7 | 1040 |
+| Algorithms | 41 | 41 | 0 | 1446 |
+| NLP | 41 | 40 | 1 | 1417 |
 | Pydantic | 30 | 30 | 0 | 1855 |
-| FastAPI | 26 | 26 | 0 | 1788 |
-| pandas | 26 | 26 | 0 | 1695 |
-| scikit-learn | 23 | 23 | 0 | 1788 |
-| matplotlib | 22 | 22 | 0 | 1747 |
-| NumPy | 20 | 20 | 0 | 1706 |
-| Concurrency | 7 | 7 | 0 | 1379 |
-| Async Python | 5 | 5 | 0 | 1396 |
+| FastAPI | 26 | 26 | 0 | 1803 |
+| pandas | 26 | 26 | 0 | 1699 |
+| scikit-learn | 23 | 23 | 0 | 1793 |
+| matplotlib | 22 | 22 | 0 | 1757 |
+| NumPy | 20 | 20 | 0 | 1709 |
+| Concurrency | 7 | 7 | 0 | 1387 |
+| Async Python | 5 | 5 | 0 | 1410 |
 
 ## Findings (site-wide, fixed in Stage 2-4 regardless of tier)
 
 ### 1. Glossary text bleeding into the prose
 
-296 of 637 modules (46%) carry hidden glossary cards inside the article - 879 cards,
-119391 characters of definition text in total. Read as page text, a sentence becomes:
+0 of 637 modules (0%) carry hidden glossary cards inside the article - 0 cards,
+0 characters of definition text in total.
 
-> `IoUIoUIntersection over union: the area two boxes share divided by the area they cover between them. 1 is identical, 0 is no overlap.Open the module →`
-
-(from `computer_vision/anchor_boxes.html`)
 
 ### 2. End-of-module answers copied from the page
 
-560 of 2116 end-of-module answers (26%) repeat the page's own prose word for word, on 203 modules.
-The cheat-sheet summary repeats the page's prose on 357 modules.
+6 of 1498 end-of-module answers (0%) repeat the page's own prose word for word, on 6 modules.
+The cheat-sheet summary repeats the page's prose on 0 modules.
 Section titles: "Check yourself" x438, "Recall check" x199.
 
 ### 3. Template headings
@@ -83,25 +80,10 @@ Headings inside the article that appear on more than 5% of modules:
 
 | Heading | Modules |
 |---|---|
-| Recap in one screen | 398 |
-| Questions people ask | 350 |
-| Where it goes wrong | 105 |
-| Things to try | 84 |
-| In one line | 71 |
-| Run it | 71 |
-| What to remember | 56 |
-| Common mistakes | 48 |
-| Summary | 46 |
-| Mistakes people make | 42 |
-| A closing note | 41 |
-| In summary | 37 |
-| Worth remembering | 36 |
-| The short version | 35 |
-| Experiments to try | 33 |
-| Try it yourself | 32 |
-| Next | 32 |
+| Recap in one screen | 59 |
+| Questions people ask | 46 |
 
-620 modules carry at least one of them.
+59 modules carry at least one of them.
 
 ### 4. Paragraphs repeated across pages
 
@@ -111,14 +93,14 @@ Headings inside the article that appear on more than 5% of modules:
 |---|---|
 | 8 | Then stop. The commonest failure on a question like this is answering it correctly in one sentence and then ta... |
 | 4 | Two habits make judge scores trustworthy. Ask for a decision and a justification, so a human can audit disagre... |
-| 4 | The labels are the expensive part. A relevance judgement per query-document pair is human work, and an evaluat... |
-| 4 | All four of these read the same object: an ordered list of retrieved results, with each one labelled relevant ... |
 | 4 | These four are usually measured with an LLM as judge: a strong model is shown the question, the retrieved cont... |
+| 4 | All four of these read the same object: an ordered list of retrieved results, with each one labelled relevant ... |
+| 4 | The labels are the expensive part. A relevance judgement per query-document pair is human work, and an evaluat... |
 | 3 | These editors run inside a browser event loop that is already going, so the examples finish with . In a standa... |
 
 ### 5. What comes before the article
 
-Median: 347 words of text before the article starts, 17% of them on 1-3 word lines
+Median: 355 words of text before the article starts, 15% of them on 1-3 word lines
 (control labels, readouts, key hints, the table of contents). 3 modules are at 50% or more.
 
 ### 6. Dates
@@ -137,44 +119,44 @@ listed so a rerun on an open network can confirm: `computer_vision/cnn.html`, `d
 
 | Page | Kind | Words | Links | Paragraphs of 2+ sentences | robots | Ad script |
 |---|---|---|---|---|---|---|
-| `index.html` | home | 4852 | 748 | 0 | - | yes |
-| `async_python/index.html` | hub | 314 | 67 | 2 | - | yes |
-| `computer_vision/index.html` | hub | 1358 | 109 | 2 | - | yes |
-| `concurrency/index.html` | hub | 370 | 69 | 2 | - | yes |
-| `database/index.html` | hub | 1409 | 104 | 4 | - | yes |
-| `deep_learning/index.html` | hub | 1539 | 108 | 3 | - | yes |
-| `dsa/index.html` | hub | 1567 | 103 | 3 | - | yes |
-| `fastapi/index.html` | hub | 758 | 88 | 3 | - | yes |
-| `gen_ai/index.html` | hub | 1362 | 114 | 1 | - | yes |
-| `interview/index.html` | hub | 1206 | 133 | 4 | - | yes |
-| `machine_learning/index.html` | hub | 1342 | 107 | 4 | - | yes |
-| `maths/index.html` | hub | 1482 | 109 | 3 | - | yes |
-| `matplotlib/index.html` | hub | 658 | 84 | 3 | - | yes |
-| `natural_language_processing/index.html` | hub | 1714 | 103 | 3 | - | yes |
-| `numpy/index.html` | hub | 683 | 82 | 4 | - | yes |
-| `pandas/index.html` | hub | 688 | 88 | 2 | - | yes |
-| `pydantic/index.html` | hub | 782 | 92 | 3 | - | yes |
-| `python/index.html` | hub | 1083 | 108 | 3 | - | yes |
-| `sklearn/index.html` | hub | 780 | 85 | 3 | - | yes |
-| `fastapi-lab/index.html` | lab | 1071 | 46 | 4 | - | yes |
-| `html-lab/index.html` | lab | 714 | 46 | 4 | - | yes |
-| `js-lab/index.html` | lab | 689 | 46 | 3 | - | yes |
-| `notebook/index.html` | lab | 937 | 47 | 4 | - | yes |
-| `pydantic-lab/index.html` | lab | 1018 | 47 | 3 | - | yes |
-| `python-lab/index.html` | lab | 798 | 46 | 4 | - | yes |
-| `sql-lab/index.html` | lab | 670 | 46 | 3 | - | yes |
+| `index.html` | home | 4429 | 701 | 0 | - | yes |
+| `async_python/index.html` | hub | 299 | 59 | 2 | - | yes |
+| `computer_vision/index.html` | hub | 1343 | 101 | 2 | - | yes |
+| `concurrency/index.html` | hub | 355 | 61 | 2 | - | yes |
+| `database/index.html` | hub | 1394 | 96 | 4 | - | yes |
+| `deep_learning/index.html` | hub | 1524 | 100 | 3 | - | yes |
+| `dsa/index.html` | hub | 1552 | 95 | 3 | - | yes |
+| `fastapi/index.html` | hub | 743 | 80 | 3 | - | yes |
+| `gen_ai/index.html` | hub | 1347 | 106 | 1 | - | yes |
+| `interview/index.html` | hub | 1191 | 125 | 4 | - | yes |
+| `machine_learning/index.html` | hub | 1327 | 99 | 4 | - | yes |
+| `maths/index.html` | hub | 1467 | 101 | 3 | - | yes |
+| `matplotlib/index.html` | hub | 643 | 76 | 3 | - | yes |
+| `natural_language_processing/index.html` | hub | 1699 | 95 | 3 | - | yes |
+| `numpy/index.html` | hub | 668 | 74 | 4 | - | yes |
+| `pandas/index.html` | hub | 673 | 80 | 2 | - | yes |
+| `pydantic/index.html` | hub | 767 | 84 | 3 | - | yes |
+| `python/index.html` | hub | 1068 | 100 | 3 | - | yes |
+| `sklearn/index.html` | hub | 765 | 77 | 3 | - | yes |
+| `fastapi-lab/index.html` | lab | 1056 | 38 | 4 | noindex, follow | no |
+| `html-lab/index.html` | lab | 699 | 38 | 4 | noindex, follow | no |
+| `js-lab/index.html` | lab | 674 | 38 | 3 | noindex, follow | no |
+| `notebook/index.html` | lab | 922 | 39 | 4 | noindex, follow | no |
+| `pydantic-lab/index.html` | lab | 1003 | 39 | 3 | noindex, follow | no |
+| `python-lab/index.html` | lab | 783 | 38 | 4 | noindex, follow | no |
+| `sql-lab/index.html` | lab | 655 | 38 | 3 | noindex, follow | no |
 | `404.html` | system | 81 | 9 | 0 | noindex, follow | no |
 | `offline.html` | system | 41 | 1 | 0 | noindex | no |
-| `about.html` | trust | 622 | 56 | 6 | - | yes |
-| `author.html` | trust | 1054 | 56 | 10 | - | yes |
-| `contact.html` | trust | 738 | 66 | 6 | - | yes |
-| `privacy.html` | trust | 1036 | 67 | 4 | - | yes |
-| `terms.html` | trust | 641 | 55 | 4 | - | yes |
-| `glossary/index.html` | utility | 1560 | 112 | 0 | - | yes |
-| `map/index.html` | utility | 2673 | 708 | 0 | noindex, follow | yes |
-| `practice/index.html` | utility | 365 | 44 | 2 | noindex, follow | yes |
-| `saved/index.html` | utility | 170 | 45 | 0 | noindex, follow | yes |
-| `whats-new/index.html` | utility | 3816 | 515 | 5 | - | yes |
+| `about.html` | trust | 607 | 48 | 6 | - | no |
+| `author.html` | trust | 1039 | 48 | 10 | - | no |
+| `contact.html` | trust | 723 | 58 | 6 | - | no |
+| `privacy.html` | trust | 1021 | 59 | 4 | - | no |
+| `terms.html` | trust | 626 | 47 | 4 | - | no |
+| `glossary/index.html` | utility | 1545 | 104 | 0 | noindex, follow | no |
+| `map/index.html` | utility | 2658 | 700 | 0 | noindex, follow | no |
+| `practice/index.html` | utility | 350 | 36 | 2 | noindex, follow | no |
+| `saved/index.html` | utility | 421 | 43 | 2 | noindex, follow | no |
+| `whats-new/index.html` | utility | 3801 | 507 | 5 | - | no |
 
 Structured data on the trust pages and homepage:
 
@@ -185,695 +167,692 @@ Structured data on the trust pages and homepage:
 - `privacy.html`: BreadcrumbList, ListItem, Organization, PrivacyPolicyPage, WebSite
 - `terms.html`: BreadcrumbList, ListItem, Organization, WebPage, WebSite
 
-## Borderline modules (40)
+## Borderline modules (37)
 
 Tier 2 on length alone and within 150 words of the cut. Each is a short expansion away from Tier 1.
 
 | Module | Prose words | Why Tier 2 |
 |---|---|---|
-| `computer_vision/colour_spaces_rgb_hsv.html` | 799 | 799 prose words (< 800) |
-| `database/primary_and_foreign_keys.html` | 798 | 798 prose words (< 800) |
-| `interview/string-compression.html` | 797 | 797 prose words (< 800) |
+| `interview/minimum-window-substring.html` | 795 | 795 prose words (< 800) |
+| `database/aggregate_functions_in_sql.html` | 794 | 794 prose words (< 800) |
+| `interview/grouping-and-inverting-dictionaries.html` | 794 | 794 prose words (< 800) |
+| `interview/longest-palindromic-substring.html` | 794 | 794 prose words (< 800) |
+| `maths/basis_span_and_orthogonality.html` | 794 | 794 prose words (< 800) |
 | `maths/sampling_distributions.html` | 794 | 794 prose words (< 800) |
-| `deep_learning/label_smoothing.html` | 790 | 790 prose words (< 800) |
-| `maths/basis_span_and_orthogonality.html` | 789 | 789 prose words (< 800) |
+| `deep_learning/label_smoothing.html` | 793 | 793 prose words (< 800) |
 | `interview/what-is-a-python-list-underneath.html` | 788 | 788 prose words (< 800) |
-| `database/aggregate_functions_in_sql.html` | 787 | 787 prose words (< 800) |
-| `interview/minimum-window-substring.html` | 787 | 787 prose words (< 800) |
-| `interview/longest-palindromic-substring.html` | 786 | 786 prose words (< 800) |
+| `database/cap_theorem.html` | 785 | 785 prose words (< 800) |
+| `database/self_joins_in_sql.html` | 784 | 784 prose words (< 800) |
 | `interview/remove-duplicates-in-place.html` | 784 | 784 prose words (< 800) |
-| `database/self_joins_in_sql.html` | 782 | 782 prose words (< 800) |
-| `database/cap_theorem.html` | 781 | 781 prose words (< 800) |
-| `machine_learning/feature_scaling.html` | 779 | 779 prose words (< 800) |
-| `database/exists_vs_in_vs_join.html` | 778 | 778 prose words (< 800) |
-| `maths/bernoulli_binomial_poisson.html` | 778 | 778 prose words (< 800) |
-| `computer_vision/one_by_one_convolutions.html` | 776 | 776 prose words (< 800) |
+| `database/exists_vs_in_vs_join.html` | 783 | 783 prose words (< 800) |
+| `maths/bernoulli_binomial_poisson.html` | 783 | 783 prose words (< 800) |
+| `machine_learning/feature_scaling.html` | 782 | 782 prose words (< 800) |
+| `computer_vision/one_by_one_convolutions.html` | 779 | 779 prose words (< 800) |
+| `interview/rotate-an-array.html` | 778 | 778 prose words (< 800) |
 | `interview/longest-substring-without-repeating-characters.html` | 776 | 776 prose words (< 800) |
-| `interview/grouping-and-inverting-dictionaries.html` | 773 | 773 prose words (< 800) |
-| `interview/rotate-an-array.html` | 766 | 766 prose words (< 800) |
-| `maths/central_limit_theorem.html` | 762 | 762 prose words (< 800) |
-| `maths/jacobian_and_hessian.html` | 761 | 761 prose words (< 800) |
+| `maths/central_limit_theorem.html` | 767 | 767 prose words (< 800) |
+| `maths/jacobian_and_hessian.html` | 767 | 767 prose words (< 800) |
+| `interview/valid-palindrome.html` | 753 | 753 prose words (< 800) |
+| `database/constraints_in_sql.html` | 751 | 751 prose words (< 800) |
 | `interview/sets-versus-lists-and-deduplication.html` | 751 | 751 prose words (< 800) |
-| `database/constraints_in_sql.html` | 749 | 749 prose words (< 800) |
+| `maths/qr_decomposition.html` | 747 | 747 prose words (< 800) |
 | `interview/what-does-string-slicing-cost.html` | 745 | 745 prose words (< 800) |
-| `maths/qr_decomposition.html` | 742 | 742 prose words (< 800) |
+| `maths/singular_value_decomposition.html` | 739 | 739 prose words (< 800) |
 | `interview/find-versus-index-on-strings.html` | 738 | 738 prose words (< 800) |
-| `interview/valid-palindrome.html` | 737 | 737 prose words (< 800) |
-| `maths/singular_value_decomposition.html` | 735 | 735 prose words (< 800) |
 | `interview/accidental-quadratic-complexity.html` | 734 | 734 prose words (< 800) |
-| `database/composite_and_covering_indexes.html` | 722 | 722 prose words (< 800) |
-| `machine_learning/handling_missing_values.html` | 720 | 720 prose words (< 800) |
-| `interview/isomorphic-strings.html` | 707 | 707 prose words (< 800) |
-| `maths/matrix_calculus.html` | 704 | 704 prose words (< 800) |
-| `interview/valid-parentheses.html` | 703 | 703 prose words (< 800) |
-| `interview/counting-with-dictionaries.html` | 701 | 701 prose words (< 800) |
+| `database/composite_and_covering_indexes.html` | 727 | 727 prose words (< 800) |
+| `machine_learning/handling_missing_values.html` | 724 | 724 prose words (< 800) |
+| `interview/counting-with-dictionaries.html` | 719 | 719 prose words (< 800) |
+| `interview/isomorphic-strings.html` | 713 | 713 prose words (< 800) |
+| `interview/valid-parentheses.html` | 709 | 709 prose words (< 800) |
+| `maths/matrix_calculus.html` | 707 | 707 prose words (< 800) |
 | `interview/modifying-a-collection-while-iterating.html` | 701 | 701 prose words (< 800) |
-| `database/key_value_and_graph_models.html` | 695 | 695 prose words (< 800) |
+| `database/key_value_and_graph_models.html` | 700 | 700 prose words (< 800) |
 | `interview/the-nested-list-multiplication-bug.html` | 686 | 686 prose words (< 800) |
 | `interview/string-interning-and-the-is-operator.html` | 680 | 680 prose words (< 800) |
 
-## Tier 1 modules (595)
+## Tier 1 modules (598)
 
 | Module | Prose words | Tables / code / maths |
 |---|---|---|
-| `machine_learning/k_means.html` | 2049 | 2 / 4 / 0 |
-| `python/generators_and_yield.html` | 2033 | 0 / 8 / 0 |
+| `machine_learning/k_means.html` | 2059 | 2 / 4 / 0 |
+| `python/generators_and_yield.html` | 2040 | 0 / 8 / 0 |
 | `numpy/performance_and_memory.html` | 2004 | 0 / 19 / 0 |
-| `python/files_and_with.html` | 1994 | 0 / 9 / 0 |
-| `pydantic/unions_and_discriminated_unions.html` | 1980 | 0 / 23 / 0 |
-| `machine_learning/roc_curve_and_auc.html` | 1979 | 1 / 4 / 0 |
-| `fastapi/response_models.html` | 1966 | 0 / 22 / 0 |
-| `pydantic/pydantic_vs_dataclasses.html` | 1929 | 0 / 22 / 0 |
-| `python/sorted_with_key.html` | 1929 | 0 / 10 / 0 |
-| `pydantic/json_schema.html` | 1927 | 0 / 20 / 0 |
-| `pydantic/enums_and_literals.html` | 1923 | 0 / 21 / 0 |
-| `python/mutability_and_aliasing.html` | 1921 | 0 / 14 / 0 |
-| `natural_language_processing/positional_encoding.html` | 1916 | 1 / 3 / 5 |
-| `fastapi/path_parameters.html` | 1914 | 0 / 23 / 0 |
-| `pydantic/type_adapter.html` | 1912 | 0 / 24 / 0 |
-| `pydantic/collections_of_models.html` | 1904 | 0 / 24 / 0 |
-| `python/variable_scope.html` | 1900 | 0 / 8 / 0 |
-| `fastapi/reading_a_422.html` | 1897 | 0 / 20 / 0 |
-| `pydantic/model_config.html` | 1897 | 0 / 23 / 0 |
-| `machine_learning/pca.html` | 1890 | 1 / 4 / 1 |
-| `pydantic/dates_uuids_and_decimals.html` | 1886 | 0 / 23 / 0 |
-| `pydantic/required_optional_and_defaults.html` | 1885 | 0 / 28 / 0 |
-| `fastapi/async_vs_sync_endpoints.html` | 1882 | 0 / 21 / 0 |
-| `pydantic/strict_vs_lax_mode.html` | 1882 | 0 / 23 / 0 |
-| `pydantic/model_validator.html` | 1880 | 0 / 22 / 0 |
-| `pydantic/parsing_json.html` | 1880 | 0 / 20 / 0 |
-| `fastapi/request_bodies.html` | 1878 | 0 / 21 / 0 |
-| `fastapi/query_parameters.html` | 1874 | 0 / 22 / 0 |
-| `natural_language_processing/self_attention.html` | 1871 | 1 / 3 / 1 |
-| `pydantic/nested_models.html` | 1866 | 0 / 25 / 0 |
+| `python/files_and_with.html` | 2001 | 0 / 9 / 0 |
+| `machine_learning/roc_curve_and_auc.html` | 1988 | 1 / 4 / 0 |
+| `pydantic/unions_and_discriminated_unions.html` | 1987 | 0 / 23 / 0 |
+| `fastapi/response_models.html` | 1976 | 0 / 22 / 0 |
+| `python/sorted_with_key.html` | 1936 | 0 / 10 / 0 |
+| `pydantic/json_schema.html` | 1935 | 0 / 20 / 0 |
+| `pydantic/enums_and_literals.html` | 1932 | 0 / 21 / 0 |
+| `pydantic/pydantic_vs_dataclasses.html` | 1932 | 0 / 22 / 0 |
+| `python/mutability_and_aliasing.html` | 1928 | 0 / 14 / 0 |
+| `natural_language_processing/positional_encoding.html` | 1927 | 1 / 3 / 5 |
+| `fastapi/path_parameters.html` | 1924 | 0 / 23 / 0 |
+| `pydantic/type_adapter.html` | 1916 | 0 / 24 / 0 |
+| `pydantic/collections_of_models.html` | 1913 | 0 / 24 / 0 |
+| `fastapi/reading_a_422.html` | 1910 | 0 / 20 / 0 |
+| `python/variable_scope.html` | 1905 | 0 / 8 / 0 |
+| `pydantic/model_config.html` | 1904 | 0 / 23 / 0 |
+| `fastapi/async_vs_sync_endpoints.html` | 1902 | 0 / 21 / 0 |
+| `machine_learning/pca.html` | 1897 | 1 / 4 / 1 |
+| `pydantic/dates_uuids_and_decimals.html` | 1893 | 0 / 23 / 0 |
+| `pydantic/required_optional_and_defaults.html` | 1892 | 0 / 28 / 0 |
+| `fastapi/request_bodies.html` | 1888 | 0 / 21 / 0 |
+| `pydantic/strict_vs_lax_mode.html` | 1886 | 0 / 23 / 0 |
+| `pydantic/model_validator.html` | 1885 | 0 / 22 / 0 |
+| `pydantic/parsing_json.html` | 1885 | 0 / 20 / 0 |
+| `fastapi/query_parameters.html` | 1884 | 0 / 22 / 0 |
+| `database/indexes_in_sql.html` | 1876 | 1 / 2 / 0 |
+| `natural_language_processing/self_attention.html` | 1874 | 1 / 3 / 1 |
+| `pydantic/nested_models.html` | 1873 | 0 / 25 / 0 |
+| `pydantic/annotated_and_custom_types.html` | 1866 | 0 / 27 / 0 |
+| `sklearn/logistic_regression.html` | 1863 | 0 / 18 / 0 |
 | `fastapi/what_is_fastapi.html` | 1860 | 0 / 20 / 0 |
-| `sklearn/logistic_regression.html` | 1860 | 0 / 18 / 0 |
-| `database/indexes_in_sql.html` | 1859 | 1 / 2 / 0 |
-| `pydantic/annotated_and_custom_types.html` | 1857 | 0 / 27 / 0 |
+| `pydantic/aliases.html` | 1855 | 0 / 26 / 0 |
 | `pydantic/types_and_coercion.html` | 1855 | 0 / 19 / 0 |
-| `pydantic/aliases.html` | 1852 | 0 / 26 / 0 |
+| `python/classes_and_objects.html` | 1851 | 0 / 7 / 0 |
+| `python/shallow_and_deep_copy.html` | 1851 | 0 / 5 / 0 |
+| `maths/matrix_as_transformation.html` | 1850 | 1 / 3 / 2 |
 | `pydantic/what_is_pydantic.html` | 1850 | 0 / 20 / 0 |
-| `python/classes_and_objects.html` | 1844 | 0 / 7 / 0 |
-| `pydantic/computed_fields.html` | 1843 | 0 / 23 / 0 |
-| `python/shallow_and_deep_copy.html` | 1842 | 0 / 5 / 0 |
-| `sklearn/decision_trees.html` | 1839 | 0 / 18 / 0 |
-| `pydantic/model_dump_and_model_dump_json.html` | 1834 | 0 / 21 / 0 |
-| `fastapi/apirouter.html` | 1833 | 0 / 24 / 0 |
-| `machine_learning/ridge_and_lasso_regression.html` | 1833 | 1 / 4 / 5 |
-| `maths/matrix_as_transformation.html` | 1833 | 1 / 3 / 2 |
-| `pydantic/validator_modes.html` | 1833 | 0 / 22 / 0 |
-| `natural_language_processing/attention_mechanism.html` | 1832 | 1 / 3 / 2 |
-| `sklearn/scaling_features.html` | 1831 | 0 / 18 / 0 |
-| `fastapi/router_and_global_dependencies.html` | 1830 | 0 / 19 / 0 |
-| `fastapi/your_first_endpoint.html` | 1830 | 0 / 23 / 0 |
-| `pydantic/performance_and_pydantic_core.html` | 1830 | 0 / 20 / 0 |
-| `sklearn/class_imbalance.html` | 1830 | 0 / 18 / 0 |
-| `matplotlib/line_plots.html` | 1828 | 0 / 21 / 0 |
+| `pydantic/computed_fields.html` | 1848 | 0 / 23 / 0 |
+| `pydantic/model_dump_and_model_dump_json.html` | 1847 | 0 / 21 / 0 |
+| `fastapi/router_and_global_dependencies.html` | 1846 | 0 / 19 / 0 |
+| `natural_language_processing/attention_mechanism.html` | 1843 | 1 / 3 / 2 |
+| `machine_learning/ridge_and_lasso_regression.html` | 1842 | 1 / 4 / 5 |
+| `sklearn/decision_trees.html` | 1842 | 0 / 18 / 0 |
+| `pydantic/validator_modes.html` | 1841 | 0 / 22 / 0 |
+| `fastapi/apirouter.html` | 1840 | 0 / 24 / 0 |
+| `fastapi/your_first_endpoint.html` | 1840 | 0 / 23 / 0 |
+| `pydantic/performance_and_pydantic_core.html` | 1840 | 0 / 20 / 0 |
+| `sklearn/scaling_features.html` | 1834 | 0 / 18 / 0 |
+| `pydantic/custom_serializers.html` | 1833 | 0 / 22 / 0 |
+| `sklearn/class_imbalance.html` | 1833 | 0 / 18 / 0 |
+| `matplotlib/line_plots.html` | 1832 | 0 / 21 / 0 |
+| `machine_learning/decision_tree.html` | 1828 | 1 / 3 / 2 |
 | `deep_learning/backpropagation.html` | 1827 | 0 / 4 / 9 |
-| `pydantic/custom_serializers.html` | 1825 | 0 / 22 / 0 |
-| `sklearn/missing_values.html` | 1823 | 0 / 18 / 0 |
-| `sklearn/classification_metrics.html` | 1822 | 0 / 18 / 0 |
+| `sklearn/missing_values.html` | 1826 | 0 / 18 / 0 |
+| `sklearn/classification_metrics.html` | 1825 | 0 / 18 / 0 |
+| `sklearn/data_leakage.html` | 1825 | 0 / 18 / 0 |
 | `pandas/what_is_pandas.html` | 1821 | 0 / 18 / 0 |
-| `sklearn/data_leakage.html` | 1819 | 0 / 18 / 0 |
-| `machine_learning/decision_tree.html` | 1817 | 1 / 3 / 2 |
-| `pydantic/field_validator.html` | 1816 | 0 / 25 / 0 |
+| `pydantic/field_validator.html` | 1818 | 0 / 25 / 0 |
+| `fastapi/background_tasks.html` | 1813 | 0 / 18 / 0 |
+| `fastapi/dependency_overrides.html` | 1812 | 0 / 19 / 0 |
 | `numpy/what_is_numpy.html` | 1812 | 0 / 20 / 0 |
-| `sklearn/a_complete_workflow.html` | 1806 | 0 / 18 / 0 |
+| `machine_learning/gradient_boosting.html` | 1811 | 4 / 4 / 0 |
+| `sklearn/a_complete_workflow.html` | 1810 | 0 / 18 / 0 |
+| `python/nested_data_structures.html` | 1807 | 0 / 4 / 0 |
 | `pandas/the_index.html` | 1804 | 0 / 18 / 0 |
-| `machine_learning/gradient_boosting.html` | 1803 | 4 / 4 / 0 |
-| `fastapi/dependency_overrides.html` | 1802 | 0 / 19 / 0 |
-| `fastapi/background_tasks.html` | 1801 | 0 / 18 / 0 |
-| `python/zip_function.html` | 1801 | 0 / 7 / 0 |
-| `sklearn/random_forests.html` | 1801 | 0 / 18 / 0 |
-| `python/nested_data_structures.html` | 1800 | 0 / 4 / 0 |
-| `sklearn/overfitting_and_underfitting.html` | 1799 | 0 / 18 / 0 |
-| `python/nested_conditionals.html` | 1796 | 0 / 7 / 0 |
-| `pandas/missing_data.html` | 1795 | 0 / 20 / 0 |
-| `python/inheritance.html` | 1795 | 0 / 17 / 0 |
-| `gen_ai/embeddings_and_vector_search.html` | 1792 | 1 / 4 / 3 |
-| `sklearn/kmeans_clustering.html` | 1792 | 0 / 18 / 0 |
+| `python/zip_function.html` | 1804 | 0 / 7 / 0 |
+| `sklearn/random_forests.html` | 1804 | 0 / 18 / 0 |
+| `fastapi/security_basics.html` | 1803 | 0 / 18 / 0 |
+| `sklearn/overfitting_and_underfitting.html` | 1803 | 0 / 18 / 0 |
+| `gen_ai/embeddings_and_vector_search.html` | 1801 | 1 / 4 / 3 |
+| `python/nested_conditionals.html` | 1801 | 0 / 7 / 0 |
+| `pandas/missing_data.html` | 1798 | 0 / 20 / 0 |
+| `python/inheritance.html` | 1798 | 0 / 17 / 0 |
+| `python/nested_for_loops.html` | 1797 | 0 / 12 / 0 |
+| `machine_learning/logistic_regression.html` | 1795 | 2 / 4 / 15 |
+| `sklearn/kmeans_clustering.html` | 1795 | 0 / 18 / 0 |
+| `fastapi/dependency_injection.html` | 1793 | 0 / 21 / 0 |
+| `fastapi/sub_dependencies.html` | 1793 | 0 / 19 / 0 |
+| `python/loop_else.html` | 1793 | 0 / 6 / 0 |
+| `sklearn/train_test_split.html` | 1793 | 0 / 18 / 0 |
+| `maths/maximum_likelihood_estimation.html` | 1792 | 2 / 4 / 2 |
+| `matplotlib/twin_axes.html` | 1791 | 0 / 22 / 0 |
 | `pydantic/your_first_basemodel.html` | 1790 | 0 / 29 / 0 |
-| `python/nested_for_loops.html` | 1790 | 0 / 12 / 0 |
 | `numpy/sorting_and_searching.html` | 1789 | 0 / 21 / 0 |
-| `fastapi/security_basics.html` | 1788 | 0 / 18 / 0 |
-| `sklearn/train_test_split.html` | 1788 | 0 / 18 / 0 |
-| `fastapi/sub_dependencies.html` | 1786 | 0 / 19 / 0 |
-| `sklearn/encoding_categoricals.html` | 1786 | 0 / 18 / 0 |
-| `machine_learning/logistic_regression.html` | 1785 | 2 / 4 / 15 |
-| `matplotlib/bar_charts.html` | 1784 | 0 / 23 / 0 |
-| `fastapi/dependency_injection.html` | 1783 | 0 / 21 / 0 |
-| `matplotlib/twin_axes.html` | 1783 | 0 / 22 / 0 |
-| `python/loop_else.html` | 1782 | 0 / 6 / 0 |
-| `sklearn/regression_metrics.html` | 1782 | 0 / 18 / 0 |
-| `matplotlib/scatter_plots.html` | 1780 | 0 / 22 / 0 |
-| `pydantic/generic_models.html` | 1780 | 0 / 26 / 0 |
-| `matplotlib/histograms.html` | 1779 | 0 / 19 / 0 |
-| `maths/maximum_likelihood_estimation.html` | 1777 | 2 / 4 / 2 |
-| `pydantic/reading_a_validation_error.html` | 1777 | 0 / 25 / 0 |
-| `python/string_methods.html` | 1776 | 0 / 14 / 0 |
-| `pandas/duplicates.html` | 1775 | 0 / 30 / 0 |
-| `maths/cross_entropy_and_kl_divergence.html` | 1774 | 1 / 4 / 8 |
-| `python/f_strings_and_formatting.html` | 1774 | 0 / 10 / 0 |
-| `python/range_step.html` | 1774 | 0 / 11 / 0 |
-| `matplotlib/subplots.html` | 1772 | 0 / 27 / 0 |
-| `python/hello_python.html` | 1772 | 0 / 9 / 0 |
-| `matplotlib/common_mistakes.html` | 1771 | 0 / 19 / 0 |
-| `pandas/inspecting_data.html` | 1771 | 0 / 23 / 0 |
-| `fastapi/http_methods_and_routing.html` | 1768 | 0 / 19 / 0 |
-| `python/try_and_except.html` | 1767 | 0 / 9 / 0 |
-| `fastapi/class_dependencies.html` | 1766 | 0 / 25 / 0 |
-| `machine_learning/random_forest.html` | 1766 | 1 / 5 / 0 |
-| `python/list_comprehensions.html` | 1764 | 0 / 4 / 0 |
+| `sklearn/encoding_categoricals.html` | 1789 | 0 / 18 / 0 |
+| `maths/cross_entropy_and_kl_divergence.html` | 1788 | 1 / 4 / 8 |
+| `matplotlib/bar_charts.html` | 1788 | 0 / 23 / 0 |
+| `machine_learning/random_forest.html` | 1785 | 1 / 5 / 0 |
+| `matplotlib/histograms.html` | 1785 | 0 / 19 / 0 |
+| `pydantic/generic_models.html` | 1785 | 0 / 26 / 0 |
+| `sklearn/regression_metrics.html` | 1785 | 0 / 18 / 0 |
+| `fastapi/http_methods_and_routing.html` | 1784 | 0 / 19 / 0 |
+| `matplotlib/scatter_plots.html` | 1784 | 0 / 22 / 0 |
+| `pydantic/reading_a_validation_error.html` | 1783 | 0 / 25 / 0 |
+| `python/f_strings_and_formatting.html` | 1781 | 0 / 10 / 0 |
+| `python/range_step.html` | 1781 | 0 / 11 / 0 |
+| `python/string_methods.html` | 1781 | 0 / 14 / 0 |
+| `pandas/duplicates.html` | 1778 | 0 / 30 / 0 |
+| `pandas/inspecting_data.html` | 1778 | 0 / 23 / 0 |
+| `python/hello_python.html` | 1777 | 0 / 9 / 0 |
+| `fastapi/class_dependencies.html` | 1776 | 0 / 25 / 0 |
+| `fastapi/openapi_and_docs.html` | 1776 | 0 / 20 / 0 |
+| `matplotlib/common_mistakes.html` | 1775 | 0 / 19 / 0 |
+| `matplotlib/subplots.html` | 1774 | 0 / 27 / 0 |
+| `python/try_and_except.html` | 1774 | 0 / 9 / 0 |
+| `machine_learning/sliding_window_for_timeseries_data.html` | 1772 | 2 / 4 / 0 |
+| `fastapi/lifespan_events.html` | 1771 | 0 / 23 / 0 |
+| `gen_ai/corrective_rag.html` | 1769 | 3 / 5 / 1 |
+| `python/list_comprehensions.html` | 1769 | 0 / 4 / 0 |
+| `python/type_conversion.html` | 1766 | 0 / 6 / 0 |
+| `pydantic/pydantic_with_fastapi.html` | 1765 | 0 / 22 / 0 |
+| `python/tuples_and_unpacking.html` | 1765 | 0 / 9 / 0 |
+| `python/function_arguments.html` | 1764 | 0 / 9 / 0 |
+| `python/functions_and_return.html` | 1764 | 0 / 9 / 0 |
+| `python/input_and_output.html` | 1764 | 0 / 19 / 0 |
 | `numpy/broadcasting.html` | 1763 | 0 / 21 / 0 |
-| `machine_learning/sliding_window_for_timeseries_data.html` | 1761 | 2 / 4 / 0 |
-| `python/type_conversion.html` | 1761 | 0 / 6 / 0 |
-| `fastapi/lifespan_events.html` | 1759 | 0 / 23 / 0 |
-| `python/function_arguments.html` | 1759 | 0 / 9 / 0 |
-| `gen_ai/corrective_rag.html` | 1758 | 3 / 5 / 1 |
-| `numpy/saving_and_loading.html` | 1758 | 0 / 20 / 0 |
-| `pydantic/pydantic_with_fastapi.html` | 1758 | 0 / 22 / 0 |
-| `python/tuples_and_unpacking.html` | 1758 | 0 / 9 / 0 |
-| `python/input_and_output.html` | 1757 | 0 / 19 / 0 |
-| `fastapi/openapi_and_docs.html` | 1756 | 0 / 20 / 0 |
-| `pandas/dtypes_and_memory.html` | 1756 | 0 / 22 / 0 |
-| `matplotlib/choosing_a_chart.html` | 1753 | 0 / 18 / 0 |
-| `python/dictionaries.html` | 1753 | 0 / 11 / 0 |
-| `python/dict_and_set_comprehensions.html` | 1753 | 0 / 7 / 0 |
-| `matplotlib/error_bars_and_bands.html` | 1751 | 0 / 23 / 0 |
-| `python/functions_and_return.html` | 1751 | 0 / 9 / 0 |
-| `matplotlib/styles_and_rcparams.html` | 1750 | 0 / 21 / 0 |
-| `sklearn/hyperparameter_search.html` | 1748 | 0 / 18 / 0 |
-| `matplotlib/colours_and_colormaps.html` | 1747 | 0 / 20 / 0 |
-| `matplotlib/box_and_violin.html` | 1746 | 0 / 19 / 0 |
-| `python/dictionary_methods.html` | 1746 | 0 / 8 / 0 |
-| `fastapi/project_structure.html` | 1745 | 0 / 19 / 0 |
+| `numpy/saving_and_loading.html` | 1763 | 0 / 20 / 0 |
+| `python/dict_and_set_comprehensions.html` | 1762 | 0 / 7 / 0 |
+| `matplotlib/choosing_a_chart.html` | 1760 | 0 / 18 / 0 |
+| `pandas/dtypes_and_memory.html` | 1760 | 0 / 22 / 0 |
+| `python/dictionaries.html` | 1760 | 0 / 11 / 0 |
+| `matplotlib/box_and_violin.html` | 1759 | 0 / 19 / 0 |
+| `matplotlib/error_bars_and_bands.html` | 1759 | 0 / 23 / 0 |
+| `matplotlib/colours_and_colormaps.html` | 1757 | 0 / 20 / 0 |
+| `matplotlib/styles_and_rcparams.html` | 1756 | 0 / 21 / 0 |
+| `python/while_loops_and_control.html` | 1754 | 1 / 10 / 0 |
+| `fastapi/project_structure.html` | 1752 | 0 / 19 / 0 |
+| `python/dictionary_methods.html` | 1751 | 0 / 8 / 0 |
+| `sklearn/hyperparameter_search.html` | 1751 | 0 / 18 / 0 |
+| `fastapi/form_data_and_files.html` | 1749 | 0 / 20 / 0 |
+| `numpy/unique_and_set_operations.html` | 1749 | 0 / 21 / 0 |
+| `python/slicing_step_negatives.html` | 1749 | 0 / 5 / 0 |
+| `sklearn/confusion_matrix.html` | 1746 | 0 / 18 / 0 |
+| `sklearn/linear_regression.html` | 1746 | 0 / 18 / 0 |
 | `numpy/views_vs_copies.html` | 1745 | 0 / 20 / 0 |
-| `numpy/unique_and_set_operations.html` | 1743 | 0 / 21 / 0 |
-| `sklearn/linear_regression.html` | 1743 | 0 / 18 / 0 |
-| `pandas/performance.html` | 1742 | 0 / 18 / 0 |
-| `python/slicing_step_negatives.html` | 1742 | 0 / 5 / 0 |
-| `sklearn/confusion_matrix.html` | 1742 | 0 / 18 / 0 |
-| `pandas/groupby_basics.html` | 1740 | 0 / 20 / 0 |
-| `sklearn/column_transformer.html` | 1738 | 0 / 18 / 0 |
+| `pandas/performance.html` | 1744 | 0 / 18 / 0 |
+| `pandas/groupby_basics.html` | 1743 | 0 / 20 / 0 |
+| `sklearn/column_transformer.html` | 1743 | 0 / 18 / 0 |
+| `gen_ai/completeness_in_llm_evaluation.html` | 1739 | 1 / 4 / 1 |
+| `matplotlib/performance.html` | 1739 | 0 / 21 / 0 |
+| `fastapi/testing_fastapi.html` | 1736 | 0 / 20 / 0 |
+| `maths/covariance_and_correlation.html` | 1736 | 2 / 4 / 2 |
+| `python/match_and_case.html` | 1736 | 0 / 10 / 0 |
+| `machine_learning/train_test_split.html` | 1735 | 0 / 4 / 0 |
+| `python/strings_and_slicing.html` | 1734 | 0 / 9 / 0 |
+| `maths/entropy_and_information.html` | 1733 | 2 / 3 / 5 |
 | `numpy/vectorised_arithmetic.html` | 1733 | 0 / 18 / 0 |
-| `matplotlib/performance.html` | 1731 | 0 / 21 / 0 |
-| `python/while_loops_and_control.html` | 1731 | 1 / 10 / 0 |
-| `fastapi/form_data_and_files.html` | 1730 | 0 / 20 / 0 |
-| `machine_learning/train_test_split.html` | 1730 | 0 / 4 / 0 |
-| `python/match_and_case.html` | 1729 | 0 / 10 / 0 |
-| `fastapi/testing_fastapi.html` | 1728 | 0 / 20 / 0 |
-| `computer_vision/vgg16_architecture.html` | 1727 | 1 / 3 / 0 |
-| `sklearn/probabilities_and_thresholds.html` | 1727 | 0 / 18 / 0 |
-| `maths/covariance_and_correlation.html` | 1725 | 2 / 4 / 2 |
-| `pandas/apply_and_map.html` | 1724 | 0 / 23 / 0 |
-| `python/conditional_expressions.html` | 1724 | 0 / 4 / 0 |
-| `python/sets_and_set_operations.html` | 1724 | 0 / 6 / 0 |
-| `maths/vector_norms.html` | 1723 | 2 / 4 / 2 |
+| `pandas/apply_and_map.html` | 1733 | 0 / 23 / 0 |
+| `python/sets_and_set_operations.html` | 1733 | 0 / 6 / 0 |
+| `maths/vector_norms.html` | 1731 | 2 / 4 / 2 |
+| `sklearn/probabilities_and_thresholds.html` | 1731 | 0 / 18 / 0 |
+| `computer_vision/vgg16_architecture.html` | 1730 | 1 / 3 / 0 |
+| `fastapi/error_handling.html` | 1729 | 0 / 22 / 0 |
+| `matplotlib/labels_and_legends.html` | 1729 | 0 / 26 / 0 |
+| `python/conditional_expressions.html` | 1729 | 0 / 4 / 0 |
+| `matplotlib/axis_limits_and_ticks.html` | 1725 | 0 / 23 / 0 |
+| `sklearn/what_is_scikit_learn.html` | 1725 | 0 / 18 / 0 |
+| `fastapi/headers_and_cookies.html` | 1723 | 0 / 19 / 0 |
 | `numpy/dtypes.html` | 1723 | 0 / 19 / 0 |
-| `matplotlib/labels_and_legends.html` | 1721 | 0 / 26 / 0 |
-| `sklearn/what_is_scikit_learn.html` | 1721 | 0 / 18 / 0 |
-| `gen_ai/completeness_in_llm_evaluation.html` | 1720 | 1 / 4 / 1 |
-| `python/strings_and_slicing.html` | 1720 | 0 / 9 / 0 |
-| `fastapi/error_handling.html` | 1719 | 0 / 22 / 0 |
-| `maths/entropy_and_information.html` | 1718 | 2 / 3 / 5 |
-| `pydantic/field_constraints.html` | 1718 | 0 / 25 / 0 |
-| `matplotlib/axis_limits_and_ticks.html` | 1717 | 0 / 23 / 0 |
-| `sklearn/cross_validation.html` | 1714 | 0 / 18 / 0 |
-| `machine_learning/knn.html` | 1711 | 0 / 3 / 0 |
-| `fastapi/headers_and_cookies.html` | 1710 | 0 / 19 / 0 |
-| `pandas/adding_and_dropping.html` | 1709 | 0 / 27 / 0 |
-| `sklearn/pipelines.html` | 1709 | 0 / 18 / 0 |
-| `matplotlib/annotations.html` | 1707 | 0 / 21 / 0 |
-| `numpy/creating_arrays.html` | 1706 | 0 / 18 / 0 |
+| `pydantic/field_constraints.html` | 1723 | 0 / 25 / 0 |
+| `gen_ai/distributed_retrieval_and_sharding.html` | 1720 | 2 / 3 / 1 |
+| `pandas/adding_and_dropping.html` | 1718 | 0 / 27 / 0 |
+| `machine_learning/knn.html` | 1716 | 0 / 3 / 0 |
+| `sklearn/cross_validation.html` | 1716 | 0 / 18 / 0 |
+| `matplotlib/annotations.html` | 1713 | 0 / 21 / 0 |
+| `sklearn/pipelines.html` | 1713 | 0 / 18 / 0 |
+| `machine_learning/model_and_data_drift.html` | 1712 | 1 / 3 / 0 |
+| `matplotlib/dates_on_axes.html` | 1710 | 0 / 21 / 0 |
+| `matplotlib/plotting_from_pandas.html` | 1710 | 0 / 20 / 0 |
+| `pandas/merge_and_join.html` | 1710 | 0 / 20 / 0 |
+| `numpy/creating_arrays.html` | 1709 | 0 / 18 / 0 |
+| `python/lambda_map_filter.html` | 1708 | 0 / 12 / 0 |
+| `numpy/random_numbers.html` | 1707 | 0 / 21 / 0 |
+| `matplotlib/what_is_matplotlib.html` | 1706 | 0 / 19 / 0 |
+| `numpy/aggregations_and_axis.html` | 1706 | 0 / 19 / 0 |
+| `pandas/creating_dataframes.html` | 1706 | 0 / 19 / 0 |
+| `deep_learning/gan_architecture.html` | 1705 | 0 / 4 / 0 |
 | `numpy/shape_and_reshape.html` | 1704 | 0 / 18 / 0 |
-| `pandas/merge_and_join.html` | 1703 | 0 / 20 / 0 |
-| `numpy/aggregations_and_axis.html` | 1702 | 0 / 19 / 0 |
-| `gen_ai/distributed_retrieval_and_sharding.html` | 1701 | 2 / 3 / 1 |
-| `numpy/random_numbers.html` | 1701 | 0 / 21 / 0 |
-| `pandas/creating_dataframes.html` | 1701 | 0 / 19 / 0 |
-| `matplotlib/plotting_from_pandas.html` | 1700 | 0 / 20 / 0 |
-| `matplotlib/saving_figures.html` | 1699 | 0 / 23 / 0 |
-| `matplotlib/what_is_matplotlib.html` | 1699 | 0 / 19 / 0 |
-| `python/lambda_map_filter.html` | 1699 | 0 / 12 / 0 |
-| `machine_learning/model_and_data_drift.html` | 1698 | 1 / 3 / 0 |
-| `matplotlib/dates_on_axes.html` | 1697 | 0 / 21 / 0 |
-| `deep_learning/gan_architecture.html` | 1696 | 0 / 4 / 0 |
-| `pandas/the_copy_warning.html` | 1695 | 0 / 23 / 0 |
-| `python/enumerate_function.html` | 1693 | 0 / 9 / 0 |
-| `pandas/multiindex.html` | 1691 | 0 / 20 / 0 |
-| `python/conditional_comprehensions.html` | 1691 | 0 / 13 / 0 |
-| `natural_language_processing/transformer_architecture.html` | 1690 | 2 / 3 / 2 |
-| `dsa/heaps_and_priority_queues.html` | 1689 | 3 / 6 / 1 |
-| `pandas/counting_and_binning.html` | 1688 | 0 / 23 / 0 |
-| `gen_ai/context_aware_chunking.html` | 1684 | 1 / 4 / 0 |
-| `pydantic/migrating_v1_to_v2.html` | 1684 | 0 / 19 / 0 |
-| `pandas/method_chaining.html` | 1683 | 0 / 24 / 0 |
-| `python/modules_and_import.html` | 1683 | 0 / 3 / 0 |
-| `python/variables_and_types.html` | 1683 | 1 / 12 / 0 |
-| `gen_ai/groundedness_in_llm_evaluation.html` | 1682 | 2 / 5 / 1 |
-| `deep_learning/softmax_and_cross_entropy.html` | 1681 | 1 / 5 / 16 |
-| `python/if_elif_else.html` | 1681 | 0 / 14 / 1 |
-| `python/numbers_and_operators.html` | 1681 | 0 / 15 / 0 |
-| `matplotlib/images_and_heatmaps.html` | 1680 | 0 / 22 / 0 |
+| `matplotlib/saving_figures.html` | 1703 | 0 / 23 / 0 |
+| `natural_language_processing/transformer_architecture.html` | 1703 | 2 / 3 / 2 |
+| `dsa/heaps_and_priority_queues.html` | 1702 | 3 / 6 / 1 |
+| `gen_ai/groundedness_in_llm_evaluation.html` | 1701 | 2 / 5 / 1 |
+| `pandas/the_copy_warning.html` | 1699 | 0 / 23 / 0 |
+| `gen_ai/context_aware_chunking.html` | 1698 | 1 / 4 / 0 |
+| `python/for_loops_and_range.html` | 1697 | 0 / 10 / 0 |
+| `python/conditional_comprehensions.html` | 1696 | 0 / 13 / 0 |
+| `python/enumerate_function.html` | 1696 | 0 / 9 / 0 |
+| `pandas/counting_and_binning.html` | 1695 | 0 / 23 / 0 |
+| `python/numbers_and_operators.html` | 1695 | 0 / 15 / 0 |
+| `pandas/multiindex.html` | 1693 | 0 / 20 / 0 |
+| `pydantic/migrating_v1_to_v2.html` | 1693 | 0 / 19 / 0 |
+| `python/if_elif_else.html` | 1690 | 0 / 14 / 1 |
+| `python/modules_and_import.html` | 1690 | 0 / 3 / 0 |
+| `python/variables_and_types.html` | 1690 | 1 / 12 / 0 |
+| `async_python/the_blocking_call_that_freezes_the_loop.html` | 1689 | 1 / 15 / 0 |
+| `gen_ai/correctness_in_llm_evaluation.html` | 1689 | 2 / 4 / 0 |
+| `deep_learning/softmax_and_cross_entropy.html` | 1688 | 1 / 5 / 16 |
+| `pandas/method_chaining.html` | 1688 | 0 / 24 / 0 |
+| `matplotlib/images_and_heatmaps.html` | 1686 | 0 / 22 / 0 |
+| `computer_vision/haar_cascade_detection.html` | 1683 | 1 / 3 / 3 |
+| `machine_learning/evaluation_metrics_for_regression.html` | 1682 | 2 / 4 / 1 |
+| `fastapi/dependencies_with_yield.html` | 1680 | 0 / 19 / 0 |
+| `natural_language_processing/query_key_value.html` | 1680 | 2 / 4 / 17 |
 | `numpy/nan_and_missing_data.html` | 1679 | 0 / 18 / 0 |
-| `computer_vision/haar_cascade_detection.html` | 1674 | 1 / 3 / 3 |
-| `python/for_loops_and_range.html` | 1674 | 0 / 10 / 0 |
-| `maths/projections.html` | 1673 | 0 / 3 / 7 |
-| `pandas/sorting_and_ranking.html` | 1671 | 0 / 23 / 0 |
-| `gen_ai/correctness_in_llm_evaluation.html` | 1670 | 2 / 4 / 0 |
-| `machine_learning/evaluation_metrics_for_regression.html` | 1669 | 2 / 4 / 1 |
-| `fastapi/dependencies_with_yield.html` | 1667 | 0 / 19 / 0 |
-| `pandas/concat.html` | 1667 | 0 / 24 / 0 |
-| `async_python/the_blocking_call_that_freezes_the_loop.html` | 1666 | 1 / 15 / 0 |
-| `natural_language_processing/query_key_value.html` | 1666 | 2 / 4 / 17 |
-| `database/subqueries_in_sql.html` | 1663 | 1 / 10 / 0 |
-| `gen_ai/rag.html` | 1662 | 2 / 4 / 1 |
-| `pandas/pivot_and_melt.html` | 1662 | 0 / 21 / 0 |
-| `deep_learning/autoencoders_conceptual_and_pytorch.html` | 1661 | 0 / 2 / 0 |
-| `machine_learning/bias_vs_variance.html` | 1660 | 1 / 3 / 1 |
+| `maths/projections.html` | 1678 | 0 / 3 / 7 |
+| `pandas/concat.html` | 1676 | 0 / 24 / 0 |
+| `gen_ai/relevance_in_llm_evaluation.html` | 1675 | 2 / 4 / 0 |
+| `pandas/sorting_and_ranking.html` | 1675 | 0 / 23 / 0 |
+| `database/subqueries_in_sql.html` | 1674 | 1 / 10 / 0 |
+| `machine_learning/bias_vs_variance.html` | 1674 | 1 / 3 / 1 |
+| `gen_ai/rag.html` | 1673 | 2 / 4 / 1 |
+| `deep_learning/autoencoders_conceptual_and_pytorch.html` | 1668 | 0 / 2 / 0 |
+| `machine_learning/cross_validation.html` | 1668 | 1 / 4 / 0 |
+| `pandas/pivot_and_melt.html` | 1665 | 0 / 21 / 0 |
+| `pandas/reading_and_writing.html` | 1665 | 0 / 21 / 0 |
+| `python/args_and_kwargs.html` | 1665 | 0 / 9 / 0 |
+| `dsa/quick_sort.html` | 1663 | 3 / 4 / 0 |
 | `numpy/transpose_and_axes.html` | 1658 | 0 / 18 / 0 |
-| `python/args_and_kwargs.html` | 1658 | 0 / 9 / 0 |
-| `machine_learning/cross_validation.html` | 1657 | 1 / 4 / 0 |
-| `gen_ai/relevance_in_llm_evaluation.html` | 1656 | 2 / 4 / 0 |
-| `pandas/reading_and_writing.html` | 1656 | 0 / 21 / 0 |
+| `gen_ai/context_window_and_kv_cache.html` | 1657 | 2 / 3 / 1 |
 | `gen_ai/hit_rate_at_k.html` | 1655 | 4 / 4 / 2 |
-| `dsa/quick_sort.html` | 1653 | 3 / 4 / 0 |
-| `numpy/stacking_and_splitting.html` | 1651 | 0 / 21 / 0 |
-| `pandas/time_series.html` | 1650 | 0 / 20 / 0 |
-| `pandas/groupby_transform.html` | 1647 | 0 / 24 / 0 |
-| `pandas/string_methods.html` | 1646 | 0 / 26 / 0 |
-| `matplotlib/layout_and_spacing.html` | 1644 | 0 / 19 / 0 |
-| `maths/conditional_probability.html` | 1640 | 1 / 3 / 5 |
-| `natural_language_processing/word2vec.html` | 1640 | 0 / 3 / 2 |
-| `pandas/loc_and_iloc.html` | 1639 | 0 / 22 / 0 |
-| `python/none_and_truthiness.html` | 1638 | 0 / 10 / 0 |
-| `maths/information_gain.html` | 1637 | 2 / 4 / 1 |
-| `numpy/boolean_masking.html` | 1634 | 0 / 21 / 0 |
+| `numpy/stacking_and_splitting.html` | 1655 | 0 / 21 / 0 |
+| `matplotlib/layout_and_spacing.html` | 1654 | 0 / 19 / 0 |
+| `pandas/groupby_transform.html` | 1654 | 0 / 24 / 0 |
+| `pandas/time_series.html` | 1653 | 0 / 20 / 0 |
+| `maths/conditional_probability.html` | 1650 | 1 / 3 / 5 |
+| `pandas/string_methods.html` | 1649 | 0 / 26 / 0 |
+| `python/none_and_truthiness.html` | 1649 | 0 / 10 / 0 |
+| `gen_ai/fine_tuning_vs_rlhf.html` | 1647 | 3 / 3 / 1 |
+| `gen_ai/permission_filtering_in_rag.html` | 1647 | 2 / 4 / 0 |
+| `maths/information_gain.html` | 1645 | 2 / 4 / 1 |
+| `python/reading_errors.html` | 1645 | 1 / 7 / 0 |
+| `python/lists_and_indexing.html` | 1644 | 1 / 12 / 0 |
+| `natural_language_processing/word2vec.html` | 1643 | 0 / 3 / 2 |
+| `pandas/loc_and_iloc.html` | 1643 | 0 / 22 / 0 |
+| `dsa/dijkstras.html` | 1641 | 2 / 4 / 1 |
+| `machine_learning/cosine_similarity.html` | 1638 | 1 / 4 / 0 |
+| `machine_learning/svm.html` | 1637 | 1 / 4 / 0 |
+| `numpy/boolean_masking.html` | 1637 | 0 / 21 / 0 |
+| `fastapi/status_codes.html` | 1635 | 0 / 19 / 0 |
+| `sklearn/loading_and_shaping_data.html` | 1634 | 0 / 18 / 0 |
 | `gen_ai/recall_at_k.html` | 1632 | 3 / 4 / 3 |
-| `dsa/dijkstras.html` | 1631 | 2 / 4 / 1 |
-| `python/reading_errors.html` | 1631 | 1 / 7 / 0 |
-| `gen_ai/context_window_and_kv_cache.html` | 1630 | 2 / 3 / 1 |
-| `gen_ai/fine_tuning_vs_rlhf.html` | 1630 | 3 / 3 / 1 |
-| `machine_learning/svm.html` | 1630 | 1 / 4 / 0 |
-| `sklearn/loading_and_shaping_data.html` | 1629 | 0 / 18 / 0 |
-| `machine_learning/cosine_similarity.html` | 1628 | 1 / 4 / 0 |
-| `python/lists_and_indexing.html` | 1626 | 1 / 12 / 0 |
-| `fastapi/status_codes.html` | 1625 | 0 / 19 / 0 |
-| `gen_ai/permission_filtering_in_rag.html` | 1624 | 2 / 4 / 0 |
-| `machine_learning/label_imbalance_problem.html` | 1621 | 2 / 3 / 0 |
-| `maths/eigenvalues_and_eigenvectors.html` | 1617 | 1 / 4 / 4 |
-| `numpy/indexing_and_slicing.html` | 1614 | 0 / 19 / 0 |
-| `database/joins_in_sql.html` | 1613 | 1 / 8 / 0 |
+| `gen_ai/caching_in_rag_pipelines.html` | 1629 | 2 / 4 / 0 |
+| `machine_learning/label_imbalance_problem.html` | 1628 | 2 / 3 / 0 |
+| `maths/eigenvalues_and_eigenvectors.html` | 1627 | 1 / 4 / 4 |
+| `database/joins_in_sql.html` | 1621 | 1 / 8 / 0 |
+| `natural_language_processing/multi_head_attention.html` | 1621 | 2 / 4 / 11 |
+| `dsa/fibonacci_search.html` | 1620 | 2 / 4 / 2 |
+| `gen_ai/indexing_in_vector_databases.html` | 1619 | 1 / 4 / 0 |
+| `deep_learning/deep_learning_for_recommendation_systems.html` | 1618 | 0 / 1 / 0 |
+| `numpy/indexing_and_slicing.html` | 1618 | 0 / 19 / 0 |
+| `dsa/breadth_first_search.html` | 1617 | 1 / 7 / 0 |
+| `computer_vision/downsampling_in_cnn.html` | 1616 | 2 / 4 / 0 |
 | `gen_ai/queries_keys_and_values.html` | 1612 | 2 / 4 / 12 |
-| `dsa/breadth_first_search.html` | 1610 | 1 / 7 / 0 |
-| `dsa/fibonacci_search.html` | 1610 | 2 / 4 / 2 |
-| `natural_language_processing/multi_head_attention.html` | 1609 | 2 / 4 / 11 |
-| `deep_learning/deep_learning_for_recommendation_systems.html` | 1607 | 0 / 1 / 0 |
-| `gen_ai/caching_in_rag_pipelines.html` | 1606 | 2 / 4 / 0 |
-| `machine_learning/naive_bayes.html` | 1606 | 1 / 3 / 2 |
-| `computer_vision/downsampling_in_cnn.html` | 1605 | 2 / 4 / 0 |
-| `numpy/linear_algebra.html` | 1604 | 0 / 18 / 0 |
-| `pandas/datetimes.html` | 1603 | 0 / 19 / 0 |
-| `gen_ai/indexing_in_vector_databases.html` | 1600 | 1 / 4 / 0 |
-| `dsa/divide_and_conquer.html` | 1594 | 3 / 4 / 1 |
-| `computer_vision/unet_architecture.html` | 1591 | 0 / 1 / 1 |
-| `pydantic/settings_management.html` | 1590 | 0 / 21 / 0 |
-| `dsa/counting_sort.html` | 1589 | 3 / 5 / 1 |
-| `gen_ai/recursive_chunking.html` | 1588 | 2 / 4 / 3 |
+| `machine_learning/naive_bayes.html` | 1611 | 1 / 3 / 2 |
+| `dsa/divide_and_conquer.html` | 1609 | 3 / 4 / 1 |
+| `numpy/linear_algebra.html` | 1607 | 0 / 18 / 0 |
+| `pandas/datetimes.html` | 1607 | 0 / 19 / 0 |
+| `gen_ai/recursive_chunking.html` | 1602 | 2 / 4 / 3 |
+| `dsa/counting_sort.html` | 1597 | 3 / 5 / 1 |
+| `pydantic/settings_management.html` | 1595 | 0 / 21 / 0 |
+| `computer_vision/unet_architecture.html` | 1594 | 0 / 1 / 1 |
+| `gen_ai/retrieval_evaluation_metrics.html` | 1584 | 5 / 3 / 1 |
 | `numpy/fancy_indexing.html` | 1584 | 1 / 23 / 0 |
+| `dsa/interpolation_search.html` | 1582 | 3 / 5 / 2 |
+| `maths/bayes_theorem.html` | 1582 | 1 / 6 / 2 |
+| `deep_learning/batch_processing_in_neural_networks.html` | 1580 | 2 / 4 / 0 |
+| `gen_ai/diskann_index.html` | 1580 | 0 / 2 / 0 |
+| `python/booleans_and_comparisons.html` | 1578 | 0 / 13 / 1 |
 | `gen_ai/precision_at_k.html` | 1577 | 3 / 4 / 1 |
-| `gen_ai/retrieval_evaluation_metrics.html` | 1577 | 5 / 3 / 1 |
-| `maths/bayes_theorem.html` | 1577 | 1 / 6 / 2 |
-| `gen_ai/diskann_index.html` | 1576 | 0 / 2 / 0 |
+| `computer_vision/edge_detection.html` | 1575 | 0 / 6 / 2 |
 | `gen_ai/mean_reciprocal_rank.html` | 1575 | 3 / 4 / 2 |
-| `python/booleans_and_comparisons.html` | 1571 | 0 / 13 / 1 |
-| `dsa/interpolation_search.html` | 1569 | 3 / 5 / 2 |
-| `deep_learning/batch_processing_in_neural_networks.html` | 1566 | 2 / 4 / 0 |
-| `pandas/filtering_rows.html` | 1564 | 0 / 22 / 0 |
+| `database/datatypes_in_sql.html` | 1573 | 1 / 3 / 0 |
+| `dsa/selection_sort.html` | 1572 | 4 / 4 / 0 |
+| `gen_ai/structure_aware_chunking.html` | 1571 | 2 / 4 / 2 |
+| `pandas/filtering_rows.html` | 1569 | 0 / 22 / 0 |
+| `dsa/a_star.html` | 1567 | 3 / 4 / 1 |
 | `gen_ai/how_llms_process_text.html` | 1562 | 2 / 3 / 4 |
-| `computer_vision/edge_detection.html` | 1560 | 0 / 6 / 2 |
-| `gen_ai/structure_aware_chunking.html` | 1560 | 2 / 4 / 2 |
-| `dsa/selection_sort.html` | 1559 | 4 / 4 / 0 |
-| `database/datatypes_in_sql.html` | 1558 | 1 / 3 / 0 |
-| `dsa/a_star.html` | 1556 | 3 / 4 / 1 |
-| `gen_ai/tf_idf.html` | 1545 | 2 / 5 / 1 |
-| `deep_learning/collaborative_filtering.html` | 1543 | 0 / 3 / 0 |
-| `maths/distance_metrics.html` | 1542 | 1 / 3 / 0 |
-| `database/normalization_in_sql.html` | 1538 | 1 / 6 / 0 |
-| `async_python/event_loop_stepped_through.html` | 1537 | 1 / 12 / 0 |
-| `machine_learning/hard_vs_soft_labelling.html` | 1535 | 1 / 3 / 0 |
-| `deep_learning/gradient_descent_batch_processing.html` | 1534 | 1 / 5 / 0 |
-| `deep_learning/neural_network_for_regression.html` | 1533 | 1 / 4 / 1 |
-| `gen_ai/ann_indexing_hnsw_and_ivf.html` | 1533 | 5 / 4 / 0 |
+| `async_python/event_loop_stepped_through.html` | 1554 | 1 / 12 / 0 |
+| `gen_ai/tf_idf.html` | 1552 | 2 / 5 / 1 |
+| `maths/distance_metrics.html` | 1550 | 1 / 3 / 0 |
+| `machine_learning/hard_vs_soft_labelling.html` | 1549 | 1 / 3 / 0 |
+| `deep_learning/collaborative_filtering.html` | 1548 | 0 / 3 / 0 |
+| `deep_learning/gradient_descent_batch_processing.html` | 1547 | 1 / 5 / 0 |
+| `deep_learning/neural_network_for_regression.html` | 1546 | 1 / 4 / 1 |
+| `gen_ai/ann_indexing_hnsw_and_ivf.html` | 1544 | 5 / 4 / 0 |
+| `database/normalization_in_sql.html` | 1541 | 1 / 6 / 0 |
+| `dsa/merge_sort.html` | 1531 | 2 / 4 / 1 |
 | `natural_language_processing/what_is_a_recurrent_cell.html` | 1530 | 1 / 4 / 13 |
-| `dsa/merge_sort.html` | 1523 | 2 / 4 / 1 |
-| `natural_language_processing/glove.html` | 1523 | 1 / 4 / 0 |
-| `computer_vision/yolov8_detection.html` | 1521 | 0 / 1 / 0 |
-| `dsa/trie_prefix_tree.html` | 1515 | 2 / 6 / 0 |
-| `gen_ai/flat_index.html` | 1514 | 0 / 1 / 0 |
-| `natural_language_processing/bert_vs_gpt.html` | 1512 | 2 / 3 / 0 |
-| `dsa/linear_search.html` | 1511 | 2 / 8 / 2 |
-| `computer_vision/how_dense_layer_works_in_cnn.html` | 1508 | 2 / 3 / 16 |
-| `maths/the_normal_distribution.html` | 1508 | 2 / 3 / 1 |
-| `database/window_functions_in_sql.html` | 1505 | 1 / 8 / 0 |
-| `maths/derivatives_and_slope.html` | 1503 | 2 / 4 / 3 |
-| `computer_vision/mask_rcnn.html` | 1501 | 0 / 2 / 0 |
-| `gen_ai/product_quantization.html` | 1500 | 1 / 3 / 0 |
-| `machine_learning/label_encoding.html` | 1500 | 2 / 4 / 0 |
-| `maths/identity_inverse_transpose.html` | 1498 | 0 / 5 / 5 |
-| `computer_vision/feature_map_in_cnn.html` | 1496 | 1 / 4 / 1 |
-| `dsa/cycle_detection.html` | 1496 | 1 / 7 / 0 |
-| `natural_language_processing/word_cloud.html` | 1495 | 1 / 5 / 0 |
-| `deep_learning/neural_network.html` | 1492 | 2 / 3 / 8 |
-| `deep_learning/batch_normalization.html` | 1491 | 2 / 4 / 3 |
-| `gen_ai/semantic_chunking.html` | 1488 | 2 / 4 / 1 |
-| `concurrency/concurrent_futures.html` | 1484 | 0 / 19 / 0 |
+| `computer_vision/yolov8_detection.html` | 1526 | 0 / 1 / 0 |
+| `natural_language_processing/glove.html` | 1526 | 1 / 4 / 0 |
+| `natural_language_processing/bert_vs_gpt.html` | 1523 | 2 / 3 / 0 |
+| `dsa/trie_prefix_tree.html` | 1522 | 2 / 6 / 0 |
+| `dsa/linear_search.html` | 1521 | 2 / 8 / 2 |
+| `gen_ai/flat_index.html` | 1521 | 0 / 1 / 0 |
+| `computer_vision/how_dense_layer_works_in_cnn.html` | 1519 | 2 / 3 / 16 |
+| `database/window_functions_in_sql.html` | 1516 | 1 / 8 / 0 |
+| `maths/identity_inverse_transpose.html` | 1516 | 0 / 5 / 5 |
+| `maths/the_normal_distribution.html` | 1515 | 2 / 3 / 1 |
+| `maths/derivatives_and_slope.html` | 1513 | 2 / 4 / 3 |
+| `machine_learning/label_encoding.html` | 1511 | 2 / 4 / 0 |
+| `dsa/cycle_detection.html` | 1507 | 1 / 7 / 0 |
+| `gen_ai/product_quantization.html` | 1507 | 1 / 3 / 0 |
+| `computer_vision/mask_rcnn.html` | 1506 | 0 / 2 / 0 |
+| `computer_vision/feature_map_in_cnn.html` | 1504 | 1 / 4 / 1 |
+| `deep_learning/batch_normalization.html` | 1502 | 2 / 4 / 3 |
+| `deep_learning/neural_network.html` | 1502 | 2 / 3 / 8 |
+| `natural_language_processing/word_cloud.html` | 1502 | 1 / 5 / 0 |
+| `maths/rank_and_linear_independence.html` | 1501 | 0 / 4 / 0 |
+| `gen_ai/semantic_chunking.html` | 1499 | 2 / 4 / 1 |
+| `machine_learning/linear_regression_with_ols.html` | 1493 | 1 / 4 / 2 |
+| `natural_language_processing/output_gate_in_lstm.html` | 1493 | 1 / 4 / 2 |
+| `computer_vision/rgb_image_processing.html` | 1492 | 1 / 5 / 0 |
+| `dsa/minimum_spanning_tree.html` | 1490 | 1 / 5 / 0 |
+| `concurrency/concurrent_futures.html` | 1489 | 0 / 19 / 0 |
+| `dsa/linked_lists.html` | 1486 | 2 / 7 / 0 |
+| `gen_ai/casual_language_modeling.html` | 1486 | 2 / 4 / 1 |
 | `computer_vision/how_neural_network_process_images.html` | 1483 | 1 / 3 / 0 |
-| `maths/rank_and_linear_independence.html` | 1483 | 0 / 4 / 0 |
-| `computer_vision/rgb_image_processing.html` | 1481 | 1 / 5 / 0 |
-| `machine_learning/linear_regression_with_ols.html` | 1479 | 1 / 4 / 2 |
+| `natural_language_processing/text_normalization_pipeline.html` | 1483 | 2 / 4 / 0 |
+| `gen_ai/knowledge_distillation_in_llms.html` | 1481 | 3 / 3 / 3 |
+| `deep_learning/overfitting_vs_underfitting.html` | 1479 | 1 / 3 / 0 |
+| `gen_ai/hallucination_and_grounding.html` | 1479 | 2 / 4 / 0 |
 | `natural_language_processing/how_are_embeddings_generated.html` | 1479 | 1 / 4 / 0 |
-| `natural_language_processing/output_gate_in_lstm.html` | 1479 | 1 / 4 / 2 |
-| `dsa/linked_lists.html` | 1476 | 2 / 7 / 0 |
-| `dsa/minimum_spanning_tree.html` | 1475 | 1 / 5 / 0 |
-| `natural_language_processing/text_normalization_pipeline.html` | 1472 | 2 / 4 / 0 |
-| `dsa/heap_sort.html` | 1471 | 2 / 4 / 0 |
-| `gen_ai/casual_language_modeling.html` | 1471 | 2 / 4 / 1 |
-| `deep_learning/overfitting_vs_underfitting.html` | 1469 | 1 / 3 / 0 |
-| `gen_ai/hallucination_and_grounding.html` | 1468 | 2 / 4 / 0 |
-| `gen_ai/knowledge_distillation_in_llms.html` | 1468 | 3 / 3 / 3 |
-| `natural_language_processing/seq2seq_architecture.html` | 1460 | 0 / 2 / 0 |
-| `natural_language_processing/tokenization.html` | 1459 | 1 / 6 / 0 |
-| `dsa/kmp_string_matching.html` | 1458 | 3 / 5 / 0 |
-| `deep_learning/model_training_curve.html` | 1454 | 1 / 3 / 0 |
-| `gen_ai/annoy_index.html` | 1450 | 1 / 1 / 0 |
-| `deep_learning/model_training_on_cpu_vs_gpu.html` | 1449 | 1 / 4 / 0 |
-| `computer_vision/resnet_architecture.html` | 1448 | 0 / 2 / 1 |
-| `database/order_by_in_sql.html` | 1448 | 1 / 9 / 0 |
-| `machine_learning/one_hot_encoding.html` | 1446 | 2 / 6 / 0 |
-| `deep_learning/early_stopping_in_neural_networks.html` | 1444 | 2 / 4 / 0 |
-| `gen_ai/hnsw_index.html` | 1444 | 1 / 1 / 0 |
-| `gen_ai/scann_index.html` | 1443 | 0 / 2 / 0 |
-| `computer_vision/padding_in_cnn.html` | 1441 | 1 / 3 / 1 |
-| `natural_language_processing/forget_gate_in_lstm.html` | 1440 | 2 / 4 / 4 |
-| `gen_ai/ivf_flat_index.html` | 1439 | 1 / 2 / 0 |
+| `dsa/heap_sort.html` | 1476 | 2 / 4 / 0 |
+| `dsa/kmp_string_matching.html` | 1473 | 3 / 5 / 0 |
+| `deep_learning/model_training_on_cpu_vs_gpu.html` | 1468 | 1 / 4 / 0 |
+| `database/order_by_in_sql.html` | 1465 | 1 / 9 / 0 |
+| `deep_learning/model_training_curve.html` | 1464 | 1 / 3 / 0 |
+| `natural_language_processing/tokenization.html` | 1464 | 1 / 6 / 0 |
+| `natural_language_processing/seq2seq_architecture.html` | 1463 | 0 / 2 / 0 |
+| `natural_language_processing/forget_gate_in_lstm.html` | 1457 | 2 / 4 / 4 |
+| `gen_ai/annoy_index.html` | 1454 | 1 / 1 / 0 |
+| `computer_vision/padding_in_cnn.html` | 1452 | 1 / 3 / 1 |
+| `deep_learning/early_stopping_in_neural_networks.html` | 1452 | 2 / 4 / 0 |
+| `computer_vision/resnet_architecture.html` | 1451 | 0 / 2 / 1 |
+| `dsa/dynamic_programming.html` | 1451 | 3 / 6 / 0 |
+| `machine_learning/one_hot_encoding.html` | 1451 | 2 / 6 / 0 |
+| `dsa/bellman_ford.html` | 1448 | 1 / 5 / 1 |
+| `gen_ai/hnsw_index.html` | 1448 | 1 / 1 / 0 |
+| `gen_ai/scann_index.html` | 1447 | 0 / 2 / 0 |
+| `dsa/binary_search_trees.html` | 1446 | 3 / 6 / 0 |
+| `dsa/depth_first_search.html` | 1445 | 2 / 7 / 0 |
+| `gen_ai/ivf_flat_index.html` | 1443 | 1 / 2 / 0 |
+| `dsa/graph_representations.html` | 1442 | 2 / 7 / 0 |
+| `machine_learning/confusion_matrix.html` | 1440 | 2 / 3 / 0 |
+| `deep_learning/data_sparsity.html` | 1438 | 2 / 5 / 0 |
+| `maths/mean_variance_standard_deviation.html` | 1438 | 1 / 4 / 1 |
 | `natural_language_processing/what_are_embeddings.html` | 1438 | 1 / 4 / 1 |
-| `dsa/dynamic_programming.html` | 1437 | 3 / 6 / 0 |
-| `dsa/binary_search_trees.html` | 1436 | 3 / 6 / 0 |
+| `dsa/greedy_algorithms.html` | 1436 | 2 / 4 / 0 |
+| `maths/exponentials.html` | 1434 | 1 / 4 / 3 |
 | `natural_language_processing/machine_translation_encoder_decoder.html` | 1433 | 1 / 2 / 0 |
-| `dsa/graph_representations.html` | 1432 | 2 / 7 / 0 |
-| `deep_learning/data_sparsity.html` | 1430 | 2 / 5 / 0 |
-| `dsa/bellman_ford.html` | 1430 | 1 / 5 / 1 |
-| `maths/exponentials.html` | 1430 | 1 / 4 / 3 |
-| `computer_vision/inception_architecture.html` | 1428 | 2 / 1 / 0 |
-| `dsa/depth_first_search.html` | 1427 | 2 / 7 / 0 |
-| `dsa/greedy_algorithms.html` | 1427 | 2 / 4 / 0 |
-| `machine_learning/confusion_matrix.html` | 1425 | 2 / 3 / 0 |
-| `deep_learning/weights_and_biases.html` | 1422 | 0 / 3 / 7 |
-| `computer_vision/data_loaders_in_cnn.html` | 1418 | 0 / 6 / 0 |
+| `computer_vision/data_loaders_in_cnn.html` | 1432 | 0 / 6 / 0 |
+| `computer_vision/inception_architecture.html` | 1431 | 2 / 1 / 0 |
+| `deep_learning/weights_and_biases.html` | 1429 | 0 / 3 / 7 |
+| `deep_learning/vanishing_vs_exploding_gradient.html` | 1424 | 2 / 5 / 4 |
+| `gen_ai/multi_query_retriever.html` | 1424 | 2 / 4 / 2 |
+| `natural_language_processing/input_gate_in_lstm.html` | 1424 | 2 / 4 / 4 |
+| `computer_vision/parameter_sharing_in_cnn.html` | 1421 | 2 / 3 / 1 |
+| `dsa/insertion_sort.html` | 1419 | 2 / 5 / 0 |
+| `maths/probability_basics.html` | 1417 | 1 / 3 / 2 |
 | `natural_language_processing/what_is_lstm.html` | 1417 | 2 / 4 / 33 |
-| `maths/mean_variance_standard_deviation.html` | 1416 | 1 / 4 / 1 |
-| `deep_learning/vanishing_vs_exploding_gradient.html` | 1413 | 2 / 5 / 4 |
-| `gen_ai/multi_query_retriever.html` | 1413 | 2 / 4 / 2 |
-| `maths/probability_basics.html` | 1409 | 1 / 3 / 2 |
-| `computer_vision/parameter_sharing_in_cnn.html` | 1408 | 2 / 3 / 1 |
-| `dsa/insertion_sort.html` | 1408 | 2 / 5 / 0 |
-| `natural_language_processing/input_gate_in_lstm.html` | 1406 | 2 / 4 / 4 |
-| `maths/determinant.html` | 1404 | 2 / 4 / 1 |
+| `machine_learning/training_on_label_imbalanced_dataset.html` | 1415 | 1 / 5 / 0 |
+| `concurrency/threads_or_processes.html` | 1411 | 1 / 10 / 0 |
+| `async_python/queues_and_backpressure.html` | 1410 | 0 / 9 / 0 |
+| `maths/determinant.html` | 1409 | 2 / 4 / 1 |
+| `deep_learning/weight_initialization.html` | 1408 | 1 / 5 / 6 |
+| `deep_learning/hyper-paramter_tuning.html` | 1407 | 1 / 4 / 1 |
 | `database/what_are_non_relational_databases.html` | 1402 | 1 / 2 / 0 |
-| `concurrency/threads_or_processes.html` | 1400 | 1 / 10 / 0 |
-| `deep_learning/hyper-paramter_tuning.html` | 1399 | 1 / 4 / 1 |
+| `deep_learning/regularization_in_neural_networks.html` | 1398 | 1 / 4 / 7 |
 | `database/what_are_relational_databases.html` | 1397 | 2 / 2 / 0 |
-| `deep_learning/weight_initialization.html` | 1397 | 1 / 5 / 6 |
 | `gen_ai/how_llms_predict_next_word.html` | 1397 | 2 / 3 / 1 |
-| `machine_learning/training_on_label_imbalanced_dataset.html` | 1397 | 1 / 5 / 0 |
-| `async_python/queues_and_backpressure.html` | 1396 | 0 / 9 / 0 |
-| `deep_learning/regularization_in_neural_networks.html` | 1391 | 1 / 4 / 7 |
+| `computer_vision/resnet_and_identity_shortcuts.html` | 1395 | 1 / 3 / 3 |
+| `gen_ai/query_rewriting_and_hyde.html` | 1394 | 2 / 4 / 0 |
+| `concurrency/locks_and_the_ways_they_go_wrong.html` | 1393 | 0 / 18 / 0 |
+| `dsa/hash_tables.html` | 1393 | 2 / 6 / 1 |
 | `database/where_clause_in_sql.html` | 1390 | 4 / 5 / 0 |
-| `concurrency/locks_and_the_ways_they_go_wrong.html` | 1388 | 0 / 18 / 0 |
 | `natural_language_processing/normalization_techniques_for_sequential_data.html` | 1388 | 2 / 4 / 3 |
-| `computer_vision/resnet_and_identity_shortcuts.html` | 1382 | 1 / 3 / 3 |
-| `gen_ai/ivf_pq_index.html` | 1380 | 2 / 3 / 0 |
-| `gen_ai/query_rewriting_and_hyde.html` | 1380 | 2 / 4 / 0 |
-| `concurrency/race_conditions_in_python.html` | 1379 | 1 / 16 / 0 |
-| `deep_learning/gradient_descent_training.html` | 1377 | 3 / 3 / 2 |
-| `dsa/binary_search.html` | 1377 | 2 / 6 / 4 |
-| `maths/matrix_multiplication.html` | 1375 | 0 / 5 / 3 |
-| `dsa/hash_tables.html` | 1374 | 2 / 6 / 1 |
+| `concurrency/race_conditions_in_python.html` | 1387 | 1 / 16 / 0 |
+| `deep_learning/gradient_descent_training.html` | 1387 | 3 / 3 / 2 |
+| `dsa/binary_search.html` | 1387 | 2 / 6 / 4 |
+| `database/transactions_and_acid.html` | 1385 | 1 / 6 / 0 |
+| `gen_ai/ivf_pq_index.html` | 1384 | 2 / 3 / 0 |
+| `computer_vision/image_data_augmentation.html` | 1381 | 1 / 4 / 0 |
+| `deep_learning/activation_functions.html` | 1381 | 4 / 3 / 2 |
+| `maths/matrix_multiplication.html` | 1380 | 0 / 5 / 3 |
+| `async_python/running_work_concurrently.html` | 1379 | 1 / 24 / 0 |
+| `dsa/radix_sort.html` | 1376 | 4 / 4 / 1 |
+| `dsa/two_pointers.html` | 1376 | 2 / 8 / 0 |
 | `concurrency/queues_between_threads.html` | 1373 | 0 / 6 / 0 |
-| `dsa/radix_sort.html` | 1371 | 4 / 4 / 1 |
-| `dsa/two_pointers.html` | 1371 | 2 / 8 / 0 |
-| `computer_vision/image_data_augmentation.html` | 1370 | 1 / 4 / 0 |
-| `database/transactions_and_acid.html` | 1369 | 1 / 6 / 0 |
-| `async_python/running_work_concurrently.html` | 1368 | 1 / 24 / 0 |
-| `deep_learning/activation_functions.html` | 1368 | 4 / 3 / 2 |
+| `gen_ai/lora_in_llms.html` | 1373 | 3 / 4 / 1 |
+| `natural_language_processing/rnn_architecture.html` | 1369 | 1 / 5 / 3 |
+| `deep_learning/optimizers_in_neural_networks.html` | 1367 | 2 / 4 / 2 |
 | `natural_language_processing/what_is_bi_directional_layer.html` | 1366 | 2 / 5 / 6 |
-| `natural_language_processing/rnn_architecture.html` | 1359 | 1 / 5 / 3 |
-| `gen_ai/lora_in_llms.html` | 1358 | 3 / 4 / 1 |
-| `deep_learning/optimizers_in_neural_networks.html` | 1354 | 2 / 4 / 2 |
-| `dsa/queues.html` | 1354 | 3 / 5 / 1 |
-| `deep_learning/dropout_in_neural_networks.html` | 1352 | 2 / 5 / 1 |
-| `deep_learning/reproducibility_of_model.html` | 1352 | 1 / 6 / 1 |
-| `deep_learning/feature_scaling_in_neural_networks.html` | 1351 | 2 / 4 / 0 |
+| `database/union_intersect_except_in_sql.html` | 1365 | 0 / 6 / 0 |
+| `deep_learning/feature_scaling_in_neural_networks.html` | 1364 | 2 / 4 / 0 |
+| `deep_learning/dropout_in_neural_networks.html` | 1363 | 2 / 5 / 1 |
+| `dsa/queues.html` | 1361 | 3 / 5 / 1 |
+| `deep_learning/reproducibility_of_model.html` | 1357 | 1 / 6 / 1 |
+| `dsa/union_find.html` | 1349 | 2 / 5 / 0 |
 | `gen_ai/masked_language_modeling.html` | 1349 | 4 / 4 / 1 |
-| `database/union_intersect_except_in_sql.html` | 1345 | 0 / 6 / 0 |
-| `dsa/union_find.html` | 1344 | 2 / 5 / 0 |
-| `maths/logarithms.html` | 1338 | 2 / 4 / 3 |
-| `dsa/sliding_window.html` | 1332 | 1 / 7 / 0 |
-| `maths/partial_derivatives_and_gradient.html` | 1331 | 1 / 3 / 4 |
-| `concurrency/the_gil_and_what_it_locks.html` | 1328 | 1 / 8 / 0 |
-| `natural_language_processing/stemming_vs_lemmatization.html` | 1328 | 2 / 5 / 0 |
-| `maths/mean_mode_and_median.html` | 1325 | 1 / 3 / 0 |
+| `maths/partial_derivatives_and_gradient.html` | 1348 | 1 / 3 / 4 |
+| `natural_language_processing/stemming_vs_lemmatization.html` | 1343 | 2 / 5 / 0 |
+| `computer_vision/semantic_segmentation_unet.html` | 1342 | 2 / 3 / 0 |
+| `dsa/sliding_window.html` | 1342 | 1 / 7 / 0 |
+| `maths/logarithms.html` | 1342 | 2 / 4 / 3 |
+| `maths/mean_mode_and_median.html` | 1339 | 1 / 3 / 0 |
+| `concurrency/the_gil_and_what_it_locks.html` | 1336 | 1 / 8 / 0 |
+| `natural_language_processing/candidate_memory_in_lstm.html` | 1335 | 1 / 5 / 2 |
+| `natural_language_processing/ascii_codes.html` | 1334 | 2 / 5 / 0 |
+| `computer_vision/calculating_parameters_in_cnn.html` | 1330 | 1 / 4 / 17 |
+| `async_python/coroutines_tasks_and_await.html` | 1325 | 0 / 12 / 0 |
 | `natural_language_processing/how_rnn_process_text.html` | 1325 | 2 / 4 / 1 |
-| `computer_vision/semantic_segmentation_unet.html` | 1323 | 2 / 3 / 0 |
-| `natural_language_processing/candidate_memory_in_lstm.html` | 1322 | 1 / 5 / 2 |
-| `natural_language_processing/ascii_codes.html` | 1321 | 2 / 5 / 0 |
-| `computer_vision/calculating_parameters_in_cnn.html` | 1317 | 1 / 4 / 17 |
-| `async_python/coroutines_tasks_and_await.html` | 1311 | 0 / 12 / 0 |
-| `computer_vision/grayscale_image_processing.html` | 1311 | 1 / 4 / 1 |
-| `computer_vision/transfer_learning_with_cnn.html` | 1308 | 3 / 4 / 0 |
-| `database/groupby_in_sql.html` | 1308 | 2 / 8 / 1 |
-| `maths/equation_of_line.html` | 1306 | 1 / 4 / 6 |
+| `database/null_handling_in_sql.html` | 1323 | 1 / 6 / 0 |
+| `computer_vision/grayscale_image_processing.html` | 1322 | 1 / 4 / 1 |
+| `maths/equation_of_line.html` | 1319 | 1 / 4 / 6 |
+| `computer_vision/transfer_learning_with_cnn.html` | 1317 | 3 / 4 / 0 |
+| `database/groupby_in_sql.html` | 1316 | 2 / 8 / 1 |
+| `natural_language_processing/limitations_of_ann_with_sequential_data.html` | 1309 | 2 / 3 / 0 |
+| `maths/vectors_and_dot_product.html` | 1307 | 2 / 5 / 3 |
+| `maths/the_chain_rule.html` | 1306 | 0 / 3 / 8 |
 | `natural_language_processing/sequential_data_preparation_with_sliding_window.html` | 1306 | 2 / 5 / 0 |
+| `dsa/backtracking.html` | 1304 | 2 / 7 / 1 |
 | `concurrency/choosing_threads_processes_or_async.html` | 1302 | 0 / 12 / 0 |
-| `maths/the_chain_rule.html` | 1299 | 0 / 3 / 8 |
-| `database/null_handling_in_sql.html` | 1297 | 1 / 6 / 0 |
-| `dsa/backtracking.html` | 1294 | 2 / 7 / 1 |
-| `gen_ai/parent_document_retriever.html` | 1293 | 2 / 4 / 1 |
-| `natural_language_processing/limitations_of_ann_with_sequential_data.html` | 1289 | 2 / 3 / 0 |
-| `maths/vectors_and_dot_product.html` | 1284 | 2 / 5 / 3 |
+| `gen_ai/parent_document_retriever.html` | 1300 | 2 / 4 / 1 |
+| `database/ddl_in_sql.html` | 1295 | 1 / 4 / 0 |
+| `dsa/big_o_notation.html` | 1292 | 3 / 4 / 0 |
+| `computer_vision/strides_in_cnn.html` | 1286 | 2 / 3 / 1 |
+| `gen_ai/bm25_and_sparse_retrieval.html` | 1285 | 1 / 4 / 3 |
+| `computer_vision/how_relu_works_in_cnn.html` | 1284 | 1 / 3 / 2 |
+| `gen_ai/byte_pair_encoding_tokenizer.html` | 1284 | 2 / 4 / 0 |
 | `natural_language_processing/how_neural_network_text.html` | 1282 | 3 / 4 / 1 |
-| `database/ddl_in_sql.html` | 1281 | 1 / 4 / 0 |
-| `computer_vision/strides_in_cnn.html` | 1279 | 2 / 3 / 1 |
+| `dsa/recursion_and_call_stack.html` | 1277 | 3 / 8 / 0 |
 | `natural_language_processing/how_words_are_represented_in_neural_networks.html` | 1273 | 1 / 4 / 1 |
-| `computer_vision/how_relu_works_in_cnn.html` | 1270 | 1 / 3 / 2 |
-| `gen_ai/byte_pair_encoding_tokenizer.html` | 1270 | 2 / 4 / 0 |
-| `dsa/big_o_notation.html` | 1269 | 3 / 4 / 0 |
-| `gen_ai/bm25_and_sparse_retrieval.html` | 1262 | 1 / 4 / 3 |
-| `dsa/recursion_and_call_stack.html` | 1260 | 3 / 8 / 0 |
-| `database/common_table_expressions_in_sql.html` | 1258 | 0 / 6 / 0 |
-| `computer_vision/object_detection_with_bounding_boxes.html` | 1254 | 1 / 3 / 1 |
-| `deep_learning/optimizers_in_3d.html` | 1251 | 1 / 3 / 0 |
-| `dsa/topological_sort.html` | 1251 | 1 / 6 / 0 |
-| `gen_ai/maximal_marginal_relevance.html` | 1246 | 3 / 4 / 5 |
-| `dsa/stacks.html` | 1244 | 1 / 7 / 0 |
-| `dsa/strings_in_python.html` | 1240 | 0 / 10 / 0 |
-| `computer_vision/iou_and_non_max_suppression.html` | 1222 | 1 / 4 / 1 |
-| `gen_ai/chunking_strategies_for_rag.html` | 1222 | 2 / 3 / 0 |
-| `dsa/bubble_sort.html` | 1218 | 3 / 5 / 0 |
-| `database/query_execution_order.html` | 1215 | 1 / 6 / 1 |
-| `natural_language_processing/n_gram.html` | 1206 | 2 / 4 / 3 |
-| `deep_learning/neural_network_for_unsupervised_learning.html` | 1205 | 1 / 3 / 1 |
-| `deep_learning/residual_connections.html` | 1204 | 1 / 4 / 15 |
-| `gen_ai/hybrid_search_reciprocal_rank_fusion.html` | 1184 | 3 / 4 / 5 |
-| `gen_ai/quantization_in_llms.html` | 1177 | 3 / 4 / 1 |
+| `computer_vision/object_detection_with_bounding_boxes.html` | 1271 | 1 / 3 / 1 |
+| `database/common_table_expressions_in_sql.html` | 1269 | 0 / 6 / 0 |
+| `dsa/topological_sort.html` | 1262 | 1 / 6 / 0 |
+| `deep_learning/optimizers_in_3d.html` | 1261 | 1 / 3 / 0 |
+| `gen_ai/maximal_marginal_relevance.html` | 1257 | 3 / 4 / 5 |
+| `dsa/stacks.html` | 1251 | 1 / 7 / 0 |
+| `dsa/strings_in_python.html` | 1251 | 0 / 10 / 0 |
+| `computer_vision/iou_and_non_max_suppression.html` | 1240 | 1 / 4 / 1 |
+| `gen_ai/chunking_strategies_for_rag.html` | 1236 | 2 / 3 / 0 |
+| `database/query_execution_order.html` | 1226 | 1 / 6 / 1 |
+| `dsa/bubble_sort.html` | 1226 | 3 / 5 / 0 |
+| `deep_learning/neural_network_for_unsupervised_learning.html` | 1221 | 1 / 3 / 1 |
+| `deep_learning/residual_connections.html` | 1213 | 1 / 4 / 15 |
+| `natural_language_processing/n_gram.html` | 1213 | 2 / 4 / 3 |
+| `gen_ai/hybrid_search_reciprocal_rank_fusion.html` | 1191 | 3 / 4 / 5 |
+| `deep_learning/linear_regression_with_gradient_descent.html` | 1189 | 1 / 4 / 2 |
+| `gen_ai/quantization_in_llms.html` | 1187 | 3 / 4 / 1 |
+| `dsa/dictionaries_in_python.html` | 1186 | 2 / 11 / 0 |
+| `gen_ai/self_query_retriever.html` | 1180 | 1 / 5 / 2 |
 | `deep_learning/how_loss_is_calculated.html` | 1176 | 1 / 5 / 0 |
-| `gen_ai/self_query_retriever.html` | 1175 | 1 / 5 / 2 |
-| `deep_learning/linear_regression_with_gradient_descent.html` | 1173 | 1 / 4 / 2 |
-| `dsa/dictionaries_in_python.html` | 1172 | 2 / 11 / 0 |
-| `dsa/lists_in_python.html` | 1162 | 1 / 11 / 0 |
+| `dsa/lists_in_python.html` | 1173 | 1 / 11 / 0 |
+| `natural_language_processing/vanishing_gradient_problem_in_rnn.html` | 1169 | 2 / 5 / 1 |
 | `gen_ai/dot_product_vs_cosine_similarity.html` | 1158 | 4 / 5 / 3 |
-| `natural_language_processing/vanishing_gradient_problem_in_rnn.html` | 1152 | 2 / 5 / 1 |
+| `database/limit_and_offset_in_sql.html` | 1152 | 1 / 10 / 0 |
+| `natural_language_processing/text_encoding_techniques_in_nlp.html` | 1151 | 2 / 4 / 1 |
 | `natural_language_processing/what_is_a_gru.html` | 1151 | 2 / 4 / 4 |
 | `natural_language_processing/how_lstm_processes_text.html` | 1137 | 2 / 5 / 3 |
-| `database/limit_and_offset_in_sql.html` | 1135 | 1 / 10 / 0 |
-| `natural_language_processing/text_encoding_techniques_in_nlp.html` | 1128 | 2 / 4 / 1 |
+| `database/case_and_views_in_sql.html` | 1120 | 1 / 8 / 0 |
 | `natural_language_processing/why_text_encoding_is_needed_in_nlp.html` | 1114 | 1 / 4 / 0 |
-| `database/case_and_views_in_sql.html` | 1103 | 1 / 8 / 0 |
-| `deep_learning/perceptron.html` | 1100 | 2 / 3 / 2 |
-| `database/having_in_sql.html` | 1093 | 2 / 7 / 1 |
-| `interview/kth-largest-element.html` | 1089 | 1 / 21 / 0 |
+| `database/having_in_sql.html` | 1107 | 2 / 7 / 1 |
+| `deep_learning/perceptron.html` | 1104 | 2 / 3 / 2 |
+| `interview/kth-largest-element.html` | 1097 | 1 / 21 / 0 |
+| `interview/sliding-window-maximum.html` | 1088 | 2 / 12 / 0 |
 | `interview/how-does-a-python-dict-work.html` | 1087 | 1 / 6 / 0 |
-| `interview/sliding-window-maximum.html` | 1080 | 2 / 12 / 0 |
-| `deep_learning/gradient_clipping.html` | 1073 | 1 / 6 / 1 |
-| `deep_learning/learning_rate_scheduling.html` | 1064 | 3 / 4 / 2 |
-| `interview/top-k-frequent-elements.html` | 1060 | 0 / 9 / 1 |
-| `deep_learning/layer_normalization.html` | 1058 | 2 / 4 / 11 |
+| `deep_learning/gradient_clipping.html` | 1081 | 1 / 6 / 1 |
+| `deep_learning/learning_rate_scheduling.html` | 1074 | 3 / 4 / 2 |
+| `interview/top-k-frequent-elements.html` | 1070 | 0 / 9 / 1 |
+| `deep_learning/layer_normalization.html` | 1063 | 2 / 4 / 11 |
 | `interview/what-does-yield-actually-do.html` | 1056 | 0 / 9 / 0 |
 | `interview/why-a-comprehension-is-faster.html` | 1045 | 0 / 9 / 0 |
-| `interview/find-the-duplicate-number.html` | 1029 | 2 / 18 / 0 |
-| `database/regular_expressions_in_sql.html` | 1026 | 2 / 6 / 0 |
-| `database/dml_in_sql.html` | 1023 | 0 / 8 / 0 |
-| `gen_ai/reranking_bi_encoders_vs_cross_encoders.html` | 1023 | 3 / 4 / 2 |
-| `interview/merge-k-sorted-sequences.html` | 1015 | 0 / 9 / 0 |
+| `interview/find-the-duplicate-number.html` | 1044 | 2 / 18 / 0 |
+| `database/regular_expressions_in_sql.html` | 1040 | 2 / 6 / 0 |
+| `database/dml_in_sql.html` | 1034 | 0 / 8 / 0 |
+| `gen_ai/reranking_bi_encoders_vs_cross_encoders.html` | 1029 | 3 / 4 / 2 |
+| `interview/merge-k-sorted-sequences.html` | 1025 | 0 / 9 / 0 |
 | `interview/closures-and-late-binding.html` | 1010 | 0 / 9 / 0 |
 | `interview/why-are-python-strings-immutable.html` | 1010 | 2 / 15 / 0 |
-| `maths/jensens_inequality.html` | 1003 | 0 / 7 / 0 |
-| `maths/hypothesis_testing_and_p_values.html` | 985 | 3 / 3 / 0 |
+| `maths/jensens_inequality.html` | 1009 | 0 / 7 / 0 |
+| `maths/hypothesis_testing_and_p_values.html` | 990 | 3 / 3 / 0 |
+| `natural_language_processing/backpropagation_through_time.html` | 987 | 2 / 4 / 1 |
 | `natural_language_processing/what_is_a_sequence.html` | 982 | 3 / 4 / 0 |
-| `natural_language_processing/backpropagation_through_time.html` | 976 | 2 / 4 / 1 |
-| `interview/daily-temperatures.html` | 974 | 0 / 9 / 1 |
-| `maths/taylor_series.html` | 974 | 2 / 4 / 0 |
+| `interview/daily-temperatures.html` | 980 | 0 / 9 / 1 |
+| `maths/taylor_series.html` | 980 | 2 / 4 / 0 |
+| `interview/longest-increasing-subsequence.html` | 970 | 0 / 9 / 1 |
+| `interview/maximum-subarray-kadane.html` | 969 | 2 / 18 / 1 |
+| `interview/queue-from-two-stacks.html` | 969 | 0 / 9 / 1 |
 | `interview/the-mutable-default-argument.html` | 968 | 0 / 10 / 0 |
-| `computer_vision/resizing_and_interpolation.html` | 961 | 2 / 3 / 0 |
-| `interview/longest-increasing-subsequence.html` | 960 | 0 / 9 / 1 |
+| `computer_vision/resizing_and_interpolation.html` | 965 | 2 / 3 / 0 |
+| `computer_vision/grad_cam.html` | 958 | 1 / 3 / 0 |
+| `interview/climbing-stairs.html` | 958 | 0 / 9 / 0 |
+| `interview/design-a-hashmap.html` | 958 | 2 / 15 / 0 |
 | `interview/design-a-min-stack.html` | 957 | 0 / 9 / 0 |
-| `interview/maximum-subarray-kadane.html` | 957 | 2 / 18 / 1 |
-| `computer_vision/grad_cam.html` | 956 | 1 / 3 / 0 |
-| `interview/queue-from-two-stacks.html` | 955 | 0 / 9 / 1 |
-| `interview/climbing-stairs.html` | 952 | 0 / 9 / 0 |
-| `machine_learning/tsne_and_umap.html` | 947 | 1 / 3 / 0 |
-| `interview/design-a-hashmap.html` | 944 | 2 / 15 / 0 |
+| `machine_learning/tsne_and_umap.html` | 953 | 1 / 3 / 0 |
+| `maths/confidence_intervals.html` | 943 | 3 / 4 / 1 |
 | `interview/list-versus-tuple-versus-deque.html` | 941 | 1 / 27 / 0 |
 | `interview/why-is-in-slow-on-a-list.html` | 941 | 1 / 15 / 0 |
-| `maths/confidence_intervals.html` | 940 | 3 / 4 / 1 |
-| `interview/two-sum.html` | 932 | 3 / 21 / 0 |
-| `interview/longest-consecutive-sequence.html` | 929 | 3 / 18 / 0 |
-| `computer_vision/convolution_kernels.html` | 927 | 2 / 6 / 0 |
-| `interview/shallow-versus-deep-copy.html` | 927 | 0 / 9 / 0 |
-| `machine_learning/data_leakage.html` | 927 | 0 / 3 / 0 |
-| `computer_vision/mean_average_precision.html` | 926 | 1 / 3 / 0 |
-| `computer_vision/erosion_and_dilation.html` | 922 | 2 / 3 / 0 |
-| `interview/coin-change.html` | 919 | 0 / 9 / 0 |
-| `interview/longest-common-prefix.html` | 919 | 2 / 24 / 0 |
-| `interview/implement-substring-search.html` | 916 | 3 / 15 / 0 |
+| `interview/shallow-versus-deep-copy.html` | 939 | 0 / 9 / 0 |
+| `interview/two-sum.html` | 938 | 3 / 21 / 0 |
+| `interview/longest-consecutive-sequence.html` | 937 | 3 / 18 / 0 |
+| `computer_vision/convolution_kernels.html` | 932 | 2 / 6 / 0 |
+| `computer_vision/mean_average_precision.html` | 930 | 1 / 3 / 0 |
+| `machine_learning/data_leakage.html` | 930 | 0 / 3 / 0 |
+| `interview/longest-common-prefix.html` | 927 | 2 / 24 / 0 |
+| `computer_vision/erosion_and_dilation.html` | 926 | 2 / 3 / 0 |
+| `interview/coin-change.html` | 925 | 0 / 9 / 0 |
+| `interview/implement-substring-search.html` | 924 | 3 / 15 / 0 |
+| `interview/running-median-of-a-stream.html` | 921 | 0 / 10 / 0 |
+| `computer_vision/blur_gaussian_median_bilateral.html` | 914 | 2 / 4 / 0 |
 | `interview/binary-search-on-the-answer.html` | 913 | 0 / 9 / 0 |
-| `computer_vision/blur_gaussian_median_bilateral.html` | 912 | 2 / 4 / 0 |
+| `interview/first-and-last-position.html` | 911 | 0 / 11 / 0 |
+| `machine_learning/grid_vs_random_search.html` | 911 | 1 / 3 / 0 |
 | `computer_vision/segmentation_tasks.html` | 907 | 1 / 3 / 0 |
-| `interview/running-median-of-a-stream.html` | 905 | 0 / 10 / 0 |
 | `interview/what-with-guarantees.html` | 905 | 0 / 10 / 0 |
-| `machine_learning/grid_vs_random_search.html` | 905 | 1 / 3 / 0 |
-| `deep_learning/variational_autoencoders.html` | 901 | 1 / 5 / 0 |
-| `interview/house-robber.html` | 898 | 0 / 10 / 0 |
-| `maths/expectation_and_variance.html` | 897 | 1 / 10 / 0 |
-| `computer_vision/vision_transformer_patches.html` | 896 | 2 / 3 / 0 |
+| `maths/expectation_and_variance.html` | 905 | 1 / 10 / 0 |
+| `deep_learning/variational_autoencoders.html` | 904 | 1 / 5 / 0 |
+| `interview/house-robber.html` | 904 | 0 / 10 / 0 |
+| `interview/product-of-array-except-self.html` | 903 | 3 / 9 / 0 |
+| `computer_vision/vision_transformer_patches.html` | 900 | 2 / 3 / 0 |
 | `interview/why-must-dict-keys-be-hashable.html` | 896 | 1 / 12 / 0 |
-| `interview/first-and-last-position.html` | 895 | 0 / 11 / 0 |
-| `interview/product-of-array-except-self.html` | 891 | 3 / 9 / 0 |
-| `interview/three-sum.html` | 890 | 3 / 12 / 0 |
-| `database/isolation_levels.html` | 889 | 3 / 0 / 0 |
-| `interview/memoisation-with-a-dictionary.html` | 885 | 2 / 21 / 0 |
-| `computer_vision/anchor_boxes.html` | 884 | 2 / 3 / 0 |
-| `computer_vision/depthwise_separable_convolution.html` | 884 | 1 / 4 / 0 |
-| `deep_learning/contrastive_learning.html` | 883 | 1 / 4 / 0 |
-| `machine_learning/probability_calibration.html` | 882 | 1 / 3 / 0 |
-| `interview/edit-distance.html` | 881 | 3 / 15 / 2 |
-| `database/sql_injection_and_parameters.html` | 880 | 0 / 4 / 0 |
-| `machine_learning/choosing_k.html` | 880 | 1 / 4 / 0 |
-| `machine_learning/hierarchical_clustering.html` | 879 | 2 / 3 / 0 |
-| `maths/combinatorics.html` | 879 | 2 / 6 / 0 |
+| `interview/three-sum.html` | 894 | 3 / 12 / 0 |
+| `database/isolation_levels.html` | 892 | 3 / 0 / 0 |
+| `interview/memoisation-with-a-dictionary.html` | 891 | 2 / 21 / 0 |
+| `computer_vision/depthwise_separable_convolution.html` | 888 | 1 / 4 / 0 |
+| `deep_learning/contrastive_learning.html` | 888 | 1 / 4 / 0 |
+| `computer_vision/anchor_boxes.html` | 887 | 2 / 3 / 0 |
+| `interview/edit-distance.html` | 887 | 3 / 15 / 2 |
+| `database/sql_injection_and_parameters.html` | 886 | 0 / 4 / 0 |
+| `machine_learning/probability_calibration.html` | 885 | 1 / 3 / 0 |
+| `machine_learning/hierarchical_clustering.html` | 884 | 2 / 3 / 0 |
+| `machine_learning/partial_dependence_and_shap.html` | 884 | 2 / 4 / 0 |
+| `machine_learning/choosing_k.html` | 883 | 1 / 4 / 0 |
+| `maths/combinatorics.html` | 883 | 2 / 6 / 0 |
+| `machine_learning/stacking_and_voting.html` | 881 | 1 / 3 / 0 |
+| `interview/subarray-sum-equals-k.html` | 879 | 3 / 15 / 1 |
 | `interview/str-versus-bytes-in-python.html` | 878 | 1 / 18 / 0 |
-| `machine_learning/partial_dependence_and_shap.html` | 878 | 2 / 4 / 0 |
-| `machine_learning/stacking_and_voting.html` | 876 | 1 / 3 / 0 |
-| `computer_vision/affine_transforms.html` | 874 | 1 / 4 / 0 |
-| `machine_learning/ml_pipelines.html` | 874 | 1 / 6 / 0 |
-| `computer_vision/template_matching.html` | 870 | 1 / 4 / 0 |
-| `interview/subarray-sum-equals-k.html` | 869 | 3 / 15 / 1 |
-| `machine_learning/isolation_forest.html` | 868 | 1 / 4 / 0 |
-| `maths/lagrange_multipliers.html` | 868 | 1 / 4 / 0 |
-| `computer_vision/harris_corners.html` | 865 | 2 / 5 / 0 |
-| `interview/group-anagrams.html` | 865 | 3 / 15 / 0 |
-| `deep_learning/generative_adversarial_networks.html` | 864 | 1 / 4 / 0 |
-| `computer_vision/global_average_pooling.html` | 863 | 1 / 4 / 0 |
-| `machine_learning/threshold_tuning.html` | 863 | 1 / 5 / 0 |
+| `computer_vision/affine_transforms.html` | 877 | 1 / 4 / 0 |
+| `machine_learning/ml_pipelines.html` | 876 | 1 / 6 / 0 |
+| `computer_vision/template_matching.html` | 873 | 1 / 4 / 0 |
+| `interview/group-anagrams.html` | 873 | 3 / 15 / 0 |
+| `machine_learning/isolation_forest.html` | 871 | 1 / 4 / 0 |
+| `maths/lagrange_multipliers.html` | 871 | 1 / 4 / 0 |
+| `computer_vision/harris_corners.html` | 870 | 2 / 5 / 0 |
+| `computer_vision/global_average_pooling.html` | 869 | 1 / 4 / 0 |
+| `deep_learning/generative_adversarial_networks.html` | 868 | 1 / 4 / 0 |
+| `machine_learning/threshold_tuning.html` | 866 | 1 / 5 / 0 |
+| `maths/quantiles_and_percentiles.html` | 863 | 1 / 3 / 0 |
 | `interview/valid-anagram.html` | 862 | 2 / 27 / 0 |
-| `maths/quantiles_and_percentiles.html` | 859 | 1 / 3 / 0 |
-| `database/explain_and_query_plans.html` | 856 | 3 / 2 / 0 |
-| `maths/convexity_and_optimisation.html` | 855 | 1 / 3 / 0 |
-| `maths/markov_chains.html` | 855 | 2 / 3 / 8 |
-| `computer_vision/thresholding.html` | 850 | 1 / 3 / 0 |
-| `deep_learning/embedding_layers.html` | 848 | 1 / 3 / 0 |
-| `computer_vision/histograms_and_equalisation.html` | 846 | 1 / 4 / 0 |
-| `database/document_model_vs_rows.html` | 846 | 2 / 0 / 0 |
-| `database/recursive_ctes_in_sql.html` | 846 | 1 / 3 / 0 |
-| `computer_vision/dilated_convolutions.html` | 844 | 1 / 4 / 0 |
-| `interview/design-an-lru-cache.html` | 843 | 1 / 12 / 0 |
-| `deep_learning/autoencoders.html` | 842 | 1 / 3 / 0 |
-| `interview/search-in-rotated-sorted-array.html` | 842 | 2 / 15 / 0 |
-| `deep_learning/gradient_accumulation.html` | 841 | 1 / 3 / 0 |
+| `database/explain_and_query_plans.html` | 861 | 3 / 2 / 0 |
+| `maths/convexity_and_optimisation.html` | 860 | 1 / 3 / 0 |
+| `interview/design-an-lru-cache.html` | 858 | 1 / 12 / 0 |
+| `maths/markov_chains.html` | 858 | 2 / 3 / 8 |
+| `interview/search-in-rotated-sorted-array.html` | 856 | 2 / 15 / 0 |
+| `computer_vision/thresholding.html` | 852 | 1 / 3 / 0 |
+| `database/document_model_vs_rows.html` | 852 | 2 / 0 / 0 |
+| `deep_learning/embedding_layers.html` | 851 | 1 / 3 / 0 |
+| `computer_vision/histograms_and_equalisation.html` | 850 | 1 / 4 / 0 |
+| `database/recursive_ctes_in_sql.html` | 849 | 1 / 3 / 0 |
+| `computer_vision/dilated_convolutions.html` | 847 | 1 / 4 / 0 |
+| `deep_learning/autoencoders.html` | 844 | 1 / 3 / 0 |
+| `deep_learning/gradient_accumulation.html` | 844 | 1 / 3 / 0 |
+| `interview/first-non-repeating-character.html` | 844 | 2 / 21 / 0 |
+| `deep_learning/mixed_precision_training.html` | 843 | 1 / 3 / 0 |
+| `machine_learning/outliers_and_influence.html` | 843 | 1 / 3 / 0 |
+| `computer_vision/receptive_field.html` | 841 | 2 / 5 / 0 |
+| `interview/is-versus-equals.html` | 840 | 0 / 9 / 0 |
 | `interview/what-a-decorator-replaces.html` | 840 | 0 / 11 / 0 |
-| `machine_learning/outliers_and_influence.html` | 839 | 1 / 3 / 0 |
-| `computer_vision/receptive_field.html` | 838 | 2 / 5 / 0 |
-| `deep_learning/mixed_precision_training.html` | 837 | 1 / 3 / 0 |
-| `database/sharding_in_databases.html` | 836 | 2 / 0 / 0 |
-| `interview/first-non-repeating-character.html` | 836 | 2 / 21 / 0 |
+| `database/sharding_in_databases.html` | 838 | 2 / 0 / 0 |
 | `interview/does-len-count-characters-or-bytes.html` | 835 | 4 / 19 / 0 |
-| `interview/is-versus-equals.html` | 834 | 0 / 9 / 0 |
-| `database/deadlocks_in_sql.html` | 829 | 2 / 0 / 0 |
-| `machine_learning/dbscan_clustering.html` | 829 | 1 / 3 / 0 |
-| `deep_learning/seq2seq_and_beam_search.html` | 828 | 1 / 3 / 0 |
-| `machine_learning/permutation_importance.html` | 828 | 1 / 3 / 0 |
-| `machine_learning/gaussian_mixture_models.html` | 827 | 1 / 3 / 0 |
-| `machine_learning/learning_curves.html` | 827 | 2 / 3 / 0 |
-| `maths/type_i_and_type_ii_errors.html` | 826 | 2 / 3 / 0 |
-| `interview/trapping-rain-water.html` | 825 | 3 / 21 / 0 |
-| `interview/evaluate-reverse-polish-notation.html` | 824 | 0 / 9 / 0 |
-| `deep_learning/diffusion_models.html` | 822 | 1 / 4 / 0 |
+| `interview/evaluate-reverse-polish-notation.html` | 834 | 0 / 9 / 0 |
+| `deep_learning/seq2seq_and_beam_search.html` | 833 | 1 / 3 / 0 |
+| `interview/trapping-rain-water.html` | 833 | 3 / 21 / 0 |
+| `machine_learning/permutation_importance.html` | 833 | 1 / 3 / 0 |
+| `maths/type_i_and_type_ii_errors.html` | 833 | 2 / 3 / 0 |
+| `database/deadlocks_in_sql.html` | 831 | 2 / 0 / 0 |
+| `machine_learning/dbscan_clustering.html` | 831 | 1 / 3 / 0 |
+| `machine_learning/gaussian_mixture_models.html` | 831 | 1 / 3 / 0 |
+| `machine_learning/learning_curves.html` | 830 | 2 / 3 / 0 |
+| `interview/reverse-a-string.html` | 828 | 2 / 19 / 0 |
+| `interview/sort-colors-dutch-national-flag.html` | 828 | 2 / 15 / 1 |
+| `deep_learning/diffusion_models.html` | 825 | 1 / 4 / 0 |
+| `interview/merge-intervals.html` | 825 | 1 / 15 / 0 |
+| `machine_learning/precision_recall_and_f1.html` | 824 | 2 / 4 / 0 |
+| `machine_learning/precision_recall_vs_roc.html` | 823 | 2 / 5 / 0 |
 | `interview/binary-search-without-an-off-by-one.html` | 820 | 0 / 9 / 1 |
-| `interview/reverse-a-string.html` | 820 | 2 / 19 / 0 |
-| `machine_learning/precision_recall_and_f1.html` | 819 | 2 / 4 / 0 |
-| `machine_learning/precision_recall_vs_roc.html` | 819 | 2 / 5 / 0 |
-| `interview/merge-intervals.html` | 817 | 1 / 15 / 0 |
-| `database/star_schema.html` | 816 | 2 / 0 / 0 |
-| `maths/cholesky_and_positive_definiteness.html` | 815 | 0 / 4 / 0 |
-| `database/oltp_vs_olap_columnar.html` | 813 | 3 / 2 / 0 |
-| `interview/sort-colors-dutch-national-flag.html` | 810 | 2 / 15 / 1 |
-| `database/mvcc_in_databases.html` | 806 | 2 / 1 / 0 |
-| `database/partitioning_in_databases.html` | 801 | 3 / 1 / 0 |
-| `database/replication_and_lag.html` | 801 | 2 / 1 / 0 |
+| `database/oltp_vs_olap_columnar.html` | 819 | 3 / 2 / 0 |
+| `database/star_schema.html` | 819 | 2 / 0 / 0 |
+| `maths/cholesky_and_positive_definiteness.html` | 819 | 0 / 4 / 0 |
+| `database/mvcc_in_databases.html` | 808 | 2 / 1 / 0 |
+| `database/partitioning_in_databases.html` | 807 | 3 / 1 / 0 |
+| `database/replication_and_lag.html` | 807 | 2 / 1 / 0 |
+| `interview/string-compression.html` | 805 | 2 / 19 / 0 |
+| `database/primary_and_foreign_keys.html` | 803 | 3 / 0 / 0 |
+| `computer_vision/colour_spaces_rgb_hsv.html` | 802 | 2 / 4 / 0 |
 
-## Tier 2 modules (42)
+## Tier 2 modules (39)
 
 | Module | Prose words | Why |
 |---|---|---|
-| `computer_vision/colour_spaces_rgb_hsv.html` | 799 | 799 prose words (< 800) |
-| `database/primary_and_foreign_keys.html` | 798 | 798 prose words (< 800) |
-| `interview/string-compression.html` | 797 | 797 prose words (< 800) |
+| `interview/minimum-window-substring.html` | 795 | 795 prose words (< 800) |
+| `database/aggregate_functions_in_sql.html` | 794 | 794 prose words (< 800) |
+| `interview/grouping-and-inverting-dictionaries.html` | 794 | 794 prose words (< 800) |
+| `interview/longest-palindromic-substring.html` | 794 | 794 prose words (< 800) |
+| `maths/basis_span_and_orthogonality.html` | 794 | 794 prose words (< 800) |
 | `maths/sampling_distributions.html` | 794 | 794 prose words (< 800) |
-| `deep_learning/label_smoothing.html` | 790 | 790 prose words (< 800) |
-| `maths/basis_span_and_orthogonality.html` | 789 | 789 prose words (< 800) |
+| `deep_learning/label_smoothing.html` | 793 | 793 prose words (< 800) |
 | `interview/what-is-a-python-list-underneath.html` | 788 | 788 prose words (< 800) |
-| `database/aggregate_functions_in_sql.html` | 787 | 787 prose words (< 800) |
-| `interview/minimum-window-substring.html` | 787 | 787 prose words (< 800) |
-| `interview/longest-palindromic-substring.html` | 786 | 786 prose words (< 800) |
+| `database/cap_theorem.html` | 785 | 785 prose words (< 800) |
+| `database/self_joins_in_sql.html` | 784 | 784 prose words (< 800) |
 | `interview/remove-duplicates-in-place.html` | 784 | 784 prose words (< 800) |
-| `database/self_joins_in_sql.html` | 782 | 782 prose words (< 800) |
-| `database/cap_theorem.html` | 781 | 781 prose words (< 800) |
-| `machine_learning/feature_scaling.html` | 779 | 779 prose words (< 800) |
-| `database/exists_vs_in_vs_join.html` | 778 | 778 prose words (< 800) |
-| `maths/bernoulli_binomial_poisson.html` | 778 | 778 prose words (< 800) |
-| `computer_vision/one_by_one_convolutions.html` | 776 | 776 prose words (< 800) |
+| `database/exists_vs_in_vs_join.html` | 783 | 783 prose words (< 800) |
+| `maths/bernoulli_binomial_poisson.html` | 783 | 783 prose words (< 800) |
+| `machine_learning/feature_scaling.html` | 782 | 782 prose words (< 800) |
+| `computer_vision/one_by_one_convolutions.html` | 779 | 779 prose words (< 800) |
+| `interview/rotate-an-array.html` | 778 | 778 prose words (< 800) |
 | `interview/longest-substring-without-repeating-characters.html` | 776 | 776 prose words (< 800) |
-| `interview/grouping-and-inverting-dictionaries.html` | 773 | 773 prose words (< 800) |
-| `interview/rotate-an-array.html` | 766 | 766 prose words (< 800) |
-| `maths/central_limit_theorem.html` | 762 | 762 prose words (< 800) |
-| `maths/jacobian_and_hessian.html` | 761 | 761 prose words (< 800) |
+| `maths/central_limit_theorem.html` | 767 | 767 prose words (< 800) |
+| `maths/jacobian_and_hessian.html` | 767 | 767 prose words (< 800) |
+| `interview/valid-palindrome.html` | 753 | 753 prose words (< 800) |
+| `database/constraints_in_sql.html` | 751 | 751 prose words (< 800) |
 | `interview/sets-versus-lists-and-deduplication.html` | 751 | 751 prose words (< 800) |
-| `database/constraints_in_sql.html` | 749 | 749 prose words (< 800) |
+| `maths/qr_decomposition.html` | 747 | 747 prose words (< 800) |
 | `interview/what-does-string-slicing-cost.html` | 745 | 745 prose words (< 800) |
-| `maths/qr_decomposition.html` | 742 | 742 prose words (< 800) |
+| `maths/singular_value_decomposition.html` | 739 | 739 prose words (< 800) |
 | `interview/find-versus-index-on-strings.html` | 738 | 738 prose words (< 800) |
-| `interview/valid-palindrome.html` | 737 | 737 prose words (< 800) |
-| `maths/singular_value_decomposition.html` | 735 | 735 prose words (< 800) |
 | `interview/accidental-quadratic-complexity.html` | 734 | 734 prose words (< 800) |
-| `database/composite_and_covering_indexes.html` | 722 | 722 prose words (< 800) |
-| `machine_learning/handling_missing_values.html` | 720 | 720 prose words (< 800) |
-| `interview/isomorphic-strings.html` | 707 | 707 prose words (< 800) |
-| `maths/matrix_calculus.html` | 704 | 704 prose words (< 800) |
-| `interview/valid-parentheses.html` | 703 | 703 prose words (< 800) |
-| `interview/counting-with-dictionaries.html` | 701 | 701 prose words (< 800) |
+| `database/composite_and_covering_indexes.html` | 727 | 727 prose words (< 800) |
+| `machine_learning/handling_missing_values.html` | 724 | 724 prose words (< 800) |
+| `interview/counting-with-dictionaries.html` | 719 | 719 prose words (< 800) |
+| `interview/isomorphic-strings.html` | 713 | 713 prose words (< 800) |
+| `interview/valid-parentheses.html` | 709 | 709 prose words (< 800) |
+| `maths/matrix_calculus.html` | 707 | 707 prose words (< 800) |
 | `interview/modifying-a-collection-while-iterating.html` | 701 | 701 prose words (< 800) |
-| `database/key_value_and_graph_models.html` | 695 | 695 prose words (< 800) |
+| `database/key_value_and_graph_models.html` | 700 | 700 prose words (< 800) |
 | `interview/the-nested-list-multiplication-bug.html` | 686 | 686 prose words (< 800) |
 | `interview/string-interning-and-the-is-operator.html` | 680 | 680 prose words (< 800) |
 | `computer_vision/cnn.html` | 0 | no written article on the page (no .vz-article) |
