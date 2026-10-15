@@ -238,6 +238,20 @@ range.
 **Scaling one-hot columns.** They're already 0 and 1. StandardScaler turns them
 into two any values and makes the model harder to read for no gain.
 
+## Questions people ask
+
+<strong>Which models need feature scaling?</strong> Distance-based and gradient-based models such as k-NN, SVMs, k-means, PCA, neural networks and regularised linear models. Tree-based models do not care.
+
+<strong>Standardisation or min-max?</strong> Standardisation is the safer default, particularly with outliers. Min-max suits bounded inputs, like pixel values, and models that expect a fixed range.
+
+<strong>Should I scale the target too?</strong> Usually not for classification. For regression it can help some models, but you must invert the predictions before computing errors.
+
+<strong>When do I fit the scaler?</strong> On the training data only, then apply it to validation and test data. Fitting on everything leaks test statistics into training.
+
+<strong>Do I scale one-hot columns?</strong> No. They are already 0 or 1, and scaling them makes coefficients harder to read with no gain.
+
+<strong>What if my data has big outliers?</strong> Min-max will squeeze most values into a sliver of the range. Use the median-and-IQR scaler, or clip or transform the feature first.
+
 ## Which models care, and which do not
 
 One dataset, one column rescaled by 10,000, five models. Two collapse, two don't move at all. The fifth is the notable case.
@@ -514,6 +528,20 @@ order of ops can't be got wrong by accident.
 **Believing a oddly good result.** It's nearly always leakage, and
 finding out later is much more costly than checking now.
 
+## Questions people ask
+
+<strong>What is data leakage in plain terms?</strong> Information from outside the training set, usually from the test set or the future, sneaks into model fitting. The score looks great and then collapses in production.
+
+<strong>How do I spot leakage?</strong> Be suspicious of scores that are too good to be true, or a single feature with huge importance. Check whether any feature would not be available at prediction time.
+
+<strong>Is fitting a scaler before splitting really leakage?</strong> Yes. The scaler learns the mean and variance of the test rows, so the test set influences training. The effect is often small but it is still a leak, and it can be large for other steps like feature selection.
+
+<strong>Does cross-validation prevent leakage?</strong> Only if every learned step runs inside each fold. Wrap preprocessing and the model in a pipeline so each fold fits its own transforms.
+
+<strong>What is target leakage?</strong> A feature that encodes the answer, such as a refund flag when predicting whether a customer churns. It carries the label because it is recorded after the outcome.
+
+<strong>How does time cause leakage?</strong> Random splits let the model train on rows from after the ones it is tested on. Use time-ordered splits, and group splits when rows from one entity repeat.
+
 ## A model that scores well and knows nothing
 
 Select features using the whole dataset, then cross-validate. The score is great and fully fake. The data is pure noise.
@@ -754,6 +782,20 @@ drops a lot of data.
 
 **Never checking why.** Ten minutes finding out what caused the gap is worth
 more than any choice of strategy.
+
+## Questions people ask
+
+<strong>Should I just drop rows with missing values?</strong> Only when few rows are affected and the values are missing at random. Otherwise you lose data and can bias the sample.
+
+<strong>Mean or median imputation?</strong> Median is safer with skewed data or outliers. Mean is fine for symmetric distributions.
+
+<strong>Why add a missing-value indicator?</strong> The fact that a value is absent often carries signal, such as an unreported income. A binary flag lets the model use that.
+
+<strong>Do I impute before or after splitting?</strong> After. Learn the fill values from the training set only, ideally inside a pipeline, to avoid leakage.
+
+<strong>When should I use model-based imputation?</strong> When many features are missing and related to each other. KNN or iterative imputation can recover the relationships, at higher cost and with more risk of leakage.
+
+<strong>Which models handle missing values natively?</strong> Gradient-boosted trees like HistGradientBoosting, XGBoost and LightGBM do. Most linear models, SVMs and neural networks need imputation first.
 
 ## Dropping, filling, and the flag that saves you
 
@@ -1024,6 +1066,20 @@ pick, not the effect.
 
 **Checking only y.** Points with high hat values can be plain in y and still
 dominate the fit.
+
+## Questions people ask
+
+<strong>Is every outlier a problem?</strong> No. An outlier is an unusual value, and it matters only if it changes the fit. A point that sits on the trend line is harmless.
+
+<strong>What is the difference between an outlier and an influential point?</strong> An outlier has an unusual response given its inputs, while an influential point changes the fitted model when removed. Points far from the other inputs are the usual cause of influence.
+
+<strong>How do I measure influence?</strong> Cook's distance combines residual size and distance from the other inputs in one number. A common rule of thumb flags values above 4/n for a closer look.
+
+<strong>Should I delete outliers?</strong> Only after checking whether they are errors. If the value is real, removing it hides something true about your data, so consider a different model or transform instead.
+
+<strong>What can I do besides removing them?</strong> Use a loss that is less sensitive to large errors, such as Huber or quantile regression. Or transform the target, or use median-based statistics.
+
+<strong>Why does squared error make outliers worse?</strong> Squaring makes one large residual count far more than many small ones, so the fit bends towards the extreme point.
 
 ## An outlier and an influential point are not the same thing
 
@@ -1346,6 +1402,20 @@ training fold only. `imblearn`'s pipeline handles this. Scikit-learn's doesn't.
 **given a pipeline validates your splits.** It fits each fold right. It
 can't know that your folds mix one patient across both sides.
 
+## Questions people ask
+
+<strong>Why use a pipeline instead of separate steps?</strong> A pipeline guarantees every transform is fit only on training data inside each fold. It also makes the whole workflow one object you can save and reuse.
+
+<strong>Does a pipeline prevent leakage?</strong> It prevents the preprocessing kind, when you cross-validate the whole pipeline. It cannot catch target leakage or time-based leakage.
+
+<strong>How do I tune hyperparameters of pipeline steps?</strong> Use the step name, a double underscore, and the parameter, such as svc__C. Pass these to GridSearchCV or RandomizedSearchCV.
+
+<strong>What is ColumnTransformer for?</strong> It applies different preprocessing to different columns, for example scaling numeric columns and one-hot encoding categorical ones, then joins the results.
+
+<strong>Can I put custom code in a pipeline?</strong> Yes. Wrap a function in FunctionTransformer, or write a class with fit and transform methods.
+
+<strong>How do I save a pipeline?</strong> Serialise the fitted pipeline with joblib. Loading it gives you the preprocessing and model together, so production predictions match training.
+
 ## The same workflow, wrong then right
 
 prep outside the pipeline scores higher and is a lie. Here are both versions side by side, on the same data.
@@ -1627,6 +1697,20 @@ only in calibration. Compare across thresholds, or tune each one.
 **Fit on imbalanced data.** It measures the class balance more than the
 model.
 
+## Questions people ask
+
+<strong>What is the difference between precision and recall?</strong> Precision is the share of positive predictions that are right. Recall is the share of actual positives you caught.
+
+<strong>When should I favour precision over recall?</strong> When false alarms are costly, such as flagging legitimate transactions as fraud. Favour recall when missing a case is worse, like cancer screening.
+
+<strong>Why does F1 use a harmonic mean?</strong> It is pulled towards the lower of the two values, so a model cannot hide terrible recall behind high precision.
+
+<strong>Why not just use accuracy?</strong> On imbalanced data a model that always predicts the majority class scores high accuracy while catching nothing.
+
+<strong>What are macro, micro and weighted averages?</strong> Macro averages the per-class scores equally, micro pools all the counts, and weighted averages by class size. Macro treats rare classes as equally important.
+
+<strong>Can I raise both precision and recall?</strong> At a fixed model, changing the threshold trades one for the other. To improve both, you need a better model or better features.
+
 ## The trade you cannot avoid
 
 Precision and recall pull in opposite directions. Sweeping the choice threshold shows just how much of one each unit of the other costs.
@@ -1868,6 +1952,20 @@ different, so the numbers aren't close.
 **Losing that both curves span all thresholds.** Neither tells you which
 threshold to deploy &mdash; that is a separate choice, made with
 [costs](threshold_tuning.html).
+
+## Questions people ask
+
+<strong>When should I use a precision-recall curve instead of ROC?</strong> When the positive class is rare. ROC can look excellent even when most flagged items are false alarms.
+
+<strong>Why does ROC AUC stay high on imbalanced data?</strong> The false positive rate divides by the huge number of negatives, so many false positives still give a small rate.
+
+<strong>What is the baseline for each curve?</strong> ROC AUC for a random model is 0.5 regardless of balance. For PR it equals the positive rate, so it changes with the data.
+
+<strong>Can I compare PR AUC across datasets?</strong> Only with care, since the baseline differs. Compare against each dataset's positive rate.
+
+<strong>What is average precision?</strong> A summary of the PR curve, the weighted mean of precision at each threshold. It is the usual way to get a single PR number.
+
+<strong>Do the curves change if I change the threshold?</strong> No. Each curve covers all thresholds. The threshold picks a single point on it.
 
 ## The same model, two curves, two different stories
 
@@ -2131,6 +2229,20 @@ folds. Tune once on a held-out validation set.
 **Losing it drifts.** The best threshold depends on the class balance,
 and that moves in production. It needs rechecking, not setting once.
 
+## Questions people ask
+
+<strong>Why is 0.5 not always the right threshold?</strong> It assumes both kinds of error cost the same and the classes are balanced. Neither is usually true.
+
+<strong>How do I pick a threshold?</strong> Assign a cost to false positives and false negatives and choose the threshold that minimises expected cost. If you cannot price them, set a recall or precision target.
+
+<strong>On which data should I tune the threshold?</strong> On validation data or cross-validated predictions, not the test set. Then report the final result on test data once.
+
+<strong>Does threshold tuning change the model?</strong> No. It changes only how scores become labels, so ranking metrics like AUC stay the same.
+
+<strong>Do I need calibrated probabilities?</strong> For thresholds derived from costs, yes. A cost-based threshold assumes the probabilities are real, so calibrate first.
+
+<strong>What happens when class balance shifts in production?</strong> The best threshold moves. Monitor the positive rate and re-tune when the distribution changes.
+
 ## 0.5 is a default, not a decision
 
 The threshold is the one setting you can change after training, in production, in a config file. Here is what it costs and what it buys.
@@ -2383,6 +2495,20 @@ does, widen it and search again.
 
 **Not searching prep.** Put the whole [pipeline](ml_pipelines.html) in
 the search, so imputation and scaling choices are tuned alongside the model.
+
+## Questions people ask
+
+<strong>Is random search always better than grid search?</strong> Not always, but it usually finds a good setting with fewer fits when only a few hyperparameters matter. Grid search is fine for one or two small, discrete parameters.
+
+<strong>How many random samples do I need?</strong> Around 60 random trials gives a good chance of landing in the top 5 percent of the space. More helps with diminishing returns.
+
+<strong>Should I sample on a log scale?</strong> Yes for parameters like learning rate, C and alpha that span orders of magnitude. Use a log-uniform distribution so each scale gets equal attention.
+
+<strong>Why does grid search waste fits?</strong> It repeats the same few values of each parameter across every combination. If one parameter does not matter, you run many near-duplicate experiments.
+
+<strong>What comes after random search?</strong> Bayesian optimisation and successive halving, which use earlier results to choose where to look next. They are worth it when each fit is expensive.
+
+<strong>Can I tune on the test set?</strong> No. Use cross-validation on the training data for the search, and touch the test set once at the end.
 
 ## Why random search finds more with fewer fits
 
@@ -2669,6 +2795,20 @@ uninformative. Plot the metric you really care about.
 **Concluding 'more data' from a gap alone.** Check the validation curve is still
 falling. A settled gap means variance you can't fix with volume.
 
+## Questions people ask
+
+<strong>What does a learning curve show?</strong> Training and validation scores as the training set grows. It tells you whether more data, a bigger model or a simpler model is likely to help.
+
+<strong>How do I recognise overfitting?</strong> Training score stays high while validation score sits well below it. A wide gap that does not close with more data points to overfitting.
+
+<strong>How do I recognise underfitting?</strong> Both scores are low and close together. More data will not help, so try a more flexible model or better features.
+
+<strong>Will more data help?</strong> If the validation curve is still rising at the right edge, yes. If it has flattened, more data of the same kind will give little.
+
+<strong>How is this different from a validation curve?</strong> A learning curve varies training set size. A validation curve varies one hyperparameter, such as tree depth, at a fixed size.
+
+<strong>Why are the curves noisy?</strong> Each point comes from a finite cross-validation run on a small subset. Use more folds or repeats, and look at the shaded spread.
+
 ## The chart that tells you whether more data will help
 
 Two models on the same problem, scored as the training set grows. One curve says collect more data. The other says don't bother. Reading the difference is the whole skill.
@@ -2930,6 +3070,20 @@ gives a defensible value.
 
 **Reading noise as failure.** Labelling outliers as noise is the feature, not a
 bug to fix.
+
+## Questions people ask
+
+<strong>How do I choose eps?</strong> Plot each point's distance to its k-th nearest neighbour, sorted, and pick the value at the bend of the curve. Domain knowledge about what counts as close helps too.
+
+<strong>How do I choose min_samples?</strong> A common start is twice the number of features, or at least 4 or 5 for 2D data. Raise it for noisier data so that small chance groupings do not become clusters.
+
+<strong>What does a label of -1 mean?</strong> It marks noise, a point that is neither a core point nor within eps of one. DBSCAN does not force every point into a cluster.
+
+<strong>Does DBSCAN need feature scaling?</strong> Yes. Eps is a single distance applied to all features, so a large-scale feature will dominate unless you standardise first.
+
+<strong>Why does DBSCAN struggle with varied densities?</strong> One eps cannot fit both a tight cluster and a loose one. Either the loose cluster is split into noise or the tight clusters merge. HDBSCAN handles this better.
+
+<strong>Is DBSCAN better than k-means?</strong> It is better for odd shapes and for flagging outliers, and you do not give it k. K-means is faster and gives every point a cluster, which suits round, similar-sized groups.
 
 ## Clusters by density, and the points left over
 
@@ -3204,6 +3358,20 @@ merge them.
 
 **Trying it on a large dataset.** The distance mat won't fit.
 
+## Questions people ask
+
+<strong>What is a dendrogram?</strong> A tree showing the order in which clusters merge and the distance at each merge. Cut it at a height to get a flat set of clusters.
+
+<strong>Which linkage should I use?</strong> Ward is a good default for compact, similar-sized clusters. Single linkage finds chains but is sensitive to noise, and average and complete sit in between.
+
+<strong>How do I choose where to cut the dendrogram?</strong> Look for a long vertical gap with no merges, and cut within it. That gap shows the clusters are well separated at that level.
+
+<strong>Does hierarchical clustering scale to large datasets?</strong> Poorly. It needs the pairwise distance matrix, so memory grows with the square of the number of points. Beyond tens of thousands of rows, use k-means or a sampled subset.
+
+<strong>Do I need to scale features?</strong> Yes, because distances drive every merge. A large-scale feature will dominate otherwise.
+
+<strong>Can I undo a merge?</strong> No. Agglomerative merges are final, so an early bad merge stays in the tree.
+
 ## Cluster without choosing k first
 
 Agglomerative clustering merges the two closest groups over and over. You get each k at once. The linkage rule decides what "closest" means. It changes the answer fully.
@@ -3475,6 +3643,20 @@ of scale on the axis.
 inherits the same assumption k-means makes.
 
 **Losing to scale.** Both metrics are distances.
+
+## Questions people ask
+
+<strong>Is the elbow method reliable?</strong> Only when the curve has a clear bend, which real data often lacks. When the inertia curve falls smoothly, treat the elbow as a hint and confirm with silhouette scores.
+
+<strong>Can inertia pick k on its own?</strong> No. Inertia always drops as k grows and reaches zero when every point is its own cluster, so its minimum is a useless answer.
+
+<strong>What is a good silhouette score?</strong> Above about 0.5 suggests clear structure, 0.25 to 0.5 means weak structure, and below that the clusters are barely separated. Compare scores across k on the same data rather than against a fixed bar.
+
+<strong>What if the elbow and the silhouette disagree?</strong> Look at the clusters at both values of k and ask which one is useful for the job. Disagreement usually means the structure is ambiguous, so the downstream purpose should break the tie.
+
+<strong>Should k be the number of classes I already know?</strong> If you know the true classes and want to recover them, start there. If the goal is finding structure, let the metrics and the use case decide, since natural groups often differ from labels.
+
+<strong>Does k-means need k even if I only want a rough grouping?</strong> Yes, k is a required input. If you do not want to choose it, try hierarchical clustering or DBSCAN, which do not fix k up front.
 
 ## Four ways to pick k, on data where you know the answer
 
@@ -3751,6 +3933,20 @@ most libraries.
 
 **Too many components.** With enough Gaussians you can fit any of it, including
 the noise. BIC punishes param count for this reason.
+
+## Questions people ask
+
+<strong>How is a GMM different from k-means?</strong> A GMM gives each point a probability of belonging to every cluster, and each cluster has its own shape through a covariance matrix. K-means gives hard labels and assumes round clusters.
+
+<strong>How do I choose the number of components?</strong> Fit models for a range of component counts and pick the lowest BIC or AIC. BIC penalises complexity more heavily, so it tends to give simpler models.
+
+<strong>Which covariance type should I use?</strong> Full covariance fits any ellipse but needs more data. Diagonal, spherical or tied reduce parameters, which helps when you have few points or many features.
+
+<strong>Why does my GMM give different results each run?</strong> EM starts from random initial values and only finds a local optimum. Set n_init higher and fix random_state.
+
+<strong>Can a GMM be used for anomaly detection?</strong> Yes. Points with a very low density under the fitted mixture are unusual, so you can threshold score_samples.
+
+<strong>What is the E-step and M-step?</strong> The E-step computes how responsible each component is for each point. The M-step updates means, covariances and weights using those responsibilities, and the two repeat until the likelihood stops improving.
 
 ## Soft clusters, and shapes k-means cannot fit
 
@@ -4044,6 +4240,20 @@ you want dimensionality reduction inside a pipeline, PCA is the safe default.
 
 **Feeding t-SNE coords into a classifier.** No stable mapping. No way to
 transform new data.
+
+## Questions people ask
+
+<strong>Can I trust the distances between clusters in t-SNE?</strong> No. t-SNE preserves local neighbourhoods, not global distances, so the gaps and sizes between clusters can be arbitrary.
+
+<strong>What is perplexity?</strong> Roughly the number of neighbours each point considers. Values from 5 to 50 are typical, and you should try several because the picture changes.
+
+<strong>t-SNE or UMAP?</strong> UMAP is faster and tends to keep more of the global structure. Both are for visualisation, and both are sensitive to their settings.
+
+<strong>Can I use t-SNE output as features for a model?</strong> It is not recommended. The embedding cannot transform new points consistently and depends on the run. UMAP can transform new data and is better suited.
+
+<strong>Why does my plot change every run?</strong> Both start from random initialisation. Set a random seed, and check that the structure you care about appears across seeds.
+
+<strong>Should I reduce dimensions with PCA first?</strong> Often yes, down to about 30 to 50 components. It cuts noise and speeds up the embedding.
 
 ## A map you can look at, and must not measure
 
@@ -4357,6 +4567,20 @@ causes the outcome.
 different model can rank the same features differently and both be right about
 themselves.
 
+## Questions people ask
+
+<strong>How does permutation importance work?</strong> Shuffle one column in held-out data and measure how much the score drops. A large drop means the model relied on that feature.
+
+<strong>Why use held-out data?</strong> On training data, an overfit model can rely on features that carry only noise. Held-out data shows which features help predictions that generalise.
+
+<strong>Why do correlated features get low scores?</strong> When two columns carry the same signal, shuffling one leaves the other to cover for it. Both look unimportant, so group correlated features or drop one.
+
+<strong>How is it different from tree feature importance?</strong> Tree importance counts how much splits reduce impurity and favours high-cardinality features. Permutation importance measures the effect on actual predictions and works with any model.
+
+<strong>How many repeats should I use?</strong> Ten or more shuffles per feature, so you can see the spread. A feature whose drop is within the noise is not clearly useful.
+
+<strong>Can importance be negative?</strong> Yes, slightly. It means shuffling the feature happened to improve the score, which suggests the feature is not helping.
+
 ## Break one column and see what it costs
 
 Permutation importance shuffles a column and measures the damage. It works on any fitted model. It disagrees with a tree's built-in importances in ways worth understanding.
@@ -4651,6 +4875,20 @@ that is a fact about the model.
 **Blending SHAP values into a global importance and stopping there.** The mean
 abs SHAP value is a reasonable global summary, and it discards the direction
 and the interplays that made SHAP worth finding.
+
+## Questions people ask
+
+<strong>What does a partial dependence plot show?</strong> The average predicted outcome as one feature varies while the others keep their observed values. It shows the model's average response to that feature.
+
+<strong>When is partial dependence misleading?</strong> When features are correlated, since averaging creates combinations that never occur in real data. ICE curves help reveal whether the average hides different behaviour.
+
+<strong>What are ICE curves?</strong> One line per row showing how its prediction changes as a feature varies. Spread between the lines indicates interactions.
+
+<strong>What is a SHAP value?</strong> The contribution of a feature to one prediction, relative to the average prediction. The contributions across features add up exactly to the difference.
+
+<strong>Is SHAP the same as feature importance?</strong> Averaging the absolute SHAP values over a dataset gives a global importance. But SHAP also explains each row, which importance scores cannot.
+
+<strong>Does SHAP show causation?</strong> No. It explains how the model uses its inputs, not how the world works. A feature can drive predictions simply because it correlates with the true cause.
 
 ## One chart for the model, one number per row
 
@@ -5009,6 +5247,20 @@ exists to disprove just that.
 **Recalibrating without re-checking after data drift.** A calibration fitted last
 year shows last year's spread.
 
+## Questions people ask
+
+<strong>What does calibrated mean?</strong> Among predictions of 0.8, about 80 percent are positive. The output can be read as a real probability.
+
+<strong>Can a model be accurate and miscalibrated?</strong> Yes. Accuracy depends on the ranking and the threshold, while calibration depends on whether the number matches the actual frequency.
+
+<strong>How do I check calibration?</strong> Plot a reliability diagram, binning predictions and comparing the mean prediction with the observed rate. Brier score and expected calibration error give single numbers.
+
+<strong>Platt scaling or isotonic regression?</strong> Platt scaling fits a sigmoid and works with small data. Isotonic is more flexible but can overfit below roughly a thousand samples.
+
+<strong>Which models are usually miscalibrated?</strong> Random forests tend to be under-confident near 0 and 1, boosting and SVMs are distorted, and naive Bayes is often over-confident. Logistic regression is usually close.
+
+<strong>When does calibration matter?</strong> When you use the probability itself, for example expected cost, risk scores or combining with other estimates. If you only rank or classify, it matters less.
+
 ## When 0.9 does not mean 90%
 
 A model can rank just right and still lie about its trust. This measures the gap, then closes it two different ways.
@@ -5296,6 +5548,20 @@ it yourself.
 
 **Expecting it to find local outliers.** Use LOF for those.
 
+## Questions people ask
+
+<strong>How does Isolation Forest find anomalies?</strong> It builds random trees that split features at random values. Anomalies are few and different, so they are isolated in fewer splits, which gives them a short average path length.
+
+<strong>What does the contamination parameter do?</strong> It sets the fraction of points you expect to be anomalies and so sets the decision threshold. If you do not know it, use the raw scores and choose a cutoff yourself.
+
+<strong>Do I need to scale features?</strong> No. Splits are made on single features, so scale does not matter.
+
+<strong>Why subsample?</strong> Smaller subsamples (256 by default) reduce masking and swamping, where normal points hide anomalies or look like them. It also makes training fast.
+
+<strong>What does Isolation Forest miss?</strong> Anomalies that are only unusual in combinations of features at very high dimension, and local anomalies hidden inside dense regions. Irrelevant features also dilute the score.
+
+<strong>How do I read the score?</strong> Scores near 1 are likely anomalies and scores well under 0.5 are normal. In scikit-learn, score_samples returns the negated version, where lower is more anomalous.
+
 ## Finding outliers by how easy they are to separate
 
 Alone Forest splits at random and counts how few cuts it takes to isolate a point. Outliers fall out early. That path length is the entire score.
@@ -5574,6 +5840,20 @@ most overfitted base model.
 
 **given range.** Two grad-boosted models with different seeds aren't
 diverse. Check whether their errors really differ.
+
+## Questions people ask
+
+<strong>What is the difference between voting and stacking?</strong> Voting combines predictions with a fixed rule, such as majority or average. Stacking trains a meta-model to learn how to combine them.
+
+<strong>Hard or soft voting?</strong> Soft voting averages probabilities and usually does better when models produce reasonable probabilities. Hard voting counts class labels.
+
+<strong>Why does stacking need cross-validated predictions?</strong> If the meta-model trains on predictions the base models made on their own training data, it learns to trust overfit outputs. Out-of-fold predictions avoid that.
+
+<strong>Do ensembles always beat the best single model?</strong> No. If the models make the same mistakes, combining them adds little. The gain comes from diverse errors.
+
+<strong>What should the meta-model be?</strong> Something simple, like logistic regression or ridge. A flexible meta-model overfits easily.
+
+<strong>Is an ensemble worth the complexity?</strong> Sometimes for a small accuracy gain in competitions or high-stakes cases. In production, check that the gain justifies slower inference and harder maintenance.
 
 ## Ensembling models that make different mistakes
 

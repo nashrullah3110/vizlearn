@@ -401,6 +401,20 @@ That validates nothing about the payload, tells mypy nothing. Makes a schema in 
 
 The choice isn't really "plain or concrete". It's "typed or untyped". The plain is what makes the typed option cheap enough that no one reaches for the untyped one.
 
+## Questions people ask
+
+<strong>What is a generic model?</strong> A model parameterised by a type, declared with `class Page(BaseModel, Generic[T])`. You then write `Page[Course]` to get a version whose `items` are validated as courses.
+
+<strong>Do I need `Generic[T]` in Pydantic v2?</strong> Not on Python 3.12 and later with a recent Pydantic, where `class Page[T](BaseModel)` works. On older versions inherit from `Generic[T]`.
+
+<strong>Is `Page[Course]` a separate class?</strong> Yes. Pydantic creates and caches a real subclass for each parameterisation, so `Page[Course]` and `Page[Track]` validate independently.
+
+<strong>How do I restrict what T can be?</strong> Give the type variable a bound, such as `T = TypeVar("T", bound=BaseModel)`. Anything else is rejected by type checkers.
+
+<strong>What happens if I use `Page` without a parameter?</strong> `T` is treated as `Any` (or its bound), so items are not validated beyond that. Always use `Page[Course]` for real validation.
+
+<strong>Do generics work with FastAPI?</strong> Yes. A parameterised model such as `Page[Course]` works as a `response_model` and appears in the OpenAPI schema with a name built from the parameter.
+
 ## Why envelopes end up generic
 
 It's worth noticing why this pattern appears in nearly each API of any size. It isn't really about type vars.

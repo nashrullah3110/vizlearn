@@ -411,6 +411,20 @@ steps on whole columns are fast. Anything per row isn't.
 
 And when a result surprises you, the answer is nearly always in `df.dtypes`, `df.shape`, or the index &mdash; in that order.
 
+## Questions people ask
+
+<strong>Is pandas built on NumPy?</strong> Yes. Each column is backed by a NumPy array (or an Arrow array in newer setups), and pandas adds labels, mixed dtypes and alignment on top.
+
+<strong>When should I use pandas instead of plain Python lists or dicts?</strong> Use pandas when your data is tabular and you want to filter, group, join or summarise whole columns at once. For a few dozen values or deeply nested records, plain Python is simpler.
+
+<strong>What is the difference between a Series and a DataFrame?</strong> A Series is one labelled column of values with a single dtype. A DataFrame is a table of Series that share one index.
+
+<strong>Can pandas handle data larger than my memory?</strong> Not directly, because a frame is loaded into RAM. You can read in chunks, load fewer columns, use smaller dtypes, or move to a tool such as Polars, DuckDB or Dask.
+
+<strong>Why does pandas feel different from Excel?</strong> Operations apply to whole columns by label rather than to cells you click, and every step is code you can rerun. That makes results repeatable but means you have to think about dtypes and the index.
+
+<strong>Do I need to learn NumPy before pandas?</strong> No. A little NumPy helps with arrays and NaN, but you can start with pandas and pick up the NumPy parts as they appear.
+
 ## A closing note
 
 pandas is a large library, and the temptation is to learn it as a list of methods. That doesn't work well. The methods aren't the hard part.
@@ -781,6 +795,20 @@ The index is written by `to_csv` unless you pass `index=False`. Read back as an 
 `to_dict()`, `to_json()` and `to_excel` all have their own views about the index. All of them are worth checking once for any output that another system consumes.
 
 The rule that avoids most of it: if the index is real data, name it and write it on purpose. If it isn't, `reset_index(drop=True)` before writing.
+
+## Questions people ask
+
+<strong>What is the index in pandas?</strong> It is the set of labels attached to each row. Labels travel with the rows through filtering, sorting and joins, and they decide how two objects line up in arithmetic.
+
+<strong>What is the difference between set_index and reset_index?</strong> set_index moves a column into the index, and reset_index moves the index back into a regular column and replaces it with 0, 1, 2 and so on.
+
+<strong>Does the index have to be unique?</strong> No. Duplicate labels are allowed, but loc then returns several rows for one label and some operations, such as reindex, raise errors.
+
+<strong>Why did my result gain NaN values after adding two Series?</strong> Arithmetic aligns on index labels first. Any label present in only one Series produces NaN, so mismatched labels give missing values rather than an error.
+
+<strong>When should I drop the index with drop=True?</strong> Use reset_index(drop=True) when the old labels carry no meaning, for example after filtering or concatenating, and you just want a clean 0..n-1 range.
+
+<strong>Is a custom index faster than a column?</strong> Lookups by label on a unique, sorted index are fast. For one-off filters a boolean mask on a column is just as good, so set an index when you will look up or align on it repeatedly.
 
 ## A working summary
 
@@ -1181,6 +1209,20 @@ The other rule is the one shared with NumPy. Never grow a frame in a loop. Colle
 `pd.DataFrame.from_records` handles an iterable of tuples with a `columns` arg. Accepts an `index` naming one of the fields. It's the constructor that fits a DB cursor most right. Cursors yield tuples rather than dicts.
 
 And `pd.concat` of many small frames is often faster than building one large list of dicts when the pieces are already frames. The rule is to avoid the loop, not to prefer one holder over the other.
+
+## Questions people ask
+
+<strong>What is the easiest way to build a small DataFrame by hand?</strong> Pass a dict of lists to pd.DataFrame, where each key becomes a column name and each list becomes that column's values.
+
+<strong>What is the difference between a dict of lists and a list of dicts?</strong> A dict of lists is column-oriented, with one key per column. A list of dicts is row-oriented, with one dict per record, and missing keys become NaN.
+
+<strong>Why should I not grow a DataFrame row by row in a loop?</strong> Each append copies the whole frame, so the loop gets slower as it grows. Collect rows in a list and call pd.DataFrame once at the end.
+
+<strong>How do I create a DataFrame from a NumPy array?</strong> Call pd.DataFrame(arr, columns=[...]). Without the columns argument the columns are numbered 0, 1, 2.
+
+<strong>How do I create an empty DataFrame with the right columns?</strong> Use pd.DataFrame(columns=['a', 'b']), then set dtypes explicitly with astype. Otherwise every column is object and later arithmetic can fail.
+
+<strong>Does pd.DataFrame copy my data?</strong> Passing a NumPy array may share memory with it, so changing one can change the other. Pass copy=True when you need an independent frame.
 
 ## In summary
 
@@ -1600,6 +1642,20 @@ Neither takes more than a few seconds. Together they answer most of what you nee
 
 And `df.sample(frac=1)` shuffles the whole frame. This Is at times the honest way to look at data that arrived in a real order. The first rows of a sorted file aren't representative of anything.
 
+## Questions people ask
+
+<strong>What should I run first on a new dataset?</strong> Check shape, then info() for dtypes and non-null counts, then head() to see real rows. After that, describe() and isna().sum() give the spread and the gaps.
+
+<strong>What does df.info() tell me that df.describe() does not?</strong> info() reports each column's dtype, non-null count and memory use. describe() summarises the values of numeric columns, so it will not show dtype problems such as numbers stored as text.
+
+<strong>How do I see summary statistics for text columns?</strong> Use df.describe(include='object') to get count, unique, top and frequency, or call value_counts() on a single column.
+
+<strong>Why does head() sometimes mislead me?</strong> The first rows are often sorted or recorded under different conditions from the rest. Use sample() to see random rows.
+
+<strong>How can I tell how many values are missing in each column?</strong> df.isna().sum() gives the count per column, and df.isna().mean() gives the share.
+
+<strong>What does the object dtype in info() mean?</strong> It usually means strings, but it can hide mixed types, such as numbers with stray text. Check with df[col].map(type).value_counts().
+
 ## In summary
 
 Six calls, run before any analysis, catch most of what goes wrong: `shape`, `dtypes`, `head`/`sample`, `info`, `show`. `value_counts` on the cat columns.
@@ -2008,6 +2064,20 @@ Each of these has one usual cause. Recognising them saves more time than any amo
 `df.loc[mask, "col"] = value` &mdash; the only set form worth using.
 
 `df.select_dtypes(...)` / `df.filter(...)` &mdash; columns by type or name pattern.
+
+## Questions people ask
+
+<strong>What is the difference between loc and iloc?</strong> loc selects by label and iloc selects by integer position. On a default RangeIndex they look alike until you filter or sort.
+
+<strong>Why is the end of a loc slice included but not the end of an iloc slice?</strong> loc slices by label, and a label range has no natural stop, so pandas includes the end label. iloc follows Python's usual rule of excluding the stop position.
+
+<strong>How do I select rows by condition and columns by name together?</strong> Use df.loc[mask, ['a', 'b']], where the first part is a boolean Series and the second is a list of column names.
+
+<strong>Why does df['a']['b'] = value sometimes fail to change my data?</strong> Chained indexing may operate on a temporary copy. Write df.loc['b', 'a'] = value in one step so pandas sets the value on the original.
+
+<strong>When should I use at and iat?</strong> Use them to read or write one single cell. They are faster than loc and iloc for that case, but only accept a single row and column.
+
+<strong>What happens if I use loc with a label that does not exist?</strong> Reading raises a KeyError. Assigning with loc to a new row label adds that row, which can hide typos.
 
 ## A closing note
 
@@ -2426,6 +2496,20 @@ Beyond that, the advice is about readability: name your masks when there's more 
 
 `df.query` accepts `engine="python"` for expressions the default parser can't handle. `inplace=True` which, as elsewhere, is best avoided.
 
+## Questions people ask
+
+<strong>How do I filter rows with more than one condition?</strong> Combine boolean masks with & for and, | for or, and wrap each condition in parentheses, for example df[(df.a > 1) & (df.b == 'x')].
+
+<strong>Why do I get an error when I use 'and' instead of '&'?</strong> Python's and tries to turn a whole Series into one True or False, which is ambiguous. & works element by element.
+
+<strong>How do I keep rows whose value is in a list?</strong> Use df[df['col'].isin(['a', 'b'])]. Negate it with ~ to keep rows not in the list.
+
+<strong>Why does my filter drop rows with missing values?</strong> Any comparison with NaN is False, so those rows never pass the mask. Add | df['col'].isna() if you want to keep them.
+
+<strong>When is query() better than a boolean mask?</strong> query('a > 1 and b == 2') reads more cleanly for long conditions and chains well. Masks are better when the logic is built from variables or functions.
+
+<strong>Does filtering change the original DataFrame?</strong> No. It returns a new frame with the original index labels, so you may want reset_index(drop=True) afterwards.
+
 ## In summary
 
 checks give boolean Series. Combine them with `&`, `|` and `~`, and parenthesise each one.
@@ -2828,6 +2912,20 @@ The underlying situation is truly awkward. `df[mask]["col"] = x` is two steps. B
 That imperfection is why "make the warning stop" is the wrong goal. The right goal is to know which object you're writing to. There are only two answers. A split frame you made with `.copy()`, or the first, handled through a single `.loc`.
 
 Copy-on-write drops the ambiguity fully and turns the default in pandas 3.0. Writing code today as though it's already on costs nothing and means the upgrade changes nothing.
+
+## Questions people ask
+
+<strong>What does SettingWithCopyWarning actually mean?</strong> pandas cannot tell whether you are writing to a copy or to a view of the original frame. Your assignment may not reach the frame you meant to change.
+
+<strong>How do I make the warning go away properly?</strong> Call .copy() when you intend an independent subset, or use a single df.loc[mask, 'col'] = value when you intend to modify the original.
+
+<strong>Why not just turn the warning off?</strong> Silencing it hides real bugs where your assignment is lost. The warning is a symptom of code whose result depends on internal details.
+
+<strong>What is copy-on-write?</strong> It is a pandas mode in which any derived object behaves as a copy, so changing it never changes its parent. It removes the ambiguity and the warning, and it is the default from pandas 3.0.
+
+<strong>Is chained indexing always a problem?</strong> Chained assignment such as df[mask]['a'] = 1 is the problem. Chained reading such as df[mask]['a'] is fine, though a single loc is clearer.
+
+<strong>How do I check whether I have a copy or a view?</strong> You cannot rely on a check, because it depends on dtypes and the operation. Write code that makes the intent explicit with .copy() or one loc call.
 
 ## One more thing
 
@@ -3256,6 +3354,20 @@ The defences are small: use `.loc` when you mean "these rows only", check the co
 
 And `df.drop` accepts `level=` for a MultiIndexed frame. A whole outer group can be removed by label without building a mask. Both are small conveniences. Both read better than the two-step options when the intent is just what they show.
 
+## Questions people ask
+
+<strong>What is the difference between df['new'] = ... and df.assign(new=...)?</strong> Bracket assignment modifies the frame in place. assign returns a new frame, which makes it suitable for method chains.
+
+<strong>Why does my new column come out full of NaN?</strong> Assigning a Series aligns it on the index. If its labels do not match the frame's index, the unmatched rows get NaN, so use .values or reset the index if you want position-based assignment.
+
+<strong>How do I drop a column?</strong> Use df.drop(columns=['a', 'b']), or df.drop('a', axis=1). Both return a new frame unless you reassign.
+
+<strong>Should I use inplace=True?</strong> Generally no. It rarely saves memory, it breaks method chaining, and it is being phased out in favour of reassigning the result.
+
+<strong>How do I add a column based on a condition?</strong> Use np.where(cond, a, b) for two outcomes or np.select for several. Avoid apply with a row-wise function, which is much slower.
+
+<strong>How do I rename columns?</strong> Use df.rename(columns={'old': 'new'}) for a few, or assign a full list to df.columns to rename them all.
+
 ## In summary
 
 Adding and dropping columns is mechanically simple. The two things that bite are both about silence.
@@ -3635,6 +3747,20 @@ Downcast numerics when the range is truly bounded.
 `to_numeric(errors="coerce")` converts what it can and shows you what it couldn't.
 
 Set types as early as possible. Check `dtypes` right after loading. It's one line and it blocks a group of silent wrongness.
+
+## Questions people ask
+
+<strong>Why is my numeric column stored as object?</strong> A single non-numeric value, such as a stray string or symbol, makes pandas read the whole column as text. Use pd.to_numeric(col, errors='coerce') to find and convert it.
+
+<strong>How do I reduce a DataFrame's memory use?</strong> Convert repeated strings to category, downcast integers and floats, and drop columns you do not need. Check with df.memory_usage(deep=True).
+
+<strong>When should I use the category dtype?</strong> Use it for columns with few distinct values repeated many times, such as country or status. It stores each value once and uses small integer codes.
+
+<strong>What is the difference between int64 and Int64?</strong> int64 is the NumPy type and cannot hold missing values. Int64 is the nullable type, which stores missing values as pd.NA and keeps the column as integers.
+
+<strong>Why does memory_usage show a smaller number than the real one?</strong> Without deep=True it counts only the pointers for object columns, not the strings they point to. Pass deep=True for a realistic figure.
+
+<strong>Is float32 safe to use instead of float64?</strong> It halves memory but carries about seven significant digits, so it can lose precision in sums and money values. Use it where that loss is acceptable.
 
 ## A closing note
 
@@ -4046,6 +4172,20 @@ Group fills use data a global fill discards.
 Add an indicator when missingness might be helpful &mdash; it often is.
 
 And record what you did. A filled value is the same from a measured one the moment it enters the frame.
+
+## Questions people ask
+
+<strong>What is the difference between NaN, None and NaT?</strong> NaN is the float missing marker, NaT is the missing marker for datetimes, and None is Python's null in object columns. pandas treats all of them as missing in isna().
+
+<strong>Should I drop or fill missing values?</strong> Drop when rows with gaps are few and random. Fill when dropping would lose too much data, and choose a fill that fits the meaning, such as zero for counts or the median for measurements.
+
+<strong>Why does df == np.nan not find the missing values?</strong> NaN is not equal to anything, including itself, so the comparison is always False. Use df.isna().
+
+<strong>How do I fill missing values using the previous value?</strong> Use df['col'].ffill() for forward-fill, or bfill() for the next value. These suit ordered data such as time series.
+
+<strong>How does a missing value affect sum and mean?</strong> By default pandas skips missing values in sum, mean and similar reductions. Pass skipna=False to get NaN instead.
+
+<strong>How can I fill with each group's own average?</strong> Use df['col'].fillna(df.groupby('g')['col'].transform('mean')). transform returns a value for every row, so the fill lines up.
 
 ## A closing note
 
@@ -4487,6 +4627,20 @@ The steps are always the same, and only the third is hard.
 pandas handles the first two well. The third is record linkage. It's a truly open problem for messy data. The same person may appear with a other spelling, a maiden name, a typo'd date of birth.
 
 The pragmatic middle ground is to match just on a normed key, count how many records fail to match. Inspect a sample of those. Often a small number of scaling rules. Drop punctuation, standardise abbreviations. Resolves most of them. The rest are truly ambiguous and better flagged for a human than resolved by code.
+
+## Questions people ask
+
+<strong>How do I find duplicate rows?</strong> df.duplicated() returns True for each repeat after the first. Pass subset=['a', 'b'] to compare only some columns, and keep=False to flag every copy.
+
+<strong>How do I remove duplicates?</strong> Use df.drop_duplicates(). By default it keeps the first occurrence, and keep='last' keeps the last.
+
+<strong>Which duplicate does drop_duplicates keep?</strong> The first one in the current row order. Sort first if you want to keep, for example, the most recent record.
+
+<strong>Why are rows that look identical not detected as duplicates?</strong> Trailing spaces, different capitalisation, or float rounding make values differ. Normalise with str.strip() and str.lower() before checking.
+
+<strong>Can I check that a column is unique?</strong> Yes. Use df['id'].is_unique, or assert not df.duplicated('id').any() to stop a pipeline when the assumption breaks.
+
+<strong>Are duplicates always errors?</strong> No. Repeated rows can be real events, like two identical purchases, so decide from what the data means before deleting.
 
 ## In summary
 
@@ -4930,6 +5084,20 @@ Two things follow. Clean text **once**, at load, rather than again and again in 
 
 The correctness trap is missing values. `.str` predicates return `NaN` rather than `False`. A mask holding `NaN` can't index a frame. `na=False` on each `.str` filter is the habit. Its lack is the error that appears only once the data has a gap.
 
+## Questions people ask
+
+<strong>How do I apply string functions to a whole column?</strong> Use the .str accessor, for example df['name'].str.lower() or df['name'].str.strip(). It works element by element and skips missing values.
+
+<strong>Why do I get an AttributeError on .str?</strong> The column is not a string dtype, often because it holds numbers or mixed types. Convert with astype(str) or fix the source column.
+
+<strong>How do I split one column into several?</strong> Use df['full'].str.split(' ', expand=True), which returns a frame with one column per piece. Assign the result to new column names.
+
+<strong>How do I filter rows that contain some text?</strong> Use df[df['col'].str.contains('abc', case=False, na=False)]. The na=False part keeps missing values from breaking the mask.
+
+<strong>Does str.contains use regular expressions?</strong> Yes, by default. Pass regex=False for a plain substring, especially when your pattern contains characters like ( or .
+
+<strong>Are .str methods fast?</strong> They are convenient but still loop over the values in Python. For big columns, convert to category first or use vectorised alternatives where they exist.
+
 ## One more thing
 
 `str.get(i)` indexes into each string or list. This Is the concise form of `str[i]` and works the same way. It returns `NaN` rather than raising where the index is out of range. This Is often what you want on ragged data.
@@ -5316,6 +5484,20 @@ Set a `DatetimeIndex` when you need period pick or `resample`.
 Sort before anything that checks a row with its neighbour.
 
 And note pandas 2.2 renamed the rate aliases. `M` to `ME`, `H` to `h`. Which is the usual reason a copied example no longer runs.
+
+## Questions people ask
+
+<strong>How do I convert a text column to dates?</strong> Use pd.to_datetime(df['col']). Pass format='%Y-%m-%d' for speed and certainty, and errors='coerce' to turn bad values into NaT.
+
+<strong>How do I get the year, month or weekday from a date column?</strong> Use the .dt accessor, for example df['d'].dt.year, .dt.month or .dt.day_name().
+
+<strong>Why are my day and month swapped?</strong> Ambiguous strings such as 03/04/2024 are read month-first unless you pass dayfirst=True or an explicit format.
+
+<strong>What is the difference between Timestamp and Timedelta?</strong> A Timestamp is a point in time and a Timedelta is a duration. Subtracting two Timestamps gives a Timedelta.
+
+<strong>How do I handle time zones?</strong> Use tz_localize to attach a zone to naive times, and tz_convert to change between zones. Store timestamps in UTC where you can.
+
+<strong>Why is to_datetime slow on my column?</strong> Without a format, pandas has to infer the pattern, which takes longer on large columns. Giving format= makes parsing much faster.
 
 ## A closing note
 
@@ -5729,6 +5911,20 @@ And missing values sort last in both directions. This Means reversing an ascendi
 `sort_values` accepts `ignore_index=True`, which renumbers the result rather than carrying the first labels along. That saves a split `reset_index(drop=True)` when the sorted output is going to be displayed or written with row numbers.
 
 And `nlargest` and `nsmallest` exist on `groupby` objects too. "the top three per group" is `df.groupby("city")["sales"].nlargest(3)`. Which returns a MultiIndexed Series with the group and the first label. Often wants `reset_index` before going anywhere else.
+
+## Questions people ask
+
+<strong>What is the difference between sort_values and sort_index?</strong> sort_values orders rows by the contents of one or more columns, and sort_index orders them by index labels.
+
+<strong>How do I sort by two columns in different directions?</strong> Pass lists: df.sort_values(['a', 'b'], ascending=[True, False]).
+
+<strong>Where do missing values go when sorting?</strong> They are placed last by default. Use na_position='first' to move them to the top.
+
+<strong>What is the difference between sort_values and rank?</strong> sort_values reorders the rows. rank leaves the rows in place and adds a number showing each value's position in the ordering.
+
+<strong>How does rank handle ties?</strong> The default method is 'average', which gives tied values the mean of their positions. Use 'min', 'dense' or 'first' for other behaviours.
+
+<strong>What is faster for the top few rows, nlargest or sort_values?</strong> nlargest(n, 'col') is usually faster, because it does not sort the whole column.
 
 ## A note on reproducibility
 
@@ -6153,6 +6349,20 @@ A groupby object supports `nth(0)`. This Takes the nth row of each group and isn
 
 `ngroup()` numbers the groups. This Is a compact way to turn a set of keys into a single int label for indexing or plotting.
 
+## Questions people ask
+
+<strong>What does groupby actually do?</strong> It splits the rows into groups by key, applies a function to each group, and combines the results. Nothing is computed until you call an aggregation.
+
+<strong>Why is my grouping column now the index?</strong> By default the keys become the index of the result. Pass as_index=False or call reset_index() to get them back as a column.
+
+<strong>What is the difference between size and count?</strong> size counts rows in each group, including missing values. count counts non-missing values in each column.
+
+<strong>Why do rows with a missing key disappear?</strong> groupby drops NaN keys by default. Pass dropna=False to keep them as their own group.
+
+<strong>How do I apply different aggregations to different columns?</strong> Use named aggregation: df.groupby('g').agg(total=('x', 'sum'), avg=('y', 'mean')).
+
+<strong>Can I group by more than one column?</strong> Yes, pass a list of column names. The result then has a MultiIndex unless you set as_index=False.
+
 ## In summary
 
 Split, apply, combine &mdash; and the details that decide whether the answer reconciles.
@@ -6567,6 +6777,20 @@ Between `agg`, `transform` and a mask, the all-round `apply` is rarely needed. W
 
 More handy is that `transform` works on a whole frame, not just one column: `df.groupby("k").transform("mean")` returns a frame of group means for each numeric column at once, aligned with the first rows. Subtracting it centres the entire frame within groups in a single formula.
 
+## Questions people ask
+
+<strong>What is the difference between agg and transform?</strong> agg returns one row per group, while transform returns a result with the same length as the input. That makes transform suited to adding a group statistic as a new column.
+
+<strong>How do I add each group's mean as a new column?</strong> Use df['g_mean'] = df.groupby('g')['x'].transform('mean').
+
+<strong>How do I calculate each row's share of its group total?</strong> Divide the column by its group sum: df['x'] / df.groupby('g')['x'].transform('sum').
+
+<strong>What does groupby().filter() do?</strong> It keeps or drops whole groups based on a condition on the group, such as filter(lambda g: len(g) > 5). The rows in the surviving groups come back unchanged.
+
+<strong>Why is apply slower than transform?</strong> transform with a built-in name uses optimised code for all groups. apply runs a Python function on each group, which is slower.
+
+<strong>How do I rank rows within each group?</strong> Use df.groupby('g')['x'].rank(ascending=False), which numbers the values separately inside every group.
+
 ## In summary
 
 Three steps, distinguished only by the shape they return: `agg` gives one row per group, `transform` one row per input row, `filter` a subset of rows.
@@ -6960,6 +7184,20 @@ A city with twice the group has twice the customers on any plan. Checking the co
 That reads as "what fraction of each city's customers are on each plan". This Is often the question people mean.
 
 The reverse scaling &mdash; `norm="columns"` &mdash; answers a other question: "what fraction of paid customers are in each city". Both are legitimate and they aren't the same. Stating which one a table shows is worth a line of text next to it. The numbers alone don't say.
+
+## Questions people ask
+
+<strong>How do I count how often each value appears?</strong> Use df['col'].value_counts(). Pass normalize=True for proportions and dropna=False to include missing values.
+
+<strong>What is the difference between cut and qcut?</strong> cut makes bins of equal width or at edges you choose. qcut makes bins with roughly equal numbers of rows, using quantiles.
+
+<strong>Why do some values become NaN after cut?</strong> Values outside the bin edges fall in no bin. Widen the edges or use include_lowest=True for the first boundary.
+
+<strong>How do I count combinations of two columns?</strong> Use pd.crosstab(df['a'], df['b']) for a table, or df.groupby(['a', 'b']).size() for a long format.
+
+<strong>How do I label my bins?</strong> Pass labels=['low', 'mid', 'high'] to cut or qcut. The number of labels must be one fewer than the number of edges.
+
+<strong>Does value_counts sort the result?</strong> Yes, in descending order by count. Use sort_index() afterwards to order by the values themselves.
 
 ## In summary
 
@@ -7375,6 +7613,20 @@ That said, the honest spot isn't that `apply` is forbidden. On a small frame the
 
 And `apply` on a groupby is where `include_groups=False` now matters. In pandas 2.2 the grouping columns are passed to the function by default and that action is being changed. Passing the arg by name is how you write code that behaves the same before and after the change.
 
+## Questions people ask
+
+<strong>What is the difference between map, apply and applymap?</strong> map works on a Series element by element, apply works on a Series or along the rows or columns of a DataFrame, and DataFrame.map (formerly applymap) works on every cell.
+
+<strong>Why is apply slow?</strong> It calls a Python function once per row or element, so pandas cannot use its compiled loops. Vectorised operations on whole columns are typically tens to hundreds of times faster.
+
+<strong>How do I replace values using a dictionary?</strong> Use df['col'].map({'a': 1, 'b': 2}). Values not in the dictionary become NaN, so use replace if you want to leave them unchanged.
+
+<strong>What can I use instead of apply with axis=1?</strong> Use vectorised arithmetic, np.where or np.select for conditions, and str or dt accessors for text and dates.
+
+<strong>When is apply the right tool?</strong> When the logic cannot be expressed on whole columns, such as parsing a complicated string or calling a function that works on one object at a time.
+
+<strong>Why does apply return a different shape than I expected?</strong> The shape depends on what your function returns: a scalar gives a Series, a Series gives a DataFrame. Use result_type to control it for row-wise applies.
+
 ## In summary
 
 `map` substitutes, `apply` finds, and both call Python once per element.
@@ -7766,6 +8018,20 @@ out = pd.concat(parts, ignore_index=True).groupby("city", as_index=False).sum()
 The double aggregation is the pattern: reduce per file, combine, reduce again. It works for sums, counts and maxima. Anything associative. And not for medians or exact distinct counts. This Need the whole dataset at once.
 
 That gap, between aggregations that break down and those that don't, is worth knowing before designing a pipeline around chunked reading.
+
+## Questions people ask
+
+<strong>What is the difference between concat and merge?</strong> concat stacks frames by position along an axis, aligning by labels on the other axis. merge joins on column values or the index, like a SQL join. Use concat when the frames share a schema and you want all the rows; use merge when you need to match rows by a key.
+
+<strong>Why does concat produce NaN columns?</strong> When two frames have different column names and you stack rows, the default outer join keeps every column. Rows from the frame that lacked a column get NaN there. Pass join="inner" to keep only columns present in all frames.
+
+<strong>Should I use ignore_index=True?</strong> Yes, if the original row labels carry no meaning. Without it, concat preserves the original indices, so you get duplicate index values that cause confusing results with loc.
+
+<strong>Why is concat inside a loop slow?</strong> Each call copies every row accumulated so far plus the new rows. Over n iterations that is O(n squared) copies. Collect the frames in a list and call concat once at the end.
+
+<strong>Can I concat along columns instead of rows?</strong> Yes, pass axis=1. The frames are then aligned by their row index. If the indices do not match, the result gets NaN in the mismatched positions.
+
+<strong>How do I keep track of which frame each row came from?</strong> Pass the keys parameter with a list of labels. concat adds a MultiIndex level that tags each group of rows with its key.
 
 ## In summary
 
@@ -8174,6 +8440,20 @@ And a good share of joins aren't joins at all. A group statistic wants `transfor
 
 For the common case of filling out a full grid before joining sparse data onto it, `pd.MultiIndex.from_product` and `reindex` are often the better route.
 
+## Questions people ask
+
+<strong>What are the types of merge?</strong> inner keeps keys found in both frames, left keeps all keys from the left, right keeps all from the right, and outer keeps all from both.
+
+<strong>Why did my merge produce more rows than I started with?</strong> Duplicate keys on one or both sides multiply: three matches on the right produce three output rows. Check df['key'].is_unique and use validate='one_to_one' or 'many_to_one'.
+
+<strong>What is the difference between merge and join?</strong> join is a shortcut for merging on the index and defaults to a left join. merge is more general and works on columns or the index.
+
+<strong>How do I merge when the key columns have different names?</strong> Use left_on='a', right_on='b'. Both columns stay in the result, so drop the extra one afterwards.
+
+<strong>What do the _x and _y suffixes mean?</strong> They are added when both frames have a non-key column with the same name. Set suffixes=('_left', '_right') to choose better names.
+
+<strong>How can I see which rows did not match?</strong> Pass indicator=True, which adds a _merge column with the values left_only, right_only or both.
+
 ## In summary
 
 The default is an inner join. This Drops unmatched rows without a word. A duplicated key on either side times rows without a word either.
@@ -8579,6 +8859,20 @@ And the structural advice is to stay long until the end. Wide data materialises 
 `melt` accepts `ignore_index=False`, which keeps the first index rather than renumbering. That matters when the identifiers you want to keep are in the index rather than in columns, since `id_vars` only names columns.
 
 And `wide_to_long` handles the exact case of columns named with a stem and a suffix. `sales_2023`, `sales_2024`. Unpivoting them into a stem column and a suffix column in one call. This Is else a `melt` followed by a `str.extract`.
+
+## Questions people ask
+
+<strong>What is the difference between pivot and pivot_table?</strong> pivot only reshapes and fails if a row and column pair repeats. pivot_table aggregates the duplicates with a function such as mean or sum.
+
+<strong>What does melt do?</strong> It turns wide data into long data: several columns become two, one holding the old column names and one holding their values.
+
+<strong>When do I need long format versus wide?</strong> Long format suits groupby, plotting libraries such as seaborn, and storage. Wide format is easier for humans to read and for matrix-style calculations.
+
+<strong>Why does pivot raise 'Index contains duplicate entries'?</strong> Two rows share the same index and column combination, so pandas does not know which value to keep. Use pivot_table with an aggregation or remove the duplicates.
+
+<strong>What is the difference between stack and unstack?</strong> stack moves column labels into the row index, and unstack moves an index level into the columns.
+
+<strong>How do I fill empty cells in a pivot table?</strong> Pass fill_value=0 to pivot_table, or call fillna on the result.
 
 ## In summary
 
@@ -9009,6 +9303,20 @@ Given sales indexed by `(city, year)`:
 
 Six ways to ask about one year. This Is a fair summary of why MultiIndexes feel heavy. The last two are the ones worth reaching for by default. Aggregate a level, or unstack it into a shape that reads.
 
+## Questions people ask
+
+<strong>What is a MultiIndex?</strong> It is an index with more than one level, so each row is identified by a combination of labels, such as (country, year). It usually appears after grouping by several columns.
+
+<strong>How do I select rows from a MultiIndex?</strong> Use df.loc[('UK', 2020)] for an exact key, df.xs(2020, level='year') for one level, or df.loc['UK'] for the outer level.
+
+<strong>How do I turn a MultiIndex back into columns?</strong> Call reset_index(), or groupby with as_index=False in the first place. Pass level= to reset only some levels.
+
+<strong>Why do I get a PerformanceWarning or a slow lookup?</strong> Slicing a MultiIndex needs it sorted. Call sort_index() first.
+
+<strong>How do I flatten MultiIndex column names?</strong> Join the levels: df.columns = ['_'.join(c) for c in df.columns].
+
+<strong>Should I use a MultiIndex at all?</strong> Often a flat frame with ordinary columns is easier to filter and merge. Keep a MultiIndex when it speeds up lookups or you are reshaping with stack and unstack.
+
 ## In summary
 
 A MultiIndex arrives from steps you were doing anyway. The handy question is whether to keep it.
@@ -9400,6 +9708,20 @@ The setup is short: parse the dates with an clear format, check the dtype, decid
 The recurring choice is what a gap means. A day with no rows is either zero events or an unrecorded reading. `resample("D").sum()` and `.mean()` encode those two other answers. Choosing without noticing gives a series that looks full and is wrong just where the notable things happen.
 
 And on panel data &mdash; a few entities stacked in one frame &mdash; `shift`, `diff` and `rolling` must be done within groups, or the compare runs across the boundary from one entity into the next and makes a plausible number from unrelated rows.
+
+## Questions people ask
+
+<strong>How do I change the frequency of a time series?</strong> Use resample, for example df.resample('M').sum() for monthly totals. It needs a DatetimeIndex or an on= column.
+
+<strong>What is the difference between resample and groupby?</strong> resample groups by time intervals and fills in intervals with no data, while groupby only produces groups that exist. resample is a groupby specialised for dates.
+
+<strong>How do I compute a moving average?</strong> Use df['x'].rolling(window=7).mean(). The first window-1 values are NaN unless you set min_periods.
+
+<strong>What does shift do?</strong> It moves the values down by n rows, which gives the previous period's value. Combine it with subtraction, or use diff() and pct_change(), for changes over time.
+
+<strong>Why do I get NaN or surprising results after resampling?</strong> Periods with no data are empty, so sums give 0 and means give NaN. Also check that the index is sorted and that you know which edge labels the bins.
+
+<strong>Do I need to sort by date first?</strong> Yes. rolling, shift, diff and slicing assume the rows are in time order and do not check it.
 
 ## One more thing
 
@@ -9797,6 +10119,20 @@ On the way out, `index=False` unless the index is data. Parquet rather than CSV 
 `read_csv` accepts a `converters` dict mapping column names to functions, applied during the read. It's slower than `dtype` and handles cases `dtype` can't. Stripping a currency symbol, parsing a bespoke format. Without a split cleaning pass later.
 
 And `to_csv` with no path returns the CSV as a **string** rather than writing a file. This Is how you round-trip through `io.StringIO` in a test, or hand the text to a thing that wants a string rather than a filename.
+
+## Questions people ask
+
+<strong>How do I read a CSV file?</strong> Use pd.read_csv('file.csv'). Common arguments are sep, usecols, dtype, parse_dates and nrows.
+
+<strong>Why do my leading zeros or ID numbers change on loading?</strong> pandas infers numeric types, which drops leading zeros. Pass dtype={'zip': str} for those columns.
+
+<strong>How do I read a file that is too large for memory?</strong> Use chunksize=100000 to iterate over pieces, or usecols and dtype to load less. Parquet is also faster and smaller than CSV.
+
+<strong>Why does my CSV have an extra 'Unnamed: 0' column?</strong> The file was written with the index included. Save with index=False, or read with index_col=0.
+
+<strong>Which format should I save in?</strong> CSV is portable but loses dtypes. Parquet keeps types and is fast and compact, and pickle is only suitable for temporary, trusted use.
+
+<strong>How do I fix encoding errors on read?</strong> Pass encoding='utf-8' or try 'latin-1' or 'cp1252' if the file came from Windows or older systems.
 
 ## In summary
 
@@ -10254,6 +10590,20 @@ Filter early, so all downstream does less.
 Measure the real workload, fix the top item, measure again.
 
 And know when the answer is a other tool. When the data doesn't fit, no pandas technique fixes it.
+
+## Questions people ask
+
+<strong>Why is my pandas code slow?</strong> The usual cause is a Python loop over rows: iterrows, apply with axis=1, or growing a frame in a loop. Replace it with whole-column operations.
+
+<strong>Is iterrows ever acceptable?</strong> For small frames or one-off scripts, yes. On more than a few thousand rows, vectorise instead, because it is typically far faster.
+
+<strong>How do I reduce memory use quickly?</strong> Read only the columns you need, use category for repeated strings, and downcast numbers. Check the result with memory_usage(deep=True).
+
+<strong>How do I find out which line is slow?</strong> Time suspects with %timeit in a notebook or time.perf_counter, and use a profiler such as cProfile for a whole script. Measure first, because the slow step is often not where you expect.
+
+<strong>Should I filter before or after merging?</strong> Before. Reducing the rows and columns first makes the merge smaller and faster.
+
+<strong>When should I switch away from pandas?</strong> When data no longer fits in memory or operations remain slow after vectorising. Polars, DuckDB or Dask handle larger data and parallel work.
 
 ## A closing note
 
@@ -10721,6 +11071,20 @@ def test_clean():
 That is a genuine unit test of a data change. It's possible only because `clean` is a function rather than a sequence of statements operating on a global `df`.
 
 The same structure makes the pipeline reusable across scripts and notebooks. Makes it obvious where a new step belongs. Chaining, in this reading, is less about elegance than about pushing data changes into functions that can be named, tested and reused. Which is plain software practice arriving one spot it's often skipped.
+
+## Questions people ask
+
+<strong>What is method chaining?</strong> It is writing a series of operations as one expression, with each method returning a new frame for the next to use. Wrapped in parentheses, it reads like a recipe from top to bottom.
+
+<strong>What does pipe do?</strong> pipe passes the frame into your own function inside a chain: df.pipe(clean, col='x'). It lets custom steps fit in the chain.
+
+<strong>How do I use a column I just created in the same chain?</strong> Use assign with a lambda: .assign(total=lambda d: d.a + d.b). The lambda receives the current frame at that step.
+
+<strong>How do I debug a long chain?</strong> Insert a pipe step that prints or checks the shape, such as .pipe(lambda d: print(d.shape) or d). You can also run the chain in parts and inspect each result.
+
+<strong>Does chaining use more memory?</strong> Each step creates a new object, but earlier ones are freed once nothing refers to them. Peak memory is usually about one extra copy.
+
+<strong>When should I not chain?</strong> When a step needs an explanation, when you need to inspect intermediate results often, or when the chain runs to dozens of lines. Split it into named steps.
 
 ## In summary
 

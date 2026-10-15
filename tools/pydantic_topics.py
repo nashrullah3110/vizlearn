@@ -379,6 +379,20 @@ When you find yourself writing `if not isinstance(...)`, or reaching into a dict
 
 The comment in given is the strongest signal. A sentence showing the shape of data is a schema that can't be ran, checked or kept honest. Turning it into a model costs about the same number of lines and can't go stale.
 
+## Questions people ask
+
+<strong>What is Pydantic used for?</strong> Validating data against Python type hints and converting it to the right types. It is common for API input, configuration files and parsing external data.
+
+<strong>Is Pydantic a web framework?</strong> No. It is a data validation library. FastAPI uses it, but it works in any Python code.
+
+<strong>Does it check types when I assign to a model?</strong> Not by default. It checks when the model is created. Set `validate_assignment=True` to check later assignments too.
+
+<strong>Do I get errors for all fields or just the first?</strong> All of them, collected in one `ValidationError`.
+
+<strong>Is it slow?</strong> Version 2 runs its core in Rust and is fast enough for most services. Cost grows with the amount of data, not the number of models.
+
+<strong>Which version should I learn?</strong> Version 2. It is the current major release and the one FastAPI and most libraries target.
+
 ## Where this track goes
 
 The next module builds a first model properly. Fields, needed versus optional. What you get back. After that comes the part all trips over. just which values Pydantic will convert and which it will refuse. How to read the error when it refuses.
@@ -792,6 +806,20 @@ Frozen, because it arrives from outside and is then only read. Two needed fields
 
 Nothing exotic, and it already gives you check, coercion, equality, a readable `repr`, JSON in both directions and a schema. That ratio. How much you get for how little you wrote. Is the reason the library is worth learning properly rather than copying from examples.
 
+## Questions people ask
+
+<strong>How do I define a model?</strong> Subclass `BaseModel` and add annotated fields, for example `title: str` and `minutes: int`.
+
+<strong>How do I create an instance?</strong> Call the class with keyword arguments, or use `Model.model_validate(data)` with a dict. Positional arguments are not accepted.
+
+<strong>How do I turn a model back into a dict or JSON?</strong> Use `model_dump()` for a dict and `model_dump_json()` for a JSON string.
+
+<strong>Are model instances mutable?</strong> Yes by default. Set `frozen=True` in `model_config` to make them immutable.
+
+<strong>How do I copy a model with one change?</strong> Use `m.model_copy(update={"minutes": 12})`. The update values are not validated.
+
+<strong>Can a required field come after one with a default?</strong> Yes. Unlike dataclasses, Pydantic allows it, and fields keep the order you wrote them for printing and dumping.
+
 ## What to try next
 
 Change a thing in the editors above and watch what happens. Add a field to a model and leave it out of the constructor call. Pass `minutes` as `"11"` and print its type. Drop a field from the JSON before checking it back.
@@ -1138,6 +1166,20 @@ When a field comes out as a thing surprising, there's a quick sequence that find
 Coercion is the feature people distrust first and lean on most. It exists because the boundary is made of text. It's bounded by a single principle. Convert when the reading is unambiguous and nothing is lost, refuse else.
 
 Once that principle is in your head, the single rules stop needing to be stored. `9.5` to an int loses data. It raises. `"9"` to an int loses nothing. So It converts. `9` to a string loses nothing either. But That direction hides caller mistakes, so it's the one deliberate exception. And knowing it's an exception is easier than remembering it as an any rule.
+
+## Questions people ask
+
+<strong>Why does `"36"` become the integer 36?</strong> Lax mode converts compatible values. A numeric string is accepted for an `int`, and a float with no fractional part is accepted too.
+
+<strong>Why is `"abc"` rejected for an int?</strong> It cannot be parsed as a number, so you get an `int_parsing` error. Pydantic only coerces when the conversion is unambiguous.
+
+<strong>Which strings become `True` for a bool?</strong> `"true"`, `"yes"`, `"on"`, `"1"` and `"t"`, `"y"`, in any case. The false set is the matching negatives. Other strings fail.
+
+<strong>Is a float accepted for an int field?</strong> Only if it has no fractional part. `3.0` becomes `3`, but `3.5` raises an `int_from_float` error.
+
+<strong>Does an int become a str?</strong> No. Pydantic v2 does not turn numbers into strings by default. Set `coerce_numbers_to_str=True` if you want that.
+
+<strong>How do I stop coercion?</strong> Use strict mode, either on one field with `Field(strict=True)` or on the whole model with `ConfigDict(strict=True)`.
 
 ## The practical shape
 
@@ -1559,6 +1601,20 @@ needed fields are a promise to the rest of your program. Each one you make lets 
 There's a fourth state people at times need, beyond needed, defaulted and nullable. A field that may be absent but has no sensible default. Here You truly want to know whether it was supplied.
 
 That is what `model_fields_set` and `exclude_unset` exist for. It's worth naming by name because the instinct is to invent a sentinel. A magic string, a `-1`, a custom `UNSET` object. And thread it through the code. Pydantic already tracks the answer. Reach for the sentinel only when the value has to live output. This Is rare. Think hard before you do. Each consumer of that data now has to know about your magic value.
+
+## Questions people ask
+
+<strong>Does `Optional[str]` make a field optional?</strong> No. It only means the value may be `None`. Without a default, the key must still be present.
+
+<strong>How do I make a field both optional and nullable?</strong> Write `name: str | None = None`. The default makes it omittable and the union allows an explicit null.
+
+<strong>Is a default value validated?</strong> No, defaults are not validated unless `validate_default=True`. A bad default will slip through until it is used.
+
+<strong>Is it safe to use a list as a default?</strong> Yes, in Pydantic. Each instance gets its own copy, unlike a plain Python function default. You can also use `Field(default_factory=list)`.
+
+<strong>How can I tell a missing field from one set to None?</strong> Check `model_fields_set`. It lists fields the caller actually supplied, including explicit `None`.
+
+<strong>How do I write an update model where every field is optional?</strong> Give each field a default of `None`, and use `model_dump(exclude_unset=True)` to apply only the fields the caller sent.
 
 ## Next
 
@@ -1985,6 +2041,20 @@ These are other audiences with other needs. Merging them serves neither. The use
 
 Doing both costs one extra line at the point where you catch the exception. It's the gap between a support conversation that starts with "can you tell me just what you typed" and one that starts with "I can see what happened". The data was in the exception the whole time. The only question is whether you kept it.
 
+## Questions people ask
+
+<strong>Does Pydantic stop at the first error?</strong> No. It collects every problem in one `ValidationError`, so you can report them all at once.
+
+<strong>What do the keys in an error entry mean?</strong> `loc` is the path to the bad value, `msg` is the human message, `type` is a stable code, and `input` is what was received.
+
+<strong>Should I check `msg` or `type` in code?</strong> Check `type`. Messages can change between versions, while error type codes are stable.
+
+<strong>How do I turn an error into JSON for an API?</strong> Call `e.errors()` for a list of dicts or `e.json()` for a string. In v2.x some entries contain exception objects under `ctx`, so use `e.json()` when you need guaranteed serialisable output.
+
+<strong>What does an integer inside `loc` mean?</strong> It is a list index. `('lessons', 2, 'title')` means the third lesson has a bad title.
+
+<strong>How do I test that validation fails?</strong> Use `pytest.raises(ValidationError)` and then inspect `exc.errors()` for the `type` and `loc` you expect.
+
 ## Next
 
 The next module goes the other way: not reading the errors Pydantic makes. Writing the rules that give them. `Field` constraints let you say more about a value than its type. A min, a length, a pattern. And each one of them comes back through just the machinery given here.
@@ -2367,6 +2437,20 @@ Look at the constraints you've written and ask what a reader learns from them. A
 An unconstrained model is a list of types. The actual rules are scattered through the code that consumes it. A check here, an assertion there, an assumption one spot else that no one wrote down. Those rules still exist. They're just not anywhere you can read them. They disagree with each other more often than anyone expects.
 
 Moving a rule into the model isn't primarily about catching bad data, though it does that. It's about having one place where the shape of your domain is stated. This Is the same reason the annotations were worth enforcing in the first place.
+
+## Questions people ask
+
+<strong>How do I require a number to be positive?</strong> Use `Field(gt=0)` for strictly positive or `Field(ge=0)` for zero and up. The same keywords, `lt` and `le`, set upper bounds.
+
+<strong>What are the string constraints?</strong> `min_length`, `max_length` and `pattern` cover most cases. For example `Field(min_length=3, pattern=r"^[a-z-]+$")`.
+
+<strong>Why does `Field(max_length=5)` also work on lists?</strong> The constraint applies to anything with a length, so strings, lists, sets and dicts all honour it. The error type changes with the container, for example `string_too_long` or `too_long`.
+
+<strong>Do constraints check the default value?</strong> No, defaults are not validated unless you set `validate_default=True`. A default that breaks its own rule will not raise until that option is on.
+
+<strong>What is the difference between `Field(gt=0)` and `PositiveInt`?</strong> They enforce the same rule. `PositiveInt` is a reusable named type, while `Field(gt=0)` is attached to one field and can sit next to a description or default.
+
+<strong>Where do constraints appear in the JSON schema?</strong> They become `minimum`, `exclusiveMinimum`, `minLength`, `maxLength` and `pattern` keywords, so clients and API docs see them for free.
 
 ## Next
 
@@ -2765,6 +2849,20 @@ A dataclass makes a class from annotations and never looks at the types again. A
 The cost of all that is real and small. It's paid where you decide to pay it. The discipline is the same one this whole tier has been building towards. Know where your boundaries are, check there, and trust what you've checked.
 
 Choose a dataclass for inner values that never meet the outside world. Choose a model for all else. And when you're truly unsure, choose the model. A slightly over-checked program is a much smaller problem than one where no one can say which values are sure.
+
+## Questions people ask
+
+<strong>What does Pydantic add over a standard dataclass?</strong> Runtime validation and coercion, JSON parsing, serialisation and schema generation. A dataclass only stores what you give it and does not check types.
+
+<strong>Is a dataclass faster to create?</strong> Yes, because it does no validation. For internal data you have already checked, that saving can matter in hot loops.
+
+<strong>Can I get validation on a dataclass?</strong> Yes, use `pydantic.dataclasses.dataclass`. It looks like a standard dataclass but validates input on construction.
+
+<strong>Can I use Pydantic models and dataclasses together?</strong> Yes. A model field can be a dataclass type, and Pydantic validates it. `TypeAdapter` also works on a plain dataclass.
+
+<strong>Which one should I use for API input?</strong> A Pydantic model, because data from outside needs checking. Use dataclasses for trusted internal structures.
+
+<strong>Does a Pydantic model use more memory?</strong> Somewhat, because it stores extra bookkeeping such as `model_fields_set`. The difference rarely matters unless you hold millions of instances.
 
 ## Where this leaves you
 
@@ -3175,6 +3273,20 @@ Three levels is comfortable. Four is worth a second look. Beyond that, the quest
 
 Nesting one model inside another is half the picture. The other half is sets. Lists of models, dicts keyed by a thing real. What happens to the error path when the failure is in the seventeenth item.
 
+## Questions people ask
+
+<strong>How do I put a model inside another model?</strong> Use the inner class as a field type, for example `author: Author`. Pydantic validates a nested dict into an `Author` instance.
+
+<strong>Where does the error point when a nested value is wrong?</strong> The `loc` is the full path, such as `('author', 'email')`, so you can see exactly which inner field failed.
+
+<strong>Can a nested model be optional?</strong> Yes. Use `author: Author | None = None`. A missing key then gives `None`, while a present dict is validated.
+
+<strong>Can a model contain itself?</strong> Yes, use a forward reference like `children: list["Category"]`. Pydantic resolves it once the class exists.
+
+<strong>How do I dump only part of a nested model?</strong> Pass a nested `exclude` such as `exclude={"author": {"email"}}`. `include` accepts the same shape.
+
+<strong>Do nested models get copied or shared?</strong> If you pass an existing model instance, Pydantic keeps the same object by default (`revalidate_instances='never'`). Passing a dict creates a new one.
+
 ## Summary
 
 A model used as a field type is checked with its full rules, dicts become objects recursively. Errors carry the whole path to the failing value.
@@ -3571,6 +3683,20 @@ Both are the same oversight: a holder's *size* is part of its contract. Leaving 
 ## Next
 
 sets handle many things of the same type. The next module is about the opposite problem. A field that could be one of a few *other* types. How to make that choice clear rather than letting Pydantic guess.
+
+## Questions people ask
+
+<strong>How do I validate a list of models?</strong> Annotate the field as `list[Lesson]`. Each item is validated as a `Lesson`, and an error names the exact index that failed, such as `lessons.2.title`.
+
+<strong>How do I validate a bare JSON array that has no wrapping model?</strong> Use `TypeAdapter(list[Lesson])` and call `validate_python` or `validate_json` on it. You do not need to invent a wrapper class.
+
+<strong>Can I require at least one item or cap the length?</strong> Yes. Use `Field(min_length=1, max_length=50)` on the list field. The same keywords work on sets, tuples and dicts.
+
+<strong>What happens to duplicates in a `set` of models?</strong> Pydantic builds a set, which needs hashable items. A regular model is not hashable unless it is frozen, so use `frozen=True` or choose a list and check duplicates yourself.
+
+<strong>How does a `dict[str, Module]` field validate?</strong> Both the keys and the values are validated. The key is coerced to `str`, and each value must be a valid `Module`.
+
+<strong>Is a tuple different from a list?</strong> A tuple such as `tuple[int, str]` checks both length and the type at each position. A `tuple[int, ...]` accepts any length of ints.
 
 ## Summary
 
@@ -3981,6 +4107,20 @@ A union of two models that share nine of their ten fields is often the second th
 
 Reach for a union when the options are truly other. Other needed fields, other meaning, other handling downstream. When they're the same thing with a variation, model the variation.
 
+## Questions people ask
+
+<strong>How does Pydantic choose a member of a union?</strong> In smart mode, which is the default, it tries each member and prefers an exact type match, then the best partial match. It does not just take the first that works.
+
+<strong>What is a discriminated union?</strong> A union of models that each carry a literal tag field, such as `kind: Literal["video"]`. Pydantic reads the tag and validates against that one model only.
+
+<strong>How do I declare one?</strong> Write `Annotated[Video | Article, Field(discriminator="kind")]` as the field type.
+
+<strong>Why use a discriminator?</strong> Errors become clearer, since only the chosen model's errors appear, and validation is faster because there is no trial and error.
+
+<strong>What error do I get for an unknown tag?</strong> A `union_tag_invalid` error that lists the allowed tags.
+
+<strong>Is `Optional[X]` a union?</strong> Yes, it is `X | None`. Pydantic tries `X` and then accepts `None`.
+
 ## Next
 
 Unions choose between shapes. The next module is about choosing between *values*. Enums and literals. This Are how you say a field may only ever hold one of a small fixed set.
@@ -4368,6 +4508,20 @@ When you add an enum to an existing field, run your data through it before you d
 A `str` field that has been accepting anything for a year almost certainly holds values no one expected. A trailing space, a other case, an old name from before a rename, a placeholder somebody typed once. each one of those will start raising the moment the annotation tightens.
 
 Finding them beforehand is a short script and an afternoon. Finding them later is an incident. The failures arrive on reads of existing data rather than on new input. This Is the direction no one tests.
+
+## Questions people ask
+
+<strong>When should I use `Literal` and when an `Enum`?</strong> Use `Literal` for a short, fixed set of values that appear only in this one place. Use an `Enum` when the set has a name, is shared across models, or needs methods.
+
+<strong>Why does my enum dump as `<Level.easy: 'easy'>`?</strong> A plain `Enum` dumps as the member in Python mode. Inherit from `str` (`class Level(str, Enum)`) or call `model_dump(mode="json")` to get the plain value.
+
+<strong>How do I accept enum values case-insensitively?</strong> Add a `mode="before"` field validator that lowercases the input, or define `_missing_` on the enum. Pydantic itself matches the value exactly.
+
+<strong>What error do I get for a value outside the set?</strong> A `literal_error` for `Literal` and an `enum` error for enums, each listing the permitted values in the message.
+
+<strong>Can I use `Literal` with non-string values?</strong> Yes. Integers, booleans, `None` and members of an enum all work, for example `Literal[1, 2, 3]`.
+
+<strong>How do I add a new value without breaking old data?</strong> Adding a member only widens what is accepted, so old data still validates. Removing one is the breaking change, because stored values may no longer parse.
 
 ## Next
 
@@ -4772,6 +4926,20 @@ Closing it in the model means the conversion happens once, in a place that is de
 
 Choosing the precise type isn't pedantry. It's deciding that the gap gets closed at the boundary rather than scattered through all downstream.
 
+## Questions people ask
+
+<strong>Why does Pydantic accept a string as a `datetime`?</strong> In lax mode it parses ISO 8601 strings and Unix timestamps into a `datetime`. In strict mode only real `datetime` objects pass from Python input.
+
+<strong>What is the difference between a naive and an aware datetime?</strong> A naive one has no timezone and an aware one does. Use `AwareDatetime` or `NaiveDatetime` to require one or the other, and a bare `datetime` will take either.
+
+<strong>Why should I use `Decimal` for money instead of `float`?</strong> Floats cannot represent most decimal fractions exactly, so `0.1 + 0.2` is not `0.3`. `Decimal` keeps exact values, and `max_digits` and `decimal_places` constrain them.
+
+<strong>How does Pydantic parse a UUID?</strong> It accepts a canonical string or a `uuid.UUID` object and returns a `UUID`. Use `UUID4` if you want to require version 4, and a malformed string raises a `uuid_parsing` error.
+
+<strong>How are dates and Decimals written to JSON?</strong> Datetimes come out as ISO 8601 strings and Decimals as strings, so no precision is lost. UUIDs also become strings.
+
+<strong>Does `Path` check that the file exists?</strong> No, a plain `Path` only parses the string. Use `FilePath` or `DirectoryPath` to also require that the path exists on disk.
+
 ## Next
 
 That ends the shapes. The last module in this tier returns to coercion with a sharper question. Now that you know what Pydantic will convert, when should you stop it?
@@ -5173,6 +5341,20 @@ The one thing worth doing on purpose rather than by default is choosing, once, f
 You can now show data with real shape. Models inside models, sets with real error paths, unions that say which branch they're, closed sets of values. The standard-library types that JSON can't carry. And you can decide, per field, how much conversion you're willing to accept.
 
 What you can't yet do is express a rule that no annotation can hold. A value that must be checked against another value, a field found from the rest, a scaling applied before checking. That is the next tier, and it starts with checkers.
+
+## Questions people ask
+
+<strong>What does lax mode do?</strong> It converts compatible input, so `"42"` becomes `42`. It is the default.
+
+<strong>What changes in strict mode?</strong> No type conversion happens. A string where an int is expected is rejected with an `int_type` error.
+
+<strong>How do I turn strict on for one field?</strong> Use `Field(strict=True)` or a type like `StrictInt`. This is usually better than switching the whole model.
+
+<strong>Can I enable strict for a whole model?</strong> Yes, with `model_config = ConfigDict(strict=True)`. Individual calls can also pass `strict=True` to `model_validate`.
+
+<strong>Does strict mode treat JSON differently?</strong> Yes. JSON has no distinct date type, so strict JSON mode still accepts ISO strings for dates, while strict Python mode wants a real `date`.
+
+<strong>Does strict stop `True` being accepted as an int?</strong> Yes. In strict mode a bool is not accepted for an `int` field, even though `bool` subclasses `int` in Python.
 
 ## Summary
 
@@ -5604,6 +5786,20 @@ The result is a field that accepts `"Maths, maths, VECTORS "` or `["Maths", "mat
 
 Types, then constraints, then checkers. Working down that list rather than up makes models where most rules are visible in the annotations and only the truly complex ones are in code. Which is also the order of how much each rule tells your schema, your docs and your consumers.
 
+## Questions people ask
+
+<strong>How do I write a validator for one field?</strong> Decorate a classmethod with `@field_validator("title")`, take the value, and return it or a changed copy. Raise `ValueError` to reject it.
+
+<strong>Do I need `@classmethod` under `@field_validator`?</strong> Yes, put `@classmethod` directly under `@field_validator`. Pydantic can often cope without it, but the explicit form is what type checkers and readers expect.
+
+<strong>Can a validator change the value?</strong> Yes. Whatever you return replaces the field value, so validators can normalise input by trimming, lowercasing or rounding.
+
+<strong>How do I validate one field against another?</strong> Take `info: ValidationInfo` and read `info.data`, which holds fields validated earlier. For rules that need all fields at once, a `model_validator` is cleaner.
+
+<strong>What exceptions should a validator raise?</strong> Raise `ValueError` or `AssertionError`, and Pydantic wraps it in a `ValidationError` with a `value_error` entry. Raise `PydanticCustomError` if you need your own error type.
+
+<strong>Can one validator cover several fields?</strong> Yes. List them: `@field_validator("a", "b")`, or use `"*"` to cover every field.
+
 ## Validators and the schema
 
 Worth restating once more, because it's the trade this whole module sits inside.
@@ -6013,6 +6209,20 @@ That is a strong promise, and it's what makes the rest of the code simpler. each
 
 **Mutating in an after checker on a model with `validate_assignment`.** The set re-triggers check. This Re-runs the checker. Use `object.__setattr__`, or set the value in a `before` checker instead.
 
+## Questions people ask
+
+<strong>When do I need `model_validator` instead of `field_validator`?</strong> When a rule depends on more than one field, such as `end > start` or password confirmation. A field validator only sees its own value plus the fields before it.
+
+<strong>What is the difference between `mode="before"` and `mode="after"`?</strong> `before` receives the raw input, often a dict, before any field is validated. `after` receives the finished model instance and can check relationships between fields.
+
+<strong>Is an after validator a classmethod?</strong> No, an `after` validator is an ordinary instance method that returns `self`. A `before` validator is a classmethod that receives the raw data.
+
+<strong>Why does the error for my model validator have an empty location?</strong> The problem belongs to the whole model, not one field, so `loc` is an empty tuple. Raise from a field validator if you want the error attached to a field.
+
+<strong>Can a validator modify the model?</strong> Yes. In an `after` validator you can set attributes on `self` before returning it, though assigning with `validate_assignment` on can cause recursion.
+
+<strong>Do model validators run if a field already failed?</strong> A `before` validator always runs first. An `after` validator is skipped when field validation failed, since there is no valid instance to check.
+
 ## Where the errors go
 
 One hands-on result of the empty `loc` deserves a final mention. It shapes how the front end has to work.
@@ -6413,6 +6623,20 @@ This is a better pattern than storing both. This Is where the two eventually dis
 **Not aliasing it.** An `alias_generator` on the model doesn't reach found fields. A camelCase API ends up with one stubbornly snake_case key. The decorator takes `alias` for just this.
 
 **Adding one without checking what already consumes the model.** Unlike a regular field. This You on purpose added to a schema, a found field written for one inner purpose at once appears in each existing output. Including the public ones.
+
+## Questions people ask
+
+<strong>What is a computed field?</strong> A property decorated with `@computed_field` that Pydantic includes in `model_dump()` and the JSON schema. It is derived from other fields and is never accepted as input.
+
+<strong>How is `@computed_field` different from a plain `@property`?</strong> A plain property is invisible to serialisation and the schema. A computed field appears in the dump, in `model_dump_json()` and in the generated schema.
+
+<strong>Do I need to put `@property` under `@computed_field`?</strong> Yes for a read-only value. Stack `@computed_field` on top of `@property` so Python still treats it as a property and Pydantic registers it.
+
+<strong>Can a client send a value for a computed field?</strong> No. It is output only, so a value supplied in the input is ignored by default. If you set `extra="forbid"`, the unknown key is rejected.
+
+<strong>Is the value cached?</strong> No. The property runs every time you dump the model. Add `functools.cached_property` below the decorator if the calculation is expensive and the inputs do not change.
+
+<strong>Can I leave a computed field out of one dump?</strong> Yes. Pass `exclude={"reading_time"}` to `model_dump`, or give the field `repr=False` to hide it from the printed form.
 
 ## Deciding, in one line
 
@@ -6844,6 +7068,20 @@ Put them on a shared base, decide them once. Let each model in the code inherit 
 
 **Building a base so opinionated that half the models replace it.** If a setting is wrong for a third of your models, it isn't a house rule and doesn't belong in the shared base.
 
+## Questions people ask
+
+<strong>How do I set model configuration in v2?</strong> Assign `model_config = ConfigDict(...)` in the class body. The old inner `class Config` still works but is deprecated.
+
+<strong>How do I stop a model accepting unknown keys?</strong> Set `extra="forbid"`. The default is `"ignore"`, which drops unknown keys silently, and `"allow"` keeps them.
+
+<strong>How do I make a model immutable?</strong> Use `frozen=True`. Assigning to a field then raises an error, and the model also becomes hashable.
+
+<strong>What does `from_attributes=True` do?</strong> It lets `model_validate` read attributes from an arbitrary object, such as an ORM row, instead of requiring a dict.
+
+<strong>Is config inherited by subclasses?</strong> Yes, and a subclass's `model_config` is merged with its parent's. Keys you set override the parent, and the rest carry over.
+
+<strong>What does `validate_assignment` do?</strong> It re-runs validation whenever you set an attribute after creation. Without it, `m.age = "oops"` is accepted silently.
+
 ## What it is really for
 
 Config is where a code records the choices it has made about its own data.
@@ -7272,6 +7510,20 @@ It also changes how the code reads to somebody arriving. Models built from named
 
 The method is a single line of `typing`. The return is a code where the vocab is written down.
 
+## Questions people ask
+
+<strong>What does `Annotated` do in Pydantic?</strong> It attaches extra metadata, such as constraints or validators, to a type without changing the type itself. Pydantic reads that metadata when it builds the schema, while type checkers just see the base type.
+
+<strong>Why define a type with `Annotated` instead of repeating `Field(...)` on every model?</strong> You write the rule once and reuse the name everywhere, so `PositiveMinutes` means the same thing in ten models. Changing the rule later means editing one line.
+
+<strong>In what order do validators inside `Annotated` run?</strong> They run left to right for `AfterValidator` and in reverse for `BeforeValidator`, with the type's own validation in the middle. The order in the metadata list is the order you should read it.
+
+<strong>Can I put a validator inside an `Annotated` alias?</strong> Yes. `AfterValidator`, `BeforeValidator`, `PlainValidator` and `WrapValidator` all go inside `Annotated[...]`, and the validator travels with the alias wherever it is used.
+
+<strong>When do I need `__get_pydantic_core_schema__`?</strong> Only when Pydantic has no idea how to validate a class you own, such as a third-party object. For most custom rules an `Annotated` alias with a validator is enough.
+
+<strong>Does an `Annotated` alias show up in the JSON schema?</strong> Constraints from `Field` metadata such as `ge` or `max_length` do show up. Custom validator functions do not, because a schema cannot describe arbitrary Python code.
+
 ## A last practical note
 
 add named types bit by bit rather than in one refactor.
@@ -7678,6 +7930,20 @@ Keep the sentence and the rest is derivable.
 
 **Rebuilding data inside a checker on each call.** A checker that makes a set of permitted values each time it runs does that work once per item checked. Hoist it out. On a large set it's the dominant cost.
 
+## Questions people ask
+
+<strong>What are the four validator modes?</strong> `after`, `before`, `plain` and `wrap`. They differ in whether your code runs after Pydantic's own checks, before them, instead of them, or around them.
+
+<strong>Which mode should I use by default?</strong> `after`. Your function receives a value that already has the right type, so you only write the extra rule.
+
+<strong>When do I need `before`?</strong> When the raw input has the wrong shape for the type, such as a comma-separated string that should become a list.
+
+<strong>What does `plain` do differently?</strong> It replaces Pydantic's built-in validation for that type, so you are responsible for everything, including the type check.
+
+<strong>What is `wrap` for?</strong> It receives the value and a handler for the normal validation, so you can run code before and after, catch errors, or skip the handler.
+
+<strong>In which order do multiple validators run?</strong> Inside `Annotated`, `after` validators run left to right, while `before` and `wrap` validators run right to left.
+
 ## A closing note
 
 Nearly each question about checkers reduces to a question about spot.
@@ -8053,6 +8319,20 @@ If only two things live from this module, make them these.
 `json.dumps(model_dump())` raises, because the dict is full of real Python objects. Use `model_dump_json()`, or `mode="json"` when a thing else does the encoding.
 
 `exclude_none` isn't `exclude_unset`. The first throws away a caller's clear instruction to clear a field. The second preserves it. On a PATCH endpoint that gap is a bug users report and no one can copy.
+
+## Questions people ask
+
+<strong>What is the difference between `model_dump` and `model_dump_json`?</strong> `model_dump` returns a Python dict, while `model_dump_json` returns a JSON string. The dict may hold objects like `datetime` that `json.dumps` cannot handle.
+
+<strong>Why does `json.dumps(m.model_dump())` raise a TypeError?</strong> The dict contains values like datetimes, UUIDs or Decimals. Use `model_dump(mode="json")` or `model_dump_json()` to get JSON-safe output.
+
+<strong>How do I leave out fields?</strong> Use `exclude={...}`, `include={...}`, `exclude_none=True`, `exclude_unset=True` or `exclude_defaults=True`, depending on what you want removed.
+
+<strong>What is the difference between `exclude_unset` and `exclude_defaults`?</strong> `exclude_unset` drops fields the caller never supplied. `exclude_defaults` drops fields whose value equals the default, even if the caller set it explicitly.
+
+<strong>How do I include aliases in the output?</strong> Pass `by_alias=True`. The default output uses Python field names.
+
+<strong>Can I round-trip a dump back into a model?</strong> Usually, with `Model.model_validate(m.model_dump())`. It breaks if you excluded required fields or used a custom serialiser that changes the shape.
 
 ## Output as a contract
 
@@ -8452,6 +8732,20 @@ What makes trouble is deciding case by case. Some endpoints camelCase, some not,
 
 Make the choice once, express it in a base model. Let the exceptions be genuine exceptions rather than accidents.
 
+## Questions people ask
+
+<strong>Why does my model reject the Python field name after I add an alias?</strong> By default an alias replaces the field name as the input key, so `Module(published_at=...)` raises. Set `populate_by_name=True` in `model_config` and both spellings work.
+
+<strong>Why does `model_dump()` return snake_case when I set an alias?</strong> Aliases are only used on output when you ask for them. Call `model_dump(by_alias=True)`, or set `serialize_by_alias` in the config on newer releases.
+
+<strong>What is the difference between alias, validation_alias and serialization_alias?</strong> `alias` sets one name for both directions. `validation_alias` only controls the input key and `serialization_alias` only controls the output key, and each wins over `alias` in its own direction.
+
+<strong>How do I accept several spellings of the same key?</strong> Use `validation_alias=AliasChoices("durationMinutes", "duration", "minutes")`. Pydantic takes the first key it finds in the input.
+
+<strong>Can I make every field camelCase without writing each alias?</strong> Yes. Put `alias_generator=to_camel` (from `pydantic.alias_generators`) in the config of a shared base model, and every field gets a camelCase alias.
+
+<strong>How do I read a value from inside a nested payload?</strong> Use `AliasPath("author", "name")` as the validation alias. It walks the keys in order and pulls the inner value up into a flat field.
+
 ## One thing to remember
 
 If just one fact lives this module, make it `by_alias=True`.
@@ -8823,6 +9117,20 @@ In each of those the two-step habit is common. In each of them the one-step form
 Speed, because an entire mid form is skipped. Errors, because syntax and check failures arrive through one channel with spots attached. Fidelity, because decimals keep the digits as written. Strictness, because the parser knows the input was JSON and applies the right rules.
 
 All of it from handing Pydantic the text instead of parsing it first. Which is also less code than the option.
+
+## Questions people ask
+
+<strong>Should I use `json.loads` then `model_validate`, or `model_validate_json`?</strong> Prefer `model_validate_json`. It parses and validates in one pass in Rust, which is faster and gives better error locations.
+
+<strong>Does `model_validate_json` accept bytes?</strong> Yes, both `str` and `bytes` work, so you can pass a request body directly without decoding.
+
+<strong>What happens when the JSON is malformed?</strong> You get a `ValidationError` with type `json_invalid` and the position of the problem, not a `JSONDecodeError`.
+
+<strong>How do I parse a top-level JSON array?</strong> Use `TypeAdapter(list[Model]).validate_json(data)`. A model cannot represent a bare array.
+
+<strong>Do the coercion rules differ for JSON input?</strong> Slightly. Tuples and sets are read from arrays and dates from ISO strings, but a string like `"1"` for an int field is still coerced in lax mode unless you turn on strict mode.
+
+<strong>Can it handle large integers?</strong> Yes. Python ints are unbounded, and Pydantic parses large JSON integers exactly instead of rounding to a float.
 
 ## Why the habit persists
 
@@ -9223,6 +9531,20 @@ Only the first is a serialiser's job. all else. Currency symbols, readable dates
 
 Applying that one question honestly drops most proposed serialisers. Makes the left ones easy to justify.
 
+## Questions people ask
+
+<strong>How do I change how one field is written out?</strong> Decorate a method with `@field_serializer("published_at")` and return the value you want. Only the output changes, and validation on input is untouched.
+
+<strong>What is the difference between `@field_serializer` and `@model_serializer`?</strong> `field_serializer` reshapes a single field. `model_serializer` receives the whole model and returns the dict you want, so it can rename, merge or drop fields in one place.
+
+<strong>How do I apply a serialiser only to JSON output?</strong> Pass `when_used="json"` to the decorator. The default is `"always"`, and `"json-unless-none"` and `"unless-none"` are the other options.
+
+<strong>Does a custom serialiser change the JSON schema?</strong> No, the schema still describes the original type. Set `return_type` on the serialiser or tune the schema with `json_schema_extra` if the output shape differs.
+
+<strong>Should I use a serialiser to hide a password?</strong> Prefer `Field(exclude=True)` or a `SecretStr`, which are simpler and harder to bypass. A serialiser that blanks the value is easy to forget when you add the next field.
+
+<strong>Can the serialiser see the other fields?</strong> Yes. A `field_serializer` method receives `self`, so it can read other attributes, and it can take an `info` argument (a `SerializationInfo`) for context such as the mode.
+
 ## A final framing
 
 It helps to think of output as the boundary in the other direction.
@@ -9585,6 +9907,20 @@ check is handy and other libraries do it.
 What made Pydantic a dependency of half the modern Python ecosystem is this. A machine-readable description of your data, made from the code that enforces it. So incapable of drifting from it.
 
 docs that can't go stale. Clients made from the truth. Forms enforcing the same rules as the server. All from annotations you were going to write anyway.
+
+## Questions people ask
+
+<strong>How do I get the JSON schema of a model?</strong> Call `Model.model_json_schema()`. It returns a dict you can serialise with `json.dumps`.
+
+<strong>Why are there two modes?</strong> `mode="validation"` describes what the model accepts and `mode="serialization"` describes what it emits. They differ for computed fields, aliases and custom serialisers.
+
+<strong>How do I add descriptions and examples?</strong> Use `Field(description=..., examples=[...])` for fields and `model_config = ConfigDict(json_schema_extra={...})` for the model. A class docstring becomes the model description.
+
+<strong>What are `$defs` and `$ref` in the output?</strong> Nested models are listed once under `$defs` and referenced with `$ref`, so a model used in three places is not repeated.
+
+<strong>Which Python rules cannot appear in a schema?</strong> Custom validator functions and arbitrary logic. The schema carries types and constraints, not code.
+
+<strong>What reads these schemas in practice?</strong> FastAPI turns them into OpenAPI docs, and code generators, form builders and LLM tool-calling APIs consume them to build clients or constrain output.
 
 ## What good looks like
 
@@ -10003,6 +10339,20 @@ That covers a great deal. A list of models. A dict of settings. A single constra
 The corollary is equally handy: if you're writing a class purely so that a thing can be checked, stop and check whether an annotation would do. The wrapper model is a real and widespread pattern. Almost each instance of it predates its author discovering this.
 
 Where a class still earns its place is where a class was always the right answer. A domain concept that deserves a name, one spot to hang methods, field access instead of subscripting, a place for checkers and config. Those are properties of a model, not of check. Adapters were never competing for them.
+
+## Questions people ask
+
+<strong>What is `TypeAdapter` for?</strong> Validating and serialising any type without defining a model, such as `list[int]` or `dict[str, Course]`.
+
+<strong>How do I use one?</strong> Build it once with `ta = TypeAdapter(list[int])`, then call `ta.validate_python(data)`, `ta.validate_json(text)` or `ta.dump_python(value)`.
+
+<strong>Why create it at module level?</strong> Constructing a `TypeAdapter` builds a core schema, which is slow to repeat. Build it once and reuse it.
+
+<strong>Can it generate a JSON schema?</strong> Yes. `ta.json_schema()` returns the schema for the type, even if it is a bare union or list.
+
+<strong>Does it work with dataclasses and TypedDict?</strong> Yes. It accepts dataclasses, `TypedDict`, `NamedTuple` and unions, which a plain model cannot wrap.
+
+<strong>When is a model still better?</strong> When you want named fields, methods, config and a class to import. `TypeAdapter` is for shapes that are not worth a class.
 
 ## Where it sits in the library
 
@@ -10445,6 +10795,20 @@ That validates nothing about the payload, tells mypy nothing. Makes a schema in 
 
 The choice isn't really "plain or concrete". It's "typed or untyped". The plain is what makes the typed option cheap enough that no one reaches for the untyped one.
 
+## Questions people ask
+
+<strong>What is a generic model?</strong> A model parameterised by a type, declared with `class Page(BaseModel, Generic[T])`. You then write `Page[Course]` to get a version whose `items` are validated as courses.
+
+<strong>Do I need `Generic[T]` in Pydantic v2?</strong> Not on Python 3.12 and later with a recent Pydantic, where `class Page[T](BaseModel)` works. On older versions inherit from `Generic[T]`.
+
+<strong>Is `Page[Course]` a separate class?</strong> Yes. Pydantic creates and caches a real subclass for each parameterisation, so `Page[Course]` and `Page[Track]` validate independently.
+
+<strong>How do I restrict what T can be?</strong> Give the type variable a bound, such as `T = TypeVar("T", bound=BaseModel)`. Anything else is rejected by type checkers.
+
+<strong>What happens if I use `Page` without a parameter?</strong> `T` is treated as `Any` (or its bound), so items are not validated beyond that. Always use `Page[Course]` for real validation.
+
+<strong>Do generics work with FastAPI?</strong> Yes. A parameterised model such as `Page[Course]` works as a `response_model` and appears in the OpenAPI schema with a name built from the parameter.
+
 ## Why envelopes end up generic
 
 It's worth noticing why this pattern appears in nearly each API of any size. It isn't really about type vars.
@@ -10838,6 +11202,20 @@ A settings model turns config from a thing an use discovers bit by bit into a th
 
 That is the same arg as checking a request body, applied to the other kind of input a program takes. It's just that request bodies are obviously untrusted and config often isn't treated that way. Which is just why config errors cause so many incidents.
 
+## Questions people ask
+
+<strong>What is `BaseSettings`?</strong> A model, from the `pydantic-settings` package, that fills its fields from environment variables and other sources. It validates them like any other model.
+
+<strong>Why is it a separate package?</strong> Since v2, settings live in `pydantic-settings`. Install it with `pip install pydantic-settings` and import `BaseSettings` from there.
+
+<strong>How do environment variable names map to fields?</strong> By default a field `database_url` reads `DATABASE_URL`, case-insensitively. Add `env_prefix="APP_"` in `SettingsConfigDict` to namespace them.
+
+<strong>How do I load a `.env` file?</strong> Set `env_file=".env"` in `model_config = SettingsConfigDict(...)`. Real environment variables take priority over the file.
+
+<strong>How do I keep secrets out of logs?</strong> Type them as `SecretStr`. Printing shows asterisks, and you call `.get_secret_value()` when you actually need the string.
+
+<strong>What happens when a required variable is missing?</strong> The app fails at start-up with a `ValidationError` naming the field, rather than failing later at the first use.
+
 ## One habit
 
 Create settings on the first line of your use's start-up, before anything else runs.
@@ -11229,6 +11607,20 @@ The annotations from tier one decide what a request body accepts. The shapes fro
 FastAPI adds routing and an HTTP layer on top. Almost nothing else. Which means the quality of an API built this way is very largely the quality of its models.
 
 That is a good spot to be in. Models are cheap to improve. Narrowing a `str` to a `Literal`, moving a rule from a checker to a constraint, splitting one all-optional model into three honest ones, adding a description to a field whose name isn't self-explanatory. Each is a small edit. Each is visible to everybody who calls you.
+
+## Questions people ask
+
+<strong>How does FastAPI use Pydantic?</strong> A model type in the endpoint signature becomes the request body, validated before your function runs. FastAPI also uses it to build the OpenAPI docs.
+
+<strong>What is a 422 response?</strong> It is FastAPI's reply when validation fails. The body is a list of errors with `loc`, `msg` and `type`, taken from Pydantic's own error entries.
+
+<strong>What does `response_model` do?</strong> It validates and filters what your function returns. Fields not in the response model, such as a password hash, are dropped from the output.
+
+<strong>Why use separate models for create, update and read?</strong> Each has different required fields. A create model needs everything, an update model makes fields optional, and a read model adds the id and hides secrets.
+
+<strong>Do I need to call `model_dump` myself?</strong> Usually not. FastAPI serialises the returned model, and calling it yourself is mostly for background tasks or storage.
+
+<strong>Where does validation stop?</strong> At the edge of the request. FastAPI will not check that a foreign key exists in your database, so that check still belongs in your code.
 
 ## One last thing to check
 
@@ -11622,6 +12014,20 @@ What changed in v2 is that this stopped being a live concern for plain code. che
 ## In one line
 
 Validate once at the boundary, validate sets in a single call. Hand JSON straight to Pydantic. Then stop thinking about it. In v2 check is almost never the slow part.
+
+## Questions people ask
+
+<strong>Why is Pydantic v2 faster than v1?</strong> Validation and serialisation moved from Python to `pydantic-core`, a Rust library. The model's rules are compiled into a schema once and executed in native code.
+
+<strong>Do I need to install Rust?</strong> No. Wheels for common platforms ship on PyPI with the compiled core already built.
+
+<strong>What is the cheapest speedup?</strong> Use `model_validate_json` for JSON input, reuse `TypeAdapter` objects, and prefer built-in constraints over Python validators.
+
+<strong>Why is building a `TypeAdapter` in a loop slow?</strong> Each construction builds a new core schema. Create it once at module level and call `validate_python` on it.
+
+<strong>Are Python validators slow?</strong> Each call crosses from Rust into Python, which is much slower than a built-in constraint. Use `Field(ge=0)` where it can express the rule.
+
+<strong>When should I stop optimising?</strong> When the profile shows validation is a small share of request time. For most services, database and network calls dominate.
 
 ## A closing thought
 
@@ -12025,6 +12431,20 @@ Rename constraint args: `min_items`, `max_items`, `regex`.
 Review error handling by hand. Anything matching v1 type codes or message text has stopped matching, silently, and tests may not notice.
 
 Then drop the deprecated method names once the warnings are the only thing left.
+
+## Questions people ask
+
+<strong>Do I have to rewrite everything to move to v2?</strong> Mostly renames. Install v2 and run `bump-pydantic`, which rewrites the common ones, then fix the behaviour changes by hand.
+
+<strong>What are the most common renames?</strong> `dict()` became `model_dump()`, `json()` became `model_dump_json()`, `parse_obj()` became `model_validate()`, and `Config` became `model_config`.
+
+<strong>What happened to `@validator`?</strong> It is deprecated in favour of `@field_validator`, which needs `@classmethod`, and `@root_validator` became `@model_validator`. The old names still work with a warning for now.
+
+<strong>Which change breaks code silently?</strong> `Optional[int]` no longer implies a default of `None`. In v2 a field with no default is required even if it accepts `None`.
+
+<strong>Can I run v1 and v2 side by side?</strong> Yes. Import `pydantic.v1` from a v2 install to keep old models running while you migrate module by module.
+
+<strong>Is v2 faster?</strong> Yes, validation runs in the Rust-based `pydantic-core` and is commonly several times faster than v1, with larger gains on big payloads.
 
 ## If you are only reading, not migrating
 

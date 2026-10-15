@@ -700,6 +700,20 @@ Most build bugs are shape bugs, and two habits prevent them.
 
 **Use the `_like` family when an array should match another.** `np.zeros_like(a)` can't drift out of sync with `a` the way a hard-coded shape can. When the shape of `a` changes, the output follows. One fewer place needs editing.
 
+## Questions people ask
+
+<strong>What is the difference between np.array and np.asarray?</strong> np.array copies by default, while np.asarray returns the input unchanged if it is already an array of the right dtype. Use asarray in functions that only read their input.
+
+<strong>Should I use arange or linspace for floats?</strong> Use linspace. With a float step, arange can land one element short or over because of rounding, whereas linspace takes the element count and includes the endpoint.
+
+<strong>Is np.empty faster than np.zeros?</strong> Slightly, since it skips filling the memory, but it returns whatever bytes were there. Use it only when you will overwrite every element.
+
+<strong>Why is growing an array with append in a loop slow?</strong> Each append allocates a new array and copies everything. Collect values in a list and convert once, or preallocate with the final shape.
+
+<strong>How do I make an array shaped like another one?</strong> Use zeros_like, ones_like, empty_like or full_like. They copy the shape and dtype of the template.
+
+<strong>What dtype do I get from np.array([1, 2, 3])?</strong> An integer type, usually int64 on Linux and macOS. Add one float to the list and every element becomes float64.
+
 ## A closing note
 
 Creation is the cheapest place to prevent problems. The dtype and shape chosen here pass through all that follows.
@@ -1039,6 +1053,20 @@ The fix is to convert before subtracting: `a.astype(np.int16) - b.astype(np.int1
 
 Mixed signed and unsigned math also promotes in ways that surprise. Mixing `int64` and `uint64` gives `float64`. No int type can hold the full range of both. And that silent jump to float is a real source of precision loss on large ints.
 
+## Questions people ask
+
+<strong>What is a dtype?</strong> It is the description of how each element's bytes are read: the kind, such as integer or float, and the width in bits. Every element in an array shares one dtype.
+
+<strong>What happens when an integer array overflows?</strong> It wraps around silently. An int8 holding 127 plus 1 becomes -128, with no warning, so pick a width that holds your largest value.
+
+<strong>What is the difference between astype and view?</strong> astype converts the values and returns a new array. view reinterprets the same bytes under another dtype, with no conversion at all.
+
+<strong>Why is 0.1 + 0.2 not equal to 0.3?</strong> Binary floating point cannot store 0.1 or 0.2 exactly. Compare with np.isclose or np.allclose instead of ==.
+
+<strong>Should I use float32 or float64?</strong> float64 is the default and the safe choice. float32 halves memory and is common in deep learning, but it carries only about seven decimal digits.
+
+<strong>Why does mixing int and float give float?</strong> NumPy promotes to the smallest type that can hold both without losing the range. An int and a float therefore produce a float.
+
 ## Choosing, summarised
 
 **Floats.** `float64` unless memory matters. `float32` when it does and seven digits suffice, building up in `float64`.
@@ -1362,6 +1390,20 @@ And check `ndim` when a function accepts both single items and batches. A great 
 **Leaning on `reshape` returning a view.** It often does and at times doesn't. `np.shares_memory` answers it. Assigning to `.shape` enforces it.
 
 **Losing an axis to an int index** and then being surprised when broadcasting fails. `a[:, 0]` gives `(3,)`. `a[:, 0:1]` gives `(3, 1)`.
+
+## Questions people ask
+
+<strong>What does -1 mean in reshape?</strong> It asks NumPy to infer that axis length from the total size. a.reshape(-1, 3) gives rows of three, whatever the count.
+
+<strong>Does reshape copy the data?</strong> Usually not, it returns a view when the memory layout allows. If it cannot, such as after certain transposes, it quietly copies.
+
+<strong>What is the difference between ravel and flatten?</strong> ravel returns a view when possible, while flatten always returns a copy. Use flatten only when you need to modify the result independently.
+
+<strong>Why do I get 'cannot reshape array of size 12 into shape (5, 3)'?</strong> The product of the new shape must equal the element count. 5 times 3 is 15, not 12.
+
+<strong>What is a shape of (5,) versus (5, 1)?</strong> The first is a flat vector with one axis. The second is a column with two axes, and the two broadcast very differently.
+
+<strong>How do I add a length-1 axis?</strong> Index with None, as in a[:, None], or call np.expand_dims. reshape also works.
 
 ## Reading a shape error
 
@@ -1744,6 +1786,20 @@ This isn't a flaw. It's why slicing large arrays costs nothing and why NumPy cod
 
 The first seven are views and free. The last two allocate. Get modules of their own. Knowing which group an formula falls into predicts both its cost and whether writing to the result affects the first. Which between them shows most of NumPy's indexing action.
 
+## Questions people ask
+
+<strong>What is the difference between a[1][2] and a[1, 2]?</strong> They give the same value on a 2D array, but a[1][2] builds an intermediate row first. Prefer the comma form, which is faster and works with slices.
+
+<strong>Do slices copy the data?</strong> No, a slice is a view onto the same memory. Changing it changes the original, so call .copy() when you need independence.
+
+<strong>What does a[::-1] do?</strong> It reverses the array along that axis using a negative step. The result is a view, not a copy.
+
+<strong>Why does indexing one row drop a dimension?</strong> An integer index removes that axis, while a slice keeps it. a[1] has shape (n,) but a[1:2] has shape (1, n).
+
+<strong>What does the ellipsis mean in an index?</strong> It stands in for as many full slices as needed. a[..., 0] picks the first entry along the last axis whatever the number of dimensions.
+
+<strong>What happens if a slice goes past the end?</strong> Slices clip silently and never raise. A single integer index out of range does raise an IndexError.
+
 ## A closing note
 
 Indexing is where NumPy diverges most visibly from plain Python, in two ways that both matter.
@@ -2094,6 +2150,20 @@ It's also not what most people expect. It's worth knowing before writing a test 
 `np.floor`, `np.ceil` and `np.trunc` have no such subtlety. Note that `trunc` and `floor` differ for negatives: `floor(-1.5)` is -2, `trunc(-1.5)` is -1.
 
 Converting to int with `astype(int)` truncates toward zero. This Is `trunc`, not `round`. That gap makes off-by-one results in just the places that are hardest to notice.
+
+## Questions people ask
+
+<strong>What does vectorised mean?</strong> The operation applies to the whole array in one call, with the loop done in compiled code. You write a + b instead of looping over elements.
+
+<strong>What is a ufunc?</strong> A universal function, such as np.add or np.exp, that operates element by element and supports broadcasting, out= and dtype arguments.
+
+<strong>Why is x / 0 not an error?</strong> NumPy follows IEEE floating point and returns inf or nan with a warning. Use np.errstate to control or raise on those cases.
+
+<strong>How do I apply a custom Python function?</strong> First try to express it with ufuncs and np.where. np.vectorize only hides the loop and is no faster.
+
+<strong>What does the out argument do?</strong> It writes the result into an existing array instead of allocating a new one. That saves memory and time in repeated calculations.
+
+<strong>Is a / b the same as a // b?</strong> No. / always gives floats, while // is floor division and keeps integer types for integer inputs. Mind the rounding on negative numbers.
 
 ## A checklist for converting a loop
 
@@ -2460,6 +2530,20 @@ Missing leading axes are treated as 1. Then, per column: 1 against 7 gives 7. 6 
 That is 1,680 elements from inputs of 48 and 35. The expansion is the point of the method and also the hazard. On real sizes it's how a plausible formula allocates a hundred gigabytes.
 
 `np.broadcast_shapes` finds this without allocating anything. This Is the safe way to check an formula before running it on real data.
+
+## Questions people ask
+
+<strong>What are the broadcasting rules?</strong> Compare shapes from the rightmost axis backwards. Two axes are compatible when they are equal or one of them is 1, and a missing leading axis counts as 1.
+
+<strong>Does broadcasting copy the data?</strong> No. NumPy reads the length-1 axis repeatedly using a stride of zero, so the small array is never physically expanded.
+
+<strong>How do I subtract a column mean from each column?</strong> Compute a.mean(axis=0), which has shape (columns,), and subtract it. The shape lines up with the last axis so it broadcasts across the rows.
+
+<strong>How do I subtract a row mean from each row?</strong> Use a.mean(axis=1, keepdims=True), giving shape (rows, 1). Without keepdims the shape is (rows,) and will not line up with the columns.
+
+<strong>What does 'operands could not be broadcast together' mean?</strong> Somewhere a pair of axes differ and neither is 1. Print both shapes, align them from the right, and find the first mismatch.
+
+<strong>How do I build a pairwise table of two vectors?</strong> Add a new axis with None or np.newaxis so one becomes a column. A[:, None] - B[None, :] gives every difference in one shape (len A, len B) array.
 
 ## A summary of the tools
 
@@ -2853,6 +2937,20 @@ Recognising which of those four you really want drops a surprising amount of cod
 
 And the one rule that applies throughout: parenthesise each rule in a compound mask. `(a > 2) & (a < 5)`, always. The op precedence won't do what you want else. It may not tell you.
 
+## Questions people ask
+
+<strong>What is a boolean mask?</strong> It is an array of True and False values with the same shape as the array you are filtering. Indexing with it keeps the elements where the mask is True.
+
+<strong>Does a mask return a view or a copy?</strong> A copy. Reading with a mask builds a new array, but assigning through a mask, as in a[mask] = 0, writes into the original.
+
+<strong>Why do I get an error combining conditions with and?</strong> Python's and and or need a single truth value, and an array has many. Use & and | instead, and wrap each comparison in parentheses because those operators bind tighter than comparisons.
+
+<strong>Why is the result of a[mask] one-dimensional?</strong> The surviving elements may not form a rectangle, so NumPy flattens them. Use np.where or assign through the mask if you need the shape kept.
+
+<strong>How do I count how many elements pass a test?</strong> Call mask.sum() or np.count_nonzero(mask). True counts as 1, so summing a boolean array counts the matches.
+
+<strong>How do I invert a mask?</strong> Use the tilde operator, ~mask. Do not use the word not, which fails on arrays with more than one element.
+
 ## A closing note
 
 Masking is the most-used feature in this track after math. It's also where the syntax is least forgiving.
@@ -3218,6 +3316,20 @@ Fancy indexing always allocates. The result is a new array of the index's shape.
 That gathering isn't free even beyond the allocation. Scattered reads defeat the processor's cache in the way covered in the speed module. Fancy indexing a large array with a random permutation is usefully slower per element than reading it in order.
 
 The hands-on result is small. It's still far faster than a Python loop &mdash; but it means fancy indexing inside a tight loop over a large array is worth a second look. Sorting the index array first. Here Order doesn't matter, can help by making the reads more sequential.
+
+## Questions people ask
+
+<strong>What is fancy indexing?</strong> Indexing with an array or list of integers instead of a slice. a[[0, 3, 5]] picks those three positions in the order you gave.
+
+<strong>Does fancy indexing return a view?</strong> No, it always returns a copy. Slices give views and fancy indexing does not, which matters when you assign to the result.
+
+<strong>How do two index arrays combine?</strong> They pair up element by element. a[[0, 1], [2, 3]] returns a[0, 2] and a[1, 3], not a 2 by 2 block. Use np.ix_ if you want the block.
+
+<strong>What happens when an index repeats in an assignment?</strong> The last write wins for plain assignment. For counting use np.add.at, which applies every repeated index instead of just one.
+
+<strong>Can I mix a slice and an index array?</strong> Yes, and the slice axis keeps its position. a[:, [0, 2]] gives all rows and columns 0 and 2.
+
+<strong>Are negative indices allowed in the index array?</strong> Yes, they count from the end like normal indexing. Out-of-range values raise an IndexError.
 
 ## The three selections, compared
 
@@ -3592,6 +3704,20 @@ Use `where` and `initial` for gated reductions rather than extracting a subset f
 
 And when the result shape isn't what you expected, print `a.shape` and the result's shape together. One compare resolves nearly each axis confusion faster than thinking about it does.
 
+## Questions people ask
+
+<strong>Which axis do I pass to get column sums?</strong> Pass axis=0. The axis you name is the one that disappears, so axis=0 collapses the rows and leaves one number per column.
+
+<strong>Why does my result have the wrong shape after a sum?</strong> The summed axis is removed from the shape. Pass keepdims=True if you want a length-1 axis left in place so the result still broadcasts against the original.
+
+<strong>What does axis=None do?</strong> It reduces over every element and returns a single scalar. That is the default for sum, mean, max and the other reductions.
+
+<strong>How do I get the index of the maximum instead of the value?</strong> Use argmax, which takes the same axis argument. Without an axis it indexes into the flattened array, so use np.unravel_index to turn it back into coordinates.
+
+<strong>Why does np.mean of an array with a NaN return NaN?</strong> NaN propagates through arithmetic, so one NaN poisons the whole reduction. Use nanmean, nansum and friends if you want the missing values skipped.
+
+<strong>Does sum work over several axes at once?</strong> Yes. Pass a tuple such as axis=(0, 1) and both axes are collapsed in one pass.
+
 ## A closing note
 
 Reductions are simple until an axis is involved. Then almost each confusion comes from one place. Reading `axis=0` as "along the rows" rather than "collapse the rows".
@@ -3953,6 +4079,20 @@ The default of copying is defensive: `astype` is often called to give a thing th
 `a.flags["OWNDATA"]` &mdash; whether the array owns its buffer.
 
 `a.flags` in full also reports contiguity. This Is what finds whether the next `reshape` or `ravel` will copy.
+
+## Questions people ask
+
+<strong>How can I tell whether two arrays share memory?</strong> Use np.shares_memory(a, b), or check b.base is a. A view keeps a reference to the array that owns the data.
+
+<strong>Which operations return views?</strong> Slices, reshape when possible, transpose, ravel when possible, and view. Basic indexing gives views.
+
+<strong>Which operations return copies?</strong> Fancy indexing, boolean masking, flatten, astype and explicit .copy(). Arithmetic always produces a new array.
+
+<strong>Why did changing b change a?</strong> b was a view of a, probably from a slice. Call .copy() when you create b if you want independent data.
+
+<strong>Is a copy always safe?</strong> It is safe but costs memory and time. On big arrays, a stray copy in a loop is a common slow-down.
+
+<strong>What is the pitfall with chained indexing and assignment?</strong> a[mask][0] = 1 assigns into a temporary copy and is lost. Combine the index into one expression such as a[mask] = 1.
 
 ## The habits that prevent the bugs
 
@@ -4347,6 +4487,20 @@ That cuts each `chunk` elements and leaves a shorter final piece. This Is often 
 
 And the rule that replaces all of them. None of these belongs inside a loop that runs once per element. Collect into a Python list and join once, or preallocate and assign into slices.
 
+## Questions people ask
+
+<strong>What is the difference between concatenate and stack?</strong> concatenate joins along an existing axis. stack creates a new axis, so all inputs must have identical shapes.
+
+<strong>When do I use vstack and hstack?</strong> vstack joins rows, hstack joins columns. They are shortcuts for concatenate on axis 0 and axis 1, with 1D inputs treated as rows.
+
+<strong>Why does concatenate raise a dimension error?</strong> All axes except the one you join along must match. Print the shapes and find the one that differs.
+
+<strong>How do I split an array into equal parts?</strong> np.split(a, n) needs the length to divide evenly. Use np.array_split when it may not, which gives parts of nearly equal size.
+
+<strong>Do the pieces from split share memory?</strong> Yes, they are views into the original. Copy them if you plan to modify one.
+
+<strong>How do I stack many arrays efficiently?</strong> Collect them in a list and make one concatenate call at the end. Repeatedly stacking two at a time copies the growing result each time.
+
 ## A closing note
 
 Joining arrays is one of the places where NumPy offers a few functions for what feels like one job. The abundance is more confusing than helpful at first.
@@ -4693,6 +4847,20 @@ each step in this module is free. That is worth stating once more because it cha
 There's no reason to avoid a transpose, a `moveaxis` or an `expand_dims` on speed grounds. They adjust a handful of ints showing the array and return at once, what its size.
 
 The cost, when it comes, arrives later. At the point a thing needs contiguous memory and quietly copies. That is where to look when a pipeline is slower than the steps in it suggest. `a.flags` plus `np.shares_memory` will tell you within a minute.
+
+## Questions people ask
+
+<strong>Does transpose copy the data?</strong> No. It returns a view with the strides swapped, so it is instant. Some later operations may then need to copy.
+
+<strong>What does a.T do for a 1D array?</strong> Nothing, because there is only one axis. Turn the vector into a column with a[:, None] if you need a 2D shape.
+
+<strong>How do I transpose a 3D array?</strong> Use a.transpose(order), listing the new axis order, for example a.transpose(2, 0, 1). a.T just reverses all the axes.
+
+<strong>What do swapaxes and moveaxis do?</strong> swapaxes exchanges two axes. moveaxis moves one axis to a new position and leaves the others in order, which is often clearer.
+
+<strong>Why is my transposed array slower to process?</strong> It is no longer C-contiguous, so memory access jumps around. np.ascontiguousarray makes a copy in the order you want.
+
+<strong>How do I turn images from HWC to CHW?</strong> Use np.moveaxis(img, -1, 0) or img.transpose(2, 0, 1). Both are views until you force a copy.
 
 ## Where axis work fits
 
@@ -5081,6 +5249,20 @@ An unstable sort is free to reorder equal elements arbitrarily. That means two r
 
 When a sort follows another sort, or when the output order of tied records is observable, pass `kind="stable"`. The cost is small and the option is a bug that copies intermittently.
 
+## Questions people ask
+
+<strong>What is the difference between sort and argsort?</strong> sort returns the sorted values, while argsort returns the indices that would sort the array. Use argsort to reorder a second array alongside the first.
+
+<strong>How do I sort in descending order?</strong> Sort ascending and reverse with a[::-1], or negate numeric values. There is no reverse flag on np.sort.
+
+<strong>Does np.sort sort in place?</strong> np.sort returns a copy. The method a.sort() sorts in place and returns None.
+
+<strong>How do I find where to insert a value in a sorted array?</strong> Use np.searchsorted. It does a binary search, so it is far faster than scanning for large arrays.
+
+<strong>How do I get the k largest values quickly?</strong> Use np.partition or argpartition. They place the k-th element correctly without sorting everything, which is faster for large arrays.
+
+<strong>Is the sort stable?</strong> Use kind='stable' to guarantee that equal elements keep their original order. The default quicksort does not promise that.
+
 ## Where sorting fits
 
 Sorting is rarely the goal in itself. It's the step that makes a thing else possible. A ranking, a top-n, a binary search, a group-by on the boundaries where a key changes, a merge of two datasets.
@@ -5460,6 +5642,20 @@ The recurring choice is between the functions that **reduce** and the one that *
 The functions in this module are simple on their own and powerful in mix. `unique` with `return_inverse` feeding `bincount` with `weights` is four lines that replace a loop, a dict and a fair amount of care about missing keys.
 
 The one gap worth carrying away is between reducing and preserving shape. Almost each mistake in this area is reaching for a set function. Which discards spots. When the question was really about filtering. This Needs them. When the answer is going to index a thing, `isin` is the function you want.
+
+## Questions people ask
+
+<strong>What does np.unique return?</strong> The sorted distinct values. Add return_counts=True for counts and return_inverse=True for the mapping back to the original.
+
+<strong>How do I count occurrences of each value?</strong> Use np.unique(a, return_counts=True). For small non-negative integers np.bincount is faster.
+
+<strong>How do I find common elements of two arrays?</strong> Use np.intersect1d. There are also union1d, setdiff1d and setxor1d for the other set operations.
+
+<strong>What is the quick way to test membership?</strong> np.isin(a, values) returns a boolean array the shape of a. It is the vectorised version of the in operator.
+
+<strong>Does np.unique keep the original order?</strong> No, it sorts. To keep the first-seen order, use return_index=True and sort those indices.
+
+<strong>Can I find unique rows?</strong> Yes, np.unique(a, axis=0) treats each row as one item.
 
 ## Where this fits
 
@@ -5852,6 +6048,20 @@ Noise is one of the few areas where the convenient API and the correct API diffe
 
 One gen, created by name, passed where it's needed. That single habit covers almost all.
 
+## Questions people ask
+
+<strong>How do I make random results reproducible?</strong> Create a generator with rng = np.random.default_rng(42) and draw from it. The same seed gives the same stream.
+
+<strong>What is wrong with np.random.seed?</strong> It sets hidden global state shared by everything in the process. The newer Generator API keeps state in an object you pass around.
+
+<strong>How do I shuffle or sample without replacement?</strong> Use rng.permutation(n) to shuffle, or rng.choice(a, size=k, replace=False) to sample. rng.shuffle works in place.
+
+<strong>How do I draw from a normal distribution?</strong> Call rng.normal(loc, scale, size). Note that scale is the standard deviation, not the variance.
+
+<strong>Is the output truly random?</strong> It is pseudorandom: deterministic given the seed but statistically well behaved. It is fine for simulation and not for cryptography.
+
+<strong>How do I get independent streams in parallel jobs?</strong> Use SeedSequence.spawn to create child seeds. Do not just add one to the seed for each worker.
+
 ## One last habit
 
 Record the seed with the output, not just in the code.
@@ -6221,6 +6431,20 @@ The diagnosis is to print both shapes and check which axis is supposed to be sha
 
 For a 1-D operand, note it's promoted to whichever orientation makes the product valid. A shape error involving one often means the wrong length rather than the wrong orientation.
 
+## Questions people ask
+
+<strong>What is the difference between * and @?</strong> The star multiplies element by element. The @ operator is matrix multiplication, which is the one you want for linear algebra.
+
+<strong>Should I use np.linalg.inv to solve Ax = b?</strong> No. Use np.linalg.solve(A, b), which is faster and more accurate than forming the inverse and multiplying.
+
+<strong>How do I check whether a matrix is singular?</strong> Look at np.linalg.matrix_rank or the condition number from np.linalg.cond. A determinant near zero is a weaker test because it depends on scale.
+
+<strong>What do eig and eigh differ in?</strong> eigh is for symmetric or Hermitian matrices. It is faster, returns real eigenvalues in ascending order, and is the right choice for covariance matrices.
+
+<strong>How do I fit a least-squares line?</strong> Use np.linalg.lstsq(A, y, rcond=None). It handles non-square and rank-deficient systems that solve cannot.
+
+<strong>What does np.dot do compared with @?</strong> For 1D and 2D arrays they agree. For higher dimensions they differ, and matmul (@) broadcasts over leading axes, which is usually what you want.
+
 ## Where SciPy takes over
 
 `np.linalg` covers the dense, general cases well. a few things sit just outside it.
@@ -6559,6 +6783,20 @@ Because each compare with NaN is False, NaN values fail each rule. Including the
 `a[a > 0]` excludes them. `a[a <= 0]` also excludes them. Two filters that look like an exhaustive split silently drop rows.
 
 Any place where a dataset is split into groups by a numeric rule is a place to ask what happens to the missing values. To add an clear `np.isnan` branch if they should be handled rather than lost.
+
+## Questions people ask
+
+<strong>Why does np.nan == np.nan return False?</strong> NaN is defined as unequal to everything, itself included. Test with np.isnan(x) instead of comparing.
+
+<strong>How do I ignore NaN in a mean?</strong> Use np.nanmean, or the other nan-prefixed reductions such as nansum, nanstd and nanmax.
+
+<strong>Can an integer array hold NaN?</strong> No. NaN is a float, so an integer array cannot represent it. Convert to float, or use a masked array.
+
+<strong>How do I replace NaN with a value?</strong> Use np.nan_to_num(a, nan=0.0), or a[np.isnan(a)] = value. Pick the fill with care, since zero changes the mean.
+
+<strong>What is the difference between nan and inf?</strong> NaN means the value is undefined, such as 0 divided by 0. Inf is an overflow or a divide by a nonzero zero, and it behaves consistently in comparisons.
+
+<strong>Are masked arrays better than NaN?</strong> They suit data where NaN is a valid value or the dtype is integer. For plain float data, NaN with the nan-functions is simpler and quicker.
 
 ## The summary
 
@@ -6965,6 +7203,20 @@ Keep the ceiling in view: an step taking 5% of the runtime can't yield more than
 
 And weigh readability honestly. A vectorised one-liner that no one can safely modify has a maintenance cost that doesn't show up in a benchmark. The version a colleague can read is often the better engineering answer even when it's slower.
 
+## Questions people ask
+
+<strong>Why is a NumPy loop so much faster than a Python loop?</strong> The loop runs in compiled C over contiguous memory, with no per-element Python object overhead or type checks.
+
+<strong>How much memory does an array use?</strong> Read a.nbytes, which is the element count times the item size. The shape and dtype fields add only a small fixed overhead.
+
+<strong>How do I avoid temporary arrays?</strong> Use in-place operators like a += b, or the out= argument on ufuncs. Chained expressions each allocate an intermediate array.
+
+<strong>Does memory layout matter?</strong> Yes. Walking along the contiguous axis is faster because of CPU caching. In a C-ordered array that means iterating over the last axis.
+
+<strong>When should I use float32?</strong> When memory or bandwidth is the limit and you can accept about seven digits of precision. It halves the footprint and often speeds up big operations.
+
+<strong>How do I time code properly?</strong> Use timeit or %timeit, which repeats the run and takes the best result. A single time.time() measurement is noisy.
+
 ## The lock behind two of these timings
 
 Some of the numbers above only make sense in the presence of the interpreter lock. It deserves a sentence rather than a hand-wave. CPython holds one lock around bytecode run. Two Python-level threads never execute Python also. But a NumPy call that spends its time in C can *release* that lock while it works. This Is why a large `dot` or a big elementwise step shares across threads and a Python loop over the same array doesn't.
@@ -7346,6 +7598,20 @@ Text when a thing else must read it, accepting that the dtype is gone.
 HDF5, Zarr or Parquet past a few hundred megabytes, or when other tools are involved.
 
 `allow_pickle=False` &mdash; the default &mdash; on anything you didn't give yourself. That one isn't a speed preference. It's the gap between reading a file and running one.
+
+## Questions people ask
+
+<strong>What is the difference between save and savetxt?</strong> save writes a binary .npy file that keeps dtype and shape exactly. savetxt writes readable text, which is bigger, slower and loses precision unless you set the format.
+
+<strong>How do I store several arrays in one file?</strong> Use np.savez, or savez_compressed for smaller files. Loading returns a dict-like object keyed by the names you gave.
+
+<strong>Is it safe to load any .npy file?</strong> Arrays of plain numbers are safe. Object arrays use pickle, so np.load refuses them by default; only set allow_pickle=True for files you trust.
+
+<strong>How do I load a CSV with a header?</strong> Use np.genfromtxt or np.loadtxt with skiprows=1 and delimiter=','. For messy or mixed-type data, pandas is the better tool.
+
+<strong>Can I read a file bigger than memory?</strong> Yes, pass mmap_mode='r' to np.load. The array is mapped from disk and only the pages you touch are read.
+
+<strong>Does loading keep the dtype?</strong> With .npy and .npz, yes, exactly. With text formats you get float64 unless you pass dtype.
 
 ## A closing note
 

@@ -365,6 +365,20 @@ Keep the ceiling in view: an step taking 5% of the runtime can't yield more than
 
 And weigh readability honestly. A vectorised one-liner that no one can safely modify has a maintenance cost that doesn't show up in a benchmark. The version a colleague can read is often the better engineering answer even when it's slower.
 
+## Questions people ask
+
+<strong>Why is a NumPy loop so much faster than a Python loop?</strong> The loop runs in compiled C over contiguous memory, with no per-element Python object overhead or type checks.
+
+<strong>How much memory does an array use?</strong> Read a.nbytes, which is the element count times the item size. The shape and dtype fields add only a small fixed overhead.
+
+<strong>How do I avoid temporary arrays?</strong> Use in-place operators like a += b, or the out= argument on ufuncs. Chained expressions each allocate an intermediate array.
+
+<strong>Does memory layout matter?</strong> Yes. Walking along the contiguous axis is faster because of CPU caching. In a C-ordered array that means iterating over the last axis.
+
+<strong>When should I use float32?</strong> When memory or bandwidth is the limit and you can accept about seven digits of precision. It halves the footprint and often speeds up big operations.
+
+<strong>How do I time code properly?</strong> Use timeit or %timeit, which repeats the run and takes the best result. A single time.time() measurement is noisy.
+
 ## The lock behind two of these timings
 
 Some of the numbers above only make sense in the presence of the interpreter lock. It deserves a sentence rather than a hand-wave. CPython holds one lock around bytecode run. Two Python-level threads never execute Python also. But a NumPy call that spends its time in C can *release* that lock while it works. This Is why a large `dot` or a big elementwise step shares across threads and a Python loop over the same array doesn't.

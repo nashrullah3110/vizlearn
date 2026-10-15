@@ -1698,7 +1698,7 @@ _q(
     slug="modifying-a-collection-while-iterating",
     kind="concept",
     level="Easy",
-    title="What happens if you modify a collection while looping over it?",
+    title="Modifying a Collection While Iterating Over It",
     asked="Why can't you delete from a dict or a list while iterating it, and "
           "what should you do instead?",
     desc="Dicts raise RuntimeError on a size change during iteration; lists "

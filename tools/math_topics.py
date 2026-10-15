@@ -236,6 +236,20 @@ people assume.
 **Losing to norm.** perp gives you the easy inverse only when
 the vectors also have length 1.
 
+## Questions people ask
+
+<strong>What is the span of a set of vectors?</strong> It is every vector you can reach by scaling the set and adding the results. Two independent vectors in 3D span a plane, not the whole space.
+
+<strong>How do I tell whether vectors are linearly independent?</strong> Put them in a matrix as columns and check its rank, or its determinant when the matrix is square. Full rank means independent.
+
+<strong>What makes a set of vectors a basis?</strong> They must be linearly independent and span the space. That gives each vector in the space exactly one set of coordinates.
+
+<strong>Are orthogonal vectors always independent?</strong> Yes, provided none of them is the zero vector. Nonzero orthogonal vectors can never be written in terms of one another.
+
+<strong>Why prefer an orthonormal basis?</strong> Coordinates become plain dot products, with no system to solve, and lengths and angles are preserved. That is why PCA, QR and SVD all aim for one.
+
+<strong>Does a vector space have one basis or many?</strong> Many, but they all contain the same number of vectors. That count is the dimension of the space.
+
 ## Same vector, three different bases
 
 coords only mean a thing scaled to a basis. Here one fixed vector is written in three of them. An unit-perp basis makes the math trivial.
@@ -482,6 +496,20 @@ square-rooted. Not the same object, and not equal except in special cases.
 **finding the full SVD when you want the top few.** For a large sparse mat
 a truncated solver is orders of magnitude cheaper.
 
+## Questions people ask
+
+<strong>What does the SVD actually give me?</strong> It factors any matrix as U times S times V transpose: a rotation, a stretch along the axes, and another rotation. The singular values in S say how much stretch each direction gets.
+
+<strong>How is SVD different from eigendecomposition?</strong> SVD works on any matrix, including non-square ones, and uses orthogonal factors. Eigendecomposition needs a square matrix and may not have orthogonal eigenvectors.
+
+<strong>How do I get the best low-rank approximation?</strong> Keep the k largest singular values and zero the rest. The Eckart-Young theorem says no other rank-k matrix is closer in the Frobenius or spectral norm.
+
+<strong>How does SVD relate to PCA?</strong> PCA on centred data is the SVD of that data matrix. The right singular vectors are the principal directions and squared singular values give the variances.
+
+<strong>What does a tiny singular value tell me?</strong> The matrix is nearly rank-deficient in that direction. A large ratio of biggest to smallest signals an ill-conditioned problem.
+
+<strong>Is SVD expensive?</strong> Full SVD costs about the cube of the smaller dimension. For large matrices use truncated or randomised SVD to get only the top k components.
+
 ## Rebuild a matrix from its biggest pieces
 
 SVD splits any mat into a stack of rank-one layers sorted by importance. Keeping only the first few is what compression and PCA really do.
@@ -712,6 +740,20 @@ this reason.
 **Expecting second-order methods to be a drop-in win.** They shine on small,
 well-conditioned problems and on batch goals, not on stochastic
 mini-batch training where the curvature estimate is noise.
+
+## Questions people ask
+
+<strong>What is the Jacobian?</strong> It is the matrix of all first partial derivatives of a vector-valued function. Row i holds the gradient of output i, so it is the best linear approximation near a point.
+
+<strong>What is the Hessian?</strong> It is the matrix of second partial derivatives of a scalar function. It describes the curvature in every direction.
+
+<strong>What does the Hessian tell me at a critical point?</strong> If it is positive definite you have a local minimum, negative definite a local maximum, and mixed signs a saddle point.
+
+<strong>Why is the Hessian rarely used in deep learning?</strong> It has one entry per pair of parameters. A network with a million parameters would need a trillion-entry matrix, so first-order methods and approximations win.
+
+<strong>How is the Jacobian used in backpropagation?</strong> Each layer's backward pass multiplies the incoming gradient by that layer's Jacobian. Frameworks do it without ever forming the full matrix.
+
+<strong>Is the Hessian the Jacobian of something?</strong> Yes, it is the Jacobian of the gradient. That is why it is symmetric when the second derivatives are continuous.
 
 ## First derivatives in a grid, second derivatives in another
 
@@ -952,6 +994,20 @@ starts, or a schedule with restarts, is the min diligence.
 
 **Expecting convex theory to transfer.** Settling rates for convex problems
 say nothing about a deep network.
+
+## Questions people ask
+
+<strong>What is a convex function?</strong> One where the line segment between any two points on its graph lies on or above the graph. A bowl is convex and a double hump is not.
+
+<strong>Why does convexity matter?</strong> Every local minimum of a convex function is a global minimum. Gradient descent with a sensible step size cannot get stuck.
+
+<strong>How do I check convexity?</strong> For a twice-differentiable function, check that the Hessian is positive semi-definite everywhere. In one dimension, check that the second derivative is not negative.
+
+<strong>Is a neural network loss convex?</strong> No, it has many saddle points and local minima. Training works anyway because the minima found in practice tend to be nearly as good as each other.
+
+<strong>What is the effect of the learning rate?</strong> Too small and progress crawls, too large and the iterates overshoot or diverge. On a quadratic, anything above twice the inverse of the largest curvature diverges.
+
+<strong>Are convex problems always easy?</strong> They are reliably solvable, but size still matters. Convex problems with huge data need stochastic or specialised methods.
 
 ## One function gradient descent cannot fail on, and one it can
 
@@ -1751,6 +1807,20 @@ there. The guess isn't.
 **Losing the fixed window.** A Poisson rate is per unit of a thing. Double
 the window and lambda doubles.
 
+## Questions people ask
+
+<strong>What is a Bernoulli trial?</strong> A single experiment with two outcomes, success with probability p and failure otherwise. Its mean is p and its variance is p times (1 - p).
+
+<strong>When is a count binomial?</strong> When you run a fixed number n of independent trials with the same success probability p. The count of successes has mean np and variance np(1 - p).
+
+<strong>When is a count Poisson?</strong> When events arrive independently at a steady average rate and you count them in a window. The mean and the variance are both equal to the rate.
+
+<strong>When does the binomial turn into a Poisson?</strong> When n is large and p is small, with np held fixed. Rare events across many chances are close to Poisson.
+
+<strong>How do I tell if my data is Poisson?</strong> Check that the variance is near the mean. Variance well above the mean is overdispersion, and a negative binomial usually fits better.
+
+<strong>What if the trials are not independent?</strong> Then the binomial variance is wrong. Clustered outcomes, such as patients in one hospital, spread more than the formula predicts.
+
 ## The three, side by side
 
 One trial, n trials, and counts with no fixed n. The last block shows a binomial with large n and small p turning into a Poisson.
@@ -1977,6 +2047,20 @@ limiting spreads.
 series data often isn't free, and the effective sample size is
 smaller than the row count suggests.
 
+## Questions people ask
+
+<strong>What does the central limit theorem say?</strong> The mean of many independent samples is approximately normal, whatever the shape of the original distribution, provided the variance is finite.
+
+<strong>How large must the sample be?</strong> About 30 is a common rule, but it depends on skew. Symmetric data needs far fewer, heavily skewed data may need hundreds.
+
+<strong>Does the data itself become normal?</strong> No. Only the distribution of the sample mean does. The raw values keep their original shape.
+
+<strong>How does the spread of the mean shrink?</strong> The standard error is the standard deviation divided by the square root of n. To halve the error you need four times as many samples.
+
+<strong>When does the theorem fail?</strong> With heavy tails such as the Cauchy distribution, where the variance is infinite, and with strongly dependent samples.
+
+<strong>Why does it matter in practice?</strong> It justifies normal-based confidence intervals and tests for averages, even when you do not know the data distribution.
+
 ## Watch it happen
 
 A on purpose lopsided group, and the means of samples drawn from it. The spread of those means shrinks like one over the square root of the sample size.
@@ -2191,6 +2275,20 @@ flagged points, mechanically.
 
 **given your language's default matches another's.** State the method when it
 matters.
+
+## Questions people ask
+
+<strong>What is the difference between a quantile and a percentile?</strong> They are the same idea on different scales. The 0.9 quantile is the 90th percentile: the value below which 90 percent of the data lies.
+
+<strong>Is the median a quantile?</strong> Yes, it is the 0.5 quantile, the 50th percentile and the second quartile.
+
+<strong>Why do different tools give different percentiles?</strong> There are several conventions for interpolating between data points when the position falls between two values. The differences shrink as the sample grows.
+
+<strong>Why use the median instead of the mean?</strong> The median ignores how extreme the extremes are. A single huge outlier moves the mean a lot and the median hardly at all.
+
+<strong>What is the interquartile range?</strong> It is the 75th percentile minus the 25th. It measures spread in the middle half of the data and is the basis of the box plot whiskers.
+
+<strong>How should I report skewed data like latency?</strong> Give percentiles such as p50, p95 and p99. The mean hides the slow tail, which is what users actually feel.
 
 ## Nobody experiences the mean
 
@@ -2423,6 +2521,20 @@ question, and bias doesn't shrink with `n`.
 **Confusing the spread of the data with the spread of the statistic.** The
 data can be wildly scattered and the mean can still be pinned down tightly, as
 long as the sample is large enough. The two spreads answer different questions.
+
+## Questions people ask
+
+<strong>What is a sampling distribution?</strong> It is the distribution of a statistic, such as the sample mean, across many repeated samples from the same population.
+
+<strong>What is the standard error?</strong> The standard deviation of a statistic's sampling distribution. For the mean it is sigma divided by the square root of n.
+
+<strong>How is standard error different from standard deviation?</strong> Standard deviation describes the spread of the data. Standard error describes how much an estimate would move between samples, and it shrinks as n grows.
+
+<strong>Why does a bigger sample help only slowly?</strong> Because of the square root. Four times the data halves the error, and a hundred times the data cuts it by ten.
+
+<strong>Can I get a sampling distribution without theory?</strong> Yes, with the bootstrap. Resample your data with replacement many times and look at the spread of the statistic.
+
+<strong>Does this apply to statistics other than the mean?</strong> Yes, every statistic has one, including the median, a correlation or a model coefficient. Their shapes and formulas differ.
 
 ## The distribution of a statistic, not of the data
 
@@ -2669,6 +2781,20 @@ sample size, and the interval will be too narrow.
 **Reporting an interval for a biased estimator.** Coverage is about sampling
 variability. A systematically wrong reading makes a tight interval around
 the wrong answer.
+
+## Questions people ask
+
+<strong>What does a 95 percent confidence interval mean?</strong> If you repeated the study many times and built an interval each time, about 95 percent of those intervals would contain the true value. It is a statement about the procedure.
+
+<strong>Does it mean a 95 percent chance the parameter is inside?</strong> Not strictly. Once computed, the interval either contains the true value or does not. The probability describes the method over repeats.
+
+<strong>How can I make an interval narrower?</strong> Collect more data, reduce the noise in your measurements, or accept a lower confidence level. Width shrinks with the square root of n.
+
+<strong>What is the formula for a mean?</strong> The sample mean plus or minus a critical value times the standard error. The critical value is about 1.96 for 95 percent with a large sample.
+
+<strong>Do overlapping intervals mean no difference?</strong> Not necessarily. Two intervals can overlap and the difference between the means can still be significant. Build an interval for the difference directly.
+
+<strong>When should I use a t value rather than 1.96?</strong> When the sample is small and you estimate the standard deviation from it. The t distribution has heavier tails, so the interval is wider.
 
 ## What "95% confident" actually counts
 
@@ -2947,6 +3073,20 @@ others argue for abandoning the dichotomy fully.
 **Running many tests without correction.** Bonferroni is crude and better than
 nothing. False find rate control is often the better tool.
 
+## Questions people ask
+
+<strong>What is a p-value?</strong> The probability of seeing data at least as extreme as yours if the null hypothesis were true. It is not the probability that the null is true.
+
+<strong>What does it mean to fail to reject the null?</strong> That the data did not give enough evidence against it. It is not proof that the null is correct, since the test may simply lack power.
+
+<strong>Why is 0.05 the usual threshold?</strong> It is a convention that dates back to early statistical practice, not a law of nature. Choose the threshold to match the cost of a wrong decision.
+
+<strong>What is the difference between one-tailed and two-tailed tests?</strong> A one-tailed test looks for a difference in one stated direction. A two-tailed test looks for any difference and is the safer default.
+
+<strong>What is p-hacking?</strong> Running many tests or analyses and reporting the ones that cross the line. With 20 tests at 0.05 you expect one false positive by chance.
+
+<strong>Does a small p-value mean a large effect?</strong> No. With enough data a trivial effect gets a tiny p-value. Always report the effect size and an interval as well.
+
 ## Where p-values come from, and what breaks them
 
 A p-value found by modelling rather than looked up in a table, then the same test run two hundred times on data with no effect in it at all.
@@ -3196,6 +3336,20 @@ seen effect is a restatement of the p-value and carries no new info.
 **Peeking at results and stopping when major.** This inflates the true
 Type I rate far above the nominal one. Sequential testing methods exist and
 correct for it.
+
+## Questions people ask
+
+<strong>What is a Type I error?</strong> Rejecting a true null hypothesis, a false positive. Its probability is the significance level alpha.
+
+<strong>What is a Type II error?</strong> Failing to reject a false null hypothesis, a false negative. Its probability is called beta.
+
+<strong>What is statistical power?</strong> Power is 1 minus beta: the chance of detecting a real effect of a given size. Aim for 80 percent or more before running an experiment.
+
+<strong>How do I reduce both errors at once?</strong> Increase the sample size. With a fixed sample, lowering alpha raises beta, so you have to trade one against the other.
+
+<strong>Which error is worse?</strong> It depends on the cost. A false alarm in a drug trial and a missed disease in screening carry very different consequences, so pick alpha with that in mind.
+
+<strong>How do I compute the sample size I need?</strong> Fix alpha, the desired power and the smallest effect you care about, then use a power calculation. Libraries such as statsmodels provide it.
 
 ## Both errors, counted
 
@@ -3452,6 +3606,20 @@ or a library.
 **given Q is square.** For a tall thin `A`, the economy QR gives a `Q` with
 the same shape as `A`, not a full perp mat.
 
+## Questions people ask
+
+<strong>What does QR decomposition produce?</strong> It writes a matrix A as Q times R, where Q has orthonormal columns and R is upper triangular.
+
+<strong>How is QR computed?</strong> Textbooks show Gram-Schmidt, but libraries use Householder reflections, which are more stable numerically.
+
+<strong>Why use QR for least squares?</strong> Solving R x = Q transpose b avoids forming A transpose A, which squares the condition number. It gives more accurate answers.
+
+<strong>What goes wrong with classical Gram-Schmidt?</strong> Rounding errors accumulate and the columns of Q lose orthogonality when the input columns are nearly dependent. Modified Gram-Schmidt or Householder fixes that.
+
+<strong>What is the QR algorithm?</strong> An iterative method for eigenvalues that repeatedly factors and recombines as RQ. It is the basis of most eigenvalue solvers.
+
+<strong>Does QR work for non-square matrices?</strong> Yes. For a tall matrix, the reduced form gives Q the same shape as A and a square R.
+
 ## Orthogonalise a basis, then solve with it
 
 QR turns any set of columns into an unit-perp set plus the bookkeeping needed to get back. It's how least squares is solved .
@@ -3704,6 +3872,20 @@ much.
 **Using it on a mat that is only positive semi-definite.** A zero eigenval
 gives a zero on `L`'s main-line. Any of it that then cuts by it fails.
 
+## Questions people ask
+
+<strong>What is a Cholesky decomposition?</strong> It factors a symmetric positive definite matrix A as L times L transpose, where L is lower triangular. It is like a square root for matrices.
+
+<strong>What does positive definite mean?</strong> x transpose A x is positive for every nonzero x. Equivalent tests are all eigenvalues positive, or the Cholesky factorisation succeeding.
+
+<strong>Why use Cholesky to solve systems?</strong> It costs about half as much as LU and needs no pivoting. It is the standard approach for covariance and kernel matrices.
+
+<strong>How do I sample correlated random numbers?</strong> Compute L from the covariance matrix, draw independent standard normals z and use L times z. The result has the covariance you wanted.
+
+<strong>Why does Cholesky fail on my covariance matrix?</strong> Rounding or near-duplicate features make it only semi-definite. Add a small jitter to the diagonal, such as 1e-6, to restore definiteness.
+
+<strong>Can I use it on a matrix that is not symmetric?</strong> No, it assumes symmetry and reads only one triangle. Symmetrise first, or use LU.
+
 ## Half a matrix, and what it costs to have one
 
 Cholesky finds a tri L with L @ L.T equal to your mat -- but only if the mat is positive definite. Here is what that rule rules out.
@@ -3953,6 +4135,20 @@ written, and the sign rule differs between texts.
 **Skipping the constraint qualification.** The method assumes the constraint
 grads are well behaved at the answer. At a cusp or where constraints are
 collapse it can fail.
+
+## Questions people ask
+
+<strong>What problem do Lagrange multipliers solve?</strong> Optimising a function subject to an equality constraint. At the optimum, the gradient of the objective is parallel to the gradient of the constraint.
+
+<strong>What does the multiplier itself mean?</strong> It is the rate at which the optimal value changes if you relax the constraint slightly. Economists call it the shadow price.
+
+<strong>How do I set up the equations?</strong> Form L = f - lambda times g, then set all partial derivatives of L, including the one in lambda, to zero and solve.
+
+<strong>How do inequality constraints change things?</strong> They need the KKT conditions. The multiplier must be non-negative, and either the constraint is active or its multiplier is zero.
+
+<strong>Where are they used in machine learning?</strong> In the SVM derivation, in maximum entropy models, and in constrained optimisation such as regularisation viewed as a budget.
+
+<strong>Does the method find the global optimum?</strong> It finds candidate stationary points. You still have to compare them, or know the problem is convex, to be sure.
 
 ## Optimise with a rule you are not allowed to break
 
@@ -4465,6 +4661,20 @@ diagnostics exist.
 long-run fraction of time spent in each state, not a guess of where the
 chain is now.
 
+## Questions people ask
+
+<strong>What is the Markov property?</strong> The next state depends only on the current state, not on how you got there. History is summarised entirely by where you are now.
+
+<strong>What is a transition matrix?</strong> A matrix whose entry (i, j) is the probability of moving from state i to state j. Each row sums to one.
+
+<strong>What is a stationary distribution?</strong> A distribution pi with pi times P equal to pi. If you start in it, you stay in it as the chain runs.
+
+<strong>When does a chain converge to a steady state?</strong> When it is irreducible and aperiodic: every state can reach every other, and it does not cycle with a fixed period.
+
+<strong>How do I compute the n-step probabilities?</strong> Raise the transition matrix to the n-th power. Entry (i, j) of P to the n is the chance of being in j after n steps from i.
+
+<strong>Where are Markov chains used?</strong> In PageRank, MCMC sampling, language modelling, queues and reinforcement learning, where states form a Markov decision process.
+
 ## Walk the chain to its steady state
 
 A three-state weather chain, stepped forward until the spread stops moving, then checked against the eigenvector that predicts it.
@@ -4723,6 +4933,20 @@ for even `A`.
 **Trusting a hand deriv without a numeric check.** Compare against a
 finite difference on a small random input. each framework ships a grad
 checker for this, and it's worth using when writing a custom op.
+
+## Questions people ask
+
+<strong>What is the gradient of a scalar with respect to a vector?</strong> A vector of the same shape holding each partial derivative. It points in the direction of steepest increase.
+
+<strong>What is the shape rule?</strong> The derivative of a scalar loss with respect to a matrix has the same shape as that matrix. If your result has a different shape, something is transposed.
+
+<strong>What is the gradient of x transpose A x?</strong> (A + A transpose) times x, which reduces to 2 A x when A is symmetric.
+
+<strong>What is the gradient of the least-squares loss?</strong> For the loss squared norm of (X w - y), it is 2 X transpose (X w - y). Setting it to zero gives the normal equations.
+
+<strong>What is the gradient of a linear layer?</strong> For y = W x + b, the gradient with respect to W is the outer product of the upstream gradient and x. The gradient with respect to x is W transpose times the upstream gradient.
+
+<strong>How can I check my derivation?</strong> Compare with a finite-difference gradient on a small random example. Autodiff libraries also provide gradient check tools.
 
 ## The four gradients you keep meeting
 

@@ -393,6 +393,20 @@ That is the arg for learning the layers rather than the recipes. A tutorial teac
 
 FastAPI reads the annotations you were going to write anyway, uses Pydantic to enforce them, uses Starlette to move the bytes. Makes an OpenAPI doc from the same data. The layer it adds is thin and mostly consists of working out where each of your function's params should come from. Learn the two libraries underneath and the framework itself takes an afternoon.
 
+## Questions people ask
+
+<strong>Is FastAPI a web server?</strong> No. FastAPI is a framework that defines your routes and validation; a server such as Uvicorn runs it and handles the network connections.
+
+<strong>Is FastAPI built on Flask?</strong> No. It is built on Starlette for the web layer and Pydantic for data validation, and it does not depend on Flask.
+
+<strong>Do I have to use async def?</strong> No. Plain def endpoints work and run in a thread pool, so they do not block the event loop.
+
+<strong>Why does FastAPI need type hints?</strong> The hints are the contract. FastAPI reads them to decide where each value comes from, how to convert it, and what to show in the docs.
+
+<strong>Where do the interactive docs come from?</strong> FastAPI builds an OpenAPI schema from your routes and type hints, then serves Swagger UI at /docs and ReDoc at /redoc automatically.
+
+<strong>Is FastAPI only for small APIs?</strong> No. Routers, dependencies, and settings let it scale to large codebases, and many production services use it.
+
 ## A closing thought
 
 The most handy thing to carry out of this module isn't a fact about FastAPI but a habit of asking which layer you're in.
@@ -807,6 +821,20 @@ The endpoints in this module are four lines each. That is representative rather 
 
 If a handler is growing, that is often the signal. Not that the endpoint is complicated. That a thing in it belongs elsewhere.
 
+## Questions people ask
+
+<strong>What does the decorator actually do?</strong> It registers the function in the app's routing table under a path and HTTP method. The function itself is returned unchanged.
+
+<strong>Why does my endpoint return JSON when I return a dict?</strong> FastAPI serializes the return value with its JSON encoder and sets the content type to application/json.
+
+<strong>Why can't I reach a route I declared later in the file?</strong> Routes match in registration order and the first match wins. Put fixed paths before paths with parameters that would shadow them.
+
+<strong>How do I change the default status code?</strong> Pass status_code to the decorator, for example @app.post("/items", status_code=201).
+
+<strong>How do I run the app?</strong> Run uvicorn main:app --reload, where main is the file name and app is the FastAPI instance. The --reload flag is for development only.
+
+<strong>Where does the description in /docs come from?</strong> From the function's docstring, unless you pass description to the decorator. Markdown in the docstring is rendered.
+
 ## What to check before shipping one
 
 A short list, all of which this module has covered.
@@ -1201,6 +1229,20 @@ That skew is worth remembering when designing one. A few minutes deciding whethe
 **Lower case, hyphens if needed.** Paths are case-sensitive in the standard and inconsistently handled . Sticking to lower case drops a class of bug that only appears on somebody else's server.
 
 Neither is enforced and both are worth deciding once. The option is deciding per endpoint and getting it wrong one spot.
+
+## Questions people ask
+
+<strong>Are path parameters ever optional?</strong> No. A value in the path is always required, because the route would not match without it. Use a query parameter for optional input.
+
+<strong>What happens if the value can't convert to the declared type?</strong> FastAPI returns a 422 response naming the parameter and the reason, and your function never runs.
+
+<strong>How do I restrict a path parameter to a range?</strong> Use Path() with constraints such as ge=1 or le=100, for example item_id: int = Path(ge=1).
+
+<strong>How do I accept a closed set of values?</strong> Declare the parameter as an Enum subclass of str. Anything outside the set is rejected with a 422 and the docs show a dropdown.
+
+<strong>How do I capture a path that contains slashes?</strong> Use the path converter: /files/{file_path:path}. It tells Starlette to match the rest of the URL, slashes included.
+
+<strong>Why does /users/me get treated as a user id?</strong> The variable route was declared first and matched "me". Declare /users/me before /users/{user_id}.
 
 ## Where this fits
 
@@ -1606,6 +1648,20 @@ Choosing those defaults on purpose costs nothing and is worth more than any sing
 Query params are where an API is most flexible and so where it most easily turns incoherent.
 
 Each one is easy to add, hard to drop. Interacts with every other. The discipline that keeps a listing endpoint healthy isn't technical. Constraints and `Literal` handle the mechanics. But editorial. Deciding what this endpoint is *for*. Declining the params that belong to a other question.
+
+## Questions people ask
+
+<strong>How does FastAPI know a parameter is a query parameter?</strong> Any function parameter that is not in the path and is not a Pydantic model is treated as a query parameter.
+
+<strong>How do I make a query parameter required?</strong> Give it no default value. A parameter with a default, or with None as the default, is optional.
+
+<strong>How do I accept a list of values like ?tag=a&tag=b?</strong> Annotate with Query, for example tags: list[str] = Query(default=[]). Without Query, a list is read as a body.
+
+<strong>Which values count as true for a bool parameter?</strong> FastAPI accepts true, 1, on, yes and their false counterparts, ignoring case. Anything else returns a 422.
+
+<strong>How do I use a query name that isn't a valid Python identifier?</strong> Set an alias, for example item_query: str = Query(alias="item-query").
+
+<strong>Should I use a path or a query parameter?</strong> Use the path for identifying one resource and query parameters for filtering, sorting, and paging a collection.
 
 ## One more on naming
 
@@ -2030,6 +2086,20 @@ It **parses**, turning bytes into typed values. It **validates**, rejecting anyt
 
 Written by hand those drift apart: the parser accepts a thing the checker rejects. The docs shows a shape neither of them runs. One class keeps all three in match because they're all made from it.
 
+## Questions people ask
+
+<strong>How do I declare a request body?</strong> Add a parameter annotated with a Pydantic model. FastAPI reads the JSON body, validates it against the model, and passes the instance to your function.
+
+<strong>Can a GET request have a body?</strong> The spec allows it, but many clients and proxies drop it. Use query parameters for GET and keep bodies for POST, PUT, and PATCH.
+
+<strong>How do I accept more than one body parameter?</strong> Declare two model parameters. FastAPI then expects a JSON object with each parameter name as a key.
+
+<strong>What happens to extra keys the client sends?</strong> By default Pydantic ignores them. Set model_config = ConfigDict(extra="forbid") to reject them with a 422.
+
+<strong>Why use separate models for input and output?</strong> The input model describes what a client may send, while the output model controls what you return. They often differ, for example by a password or an id field.
+
+<strong>How do I read the raw body instead?</strong> Take a Request parameter and call await request.body() or await request.json(). You lose validation and documentation for that body.
+
 ## A closing thought
 
 Almost each question about request bodies turns out to be a Pydantic question wearing an HTTP hat. What will it coerce, what is needed, how do I express this rule, why did that fail.
@@ -2451,6 +2521,20 @@ An API's consumers can't read your handlers. all they know comes from the schema
 
 That is the real reason to declare the response. Not tidiness. Not the small check gain. That it makes the documented contract and the actual action the same object. Once they're the same object they can't drift, and a consumer reading your docs is reading the truth rather than an intention.
 
+## Questions people ask
+
+<strong>What does response_model do?</strong> It validates the returned data against a model and filters out any fields the model does not declare. It also drives the response schema in the docs.
+
+<strong>How do I stop a password field from leaking?</strong> Return through an output model that has no password field, set with response_model. Fields not in that model are dropped.
+
+<strong>Can I return a different type than the response model?</strong> Yes. You can return a dict or an ORM object, and FastAPI converts it to the model. With a return type annotation, FastAPI uses it the same way.
+
+<strong>How do I omit fields that were never set?</strong> Pass response_model_exclude_unset=True to the decorator. Fields left at their defaults are then left out of the JSON.
+
+<strong>What happens if my data doesn't match the model?</strong> FastAPI raises a server error, because it is your code that is wrong, not the client. This catches bugs before bad data reaches a client.
+
+<strong>Do I document error responses with it too?</strong> Yes. The responses argument maps status codes to models, which adds those shapes to the OpenAPI schema.
+
 ## The cost of not having one
 
 It's worth being concrete about what goes wrong. The failure is never direct.
@@ -2870,6 +2954,20 @@ Most hand-rolled check answers one. That gap is the arg for letting the framewor
 
 what envelope you settle on, keep those three. A friendlier message that drops the location has made things worse.
 
+## Questions people ask
+
+<strong>What does a 422 mean?</strong> The request was well formed but failed validation. Your handler did not run, and the body lists what was wrong.
+
+<strong>What is the loc field in the error?</strong> It is the path to the bad value: the first element is where it came from (body, query, path, header) and the rest is the field name.
+
+<strong>What is the difference between msg and type?</strong> msg is a human-readable sentence, while type is a stable machine code such as missing or int_parsing that clients can branch on.
+
+<strong>Does FastAPI report one error or all of them?</strong> All of them. It validates every parameter and returns the full list in one response.
+
+<strong>How do I change the shape of the error response?</strong> Register an exception handler for RequestValidationError and return your own JSON.
+
+<strong>Why 422 and not 400?</strong> 422 Unprocessable Entity says the syntax was fine but the content was semantically invalid. FastAPI uses it for every validation failure.
+
 ## A closing thought
 
 Errors are the part of an API that gets the least design focus and the most use by anyone struggling with it.
@@ -3250,6 +3348,20 @@ And design the URL space once: plural nouns, shallow nesting, filters in the que
 
 Headers and cookies come next - the parts of a request that show the exchange rather than the resource - followed by the two body formats a browser form really sends, the status codes that report what happened, the error handling that makes them. The structure that keeps all of it navigable once there's more than one resource.
 
+## Questions people ask
+
+<strong>Which method should I use to create a resource?</strong> POST, typically returning 201 with the new resource. Use PUT when the client chooses the id and replaces the whole thing.
+
+<strong>What is the difference between PUT and PATCH?</strong> PUT replaces the entire resource, while PATCH changes only the fields supplied in the request.
+
+<strong>What does idempotent mean?</strong> Repeating the request has the same effect as sending it once. GET, PUT, and DELETE are idempotent; POST is not.
+
+<strong>Why do I get a 405 instead of a 404?</strong> The path exists but not for that method. A 404 means no route matched the path at all.
+
+<strong>Can one function handle several methods?</strong> Yes, with app.api_route("/x", methods=["GET", "POST"]). Separate functions per method are usually clearer.
+
+<strong>How do I see every registered route?</strong> Loop over app.routes and print each route's path and methods, or open /docs.
+
 ## One more on safety
 
 The safe-method rule deserves restating because it's the only item here whose violation causes real damage rather than inconvenience.
@@ -3583,6 +3695,20 @@ The **path** finds a resource and is always needed. The **query string** shows a
 FastAPI reads all four from one function signature, deciding by where a name appears and what marks it. That uniformity is the framework's main part. It's why a handler taking a path param, two query filters, a body and an API key still reads as an plain Python function.
 
 The corollary is that putting a value in the wrong place is easy and makes a working endpoint that is awkward to use. An identifier in a header, a session token in the query string, a filter in the body of a GET - each works. Each will confuse whoever integrates with it.
+
+## Questions people ask
+
+<strong>How do I read a request header?</strong> Declare a parameter with Header(), for example user_agent: str | None = Header(default=None). FastAPI converts underscores to hyphens for the lookup.
+
+<strong>Why is my header name lowercase in Python?</strong> HTTP header names are case-insensitive, and FastAPI maps user_agent to User-Agent. You can disable the conversion with convert_underscores=False.
+
+<strong>How do I read a cookie?</strong> Declare a parameter with Cookie(), for example session_id: str | None = Cookie(default=None).
+
+<strong>How do I set a cookie or header on the response?</strong> Take a Response parameter and call response.set_cookie(...) or set response.headers["X-Name"]. FastAPI merges it into the final response.
+
+<strong>Where should authentication headers be read?</strong> In a dependency, so every protected endpoint reuses one check instead of repeating the header logic.
+
+<strong>Cookies or tokens in headers?</strong> Cookies suit browser apps and bring CSRF concerns. Bearer tokens in the Authorization header suit APIs called from scripts and mobile apps.
 
 ## Summary
 
@@ -3932,6 +4058,20 @@ Prefer JSON where you've the choice, use multipart when files are involved. For 
 ## Next
 
 Status codes: which number to return when, why the class matters more than the number. How returning 200 for all throws away data that clients, caches and monitoring all already know how to use.
+
+## Questions people ask
+
+<strong>Why do forms need python-multipart?</strong> FastAPI uses that package to parse form bodies. Without it installed, endpoints declaring Form or File fail at startup.
+
+<strong>Can I mix JSON and form fields in one request?</strong> No. A request has a single body content type, so declare form fields or a JSON model, not both.
+
+<strong>What is the difference between bytes and UploadFile?</strong> bytes reads the whole file into memory. UploadFile spools to disk past a size limit and offers async read and a filename, so it suits larger files.
+
+<strong>How do I accept several files?</strong> Annotate with list[UploadFile]. The client sends the same field name multiple times.
+
+<strong>Does FastAPI check file size or type?</strong> No. You must check the content type and size yourself, and do not trust the filename the client supplies.
+
+<strong>How do I read an UploadFile?</strong> Use await file.read() in an async endpoint, or file.file.read() in a sync one.
 
 ## A final note
 
@@ -4315,6 +4455,20 @@ Set the route default with `status_code=`, vary it through a `Response` param, a
 ## Next
 
 The mechanics behind most of the codes above: `HTTPException`, custom exception handlers. The setup that keeps HTTP concerns out of the code that does the actual work.
+
+## Questions people ask
+
+<strong>Which status code should a successful POST return?</strong> 201 Created when it makes a resource, ideally with a Location header. Use 200 when it only runs an action.
+
+<strong>When do I use 204?</strong> For success with nothing to return, such as a DELETE. The response must carry no body.
+
+<strong>What is the difference between 401 and 403?</strong> 401 means the caller is not authenticated, while 403 means they are authenticated but not allowed.
+
+<strong>What is the difference between 400, 409, and 422?</strong> 422 is a validation failure, 409 is a conflict with current state such as a duplicate, and 400 is a general bad request.
+
+<strong>How do I use constants instead of numbers?</strong> Import status from fastapi and write status.HTTP_201_CREATED.
+
+<strong>Should I return 404 or 403 for a resource the user can't see?</strong> Return 404 if revealing that it exists would leak information, and 403 when the user is allowed to know it exists.
 
 ## A final note
 
@@ -4755,6 +4909,20 @@ A handler for `Exception` turns anything unanticipated into a clean 500 - logged
 
 Structure comes next: splitting a growing use into routers. That the error handlers, the models and the endpoints each live one spot a newcomer can find them - and so that `main.py` stays short enough to read in one screen.
 
+## Questions people ask
+
+<strong>How do I return an error from an endpoint?</strong> Raise HTTPException(status_code=404, detail="Item not found"). FastAPI turns it into a JSON response with a detail key.
+
+<strong>Can I add headers to an error?</strong> Yes. Pass headers={"WWW-Authenticate": "Bearer"} to HTTPException.
+
+<strong>How do I handle a custom exception globally?</strong> Register a function with @app.exception_handler(MyError) that returns a JSONResponse.
+
+<strong>How do I catch unexpected exceptions?</strong> Add a handler for Exception, or middleware, that logs the error and returns a generic 500. Never send tracebacks to clients.
+
+<strong>Is HTTPException the same as a Python exception I can catch?</strong> It is a real exception, so raising it stops the function. Do not wrap it in a bare except that swallows it.
+
+<strong>Should domain code raise HTTPException?</strong> Better not. Raise domain errors from the business logic and map them to status codes at the edge in handlers.
+
 ## A final note
 
 The setup given here - domain exceptions raised low, mapped once at the edge - is worth adopting earlier than it feels needed.
@@ -5193,6 +5361,20 @@ That ends the request tier. You can route by path and method, read each source o
 
 What is still missing is the thing that makes all of it composable. A way to declare that an endpoint needs a DB session, an authenticated user or a checked set of filters. Have that need met, cached and documented on its own. That is `Depends`, and it's the next tier.
 
+## Questions people ask
+
+<strong>What is an APIRouter?</strong> A mini app that holds a group of routes. You define routes on it and attach it to the main app with include_router.
+
+<strong>How do I add a common prefix to all routes in a router?</strong> Pass prefix="/users" to APIRouter or to include_router.
+
+<strong>How do I group routes in the docs?</strong> Pass tags=["users"] to the router or to include_router.
+
+<strong>Can routers be nested?</strong> Yes. A router can include another router, and prefixes and dependencies stack.
+
+<strong>Does route order still matter across routers?</strong> Yes. Routes match in registration order, so fixed paths in an earlier router can still be shadowed by variable ones.
+
+<strong>How should I split files?</strong> By resource, such as users.py and orders.py, not by layer. Each file keeps its routes, models, and dependencies together.
+
 ## A final note
 
 None of the structure in this module is FastAPI-exact. Grouping by resource, keeping handlers thin, separating config and startup. Assembling in a boring file are practices that predate the framework and outlast it.
@@ -5610,6 +5792,20 @@ That gap is older and larger than this framework. FastAPI's part is making the d
 
 **Dependencies supply, they don't perform.** "This endpoint needs an X" is a dependency. "this endpoint does Y" is the handler's job.
 
+## Questions people ask
+
+<strong>What is a dependency in FastAPI?</strong> Any callable you pass to Depends(). FastAPI calls it for each request and passes the result to your function.
+
+<strong>Does a dependency see the request?</strong> Yes. It can declare the same parameters an endpoint can: query, headers, cookies, and body.
+
+<strong>Is a dependency called once per request or once per use?</strong> Once per request. If several dependencies share it, the result is cached for that request unless you pass use_cache=False.
+
+<strong>Can a dependency stop the request?</strong> Yes. If it raises HTTPException, the endpoint never runs and the client gets that error.
+
+<strong>What is Annotated used for here?</strong> Annotated[User, Depends(get_user)] lets you store the dependency in a reusable type alias, so signatures stay short.
+
+<strong>How does this help testing?</strong> You can replace any dependency with a fake using dependency_overrides, so tests need no real database or login.
+
 ## Next
 
 Dependencies that need to clean up after themselves - a session that must be closed whether the handler succeeded or raised - which is what `yield` is for. Where the transaction pattern comes from.
@@ -6023,6 +6219,20 @@ all here reduces to two.
 Of the five modules here, this is the one whose lack causes production incidents rather than inconvenience.
 
 A missing `Depends` is a repeated four lines. A missing `try/finally` is a link pool that empties under load on the error path. This Is the path that gets busy just when all else is going wrong.
+
+## Questions people ask
+
+<strong>What does yield do in a dependency?</strong> Code before yield runs before the endpoint, the yielded value is injected, and code after yield runs once the response is handled.
+
+<strong>Does the cleanup run if the endpoint raises?</strong> Yes, if you put it in a finally block. Without finally, an exception skips code after yield.
+
+<strong>What is the common use?</strong> Database sessions and other resources: open a session, yield it, and close it afterward.
+
+<strong>In what order do nested yield dependencies close?</strong> In reverse order of creation, so the dependency opened last closes first.
+
+<strong>Should I raise HTTPException in the teardown?</strong> Not after yield. The response may have already been sent, so errors there cannot change the status.
+
+<strong>Does a sync generator dependency block the loop?</strong> No. FastAPI runs sync generators in a thread pool, while async generators run on the event loop.
 
 ## Next
 
@@ -6453,6 +6663,20 @@ Keeping the tree shallow and naming each level for its promise is what keeps tha
 **Name each level for what it promises**, not for what it does. `admin` tells a reader what the handler receives. `check_role_after_token` shows the plumbing.
 
 **Stop at about three levels.** The tree stays handy while a signature still implies what the endpoint needs. Stops being handy the moment it doesn't.
+
+## Questions people ask
+
+<strong>What is a sub-dependency?</strong> A dependency that itself declares Depends() in its parameters. FastAPI resolves the whole tree before calling your endpoint.
+
+<strong>Is a shared dependency called twice in one tree?</strong> No. Results are cached per request, so a dependency used at two levels runs once.
+
+<strong>What happens when a deep dependency raises?</strong> The chain stops there and the client gets that error. The dependencies above it and the endpoint never run.
+
+<strong>How do I layer permissions?</strong> Build them as a chain, for example get_current_user, then get_active_user, then get_admin_user, each depending on the one before.
+
+<strong>Where do query parameters from sub-dependencies appear?</strong> They are gathered upward, so the endpoint's OpenAPI schema lists parameters from every level of the tree.
+
+<strong>How deep is too deep?</strong> When you cannot read the endpoint signature and know what runs. Two or three levels is common, beyond that consider flattening.
 
 ## Next
 
@@ -6951,6 +7175,20 @@ Function dependencies cover the overwhelming majority of real use. Sub-dependenc
 
 The class form fills one exact gap: a rule that is the same shape at a few settings. Recognising that gap - and not reaching for a class before you're in it - is the whole lesson.
 
+## Questions people ask
+
+<strong>Why would a class be a dependency?</strong> A class is callable, so Depends(MyClass) calls its constructor with parameters read from the request. You get an object with attributes.
+
+<strong>Do I need to write Depends(MyClass()) or Depends(MyClass)?</strong> Write Depends(MyClass) to have FastAPI construct it per request. Passing an instance only works if the instance defines __call__.
+
+<strong>How do I create a configurable dependency?</strong> Make a class with __init__ for configuration and __call__ for the per-request logic, then pass an instance such as Depends(RoleChecker("admin")).
+
+<strong>Should I use a function or a class?</strong> Use a function for simple logic, and a class when you want grouped parameters, shared defaults, or configuration.
+
+<strong>Are class instances shared between requests?</strong> A class used as Depends(MyClass) gets a new instance per request. An instance you create yourself at import time is shared, so keep it stateless.
+
+<strong>Can a class dependency be a Pydantic model?</strong> Yes, but a model is read as a body unless you mark it with Depends or Query. Use Depends to read its fields from the query string.
+
 ## Next
 
 Applying a dependency to a whole router or the entire use. That a section is protected without each endpoint repeating the declaration - and without a route added later quietly missing it.
@@ -7350,6 +7588,20 @@ The other modules make a dependency on hand to an endpoint that asks for it. Thi
 
 That gap matters most for security. Here The failure is silent. No one notices an unprotected route until somebody is looking for one.
 
+## Questions people ask
+
+<strong>Where can I declare dependencies besides each endpoint?</strong> On the decorator, on an APIRouter, in include_router, and on the FastAPI app itself.
+
+<strong>Do these dependencies pass a value to my function?</strong> No. They run for side effects like checks and raise on failure, but the return value is not injected.
+
+<strong>How do I protect a whole section of the API?</strong> Add dependencies=[Depends(require_user)] to the APIRouter. Every route on it then needs a signed-in user.
+
+<strong>What is the order they run in?</strong> App-level first, then router, then decorator, then the endpoint's own parameters.
+
+<strong>Dependencies or middleware?</strong> Use a dependency when you need route-aware logic, validation, or the docs to reflect it. Use middleware for every request regardless of route.
+
+<strong>How do I test a router with protected routes?</strong> Override the dependency in tests with dependency_overrides, so no real credentials are needed.
+
 ## Next
 
 Replacing a dependency for a test - the piece that makes all in this tier testable without a DB, a token service or a network.
@@ -7737,6 +7989,20 @@ Fake at the edges - the DB, the clock, the token - and let the real logic above 
 Last of the five, and the one that justifies the other four.
 
 Pushing needs into dependencies moves real things - DBs, tokens, clocks - to the edge of the use. That would make testing harder if the edge couldn't be replaced. replaces are what make it replaceable. So what makes the whole approach pay.
+
+## Questions people ask
+
+<strong>How do I replace a dependency in a test?</strong> Set app.dependency_overrides[original_function] = fake_function. FastAPI then calls the fake.
+
+<strong>What is the key of the overrides dict?</strong> The original function object itself, not its name. It must be the same object used in Depends().
+
+<strong>Does it work for sub-dependencies?</strong> Yes. The override applies anywhere in the tree where that dependency is used.
+
+<strong>How do I undo it?</strong> Call app.dependency_overrides.clear() or use a pytest fixture that yields then clears.
+
+<strong>Does the fake need the same parameters?</strong> No. The override gets its own signature, and FastAPI resolves that signature instead.
+
+<strong>Is it only for tests?</strong> It is mostly for tests, but it also helps with local development against a stub service.
 
 ## Next
 
@@ -8151,6 +8417,20 @@ That single finding splits a room problem from a bug. The two have fully other f
 
 And if a service is slow and you can't tell which ceiling you hit, hit an endpoint that does nothing. If it's fast, the pool is full. If it's slow, the loop is blocked.
 
+## Questions people ask
+
+<strong>When should I use async def?</strong> When the body awaits async libraries, such as an async database driver or httpx.AsyncClient.
+
+<strong>What happens to a plain def endpoint?</strong> FastAPI runs it in a thread pool so it does not block the event loop.
+
+<strong>What goes wrong if I call a blocking function inside async def?</strong> The whole event loop stalls, so every other request waits until that call returns.
+
+<strong>Is async faster than sync?</strong> Only under many concurrent I/O waits. For CPU-bound work neither helps, and a sync endpoint in a thread is just as fast for a single request.
+
+<strong>How do I call blocking code from an async endpoint?</strong> Wrap it with await run_in_threadpool(func) or asyncio.to_thread.
+
+<strong>Do dependencies follow the same rule?</strong> Yes. Each dependency is sync or async on its own, and FastAPI treats it that way independent of the endpoint.
+
 ## Where the loop itself is explained
 
 This page decides one thing: `async def` or `def`. What FastAPI does with each. The thing being decided *about*. A single-threaded loop that only makes progress when the coroutine on it suspends. Is worth seeing on its own, away from routing and dependencies.
@@ -8527,6 +8807,20 @@ A sync task added by a sync handler runs in the threadpool, occupying a worker t
 That second case is worth watching for. Nothing about it looks slow from outside. The endpoint's delay is fine. All else in the process degrades. The cause is code that runs after the thing you were measuring.
 
 The rule from the async module applies unchanged: if the task blocks, it shouldn't be running on the loop.
+
+## Questions people ask
+
+<strong>How do I run something after sending the response?</strong> Add a BackgroundTasks parameter and call tasks.add_task(func, arg).
+
+<strong>When does the task run?</strong> After the response has been sent to the client, in the same process.
+
+<strong>What if the task fails?</strong> The client has already received success, so the error is not reported to them. Log inside the task.
+
+<strong>Can background tasks be async?</strong> Yes. An async def task runs on the event loop and a plain def task runs in a thread pool.
+
+<strong>When should I use Celery or a queue instead?</strong> When the work is long, must survive a restart, needs retries, or should run on another machine.
+
+<strong>Can I add a task from a dependency?</strong> Yes. Dependencies can declare BackgroundTasks and add to the same shared instance.
 
 ## In one line
 
@@ -8982,6 +9276,20 @@ The gap isn't obvious from inside the function. Nothing about `async def lifespa
 
 Testing what has been built - the client that needs no server, the replaces that drop the DB. What a suite should really assert.
 
+## Questions people ask
+
+<strong>What is lifespan?</strong> An async context manager passed to FastAPI(lifespan=...). Code before yield runs at startup and code after yield runs at shutdown.
+
+<strong>Why is lifespan preferred over on_event?</strong> on_event is deprecated, and lifespan keeps setup and teardown in one place so they can share variables.
+
+<strong>Where do I store what I create at startup?</strong> On app.state, or in a dict yielded from lifespan, and read it back through the request.
+
+<strong>Does lifespan run in tests?</strong> Only when you use TestClient as a context manager (with TestClient(app) as client). Otherwise startup is skipped.
+
+<strong>What happens if startup raises?</strong> The app does not start, and the error appears in the server log.
+
+<strong>What belongs in lifespan?</strong> Opening connection pools, loading a model, and starting background workers, along with closing them on exit.
+
 ## In one line
 
 Startup and shutdown run once per worker, not once per use - so create costly long-lived things there, hand them over through a dependency, fail loudly if config is missing. Put anything that must happen just once one spot that runs just once.
@@ -9360,6 +9668,20 @@ What remains is writing the tests. The shape is small: success, check failure, d
 ## Next
 
 The doc all of this makes - and how much of an API's usability is decided by how carefully it was filled in.
+
+## Questions people ask
+
+<strong>How do I test an endpoint?</strong> Create TestClient(app) from fastapi.testclient and call client.get("/path"), then assert on status_code and json().
+
+<strong>Do I need a running server?</strong> No. TestClient calls the app directly in-process.
+
+<strong>How do I avoid hitting a real database?</strong> Override the database dependency with dependency_overrides to return a test session.
+
+<strong>How do I test async endpoints?</strong> TestClient handles them. For async test functions, use httpx.AsyncClient with ASGITransport and pytest-asyncio or anyio.
+
+<strong>How do I send auth in tests?</strong> Pass headers={"Authorization": "Bearer token"} or override the current-user dependency.
+
+<strong>What should I assert on?</strong> The status code, the response body shape, and side effects such as database rows, not the internals of the handler.
 
 ## In one line
 
@@ -9774,6 +10096,20 @@ The made doc is the closest thing an API has to a public interface meaning. It's
 That is unusual and worth appreciating. In most stacks the specification is a split artefact that somebody keeps. It drifts from the setup at once because nothing forces them together.
 
 Here it can't drift, because there's only one source. What varies is how much you put into that source - and the gap between a doc consumers can build against and one they've to guess at is a handful of descriptions, one example per model. A `Literal` where a `str` would have done.
+
+## Questions people ask
+
+<strong>Where is the OpenAPI schema?</strong> At /openapi.json by default. Swagger UI is at /docs and ReDoc is at /redoc.
+
+<strong>How do I turn the docs off?</strong> Pass docs_url=None, redoc_url=None, and openapi_url=None to FastAPI().
+
+<strong>How do I group endpoints?</strong> Add tags=["name"] to routes or routers, and describe tags with openapi_tags.
+
+<strong>How do I add examples?</strong> Use Field(examples=[...]) on model fields, or model_config json_schema_extra for a full example.
+
+<strong>Can I generate a client from the schema?</strong> Yes. Tools such as openapi-generator consume openapi.json and produce typed clients in many languages.
+
+<strong>How do I hide an endpoint from the docs?</strong> Pass include_in_schema=False to the decorator.
 
 ## In one line
 
@@ -10200,6 +10536,20 @@ Security is the area where the framework helps most with shape and least with su
 `Depends` makes authentication hopeless for an endpoint to forget, gives it one place to live. Puts it in the schema. That is truly valuable and it's structural - it says nothing about whether your token lifetime is sensible, your hashing is current, or your permission model matches what the business intended.
 
 Those are choices, and they need review by someone who does this for a living before anything real depends on them. What this module offers is the setup that makes such a review possible. Rules in one place, expressed once, visible in the signature of each endpoint that leans on them.
+
+## Questions people ask
+
+<strong>Does FastAPI handle authentication for me?</strong> It provides tools such as OAuth2PasswordBearer and the docs Authorize button, but you write the logic that checks passwords and tokens.
+
+<strong>How should I store passwords?</strong> Hash them with a slow algorithm such as bcrypt or argon2 and never store plain text.
+
+<strong>What is a JWT used for here?</strong> It is a signed token that carries the user id and an expiry, so the server can verify the caller without a database lookup on every request.
+
+<strong>Where do I enforce authentication?</strong> In a dependency such as get_current_user, so protected routes depend on it and public routes do not.
+
+<strong>What is CORS and do I need it?</strong> CORS controls which browser origins may call your API. Add CORSMiddleware if a web page on another origin calls it.
+
+<strong>Is HTTPS part of FastAPI?</strong> No. Terminate TLS at a proxy or load balancer in front of the app. Without it, tokens travel in clear text.
 
 ## In one line
 
@@ -10684,6 +11034,20 @@ Three subjects have no module here, on purpose.
 **WebSockets** need a real link. This No amount of cleverness conjures in a browser tab.
 
 They're real parts of the framework and worth learning from the official docs. The rest of this track runs. This Is the trade that was chosen.
+
+## Questions people ask
+
+<strong>Where should I put the FastAPI instance?</strong> In main.py (or app/main.py), which creates the app, includes routers, and stays short.
+
+<strong>How do I split a growing project?</strong> Group by resource into folders such as users/ and orders/, each with routes, schemas, and dependencies.
+
+<strong>Where do Pydantic models go?</strong> Beside the routes that use them, in a schemas.py per resource, kept separate from database models.
+
+<strong>Where does configuration go?</strong> In a settings class, typically pydantic-settings BaseSettings, that reads environment variables once.
+
+<strong>How do I avoid circular imports?</strong> Keep dependencies and models in modules that do not import the routers, and import routers only in main.py.
+
+<strong>Where do tests live?</strong> In a top-level tests/ folder that mirrors the app layout, with shared fixtures in conftest.py.
 
 ## In one line
 

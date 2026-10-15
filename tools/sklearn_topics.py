@@ -351,6 +351,20 @@ It also doesn't do statistical inference. A linear model gives you coeffs and no
 3. <strong>Swap the model.</strong> In the fifth editor, add `from sklearn.svm import SVR` and put `SVR()` in the list. Nothing else changes.
 4. <strong>Break the shape.</strong> In the last editor, read the error properly. It names the shape it got and the shape it wanted.
 
+## Questions people ask
+
+<strong>Do I need to know deep learning to use scikit-learn?</strong> No. Scikit-learn covers classical machine learning such as linear models, trees, clustering and preprocessing. Neural networks at scale are handled by libraries like PyTorch.
+
+<strong>What is the difference between fit and fit_transform?</strong> `fit_transform` fits a transformer and returns the transformed data in one call. Use it on training data only; call plain `transform` on anything else.
+
+<strong>Why does X have to be two-dimensional?</strong> Because every estimator expects rows as samples and columns as features. A single feature still needs `reshape(-1, 1)`.
+
+<strong>Does scikit-learn run on a GPU?</strong> Not by default. It runs on the CPU with NumPy and SciPy, and some estimators accept an `n_jobs` argument to use several cores.
+
+<strong>Can I use pandas DataFrames with it?</strong> Yes. DataFrames are accepted as input and column names are kept as `feature_names_in_` after fitting.
+
+<strong>Where should a beginner start?</strong> Load a small dataset, split it, fit a `LogisticRegression` or `LinearRegression`, and call `score` on the held-out part. That loop is the whole library in miniature.
+
 ## Where this leaves you
 
 Three method names, one shape rule and one naming rule cover the surface of the entire library. All from here is a choice of estimator and, far more importantly, whether the number it reports can be believed. """,
@@ -601,6 +615,20 @@ The habit worth adopting: use DataFrames at the boundary where data enters. Stop
 2. <strong>Change the made data.</strong> In the third editor, set `n_informative=1` and see that four of the five features are noise by build. handy when testing whether a model can skip them.
 3. <strong>Trigger the shape error on purpose.</strong> Pass `data.data[0]` as `X` and read what it suggests. One sample needs `reshape(1, -1)`, not `reshape(-1, 1)`.
 4. <strong>Compare the two forms.</strong> Fit any of it on `as_frame=True` data, then check `model.feature_names_in_`. With plain arrays that field doesn't exist.
+
+## Questions people ask
+
+<strong>What does return_X_y=True do?</strong> It makes loaders such as `load_iris` return a plain `(X, y)` tuple instead of a Bunch object, which is shorter when you only need the arrays.
+
+<strong>How do I get my own CSV into X and y?</strong> Read it with pandas, pick the target column as `y`, and keep the remaining columns as `X`. Check the shapes before fitting.
+
+<strong>Why does scikit-learn complain about a 1-D array?</strong> Features must be 2-D with one row per sample. A single column needs `reshape(-1, 1)`, and a single sample needs `reshape(1, -1)`.
+
+<strong>Is a sparse matrix a problem?</strong> Usually not. Many estimators accept sparse input directly, and it saves memory when most entries are zero, as in text counts.
+
+<strong>Should I keep feature names?</strong> Yes. A DataFrame input lets the fitted model remember column names, which makes coefficients and importances readable later.
+
+<strong>Can the data contain strings or NaN?</strong> Not for most estimators. Strings must be encoded and missing values imputed first, or the call raises an error.
 
 ## Where this leaves you
 
@@ -888,6 +916,20 @@ The question to ask before splitting is simply. Could two rows on opposite sides
 2. <strong>Drop random_state.</strong> Run the same editor three times and watch the test score move. Then put it back.
 3. <strong>Make a class rare.</strong> Keep only ten samples of class 2, split without `stratify`. Count the classes in the test set a few times with different seeds.
 4. <strong>Break the order.</strong> In the last editor, compare the shuffled and unshuffled test rows. The shuffled set holds rows from the beginning of the series.
+
+## Questions people ask
+
+<strong>What test size should I use?</strong> A common choice is 20 to 30 percent. Smaller datasets need a larger share held out to get a stable estimate, while huge ones can spare far less.
+
+<strong>What does random_state do in train_test_split?</strong> It fixes the shuffle so the same rows land in the same halves on every run. Without it, scores change between runs.
+
+<strong>When should I use stratify?</strong> When classes are imbalanced or the dataset is small. `stratify=y` keeps the class proportions the same in both halves.
+
+<strong>Can I use train_test_split for time series?</strong> Not with shuffling. Time-ordered data needs the past to train and the future to test, for example with `shuffle=False` or `TimeSeriesSplit`.
+
+<strong>Should I scale before or after splitting?</strong> After. Split first, fit the scaler on the training part only, then transform both parts.
+
+<strong>Is one split enough to judge a model?</strong> It gives one estimate that depends on which rows landed where. Cross-validation averages over several splits and is steadier.
 
 ## Where this leaves you
 
@@ -1177,6 +1219,20 @@ The hands-on version: look at the residuals for a pattern. A pattern means a mis
 2. <strong>Read the units.</strong> The fifth editor makes the coeff trap concrete. Fit both, then look at the R&sup2; column and note it doesn't move.
 3. <strong>Fit the curve.</strong> In the last editor, try degree three by adding `x ** 3` as a third column and check whether R&sup2; raises on data that is truly quadratic.
 4. <strong>Break it on purpose.</strong> Give the model two the same columns and look at the two coeffs. The sum is stable. The split between them isn't.
+
+## Questions people ask
+
+<strong>Does linear regression need scaled features?</strong> Plain least squares does not, since the predictions are unchanged. Scaling matters for Ridge and Lasso, and for comparing coefficients across features.
+
+<strong>Can R-squared be negative?</strong> Yes, on held-out data. It means the model predicts worse than always guessing the mean of the target.
+
+<strong>Can a linear model fit a curve?</strong> Yes, if you add features such as squares with `PolynomialFeatures`. The model is still linear in its coefficients.
+
+<strong>What is the difference between Ridge and Lasso?</strong> Both shrink coefficients to reduce overfitting. Lasso can push some exactly to zero, which drops features, while Ridge only makes them small.
+
+<strong>Do outliers affect it?</strong> Strongly. Squared error gives a far point a large pull on the line, so check for outliers or try `HuberRegressor`.
+
+<strong>Can I read coefficients as importance?</strong> Only when features share a scale and are not strongly correlated. Otherwise the same effect can be split across features in misleading ways.
 
 ## Where this leaves you
 
@@ -1468,6 +1524,20 @@ Neither of these appears in a metric, and both change what you do next.
 2. <strong>Add an outlier.</strong> In the first editor, change one guess to 400 and watch which metrics move most.
 3. <strong>Beat the baseline by less.</strong> In the fifth editor, raise `noise` to 200 and see how much of the model's edge lives.
 4. <strong>Get the spelling wrong.</strong> Ask for `scoring="mae"` and read the error - it lists each valid name.
+
+## Questions people ask
+
+<strong>Which metric should I report: MAE, RMSE or R-squared?</strong> Report MAE for an average error in the target's own units and RMSE if large misses matter more. R-squared helps compare against a mean baseline.
+
+<strong>Why is RMSE larger than MAE?</strong> RMSE squares errors before averaging, so big mistakes count more. The gap between the two hints at how heavy the tail of errors is.
+
+<strong>Why do scores show up negative in cross_val_score?</strong> Scorers follow a greater-is-better rule, so errors are returned with a `neg_` prefix. Flip the sign to read the error.
+
+<strong>When does MAPE fail?</strong> When true values are zero or close to it, because it divides by them. It also penalises over- and under-prediction unequally.
+
+<strong>What counts as a good R-squared?</strong> It depends on the field. Compare against a dummy model on the same data rather than against a fixed number.
+
+<strong>Should I look at more than one number?</strong> Yes. A residual plot or an error histogram shows patterns, such as errors growing with the target, that a single metric hides.
 
 ## Where this leaves you
 
@@ -1786,6 +1856,20 @@ The sequence worth following is: logistic regression first for the number to bea
 3. <strong>Turn smoothing up.</strong> Fit with `C=0.001` and compare the coeffs to the default. They shrink towards zero together.
 4. <strong>Bend the boundary.</strong> In the last editor, wrap the logistic model in a pipeline with `PolynomialFeatures(degree=3)` and see how much of the gap closes.
 
+## Questions people ask
+
+<strong>Why is it called regression if it classifies?</strong> It fits a linear model to the log-odds of a class, then passes that through a sigmoid to get a probability. The class label comes from thresholding it.
+
+<strong>Do I need to scale features for logistic regression?</strong> Yes in practice. The default solver converges poorly on unscaled data, and regularisation treats features unevenly.
+
+<strong>What does C control?</strong> C is the inverse of regularisation strength. A smaller C pulls coefficients towards zero more firmly, and a larger C lets the model fit the training data closely.
+
+<strong>Can it handle more than two classes?</strong> Yes. It supports multi-class problems directly with the default solvers, producing one probability per class.
+
+<strong>Can it learn a non-linear boundary?</strong> Not by itself. Add polynomial or interaction features, or switch to a tree-based model.
+
+<strong>Are predict_proba outputs reliable?</strong> Often fairly well calibrated, but not guaranteed. Check a calibration curve before treating them as true probabilities.
+
 ## Where this leaves you
 
 A fast linear classifier that returns chances, needs its features scaled, is smoothed by default with an inverted param. Draws a straight boundary. Fit it first on each classification problem. Treat its score as the number any of it more complicated has to justify itself against.
@@ -2103,6 +2187,20 @@ The two failure modes need opposite treatments. This Is why guessing between the
 3. <strong>Run the leakage demo.</strong> The data is random. Sit with that the wrong version reports 0.825.
 4. <strong>Watch overfitting appear.</strong> In the fourth editor, swap the pipeline for `DecisionTreeClassifier()` and compare the train and test columns.
 
+## Questions people ask
+
+<strong>How many folds should I use?</strong> Five or ten is the usual choice. More folds cost more time and reduce bias slightly, while fewer are quicker but noisier.
+
+<strong>What does a large spread between fold scores mean?</strong> The estimate is unstable. The data may be small or uneven, so report the mean together with the standard deviation.
+
+<strong>Does cross_val_score train a final model?</strong> No. It fits throwaway copies on each fold and returns scores. You still call `fit` on the full training set afterwards.
+
+<strong>Should preprocessing be inside the folds?</strong> Yes. Put scalers and imputers in a pipeline so they are fitted on each training fold only, which prevents leakage.
+
+<strong>When is plain KFold wrong?</strong> With grouped rows, time series or imbalanced classes. Use `GroupKFold`, `TimeSeriesSplit` or `StratifiedKFold` instead.
+
+<strong>Do I still need a test set?</strong> Yes. Cross-validation guides choices during development, and a final untouched test set gives the report number.
+
 ## Where this leaves you
 
 `cross_val_score` for a quick guess with its spread, `cross_validate` when you want a few metrics or the training scores, a `Pipeline` around all that learns. A splitter object when the data has time or groups in it. The mean is the headline. The spread is what tells you whether to believe it.
@@ -2413,6 +2511,20 @@ The habit worth forming is to state, alongside each metric, what it means in uni
 3. <strong>Read the support column.</strong> In the fourth editor, note how few positives the metrics for class 1 are found from.
 4. <strong>Break the macro mean.</strong> In the fifth editor, make the model get the rare class right once and watch macro move far more than weighted.
 
+## Questions people ask
+
+<strong>Why is accuracy misleading?</strong> On imbalanced data a model that always predicts the majority class scores high while finding nothing. Precision and recall expose that.
+
+<strong>What is the difference between precision and recall?</strong> Precision asks how many predicted positives were right. Recall asks how many actual positives were found.
+
+<strong>What does F1 measure?</strong> It is the harmonic mean of precision and recall. It stays low unless both are reasonably high.
+
+<strong>Macro, micro or weighted averaging?</strong> Macro treats every class equally, micro pools all samples, and weighted scales each class by its size. Macro is the one that notices a poor rare class.
+
+<strong>When should I use ROC AUC versus average precision?</strong> ROC AUC suits balanced problems. Average precision is more informative when positives are rare.
+
+<strong>What does classification_report show?</strong> Precision, recall, F1 and support for every class in one table, which is a good first look.
+
 ## Where this leaves you
 
 Fit for weighed problems only. Precision when false alarms cost, recall when misses cost, F1 or weighed fit when you need one number. `classification_report` printed each time so an skipped class can't hide behind an mean.
@@ -2721,6 +2833,20 @@ Where it goes wrong is treating the guessed costs as precise. They aren't. A thr
 2. <strong>Find the worst pair.</strong> In the third editor, locate the largest off-main-line cell and note that it isn't mirrored.
 3. <strong>Switch the norming.</strong> In the fourth editor, compare `norm="true"` with `norm="pred"` and work out which main-line is recall and which is precision.
 4. <strong>Read the mistakes.</strong> In the last editor, raise the slice to see all thirteen and look for what they've in common.
+
+## Questions people ask
+
+<strong>How do I read a confusion matrix?</strong> Rows are the true classes and columns the predicted ones in scikit-learn. The diagonal holds correct predictions and everything else is a mistake.
+
+<strong>Which cell is a false positive?</strong> For a binary problem, the cell where the true class is 0 and the prediction is 1, which is the top-right entry.
+
+<strong>What does normalize do?</strong> It converts counts to rates. `normalize='true'` divides each row by its total, so each row shows recall per class.
+
+<strong>Why does my matrix look transposed compared with a textbook?</strong> Some sources put predictions on rows. Scikit-learn uses true labels on rows, so check the convention before comparing.
+
+<strong>Can I get TN, FP, FN and TP out directly?</strong> Yes. For binary problems, `tn, fp, fn, tp = confusion_matrix(y, p).ravel()` unpacks them.
+
+<strong>Does it work for many classes?</strong> Yes, it becomes a square table with one row and column per class. Large off-diagonal cells show which classes get confused.
 
 ## Where this leaves you
 
@@ -3032,6 +3158,20 @@ The rule that covers the whole table: if the method ever adds two different feat
 2. <strong>Watch a tree skip it.</strong> The last editor reports a change of just zero for the forest. Try `MinMaxScaler` instead and confirm it's still zero.
 3. <strong>Break the range.</strong> In the third editor, change the outlier to 10000 and see how much further MinMax compresses the plain values.
 4. <strong>Cheat on purpose.</strong> In the fourth editor, fit the scaler on all of `X` and note that the test mean turns 0 - the signature of a compromised test.
+
+## Questions people ask
+
+<strong>Which models need scaling?</strong> Distance- and gradient-based models such as KNN, SVM, logistic regression and neural networks. Tree-based models do not.
+
+<strong>StandardScaler or MinMaxScaler?</strong> StandardScaler is the safe default. MinMaxScaler suits bounded ranges but is sensitive to outliers.
+
+<strong>What if my data has outliers?</strong> Try a scaler that uses the median and interquartile range, found in `sklearn.preprocessing`, so extreme values distort the scale far less.
+
+<strong>Do I scale the target too?</strong> Usually not for classification. For regression it is optional, and `TransformedTargetRegressor` handles it safely.
+
+<strong>Why fit the scaler on training data only?</strong> Fitting on all rows lets test statistics leak into training. Fit on the training part and reuse it to transform the test part.
+
+<strong>Should I scale one-hot columns?</strong> Normally not. They are already 0 or 1, and scaling makes them harder to read without much benefit.
 
 ## Where this leaves you
 
@@ -3346,6 +3486,20 @@ Two things to note when reading them. The importance of a category is spread acr
 2. <strong>Meet the unknown category.</strong> In the second editor, drop `handle_unknown="skip"` from the safe encoder and watch it raise on tokyo.
 3. <strong>Explode a column.</strong> In the fifth editor, raise the number of distinct users and watch the column count follow it just.
 4. <strong>Group the rare ones.</strong> Add `min_frequency=50` to that encoder and see how many columns live.
+
+## Questions people ask
+
+<strong>OneHotEncoder or OrdinalEncoder?</strong> Use one-hot for unordered categories like colour. Use ordinal only when the categories have a real order, such as small, medium and large.
+
+<strong>What does handle_unknown='ignore' do?</strong> It encodes a category not seen in training as all zeros instead of raising an error at prediction time.
+
+<strong>Why not use LabelEncoder on features?</strong> It is meant for the target. On features it invents an order that models will treat as meaningful.
+
+<strong>What if a column has thousands of categories?</strong> One-hot gets wide. Consider grouping rare values with `min_frequency`, or target encoding done inside cross-validation.
+
+<strong>Should I drop one column from one-hot output?</strong> Only when the model suffers from collinearity, such as unregularised linear regression. Trees and regularised models do not need it.
+
+<strong>Do tree models need encoding?</strong> Most still need numeric input, though `HistGradientBoostingClassifier` can take categorical columns natively.
 
 ## Where this leaves you
 
@@ -3693,6 +3847,20 @@ Getting it wrong often raises. This Is fortunate. The exception is putting pick 
 3. <strong>Tune the prep.</strong> In the fourth editor, add `"scale__with_std": [True, False]` to the grid and see whether it changes the winner.
 4. <strong>Break it on purpose.</strong> Fit the scaler outside a pipeline on all of `X`, then cross-validate the model alone. Compare against the pipeline version.
 
+## Questions people ask
+
+<strong>Why use a pipeline instead of separate steps?</strong> It ensures each step is fitted on training data only and replays the same steps on new data, which removes a common source of leakage.
+
+<strong>What is the difference between Pipeline and make_pipeline?</strong> `make_pipeline` names the steps automatically from their class names. `Pipeline` lets you name them yourself.
+
+<strong>How do I tune a step inside a pipeline?</strong> Use the step name, two underscores and the parameter, for example `clf__C`, in the grid passed to the search.
+
+<strong>How do I get at a fitted step?</strong> Use `pipe.named_steps['name']` or index it, such as `pipe[-1]`, to read coefficients or learned attributes.
+
+<strong>Can the last step be a transformer?</strong> Yes. Only the final step may lack `predict`, and then the pipeline acts as a transformer.
+
+<strong>Can I save a pipeline?</strong> Yes. Persist the whole fitted pipeline with `joblib.dump` so preprocessing and model travel together.
+
 ## Where this leaves you
 
 One object, fitted once, holding each step that learns any of it. It makes cross-validation honest, makes the prep tunable. Makes deployment a single file. There's no situation in this track where doing the steps by hand is preferable. Forming the habit early costs nothing.
@@ -4033,6 +4201,20 @@ A model that lives all six isn't ensured honest. The left routes are narrow and 
 3. <strong>Change the group size.</strong> In the third editor, set `per_person=2` and watch the gap narrow. The more rows per entity, the worse the leak.
 4. <strong>Make the categories rarer.</strong> In the fifth editor, raise `n_cats` to 150 and watch the leaked score climb.
 
+## Questions people ask
+
+<strong>What is the most common cause of leakage?</strong> Fitting a scaler, imputer or encoder on the full dataset before splitting, which lets test information shape training.
+
+<strong>Does cross-validation prevent leakage?</strong> Only if preprocessing happens inside each fold. A pipeline passed to `cross_val_score` does this correctly.
+
+<strong>How can I spot leakage?</strong> A score that looks too good to be true is the main sign. Also check for features that would not exist at prediction time.
+
+<strong>What is target leakage?</strong> A feature that contains or is derived from the outcome, such as a refund flag when predicting churn. The model looks great and fails in production.
+
+<strong>Can duplicate rows leak?</strong> Yes. Identical or near-identical rows in train and test inflate the score, so deduplicate or group them before splitting.
+
+<strong>Is leakage possible in time series?</strong> Yes. Shuffling lets the model see the future, so split by time and build features only from earlier data.
+
 ## Where this leaves you
 
 The failure that raises your metrics. Cross-validation can't see it, a good score is evidence for it rather than against it. The only solid defence is asking, of each column, whether it would exist at the moment the guess is needed.
@@ -4347,6 +4529,20 @@ None of this needs a plot or a library. Three counts and a check, before any cho
 2. <strong>Recover the link.</strong> The fifth editor has KNNImputer land on 8.0 just. Change the neighbours to 1 and see what happens.
 3. <strong>Turn the indicator off.</strong> The last editor drops from 0.987 to 0.77. That gap is the value of one extra column.
 4. <strong>Skip imputation fully.</strong> Replace the pipeline in the last editor with `HistGradientBoostingClassifier()` on the raw data with gaps.
+
+## Questions people ask
+
+<strong>Should I drop rows or fill them in?</strong> Dropping is fine when few rows are affected and the loss is random. Otherwise impute, and keep an indicator if missingness could carry signal.
+
+<strong>Which SimpleImputer strategy should I use?</strong> Median for skewed numbers, mean for roughly symmetric ones, and most_frequent for categories. Constant works when you want an explicit placeholder.
+
+<strong>Why fit the imputer on training data only?</strong> Because the fill value is learned. Learning it from test rows leaks information.
+
+<strong>What does add_indicator do?</strong> It appends binary columns marking which values were missing, so the model can use the pattern of missingness.
+
+<strong>When is KNNImputer or IterativeImputer worth it?</strong> When columns are related and a simple fill would ignore that. They are slower, so test whether they actually improve the score.
+
+<strong>Do all models need imputation?</strong> No. `HistGradientBoosting` models handle NaN natively, but most other estimators raise an error.
 
 ## Where this leaves you
 
@@ -4710,6 +4906,20 @@ The general lesson is that the object is introspectable at each level. The troub
 3. <strong>Add a column.</strong> In the second editor, add another numeric column to the frame and confirm the selector picks it up with no edit to the transformer.
 4. <strong>Find the param names.</strong> In the fifth editor, print `sorted(pipe.get_params())` and look for the keys you could tune.
 
+## Questions people ask
+
+<strong>What is ColumnTransformer for?</strong> It applies different preprocessing to different columns, such as scaling numbers and one-hot encoding categories, then joins the results.
+
+<strong>What does remainder do?</strong> Columns not named in any branch are dropped by default. Set `remainder='passthrough'` to keep them unchanged.
+
+<strong>How do I select columns by type?</strong> Use `make_column_selector(dtype_include=...)` so the transformer picks numeric or object columns automatically.
+
+<strong>Can a branch be a pipeline?</strong> Yes. A branch such as impute then scale is a small pipeline, and it can be nested inside the transformer.
+
+<strong>How do I get the output column names?</strong> Call `get_feature_names_out()` on the fitted transformer. It returns names prefixed by branch.
+
+<strong>How do I tune parameters inside it?</strong> Use the double-underscore path, like `pre__num__imputer__strategy`, through the outer pipeline.
+
 ## Where this leaves you
 
 One object that sends each group of columns to the transformer it needs, nests pipelines inside its branches, drops what you didn't mention. Exposes each setting inside it to a search. Together with `Pipeline` it's the shape of each real scikit-learn program on tabular data.
@@ -5052,6 +5262,20 @@ The pattern underneath: each one of these controls how much of the training data
 3. <strong>Ask whether data would help.</strong> In the third editor, cut `n_samples` to 300 and see whether the curves have settled by then.
 4. <strong>Over-constrain on purpose.</strong> In the last editor, try `min_samples_leaf=100` and watch both scores fall together.
 
+## Questions people ask
+
+<strong>How can I tell overfitting from underfitting?</strong> Compare scores. High training and low validation scores mean overfitting, and low scores on both mean underfitting.
+
+<strong>Will more data fix overfitting?</strong> Often, yes, if the model is flexible. It does not help an underfit model, which needs more capacity or better features.
+
+<strong>What reduces overfitting?</strong> Simpler models, regularisation, fewer features, early stopping or more training data. Pick whichever matches the model.
+
+<strong>What fixes underfitting?</strong> A more flexible model, added or better features, or weaker regularisation.
+
+<strong>What is a learning curve?</strong> A plot of training and validation score against training set size. It shows whether more data would still help.
+
+<strong>Can I overfit the validation set?</strong> Yes. Trying many settings against one validation score picks noise, so keep a final test set untouched.
+
 ## Where this leaves you
 
 One extra column tells you which failure you've. `validation_curve` finds the right cost, `learning_curve` says whether more data would help. Each constraint is a trade that has to be measured rather than assumed.
@@ -5365,6 +5589,20 @@ Ensembles help here too, and not only by blending. A random forest restricts eac
 2. <strong>Watch the instability.</strong> In the fourth editor, change `random_state` on the resampler and see how much the six trees disagree this time.
 3. <strong>Confirm the flat line.</strong> In the fifth editor, ask for x=100. The tree still says 54.
 4. <strong>Compare the importances.</strong> Fit at depth 1 and at depth 5 and see how the numbers redistribute.
+
+## Questions people ask
+
+<strong>Do decision trees need scaling?</strong> No. Splits compare a feature to a threshold, so monotonic rescaling makes no difference.
+
+<strong>Why do trees overfit?</strong> An unconstrained tree keeps splitting until each leaf is pure, memorising the training data. Limit it with `max_depth` or `min_samples_leaf`.
+
+<strong>What do gini and entropy mean?</strong> Both measure how mixed a node is. In practice they give similar trees, so Gini is a fine default.
+
+<strong>Can I see the tree?</strong> Yes. `plot_tree` draws it, and `export_text` prints the rules as text.
+
+<strong>Are feature importances trustworthy?</strong> They are biased towards features with many distinct values. Permutation importance on held-out data is a safer check.
+
+<strong>Do trees handle missing values?</strong> Recent versions of `DecisionTreeClassifier` support NaN natively, but check your installed version first.
 
 ## Where this leaves you
 
@@ -5712,6 +5950,20 @@ Boosting attacks the other half of the problem, fitting each new model to what t
 2. <strong>Push the trees up.</strong> In the second editor, add 1000 and confirm the score doesn't fall.
 3. <strong>Compare the importances.</strong> The third editor's two columns disagree about a column that is pure noise.
 4. <strong>Break the decorrelation.</strong> In the fifth editor, try `max_features=1` and see whether so much range starts to hurt.
+
+## Questions people ask
+
+<strong>Why is a forest better than one tree?</strong> Averaging many de-correlated trees cancels out much of their individual variance, so the ensemble is steadier.
+
+<strong>How many trees do I need?</strong> A few hundred is usually plenty. More trees rarely hurt accuracy but add time and memory.
+
+<strong>What is out-of-bag scoring?</strong> Each tree skips about a third of the rows, so those rows act as a free validation set. Enable it with `oob_score=True`.
+
+<strong>Does a random forest need scaling?</strong> No, because trees split on thresholds and are unaffected by feature scale.
+
+<strong>Can a forest still overfit?</strong> Yes, though less than one tree. Limiting depth and leaf size and using `max_features` helps.
+
+<strong>Are forest importances reliable?</strong> Impurity-based ones favour high-cardinality features. Permutation importance on a held-out set is more honest.
 
 ## Where this leaves you
 
@@ -6065,6 +6317,20 @@ The corollary is that a first pass should be on purpose wide and coarse. Powers 
 3. <strong>Tune a step away.</strong> In the fourth editor, note that `passthrough` won. The PCA step wasn't helping.
 4. <strong>Change the metric.</strong> In the last editor, add `"recall"` and see which setting it prefers.
 
+## Questions people ask
+
+<strong>GridSearchCV or RandomizedSearchCV?</strong> Grid search tries every combination and suits small spaces. Randomized search samples a fixed number and covers large spaces cheaper.
+
+<strong>Why is best_score_ too optimistic?</strong> It is the maximum over many noisy trials, so it is biased upwards. Confirm on a test set or with nested cross-validation.
+
+<strong>Should I search over a whole pipeline?</strong> Yes. Passing the pipeline keeps preprocessing inside each fold, and you can tune its steps with the double-underscore names.
+
+<strong>How do I choose the scoring metric?</strong> Pick the metric that matches the real goal and pass it as `scoring`. The default may favour something you do not care about.
+
+<strong>How do I keep a search affordable?</strong> Use fewer folds, a smaller range, `n_jobs=-1` and `HalvingRandomSearchCV`, which drops weak candidates early.
+
+<strong>Where can I read all the results?</strong> In `cv_results_`, which converts to a DataFrame and shows scores and spread for every candidate.
+
 ## Where this leaves you
 
 Random search over a sensible range, with a pipeline so the prep is tuned honestly, a `scoring` chosen for the problem, `cv_results_` read rather than skimmed. The winner's score treated as optimistic until a held-out set says or else.
@@ -6397,6 +6663,20 @@ The whole thing is about fifteen lines and it's the difference between a model w
 2. <strong>Set a target.</strong> In the third editor, change the targets to 0.95 and 0.99 and watch the precision collapse.
 3. <strong>Change the cost ratio.</strong> In the last editor, make a miss cost 100 and see where the threshold moves.
 4. <strong>Calibrate the forest.</strong> Wrap it in `CalibratedClassifierCV` and re-measure the gap.
+
+## Questions people ask
+
+<strong>What threshold does predict use?</strong> For most binary classifiers it effectively uses 0.5 on the positive probability. You can choose a different cut-off yourself.
+
+<strong>How do I choose a threshold?</strong> Use a precision-recall curve on validation data and pick the point that matches your costs or minimum recall.
+
+<strong>Does changing the threshold retrain the model?</strong> No. It only changes how probabilities become labels, so it is cheap to try.
+
+<strong>Are predict_proba values true probabilities?</strong> Not always. Check a calibration curve, and use `CalibratedClassifierCV` if they are off.
+
+<strong>What does ROC AUC tell me?</strong> It is the chance that a random positive scores higher than a random negative, independent of any threshold.
+
+<strong>Should the threshold be saved with the model?</strong> Yes. It is part of the decision rule, and a loaded model will otherwise fall back to the default.
 
 ## Where this leaves you
 
@@ -6757,6 +7037,20 @@ The general rule: the more a model means across all rows at once, the more the r
 3. <strong>Watch the leak.</strong> In the fourth editor, the labels are random. The first number isn't a result.
 4. <strong>Make it separable.</strong> In the last editor, lower `class_sep` to 0.5 and watch the need for a remedy return.
 
+## Questions people ask
+
+<strong>Why does accuracy fail with imbalanced classes?</strong> A model that always predicts the majority class gets a high score yet finds no positives. Use recall, precision or average precision.
+
+<strong>What is the cheapest fix?</strong> Set `class_weight='balanced'`, which reweights the loss without changing the data.
+
+<strong>When should I use SMOTE or oversampling?</strong> When weights are not enough. Apply resampling inside the training folds only, using an imbalanced-learn pipeline.
+
+<strong>Does resampling change predicted probabilities?</strong> Yes. They no longer match real-world rates, so recalibrate or move the threshold.
+
+<strong>Should I resample the test set?</strong> No. The test set must keep the real class ratio so the numbers reflect production.
+
+<strong>Which models suffer most from imbalance?</strong> Those trained to minimise overall error, like logistic regression and plain trees. Boosting with class weights usually copes better.
+
 ## Where this leaves you
 
 Stratify the split, drop fit, and check whether the model is really struggling before doing any of it. If it's, move the threshold first, reach for `class_weight` second, and resample only inside the folds. Never before the split, and never on the test set.
@@ -7081,6 +7375,20 @@ The output of that work is a name and a description per group. That is the deliv
 2. <strong>Break it with scale.</strong> The fourth editor's unscaled run scores below chance. Change 500 to 5 and see where the crossover is.
 3. <strong>Try the wrong shape.</strong> In the fifth editor, raise `noise` to 0.15 and see whether DBSCAN still manages.
 4. <strong>Cluster noise.</strong> Fit k=4 on `np.random.rand(300, 2)` and look at the silhouette. It won't be zero.
+
+## Questions people ask
+
+<strong>How do I choose k?</strong> Try several values and compare the elbow in inertia and the silhouette score. Also ask which k gives groups you can use.
+
+<strong>Do I need to scale for KMeans?</strong> Yes. It uses Euclidean distance, so a feature with a large range will dominate the clusters.
+
+<strong>Why do results change between runs?</strong> The starting centroids are random. Set `random_state` and keep `n_init` above 1 for a steadier result.
+
+<strong>What shapes does KMeans assume?</strong> Roughly round, similarly sized blobs. For odd shapes or noise, try DBSCAN or a Gaussian mixture.
+
+<strong>Can I check the clusters without labels?</strong> Use the silhouette score and inspect cluster profiles. Stability across different seeds is also a useful sign.
+
+<strong>Can KMeans find outliers?</strong> Not directly. Outliers drag centroids, so remove or handle them first.
 
 ## Where this leaves you
 
@@ -7438,6 +7746,20 @@ What you can do now is take a table you've never seen, work out what it needs, b
 1. <strong>Swap the model.</strong> Change `LogisticRegression` to `RandomForestClassifier` in step three and re-run all after it. Nothing else needs to change.
 2. <strong>Drop the indicator.</strong> Drop `add_indicator=True` and compare the cross-validated mean precision.
 3. <strong>Break the order.</strong> Fit the imputer on all of `X` before the split. Watch the test score improve for the wrong reason.
+
+## Questions people ask
+
+<strong>What order should the steps follow?</strong> Look at the data, split it, build a pipeline, compare with a baseline, tune with cross-validation, choose the threshold and report on the test set once.
+
+<strong>Why fit a baseline first?</strong> A dummy model sets the floor. Without it a score has no scale.
+
+<strong>When do I touch the test set?</strong> Once, at the end. Using it to guide choices turns it into a second validation set.
+
+<strong>Why put everything in one pipeline?</strong> So every learned step is refitted inside each fold and the same steps run on new data.
+
+<strong>What if the result is disappointing?</strong> Check for data problems, try a better baseline comparison and look at errors by group before reaching for a fancier model.
+
+<strong>How do I ship the model?</strong> Save the fitted pipeline and the chosen threshold together, then record the library versions.
 
 ## Where this leaves you
 

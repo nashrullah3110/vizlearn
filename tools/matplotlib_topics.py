@@ -350,27 +350,17 @@ Then judgement: choosing a chart, common mistakes, and speed when the data is la
 
 each module is six short programs. Each one draws. Changing a number and re-running is the fastest way to find out what an arg really does. Which is worth more here than in most libraries. Matplotlib's arg names aren't always guessable.
 
-## Questions people ask first
+## Questions people ask
 
-**Why are there two ways to do all?**
+<strong>Why are there two ways to do everything?</strong> History. pyplot was written to feel like MATLAB: one hidden figure, commands act on it. The object-oriented API came later and is what pyplot calls underneath. Both are supported permanently, and examples mix them, which is the main reason matplotlib feels harder than it is.
 
-History. pyplot was written to feel like MATLAB. Here There's one silent figure and commands act on it. The object-oriented API came later and is what pyplot calls underneath. Both are supported permanently. Examples mix them. That is the main reason matplotlib feels harder than it's.
+<strong>Do I need plt.show()?</strong> In a script, yes, unless you save to a file. In a notebook, no. On these pages, no &mdash; the runner collects what is open.
 
-**Do I need `plt.show()`?**
+<strong>Why does my figure look different on someone else's machine?</strong> A different style, a different matplotlibrc, a missing font, or a different backend. The first two are the usual causes and both are silent.
 
-In a script, yes, unless you're saving to a file. In a notebook, no. On these pages, no. The runner collects what is open.
+<strong>Should I use seaborn instead?</strong> For statistical charts, often yes. Seaborn makes matplotlib objects, so nothing is lost, and knowing matplotlib is what lets you adjust what seaborn gives you.
 
-**Why does my figure look other on someone else's machine?**
-
-A other style, a other `matplotlibrc`, a missing font, or a other backend. The first two are the usual causes and both are silent.
-
-**Should I use seaborn instead?**
-
-For statistical charts, often yes. It makes matplotlib objects. Nothing is lost. Knowing matplotlib is what lets you adjust what seaborn gives you.
-
-**Why is my chart slow?**
-
-Almost always too many artists, or too many points to be visible. Both have their own module.
+<strong>Why is my chart slow?</strong> Almost always too many artists or too many points to be visible. The performance module covers both cases.
 
 ## How to read the documentation
 
@@ -807,6 +797,20 @@ A line chart is the most common chart there's. The finishing sequence is the sam
 
 The line itself is an aid rather than data. This Is worth remembering when the points are few and the line is doing a lot of implying.
 
+## Questions people ask
+
+<strong>Why does my line chart show 0 to 99 on the x axis?</strong> You passed only y values. With one argument, `ax.plot` uses `range(len(y))` for x, so supply the x array (dates, years) as the first argument.
+
+<strong>How do I stop a line crossing a gap in my data?</strong> Put NaN where the value is missing. matplotlib breaks the line at each NaN instead of drawing through it.
+
+<strong>How many lines are too many on one chart?</strong> Past about five, readers cannot tell lines apart. Mute most of them in grey and colour only the one or two that carry the message.
+
+<strong>What is the difference between `ax.plot` and `ax.step`?</strong> `plot` joins points with straight segments, which implies smooth change. `step` holds each value until the next point, which suits counts and settings that change at moments.
+
+<strong>Should I show markers on a line?</strong> Show them when there are few points, so readers see where the real observations are. With hundreds of points they only add clutter.
+
+<strong>Why do my lines change colour when I add another?</strong> Each call takes the next colour from the axes' property cycle. Pass `color=` explicitly to pin a series to a colour.
+
 ## Reading the code back
 
 A finished line chart is about a dozen calls. It's worth being able to name what each one is for. The figure size sets the aspect, the plot call sets colour and weight, the title carries the message, the labels carry the units, the margins control the breathing space, the grid supports value reading. The spine removal takes away what carries nothing. Nothing in that list is optional in the sense of being decorative. Each answers a question a reader would else have to ask. Writing them in the same order each time makes the chart quick to give and quick to review. This Is most of why a house function is worth having.
@@ -1215,6 +1219,20 @@ A scatter is the display that shows what a summary statistic can't: shape, clust
 
 Its failure mode is density, and the sequence of fixes is fixed. Alpha, smaller markers, hexbin, aggregation. The question at each stage is whether the middle of the spread is still visible.
 
+## Questions people ask
+
+<strong>What is the difference between `ax.scatter` and `ax.plot` with markers?</strong> `scatter` can vary size and colour per point. `plot` draws one style for all points and is much faster for large arrays.
+
+<strong>How do I handle thousands of overlapping points?</strong> Lower alpha, shrink the markers, or switch to `hexbin` or a 2D histogram. All three show density that overplotting hides.
+
+<strong>How do I colour points by a third variable?</strong> Pass an array to `c=` and a colormap to `cmap=`, then add a colorbar so readers can decode the colours.
+
+<strong>How do I add a trend line?</strong> Fit it yourself, for example with `np.polyfit`, and draw it with `ax.plot`. matplotlib does not fit models for you.
+
+<strong>What does the `s` argument mean?</strong> It is marker area in points squared, not radius. Doubling `s` does not double the visible width.
+
+<strong>Does a tight scatter prove one variable causes the other?</strong> No. A scatter shows association only. A third variable or the direction of causation can produce the same pattern.
+
 ## Reading the code back
 
 A working scatter is often four choices: marker size, transparency, whether an edge is needed. Whether a third var is being coded. all else follows from the data. The size and alpha are chosen from the number of points rather than from taste. This Is why the same two lines that work for two hundred points fail for twenty thousand. Why the sequence of density fixes in this module is worth having in mind before drawing rather than after.
@@ -1619,6 +1637,20 @@ Flat, sorted, one colour, from zero. Four defaults that fix most bar charts befo
 
 The zero baseline is the only rule here that isn't a matter of taste. A bar codes value as length and a truncated axis misstates each ratio on the chart.
 
+## Questions people ask
+
+<strong>Should bars always start at zero?</strong> Yes. Bar length encodes value, so a truncated baseline exaggerates differences. If zero hides the story, use a dot plot instead.
+
+<strong>How do I make horizontal bars?</strong> Use `ax.barh`. It suits long category names, which would collide on a horizontal x axis.
+
+<strong>How do I draw grouped bars side by side?</strong> Offset the x positions by half a bar width in each direction and set `width` to less than the offset step.
+
+<strong>How do I put values on top of the bars?</strong> Call `ax.bar_label(bars)` on the container that `ax.bar` returns. It handles placement and formatting.
+
+<strong>In what order should the bars go?</strong> Sort by value unless the categories have a natural order such as months or age bands. Sorted bars let readers rank at a glance.
+
+<strong>When is a bar chart the wrong choice?</strong> For trends over many time points, a line reads better. For distributions, use a histogram. Bars suit comparing a few categories.
+
 ## Reading the code back
 
 A bar chart is one call and a handful of choices made before it. Which orientation, what order, one colour or two, whether the values go on the bars. Whether the axis is then needed at all. Those choices are all made in the data preparation and the arg list rather than in anything clever. This Is why bar charts are quick to give well once the defaults are settled and quick to give badly when they aren't.
@@ -2014,6 +2046,20 @@ It takes the same `bins` arg and returns counts and edges. The values behind a h
 The bin count is a param that changes the answer. It's chosen by default when no one chooses it on purpose.
 
 Looking at more than one binning. Stating which one the chart uses, is the whole of good practice here. Along with knowing that a cumulative view sidesteps the problem when the question is about quantiles.
+
+## Questions people ask
+
+<strong>How many bins should I use?</strong> There is no single answer. Start with `bins='auto'`, then try half and double that number. If the shape changes a lot, report that.
+
+<strong>What does `density=True` do?</strong> It scales the bars so the total area is 1. Use it when comparing groups of different sizes.
+
+<strong>What is the difference between a histogram and a bar chart?</strong> A histogram bins a continuous variable, so bars touch and order is fixed. A bar chart compares separate categories.
+
+<strong>How do I compare two groups?</strong> Use the same bin edges for both, then use `histtype='step'`, transparency, or side-by-side panels with a shared x axis.
+
+<strong>How do I get the counts without drawing?</strong> Call `np.histogram` for counts and edges. `ax.hist` also returns them, as its first two return values.
+
+<strong>Why does my histogram look different with the same data?</strong> Different bin edges move points between bars. A different bin count or a shifted start can change the apparent shape.
 
 ## Reading the code back
 
@@ -2459,6 +2505,20 @@ Text is what turns a picture of numbers into a thing someone else can act on. Un
 
 A legend is link material that the reader consults again and again. A direct label is read once. Where the lines end apart, the direct label wins. It costs two lines of `text`.
 
+## Questions people ask
+
+<strong>Why does `ax.legend()` show nothing?</strong> No artist has a label. Pass `label=` to each plot call, since legend only lists labelled artists.
+
+<strong>Where should the legend go?</strong> Away from the data. Try `loc='best'` first, then move it outside with `bbox_to_anchor`, or label lines directly instead.
+
+<strong>What should a title say?</strong> The finding, not the topic. 'Sales fell after March' tells readers what to look for. 'Monthly sales' does not.
+
+<strong>How do I include units in axis labels?</strong> Put them in parentheses after the name, such as `ax.set_xlabel('Distance (km)')`. Label every axis that has units.
+
+<strong>How do I write maths in a label?</strong> Wrap it in dollar signs, for example a Greek letter name between two dollar signs. matplotlib renders a subset of LaTeX called mathtext without needing LaTeX installed.
+
+<strong>What is the difference between `plt.title` and `ax.set_title`?</strong> `plt.title` acts on the current axes. `ax.set_title` acts on the axes you name, which is safer with more than one panel.
+
 ## Reading the code back
 
 The text on a chart is written in a fixed order. The title says what was found, the axis labels say what the numbers are. The legend or the direct labels say which series is which. Written in that order, the chart is full. Written in any other, a thing is often missing. The most common omission is units. The most common redundancy is a title that repeats the axis names.
@@ -2899,6 +2959,20 @@ It's the usual way to draw a ranked list with spot 1 at the top. A depth or pres
 Ticks and limits are where a chart quietly decides what the reader can see and how they read it.
 
 Most charts have more ticks than anyone uses, a margin they didn't choose. A top and right spine carrying no data. Dropping the excess isn't decoration. It's what leaves the data as the most prominent thing on the chart.
+
+## Questions people ask
+
+<strong>How do I set the axis range?</strong> Use `ax.set_xlim` and `ax.set_ylim`, or `ax.set(xlim=..., ylim=...)`. Pass `None` for one side to leave it automatic.
+
+<strong>How do I reverse an axis?</strong> Swap the limits, as in `ax.set_ylim(top, bottom)`, or call `ax.invert_yaxis()`.
+
+<strong>How do I choose where ticks fall?</strong> Use `ax.set_xticks` with a list of positions, or a locator such as `MultipleLocator(5)` for regular spacing.
+
+<strong>How do I format tick labels as percentages or currency?</strong> Use a formatter, such as `PercentFormatter` or a `FuncFormatter` with your own function.
+
+<strong>When should I use a log scale?</strong> When values span several orders of magnitude, or when ratios matter more than differences. Say on the axis that it is logarithmic.
+
+<strong>Why is my axis range slightly larger than my data?</strong> matplotlib adds margins around the data. Change them with `ax.margins(0)` or `ax.set_xlim`.
 
 ## Reading the code back
 
@@ -3367,6 +3441,20 @@ A grid is a claim that the panels belong together. Sharing the axes is what make
 
 The three things that most often go wrong are an unshared y axis making incomparable panels look close, a figure size that didn't grow with the grid so all is cramped. Empty cells left as bare boxes. All three are one line each.
 
+## Questions people ask
+
+<strong>Why does `plt.subplots` return two things?</strong> It returns the figure and the axes. Unpack as `fig, ax = plt.subplots()`.
+
+<strong>Why can I not index my axes with `ax[0]`?</strong> With one row and one column you get a single Axes. With a row or column you get a 1D array. A grid gives a 2D array. Pass `squeeze=False` to always get 2D.
+
+<strong>How do I share an axis between panels?</strong> Pass `sharex=True` or `sharey=True` to `plt.subplots`. Inner tick labels are hidden automatically.
+
+<strong>How do I make panels of different sizes?</strong> Use `subplot_mosaic` or `GridSpec` with `width_ratios` and `height_ratios`.
+
+<strong>How do I hide unused panels?</strong> Call `ax.set_visible(False)` or `ax.axis('off')` on each spare axes.
+
+<strong>What is the difference between `plt.subplot` and `plt.subplots`?</strong> `subplot` adds one axes to the current figure. `subplots` creates the figure and the whole grid at once.
+
 ## Reading the code back
 
 A grid is created in one call and finished in three. Share the axes, label the grid once. Drop what is unused. The figure size should be found from the grid rather than fixed. Adding a row makes the figure taller instead of making each panel smaller. Those four choices are what split a grid that reads as one figure from a few charts that happen to be adjacent.
@@ -3781,6 +3869,20 @@ The greyscale test remains the quickest check on all of it.
 Colour is the most over-used channel in charting and the most rewarding to use sparingly.
 
 One accent against grey beats a seven-hue palette in almost each case. The greyscale test is the quickest check on whether the encoding lives contact with the real world.
+
+## Questions people ask
+
+<strong>How do I specify a colour?</strong> Use a name such as `'steelblue'`, a hex string such as `'#1f77b4'`, an RGB tuple of 0 to 1 floats, or a cycle reference like `'C0'`.
+
+<strong>Which colormap should I use?</strong> Sequential maps such as `viridis` for ordered values, diverging maps such as `RdBu` for data with a meaningful centre, and qualitative maps for categories.
+
+<strong>Why is `jet` discouraged?</strong> Its brightness changes unevenly, so some value ranges look like features that are not in the data. It is also hard for colour-blind readers.
+
+<strong>How do I make a chart readable for colour-blind readers?</strong> Avoid red-green pairs, use perceptually uniform maps like `viridis`, and add another cue such as marker shape or direct labels.
+
+<strong>How do I add a colorbar?</strong> Call `fig.colorbar(mappable, ax=ax)` with the object returned by `imshow`, `scatter` or `pcolormesh`.
+
+<strong>How do I centre a diverging colormap on zero?</strong> Pass `vmin=-m, vmax=m` with the same magnitude, or use `TwoSlopeNorm(vcenter=0)`.
 
 ## Reading the code back
 
@@ -4203,6 +4305,20 @@ That is how you draw an arrow from a corner note to a data point. Text anchored 
 Annotation is where a chart stops showing and starts saying.
 
 The technique is straightforward. The discipline isn't. One thing pointed out clearly beats five things labelled. Greying the context is often more good than adding an arrow.
+
+## Questions people ask
+
+<strong>What is the difference between `ax.text` and `ax.annotate`?</strong> `text` places words at a point. `annotate` can also draw an arrow from the text to a different point.
+
+<strong>What coordinates does annotation use?</strong> Data coordinates by default. Use `xycoords='axes fraction'` to position relative to the axes box, which survives changes to the data range.
+
+<strong>How do I draw a reference line?</strong> Use `ax.axhline` or `ax.axvline` for lines across the axes, and `ax.axhspan` or `ax.axvspan` to shade a band.
+
+<strong>How many annotations are too many?</strong> If readers must read each one to understand the chart, there are too many. Annotate the one or two points that carry the message.
+
+<strong>Why does my annotation move when I resize the figure?</strong> Offsets given in points stay fixed, while data coordinates move with the axes. Choose the coordinate system that matches what the note is attached to.
+
+<strong>How do I stop labels overlapping?</strong> Offset each with `xytext` and `textcoords='offset points'`, or use a helper library such as adjustText for many labels.
 
 ## Reading the code back
 
@@ -4636,6 +4752,20 @@ That is what you want for a figure being embedded in a layout that gives its own
 The saved file is the artefact. The screen is a preview.
 
 Size and dpi are one choice made for the destination, `bbox_inches="tight"` blocks the most common cropping, vector formats need rasterised layers for dense data. Each loop that saves needs to close.
+
+## Questions people ask
+
+<strong>What resolution should I save at?</strong> Use 150 to 200 dpi for the web and 300 for print. Vector formats such as SVG and PDF need no dpi.
+
+<strong>Why is my saved figure cropped?</strong> Labels extend outside the default box. Pass `bbox_inches='tight'` to `savefig`.
+
+<strong>Why is my saved background transparent or white?</strong> `savefig` uses its own `facecolor`. Set `facecolor=` or `transparent=True` explicitly.
+
+<strong>Which format should I choose?</strong> PNG for the web and slides, SVG or PDF for print and papers. Vector files stay sharp at any size.
+
+<strong>Why does `savefig` give a blank image?</strong> You called `plt.show()` first. In some backends that closes the figure. Call `savefig` before `show`, or save through the `fig` object.
+
+<strong>How do I save many figures without running out of memory?</strong> Call `plt.close(fig)` after each save. Open figures stay in memory until closed.
 
 ## Reading the code back
 
@@ -5077,6 +5207,20 @@ And rate aliases changed in pandas 2.2. This Accounts for a large share of examp
 A date axis is the gap between a chart of a time series and a chart of some values in order.
 
 Parse properly, sort, choose a rate that matches the question. Use fewer ticks than the default. The rest follows from the line-chart material.
+
+## Questions people ask
+
+<strong>Why are my dates plotted as strings?</strong> The values are text, not datetimes. Convert with `pd.to_datetime` or `np.datetime64`, then matplotlib builds a date axis.
+
+<strong>How do I control where date ticks go?</strong> Use locators such as `mdates.MonthLocator()` or `AutoDateLocator`, and set formats with `mdates.DateFormatter('%b %Y')`.
+
+<strong>How do I fix overlapping date labels?</strong> Call `fig.autofmt_xdate()` to rotate them, or use `ConciseDateFormatter` for compact labels.
+
+<strong>How do I mark an event on a time axis?</strong> Use `ax.axvline` with a datetime value, and add a label with `ax.annotate`.
+
+<strong>Why does my line connect weekends or holidays?</strong> A date axis is continuous. Closed days leave gaps that a line bridges. Plot the data as points or insert NaN to break the line.
+
+<strong>What do the codes in `DateFormatter` mean?</strong> They use strftime: `%Y` year, `%m` month number, `%b` month name, `%d` day, `%H:%M` time.
 
 ## Reading the code back
 
@@ -5529,6 +5673,20 @@ An interval is a claim, and the caption is part of the claim.
 
 Standard deviation, standard error, trust and guess intervals differ by large factors on the same data. Drawing them the same way without saying which is the most common way a chart overstates what is known.
 
+## Questions people ask
+
+<strong>What does an error bar represent?</strong> Whatever you say it does: standard deviation, standard error, or a confidence interval. State which one in the caption or label.
+
+<strong>How do I draw error bars?</strong> Use `ax.errorbar(x, y, yerr=err)`. Pass a 2 by N array for different lower and upper sizes.
+
+<strong>When should I use a band instead?</strong> For a continuous series such as a forecast, use `ax.fill_between` with some transparency. Bands read more clearly than many bars.
+
+<strong>Should I show standard deviation or standard error?</strong> Standard deviation describes spread in the data. Standard error describes uncertainty in the mean. Pick the one that matches the claim.
+
+<strong>Do error bars hide the data?</strong> They can. When samples are small, plot the individual points as well.
+
+<strong>Why do my error bars look asymmetric on a log axis?</strong> Equal absolute sizes span different visual distances on a log scale. Compute bounds in log space or use asymmetric intervals.
+
 ## Reading the code back
 
 Drawing an interval is one arg. Deciding which interval, finding it right as offsets. Saying in the chart which one it's are three split pieces of work. Only the first is about matplotlib. A band drawn without the other two is a decoration that readers will read as a claim.
@@ -5953,6 +6111,20 @@ It's convenient for a link mat and confusing for anything with a quantitative y 
 A heatmap is read for its pattern, not its values. This Is why sorting the rows and columns matters as much as the colormap.
 
 The defaults are built for photos. Three of them. Origin, aspect and blending. Are wrong for data. Setting all three by name is the honest starting point.
+
+## Questions people ask
+
+<strong>What is the difference between `imshow` and `pcolormesh`?</strong> `imshow` shows a regular grid of pixels. `pcolormesh` handles uneven cell edges and non-uniform coordinates.
+
+<strong>Why is my image upside down?</strong> `imshow` puts row 0 at the top by default. Use `origin='lower'` if your data has y increasing upward.
+
+<strong>How do I label heatmap cells?</strong> Loop over the cells and call `ax.text` with the value, choosing white or black text based on the cell colour.
+
+<strong>How do I set the colour range?</strong> Use `vmin` and `vmax`. Use the same values on every panel when comparing.
+
+<strong>How do I map the pixels to real coordinates?</strong> Pass `extent=(left, right, bottom, top)` to `imshow`.
+
+<strong>Why are my heatmap cells blurry?</strong> Interpolation smooths them. Pass `interpolation='nearest'` to see the cells as they are.
 
 ## Reading the code back
 
@@ -6419,6 +6591,20 @@ A style is a set of choices written down once. This Is worth more than the agree
 
 It handles typography, spacing and palette. Roughly the last fifth of a good chart. The other four fifths are choices no setting can make. A good style applied to a bad chart makes a professional-looking bad chart.
 
+## Questions people ask
+
+<strong>What is `rcParams`?</strong> A dictionary of default settings, such as font size, line width and colours, that every new figure reads.
+
+<strong>How do I use a built-in style?</strong> Call `plt.style.use('ggplot')` or another name from `plt.style.available`. Later styles override earlier ones.
+
+<strong>How do I change style for one figure only?</strong> Wrap the code in `with plt.style.context('name'):` or `with plt.rc_context({...}):`.
+
+<strong>Where does matplotlib read defaults from?</strong> Style sheets and the `matplotlibrc` file. Run `matplotlib.matplotlib_fname()` to find which one is loaded.
+
+<strong>How do I make my own style?</strong> Write a `.mplstyle` file with one `key: value` per line and load it with `plt.style.use('path/to/file.mplstyle')`.
+
+<strong>Why do my settings not apply to existing figures?</strong> Most `rcParams` are read when an artist is created. Set them before drawing.
+
 ## Reading the code back
 
 A style is a dict applied in a context manager. Its contents are choices rather than settings. The ones that matter most are the ones fixing matplotlib's weakest defaults. Spines, title alignment, grid weight, legend frame and the colour cycle. Six entries covers it. Each chart in the project then starts from a better place.
@@ -6852,6 +7038,20 @@ A second y axis is the only common chart feature whose main effect is on what th
 
 all else in this track can be done badly. A twin axis is hard to do well even on purpose. The ambiguity is in the display rather than in the run. Reaching for stacked panels or a common index first is the habit worth having.
 
+## Questions people ask
+
+<strong>How do I put two y axes on one chart?</strong> Call `ax2 = ax.twinx()`. It shares the x axis and has its own y axis on the right.
+
+<strong>Why are twin axes controversial?</strong> The two scales are chosen freely, so the lines can appear to correlate or cross anywhere. Readers infer a relationship that is only a result of the scaling.
+
+<strong>What can I use instead?</strong> Two stacked panels with a shared x axis, or indexing both series to a base of 100 on one axis.
+
+<strong>How do I get one legend for both axes?</strong> Collect handles and labels from each axes with `get_legend_handles_labels` and pass the combined lists to one `legend` call.
+
+<strong>What does `secondary_axis` do?</strong> It adds an axis that is a function of the first, such as Celsius and Fahrenheit. No new data is plotted.
+
+<strong>How do I tell readers which axis belongs to which line?</strong> Colour each axis label and tick labels to match its line.
+
 ## Reading the code back
 
 A twin axis is one call and a series of mitigations. Colour-code both scales, assemble one legend, fix the limits by name, establish a visual tree. Say in the caption that the scales are split. The length of that list is itself the arg for checking whether stacked panels would do instead.
@@ -7264,6 +7464,20 @@ The exact thing worth remembering: a box plot can't show bimodality. Bimodality 
 Both displays trade completeness for comparability. Both hide a thing exact. The box hides shape, the violin hides its own smoothing choice.
 
 Knowing what each discards is more handy than preferring one. Looking at a histogram of each group once before choosing is what blocks the bimodality failure this module exists to show.
+
+## Questions people ask
+
+<strong>What does a box plot show?</strong> The median, the quartiles as the box, and whiskers at 1.5 times the interquartile range. Points beyond the whiskers are drawn as outliers.
+
+<strong>When should I use a violin instead?</strong> When the shape matters, such as two peaks. A violin shows the density, which a box plot cannot.
+
+<strong>What do the whiskers mean?</strong> By default, the farthest data point within 1.5 times the IQR of the box. Some plots use min and max or percentiles, so check.
+
+<strong>How do I show the individual points too?</strong> Overlay a jittered `scatter` or a strip plot. This helps most when each group has few observations.
+
+<strong>How do I make horizontal boxes?</strong> Pass `vert=False` to `ax.boxplot`, or `orientation='horizontal'` in recent versions.
+
+<strong>Are violins reliable for small groups?</strong> No. The smoothed density can imply shape that is not there. Use a box plot or show the points.
 
 ## Reading the code back
 
@@ -7695,6 +7909,20 @@ For a quick line chart of a time-indexed frame it's unbeatable. One call, correc
 The two together are the normal way to write plotting code. The boundary isn't a choice you make once. `df.plot(ax=ax)` followed by half a dozen `ax.` calls is a just right plain chart.
 
 What is worth internalising is that most plotting problems are data problems. When the chart is grouped wrongly, or has too many lines, or shows a group as a number, the fix is in the frame.
+
+## Questions people ask
+
+<strong>Does pandas use matplotlib?</strong> Yes. `df.plot` builds a matplotlib figure and returns an Axes, so every matplotlib method works on the result.
+
+<strong>How do I put a pandas plot on my own axes?</strong> Pass `ax=ax` to `df.plot`. This is how you place pandas charts in a subplot grid.
+
+<strong>Why is my index on the x axis?</strong> `df.plot` uses the index for x by default. Set the index first, or pass `x='column'`.
+
+<strong>How do I plot one column against another?</strong> Use `df.plot(x='a', y='b')`, or pass the columns to `ax.plot` directly.
+
+<strong>How do I get dates formatted well?</strong> Use a `DatetimeIndex`. pandas then picks sensible date ticks for you, and you can adjust them with matplotlib's date tools.
+
+<strong>Should I aggregate before plotting?</strong> Yes. Use `groupby` or `resample` first, so the chart draws the summary rather than every raw row.
 
 ## The short version
 
@@ -8145,6 +8373,20 @@ The recurring theme is that a chart is a piece of exchange. The reader's effort 
 The chart types worth avoiding. Pies with many slices, dual axes, truncated bars &mdash; are all cases where the display asks the reader to do a thing people do badly, or invites a conclusion the data doesn't support.
 
 And the most handy single constraint remains the simplest. One chart, one message. Almost each design question resolves once that is decided.
+
+## Questions people ask
+
+<strong>How do I choose a chart type?</strong> Start with the question. Comparison suits bars, trend suits lines, distribution suits histograms, and relationship suits scatter plots.
+
+<strong>When is a pie chart acceptable?</strong> For a few parts of one whole, when one slice is clearly the largest. Otherwise bars are easier to compare.
+
+<strong>Should I use 3D charts?</strong> Rarely. Depth distorts lengths and hides data behind other data. A 2D chart with colour or facets usually works better.
+
+<strong>What if no single chart works?</strong> Split the question. Two simple charts almost always beat one crowded one.
+
+<strong>How many series can one chart hold?</strong> About five. Past that, use small multiples or highlight one series against grey.
+
+<strong>Does the audience matter?</strong> Yes. A specialist reads a box plot easily, while a general audience may need a bar chart with labelled values.
 
 ## Reading the code back
 
@@ -8645,6 +8887,20 @@ Nearly each speed problem in matplotlib is a display problem in disguise: drawin
 
 Fixing it by drawing less. Aggregating, subsampling with care, rasterising a dense layer &mdash; makes the chart faster and often more readable also. This Is unusual among optimisations.
 
+## Questions people ask
+
+<strong>Why is my plot slow?</strong> Usually too many artists, such as a loop that makes thousands of lines, or too many points to be seen on screen.
+
+<strong>How do I plot a million points?</strong> Downsample, aggregate into bins, use `hexbin`, or draw one `plot` call with an array rather than many calls.
+
+<strong>Is `scatter` slower than `plot`?</strong> Yes, for large arrays. `plot` with a marker and no line draws one artist, while `scatter` tracks per-point properties.
+
+<strong>What does `rasterized=True` do?</strong> It draws that artist as pixels inside a vector file, which keeps PDF and SVG sizes small.
+
+<strong>How do I speed up animation?</strong> Update artist data with `set_data` instead of redrawing, and use blitting where the backend supports it.
+
+<strong>How do I find out what is slow?</strong> Time the plotting calls with `time.perf_counter` or `cProfile`. Often the saving step, not drawing, dominates.
+
 ## Reading the code back
 
 speed work here is a short list checked in order. Is there a loop creating artists, are there more points than pixels, are figures being closed, is the output vector with a dense layer in it. Four questions. The first two account for nearly all. None of them needs knowing anything about how matplotlib renders.
@@ -9043,6 +9299,20 @@ A chart with the right data, the right type and the wrong spacing looks unfinish
 The methods are few: pick a figure size for the destination, let `constrained_layout` handle the spacing, reserve room for anything outside the axes. Check the saved file rather than the screen.
 
 Doing that always is most of the gap between charts that look made and charts that look exported.
+
+## Questions people ask
+
+<strong>Why are my labels cut off or overlapping?</strong> The default spacing does not account for label size. Use `layout='constrained'` or `fig.tight_layout()`.
+
+<strong>What is the difference between `tight_layout` and constrained layout?</strong> `tight_layout` adjusts once when called. Constrained layout recalculates as you add elements, and handles colorbars and legends better.
+
+<strong>How do I set the figure size?</strong> Pass `figsize=(width, height)` in inches to `plt.figure` or `plt.subplots`.
+
+<strong>How do I move a legend outside the axes?</strong> Use `bbox_to_anchor` with `loc`, then save with `bbox_inches='tight'` so it is not cropped.
+
+<strong>How do I control the gap between panels?</strong> Use `fig.subplots_adjust(wspace=..., hspace=...)`, or `GridSpec` spacing arguments.
+
+<strong>How do I set the aspect ratio of one plot?</strong> Use `ax.set_aspect('equal')` for equal units, or `ax.set_box_aspect(0.5)` for a fixed box shape.
 
 ## The short version
 
@@ -9514,6 +9784,20 @@ A concrete example of the routine, on the most common complaint: "the chart is w
 **Look at it in greyscale.**
 
 The order matters because each step is cheaper than the next. The first one resolves the majority. The instinct to start by reading matplotlib docs is often the slowest on hand route.
+
+## Questions people ask
+
+<strong>What is the most common mistake?</strong> A mismatch between what the chart says and what the reader takes from it, such as a truncated bar axis or an unlabelled unit.
+
+<strong>Why do my plots stack up on the same figure?</strong> Without a new figure or `ax.clear()`, `plt` keeps drawing to the current axes. Create a figure per chart.
+
+<strong>Why does my chart show nothing in a script?</strong> You forgot `plt.show()`, or you saved before drawing. Check the order of calls.
+
+<strong>Is it a mistake to use default colours?</strong> Not by itself. It becomes one when colours carry no meaning, or when they are hard to tell apart.
+
+<strong>Why do I get a warning about the legend?</strong> No artist had a label. Pass `label=` when you plot.
+
+<strong>How do I avoid the most common errors?</strong> Label axes with units, start bars at zero, limit series per chart, and look at the figure at the size it will be viewed.
 
 ## The short version
 

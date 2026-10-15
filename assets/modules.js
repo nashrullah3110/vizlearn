@@ -657,7 +657,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Push a signal vector through the same contractive layer twenty times, with and without an identity shortcut, and watch one collapse toward zero while the other never can."
+  "desc": "Push a signal through twenty contractive layers with and without an identity shortcut. One collapses toward zero; the other never can."
  },
  {
   "title": "Resizing and Interpolation",
@@ -1825,7 +1825,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Stretch one document's vector and watch dot-product ranking promote it purely for being longer, while cosine ranking never moves. Two different questions, one embedding."
+  "desc": "Stretch a document vector and watch dot-product ranking promote it for being longer, while cosine ranking stays put."
  },
  {
   "title": "Embeddings and Vector Search",
@@ -1881,7 +1881,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Interactive lab on LLM next-word prediction - see logits become probabilities through softmax, and how temperature, top-k and top-p sampling reshape the distribution."
+  "desc": "See logits become probabilities through softmax, and watch temperature, top-k and top-p sampling reshape which word the model picks."
  },
  {
   "title": "How LLMs Process Text?",
@@ -1993,7 +1993,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "A terse question shares almost no vocabulary with the formal passage that answers it. Expand the query, or embed a hypothetical answer instead, and watch it climb the ranking."
+  "desc": "A terse question shares few words with the passage that answers it. Expand the query or embed a hypothetical answer and watch it climb."
  },
  {
   "title": "Query, embedding and prompt caching",
@@ -2420,6 +2420,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Shrink and expand a sliding window until it holds every character of t. Track character counts in a dictionary and record the smallest valid span."
  },
  {
+  "title": "Modifying a Collection While Iterating Over It",
+  "path": "interview/modifying-a-collection-while-iterating.html",
+  "category": "Interview",
+  "topic": "interview",
+  "icon": "interview",
+  "desc": "See what breaks when you delete from a list or dict mid-loop. Trace the iterator state, watch the error, and learn the safe alternatives."
+ },
+ {
   "title": "Product of array except self",
   "path": "interview/product-of-array-except-self.html",
   "category": "Interview",
@@ -2562,14 +2570,6 @@ window.VIZLEARN_MODULES = [
   "topic": "interview",
   "icon": "interview",
   "desc": "Slice a Python string and measure the cost. See that slicing copies the data every time, count the bytes moved, and spot when it hides an O(n) hit."
- },
- {
-  "title": "What happens if you modify a collection while looping over it?",
-  "path": "interview/modifying-a-collection-while-iterating.html",
-  "category": "Interview",
-  "topic": "interview",
-  "icon": "interview",
-  "desc": "See what breaks when you delete from a list or dict mid-loop. Trace the iterator state, watch the error, and learn the safe alternatives."
  },
  {
   "title": "What is a Python list underneath?",
@@ -3473,7 +3473,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Interactive walkthrough of the Forget Gate in an LSTM cell - see how a sigmoid between 0 and 1 erases or preserves the cell state, and how forgetting compounds over time."
+  "desc": "See how a sigmoid between 0 and 1 erases or preserves the cell state, and how forgetting compounds over successive time steps."
  },
  {
   "title": "GloVe",
@@ -3593,7 +3593,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Interactive walkthrough of the Output Gate in an LSTM cell - see how it filters the cell state through tanh to produce the hidden state that the rest of the network sees."
+  "desc": "See how the output gate filters the cell state through tanh to produce the hidden state that the rest of the network sees."
  },
  {
   "title": "Positional Encoding",

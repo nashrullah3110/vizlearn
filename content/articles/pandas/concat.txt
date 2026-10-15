@@ -359,6 +359,20 @@ The double aggregation is the pattern: reduce per file, combine, reduce again. I
 
 That gap, between aggregations that break down and those that don't, is worth knowing before designing a pipeline around chunked reading.
 
+## Questions people ask
+
+<strong>What is the difference between concat and merge?</strong> concat stacks frames by position along an axis, aligning by labels on the other axis. merge joins on column values or the index, like a SQL join. Use concat when the frames share a schema and you want all the rows; use merge when you need to match rows by a key.
+
+<strong>Why does concat produce NaN columns?</strong> When two frames have different column names and you stack rows, the default outer join keeps every column. Rows from the frame that lacked a column get NaN there. Pass join="inner" to keep only columns present in all frames.
+
+<strong>Should I use ignore_index=True?</strong> Yes, if the original row labels carry no meaning. Without it, concat preserves the original indices, so you get duplicate index values that cause confusing results with loc.
+
+<strong>Why is concat inside a loop slow?</strong> Each call copies every row accumulated so far plus the new rows. Over n iterations that is O(n squared) copies. Collect the frames in a list and call concat once at the end.
+
+<strong>Can I concat along columns instead of rows?</strong> Yes, pass axis=1. The frames are then aligned by their row index. If the indices do not match, the result gets NaN in the mismatched positions.
+
+<strong>How do I keep track of which frame each row came from?</strong> Pass the keys parameter with a list of labels. concat adds a MultiIndex level that tags each group of rows with its key.
+
 ## In summary
 
 Row stacking aligns columns by name. Column stacking aligns the index by label. Knowing which axis you're joining along tells you which axis is doing the matching. That predicts each surprise this function makes.

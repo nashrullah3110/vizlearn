@@ -230,6 +230,20 @@ blurred.
 **given the latent dims mean any of it on their own.** They aren't
 sorted or disentangled unless a thing in the training made them so.
 
+## Questions people ask
+
+<strong>What is an autoencoder?</strong> A network trained to reproduce its input after squeezing it through a narrow bottleneck. The bottleneck forces it to learn a compact code.
+
+<strong>How is an autoencoder related to PCA?</strong> A linear autoencoder with squared error learns the same subspace as PCA. Non-linear activations let it capture curved structure that PCA cannot.
+
+<strong>Why not just make the bottleneck as big as the input?</strong> Then the network can learn the identity function and copy the input without learning anything useful. A small bottleneck, noise or a sparsity penalty prevents that.
+
+<strong>What is a denoising autoencoder?</strong> One trained to recover the clean input from a corrupted copy. This pushes it to learn the structure of the data rather than memorise it.
+
+<strong>What are autoencoders used for?</strong> Dimensionality reduction, anomaly detection through high reconstruction error, pretraining and compression. They are not good generators by themselves.
+
+<strong>How do I choose the bottleneck size?</strong> Plot reconstruction error against code size and look for the elbow. Beyond the elbow, extra dimensions add little.
+
 ## Train one, then look at what the bottleneck kept
 
 An autoencoder learns to copy its own input through a narrow layer. Training one on data with a known hidden structure shows what a bottleneck forces it to discover -- and where PCA does the job better.
@@ -608,6 +622,20 @@ without the latent. Anneal the KL, or weaken the decoder.
 **Reading latent dims as real.** A plain VAE isn't disentangled;
 beta-VAE pushes it and doesn't ensure it.
 
+## Questions people ask
+
+<strong>How is a VAE different from an autoencoder?</strong> The encoder outputs a distribution (mean and variance) rather than a single point, and a KL term keeps those distributions close to a standard normal. This makes the latent space smooth enough to sample from.
+
+<strong>What is the reparameterisation trick?</strong> Write the sample as mean plus standard deviation times random noise. The randomness moves into an input, so gradients can flow through the mean and variance.
+
+<strong>What are the two terms in the loss?</strong> A reconstruction term that rewards accurate output, and a KL term that regularises the latent distribution. Their balance sets the trade-off between sharpness and a well-organised latent space.
+
+<strong>Why are VAE samples blurry?</strong> The pixel-wise reconstruction loss averages over plausible outputs. A sharper decoder loss, or a larger model, helps.
+
+<strong>What is posterior collapse?</strong> The decoder ignores the latent code and the KL goes to zero. Fixes include KL annealing, free bits and a weaker decoder.
+
+<strong>What is a beta-VAE?</strong> A VAE with the KL term multiplied by a factor beta. A larger beta pushes towards disentangled factors, at the cost of reconstruction quality.
+
 ## The two terms in the loss, and what each one buys
 
 A VAE is an autoencoder whose code is a spread rather than a point. That one change adds a second loss term. The balance between the two is the whole action.
@@ -907,6 +935,20 @@ samples are good. Look at samples.
 range, not the quality.
 
 **Expecting a likelihood.** There isn't one.
+
+## Questions people ask
+
+<strong>How does a GAN work?</strong> A generator turns noise into samples while a discriminator tries to tell them from real data. Each improves by competing with the other.
+
+<strong>What is mode collapse?</strong> The generator produces only a few kinds of output that fool the discriminator, ignoring the rest of the data. Diversity drops even when individual samples look fine.
+
+<strong>Why are GANs hard to train?</strong> Two networks chase moving targets. If the discriminator wins too early, its gradient to the generator vanishes.
+
+<strong>How do I know when a GAN has converged?</strong> You cannot rely on the loss, which does not track quality. Use metrics such as FID and inspect samples regularly.
+
+<strong>What are common fixes for instability?</strong> Use Wasserstein loss with a gradient penalty, spectral normalisation, a lower learning rate for the discriminator, and balanced update schedules.
+
+<strong>When should I choose a GAN over a diffusion model?</strong> When you need fast single-pass sampling, such as real-time use. For quality and coverage, diffusion models are now more common.
 
 ## Two networks, one moving target
 
@@ -1219,6 +1261,20 @@ range.
 
 **given the model predicts the image.** Most predict the noise, and confusing
 the two makes the sampling code nonsense.
+
+## Questions people ask
+
+<strong>How does a diffusion model generate images?</strong> It starts from pure noise and removes a little noise at each step with a trained network, until a clean sample remains.
+
+<strong>What does the network actually predict?</strong> Usually the noise that was added to a noisy input, from which the clean image or the score can be derived.
+
+<strong>Why is training cheap even though sampling takes many steps?</strong> The forward noising has a closed form, so you can jump to any step directly. Each training step needs only one random timestep.
+
+<strong>Why is sampling slow, and how is it sped up?</strong> It needs hundreds of sequential network calls. DDIM, better samplers and distillation cut that to a few dozen steps or fewer.
+
+<strong>How are diffusion models compared with GANs?</strong> They train more stably and cover the data distribution better, at the cost of slower generation. GANs are fast but prone to mode collapse.
+
+<strong>What is the noise schedule?</strong> The list of how much noise is added at each step. Poor schedules leave signal in the last step or waste steps, so it affects quality.
 
 ## Destroy the data, then learn to undo it one step at a time
 
@@ -1565,6 +1621,20 @@ you can prompt with words.
 **False negatives.** Two photos of the same class are pushed apart. The loss
 has no labels and cannot know they belong together. Guided contrastive learning
 fixes this when labels are on hand.
+
+## Questions people ask
+
+<strong>What is contrastive learning?</strong> A way to learn representations without labels by pulling together views of the same example and pushing apart different ones.
+
+<strong>What is the InfoNCE loss?</strong> A softmax cross-entropy over similarities. The positive pair should score higher than all negatives in the batch.
+
+<strong>What does the temperature do?</strong> It scales the similarities before the softmax. A low temperature sharpens the loss and focuses it on the hardest negatives, a high one treats all negatives alike.
+
+<strong>Why does batch size matter?</strong> Other examples in the batch serve as negatives, so a larger batch gives more of them. Methods like MoCo use a queue to get many negatives with small batches.
+
+<strong>Can it work without negatives?</strong> Yes. BYOL and SimSiam use a predictor and stop-gradient to avoid collapse, with no negative pairs.
+
+<strong>Why is augmentation so important?</strong> Augmentations define what counts as the same thing. Crops, colour jitter and blur tell the model which changes to ignore, and so shape what it learns.
 
 ## Learn what is similar without a single label
 
@@ -1937,6 +2007,20 @@ against the translation it buys.
 **Losing the cost.** Width `k` times both work and memory by
 `k`, and for a large model that is the binding constraint.
 
+## Questions people ask
+
+<strong>What is a seq2seq model?</strong> An encoder reads the input sequence into a representation and a decoder generates the output sequence one token at a time.
+
+<strong>Why is greedy decoding not enough?</strong> Picking the best token at each step can lock you into a poor path. A slightly worse first word may lead to a much better whole sentence.
+
+<strong>How does beam search work?</strong> It keeps the k best partial sequences at each step and extends all of them. At the end it returns the best complete one.
+
+<strong>Why does beam search favour short outputs?</strong> Each token multiplies in a probability below one, so longer sequences score lower. Length normalisation or a length penalty corrects this.
+
+<strong>Is a larger beam always better?</strong> No. Past a modest width, quality can drop, and very wide beams tend to produce bland, repetitive text.
+
+<strong>When do I sample instead?</strong> For creative generation where diversity matters. Use top-k or nucleus sampling rather than a beam, which suits tasks with a single right answer such as translation.
+
 ## Greedy decoding, and the sentence it cannot find
 
 At each step a decoder picks a token. Taking the most likely one each time isn't the same as finding the most likely sentence -- here is a case where it demonstrably isn't.
@@ -2294,6 +2378,20 @@ subword tokenisation avoids the question.
 **Reading likeness as meaning.** Embedding nearness reflects co-hit in
 the training data, which isn't the same thing.
 
+## Questions people ask
+
+<strong>What is an embedding layer?</strong> A trainable lookup table that maps each integer ID to a dense vector. The vectors are learned by backpropagation like any other weight.
+
+<strong>How is it different from one-hot plus a linear layer?</strong> It is mathematically the same, but a lookup reads one row instead of multiplying by a mostly-zero matrix. It is far faster and uses less memory.
+
+<strong>How large should the embedding dimension be?</strong> A rough rule is the fourth root of the vocabulary size, but it is tuned in practice. Common values are 64 to 1024 depending on the task.
+
+<strong>What happens to unknown IDs?</strong> You must reserve an index for them, often 0 or a special unknown token. An out-of-range ID raises an error in most frameworks.
+
+<strong>Do embeddings only work for words?</strong> No. Users, products, categories, genes and positions can all be embedded. Anything with a discrete ID is a candidate.
+
+<strong>Should I use pretrained embeddings?</strong> They help when you have little data. With plenty of data, training from scratch or fine-tuning usually matches or beats them.
+
 ## A lookup table that learns what things mean
 
 An embedding layer is one-hot encoding times a weight mat, with the times skipped. This shows the equivalence, the cost saving, and what the learned vectors end up encoding.
@@ -2588,6 +2686,20 @@ mysterious NaNs.
 
 **given a speed-up.** It comes from the tensor cores. Layers that are
 memory-bound rather than find-bound gain little. Profile before expecting a win.
+
+## Questions people ask
+
+<strong>What is mixed precision training?</strong> Running most operations in 16-bit floats while keeping a 32-bit master copy of the weights. It saves memory and speeds up GPUs with tensor cores.
+
+<strong>Why is loss scaling needed?</strong> Small gradients underflow to zero in fp16. Multiplying the loss by a large factor shifts the gradients into representable range, then they are divided back.
+
+<strong>What is the difference between fp16 and bfloat16?</strong> bfloat16 keeps the exponent range of fp32 but fewer mantissa bits, so it rarely overflows and usually needs no loss scaling. fp16 has more precision but a narrow range.
+
+<strong>Which operations stay in fp32?</strong> Reductions, softmax, loss computation and the optimiser updates. They are sensitive to rounding and overflow.
+
+<strong>What are signs that it is going wrong?</strong> NaN losses, loss scale collapsing to a tiny value, or accuracy dropping below the fp32 baseline.
+
+<strong>Will it change my accuracy?</strong> Usually not. With a master copy and loss scaling, results match fp32 within normal run-to-run noise.
 
 ## Half the bits, and the two things that break
 
@@ -2901,6 +3013,20 @@ that buildup can't.
 
 **Expecting a speed-up.** It buys capability, not throughput.
 
+## Questions people ask
+
+<strong>What does gradient accumulation do?</strong> It sums gradients over several small batches and applies one optimiser step. You get the effect of a large batch without the memory.
+
+<strong>Is it identical to a real large batch?</strong> For the gradient, yes, once you divide the loss by the number of accumulation steps. Batch normalisation statistics still differ, since they see only the small batch.
+
+<strong>Why must I scale the loss?</strong> Gradients add up across micro-batches. Divide each loss by the step count, or the update will be that many times too big.
+
+<strong>When do I call optimizer.step()?</strong> Only every N micro-batches, followed by zero_grad. Calling backward each time without zeroing is what accumulates.
+
+<strong>Does it make training slower?</strong> Each update takes N forward and backward passes, so wall time per update grows. Throughput per sample is about the same.
+
+<strong>How does it interact with the learning rate?</strong> Treat the effective batch size as micro-batch times steps and scale the learning rate as you would for that larger batch.
+
 ## A large batch on a small GPU
 
 Building up grads over a few small batches before stepping is arithmetically the same to one large batch. This proves the identity, then shows the two things that aren't the same.
@@ -3189,6 +3315,20 @@ meaning without one.
 not a full fix on its own. Clear [temperature
 scaling](../machine_learning/probability_calibration.html) on a validation set
 helps more, and the two combine well together.
+
+## Questions people ask
+
+<strong>What is label smoothing?</strong> It replaces the one-hot target with a softer one, such as 0.9 for the true class and the remaining 0.1 spread over the others.
+
+<strong>Why does it help?</strong> Hard targets push the logits towards infinity, giving overconfident models. Smoothing caps the confidence and often improves generalisation and calibration.
+
+<strong>What value should I use?</strong> 0.1 is the common default. Values from 0.05 to 0.2 are typical, and large values hurt accuracy.
+
+<strong>Why does my loss never reach zero?</strong> Because the target is no longer one-hot, the minimum cross-entropy is the entropy of the smoothed target. That floor is expected.
+
+<strong>When does it hurt?</strong> In knowledge distillation, where the teacher's soft outputs matter, and in tasks needing sharp probabilities. It can also reduce the quality of a teacher model.
+
+<strong>How do I turn it on in PyTorch?</strong> Pass label_smoothing=0.1 to nn.CrossEntropyLoss. No change to the targets is needed.
 
 ## Tell the model it might be wrong
 

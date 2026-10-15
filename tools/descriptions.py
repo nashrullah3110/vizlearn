@@ -182,7 +182,7 @@ DESCRIPTIONS = {
     "computer_vision/object_detection_with_bounding_boxes.html":
         "Drag a predicted box toward the ground truth and watch IoU climb, the loss fall, and the detection flip from a miss to a match at the 0.5 threshold.",
     "computer_vision/resnet_and_identity_shortcuts.html":
-        "Push a signal vector through the same contractive layer twenty times, with and without an identity shortcut, and watch one collapse toward zero while the other never can.",
+        "Push a signal through twenty contractive layers with and without an identity shortcut. One collapses toward zero; the other never can.",
     "computer_vision/semantic_segmentation_unet.html":
         "Downsample a mask to see more context, then upsample it back, and watch the boundary blur unless a skip connection carries the resolution pooling just destroyed.",
 
@@ -374,8 +374,7 @@ DESCRIPTIONS = {
         "paste the winners into the prompt, and turn a guess into a cited answer.",
 
     "gen_ai/dot_product_vs_cosine_similarity.html":
-        "Stretch one document's vector and watch dot-product ranking promote it purely for "
-        "being longer, while cosine ranking never moves. Two different questions, one embedding.",
+        "Stretch a document vector and watch dot-product ranking promote it for being longer, while cosine ranking stays put.",
 
     "gen_ai/bm25_and_sparse_retrieval.html":
         "The keyword-matching half of search, computed live. Drag length normalization to "
@@ -411,8 +410,7 @@ DESCRIPTIONS = {
         "Split a question into a semantic query and a metadata filter, so \"after 2020\" "
         "becomes a rule that is enforced rather than a phrase that is matched.",
     "gen_ai/query_rewriting_and_hyde.html":
-        "A terse question shares almost no vocabulary with the formal passage that answers it. "
-        "Expand the query, or embed a hypothetical answer instead, and watch it climb the ranking.",
+        "A terse question shares few words with the passage that answers it. Expand the query or embed a hypothetical answer and watch it climb.",
 
     # --- Deep Learning, later additions ------------------------------------
     "deep_learning/backpropagation.html":
@@ -699,6 +697,14 @@ DESCRIPTIONS = {
         "Parse headings, lists and tables before splitting. See how structure-aware chunking keeps logical sections intact and beats character-based splitters.",
     "gen_ai/tf_idf.html":
         "Compute TF-IDF scores by hand, watch common words shrink and rare words rise, and see how a simple formula still powers keyword-based search.",
+    "gen_ai/how_llms_predict_next_word.html":
+        "See logits become probabilities through softmax, and watch temperature, top-k and top-p sampling reshape which word the model picks.",
+
+    # --- NLP (SEO batch) ----------------------------------------
+    "natural_language_processing/forget_gate_in_lstm.html":
+        "See how a sigmoid between 0 and 1 erases or preserves the cell state, and how forgetting compounds over successive time steps.",
+    "natural_language_processing/output_gate_in_lstm.html":
+        "See how the output gate filters the cell state through tanh to produce the hidden state that the rest of the network sees.",
 
     # --- Interview (SEO batch) -----------------------------------
     "interview/accidental-quadratic-complexity.html":

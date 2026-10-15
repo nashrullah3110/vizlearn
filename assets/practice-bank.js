@@ -10092,6 +10092,46 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "interview/modifying-a-collection-while-iterating.html",
+  "title": "Modifying a Collection While Iterating Over It",
+  "cat": "Interview",
+  "q": [
+   {
+    "t": "Deleting from a list while iterating over it:",
+    "o": [
+     "Raises RuntimeError",
+     "Silently skips elements",
+     "Works correctly",
+     "Raises IndexError"
+    ],
+    "a": 1,
+    "w": "Removing an element shifts the rest left while the loop index advances, so the shifted-in element is never visited. No error is raised, which makes it worse than the dict's behaviour."
+   },
+   {
+    "t": "Which dict operation during iteration is legal?",
+    "o": [
+     "Deleting a key",
+     "Adding a key",
+     "Assigning to a key that already exists",
+     "None of them"
+    ],
+    "a": 2,
+    "w": "Only a size change trips the check. Reassigning an existing key leaves the size alone, so it is allowed."
+   },
+   {
+    "t": "The preferred fix is:",
+    "o": [
+     "Iterate backwards",
+     "Build a new collection with a comprehension",
+     "Use a while loop",
+     "Catch the RuntimeError"
+    ],
+    "a": 1,
+    "w": "It mutates nothing, states the intent, and avoids the repeated O(n) removals. Iterating a copy is for when in-place mutation is genuinely required."
+   }
+  ]
+ },
+ {
   "path": "interview/product-of-array-except-self.html",
   "title": "Product of array except self",
   "cat": "Interview",
@@ -10863,46 +10903,6 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "memoryview shares the underlying buffer, so slicing it is O(1). It works on bytes-like objects, not on str."
-   }
-  ]
- },
- {
-  "path": "interview/modifying-a-collection-while-iterating.html",
-  "title": "What happens if you modify a collection while looping over it?",
-  "cat": "Interview",
-  "q": [
-   {
-    "t": "Deleting from a list while iterating over it:",
-    "o": [
-     "Raises RuntimeError",
-     "Silently skips elements",
-     "Works correctly",
-     "Raises IndexError"
-    ],
-    "a": 1,
-    "w": "Removing an element shifts the rest left while the loop index advances, so the shifted-in element is never visited. No error is raised, which makes it worse than the dict's behaviour."
-   },
-   {
-    "t": "Which dict operation during iteration is legal?",
-    "o": [
-     "Deleting a key",
-     "Adding a key",
-     "Assigning to a key that already exists",
-     "None of them"
-    ],
-    "a": 2,
-    "w": "Only a size change trips the check. Reassigning an existing key leaves the size alone, so it is allowed."
-   },
-   {
-    "t": "The preferred fix is:",
-    "o": [
-     "Iterate backwards",
-     "Build a new collection with a comprehension",
-     "Use a while loop",
-     "Catch the RuntimeError"
-    ],
-    "a": 1,
-    "w": "It mutates nothing, states the intent, and avoids the repeated O(n) removals. Iterating a copy is for when in-place mutation is genuinely required."
    }
   ]
  },

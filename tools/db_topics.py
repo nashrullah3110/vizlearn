@@ -251,6 +251,20 @@ it simply doesn't also have to be the value scattered across a dozen tables. Tha
 is the thinking behind "surrogate main key plus a unique natural key" &mdash;
 stable, compact identity for the machine, and the business rule kept as well.
 
+## Questions people ask
+
+<strong>Can a table have more than one primary key?</strong> No. A table has exactly one primary key, though it can span several columns. Other columns that must be unique can use a UNIQUE constraint instead.
+
+<strong>Can a foreign key be NULL?</strong> Yes. A NULL foreign key means no reference, and the database skips the check for that row. Add NOT NULL to the column if every child must have a parent.
+
+<strong>Does a foreign key create an index?</strong> Not on the child side. The parent key is indexed because it is a primary or unique key, but the referencing column needs its own index if you join or cascade on it.
+
+<strong>Should I use an auto-increment integer or a UUID as the primary key?</strong> An integer is smaller and sorts in insert order, which keeps the index compact. A UUID is useful when ids are generated in many places, at the cost of larger keys and scattered inserts.
+
+<strong>What happens if I delete a parent row that has children?</strong> By default the delete is refused. You can choose ON DELETE CASCADE to remove the children, or SET NULL to keep them with no parent.
+
+<strong>Why does my foreign key not stop bad inserts in SQLite?</strong> SQLite leaves enforcement off unless you run PRAGMA foreign_keys = ON on each connection. Without it the REFERENCES clause is accepted and ignored.
+
 ## Where it goes wrong
 
 **Turning foreign keys off for speed.** They cost a thing on write. The
@@ -466,6 +480,20 @@ policy. A `CHECK` on this year's VAT rate has to be dropped and re-verified acro
 each row each time the rate changes. Re-verifying a large table is the
 costly op above, paid on a schedule set by the tax authority rather
 than by you.
+
+## Questions people ask
+
+<strong>What is the difference between NOT NULL and a CHECK constraint?</strong> NOT NULL rejects missing values. CHECK evaluates any condition on the row, such as price greater than zero, and rejects the row if it is false.
+
+<strong>Does UNIQUE allow multiple NULLs?</strong> In most databases, yes, because NULL is not equal to NULL. SQL Server is a notable exception that allows only one, so check your engine.
+
+<strong>Is DEFAULT a constraint?</strong> No. DEFAULT only fills in a value when none is given. It does not stop someone inserting a different value or an explicit NULL.
+
+<strong>Why not validate everything in application code?</strong> Application checks can be bypassed by another service, a script, or a bug. A constraint is enforced for every writer, so the rule holds no matter who connects.
+
+<strong>Will adding a constraint to a big table lock it?</strong> It can. The database has to check every existing row, and some engines hold a lock while doing so. Many support adding the constraint as not validated first, then validating later.
+
+<strong>What error do I get when a constraint fails?</strong> The statement is rejected with an error naming the constraint, and no row from that statement is written. Read the message, because it tells you which rule was broken.
 
 ## Where it goes wrong
 
@@ -719,6 +747,20 @@ subtotals by group and then does math on the subtotals will show blanks, not
 zeros, for the empty groups. And a blank where a number was expected is how
 this surfaces, often in front of someone who trusts the report.
 
+## Questions people ask
+
+<strong>What is the difference between COUNT(*) and COUNT(column)?</strong> COUNT(*) counts rows. COUNT(column) counts only rows where that column is not NULL, so the two can differ.
+
+<strong>Do aggregate functions ignore NULL?</strong> Yes, SUM, AVG, MIN, MAX and COUNT(column) all skip NULLs. That is why AVG of a column can differ from the sum divided by the row count.
+
+<strong>What does SUM return on an empty set?</strong> NULL, not zero. Wrap it in COALESCE(SUM(x), 0) if you want a zero.
+
+<strong>Why can I not use an aggregate in WHERE?</strong> WHERE filters rows before grouping, so the aggregate does not exist yet. Use HAVING to filter on aggregate results.
+
+<strong>Why does SQL complain about columns not in GROUP BY?</strong> Each output row represents a group, so every selected column must be either grouped or aggregated. Otherwise the database has no single value to show.
+
+<strong>How do I count distinct values?</strong> Use COUNT(DISTINCT column). It counts each different non-NULL value once, though it is slower than a plain count on large tables.
+
 ## Where it goes wrong
 
 **Using AVG on data where NULL means zero.** The mean silently rises. Use
@@ -969,6 +1011,20 @@ want to count them. So the habit worth forming is `EXISTS` for "is there at leas
 one", never `COUNT(*) > 0`: the question is existence, and existence is answered
 by the first row, not the last.
 
+## Questions people ask
+
+<strong>Is EXISTS faster than IN?</strong> Not always. Modern optimisers often turn both into the same plan. EXISTS can stop at the first match, which helps when the subquery is large.
+
+<strong>Why does NOT IN return no rows when the subquery has a NULL?</strong> Because x NOT IN (1, NULL) evaluates to unknown, never true. Use NOT EXISTS, or filter NULLs out of the subquery.
+
+<strong>When should I use a JOIN instead of EXISTS?</strong> Use a JOIN when you need columns from the other table. Use EXISTS when you only need to know whether a match exists.
+
+<strong>Can a JOIN return duplicate rows where EXISTS does not?</strong> Yes. If one parent matches many children, a JOIN returns the parent once per child. EXISTS returns each parent once.
+
+<strong>What does SELECT 1 inside EXISTS mean?</strong> Nothing special. EXISTS only checks whether any row comes back, so the selected columns are ignored.
+
+<strong>How do I find rows with no match?</strong> Use NOT EXISTS, or a LEFT JOIN with a WHERE clause that checks the right side is NULL. Both are safe with NULLs.
+
 ## Where it goes wrong
 
 **`NOT IN` on any of it nullable.** The query returns zero rows and looks like a
@@ -1210,6 +1266,20 @@ steps each &mdash; the difference between a query that returns and one that does
 not. The index on the parent column that a foreign key would give you is on
 the *referenced* side. The self-join reads the *referencing* column, which is the
 one that often lacks an index. This is easy to miss until the table grows.
+
+## Questions people ask
+
+<strong>What is a self join?</strong> It is a join of a table to itself, using two different aliases so each copy can be referred to separately.
+
+<strong>Why do I need aliases in a self join?</strong> Without aliases the column names are ambiguous, because both copies share the same names. Aliases such as e and m let you say which copy you mean.
+
+<strong>How do I stop a self join pairing a row with itself?</strong> Add a condition such as a.id <> b.id. For unordered pairs use a.id < b.id, which also removes mirrored duplicates.
+
+<strong>Why does the top of my hierarchy vanish from the result?</strong> An inner join drops rows with no match, and the top manager has no manager. Use a LEFT JOIN to keep them.
+
+<strong>How many levels can a self join walk?</strong> One level per join. For a hierarchy of unknown depth, use a recursive CTE instead.
+
+<strong>Are self joins slow?</strong> They are as fast as the join condition allows. Index the column you join on, such as manager_id, and they stay quick.
 
 ## Where it goes wrong
 
@@ -1493,6 +1563,20 @@ path &mdash; is stricter and costs a substring check per row, and it's the right
 choice when the data is a graph rather than a tree and genuine repeats are
 expected.
 
+## Questions people ask
+
+<strong>What are the two parts of a recursive CTE?</strong> An anchor query that supplies the starting rows, and a recursive query that refers to the CTE itself. They are joined with UNION or UNION ALL.
+
+<strong>How does a recursive CTE know when to stop?</strong> It stops when the recursive part returns no new rows. If it never does, you need your own limit.
+
+<strong>What causes infinite recursion?</strong> A cycle in the data, such as A pointing to B and B pointing to A. Track visited ids or add a depth limit.
+
+<strong>Should I use UNION or UNION ALL in a recursive CTE?</strong> UNION ALL is faster. UNION removes duplicates each round, which can break cycles but costs more.
+
+<strong>Can a recursive CTE generate rows from nothing?</strong> Yes. Start with a single row and add one each step, for example to build a row for every date in a range.
+
+<strong>What is the difference between a recursive CTE and a self join?</strong> A self join walks a fixed number of levels. A recursive CTE repeats until there is nothing left, so it handles any depth.
+
 ## Where it goes wrong
 
 **No termination guard.** Cyclic data plus `UNION ALL` runs forever.
@@ -1734,6 +1818,20 @@ rows, can right switch to a scan in production against millions with a
 different spread. The plan changing under you is the tuner doing its
 job, not misbehaving.
 
+## Questions people ask
+
+<strong>What does EXPLAIN actually show?</strong> The plan the database intends to follow: which tables it reads, which indexes it uses, and in what order. It does not run the query unless you ask for ANALYZE.
+
+<strong>What is the difference between SCAN and SEARCH?</strong> SCAN reads every row in the table. SEARCH uses an index to jump to matching rows.
+
+<strong>Why is my index not being used?</strong> Common causes are a function wrapped around the column, a leading wildcard in LIKE, a mismatched type, or a filter that matches most of the table.
+
+<strong>Is a table scan always bad?</strong> No. On a small table, or when you need most of the rows, a scan is cheaper than going through an index.
+
+<strong>What is the difference between EXPLAIN and EXPLAIN ANALYZE?</strong> EXPLAIN shows estimates. EXPLAIN ANALYZE runs the query and shows actual row counts and timings, so you can spot bad estimates.
+
+<strong>Why does the plan change when the data grows?</strong> The optimiser picks plans from table statistics. As row counts and value spread change, a different plan can become cheaper.
+
 ## Where it goes wrong
 
 **Guessing instead of asking.** The plan is one command away and settles the
@@ -1964,6 +2062,20 @@ lookup on the composite &mdash; and neither gives the sorting for
 more capable for queries that lead with `status`. This Is why column order is a
 design choice: it's chosen for the queries you really run, and it's the
 leading column that a second query can borrow, never the trailing one.
+
+## Questions people ask
+
+<strong>What is the leftmost prefix rule?</strong> A composite index on (a, b, c) can serve queries filtering on a, on a and b, or on all three. It cannot efficiently serve a query filtering only on b.
+
+<strong>Does column order in a composite index matter?</strong> Yes. Put equality filters first, then the range or sort column. The order decides which queries the index can help.
+
+<strong>What is a covering index?</strong> An index that holds every column the query needs, so the database never reads the table rows. It is often shown as a covering index in the plan.
+
+<strong>Are two single-column indexes the same as one composite index?</strong> No. The database can usually use only one of them well, while a composite index narrows on both columns together.
+
+<strong>What is the cost of adding more indexes?</strong> Each index slows inserts, updates and deletes, and takes disk space. Add them for queries that run often.
+
+<strong>Can a composite index help ORDER BY?</strong> Yes, if the index order matches the sort order after the equality columns, the database can read rows already sorted and skip the sort.
 
 ## Where it goes wrong
 
@@ -2223,6 +2335,20 @@ outliers a level *permits*, and an engine may prevent more &mdash; and it's why
 the level a system runs at is a fact about the engine as much as about the
 `SET` statement.
 
+## Questions people ask
+
+<strong>What are the four standard isolation levels?</strong> READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ and SERIALIZABLE. Each one blocks more anomalies than the one before.
+
+<strong>What is a dirty read?</strong> Reading data another transaction has written but not yet committed. If that transaction rolls back, you acted on data that never existed.
+
+<strong>What is the difference between a non-repeatable read and a phantom?</strong> A non-repeatable read sees an existing row change between two reads. A phantom sees new rows appear that match your filter.
+
+<strong>Which isolation level should I use by default?</strong> READ COMMITTED is the default in PostgreSQL and many others, and it is fine for most work. Raise it only where a specific anomaly would hurt.
+
+<strong>Does SERIALIZABLE mean transactions run one at a time?</strong> No. It means the result is the same as if they had, but the database may run them together and abort one with a serialization error. Your code must retry.
+
+<strong>Do isolation levels prevent lost updates?</strong> Not always. A read-then-write pattern can lose updates even under READ COMMITTED. Use SELECT FOR UPDATE, an atomic UPDATE, or a version column.
+
 ## Where it goes wrong
 
 **given a default.** They differ between engines, and code written against
@@ -2447,6 +2573,20 @@ become a livelock: no cycle in the wait graph. But Two transactions retrying in
 step and failing each other forever. The fix for a deadlock and the fix for the
 retry storm it can cause are different, and both are needed.
 
+## Questions people ask
+
+<strong>What is a deadlock?</strong> Two or more transactions each hold a lock the other needs, so none can proceed. The database detects the cycle and aborts one.
+
+<strong>Is a deadlock the same as a slow lock wait?</strong> No. A wait ends when the holder commits. A deadlock is a cycle that can never resolve without intervention.
+
+<strong>How do I prevent deadlocks?</strong> Make every transaction take locks in the same order, keep transactions short, and avoid waiting on user input while holding locks.
+
+<strong>What should my code do after a deadlock error?</strong> Roll back and retry the whole transaction, ideally with a short random delay so the two sides do not collide again.
+
+<strong>Which transaction does the database kill?</strong> Usually the one that is cheapest to roll back, though the rule differs between engines. You cannot rely on being the survivor.
+
+<strong>Can an index help avoid deadlocks?</strong> Yes. Without a good index, a statement may lock many more rows than it needs, which raises the chance of overlap.
+
 ## Where it goes wrong
 
 **Treating it as a DB configuration problem.** No setting blocks
@@ -2634,6 +2774,20 @@ picks its version. A snapshot of 120 keeps seeing 1000 no matter how many times
 mechanism by which a long report runs undisturbed beside a stream of writes. It's also why the visible version is found without a scan of the history: the
 engine keeps versions chained newest-first and walks until the check first
 succeeds, which for a recently-read row is often the very first link.
+
+## Questions people ask
+
+<strong>What does MVCC stand for?</strong> Multi-Version Concurrency Control. The database keeps several versions of a row so readers and writers do not block each other.
+
+<strong>Do readers block writers under MVCC?</strong> No. Readers see a snapshot of older versions while writers create new ones, so neither waits for the other.
+
+<strong>Does MVCC remove the need for locks?</strong> No. Two writers changing the same row still conflict, and the second one waits or fails.
+
+<strong>What is VACUUM and why does PostgreSQL need it?</strong> Old row versions pile up after updates and deletes. VACUUM reclaims their space once no transaction can still see them.
+
+<strong>Why can a long-running transaction cause table bloat?</strong> It holds an old snapshot, so the database cannot discard any version that snapshot might need.
+
+<strong>How does a transaction decide which version it can see?</strong> Each version records which transaction created and removed it. A transaction sees the versions committed before its snapshot was taken.
 
 ## Where it goes wrong
 
@@ -2862,6 +3016,20 @@ table &mdash; two million rows, not 120 million &mdash; fits in memory instead o
 spilling to disk. This is why data warehouses split fact and dim tables
 on the join key: the join, not just the scan, gets cut into pieces the engine can
 hold.
+
+## Questions people ask
+
+<strong>What is partitioning?</strong> Splitting one large table into smaller pieces, called partitions, that are stored separately but queried as one table.
+
+<strong>What is the difference between range and hash partitioning?</strong> Range splits by value ranges such as dates. Hash spreads rows evenly using a hash of the key.
+
+<strong>What is partition pruning?</strong> The planner skips partitions that cannot contain matching rows. It only works when the query filters on the partition key.
+
+<strong>Is partitioning the same as sharding?</strong> No. Partitioning splits a table inside one database server. Sharding spreads data across several servers.
+
+<strong>How do I choose a partition key?</strong> Pick the column most queries filter on, such as a date for time-series data. A poor choice leaves queries touching every partition.
+
+<strong>Does partitioning always make queries faster?</strong> No. It helps when queries prune partitions or when old data is dropped by detaching a partition. Otherwise it adds overhead.
 
 ## Where it goes wrong
 
@@ -3092,6 +3260,20 @@ event into the common case, and the only cures are to make each shard far more
 solid (the third row) or to avoid the fan-out by putting the shard key in the
 query. This is why a single degraded node makes an entire sharded tier feel slow,
 and why "the mean shard is fast" is the wrong thing to measure.
+
+## Questions people ask
+
+<strong>What is sharding?</strong> Splitting data across multiple database servers, so each holds only part of it. Each part is called a shard.
+
+<strong>When should I shard?</strong> Only after cheaper options fail: better indexes, read replicas, caching and a bigger machine. Sharding adds a lot of complexity.
+
+<strong>What makes a good shard key?</strong> One that spreads data and traffic evenly and appears in most queries. A bad key creates a hot shard that takes most of the load.
+
+<strong>Why are cross-shard joins hard?</strong> The rows live on different servers, so the join has to move data over the network or be done in application code.
+
+<strong>What is rebalancing?</strong> Moving data between shards when you add or remove servers. Consistent hashing reduces how much data has to move.
+
+<strong>Why does the slowest shard set the latency?</strong> A query that fans out to every shard must wait for all of them. One slow shard delays the whole answer.
 
 ## Where it goes wrong
 
@@ -3339,6 +3521,20 @@ Which is why durability needs and replication mode are the same choice.
 Asynchronous replication means accepting that a failover can lose the most recent
 writes.
 
+## Questions people ask
+
+<strong>What is replication lag?</strong> The delay between a write on the primary and that write appearing on a replica. It can be milliseconds or much longer under load.
+
+<strong>What is a read-your-writes problem?</strong> A user writes data, then reads from a replica that has not caught up and does not see their own change. Route that read to the primary.
+
+<strong>What is the difference between synchronous and asynchronous replication?</strong> Synchronous waits for a replica to confirm before the write returns. Asynchronous returns right away, which is faster but can lose recent writes on failover.
+
+<strong>Do read replicas help with write load?</strong> No. Every replica must apply every write, so replicas scale reads only.
+
+<strong>What happens to writes during failover?</strong> If replication was asynchronous, writes the replica had not received are lost when it is promoted.
+
+<strong>How can I measure lag?</strong> Compare the primary's log position with the replica's, or use the lag figure your database exposes. Alert when it passes your tolerance.
+
 ## Where it goes wrong
 
 **given replicas are current.** They aren't, and the window is where the bugs
@@ -3561,6 +3757,20 @@ shares by one replica *and* still ends with a single node down, where the
 what Cassandra's `ONE` / `QUORUM` / `ALL` levels and DynamoDB's strongly-steady
 reads are selecting.
 
+## Questions people ask
+
+<strong>What do the letters in CAP stand for?</strong> Consistency, Availability and Partition tolerance.
+
+<strong>Can I really only pick two of the three?</strong> Not quite. Partitions happen on real networks, so the choice is what to give up during a partition: consistency or availability.
+
+<strong>What does a CP system do during a partition?</strong> It refuses some requests, or returns errors, to avoid serving inconsistent data.
+
+<strong>What does an AP system do during a partition?</strong> It keeps answering from each side, accepting that replicas may disagree until they can be reconciled later.
+
+<strong>What is PACELC?</strong> It extends CAP: if there is a Partition, choose Availability or Consistency; Else, choose Latency or Consistency. It covers the normal case too.
+
+<strong>What does R + W > N mean?</strong> With N replicas, reading from R and writing to W of them such that R + W exceeds N guarantees every read overlaps the latest write.
+
 ## Where it goes wrong
 
 **"We chose AP, so we gave up agreement."** You gave up linearisability during
@@ -3775,6 +3985,20 @@ this read cheap, and the relational shape pays a little at read time to keep eac
 fact in one place. Which way that trade should fall is a property of the workload, not of the
 DB &mdash; read-mostly and object-shaped leans doc, write-shared and
 queried-many-ways leans relational.
+
+## Questions people ask
+
+<strong>When is a document database a better fit than rows?</strong> When records are read and written whole, vary in shape, and are rarely joined to other records.
+
+<strong>What is denormalisation?</strong> Storing related data together, even if it repeats, so reads need no joins. It speeds reads and complicates updates.
+
+<strong>Can a relational database store JSON?</strong> Yes. PostgreSQL, MySQL and others have JSON column types with indexing, so the line between the models has blurred.
+
+<strong>Why are updates harder in documents?</strong> A repeated value, such as a customer name, must be changed in every document that copies it.
+
+<strong>Do document databases support joins?</strong> Some offer lookup operations, but they are not as flexible or fast as relational joins. Design documents around the queries you run.
+
+<strong>How do I choose between them?</strong> Look at your access pattern. Many cross-entity queries and strict integrity favour rows. Self-contained records read as a unit favour documents.
 
 ## Where it goes wrong
 
@@ -4037,6 +4261,20 @@ after this one" &mdash; none of which a hash can answer. So the choice isn't
 "key-value is faster" but "key-value is faster at point lookups and can't do
 ranges at all", which is just the trade to weigh before moving a workload off
 SQL for speed.
+
+## Questions people ask
+
+<strong>What is a key-value store good for?</strong> Fast lookups by a known key, such as sessions, caches and counters. It does one thing and does it quickly.
+
+<strong>Why is a key-value lookup O(1)?</strong> The key is hashed to find where the value is stored, so lookup time does not grow with the number of entries.
+
+<strong>What is a graph database?</strong> A database that stores nodes and the relationships between them, and makes following those links a primary operation.
+
+<strong>When does a graph beat SQL joins?</strong> When queries follow connections several hops deep, such as friends of friends. Each hop in SQL adds a join, while a graph follows stored links.
+
+<strong>Can I query a key-value store by value?</strong> Not directly. You can only look up by key unless the store adds secondary indexes, so design keys around your queries.
+
+<strong>Do I need to leave SQL for these workloads?</strong> Often not. Recursive CTEs handle many graph questions, and a table with a key column works as a simple key-value store. Switch when scale or traversal depth demands it.
 
 ## Where it goes wrong
 
@@ -4313,6 +4551,20 @@ with nothing to compress against. The compression isn't a feature bolted on. It
 is a consequence of putting like values next to like, and most of the resulting
 speed-up is simply that there's less to read.
 
+## Questions people ask
+
+<strong>What is the difference between OLTP and OLAP?</strong> OLTP handles many small reads and writes, such as orders. OLAP runs large analytical queries over many rows.
+
+<strong>Why are columnar stores faster for analytics?</strong> They read only the columns a query needs, and similar values stored together compress well.
+
+<strong>Why are row stores better for OLTP?</strong> A row is stored together, so reading or writing one whole record touches a single place on disk.
+
+<strong>Can I run analytics on my production database?</strong> You can for small data, but long scans compete with transactions for resources. Use a replica or a separate warehouse.
+
+<strong>What is ETL?</strong> Extract, transform, load: copying data from the transactional system into an analytical store, reshaping it on the way.
+
+<strong>Are the two types converging?</strong> Partly. Some systems offer hybrid storage or columnar extensions, but each design still favours one workload.
+
 ## Where it goes wrong
 
 **Reporting off the main.** Cache eviction makes the use slow, and the
@@ -4560,6 +4812,20 @@ warehouses scan the columns a query touches, a bloated fact table isn't just dis
 it's read on each query that goes near it. Narrow facts, wide dims isn't
 an aesthetic preference &mdash; it's keeping the big table small and the
 redundancy in the place where it's cheap.
+
+## Questions people ask
+
+<strong>What is a star schema?</strong> A central fact table of measurable events surrounded by dimension tables that describe them, such as product, customer and date.
+
+<strong>What is the grain of a fact table?</strong> What one row represents, for example one line item on one order. Settle it first, and keep it consistent.
+
+<strong>What is the difference between a fact and a dimension?</strong> Facts are numbers you add up. Dimensions are the descriptive attributes you filter and group by.
+
+<strong>Star schema or snowflake schema?</strong> A star keeps dimensions flat, with fewer joins. A snowflake normalises them, saving space but adding joins. Star is the usual default.
+
+<strong>What is a slowly changing dimension?</strong> A dimension whose attributes change over time, such as a customer's city. You choose whether to overwrite, or keep history with new rows.
+
+<strong>Why have a date dimension?</strong> It lets you group by week, quarter or holiday without computing them in every query, and it keeps date logic in one place.
 
 ## Where it goes wrong
 
@@ -4859,6 +5125,20 @@ fast.
 **ORMs help but don't immunise.** Their query builders parameterise by default,
 and each one of them has a raw-SQL escape hatch that doesn't. The escape hatch
 is where the vulnerabilities are.
+
+## Questions people ask
+
+<strong>What is SQL injection?</strong> An attack where user input is treated as SQL code, letting the attacker change what a query does.
+
+<strong>How do parameterised queries prevent it?</strong> The query text and the values are sent separately, so input is always treated as data and never parsed as SQL.
+
+<strong>Is escaping input enough?</strong> No. Escaping is easy to get wrong across encodings and contexts. Parameters are the reliable fix.
+
+<strong>Can I parameterise table or column names?</strong> No. Identifiers cannot be bound as parameters. Check them against an allowed list instead.
+
+<strong>Do ORMs protect me from injection?</strong> Mostly, but raw query helpers and string-built filters can still be injectable. Check that values go through parameters.
+
+<strong>What other defences should I add?</strong> Give the application account the fewest privileges it needs, validate input, and log failed queries. They limit damage if one slips through.
 
 ## Where it goes wrong
 

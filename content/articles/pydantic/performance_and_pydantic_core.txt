@@ -350,6 +350,20 @@ What changed in v2 is that this stopped being a live concern for plain code. che
 
 Validate once at the boundary, validate sets in a single call. Hand JSON straight to Pydantic. Then stop thinking about it. In v2 check is almost never the slow part.
 
+## Questions people ask
+
+<strong>Why is Pydantic v2 faster than v1?</strong> Validation and serialisation moved from Python to `pydantic-core`, a Rust library. The model's rules are compiled into a schema once and executed in native code.
+
+<strong>Do I need to install Rust?</strong> No. Wheels for common platforms ship on PyPI with the compiled core already built.
+
+<strong>What is the cheapest speedup?</strong> Use `model_validate_json` for JSON input, reuse `TypeAdapter` objects, and prefer built-in constraints over Python validators.
+
+<strong>Why is building a `TypeAdapter` in a loop slow?</strong> Each construction builds a new core schema. Create it once at module level and call `validate_python` on it.
+
+<strong>Are Python validators slow?</strong> Each call crosses from Rust into Python, which is much slower than a built-in constraint. Use `Field(ge=0)` where it can express the rule.
+
+<strong>When should I stop optimising?</strong> When the profile shows validation is a small share of request time. For most services, database and network calls dominate.
+
 ## A closing thought
 
 The most handy speed property of Pydantic v2 isn't that it's fast. It's that it's fast enough to stop being a consideration.

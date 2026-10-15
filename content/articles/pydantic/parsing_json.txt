@@ -338,6 +338,20 @@ Speed, because an entire mid form is skipped. Errors, because syntax and check f
 
 All of it from handing Pydantic the text instead of parsing it first. Which is also less code than the option.
 
+## Questions people ask
+
+<strong>Should I use `json.loads` then `model_validate`, or `model_validate_json`?</strong> Prefer `model_validate_json`. It parses and validates in one pass in Rust, which is faster and gives better error locations.
+
+<strong>Does `model_validate_json` accept bytes?</strong> Yes, both `str` and `bytes` work, so you can pass a request body directly without decoding.
+
+<strong>What happens when the JSON is malformed?</strong> You get a `ValidationError` with type `json_invalid` and the position of the problem, not a `JSONDecodeError`.
+
+<strong>How do I parse a top-level JSON array?</strong> Use `TypeAdapter(list[Model]).validate_json(data)`. A model cannot represent a bare array.
+
+<strong>Do the coercion rules differ for JSON input?</strong> Slightly. Tuples and sets are read from arrays and dates from ISO strings, but a string like `"1"` for an int field is still coerced in lax mode unless you turn on strict mode.
+
+<strong>Can it handle large integers?</strong> Yes. Python ints are unbounded, and Pydantic parses large JSON integers exactly instead of rounding to a float.
+
 ## Why the habit persists
 
 The two-step form isn't the result of anyone deciding it was better. It's what you write when you learn `json` before you learn Pydantic. This Is the order nearly everybody learns them in.

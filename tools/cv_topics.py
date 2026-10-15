@@ -265,6 +265,20 @@ times, or stack a few small ones. This Is what modern
 architectures do and why [receptive field](feature_map_in_cnn.html) is a
 concept worth having.
 
+## Questions people ask
+
+<strong>Is convolution the same as correlation?</strong> Strictly, convolution flips the kernel first and correlation does not. Most libraries, and every deep learning framework, actually compute correlation but still call it convolution.
+
+<strong>Why do some kernels sum to 1 and others to 0?</strong> A sum of 1 keeps overall brightness, as in blur and sharpen. A sum of 0 gives a difference image that is zero on flat regions, as in Sobel and Laplacian.
+
+<strong>Why does Sobel come as two kernels?</strong> One measures change along x and the other along y. Combining them gives edge strength from the magnitude and edge direction from the angle.
+
+<strong>What happens at the image border?</strong> The kernel hangs off the edge, so you pad with zeros, replicate or reflect the edge pixels, or just shrink the output. The choice changes the result near the border.
+
+<strong>How does this relate to a CNN layer?</strong> A convolutional layer runs the same sliding weighted sum. The difference is that the kernel values are learned by gradient descent rather than chosen by hand.
+
+<strong>Why do the results sometimes look clipped or all black?</strong> Outputs can be negative or exceed 255, and an 8-bit image cannot hold them. Compute in float, then rescale or take the absolute value before display.
+
 ## Slide a 3x3 grid over an image and watch what each one finds
 
 A convolution is a weighted sum repeated at each spot. Six classic kernels are applied to the same small image here, with the math for one output pixel written out in full.
@@ -598,6 +612,20 @@ single spread.
 **Thresholding before denoising.** A salt-and-pepper pixel is by meaning at
 an extreme value, so it lives any threshold. A median filter first costs
 almost nothing and drops them fully.
+
+## Questions people ask
+
+<strong>What does thresholding do?</strong> It turns a greyscale image into a binary one by setting pixels above a cut-off to white and the rest to black.
+
+<strong>How does Otsu's method choose the threshold?</strong> It tries every value and picks the one that maximises the variance between the two resulting classes. It works best when the histogram has two clear peaks.
+
+<strong>When does a global threshold fail?</strong> When lighting is uneven, so the background brightness changes across the image. Adaptive thresholding computes a separate threshold for each local neighbourhood.
+
+<strong>What is adaptive thresholding?</strong> Each pixel is compared with the mean or Gaussian-weighted mean of its neighbourhood minus a constant. It copes with shadows and gradients.
+
+<strong>Should I blur before thresholding?</strong> Usually, yes. Noise pushes pixels across the threshold at random, so a light blur gives cleaner regions.
+
+<strong>What do I do about specks left after thresholding?</strong> Clean the mask with morphological opening to remove specks and closing to fill small holes.
 
 ## Turning grey into black and white, and choosing where
 
@@ -964,6 +992,20 @@ brightness channel, equalise that one channel, and convert back.
 different photos can share a histogram. It shows the palette, not the
 picture.
 
+## Questions people ask
+
+<strong>What does an image histogram show?</strong> How many pixels have each intensity value. It shows overall brightness and contrast but nothing about where pixels are.
+
+<strong>How does histogram equalisation work?</strong> It maps each intensity through the image's cumulative distribution, spreading the values to use the full range. Common intensities get stretched apart.
+
+<strong>Why can equalisation make an image look worse?</strong> It treats the whole image the same way, so noise in flat regions is amplified and bright areas can wash out. It also changes colours if applied per channel.
+
+<strong>What is CLAHE?</strong> Contrast Limited Adaptive Histogram Equalisation. It equalises small tiles separately and clips the histogram so noise is not blown up.
+
+<strong>How should I equalise a colour image?</strong> Convert to a space that separates brightness, such as YCrCb or HSV, and equalise only the luminance or value channel. Doing R, G and B separately shifts the hues.
+
+<strong>Does equalisation add information?</strong> No. It redistributes existing values, so detail that was already lost to clipping or quantisation does not come back.
+
 ## The histogram, and the CDF that flattens it
 
 A histogram throws away each bit of spatial info and keeps only how often each brightness occurs. That sounds like a loss. It's -- but it's just what you need to fix exposure. Equalisation turns out to be nothing more than applying the image's own cumulative spread as a lookup table.
@@ -1297,6 +1339,20 @@ drops them along with the noise.
 **Reaching for bilateral by default.** It's far more costly than the other
 two and has two params instead of one. If the edges don't need protecting,
 it's a slow Gaussian.
+
+## Questions people ask
+
+<strong>Which blur should I use to remove salt-and-pepper noise?</strong> The median filter. It discards extreme outliers by sorting the neighbourhood, whereas a Gaussian smears each speck into its neighbours.
+
+<strong>Why does a Gaussian blur soften edges?</strong> It averages across an edge, mixing dark and bright pixels together. It has no way to tell an edge from a gradual change.
+
+<strong>How does a bilateral filter keep edges sharp?</strong> It weights neighbours by both distance and similarity of colour. Pixels across an edge look very different, so they get almost no weight and the edge survives.
+
+<strong>How do I pick the kernel size or sigma?</strong> Sigma sets how much smoothing happens, and the kernel only needs to be about six sigma wide to hold the bell shape. Raise sigma until noise is gone, then stop, since every extra step loses detail.
+
+<strong>Why is the bilateral filter so slow?</strong> Its weights depend on pixel values, so they must be recomputed at every position, and it cannot be split into two separable passes. Large diameters get costly quickly.
+
+<strong>Should I blur before edge detection?</strong> Usually yes. Gradient kernels amplify noise, so a light Gaussian blur first gives cleaner edges, which is why Canny begins with one.
 
 ## Three blurs, and the one that keeps edges
 
@@ -1671,6 +1727,20 @@ together. Thin structures are lost first and can't be got back.
 *bright* things and closing drops *dark* ones. If your foreground is dark
 against a light background, they swap.
 
+## Questions people ask
+
+<strong>What does erosion do?</strong> A pixel stays on only if every pixel under the structuring element is on. Foreground shrinks, and thin lines and small specks disappear.
+
+<strong>What does dilation do?</strong> A pixel turns on if any pixel under the element is on. Foreground grows and small holes and gaps close.
+
+<strong>What is the difference between opening and closing?</strong> Opening is erosion then dilation and removes small bright specks. Closing is dilation then erosion and fills small dark holes.
+
+<strong>Why not just erode and dilate repeatedly?</strong> Erosion followed by dilation does not simply undo itself. Opening restores the size of surviving shapes while the removed specks stay gone.
+
+<strong>How do I choose the structuring element?</strong> Match its shape to the shapes you want to keep or remove, and make it a little bigger than the noise. A rectangle suits boxy objects, an ellipse or cross suits rounder ones.
+
+<strong>Do these work on greyscale images?</strong> Yes. Erosion becomes a local minimum and dilation a local maximum, which darkens or brightens regions rather than flipping pixels.
+
 ## Shrinking and growing shapes with min and max
 
 Erosion takes the min over a zone, dilation the max. Two ops. Every other morphological tool is a composition of them -- which this builds one at a time, then measures on a shape designed to have a thing for each of them to catch.
@@ -2002,6 +2072,20 @@ scene.
 **Reading OpenCV's hue as degrees.** OpenCV stores hue in 0-179 so it fits in a
 byte, not 0-359. Half of each published threshold is wrong for this reason.
 
+## Questions people ask
+
+<strong>Why use HSV instead of RGB for colour detection?</strong> In RGB, a single colour changes all three channels as lighting changes. In HSV the hue stays roughly constant, so one hue range picks out an object under varying light.
+
+<strong>What do the H, S and V channels mean?</strong> Hue is the colour angle, saturation is how far it is from grey, and value is how bright it is.
+
+<strong>Why is red hard to threshold in HSV?</strong> Hue is circular, so red sits at both ends of the scale, near 0 and near 180 in OpenCV. You need two ranges and combine their masks.
+
+<strong>Why does OpenCV use hue values only up to 179?</strong> Hue is stored in 8 bits, and 360 degrees does not fit in 0 to 255. OpenCV halves it, so the full circle runs 0 to 179.
+
+<strong>Why does my image look blue-tinted after loading it with OpenCV?</strong> OpenCV loads channels in BGR order while most plotting libraries expect RGB. Convert with cvtColor and COLOR_BGR2RGB before displaying.
+
+<strong>When is Lab better than HSV?</strong> When you need distances between colours to match human perception. Lab is built so that equal numeric steps look like equal colour differences.
+
 ## The same colour, described two ways
 
 RGB says how much of each light. HSV says which colour, how vivid, how bright. Converting between them by hand shows why one is right for displays and the other for finding a coloured object.
@@ -2323,6 +2407,20 @@ rather than in steps.
 
 **Skipping aspect ratio.** Stretching to a square distorts each shape in the
 frame. Pad to the target aspect ratio, then resize.
+
+## Questions people ask
+
+<strong>Which interpolation method should I use?</strong> Use INTER_AREA when shrinking, INTER_LINEAR as a general default when enlarging, and INTER_CUBIC for higher quality at a higher cost. Use nearest neighbour for labels and masks.
+
+<strong>Why does a downscaled image look jagged or show moire?</strong> Dropping pixels without filtering causes aliasing. INTER_AREA, or a blur before subsampling, removes the detail that would otherwise fold into false patterns.
+
+<strong>Why can't I use bilinear on a segmentation mask?</strong> It blends label values, producing classes that do not exist, such as 1.5 between class 1 and class 2. Nearest neighbour copies existing labels only.
+
+<strong>Does upscaling add detail?</strong> No. Interpolation only estimates values between existing pixels, so the image gets bigger and smoother but not sharper. Recovering detail needs learned super-resolution.
+
+<strong>How do I resize while keeping the aspect ratio?</strong> Compute one scale factor from the target width or height and apply it to both. Pad or crop afterwards if you need a fixed shape.
+
+<strong>Does resizing affect model accuracy?</strong> Yes, so use the same method in training and inference. A mismatch between libraries, such as PIL and OpenCV, can shift predictions.
 
 ## Nearest, bilinear, and why downscaling needs a blur first
 
@@ -2724,6 +2822,20 @@ together.
 Either accept the clipping or find the bounding box of the transformed
 corners and enlarge the canvas first.
 
+## Questions people ask
+
+<strong>What makes a transform affine?</strong> It preserves straight lines and parallelism. Rotation, scaling, shear and translation are all affine, and any combination of them is still one 2x3 matrix.
+
+<strong>What is the difference between affine and perspective transforms?</strong> Affine keeps parallel lines parallel. A perspective transform does not, so a rectangle can become a trapezoid, and it needs a 3x3 matrix with a division step.
+
+<strong>Why does the order of transforms matter?</strong> Matrix multiplication is not commutative. Rotating then translating puts the shape somewhere different from translating then rotating, so compose the matrices in the order you want them applied.
+
+<strong>How do I rotate around the image centre instead of the corner?</strong> Translate the centre to the origin, rotate, then translate back. OpenCV's getRotationMatrix2D builds exactly this combined matrix for you.
+
+<strong>Why do warps leave black corners or cut off content?</strong> The output canvas keeps its original size, so rotated corners fall outside it and uncovered output pixels have no source. Enlarge the canvas or choose a border mode such as reflect.
+
+<strong>What does the determinant tell me?</strong> Its absolute value is the area scale factor. A determinant of 1 preserves area, 4 quadruples it, and a negative value means the image was mirrored.
+
 ## Rotation, scale and shear as one matrix
 
 each geometric transform that keeps straight lines straight is one 2x3 mat. Knowing that turns six separate ops into one. This builds the mats, composes them. Works through the two things that trip everyone up -- composition order, and that you've to run the transform backwards.
@@ -3064,6 +3176,20 @@ silently changes what the architecture can see.
 **Reading spotting failures as a data problem.** If the model always
 misses large objects, check the receptive field before collecting more images.
 
+## Questions people ask
+
+<strong>What is a receptive field?</strong> The region of the input image that can affect one output unit. It grows as you stack layers.
+
+<strong>How do I calculate it?</strong> Layer by layer: add (kernel - 1) times the product of earlier strides. Stride multiplies how much each later layer adds.
+
+<strong>Why do small kernels beat large ones?</strong> Two 3x3 layers cover 5x5 with 18 weights instead of 25, plus an extra non-linearity. Stacking small kernels is cheaper and more expressive.
+
+<strong>What is the difference between theoretical and effective receptive field?</strong> The theoretical one is every pixel that could matter. The effective one is the smaller central region where influence is actually strong, roughly Gaussian in shape.
+
+<strong>Why does the receptive field matter for my task?</strong> A unit cannot recognise anything bigger than it can see. Segmentation of large objects needs a receptive field that covers them.
+
+<strong>How can I enlarge it without losing resolution?</strong> Use dilated convolutions, or add attention or global context blocks. Pooling and striding work too but shrink the feature map.
+
 ## How much of the image one output pixel can see
 
 A single neuron deep in a network reacts to a patch of the first image. finding that patch's size layer by layer shows most architectural choices -- kernel sizes, depth, dilation and pooling.
@@ -3355,6 +3481,20 @@ work and can cost more fit than it's worth.
 **Losing the activation.** A 1&#215;1 with no non-linearity after it,
 stacked on another linear layer, merges into a single linear map. Two
 mats times'd together are one mat.
+
+## Questions people ask
+
+<strong>What does a 1x1 convolution do?</strong> It takes a weighted sum across channels at each pixel independently. Spatial neighbours are not mixed at all.
+
+<strong>Why use one if it sees no neighbours?</strong> To change the number of channels cheaply and add a non-linearity. It reduces or expands channel depth without touching spatial size.
+
+<strong>How is it different from a fully connected layer?</strong> It is the same weights applied at every position, so it works on any image size. A fully connected layer is tied to a fixed input shape.
+
+<strong>What is a bottleneck block?</strong> A 1x1 reduces channels, a 3x3 does the spatial work on the thinner tensor, and another 1x1 expands again. This saves many multiplications, as in ResNet.
+
+<strong>How many parameters does a 1x1 convolution have?</strong> Input channels times output channels, plus biases. Going from 256 to 64 channels takes 16,384 weights.
+
+<strong>Where did the idea come from?</strong> From the Network in Network paper, and it was popularised by Inception modules for dimension reduction.
 
 ## A convolution that looks at one pixel
 
@@ -3662,6 +3802,20 @@ afford it.
 activation between them, or the pair is closer to a single linear map than the
 two-stage breakdown it's supposed to be.
 
+## Questions people ask
+
+<strong>What does depthwise separable convolution do?</strong> It splits a standard convolution into a per-channel spatial filter followed by a 1x1 convolution that mixes channels. The result is similar in capacity at a fraction of the cost.
+
+<strong>How much cheaper is it?</strong> The cost ratio is about 1/N + 1/K squared, for N output channels and K by K kernels. With 3x3 kernels and many channels that works out to roughly 8 to 9 times fewer operations.
+
+<strong>Does it lose accuracy?</strong> Slightly, since it is a restricted form of convolution. Models like MobileNet and Xception show the loss is small compared with the savings.
+
+<strong>Why is it not always faster in practice?</strong> Depthwise layers do little arithmetic per byte of memory moved, so they are often memory-bound. Real speedups are smaller than the operation count suggests.
+
+<strong>Which models use it?</strong> MobileNet, Xception and EfficientNet all rely on it. It is the standard building block when the model must run on phones or embedded hardware.
+
+<strong>What is the difference between depthwise and pointwise?</strong> Depthwise filters each channel on its own spatially. Pointwise is the 1x1 convolution that combines channels at each pixel.
+
 ## Splitting one convolution into two cheaper ones
 
 A normal convolution mixes space and channels at once. Doing those apart costs a fraction as much. This Is the whole idea behind MobileNet -- and this measures both the saving and what it gives up.
@@ -3947,6 +4101,20 @@ maps cost memory at each layer.
 **given it's free.** The params are free. The memory isn't. A network
 that never downsamples holds full-detail activations throughout, which is
 often the binding constraint on segmentation models.
+
+## Questions people ask
+
+<strong>What is a dilated convolution?</strong> A convolution whose kernel taps are spaced apart by a dilation rate, with gaps in between. A 3x3 kernel at rate 2 covers a 5x5 area using still only nine weights.
+
+<strong>Why use dilation instead of a bigger kernel?</strong> It enlarges the receptive field without adding parameters or cost. A bigger kernel grows quadratically in both.
+
+<strong>What is the gridding problem?</strong> Stacking layers with the same dilation rate samples the input on a sparse checkerboard and misses pixels in between. Mixing rates, such as 1, 2 and 5, fills the gaps.
+
+<strong>Where are dilated convolutions used?</strong> In semantic segmentation such as DeepLab, in WaveNet for audio and in other models that need wide context at full resolution.
+
+<strong>How does dilation compare with pooling or striding?</strong> Pooling and striding shrink the feature map to reach further, losing resolution. Dilation keeps the resolution, which matters for per-pixel outputs.
+
+<strong>What is the effective kernel size for a given dilation?</strong> It is k + (k - 1)(d - 1) for kernel size k and dilation d. A 3x3 kernel with d = 4 spans 9x9.
 
 ## Skipping pixels to see further for the same price
 
@@ -4234,6 +4402,20 @@ nothing to mean and the two are the same.
 **Losing global max pooling exists.** It takes the max instead of the
 mean, and for tasks where one strong local response matters more than an mean
 &mdash; some spotting and audio tasks. It can be the better choice.
+
+## Questions people ask
+
+<strong>What does global average pooling do?</strong> It averages each feature map to a single number, turning an H by W by C block into a vector of C values.
+
+<strong>Why replace the flatten and dense layers with it?</strong> Flattening feeds millions of values into a dense layer, which holds most of the model's parameters. Pooling removes those weights and cuts overfitting.
+
+<strong>Does it work with any input size?</strong> Yes, because the average is taken over whatever spatial size arrives. A network ending in global average pooling accepts images of different resolutions.
+
+<strong>What does it throw away?</strong> All spatial position information. It knows how strongly a feature fired somewhere, but not where.
+
+<strong>How is it related to class activation maps?</strong> Because each channel is reduced to one average, the final weights connect channels directly to classes. Weighting the feature maps by those weights shows where the class evidence was.
+
+<strong>Is global max pooling an alternative?</strong> It keeps the strongest response instead of the mean. Max suits sparse, detection-like features, while average gives smoother, more stable signals.
 
 ## Replacing the flatten layer with one number per channel
 
@@ -4539,6 +4721,20 @@ background all over and the loss looks fine.
 **Too many anchors.** Each one costs memory and work at each spot of
 each feature map, and past a point they share so much that extra ones add
 nothing.
+
+## Questions people ask
+
+<strong>What is an anchor box?</strong> It is a predefined box of a fixed size and aspect ratio placed at every position on a feature map. The network predicts small offsets from each anchor instead of drawing a box from nothing.
+
+<strong>Why use anchors instead of predicting boxes directly?</strong> Regressing a small correction to a sensible starting box is far easier to learn than regressing absolute coordinates. Anchors also let one network handle many objects at once.
+
+<strong>How are anchors matched to ground-truth boxes?</strong> By intersection over union. An anchor above a high threshold, often 0.5 to 0.7, is positive, one below a low threshold is negative, and the ones between are ignored.
+
+<strong>How do I choose anchor sizes and ratios?</strong> Cluster the box shapes in your training labels, as YOLO does with k-means, so anchors cover what your objects actually look like. Default COCO anchors suit general photos, not unusual datasets.
+
+<strong>Why are there so many more negative anchors than positive ones?</strong> A typical image has a few objects and tens of thousands of anchors, so almost all of them match nothing. Hard negative mining or focal loss stops the background from drowning the loss.
+
+<strong>Are anchor-free detectors replacing anchors?</strong> Detectors like FCOS and CenterNet predict from points or centres and skip anchors, which removes several hyperparameters. Anchor-based models remain common and work well.
 
 ## Guessing boxes so the network only has to correct them
 
@@ -4874,6 +5070,20 @@ info is.
 **Tuning NMS to raise mAP.** Easy to do and often makes the deployed finder
 worse, because the operating point that raises an integral over all
 thresholds isn't the one you ship.
+
+## Questions people ask
+
+<strong>What does mAP measure?</strong> How well a detector ranks correct detections above wrong ones, across all classes. It averages the area under each class's precision-recall curve.
+
+<strong>What does mAP@0.5 mean?</strong> A detection counts as correct if its IoU with a ground-truth box is at least 0.5. mAP@[0.5:0.95], used by COCO, averages across IoU thresholds from 0.5 to 0.95.
+
+<strong>How is average precision computed for one class?</strong> Sort detections by confidence, walk down the list marking true and false positives, and trace precision against recall. The area under that curve is AP.
+
+<strong>Why is mAP preferred over accuracy?</strong> Detection has no fixed set of negatives, and accuracy ignores box placement and ranking. mAP rewards both correct localisation and sensible confidence scores.
+
+<strong>What is the difference between VOC and COCO mAP?</strong> VOC uses a single IoU of 0.5, while COCO averages over ten thresholds and so rewards tighter boxes. The same model gets a lower score under COCO.
+
+<strong>Does a high mAP mean the model is ready for production?</strong> Not by itself. It hides the operating threshold, per-size performance and rare-class failures, so check the precision-recall curve at the confidence you will deploy at.
 
 ## From one PR curve to a single number
 
@@ -5256,6 +5466,20 @@ peaks.
 **Expecting steadiness it doesn't have.** If the object can rotate or change
 size, this is the wrong method, not a method that needs tuning.
 
+## Questions people ask
+
+<strong>How does template matching work?</strong> It slides the template across the image and scores the similarity at every position. The best score marks the most likely location.
+
+<strong>Which matching method should I use?</strong> Normalised correlation coefficient, TM_CCOEFF_NORMED, is a good default. It is tolerant of brightness and contrast changes, unlike plain squared difference.
+
+<strong>Does it handle rotation or scale changes?</strong> No. It only finds the template at the same size and orientation, so you would need to search over rotated and scaled copies.
+
+<strong>How do I find multiple matches?</strong> Threshold the response map and take the local maxima, with non-maximum suppression so one object does not give a cluster of hits.
+
+<strong>Why is it slow on large images?</strong> It does a comparison at every pixel position over the whole template area. FFT-based correlation or an image pyramid speeds it up considerably.
+
+<strong>When should I use feature matching or a detector instead?</strong> When the object varies in scale, rotation, viewpoint or lighting. Template matching suits fixed, known appearances such as UI icons or printed marks.
+
 ## Sliding a patch, and the correlation that lies
 
 Template matching is the simplest possible finder: slide a patch over the image and score each spot. Building it exposes just why raw link fails, why normed cross-link is the fix. The limits that no amount of norming repairs.
@@ -5623,6 +5847,20 @@ scale-rule finder.
 **Corners on a blurred image.** Blur destroys the grads the whole method
 depends on, so denoise gently or not at all before detecting.
 
+## Questions people ask
+
+<strong>What is a corner, to a computer?</strong> A point where the image changes strongly in every direction when you shift a small window. Along an edge it changes in only one direction, and on flat areas it barely changes.
+
+<strong>What is the Harris response?</strong> R = det(M) - k * trace(M) squared, where M is the matrix of summed gradient products in a window. Large positive R means corner, large negative means edge, small means flat.
+
+<strong>What value should k take?</strong> Typically 0.04 to 0.06. A smaller k admits more corner-like points and a larger k makes the detector stricter.
+
+<strong>Is Harris invariant to rotation and scale?</strong> Rotation, yes, since the eigenvalues of M do not change. Scale, no, so a corner at one size can look like an edge at another.
+
+<strong>Why do I get clusters of detections around one corner?</strong> Neighbouring pixels all have high responses. Apply non-maximum suppression so only the local peak remains.
+
+<strong>How does Shi-Tomasi differ?</strong> It scores a point by the smaller eigenvalue of M instead. It is simple, tends to pick better points to track and is what goodFeaturesToTrack uses.
+
 ## Two eigenvalues that tell an edge from a corner
 
 A corner is a place where the image changes in two free directions. That sentence turns right into linear algebra. This builds the structure tensor, reads its eigenvals. Shows why Harris uses a determinant-and-trace shortcut instead of finding them.
@@ -5952,6 +6190,20 @@ and interpolation is needed.
 **given patches must be square and non-shared.** shared patches
 help. A few later architectures use them.
 
+## Questions people ask
+
+<strong>How does a Vision Transformer turn an image into tokens?</strong> It cuts the image into fixed-size patches, such as 16x16, flattens each one and projects it linearly into an embedding. Each patch acts as one token.
+
+<strong>Why 16x16 patches?</strong> It is a trade-off. Smaller patches give more tokens and finer detail but attention cost grows with the square of the token count.
+
+<strong>Why does a ViT need position embeddings?</strong> Self-attention ignores order, so without them the model would see patches as an unordered set. Learned position embeddings tell it where each patch came from.
+
+<strong>What is the CLS token?</strong> A learnable extra token prepended to the sequence. Its final state aggregates information from all patches and feeds the classification head.
+
+<strong>Does a ViT need more data than a CNN?</strong> Generally yes. It lacks built-in locality, so it needs large datasets or strong augmentation and distillation to match CNNs.
+
+<strong>How many tokens does a 224x224 image give?</strong> With 16x16 patches, 14 times 14 equals 196 tokens, plus the CLS token.
+
 ## Cutting an image into tokens
 
 A vision transformer starts by chopping the image into patches and flattening each one into a vector. That single step decides the model's cost, its detail limit. All it doesn't know about geometry -- which it then has to be told.
@@ -6277,6 +6529,20 @@ not a verification of it.
 **Choosing a layer without saying so.** The layer is a param, and the answer
 depends on it.
 
+## Questions people ask
+
+<strong>What does Grad-CAM show?</strong> A heat map of the image regions that most increased the score for a chosen class, built from the last convolutional layer's feature maps.
+
+<strong>How is it calculated?</strong> Take the gradient of the class score with respect to each feature map, average it spatially to get a weight per channel, and sum the weighted maps. A ReLU keeps only positive influence.
+
+<strong>Why use the last convolutional layer?</strong> It balances high-level meaning with some remaining spatial layout. Earlier layers localise better but say less about the class, and later dense layers have lost the layout.
+
+<strong>Is a Grad-CAM heat map an explanation of the model?</strong> It shows where the model looked, not why. A good-looking map can still hide shortcut features, and the map is low resolution.
+
+<strong>How does Grad-CAM differ from the original CAM?</strong> CAM needs a global average pooling architecture. Grad-CAM uses gradients, so it works on any CNN without changing it.
+
+<strong>Can I use it to debug a model?</strong> Yes. If maps highlight the background, watermarks or borders instead of the object, the model has likely learned a dataset artefact.
+
 ## Asking the gradient which pixels mattered
 
 Grad-CAM makes a heatmap over the image for a chosen class. Each step of it's math you can follow. This builds one end to end on a small network, then checks the two things people forget to check -- whether the map changes with the class. Whether it can be trusted when the guess is wrong.
@@ -6597,6 +6863,20 @@ isn't an oversight.
 **Skipping the one-label constraint.** Merging separate semantic and instance
 outputs into a panoptic one needs a conflict rule, and the rule affects the
 score.
+
+## Questions people ask
+
+<strong>What is the difference between semantic and instance segmentation?</strong> Semantic segmentation labels each pixel with a class, with no separation between objects of the same class. Instance segmentation also separates individual objects.
+
+<strong>What is panoptic segmentation?</strong> It combines both. Countable things such as cars get instance IDs, and amorphous stuff such as sky or road gets a class label.
+
+<strong>How is segmentation different from object detection?</strong> Detection outputs boxes, whereas segmentation outputs pixel-accurate masks. Segmentation costs more annotation effort but gives exact shapes.
+
+<strong>Which metrics are used?</strong> Intersection over union per class, averaged as mIoU, and the Dice coefficient. Pixel accuracy is easily misled when the background dominates.
+
+<strong>Which architectures are common?</strong> U-Net, DeepLab and FCN for semantic work, Mask R-CNN for instances, and transformer-based models such as SegFormer and Mask2Former.
+
+<strong>Why do segmentation models use skip connections?</strong> Downsampling loses fine spatial detail. Skip connections pass high-resolution features straight to the decoder to sharpen the boundaries.
 
 ## Three tasks that all look like colouring in
 
