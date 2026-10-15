@@ -57,6 +57,21 @@ AUTHOR_LD = {
         "https://www.kaggle.com/ashishjangra27",
     ],
 }
+# VizLearn itself, in full, on the two pages that are about the site rather than
+# one topic - the homepage and about.html. Elsewhere the publisher stays the
+# short Organization reference. EducationalOrganization is the schema.org
+# subtype for an organisation whose purpose is teaching, and `founder` links
+# it to the same Person every module's byline points at.
+SITE_ORG_LD = {
+    "@type": "EducationalOrganization",
+    "name": "VizLearn",
+    "url": SITE + "/",
+    "logo": SITE + "/assets/icon-512.png",
+    "description": ("Free interactive visual explainers for machine learning, deep "
+                    "learning, algorithms and the mathematics underneath them."),
+    "founder": AUTHOR_LD,
+}
+
 LIGHT_BG = "#f0fdf4"   # --bg-body in light mode, the default theme
 
 # Google AdSense loader. Google expects this in <head> on every page you want
@@ -339,6 +354,9 @@ def build_block(rel, title, desc, prefix, mod, needs_icons=False):
             "publisher": {"@type": "Organization", "name": "VizLearn", "url": SITE + "/",
                           "logo": SITE + "/assets/icon-512.png"},
         }
+        if rel == "about.html":
+            ld["publisher"] = SITE_ORG_LD
+            ld["mainEntity"] = SITE_ORG_LD
     elif rel == "index.html":
         ld = {
             "@context": "https://schema.org",
@@ -347,8 +365,7 @@ def build_block(rel, title, desc, prefix, mod, needs_icons=False):
             "url": SITE + "/",
             "description": desc,
             "inLanguage": "en",
-            "publisher": {"@type": "Organization", "name": "VizLearn", "url": SITE + "/",
-                          "logo": SITE + "/assets/icon-512.png"},
+            "publisher": SITE_ORG_LD,
             "potentialAction": {
                 "@type": "SearchAction",
                 "target": {"@type": "EntryPoint",
