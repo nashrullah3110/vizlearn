@@ -14,6 +14,73 @@ Keyed by the same topic key as TOPICS. Rendered by tools/build_topics.py.
 
 # Each entry: extra "About this track" paragraph, then the three sections.
 TOPIC_SECTIONS = {
+    "async_python": {
+        "learn": [
+            "Describe what the event loop does on each tick, and why one thread can keep thousands of coroutines moving.",
+            "Explain why calling an async function returns a coroutine rather than a result, and what await actually waits for.",
+            "Turn a run of sequential awaits into tasks that overlap, with gather or a TaskGroup, and decide what happens when one fails.",
+            "Spot a blocking call inside a coroutine, and move it off the loop instead of letting it stall everything else.",
+            "Connect a fast producer to a slow consumer through a bounded queue, so memory stays flat however far ahead the producer gets.",
+        ],
+        "order": (
+            "The loop comes first, because every later page is a consequence of "
+            "it: one thread, a queue of ready work, and coroutines that give way "
+            "at each await. Coroutines and tasks follow, which is where most "
+            "first async programs go wrong by awaiting one thing after another. "
+            "Running work concurrently builds on tasks. The blocking call is "
+            "deliberately fourth - it only makes sense once you have seen what "
+            "the loop was doing while it froze - and queues close the track "
+            "because backpressure is a pattern made out of everything before it. "
+            "It assumes ordinary Python functions and exceptions, nothing more."
+        ),
+        "next": (
+            "Async is one of three ways Python does more than one thing at once. "
+            "The Concurrency track covers the other two, threads and processes, "
+            "and ends on how to choose between all three. FastAPI is the most "
+            "common place this knowledge gets used: its async def endpoints run "
+            "on an event loop like the one described here."
+        ),
+        "more": (
+            "The examples are short on purpose and print the thing being "
+            "explained - the order two coroutines interleave in, or how a run of "
+            "sequential awaits compares with tasks that overlap - so "
+            "what the loop is doing is visible in the output rather than "
+            "described around it."
+        ),
+    },
+    "concurrency": {
+        "learn": [
+            "Say what the GIL protects, and predict whether threads will speed up a given program before running it.",
+            "Trace why x += 1 from two threads can lose a count, down to the three bytecode operations it compiles to.",
+            "Use a lock correctly, and recognise deadlock, livelock and lock-order mistakes when they appear.",
+            "Decide what a process can be sent and what it cannot, and what that boundary costs.",
+            "Choose between threads, processes and async for a workload, and use concurrent.futures to switch without a rewrite.",
+        ],
+        "order": (
+            "The interpreter lock comes first, because it decides when threads "
+            "help at all. Race conditions follow, shown at the bytecode level so "
+            "the lost update is a mechanism rather than a mystery, and locks come "
+            "next as the fix, along with the ways a fix goes wrong. Threads and "
+            "processes are then compared directly, concurrent.futures shows one "
+            "interface over both, and a thread-safe queue replaces most "
+            "hand-rolled coordination. The last page puts it together as a "
+            "decision. It assumes comfortable Python and nothing about operating "
+            "systems."
+        ),
+        "next": (
+            "The Async Python track is the third option the final page weighs, "
+            "and the right one for programs that mostly wait on the network. "
+            "For numerical work, NumPy releases the interpreter lock inside many "
+            "of its own loops, which is part of why vectorised code and threads can "
+            "combine better than plain Python and threads."
+        ),
+        "more": (
+            "Where a page's point depends on real operating-system threads, "
+            "which the browser interpreter does not have, the example is shown "
+            "with its recorded output and the mechanism underneath it - the "
+            "bytecode, the lock protocol, the pickling boundary - runs live."
+        ),
+    },
     "numpy": {
         "learn": [
             "Predict an operation's result shape from the shapes going in, rather than running it to find out.",

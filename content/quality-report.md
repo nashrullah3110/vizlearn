@@ -94,9 +94,9 @@ Headings inside the article that appear on more than 5% of modules:
 |---|---|
 | 8 | Then stop. The commonest failure on a question like this is answering it correctly in one sentence and then ta... |
 | 4 | All four of these read the same object: an ordered list of retrieved results, with each one labelled relevant ... |
-| 4 | Two habits make judge scores trustworthy. Ask for a decision and a justification, so a human can audit disagre... |
 | 4 | The labels are the expensive part. A relevance judgement per query-document pair is human work, and an evaluat... |
 | 4 | These four are usually measured with an LLM as judge: a strong model is shown the question, the retrieved cont... |
+| 4 | Two habits make judge scores trustworthy. Ask for a decision and a justification, so a human can audit disagre... |
 | 3 | These editors run inside a browser event loop that is already going, so the examples finish with . In a standa... |
 
 ### 5. What comes before the article
@@ -104,7 +104,7 @@ Headings inside the article that appear on more than 5% of modules:
 Median: 362 words of text before the article starts, 15% of them on 1-3 word lines
 (control labels, readouts, key hints, the table of contents). 2 modules are at 50% or more.
 
-634 modules mark their controls and readouts `data-nosnippet`: 89497 words in all that a
+634 modules mark their controls and readouts `data-nosnippet`: 89494 words in all that a
 search snippet may not quote. (A snippet hint only - the text is still read and indexed.)
 
 ### 6. Dates
@@ -115,7 +115,7 @@ No date in the future, unparseable, or modified-before-published, on any page.
 
 9 pages threw an error only because the scan could not load their library from a CDN
 (Chart.js, three.js, MathJax - this sandbox's network blocks those hosts). Not a site bug;
-listed so a rerun on an open network can confirm: `computer_vision/cnn.html`, `deep_learning/activation_functions.html`, `deep_learning/gradient_descent_batch_processing.html`, `deep_learning/learning_rate_scheduling.html`, `deep_learning/model_training_curve.html`, `deep_learning/optimizers_in_3d.html`, `deep_learning/overfitting_vs_underfitting.html`, `machine_learning/bias_vs_variance.html`, `natural_language_processing/rnn.html`.
+listed so a rerun on an open network can confirm: `computer_vision/cnn.html`, `deep_learning/activation_functions.html`, `deep_learning/gradient_descent_batch_processing.html`, `deep_learning/learning_rate_scheduling.html`, `deep_learning/model_training_curve.html`, `deep_learning/overfitting_vs_underfitting.html`, `deep_learning/optimizers_in_3d.html`, `machine_learning/bias_vs_variance.html`, `natural_language_processing/rnn.html`.
 
 - `html-lab/index.html`: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.
 
@@ -123,25 +123,25 @@ listed so a rerun on an open network can confirm: `computer_vision/cnn.html`, `d
 
 | Page | Kind | Words | Links | Paragraphs of 2+ sentences | robots | Ad script |
 |---|---|---|---|---|---|---|
-| `index.html` | home | 4429 | 701 | 0 | - | yes |
-| `async_python/index.html` | hub | 299 | 59 | 2 | - | yes |
-| `computer_vision/index.html` | hub | 1343 | 101 | 2 | - | yes |
-| `concurrency/index.html` | hub | 355 | 61 | 2 | - | yes |
-| `database/index.html` | hub | 1394 | 96 | 4 | - | yes |
-| `deep_learning/index.html` | hub | 1524 | 100 | 3 | - | yes |
+| `index.html` | home | 1768 | 74 | 13 | - | yes |
+| `async_python/index.html` | hub | 733 | 59 | 4 | - | yes |
+| `computer_vision/index.html` | hub | 1791 | 101 | 2 | - | yes |
+| `concurrency/index.html` | hub | 775 | 61 | 4 | - | yes |
+| `database/index.html` | hub | 1887 | 96 | 4 | - | yes |
+| `deep_learning/index.html` | hub | 1762 | 100 | 3 | - | yes |
 | `dsa/index.html` | hub | 1552 | 95 | 3 | - | yes |
-| `fastapi/index.html` | hub | 743 | 80 | 3 | - | yes |
-| `gen_ai/index.html` | hub | 1347 | 106 | 1 | - | yes |
-| `interview/index.html` | hub | 1191 | 125 | 4 | - | yes |
-| `machine_learning/index.html` | hub | 1327 | 99 | 4 | - | yes |
-| `maths/index.html` | hub | 1467 | 101 | 3 | - | yes |
-| `matplotlib/index.html` | hub | 643 | 76 | 3 | - | yes |
+| `fastapi/index.html` | hub | 1344 | 80 | 3 | - | yes |
+| `gen_ai/index.html` | hub | 1985 | 106 | 1 | - | yes |
+| `interview/index.html` | hub | 2964 | 125 | 4 | - | yes |
+| `machine_learning/index.html` | hub | 1775 | 99 | 4 | - | yes |
+| `maths/index.html` | hub | 1903 | 101 | 3 | - | yes |
+| `matplotlib/index.html` | hub | 1133 | 76 | 3 | - | yes |
 | `natural_language_processing/index.html` | hub | 1699 | 95 | 3 | - | yes |
-| `numpy/index.html` | hub | 668 | 74 | 4 | - | yes |
-| `pandas/index.html` | hub | 673 | 80 | 2 | - | yes |
-| `pydantic/index.html` | hub | 767 | 84 | 3 | - | yes |
-| `python/index.html` | hub | 1068 | 100 | 3 | - | yes |
-| `sklearn/index.html` | hub | 765 | 77 | 3 | - | yes |
+| `numpy/index.html` | hub | 1131 | 74 | 4 | - | yes |
+| `pandas/index.html` | hub | 1240 | 80 | 2 | - | yes |
+| `pydantic/index.html` | hub | 1380 | 84 | 3 | - | yes |
+| `python/index.html` | hub | 1808 | 100 | 3 | - | yes |
+| `sklearn/index.html` | hub | 1241 | 77 | 3 | - | yes |
 | `fastapi-lab/index.html` | lab | 1056 | 38 | 4 | noindex, follow | no |
 | `html-lab/index.html` | lab | 699 | 38 | 4 | noindex, follow | no |
 | `js-lab/index.html` | lab | 674 | 38 | 3 | noindex, follow | no |
@@ -677,8 +677,8 @@ Tier 2 on length alone and within 150 words of the cut. Each is a short expansio
 | `interview/why-is-in-slow-on-a-list.html` | 1048 | 1 / 15 / 0 |
 | `computer_vision/resizing_and_interpolation.html` | 1047 | 2 / 3 / 0 |
 | `interview/modifying-a-collection-while-iterating.html` | 1044 | 1 / 33 / 0 |
-| `interview/longest-increasing-subsequence.html` | 1042 | 0 / 9 / 1 |
 | `interview/longest-consecutive-sequence.html` | 1042 | 3 / 18 / 0 |
+| `interview/longest-increasing-subsequence.html` | 1042 | 0 / 9 / 1 |
 | `interview/maximum-subarray-kadane.html` | 1042 | 2 / 18 / 1 |
 | `maths/expectation_and_variance.html` | 1040 | 1 / 10 / 0 |
 | `computer_vision/mean_average_precision.html` | 1038 | 1 / 3 / 0 |

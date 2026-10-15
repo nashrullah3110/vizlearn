@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Pre-render the hub's card grid into index.html.
+"""Pre-render the homepage's default view into index.html: one card per track.
 
-The grid is built client-side from courseData. Googlebot runs JavaScript, but
-Bing, LinkedIn, Slack, WhatsApp and most other crawlers do not - they saw an
-empty <main>. This writes the same markup statically between markers, so the
-every module link is in the HTML source. The existing renderCourses() still
-takes over on load and replaces it, so filtering and carousels are unaffected.
+This used to be the whole catalogue - every module card in every track, 637
+links - written statically so crawlers that do not run JavaScript still saw
+it, and then redrawn by renderCourses() on load. That made the homepage a
+directory: 748 links and not one paragraph of two sentences.
+
+The default view is now the 18 tracks, each a card with a short paragraph
+(tools/home_copy.py) and one link to the track's own page, where the full
+ordered module list lives. renderCourses() keeps this markup for the default
+view and only draws the full catalogue for a track filter or a search.
 
 Idempotent: re-running replaces the block.
 """
@@ -14,8 +18,9 @@ import html
 import os
 import re
 
+from home_copy import TRACK_BLURBS
 from lib_catalog import ROOT, read_course_data
-from lib_pages import TOPIC_ORDER
+from lib_pages import TOPICS, TOPIC_ORDER
 
 INDEX = os.path.join(ROOT, "index.html")
 
@@ -26,23 +31,22 @@ BLOCK = re.compile(re.escape(BEGIN) + r".*?" + re.escape(END), re.S)
 PLACEHOLDER = re.compile(r"<!-- Courses will be injected here -->")
 
 
-def card(course):
-    """Link + title only.
+def track_card(key, n):
+    """A track: its size, its name as the one link, and its paragraph.
 
-    The card artwork is deliberately left out: it is decorative, it is the bulk
-    of courseData's bytes, and renderCourses() paints it in a moment anyway.
-    Crawlers need the href and the title, and inlining every SVG here nearly
-    doubled the transferred size of the homepage.
+    The paragraph sits outside the link, so the page's prose is prose rather
+    than anchor text; the CSS stretches the heading's link over the card so
+    the whole card is still one click target.
     """
+    t = TOPICS[key]
     return (
-        '<div class="course-wrapper group">'
-        '<div class="card-container">'
-        '<a href="%s" class="block">'
-        '<div class="card-icon-area aspect-[16/9]"></div>'
-        '<div class="px-4 py-4">'
-        '<h3 class="card-title text-sm font-semibold leading-tight">%s</h3>'
-        "</div></a></div></div>"
-        % (html.escape(course["path"]), html.escape(course["title"]))
+        '<div class="vzx-panel vzx-start-card">'
+        '<span class="vzx-start-track">%d modules</span>'
+        '<h3 class="vzx-start-title"><a href="%s/">%s</a></h3>'
+        '<p class="vzx-start-p">%s</p>'
+        '<span class="vzx-start-go" aria-hidden="true">Open the track &rarr;</span>'
+        "</div>"
+        % (n, html.escape(t["dir"]), html.escape(t["title"]), html.escape(TRACK_BLURBS[key]))
     )
 
 
@@ -56,34 +60,24 @@ def main():
     ordered = ([k for k in TOPIC_ORDER if k in data] +
                [k for k in data if k not in TOPIC_ORDER])
 
-    sections = []
-    total = 0
-    for key in ordered:
-        topic = data[key]
-        cards = "".join(card(c) for c in topic["courses"])
-        total += len(topic["courses"])
-        sections.append(
-            '<section class="course-section mb-12" data-topic="%s" id="%s">'
-            '<div class="vz-rail-head flex justify-between items-end mb-5 px-1 border-b border-green-500/10 pb-2">'
-            '<div class="flex items-center gap-3">'
-            '<div class="w-1 h-5 bg-green-500 rounded-full"></div>'
-            '<h2 class="text-xl font-bold tracking-wide" style="color: var(--text-main)">%s</h2>'
-            "</div>"
-            # Matches trackProgressHtml()'s no-progress branch in index.html, so
-            # the crawled copy carries the same size cue as the rendered one.
-            '<span class="vz-track-count">%d modules</span>'
-            "</div>"
-            '<div class="flex flex-nowrap overflow-x-auto space-x-5 pb-6 no-scrollbar carousel-wrapper">%s</div>'
-            "</section>" % (key, key, html.escape(topic["title"]),
-                            len(topic["courses"]), cards)
-        )
+    missing = [k for k in ordered if k not in TRACK_BLURBS or k not in TOPICS]
+    if missing:
+        raise SystemExit("no homepage copy for track(s): %s (tools/home_copy.py)" % missing)
 
+    total = sum(len(data[k]["courses"]) for k in ordered)
+    cards = "".join(track_card(k, len(data[k]["courses"])) for k in ordered)
     block = (
         BEGIN
-        + "\n<!-- Static copy of the card grid for crawlers that do not run JS.\n"
-        "     renderCourses() replaces this on load; edit courseData, not this. -->\n"
-        + "\n".join(sections)
-        + "\n"
+        + "\n<!-- The homepage's default view. renderCourses() keeps it for the\n"
+        "     default view; edit tools/home_copy.py, not this. -->\n"
+        '<section class="vz-home-tracks" id="tracks" aria-labelledby="vz-tracks-h">'
+        '<p class="vzx-kicker">Every track</p>'
+        '<h2 class="vzx-h" id="vz-tracks-h">%d modules in %d tracks</h2>'
+        '<p class="vzx-sub">Each track is ordered so a module only leans on the ones '
+        "before it. Open a track for its full module list, what it assumes and where "
+        "it leads.</p>"
+        '<div class="vzx-start vzx-start-wide">%s</div>'
+        "</section>\n" % (total, len(ordered), cards)
         + END
     )
 
@@ -96,7 +90,7 @@ def main():
         raise SystemExit("no insertion point found in index.html")
 
     open(INDEX, "w", encoding="utf-8").write(src)
-    print("pre-rendered %d cards across %d sections" % (total, len(sections)))
+    print("homepage tracks : %d track cards (%d modules)" % (len(ordered), total))
 
 
 if __name__ == "__main__":
