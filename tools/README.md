@@ -53,6 +53,7 @@ That runs, in order:
 | 12 | `tools/build_seo.py` | canonical / OG / breadcrumbs / JSON-LD, plus the shared `<script>` tags; the robots meta and the AdSense loader per `tools/indexing.py` |
 | 13 | `tools/build_prerender.py` | static card grid inside `index.html` |
 | 13a | `tools/build_headings.py` | names the topic in the section headings every module shares (runs after `faq`, before `css`) |
+| 13b | `tools/build_nosnippet.py` | `data-nosnippet` on the controls and readouts between the opening section and the article (after `headings`) |
 | 14 | `tailwindcss` | `assets/vizlearn.css` |
 | 15 | `tools/build_sitemap.py` | `sitemap.xml` (indexed pages only), `robots.txt` |
 | 16 | `tools/check_inline_js.js` | parses every inline `<script>`; catches unbalanced braces |

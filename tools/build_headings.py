@@ -30,6 +30,7 @@ and build_faq_schema.py has read the Q&A section. Idempotent: a heading that
 already names its topic no longer matches a phrase below.
 """
 
+import html
 import os
 import re
 import sys
@@ -112,15 +113,17 @@ def rename(src, topic):
         idm = ID_ATTR.search(m.group(2))
         if idm:
             renamed[idm.group(1)] = (text, new)
-        return "<%s%s>%s</%s>" % (m.group(1), m.group(2), new, m.group(1))
+        return "<%s%s>%s</%s>" % (m.group(1), m.group(2), html.escape(new, quote=False),
+                                  m.group(1))
 
     body = HEADING.sub(one, src[start:end])
     out = src[:start] + body + src[end:]
 
-    # The table of contents lists the headings by the same text.
+    # The table of contents lists the headings by the same text, escaped the
+    # way build_lede.py writes it, so a later lede run reproduces it exactly.
     for hid, (old, new) in renamed.items():
-        out = out.replace('<a href="#%s">%s</a>' % (hid, old),
-                          '<a href="#%s">%s</a>' % (hid, new))
+        out = out.replace('<a href="#%s">%s</a>' % (hid, html.escape(old)),
+                          '<a href="#%s">%s</a>' % (hid, html.escape(new)))
     return out, count[0]
 
 

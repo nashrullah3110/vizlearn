@@ -62,6 +62,11 @@ function collect() {
     if (at > 0) preArticle = bodyText.slice(0, at);
   }
 
+  // Text a snippet may not quote: the outermost data-nosnippet elements.
+  const nosnippetWords = qa('[data-nosnippet]')
+    .filter((n) => !n.parentElement.closest('[data-nosnippet]'))
+    .reduce((t, n) => t + words(n.innerText || ''), 0);
+
   const check = q('.vz-check');
   const checkAnswers = check
     ? qa('.vz-q-answer, .vz-q-why', check).map((n) => clean(n.textContent)).filter((t) => t)
@@ -111,6 +116,7 @@ function collect() {
     bleedSamples,
     bodyWords: words(bodyText),
     preArticle,
+    nosnippetWords,
     checkTitle,
     checkAnswers,
     cheatText: cheat ? clean(cheat.textContent) : '',

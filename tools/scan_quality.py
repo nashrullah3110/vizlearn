@@ -43,7 +43,7 @@ REPORT = os.path.join(ROOT, "content", "quality-report.md")
 # ---------------------------------------------------------------- thresholds
 # Tier 1 is the set kept indexable and carrying the ad script during review.
 # These are the only knobs; change them and rerun with --reuse.
-TIER1_MIN_PROSE = 800       # words of article prose, code/tables/figures excluded
+TIER1_MIN_PROSE = 800       # words of prose (opening section + article), code/tables/figures excluded
 BORDERLINE_MIN_PROSE = 650  # reported separately: an edit away from Tier 1
 TIER1_MAX_SHARED = 0.20     # max share of prose paragraphs also found on 3+ other pages
 BOILERPLATE_SHARE = 0.05    # a heading on more than 5% of modules counts as template
@@ -218,7 +218,10 @@ def score(rows, kinds, today):
 
         m.update({
             "hasArticle": r.get("hasArticle", False),
-            "proseWords": r.get("proseWords", 0),
+            # The opening section is the article's own first section, moved
+            # above the visualisation by build_lede.py - still its prose.
+            # Counting only .vz-article undercounted 635 pages by it.
+            "proseWords": r.get("proseWords", 0) + words(r.get("lede", "")),
             "ledeWords": words(r.get("lede", "")),
             "worked": {"tables": r.get("hasTable", 0), "code": r.get("hasCode", 0), "math": r.get("hasMath", 0)},
             "glossaryCards": r.get("glossaryCards", 0),
@@ -232,6 +235,7 @@ def score(rows, kinds, today):
             "sharedParaShare": round(shared_n / len(paras), 2) if paras else 0.0,
             "preArticleWords": pre_words,
             "preArticleLabelShare": round(ls, 2),
+            "nosnippetWords": r.get("nosnippetWords", 0),
             "links": r.get("links", 0),
             "uniqueLinks": r.get("uniqueLinks", 0),
             "bodyWords": r.get("bodyWords", 0),
@@ -301,15 +305,16 @@ def write_report(scored, rows_by_path, heading_pages, boiler, shared, today):
     a("| Tier 2 modules (noindex during review) | %d |" % len(t2))
     a("| of which borderline (%d-%d prose words) | %d |" % (BORDERLINE_MIN_PROSE, TIER1_MIN_PROSE - 1, len(border)))
     a("")
-    a("Tier 1 rule: at least %d words of article prose (code, tables, the code lab and" % TIER1_MIN_PROSE)
-    a("glossary cards excluded), at least one table, code block or worked formula, and no more")
+    a("Tier 1 rule: at least %d words of prose - the opening section plus the article (code," % TIER1_MIN_PROSE)
+    a("tables, the code lab and glossary cards excluded) - at least one table, code block or")
+    a("worked formula, and no more")
     a("than %d%% of its paragraphs repeated on %d+ other pages. Thresholds are constants at the" % (100 * TIER1_MAX_SHARED, SHARED_PARA_PAGES))
     a("top of the script; change them and rerun with `--reuse`.")
     a("")
 
     # prose distribution
     buckets = [(0, 400), (400, 650), (650, 800), (800, 1200), (1200, 2000), (2000, 10 ** 9)]
-    a("### Article prose length, all modules")
+    a("### Prose length (opening section + article), all modules")
     a("")
     a("| Prose words | Modules |")
     a("|---|---|")
@@ -397,6 +402,11 @@ def write_report(scored, rows_by_path, heading_pages, boiler, shared, today):
     a("Median: %d words of text before the article starts, %d%% of them on 1-3 word lines" % (
         sorted(m["preArticleWords"] for m in mods.values())[n // 2], round(100 * ls[n // 2])))
     a("(control labels, readouts, key hints, the table of contents). %d modules are at 50%% or more." % len(hi))
+    marked = sum(1 for m in mods.values() if m.get("nosnippetWords"))
+    a("")
+    a("%d modules mark their controls and readouts `data-nosnippet`: %d words in all that a" % (
+        marked, sum(m.get("nosnippetWords", 0) for m in mods.values())))
+    a("search snippet may not quote. (A snippet hint only - the text is still read and indexed.)")
     a("")
 
     bd = {p: m["badDates"] for p, m in scored.items() if m.get("badDates")}
