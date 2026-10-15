@@ -169,7 +169,7 @@ SHARED_SCRIPTS = (
     # focus of the search box, so a reader who never searches never pays for
     # it. The one page that needs it synchronously is /saved/, whose own
     # saved.js reads window.VIZLEARN_MODULES at load.
-    ("modules.js", "assets/saved.js"),
+    ("modules.js", ("assets/saved.js", "VIZLEARN_PATHS")),
     ("search.js", None),
     ("vizlearn.js", None),         # theme, nav, the shell
     ("vizlearn-state.js", None),   # progress and bookmarks, on every page
