@@ -16,6 +16,7 @@ import json
 import os
 import re
 
+import indexing
 from lib_catalog import ROOT, SITE, counts, modules, page_description
 from lib_pages import (is_tool_page, tool_page,
                        DIR_TO_TOPIC, STATIC_LD_TYPE, STATIC_PAGES, STATIC_TITLES,
@@ -82,6 +83,11 @@ ADSENSE_TAG = (
 # Any copy placed by hand outside the generated block, so re-runs cannot stack.
 LOOSE_ADSENSE = re.compile(
     r'[ \t]*<script[^>]*pagead2\.googlesyndication\.com[^>]*>\s*</script>\n?', re.S)
+
+# A robots meta written into a page by hand. The generated block is the only
+# place one belongs (tools/indexing.py decides it); a stray "index, follow"
+# left beside a generated noindex sends Google two answers.
+LOOSE_ROBOTS = re.compile(r'[ \t]*<meta name="robots"[^>]*>\n?')
 
 # Pages whose description this build owns. index.html is here because its
 # description quotes a module count, which cannot be maintained by hand -
@@ -378,8 +384,8 @@ def build_block(rel, title, desc, prefix, mod, needs_icons=False):
         BEGIN,
         '    <link rel="canonical" href="%s">' % url,
     ] + ([
-        '    <meta name="robots" content="noindex, follow">',
-    ] if rel in NOINDEX else []) + [
+        '    <meta name="robots" content="%s">' % indexing.robots(rel),
+    ] if indexing.robots(rel) else []) + [
         "",
         "    <!-- icons -->",
         '    <link rel="icon" type="image/svg+xml" href="%sassets/favicon.svg">' % prefix,
@@ -417,10 +423,11 @@ def build_block(rel, title, desc, prefix, mod, needs_icons=False):
         "",
         "    <!-- prebuilt stylesheet (replaces the Tailwind CDN compiler) -->",
         '    <link rel="stylesheet" href="%sassets/vizlearn.css">' % prefix,
+    ] + ([
         "",
         "    <!-- Google AdSense -->",
         ADSENSE_TAG,
-    ] + ([
+    ] if indexing.ads(rel) else []) + ([
         "",
         "    <!-- runtime icon lookup, for icons this page picks in JS -->",
         '    <script defer src="%sassets/icons.js"></script>' % prefix,
@@ -493,18 +500,10 @@ def generated_description(rel, mods):
     return None
 
 
-# App pages, not articles. /saved/ is a bookmarks list, /map/ a navigation
-# graph and /practice/ a spaced-repetition queue - each is a few dozen words
-# of prose wrapped around state that only exists in the reader's own browser,
-# so there is nothing on them for a crawler to index. /glossary/ and
-# /whats-new/ are excluded from this list because they are real content: the
-# first defines every term the modules assume, the second is a written record
-# of what shipped and when.
-NOINDEX = {
-    "saved/index.html",
-    "map/index.html",
-    "practice/index.html",
-}
+# Pages carrying a noindex: Tier 2 modules, the labs and the app pages.
+# The policy itself lives in tools/indexing.py; this name is kept because
+# the sitemap and the audit read it from here.
+NOINDEX = indexing.noindex_pages()
 
 
 def main():
@@ -527,6 +526,7 @@ def main():
         # strip anything we are replacing
         src = GENERATED.sub("", src)
         src = LOOSE_ADSENSE.sub("", src)
+        src = LOOSE_ROBOTS.sub("", src)
         src = CDN_TAILWIND.sub("", src)
         src = CDN_FA.sub("", src)
         src = INLINE_TW_CONFIG.sub("", src)
@@ -607,6 +607,11 @@ def main():
         open(f, "w", encoding="utf-8").write(src)
 
     print("pages updated        : %d" % len(files))
+    print("noindex / ad script  : %d pages noindexed, %d carry the AdSense loader"
+          % (len(NOINDEX), sum(1 for f in files if indexing.ads(os.path.relpath(f, ROOT)))))
+    if indexing.unscanned():
+        print("  %d modules are not in content/tiers.json and default to Tier 1 -"
+              " run npm run scan to place them" % len(indexing.unscanned()))
     print("descriptions added   : %d" % added_desc)
     print("descriptions rewritten from descriptions.py : %d" % rewritten_desc)
 

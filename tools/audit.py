@@ -298,7 +298,8 @@ def main():
         # practice, whats-new) that are deliberately kept out of the index,
         # and a sitemap should not advertise a URL it then tells Google to drop.
         tools_indexed = [k for k in TOOL_ORDER if TOOL_PAGES[k]["rel"] not in NOINDEX]
-        want = (1 + len(TOPIC_ORDER) + len(modules()) + len(STATIC_PAGES)
+        mods_indexed = [m for m in modules() if m["path"] not in NOINDEX]
+        want = (1 + len(TOPIC_ORDER) + len(mods_indexed) + len(STATIC_PAGES)
                 + len(tools_indexed))
         check(len(locs) == want, "sitemap has %d urls (expected %d)" % (len(locs), want))
         for loc in locs:
@@ -307,6 +308,7 @@ def main():
             if p.endswith("/"):
                 p += "index.html"
             check(os.path.exists(os.path.join(ROOT, p)), "sitemap url has no file: %s" % loc)
+            check(p not in NOINDEX, "sitemap lists a noindexed page: %s" % loc)
 
         # Each track must be in there exactly once, as a real URL rather than
         # the `index.html#ml` fragment it used to be.
@@ -339,6 +341,28 @@ def main():
                   % ga.group(1))
 
     check(os.path.exists(os.path.join(ROOT, "robots.txt")), "robots.txt missing")
+    if os.path.exists(os.path.join(ROOT, "robots.txt")):
+        rt = open(os.path.join(ROOT, "robots.txt"), encoding="utf-8").read()
+        check("User-agent: Mediapartners-Google" in rt,
+              "robots.txt has no group for the AdSense crawler (Mediapartners-Google)")
+
+    # --- robots meta and the ad script follow tools/indexing.py exactly ---
+    import indexing
+    for rel in sorted({m["path"] for m in modules()} | indexing.LABS | indexing.APP_PAGES
+                      | {topic_rel(k) for k in TOPIC_ORDER} | {"index.html"}
+                      | set(STATIC_PAGES)):
+        f = os.path.join(ROOT, rel)
+        if not os.path.exists(f):
+            continue
+        src = open(f, encoding="utf-8").read()
+        m = re.search(r'<meta name="robots" content="([^"]*)"', src)
+        check((m.group(1) if m else None) == indexing.robots(rel),
+              "%s: robots meta is %r, policy says %r"
+              % (rel, m.group(1) if m else None, indexing.robots(rel)))
+        has_ads = "pagead2.googlesyndication.com" in src
+        check(has_ads == indexing.ads(rel),
+              "%s: AdSense script %s, policy says %s"
+              % (rel, "present" if has_ads else "absent", "yes" if indexing.ads(rel) else "no"))
 
     # --- ads.txt must agree with the AdSense client the pages actually load ---
     ads = os.path.join(ROOT, "ads.txt")

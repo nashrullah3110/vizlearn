@@ -472,7 +472,7 @@ TOOL_PAGES = {
         "dir": "python-lab",
         "rel": "python-lab/index.html",
         "title": "Python Compiler",
-        "footer": True,
+        "footer": False,  # off during AdSense review: see tools/indexing.py
         "lead": "Write Python and run it. Real CPython in your browser - no install, "
                 "no account, nothing sent to a server.",
         "description": "A free online Python compiler. Write and run real Python 3 in "
@@ -483,7 +483,7 @@ TOOL_PAGES = {
         "dir": "sql-lab",
         "rel": "sql-lab/index.html",
         "title": "SQL Playground",
-        "footer": True,
+        "footer": False,  # off during AdSense review: see tools/indexing.py
         "lead": "Create tables, insert rows and query them. A real SQLite database "
                 "living in your browser tab, with the schema and results shown as you go.",
         "description": "A free online SQL playground. Run CREATE, INSERT and SELECT "
@@ -494,7 +494,7 @@ TOOL_PAGES = {
         "dir": "js-lab",
         "rel": "js-lab/index.html",
         "title": "JavaScript Compiler",
-        "footer": True,
+        "footer": False,  # off during AdSense review: see tools/indexing.py
         "lead": "Write JavaScript and run it. Your browser's own engine in a worker "
                 "thread - no install, no account, nothing sent to a server.",
         "description": "A free online JavaScript compiler. Write and run real "
@@ -505,7 +505,7 @@ TOOL_PAGES = {
         "dir": "html-lab",
         "rel": "html-lab/index.html",
         "title": "HTML Playground",
-        "footer": True,
+        "footer": False,  # off during AdSense review: see tools/indexing.py
         "lead": "Write HTML, CSS and inline scripts and see them render instantly "
                 "in a sandboxed preview - no tooling, nothing uploaded.",
         "description": "A free online HTML playground. Write HTML with CSS and "
@@ -516,7 +516,7 @@ TOOL_PAGES = {
         "dir": "pydantic-lab",
         "rel": "pydantic-lab/index.html",
         "title": "Pydantic Compiler",
-        "footer": True,
+        "footer": False,  # off during AdSense review: see tools/indexing.py
         "lead": "Write Pydantic models and run them. Real Pydantic v2 on real CPython, "
                 "in your browser - no install, no account, nothing sent to a server.",
         "description": "A free online Pydantic compiler. Define BaseModel classes and "
@@ -527,7 +527,7 @@ TOOL_PAGES = {
         "dir": "fastapi-lab",
         "rel": "fastapi-lab/index.html",
         "title": "FastAPI Compiler",
-        "footer": True,
+        "footer": False,  # off during AdSense review: see tools/indexing.py
         "lead": "Define routes and call them. A real FastAPI app running in your "
                 "browser - no server, no install, nothing sent anywhere.",
         "description": "A free online FastAPI compiler. Write real FastAPI routes and "
@@ -538,7 +538,7 @@ TOOL_PAGES = {
         "dir": "notebook",
         "rel": "notebook/index.html",
         "title": "Python Notebook",
-        "footer": True,
+        "footer": False,  # off during AdSense review: see tools/indexing.py
         "lead": "Cells that share one kernel, with NumPy, pandas and Matplotlib "
                 "loaded. Charts and DataFrames render inline - no install, nothing "
                 "sent to a server.",
@@ -550,7 +550,7 @@ TOOL_PAGES = {
         "dir": "saved",
         "rel": "saved/index.html",
         "title": "Saved",
-        "footer": True,
+        "footer": False,  # off during AdSense review: see tools/indexing.py
         "lead": "The modules you bookmarked and the notes you left on them.",
         "description": "Your bookmarked VizLearn modules and the notes you left "
                        "on them, kept in your browser and nowhere else.",

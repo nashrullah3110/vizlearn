@@ -26,7 +26,9 @@ def entries():
     """(rel, priority, changefreq) in the order they appear in the sitemap."""
     out = [("index.html", "1.0", "weekly")]
     out += [(topic_rel(k), "0.9", "weekly") for k in TOPIC_ORDER]
-    out += [(m["path"], "0.8", "monthly") for m in modules()]
+    # Tier 2 modules carry a noindex during AdSense review (tools/indexing.py)
+    # and so stay out of the sitemap until they are back in the index.
+    out += [(m["path"], "0.8", "monthly") for m in modules() if m["path"] not in NOINDEX]
     # Policy pages matter for trust and for AdSense review, not for ranking.
     out += [(p, "0.3", "yearly") for p in STATIC_PAGES
             if os.path.exists(os.path.join(ROOT, p))]
@@ -60,7 +62,13 @@ def main():
     )
     open(SITEMAP, "w", encoding="utf-8").write(xml)
 
+    # The AdSense crawler gets its own group so nothing added under "*"
+    # later can block it by accident. noindex pages are deliberately not
+    # disallowed: a crawler that may not fetch a page never sees its noindex.
     robots = (
+        "User-agent: Mediapartners-Google\n"
+        "Allow: /\n"
+        "\n"
         "User-agent: *\n"
         "Allow: /\n"
         "\n"
