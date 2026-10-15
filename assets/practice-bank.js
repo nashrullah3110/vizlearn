@@ -2067,7 +2067,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “What is a DataLoader”?",
-    "ans": "In deep learning frameworks like PyTorch or TensorFlow, a DataLoader is an utility class that handles the heavy lifting of preparing your data. Instead of writing complex loops to read pics from your hard drive one by one, the DataLoader fetches the pics, preprocesses them, optionally shuffles them. And groups them into perfectly sized chunks called mini-batches to feed into your CNN."
+    "ans": "In deep learning frameworks like PyTorch or TensorFlow, a DataLoader is an utility class that handles the heavy lifting of preparing your data. Instead of writing complex loops to read images from your hard drive one by one, the DataLoader fetches the images, preprocesses them, optionally shuffles them, and groups them into perfectly sized chunks called mini-batches to feed into your CNN."
    },
    {
     "t": "What does this module say about “The Memory Problem (Why use batches?)”?",
@@ -2206,7 +2206,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “The Transition to 1D”?",
-    "ans": "Throughout the early stages of a CNN, pics are handled as 2D grids (or 3D volumes with color channels). Convolutional and pooling layers extract spatial features like edges, textures, and shapes. However, to make a final classification (e.g., \"Is this a cat or a dog?\"), the network must flatten this 2D/3D data into a single 1D list of counts. This is the input vector you see on the left."
+    "ans": "Throughout the early stages of a CNN, images are processed as 2D grids (or 3D volumes with color channels). Convolutional and pooling layers extract spatial features like edges, textures, and shapes. However, to make a final classification (e.g., \"Is this a cat or a dog?\"), the network must flatten this 2D/3D data into a single 1D list of numbers. This is the input vector you see on the left."
    },
    {
     "t": "What does this module say about “Why \"Fully Connected\"”?",
@@ -2540,7 +2540,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “The problem it solves”?",
-    "ans": "A detector's region proposal stage doesn't stop at one box per object — it scores hundreds of candidate boxes and keeps each one above a confidence floor. It for a single real object often means a cluster of overlapping, near-duplicate boxes. Intersection over Union (IoU) is the standard way to measure how much two boxes overlap: the area they share, divided by the total area either one covers."
+    "ans": "A detector's region proposal stage doesn't stop at one box per object — it scores hundreds of candidate boxes and keeps every one above a confidence floor, which for a single real object usually means a cluster of overlapping, near-duplicate boxes. Intersection over Union (IoU) is the standard way to measure how much two boxes overlap: the area they share, divided by the total area either one covers."
    },
    {
     "t": "What does this module say about “NMS Threshold”?",
@@ -2649,16 +2649,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Computer Vision",
   "q": [
    {
+    "t": "What does this module say about “Start here”?",
+    "ans": "An object detector's output head does two jobs per candidate region: classify what's there, and regress four numbers describing where it is precisely — typically a box center, width and height, or the offsets needed to nudge a fixed anchor box onto the real object. The classification half is an ordinary softmax problem."
+   },
+   {
     "t": "What does this module say about “What a detector outputs and how it is trained”?",
     "ans": "An object detector's output head does two jobs per candidate region: classify what is there. And regress four counts describing where it is precisely. Often a box centre, width and height. Or the offsets needed to nudge a fixed anchor box onto the real object. The sorting half is an ordinary softmax problem. The localisation half is what this module is about."
    },
    {
     "t": "What does this module say about “IoU as loss, IoU as grade”?",
     "ans": "A natural localization loss is simply 1 − IoU between the predicted box and the ground truth box: 0 when they coincide just, approaching 1 as they stop overlapping at all. At test time, the same IoU count gets a other job. A detection is often scored as a true positive just if its IoU with the matching ground truth box clears a threshold, conventionally 0.5 under the PASCAL VOC convention."
-   },
-   {
-    "t": "What does this module say about “Sorting says what. Detection says what and where”?",
-    "ans": "A sorter answers one question about a whole pic. A detector answers two questions about each object in it: what is it . And where is it — expressed as a rectangle."
    }
   ]
  },
@@ -2687,16 +2687,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Computer Vision",
   "q": [
    {
+    "t": "What does this module say about “What is Parameter Sharing”?",
+    "ans": "In a traditional Fully Connected (Dense) neural network layer, every output node is connected to every input node with a unique weight (parameter). If you process an image, a specific pixel in the top-left corner has a completely different weight than a pixel in the bottom-right corner."
+   },
+   {
     "t": "What does this module say about “What is Param Sharing”?",
     "ans": "In a classic Fully Connected (Dense) neural network layer, each output node is connected to each input node with a unique weight (param). If you process an pic, a set pixel in the top-left corner has a fully other weight than a pixel in the bottom-right corner."
    },
    {
     "t": "What does this module say about “The Massive Efficiency Gain”?",
     "ans": "Let's look at the math for the simple interactive above. We have a 4x4 input grid (16 pixels) and we are making a 3x3 output grid (9 pixels)."
-   },
-   {
-    "t": "What does this module say about “One filter, used all over”?",
-    "ans": "A dense layer gives each input pixel its own weight to each output unit. A convolutional layer does something quite other: it learns one small filter and applies that same filter at each position in the pic."
    }
   ]
  },
@@ -2752,12 +2752,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "For convolutional networks, plain ReLU stays the sensible default. Leaky ReLU is the first thing to try if you observe many dead units. GELU and SiLU dominate in transformers and in recent fast vision designs. There their smoothness appears to help slightly — at a small computational cost."
    },
    {
-    "t": "What does this module say about “What is an Output Function”?",
-    "ans": "When a Convolutional or Dense layer processes data, it computes a series of linear math-based steps (dot products). If a neural network just consisted of linear steps, stacking multiple layers wouldn't help—the whole network would in math collapse into a single linear net. To learn complex, real-world patterns (like recognizing a face or a dog), we must add non-linearity . This is the job of the Output Function."
+    "t": "What does this module say about “What is an Activation Function”?",
+    "ans": "When a Convolutional or Dense layer processes data, it computes a series of linear mathematical operations (dot products). If a neural network only consisted of linear operations, stacking multiple layers wouldn't help—the entire network would mathematically collapse into a single linear model. To learn complex, real-world patterns (like recognizing a face or a dog), we must introduce non-linearity ."
    },
    {
-    "t": "What does this module say about “Enter ReLU (Rectified Linear Unit)”?",
-    "ans": "ReLU is now the most popular output function in the world for hidden layers. Its formula is brilliantly simple: if the input is negative, output 0. If the input is positive, output the input unchanged."
+    "t": "What does this module say about “What is an Output Function”?",
+    "ans": "When a Convolutional or Dense layer processes data, it computes a series of linear math-based steps (dot products). If a neural network just consisted of linear steps, stacking multiple layers wouldn't help—the whole network would in math collapse into a single linear net. To learn complex, real-world patterns (like recognizing a face or a dog), we must add non-linearity . This is the job of the Output Function."
    }
   ]
  },
@@ -3103,7 +3103,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “What is Transfer Learning”?",
-    "ans": "Training a Deep Convolutional Neural Network from scratch needs millions of pics (like the ImageNet dataset), massive amounts of computing power (GPUs). And weeks of training time. Also, early layers in a CNN generally learn the exact same things no matter the dataset: generic edges, colors. And basic textures."
+    "ans": "Training a Deep Convolutional Neural Network from scratch requires millions of images (like the ImageNet dataset), massive amounts of computing power (GPUs), and weeks of training time. Furthermore, early layers in a CNN generally learn the exact same things regardless of the dataset: generic edges, colors, and basic textures."
    },
    {
     "t": "What does this module say about “How it Works: Changing the Design”?",
@@ -3487,16 +3487,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
+    "t": "What does this module say about “Start here”?",
+    "ans": "CASE is an if/else that lives inside a SELECT list, evaluated once per row. A VIEW is a query with a name, so you can SELECT from it like a table without repeating the logic every time."
+   },
+   {
     "t": "What does this module say about “What CASE and views give you”?",
     "ans": "SQL has no if statement, but it has CASE — a conditional expression that lives inside a SELECT list and produces a different value for each row depending on a condition. You use it whenever a query needs to classify, bucket, or label rows on the fly."
    },
    {
     "t": "What does this module say about “Views: a name for a query, not a copy of it”?",
     "ans": "A plain view stores no data. Every time you query it, the underlying SELECT runs again against the current table — which is the whole point of the raise experiment below. This is different from a materialized view , which does store a snapshot and has to be refreshed explicitly to catch up with changes underneath it."
-   },
-   {
-    "t": "What does this module say about “CASE: if/else inside a query”?",
-    "ans": "CASE is SQL's conditional expression. It returns a value, so it can appear anywhere a value can — in SELECT , in ORDER BY , inside an aggregate, even in WHERE ."
    }
   ]
  },
@@ -3972,7 +3972,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Context first”?",
-    "ans": "NULL is not zero, not an empty string, and not false. It means the value is unknown or missing or not applicable. Every comparison that touches NULL inherits that uncertainty: NULL = NULL is not TRUE, it is UNKNOWN. NULL > 5 is UNKNOWN. NULL + 10 is UNKNOWN. This is three-valued logic — true, false, or unknown — not the two-valued logic of most programming languages."
+    "ans": "NULL is not zero, not an empty string, and not false. It means the value is unknown, and every comparison that touches it inherits that uncertainty: NULL = NULL is not TRUE, it is UNKNOWN. This is three-valued logic , and COALESCE, NULLIF and IS NULL are the tools for working with it on purpose instead of by accident."
    },
    {
     "t": "What does this module say about “The three tools”?",
@@ -3987,7 +3987,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Start here”?",
-    "ans": "A denormalized table stores the same fact in more than one place. It means updating it can leave two copies disagreeing. Normalization is a sequence of rules, each one removing a set kind of redundancy by moving data into its own table."
+    "ans": "A denormalized table stores the same fact in more than one place, which means updating it can leave two copies disagreeing. Normalization is a sequence of rules, each one removing a specific kind of redundancy by moving data into its own table."
    },
    {
     "t": "What does this module say about “The three rules”?",
@@ -5386,7 +5386,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Context first”?",
-    "ans": "Most gradients in training are reasonably sized. At times — a badly scaled batch, a long recurrent chain, a numerically unstable loss — one gradient is enormous. Applied right, w − lr · g can throw a weight far outside the region the optimiser was making sane progress in. And the next few steps are spent recovering rather than learning."
+    "ans": "Most gradients during training are reasonably sized. Occasionally — a badly scaled batch, a long recurrent chain, a numerically unstable loss — one gradient is enormous. Applied directly, w − lr · g can throw a weight far outside the region the optimiser was making sane progress in, and the next few steps are spent recovering rather than learning."
    },
    {
     "t": "What does this module say about “Run Training”?",
@@ -5558,16 +5558,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Deep Learning",
   "q": [
    {
+    "t": "What does this module say about “Start here”?",
+    "ans": "BatchNorm normalizes each feature — each column — using the mean and standard deviation computed across every sample currently in the batch. That is powerful, and it has one structural weakness: its statistics depend on which other examples happen to be in the batch with you, which becomes a real problem at batch size 1 and in architectures like transformers where \"the batch\" is not a stable, meaningful group."
+   },
+   {
     "t": "What does this module say about “What LayerNorm changes and why it matters”?",
     "ans": "BatchNorm normalizes each feature — each column — with the mean and standard deviation computed across each sample now in the batch. That is powerful, and it has one structural weakness: its statistics depend on which other cases happen to be in the batch with you. It turns a real problem at batch size 1 and in designs like transformers where \"the batch\" is not a stable, meaningful group."
    },
    {
     "t": "What does this module say about “Normalising across features, not across the batch”?",
     "ans": "Batch normalisation standardises each feature with statistics computed across the cases in a batch. Layer normalisation does the opposite: it standardises each case with statistics computed across its own features."
-   },
-   {
-    "t": "What does this module say about “Pre-norm versus post-norm”?",
-    "ans": "Where the normalisation sits relative to the residual connection turns out to matter a great deal."
    }
   ]
  },
@@ -5949,7 +5949,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “What this is”?",
-    "ans": "Stack enough layers and, by the chain rule, the gradient reaching an early layer is the product of each local derivative between it and the loss. If each of those derivatives is reliably less than 1 — true of sigmoid and tanh almost all over — the product shrinks geometrically. Ten layers at a local derivative of 0.55 now leaves the input gradient at about 0.0025 of what it started as."
+    "ans": "Stack enough layers and, by the chain rule, the gradient reaching an early layer is the product of every local derivative between it and the loss. If each of those derivatives is reliably less than 1 — true of sigmoid and tanh almost everywhere — the product shrinks geometrically."
    },
    {
     "t": "What does this module say about “The Stack”?",
@@ -7488,7 +7488,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “What this is”?",
-    "ans": "Before dense vector search , and still running alongside it in most real systems, is sparse lexical search. Score a document by which query terms it holds, weighted by how informative each term is. BM25 is the version of this idea that really works well. And it needs no training, no GPU, and no embedding model. BM25 scores a document by summing a term-weight for each query word that appears in it."
+    "ans": "Before dense vector search , and still running alongside it in most real systems, is sparse lexical search: score a document by which query terms it contains, weighted by how informative each term is. BM25 is the version of this idea that actually works well, and it needs no training, no GPU, and no embedding model."
    },
    {
     "t": "What does this module say about “Scoring by term overlap, carefully”?",
@@ -7545,7 +7545,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Before the details”?",
-    "ans": "Every piece of RAG downstream of chunking — embedding, indexing, retrieval, reranking — operates on any the chunk boundaries gave. Cut a sentence in half and both halves lose the context that made the first sentence meaningful; the embedding of a fragment is not a fragment of the embedding."
+    "ans": "Every piece of RAG downstream of chunking — embedding, indexing, retrieval, reranking — operates on whatever the chunk boundaries produced. Cut a sentence in half and both halves lose the context that made the original sentence meaningful; the embedding of a fragment is not a fragment of the embedding."
    },
    {
     "t": "What does this module say about “Fixed-size vs semantic”?",
@@ -8003,7 +8003,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Context first”?",
-    "ans": "Plain top-k retrieval picks the k highest-scoring documents on its own. If a document collection has a few near-the same passages about the same popular sub-topic, all of them can legitimately score near the top — and a naive top-k fills the context with repetition instead of coverage. This wastes the retrieval budget on saying the same thing three times."
+    "ans": "Plain top-k retrieval picks the k highest-scoring documents independently. If a document collection has several near-identical passages about the same popular sub-topic, all of them can legitimately score near the top — and a naive top-k fills the context with repetition instead of coverage, wasting the retrieval budget on saying the same thing three times."
    },
    {
     "t": "What does this module say about “Selection”?",
@@ -8159,7 +8159,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Before the details”?",
-    "ans": "A user's question and the passage that answers it are much written in else registers. Short and colloquial versus long-form and technical. Each likeness metric in this batch — cosine , BM25 — depends on shared vocabulary between what is embedded and what is stored. If the question and the answer do not share words, no likeness metric can bridge that gap on its own."
+    "ans": "A user's question and the passage that answers it are usually written in different registers: short and colloquial versus long-form and technical. Every similarity metric in this batch — cosine , BM25 — depends on shared vocabulary between what is embedded and what is stored."
    },
    {
     "t": "What does this module say about “What Gets Embedded”?",
@@ -8197,7 +8197,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “The idea in brief”?",
-    "ans": "A bi-encoder embeds the query and each document apart , ahead of time — that is what makes the embeddings precomputable and search fast. But it too means the net never looks at a query and a document together. A cross-encoder takes both as one input and lets the net attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable."
+    "ans": "A bi-encoder embeds the query and every document separately , ahead of time — that is what makes the embeddings precomputable and search fast, but it also means the model never looks at a query and a document together. A cross-encoder takes both as one input and lets the model attend across them jointly, at the cost of running a full forward pass per query-document pair, at query time, with nothing precomputable."
    },
    {
     "t": "What does this module say about “The two-stage pattern”?",
@@ -8262,7 +8262,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Why classification metrics are not enough”?",
-    "ans": "A retriever does not return a yes or no; it returns an ordered list of candidates. Two systems can retrieve exactly the same documents and be very different in quality if one puts the apt ones first and the other buries them at position 10."
+    "ans": "A retriever does not return a yes or no; it returns an ordered list of candidates. Two systems can retrieve exactly the same documents and be very different in quality if one puts the relevant ones first and the other buries them at position 10."
    },
    {
     "t": "What does this module say about “Ranking”?",
@@ -14950,7 +14950,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “Unrolling”?",
-    "ans": "An RNN is often drawn as a cell with an arrow looping back to itself. That is compact and slightly misleading. To understand training, unroll it: draw one copy of the cell per timestep, with the hidden state flowing left to right between copies."
+    "ans": "An RNN is usually drawn as a cell with an arrow looping back to itself. That is compact and slightly misleading. To understand training, unroll it: draw one copy of the cell per timestep, with the hidden state flowing left to right between copies."
    },
    {
     "t": "What does this module say about “Internal Flow”?",

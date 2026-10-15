@@ -57,7 +57,7 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Key-Value and Graph Models - interactive visualization on VizLearn">
     <meta property="og:locale" content="en_US">
-    <meta property="article:modified_time" content="2026-09-18">
+    <meta property="article:modified_time" content="2026-10-15">
     <meta property="article:published_time" content="2026-08-24">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Key-Value and Graph Models">
@@ -71,7 +71,7 @@
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7551664560637561" crossorigin="anonymous"></script>
 
     <meta name="author" content="Ashish Jangra">
-    <meta name="last-modified" content="2026-09-18">
+    <meta name="last-modified" content="2026-10-15">
 
     <script type="application/ld+json">
 {
@@ -88,7 +88,7 @@
   "educationalLevel": "Beginner",
   "typicalAgeRange": "16-",
   "datePublished": "2026-08-24",
-  "dateModified": "2026-09-18",
+  "dateModified": "2026-10-15",
   "author": {
     "@type": "Person",
     "name": "Ashish Jangra",
@@ -220,8 +220,8 @@
                     <h3 id="vz-s-key-value-doing-less-on-purpose">Key-value: doing less on purpose</h3>
                     <p>The interface is three ops:</p><pre><code>get(key)  -&gt;  value
 put(key, value)
-delete(key)</code></pre><p>The value is opaque &mdash; a blob the store does not interpret. You cannot query by its contents, sort by it, or join on it. There is no schema and no query language.</p><p>That poverty is the point. With no query planner, no join algorithms and no secondary indexes to maintain, a lookup is a hash and a read. Redis, Memcached, DynamoDB in its simplest mode and etcd all live here, and they are fast in a way a general-purpose database cannot match, because they have far less to do.</p><p>The cost is that every access path must be designed in advance, encoded in the key. Fetching a user by id means <code>user:1234</code>. Fetching them by email means maintaining a second key, <code>email:ada@example.com -&gt; 1234</code>, and keeping the two in step yourself &mdash; there is no unique constraint and no transaction spanning them.</p><p>The first variant above shows the shape: a two-column table used as nothing but a key lookup.</p><p><strong>Where it fits.</strong> Caches, sessions, feature flags, rate limiters, leaderboards, service discovery. Anything with one obvious access path and a strong preference for speed.</p><p><strong>Where it does not.</strong> Anything needing an ad-hoc question. "How many active sessions are from Leeds" is not answerable without scanning every key, which the model is not built for.</p>
-                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-graph-relationships-as-the-primary-thing">Graph: relationships as the primary thing</a></li><li><a href="#vz-s-the-honest-comparison">The honest comparison</a></li><li><a href="#vz-s-do-you-need-to-leave-sql">Do you need to leave SQL?</a></li><li><a href="#vz-s-why-traversal-depth-is-where-graphs-win">Why traversal depth is where graphs win</a></li><li><a href="#vz-s-the-lookup-and-why-it-is-o-1">The lookup, and why it is O(1)</a></li><li><a href="#vz-s-where-it-goes-wrong">Where it goes wrong with Key-Value and Graph Models</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
+delete(key)</code></pre><p>The value is opaque &mdash; a blob the store doesn't read. You can't query by its contents, sort by it, or join on it. There's no schema and no query language.</p><p>That poverty is the point. With no query planner, no join methods and no secondary indexes to maintain, a lookup is a hash and a read. Redis, Memcached, DynamoDB in its simplest mode and etcd all live here. They're fast in a way a all-round DB can't match, because they've far less to do.</p><p>The cost is that each access path must be designed in advance, coded in the key. Fetching a user by id means <code>user:1234</code>. Fetching them by email means keeping a second key, <code>email:ada@example.com -&gt; 1234</code>, and keeping the two in step yourself &mdash; there's no unique constraint and no transaction spanning them.</p><p>The first variant above shows the shape: a two-column table used as nothing but a key lookup.</p><p><strong>Where it fits.</strong> Caches, sessions, feature flags, rate limiters, leaderboards, service find. any of it with one obvious access path and a strong preference for speed.</p><p><strong>Where it doesn't.</strong> any of it needing an ad-hoc question. "How many active sessions are from Leeds" isn't answerable without scanning each key, which the model isn't built for.</p>
+                </div><!-- VIZLEARN:LEDE:/SRC --></div><nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h"><h2 id="vz-lede-toc-h">In this guide</h2><ol><li><a href="#vz-s-graph-relationships-as-the-primary-thing">Graph: relationships as the primary thing</a></li><li><a href="#vz-s-the-honest-comparison">The honest comparison</a></li><li><a href="#vz-s-do-you-need-to-leave-sql">Do you need to leave SQL?</a></li><li><a href="#vz-s-why-traversal-depth-is-where-graphs-win">Why traversal depth is where graphs win</a></li><li><a href="#vz-s-the-lookup-and-why-it-is-o-1">The lookup, and why it is O(1)</a></li><li><a href="#vz-s-questions-people-ask">Questions people ask about Key-Value and Graph Models</a></li><li><a href="#vz-s-where-it-goes-wrong">Where it goes wrong with Key-Value and Graph Models</a></li></ol></nav></section><!-- VIZLEARN:LEDE:END -->
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in" data-nosnippet>
             <div class="lg:col-span-7 space-y-6" data-vz-viz>
@@ -372,12 +372,12 @@ SELECT value FROM kv WHERE key = 'user:1234';
                     <p>The reason a key-value store outruns a general DB on its one job is the lack of a tree. A relational main-key lookup descends a B-tree &mdash; about <code>log2(n)</code> steps &mdash; while a hash-based key-value <code>get</code> finds one hash and does one read, even so of size:</p><div class="vz-table-wrap"><table><thead><tr><th>keys stored</th><th>B-tree lookup</th><th>hash lookup</th></tr></thead><tbody><tr><td>1,000,000</td><td>~20 steps</td><td>~1 probe</td></tr><tr><td>1,000,000,000</td><td>~30 steps</td><td>~1 probe</td></tr></tbody></table></div><p>The B-tree's cost grows, slowly, forever. The hash's doesn't grow at all. That flat line is the whole value proposition, and it's bought by giving up all a tree enables &mdash; sorted scans, range queries, "the next key after this one" &mdash; none of which a hash can answer. So the choice isn't "key-value is faster" but "key-value is faster at point lookups and can't do ranges at all", which is just the trade to weigh before moving a workload off SQL for speed.</p>
                 </div>
                 <div>
-                    <h3 id="vz-s-questions-people-ask">Questions people ask</h3>
+                    <h3 id="vz-s-questions-people-ask">Questions people ask about Key-Value and Graph Models</h3>
                     <p><strong>What is a key-value store good for?</strong> Fast lookups by a known key, such as sessions, caches and counters. It does one thing and does it quickly.</p><p><strong>Why is a key-value lookup O(1)?</strong> The key is hashed to find where the value is stored, so lookup time does not grow with the number of entries.</p><p><strong>What is a graph database?</strong> A database that stores nodes and the relationships between them, and makes following those links a primary operation.</p><p><strong>When does a graph beat SQL joins?</strong> When queries follow connections several hops deep, such as friends of friends. Each hop in SQL adds a join, while a graph follows stored links.</p><p><strong>Can I query a key-value store by value?</strong> Not directly. You can only look up by key unless the store adds secondary indexes, so design keys around your queries.</p><p><strong>Do I need to leave SQL for these workloads?</strong> Often not. Recursive CTEs handle many graph questions, and a table with a key column works as a simple key-value store. Switch when scale or traversal depth demands it.</p>
                 </div>
                 <div>
                     <h3 id="vz-s-where-it-goes-wrong">Where it goes wrong with Key-Value and Graph Models</h3>
-                    <p><strong>Using a key-value store as the system of record without a plan for secondary access.</strong> The second access path is your problem, forever.</p><p><strong>Assuming a graph database is faster at everything.</strong> It is faster at traversals and often slower at aggregates.</p><p><strong>Recursive CTEs without a depth limit.</strong> A cycle in the data is an infinite loop; the variant here carries a guard for exactly that reason.</p><p><strong>Modelling everything as a graph.</strong> If the questions are about attributes rather than connections, a table is the better graph.</p>
+                    <p><strong>Using a key-value store as the system of record without a plan for secondary access.</strong> The second access path is your problem, forever.</p><p><strong>given a graph DB is faster at all.</strong> It's faster at traversals and often slower at aggregates.</p><p><strong>Recursive CTEs without a depth limit.</strong> A cycle in the data is an infinite loop. The variant here carries a guard for just that reason.</p><p><strong>Modelling all as a graph.</strong> If the questions are about fields rather than links, a table is the better graph.</p>
                 </div>
             </div>
 <!-- VIZLEARN:ARTICLE:END -->
