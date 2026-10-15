@@ -27,6 +27,7 @@ import os
 import re
 import sys
 
+import indexing
 from build_seo import ADSENSE_CLIENT, AD_SLOTS
 from lib_catalog import ROOT, modules
 
@@ -87,6 +88,12 @@ def apply(src, name, slot):
     return src[:line_start] + indent + fresh + src[line_start:]
 
 
+def remove(src, name):
+    existing = re.compile(
+        r"[ \t]*" + re.escape(BEGIN % name) + r".*?" + re.escape(END % name) + r"\n*", re.S)
+    return existing.sub("", src, count=1)
+
+
 def main():
     touched = 0
     for m in modules():
@@ -96,7 +103,12 @@ def main():
         src = open(path, encoding="utf-8").read()
         out = src
         for name in ("TOP", "BOTTOM"):
-            out = apply(out, name, AD_SLOTS.get(name.lower(), ""))
+            if indexing.ads(m["path"]):
+                out = apply(out, name, AD_SLOTS.get(name.lower(), ""))
+            else:
+                # Tier 2 during review: no placement at all, not even an
+                # inert marker, so turning a slot on cannot reach these pages.
+                out = remove(out, name)
         if out != src:
             open(path, "w", encoding="utf-8").write(out)
             touched += 1

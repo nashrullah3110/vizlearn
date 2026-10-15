@@ -761,11 +761,16 @@ def check_markup(questions, cards):
             % (html.escape(q["q"]), opts, why)
         )
 
+    # A card's answer is a quotation of the page's own prose, so writing it
+    # out as text put the same paragraph on the page twice - 554 times across
+    # the site, which reads as duplicated content to anything parsing it. It
+    # rides in an attribute instead and vizlearn-lab.js writes it into the
+    # <p> when the reader asks for it.
     for prompt, answer in cards:
         body.append(
             '<li class="vz-q vz-q-card"><p class="vz-q-text">%s</p>'
             '<button type="button" class="vz-q-reveal" data-vz-reveal>Show answer</button>'
-            '<p class="vz-q-answer" hidden>%s</p></li>'
+            '<p class="vz-q-answer" hidden data-vz-answer="%s"></p></li>'
             % (html.escape(prompt), html.escape(answer))
         )
 

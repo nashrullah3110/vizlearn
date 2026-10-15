@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Site-wide checks. Exits non-zero if anything fails."""
 
+import datetime
 import glob
 import json
 import os
@@ -8,6 +9,7 @@ import re
 import sys
 from collections import Counter
 
+from build_headings import TEMPLATES as HEADING_TEMPLATES, topic_name
 from build_seo import NOINDEX, SHARED_SCRIPTS, scripts_for
 from lib_catalog import ROOT, SITE, modules
 from lib_pages import (STATIC_PAGES, TOOL_ORDER, TOOL_PAGES, TOPIC_ORDER,
@@ -29,6 +31,21 @@ TEXT_PLAIN = re.compile(
     r'<script\b[^>]*type=["\']text/plain["\'][^>]*>[\s\S]*?</script>')
 
 
+TODAY = datetime.date.today().isoformat()
+
+# Every place a page states a date a crawler reads: JSON-LD, the article and
+# last-modified metas, and <time datetime>.
+FUTURE_DATE_FIELDS = re.compile(
+    r'(?:"(date(?:Published|Modified))"\s*:\s*"|'
+    r'(?:property|name)="(?:article:)?((?:modified|published)_time|last-modified)"\s+content="|'
+    r'<(time) datetime=")(\d{4}-\d{2}-\d{2})')
+
+# The exact phrases build_headings.py rewrites, as a whole heading.
+BOILER_HEADING = re.compile(
+    r'<h[2-4]\b[^>]*\bid="vz-s-[^"]*"[^>]*>\s*(%s)\s*</h[2-4]>'
+    % "|".join(re.escape(p) for p in HEADING_TEMPLATES), re.I)
+
+
 def main():
     files = sorted(glob.glob(os.path.join(ROOT, "*", "*.html")))
     files = [f for f in files
@@ -37,6 +54,7 @@ def main():
     files += [os.path.join(ROOT, p) for p in STATIC_PAGES]
 
     module_paths = {m["path"] for m in modules()}
+    topic_names = {m["path"]: topic_name(m["title"]) for m in modules()}
     titles = Counter()
     for f in files:
         rel = os.path.relpath(f, ROOT)
@@ -50,6 +68,26 @@ def main():
         check("initTailwind" not in s, "%s: still has the initTailwind polling loop" % rel)
         check("<i class=\"fa" not in s, "%s: leftover Font Awesome <i> tag" % rel)
         check("ns0:" not in s, "%s: namespaced SVG tag (ns0:) would not render" % rel)
+
+        # --- no date a crawler would read as being in the future ---
+        for dm in FUTURE_DATE_FIELDS.finditer(s):
+            field = dm.group(1) or dm.group(2) or dm.group(3)
+            value = dm.group(4)
+            check(value <= TODAY, "%s: %s is in the future (%s)" % (rel, field, value))
+
+        # --- nothing that puts the page's own prose on the page twice ---
+        check('class="vz-q-answer" hidden>' not in s or
+              not re.search(r'<p class="vz-q-answer" hidden>[^<]', s),
+              "%s: a recall-card answer is written out as text - it belongs in "
+              "data-vz-answer (tools/build_labs.py)" % rel)
+        check('<span class="vz-term-card"' not in s,
+              "%s: a glossary card is in the static HTML - cards are built on "
+              "hover (assets/vizlearn-glossary.js)" % rel)
+        if rel in module_paths and topic_names.get(rel):
+            for h in BOILER_HEADING.findall(s):
+                check(False, "%s: section heading %r is the same string on hundreds "
+                      "of pages - tools/build_headings.py should have named the topic"
+                      % (rel, h))
 
         # --- document structure ---
         s_struct = TEXT_PLAIN.sub("", s)
@@ -298,7 +336,8 @@ def main():
         # practice, whats-new) that are deliberately kept out of the index,
         # and a sitemap should not advertise a URL it then tells Google to drop.
         tools_indexed = [k for k in TOOL_ORDER if TOOL_PAGES[k]["rel"] not in NOINDEX]
-        want = (1 + len(TOPIC_ORDER) + len(modules()) + len(STATIC_PAGES)
+        mods_indexed = [m for m in modules() if m["path"] not in NOINDEX]
+        want = (1 + len(TOPIC_ORDER) + len(mods_indexed) + len(STATIC_PAGES)
                 + len(tools_indexed))
         check(len(locs) == want, "sitemap has %d urls (expected %d)" % (len(locs), want))
         for loc in locs:
@@ -307,6 +346,7 @@ def main():
             if p.endswith("/"):
                 p += "index.html"
             check(os.path.exists(os.path.join(ROOT, p)), "sitemap url has no file: %s" % loc)
+            check(p not in NOINDEX, "sitemap lists a noindexed page: %s" % loc)
 
         # Each track must be in there exactly once, as a real URL rather than
         # the `index.html#ml` fragment it used to be.
@@ -339,6 +379,28 @@ def main():
                   % ga.group(1))
 
     check(os.path.exists(os.path.join(ROOT, "robots.txt")), "robots.txt missing")
+    if os.path.exists(os.path.join(ROOT, "robots.txt")):
+        rt = open(os.path.join(ROOT, "robots.txt"), encoding="utf-8").read()
+        check("User-agent: Mediapartners-Google" in rt,
+              "robots.txt has no group for the AdSense crawler (Mediapartners-Google)")
+
+    # --- robots meta and the ad script follow tools/indexing.py exactly ---
+    import indexing
+    for rel in sorted({m["path"] for m in modules()} | indexing.LABS | indexing.APP_PAGES
+                      | {topic_rel(k) for k in TOPIC_ORDER} | {"index.html"}
+                      | set(STATIC_PAGES)):
+        f = os.path.join(ROOT, rel)
+        if not os.path.exists(f):
+            continue
+        src = open(f, encoding="utf-8").read()
+        m = re.search(r'<meta name="robots" content="([^"]*)"', src)
+        check((m.group(1) if m else None) == indexing.robots(rel),
+              "%s: robots meta is %r, policy says %r"
+              % (rel, m.group(1) if m else None, indexing.robots(rel)))
+        has_ads = "pagead2.googlesyndication.com" in src
+        check(has_ads == indexing.ads(rel),
+              "%s: AdSense script %s, policy says %s"
+              % (rel, "present" if has_ads else "absent", "yes" if indexing.ads(rel) else "no"))
 
     # --- ads.txt must agree with the AdSense client the pages actually load ---
     ads = os.path.join(ROOT, "ads.txt")

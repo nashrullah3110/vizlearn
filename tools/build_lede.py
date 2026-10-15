@@ -223,8 +223,15 @@ def process(rel):
     preamble, blocks = segments(src, *body)
     if len(blocks) < 3:
         return bail("too-few-sections")
-    ids = list(zip(unique_slugs([t for _, _, t in blocks]),
-                   [t for _, _, t in blocks]))
+    # Link to the id each heading actually carries. Deriving it from the text
+    # again broke every link to a heading renamed after its id was set -
+    # build_headings.py renames hundreds, and keeps their ids on purpose.
+    fresh = unique_slugs([t for _, _, t in blocks])
+    ids = []
+    for (a, b, title), slug_ in zip(blocks, fresh):
+        m = H3.search(src, a, b)
+        idm = re.search(r'\bid="([^"]+)"', m.group(1)) if m else None
+        ids.append((idm.group(1) if idm else slug_, title))
 
     # Prefer a substantial opening paragraph; otherwise lift the first section.
     if preamble and len(text_of(src[preamble[0]:preamble[1]]).split()) >= 45:
@@ -236,6 +243,14 @@ def process(rel):
         if title.lower().rstrip(":?") in UI_HEADINGS:
             return bail("not-prose")
         rest = [i for i in ids[1:] if i]
+        # A short opening section ("The problem it solves", 30-44 words) is
+        # still the introduction; 44 pages fell just under the floor below
+        # and so showed the reader a tool before any prose. Take the section
+        # after it too, when that one is prose, rather than lifting nothing.
+        if (len(text_of(src[first_start:first_end]).split()) < 45 and len(blocks) > 3
+                and blocks[1][2].lower().rstrip(":?") not in UI_HEADINGS):
+            first_end = blocks[1][1]
+            rest = [i for i in ids[2:] if i]
 
     first = src[first_start:first_end]
     # A list-led section is still an introduction; only length disqualifies it.

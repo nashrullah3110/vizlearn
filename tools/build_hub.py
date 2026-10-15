@@ -3,8 +3,11 @@
 
 The hub opened with four blocks of prose before it reached a single module,
 which is backwards for a site whose argument is that you should go and push a
-slider. It now opens on six real modules, then the rails, and keeps the
-explanatory material below them.
+slider. It now opens on sixteen featured modules, each with a two-sentence
+reason to open it (tools/home_copy.py), then the track cards, and keeps the
+explanatory material below them. A chart of modules per track used to sit
+below as well; the track cards carry the same numbers, and it repeated all
+eighteen track links twice.
 
 Everything this writes lives between VIZLEARN:HUB markers and is replaced on
 re-run, so it is safe in the build chain. The intro band it removes is
@@ -19,12 +22,12 @@ the real module counts.
 """
 
 import html
-import math
 import os
 import re
 import sys
 
-from lib_catalog import DIR_META, counts, modules
+from home_copy import FEATURED
+from lib_catalog import counts, modules
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INDEX = os.path.join(ROOT, "index.html")
@@ -49,111 +52,37 @@ def esc(s):
     return html.escape(str(s))
 
 
-def track_data():
-    seen, order = {}, []
-    for m in modules():
-        d = m["dir"]
-        if d not in seen:
-            seen[d] = {"dir": d, "label": DIR_META.get(d, (d,))[0], "n": 0,
-                       "first": m["path"], "first_title": m["title"]}
-            order.append(seen[d])
-        seen[d]["n"] += 1
-    return sorted(order, key=lambda t: -t["n"])
-
-
-# --------------------------------------------------------------------------
-# Radar
-# --------------------------------------------------------------------------
-W, H, CX, CY, R = 880, 640, 440, 312, 196
-
-
-def _pt(i, n, frac):
-    a = -math.pi / 2 + (2 * math.pi * i / n)
-    return CX + R * frac * math.cos(a), CY + R * frac * math.sin(a)
-
-
-def radar(tracks):
-    n = len(tracks)
-    scale = int(math.ceil(tracks[0]["n"] / 10.0) * 10)
-    rings = [0.25, 0.5, 0.75, 1.0]
-    o = ['<svg class="vzx-radar" viewBox="0 0 %d %d" role="img" '
-         'aria-labelledby="vzx-radar-t vzx-radar-d" preserveAspectRatio="xMidYMid meet">' % (W, H),
-         '<title id="vzx-radar-t">Modules per track</title>',
-         '<desc id="vzx-radar-d">One spoke per track; distance from the centre is '
-         "that track's module count. Every spoke is a link, and the same numbers "
-         'are in the table beside the chart.</desc>']
-    for f in rings:
-        o.append('<polygon class="vzx-r-ring" points="%s"/>'
-                 % " ".join("%.1f,%.1f" % _pt(i, n, f) for i in range(n)))
-    for i in range(n):
-        x, y = _pt(i, n, 1.0)
-        o.append('<line class="vzx-r-spoke" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/>' % (CX, CY, x, y))
-    for f in rings:
-        o.append('<text class="vzx-r-scale" x="%.1f" y="%.1f">%d</text>'
-                 % (CX + 7, CY - R * f + 4, int(round(scale * f))))
-    pts = [_pt(i, n, t["n"] / float(scale)) for i, t in enumerate(tracks)]
-    o.append('<polygon class="vzx-r-area" points="%s"/>'
-             % " ".join("%.1f,%.1f" % p for p in pts))
-    for i, (t, (px, py)) in enumerate(zip(tracks, pts)):
-        lx, ly = _pt(i, n, 1.0)
-        dx, dy = lx - CX, ly - CY
-        d = math.hypot(dx, dy) or 1
-        tx, ty = CX + dx / d * (R + 32), CY + dy / d * (R + 32)
-        anchor = "middle" if abs(dx) < 14 else ("start" if dx > 0 else "end")
-        o.append(
-            '<a class="vzx-r-node" href="%s/" data-track="%s" aria-label="%s, %d modules">'
-            '<line class="vzx-r-lead" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/>'
-            '<circle class="vzx-r-hit" cx="%.1f" cy="%.1f" r="26"/>'
-            '<circle class="vzx-r-dot" cx="%.1f" cy="%.1f" r="5"/>'
-            '<text class="vzx-r-label" x="%.1f" y="%.1f" text-anchor="%s">%s</text>'
-            '<text class="vzx-r-num" x="%.1f" y="%.1f" text-anchor="%s">%d</text></a>'
-            % (esc(t["dir"]), esc(t["dir"]), esc(t["label"]), t["n"], CX, CY, px, py,
-               px, py, px, py, tx, ty, anchor, esc(t["label"]), tx, ty + 18, anchor, t["n"]))
-    o.append("</svg>")
-    return "".join(o)
-
-
-def radar_table(tracks):
-    rows = "".join(
-        '<tr class="vzx-r-row" data-track="%s"><th scope="row"><a href="%s/">%s</a></th>'
-        '<td>%d</td></tr>' % (esc(t["dir"]), esc(t["dir"]), esc(t["label"]), t["n"])
-        for t in tracks)
-    return ('<table class="vzx-r-table"><caption>Modules per track</caption><thead><tr>'
-            '<th scope="col">Track</th><th scope="col">Modules</th></tr></thead>'
-            '<tbody>%s</tbody></table>' % rows)
-
-
 # --------------------------------------------------------------------------
 # Sections
 # --------------------------------------------------------------------------
 
-def start_here(tracks):
-    want = ["python", "maths", "dsa", "machine_learning", "gen_ai", "interview"]
-    by = {t["dir"]: t for t in tracks}
-    cards = "".join(
-        '<a class="vzx-panel vzx-start-card" href="%s"><span class="vzx-start-track">%s</span>'
-        '<span class="vzx-start-title">%s</span>'
-        '<span class="vzx-start-go">Start the track &rarr;</span></a>'
-        % (esc(by[d]["first"]), esc(by[d]["label"]), esc(by[d]["first_title"]))
-        for d in want if d in by)
+def featured():
+    """Sixteen modules across the tracks, two sentences each.
+
+    This was "Start here": the first module of six tracks, title only. The
+    homepage now opens on the track cards below it, so this is the place for
+    a short, written reason to open a particular page. Copy lives in
+    tools/home_copy.py; the paragraph sits outside the link, as on the track
+    cards.
+    """
+    by = {m["path"]: m for m in modules(with_desc=False)}
+    cards = []
+    for path, blurb in FEATURED:
+        m = by.get(path)
+        if not m:
+            raise SystemExit("featured module not in the catalog: %s" % path)
+        cards.append(
+            '<div class="vzx-panel vzx-start-card"><span class="vzx-start-track">%s</span>'
+            '<h3 class="vzx-start-title"><a href="%s">%s</a></h3>'
+            '<p class="vzx-start-p">%s</p></div>'
+            % (esc(m["category"]), esc(path), esc(m["title"]), esc(blurb)))
     return ('<section class="vzx-sec" aria-labelledby="vzx-start-h"><div class="vzx-wrap">'
-            '<p class="vzx-kicker">Start here</p>'
-            '<h2 class="vzx-h" id="vzx-start-h">The first page of six tracks</h2>'
-            '<p class="vzx-sub">Each of these is the opening module of its track - the '
-            'one that assumes the least.</p><div class="vzx-start">%s</div></div></section>'
-            % cards)
-
-
-def tracks_section(tracks, n_mods, n_tracks):
-    return ('<section class="vzx-sec" aria-labelledby="vzx-tracks-h"><div class="vzx-wrap">'
-            '<p class="vzx-kicker">Every track</p>'
-            '<h2 class="vzx-h" id="vzx-tracks-h">%d modules across %d tracks</h2>'
-            '<p class="vzx-sub">Distance from the centre is the number of modules in that '
-            'track. Point at a spoke, or tab through them, to pull one out - each is a '
-            'link to that track.</p><div class="vzx-radar-wrap"><div class="vzx-radar-col">%s'
-            '<p class="vzx-r-readout" role="status" aria-live="polite">Hover a spoke for '
-            'its count</p></div>%s</div></div></section>'
-            % (n_mods, n_tracks, radar(tracks), radar_table(tracks)))
+            '<p class="vzx-kicker">Featured</p>'
+            '<h2 class="vzx-h" id="vzx-start-h">Sixteen places to start</h2>'
+            '<p class="vzx-sub">One or two from each of the main tracks, chosen because '
+            'the visualisation does the explaining. Every one runs in the browser, with '
+            'the written guide underneath.</p><div class="vzx-start">%s</div></div></section>'
+            % "".join(cards))
 
 
 def how_it_works():
@@ -213,30 +142,7 @@ def cta(n_mods):
             '</div></div></div></section>' % n_mods)
 
 
-RADAR_JS = """<script>
-(function () {
-  var wrap = document.querySelector('.vzx-radar-wrap');
-  if (!wrap) return;
-  var out = wrap.querySelector('.vzx-r-readout');
-  var idle = out ? out.textContent : '';
-  function set(key) {
-    wrap.querySelectorAll('.vzx-r-node, .vzx-r-row').forEach(function (el) {
-      el.classList.toggle('is-on', !!key && el.dataset.track === key);
-    });
-    wrap.classList.toggle('is-focused', !!key);
-    if (!out) return;
-    if (!key) { out.textContent = idle; return; }
-    var node = wrap.querySelector('.vzx-r-node[data-track="' + key + '"]');
-    if (node) out.textContent = node.getAttribute('aria-label');
-  }
-  wrap.querySelectorAll('.vzx-r-node, .vzx-r-row').forEach(function (el) {
-    var key = el.dataset.track;
-    el.addEventListener('mouseenter', function () { set(key); });
-    el.addEventListener('mouseleave', function () { set(null); });
-    el.addEventListener('focusin', function () { set(key); });
-    el.addEventListener('focusout', function () { set(null); });
-  });
-})();
+HUB_JS = """<script>
 (function () {
   // Suppress transitions for the frame the theme class flips in, so nothing
   // on the page tries to interpolate its colours.
@@ -256,18 +162,17 @@ RADAR_JS = """<script>
 
 def main():
     src = open(INDEX, encoding="utf-8").read()
-    n, tracks = counts(), track_data()
+    n = counts()
 
     removed = bool(INTRO_BAND.search(src))
     src = INTRO_BAND.sub("", src)
     src = TOP_BLOCK.sub("", src)
     src = BOT_BLOCK.sub("", src)
 
-    top = "%s\n%s\n%s\n    " % (BEGIN_TOP, start_here(tracks), END_TOP)
-    bottom = "%s\n%s%s%s%s\n%s\n%s\n    " % (
+    top = "%s\n%s\n%s\n    " % (BEGIN_TOP, featured(), END_TOP)
+    bottom = "%s\n%s%s%s\n%s\n%s\n    " % (
         BEGIN_BOT,
-        tracks_section(tracks, n["modules"], n["tracks"]),
-        how_it_works(), faq(), cta(n["modules"]), RADAR_JS, END_BOT)
+        how_it_works(), faq(), cta(n["modules"]), HUB_JS, END_BOT)
 
     at = src.find(ANCHOR_TOP)
     if at == -1:
@@ -280,7 +185,7 @@ def main():
     src = src[:at] + bottom + src[at:]
 
     open(INDEX, "w", encoding="utf-8").write(src)
-    print("hub sections    : start-here above the rails, chart/steps/questions below")
+    print("hub sections    : featured modules above the tracks, steps/questions below")
     print("intro band      : %s" % ("removed" if removed else "already gone"))
     print("numbers         : %d modules, %d tracks (from the catalog)"
           % (n["modules"], n["tracks"]))

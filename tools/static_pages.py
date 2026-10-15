@@ -57,20 +57,34 @@ PAGES = {
          "maths everything assumes, then the machine learning core, then enough of each "
          "specialism to choose one.</p>"),
 
-        ("Who makes it",
-         "<p>VizLearn is built and maintained by Ashish Jangra. You can find more of the "
-         "work on <a href=\"%s\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub</a>, "
-         "<a href=\"%s\" target=\"_blank\" rel=\"noopener noreferrer\">LinkedIn</a> and "
-         "<a href=\"%s\" target=\"_blank\" rel=\"noopener noreferrer\">Kaggle</a>.</p>"
+        # Every fact here is one author.html already states, in more detail.
+        ("About the author",
+         "<p>VizLearn is written and maintained by Ashish Jangra, a data scientist at "
+         "GeeksforGeeks with a B.Tech in Computer Science from Lovely Professional "
+         "University. He has spent about five years building AI systems and teaching how "
+         "they work: designing data science programmes that enrolled more than 26,000 "
+         "learners, writing the curriculum for 13 instructor-led courses, and delivering "
+         "more than 200 live sessions to over 100,000 students.</p>"
+         "<p>The production work is what several tracks are drawn from. He has built a "
+         "retrieval-augmented chatbot over a 213,000-article knowledge base, a semantic "
+         "search engine over the same corpus, and a generative-AI pipeline that grades "
+         "thousands of project submissions &mdash; so the embedding, retrieval, evaluation, "
+         "FastAPI and Pydantic pages describe systems he has had to keep working, not only "
+         "read about. The <a href=\"author.html\">author page</a> has the detail.</p>"
+         "<p>Verify and connect: "
+         "<a href=\"%s\" target=\"_blank\" rel=\"me noopener noreferrer\">GitHub</a> &middot; "
+         "<a href=\"%s\" target=\"_blank\" rel=\"me noopener noreferrer\">LinkedIn</a> &middot; "
+         "<a href=\"%s\" target=\"_blank\" rel=\"me noopener noreferrer\">Kaggle</a></p>"
          "<p>Corrections are genuinely welcome. If a module states something wrong, or an "
          "animation misrepresents what the algorithm does, please "
          "<a href=\"contact.html\">get in touch</a> &mdash; that is the fastest way to make "
          "the site better.</p>" % (GITHUB, LINKEDIN, KAGGLE)),
 
         ("How it is funded",
-         "<p>VizLearn is free to use and does not require an account. It is supported by "
-         "display advertising, which is what pays for the domain and the time that goes "
-         "into new modules. Ads never sit inside a visualisation and never gate a page.</p>"
+         "<p>VizLearn is free to use and does not require an account. To keep every module "
+         "free, with no paywall and no login, the site may show advertising outside the "
+         "learning area; that is what pays for the domain and the time that goes into new "
+         "modules. Ads never sit inside a visualisation and never gate a page.</p>"
          "<p>Advertising means third-party cookies, so the "
          "<a href=\"privacy.html\">Privacy Policy</a> sets out exactly what is collected "
          "and how to opt out.</p>"),
@@ -167,9 +181,9 @@ PAGES = {
          "controls that drive it, a live readout of what the algorithm is doing right now, "
          "and a written explanation underneath.</p>"
          "<p>The pipeline matters more than it sounds. The prose for each module lives in a "
-         "plain text file, not in the HTML, and the pages are generated from it &mdash; so a "
-         "correction is made once, at the source, and cannot survive somewhere else on the "
-         "site. Every visualisation is hand-written SVG driven by plain JavaScript: no "
+         "plain text file, not in the HTML, and a small build script assembles the pages "
+         "from it &mdash; so a correction is made once, at the source, and cannot survive "
+         "somewhere else on the site. Every visualisation is hand-written SVG driven by plain JavaScript: no "
          "charting library, no framework, no backend.</p>"
          "<p>Two rules I hold to. Where a page states a number, that number is produced by "
          "the same code the visualisation runs, so the text and the animation cannot "
@@ -191,9 +205,10 @@ PAGES = {
          "without taking my word for it.</p>"),
 
         ("How this is paid for",
-         "<p>VizLearn is free, requires no account, and puts nothing behind a signup. It is "
-         "supported by display advertising, which covers the domain and the time that goes "
-         "into new modules. Ads never sit inside a visualisation and never gate a page.</p>"
+         "<p>VizLearn is free, requires no account, and puts nothing behind a signup. To "
+         "keep it that way, the site may show advertising outside the learning area, which "
+         "covers the domain and the time that goes into new modules. Ads never sit inside a "
+         "visualisation and never gate a page.</p>"
          "<p>Advertising means third-party cookies, and the "
          "<a href=\"privacy.html\">Privacy Policy</a> sets out exactly what is collected "
          "and how to opt out.</p>"),
@@ -225,11 +240,12 @@ PAGES = {
          "the algorithm, are the two things I most want to hear about.</p>"),
 
         ("What happens to a correction",
-         "<p>Every page on this site is generated from source rather than edited by hand, "
-         "so a fix is never a patch to one file. A reported error gets reproduced first, "
-         "then corrected at the point it comes from &mdash; the written explanation, the "
-         "code that draws the visualisation, or the numbers the two share &mdash; and the "
-         "whole site is rebuilt from there.</p>"
+         "<p>Every visualisation, worked example and code sample on VizLearn is written "
+         "and maintained by Ashish Jangra. Because the simulations run live computations "
+         "in your browser, accuracy matters more here than on most sites, so a reported "
+         "error is reproduced first and then corrected where it comes from &mdash; the "
+         "written explanation, the code that draws the visualisation, or the numbers the "
+         "two share &mdash; never patched over on one page.</p>"
          "<p>That is slower than editing a page in place, but it means the same mistake "
          "cannot survive somewhere else. When a module states a number, that number is "
          "computed by the same code the visualisation runs, so a correction to one is "
@@ -326,26 +342,38 @@ PAGES = {
          "rel=\"noopener noreferrer\">How Google uses data from sites that use its "
          "services</a>.</p>" % GA_ID),
 
+        # The three bullets Google's AdSense programme policies require every
+        # publisher's privacy policy to carry, worded as close to theirs as
+        # reads naturally, then the wider opt-outs.
         ("Advertising",
-         "<p>VizLearn shows ads through <strong>Google AdSense</strong> (publisher ID "
-         "<span class=\"mono-font\">%s</span>). To do that, Google and its partners set "
-         "cookies in your browser.</p>"
+         "<p>VizLearn works with third-party advertising networks, such as "
+         "<strong>Google AdSense</strong> (publisher ID "
+         "<span class=\"mono-font\">%s</span>), to serve advertisements when you visit "
+         "the site. To do that, Google and its partners set and read cookies in your "
+         "browser.</p>"
          "<ul class=\"vz-list\">"
-         "<li>Google uses cookies, including the <span class=\"mono-font\">DoubleClick</span> "
-         "cookie, to serve ads based on your prior visits to this and other websites.</li>"
-         "<li>Third-party vendors and ad networks may also serve ads on this site and set "
-         "their own cookies. VizLearn does not control those cookies and cannot read "
-         "them.</li>"
-         "<li>Personalised advertising can be switched off entirely at "
-         "<a href=\"https://www.google.com/settings/ads\" target=\"_blank\" "
-         "rel=\"noopener noreferrer\">Google Ads Settings</a>. Ads still appear; they stop "
-         "being tailored to you.</li>"
-         "<li>To opt out of a wider set of vendors at once, use "
+         "<li>Third-party vendors, including Google, use cookies to serve ads based on your "
+         "prior visits to this website or to other websites.</li>"
+         "<li>Google's use of advertising cookies, including the "
+         "<span class=\"mono-font\">DoubleClick</span> cookie, enables it and its partners "
+         "to serve ads to you based on your visits to this site and/or other sites on the "
+         "Internet.</li>"
+         "<li>You may opt out of personalised advertising by visiting "
+         "<a href=\"https://myadcenter.google.com/\" target=\"_blank\" "
+         "rel=\"noopener noreferrer\">Google's Ads Settings (My Ad Center)</a>. Ads still "
+         "appear; they stop being tailored to you.</li>"
+         "<li>Other third-party vendors and ad networks may also serve ads on this site and "
+         "set their own cookies. VizLearn does not control those cookies and cannot read "
+         "them. To opt out of a wider set of vendors' personalised advertising at once, use "
          "<a href=\"https://optout.aboutads.info/\" target=\"_blank\" "
-         "rel=\"noopener noreferrer\">aboutads.info</a> or "
+         "rel=\"noopener noreferrer\">www.aboutads.info</a> or "
          "<a href=\"https://optout.networkadvertising.org/\" target=\"_blank\" "
          "rel=\"noopener noreferrer\">the NAI opt-out page</a>.</li>"
          "</ul>"
+         "<p>Google's own explanation of how it uses information from sites that show its "
+         "ads is at <a href=\"https://policies.google.com/technologies/partner-sites\" "
+         "target=\"_blank\" rel=\"noopener noreferrer\">How Google uses information from "
+         "sites or apps that use our services</a>.</p>"
          "<p>The ads.txt file at "
          "<a href=\"ads.txt\">vizlearn.in/ads.txt</a> declares which sellers are authorised "
          "to sell inventory on this domain.</p>" % ADSENSE_PUB),

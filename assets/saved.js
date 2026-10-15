@@ -93,7 +93,12 @@
     });
   }
 
-  if (document.readyState === 'loading') {
+  // This script is deferred ahead of vizlearn.js, which defines the store it
+  // reads. Deferred scripts run with readyState already 'interactive', so
+  // checking only for 'loading' ran init() before the store existed and the
+  // page always rendered as empty. DOMContentLoaded waits for every deferred
+  // script.
+  if (document.readyState === 'loading' || !window.VizLearn) {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();

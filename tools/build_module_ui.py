@@ -3,7 +3,7 @@
 
 Adds, as real markup rather than client-rendered HTML so crawlers follow it:
 
-  * a cheat sheet - the page's own lead paragraph, copy-pasteable
+  * a cheat sheet - the module's one-sentence description, copy-pasteable
   * a related-modules rail, styled like the hub carousel
   * previous / next links through the module's track
   * a share control in the header
@@ -122,6 +122,11 @@ UI_START = re.compile(
     r"^(drag|click|press|tap|slide|move|use the|try |select |toggle|hover|scroll|adjust|watch the|notice)",
     re.I,
 )
+
+
+# The tail of the stand-in description build_seo.py writes for a page that
+# has none of its own.
+GENERIC_DESC = "with a beginner-friendly interactive visualization"
 
 
 def lead_paragraph(src, fallback):
@@ -358,8 +363,15 @@ def main():
         src = SAVE_BLOCK.sub("", src)
         src = BYLINE_BLOCK.sub("", src)
 
-        summary = lead_paragraph(src, mod["desc"])
-        if summary == mod["desc"]:
+        # The module's own one-sentence description, not its lead paragraph.
+        # Quoting the lead put the page's opening paragraph on the page a
+        # second time (357 modules), which is duplicated text to a crawler and
+        # nothing new to a reader. The lead is only the fallback now, for a
+        # page with no description or with the generic stand-in build_seo.py
+        # writes when it has nothing better.
+        summary = mod["desc"]
+        if not summary or GENERIC_DESC in summary:
+            summary = lead_paragraph(src, mod["desc"])
             fallback_used += 1
 
         # Related: the next few modules in the same track, wrapping around.
@@ -455,7 +467,7 @@ def main():
     print("prose sections tagged  : %d" % prose_tagged)
     print("bylines added          : %d" % bylines)
     print("share controls added   : %d" % shared)
-    print("cheat sheets using the meta description as fallback : %d" % fallback_used)
+    print("cheat sheets falling back to the lead paragraph : %d" % fallback_used)
     if missing_anchor:
         print("\nNO THEME TOGGLE (share control skipped) on %d page(s):" % len(missing_anchor))
         for r in missing_anchor:
