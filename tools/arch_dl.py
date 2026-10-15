@@ -58,9 +58,17 @@ intro: Two networks with opposite goals, one closed-form answer for the critic. 
 
 ## The game
 
-A gen maps noise to samples. A critic receives a sample and
+Generative adversarial networks learn to produce data without ever being
+shown what a correct output looks like. Instead, a second network judges
+whether each sample is real or fake, and the generator learns by trying to
+fool that judge. The result is a training loop where both networks improve
+together &mdash; or, if things go wrong, neither does. This page works
+through the math behind that loop, the fixed point it aims for, and the
+failure modes that make GANs famously hard to train.
+
+A generator maps noise to samples. A critic receives a sample and
 guesses the chance that it came from the real data rather than the
-gen. They're trained against each other:
+generator. They are trained against each other:
 
 ```
 min over G   max over D   E_data[log D(x)]  +  E_z[log(1 - D(G(z)))]

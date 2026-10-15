@@ -215,6 +215,19 @@ intro: One type, laid out end to end. Why almost all else follows from that.
 
 ## Two ways to hold five numbers
 
+NumPy exists because Python lists are too slow for numerical work. The difference is not a small percentage. It is often a factor of a hundred. That gap comes from how each structure stores data in memory.
+
+A Python list stores pointers. Each element is a Python object sitting somewhere in memory, with its own type information, reference count, and value. Adding two lists elementwise means following each pointer, checking each type, calling the addition operator, and building a new object for the result. That is a lot of work per number.
+
+A NumPy array stores raw values. Five int64 numbers are forty bytes in a row, with the type recorded once for the whole array. Adding two arrays is a single compiled loop over those bytes. No pointer chasing, no type checking, no object creation. The loop runs in C, not in Python.
+
+That speed difference is the entire reason NumPy exists. Every library that does numerical work in Python -- pandas, scikit-learn, scipy, matplotlib -- builds on NumPy arrays underneath. Learning NumPy means learning the data structure that the whole ecosystem shares.
+
+The cost of that speed is rigidity. Every element has the same type. The array has a fixed size. Appending is expensive. These constraints are what make the compiled loops possible. If every element could be a different type, the code would need the same per-element checks that make lists slow.
+
+This module introduces the array, shows how it differs from a list in memory and in speed, and explains the one-dtype constraint that everything else follows from.
+
+
 A Python list of five ints is five pointers, each to a full `PyObject` sitting one spot else in memory. Each of those objects carries a type, a link count and the value. Adding two lists elementwise means following each pointer, checking each type. Building a new object for each result.
 
 A NumPy array of five ints is forty bytes. Five 64-bit numbers, one after another, with the type recorded once for the whole array.
@@ -523,6 +536,19 @@ title: Creating Arrays
 intro: The half-dozen constructors that cover almost all, and which to reach for when.
 
 ## From data you already have
+
+Every NumPy program starts by creating an array. The constructor you choose depends on where the data comes from and what shape you need. Getting the right constructor is a small decision, but the wrong one can give you an array with the wrong dtype, the wrong shape, or the wrong number of dimensions.
+
+The most common path is np.array, which takes a list and infers the shape and dtype from its contents. One level of nesting gives a 1-D array. Two levels give a 2-D array. The rows must be the same length. Ragged input raises a ValueError rather than guessing, which is the right behaviour because the alternative would be an array of Python objects that looks like an array but performs like a list.
+
+When you need an array of a specific size filled with a known value, np.zeros, np.ones and np.full are faster and clearer than building a list first. np.zeros gives you the array in one allocation. Building a list of zeros and then converting it allocates the list, populates it, then allocates the array and copies, for no benefit.
+
+np.arange and np.linspace generate sequences. arange steps by a fixed increment. linspace divides a range into a fixed number of points. The difference matters when you care about the number of points versus the step size. linspace includes the endpoint by default. arange does not. That is a common source of off-by-one errors.
+
+np.empty allocates memory without filling it. The values are whatever happened to be in memory. It is faster than zeros when you plan to overwrite every element immediately. Using it and then reading before writing is a bug.
+
+This module covers np.array, the convenience constructors, sequence generators, and the dtype argument that overrides inference. The examples show the shape and dtype of each result, because checking those two properties is the first thing you should do after creating an array.
+
 
 `np.array` takes a list, a tuple, or nested lists. Infers the shape from the nesting. One level gives you 1-D, two levels gives 2-D, and so on.
 
@@ -848,6 +874,21 @@ title: Dtypes
 intro: One type for the whole array: what it costs, when it overflows. How promotion decides the result.
 
 ## Kind and width
+
+Every element in a NumPy array has the same type. That type is the dtype. It records two things: what kind of number the element is, and how many bytes it occupies. Understanding dtypes is necessary because they control precision, memory usage, and the behaviour of arithmetic operations.
+
+The kind tells you the family: signed integer, unsigned integer, floating point, complex, boolean, or string. The width tells you the size: int8 is one byte, int64 is eight bytes. A wider type holds a larger range of values but uses more memory.
+
+Choosing the right dtype matters for two reasons. First, memory. A column of ages stored as int64 uses eight bytes per value. Stored as int8, it uses one byte. For a million rows, that is the difference between eight megabytes and one megabyte. Multiply by many columns and the savings determine whether the data fits in memory at all.
+
+Second, overflow. An int8 holds values from negative 128 to positive 127. Adding two int8 values that sum to more than 127 wraps around silently. There is no error. The result is wrong. This happens in practice when people downcast aggressively without checking the value range.
+
+Floating-point precision is the other common issue. float32 has about seven decimal digits of precision. float64 has about fifteen. Most scientific computation uses float64 by default. Switching to float32 halves the memory and speeds up some operations, but accumulated rounding errors can change the result. Whether that matters depends on the application.
+
+NumPy infers the dtype from the input. A list of Python ints becomes int64. A list of Python floats becomes float64. A list with one float and the rest ints becomes float64, because the dtype must hold every element. That promotion is silent and worth checking.
+
+This module covers the common dtypes, their ranges and memory costs, how to specify them, and how to convert between them safely. It also covers the structured dtypes that let a single array hold multiple fields per element, like a lightweight record type.
+
 
 A dtype records what kind of number and how many bytes. `int32` is a signed int in four bytes. `float64` is a double-precision float in eight.
 
@@ -1177,6 +1218,19 @@ intro: The same numbers read a other way, and why it often costs nothing.
 
 ## Three numbers
 
+The shape of an array tells you its size along each axis. A 2-D array with three rows and four columns has shape (3, 4). A 1-D array of ten elements has shape (10,). A scalar has an empty shape. These three numbers -- shape, ndim, and size -- are the first things to check when an operation gives an unexpected result.
+
+ndim is the number of axes, which is just the length of the shape tuple. size is the total number of elements, which is the product of the shape entries. Both are derived from shape, but having them as separate attributes makes quick checks easier.
+
+Reshaping changes the shape without changing the data. A (12,) array can become (3, 4) or (2, 6) or (4, 3). The total number of elements must stay the same. Reshape does not move any data in memory. It just changes the description of how the bytes are interpreted. That is why reshape is fast and why the result is a view of the original array.
+
+The negative-one shorthand lets you specify all dimensions but one. reshape(3, -1) on a 12-element array gives (3, 4) because NumPy infers that the missing dimension must be four. This is convenient when one dimension is known and the other depends on the data size.
+
+The distinction between (n,) and (n, 1) matters more than it looks. A 1-D array and a column vector have different numbers of dimensions. Broadcasting rules treat them differently. Some functions return one shape when you expected the other. Knowing the difference prevents a class of shape-mismatch errors.
+
+This module covers shape, ndim, size, reshape, ravel, flatten, and the newaxis trick for adding dimensions. The examples focus on small arrays where you can verify the layout by printing.
+
+
 `shape` is a tuple showing the extent of each axis. `ndim` is how many axes there are. This Is just `len(shape)`. `size` is the total number of elements. This Is the product of the shape.
 
 When an step complains about shapes, printing all three of these for both operands answers the question most of the time. It's worth making that reflex.
@@ -1489,6 +1543,21 @@ title: Indexing and Slicing
 intro: Elements, rows and rectangles - and the one action that differs from lists in a way that matters.
 ## One index per axis
 
+Indexing a NumPy array works differently from indexing a Python list. The syntax looks similar, but the semantics differ in ways that matter for both correctness and performance.
+
+The fundamental rule is one index per axis, separated by commas. A 2-D array uses two indices: one for the row, one for the column. Writing a[1, 2] gives you the element at row 1, column 2. That comma-separated form is both the idiomatic style and the faster one.
+
+The alternative, a[1][2], works but creates an intermediate array. The first index selects the entire row as a 1-D array. The second index then selects from that temporary. For a single element the overhead is small. Inside a loop it adds up. More importantly, the chained form does not generalize to fancier indexing patterns.
+
+Slicing returns a view, not a copy. A slice like a[0:3, 1:4] gives you a rectangular sub-array that shares memory with the original. Writing to the slice changes the original. That is a deliberate design choice. It saves memory and makes slice assignment a natural way to fill parts of an array.
+
+The combination of integer indexing and slicing in the same expression is allowed. a[:, 2] gives you all rows of column 2 as a 1-D array. a[1, :] gives you all columns of row 1. These mixed forms appear constantly in real code.
+
+Step values work as in Python lists. a[::2] gives every other element. a[::-1] reverses. Both return views. Combining steps across multiple axes selects a regular sub-grid of the array.
+
+This module covers single-element indexing, slicing, step values, and the difference between views and copies in the context of slicing. Understanding these basics makes the next modules on boolean masking and fancy indexing straightforward.
+
+
 A comma splits axes, so `a[1, 2]` means row one, column two. That is the idiomatic form and the fast one.
 
 `a[1][2]` reaches the same element by first making row one as an array, then indexing that. For reading a single value the gap is small. Inside a loop it's a temporary array per loop.
@@ -1498,6 +1567,18 @@ Minus indices count from the end, just as in Python. `a[-1, -1]` is the last ele
 Indexing with fewer indices than axes gives you all in the left ones. On a `(3, 4)` array, `a[1]` is a row of four.
 
 ## Slices, per axis
+
+Indexing and slicing are the operations you perform most often on a NumPy array. They control which elements you read, which you write, and how you carve sub-arrays out of a larger block. Getting them right is the foundation for every later topic.
+
+NumPy extends the familiar Python slice syntax to multiple dimensions. Each axis gets its own start, stop and step, separated by commas. A single expression can select a rectangular block from a matrix, every other row from a 3-D tensor, or a reversed column from a table. That composability is what makes array code compact.
+
+The key difference from Python lists is that a NumPy slice returns a view, not a copy. The slice and the original share the same memory. Writing through the slice changes the original. That behaviour is a deliberate design choice: it saves memory and makes in-place updates natural. But it also means that modifying a slice can change data you thought was separate, which surprises anyone coming from Python lists.
+
+Integer indexing also behaves differently across dimensions. A comma separates axes, so a single expression addresses a specific element without building intermediate arrays. That matters for both readability and performance.
+
+Beyond basic indexing, NumPy supports boolean masks and fancy indexing with arrays of indices. Those are covered in their own modules. The concepts here -- per-axis indexing, slice views, and the comma separator -- are the foundation those later topics build on.
+
+This module covers single-element access, slicing with start, stop and step, mixed integer-and-slice expressions, and the view behaviour that differs from lists. The examples use small arrays where you can verify the result by counting elements.
 
 The familiar `start:stop:step`, once per dim.
 
@@ -1859,6 +1940,19 @@ intro: showing the step instead of writing the loop. The two habits that undo th
 
 ## Operators apply to every element
 
+The defining feature of NumPy arrays is that arithmetic operators work elementwise. Adding two arrays adds corresponding elements. Multiplying by a scalar multiplies every element. There is no loop in Python. The operation happens in compiled code, and the result is a new array of the same shape.
+
+That elementwise behaviour is what makes NumPy fast. The same computation written as a Python loop would be a hundred times slower, because each iteration would need to look up the type of each element, call the operator, and build a new Python object for the result. The NumPy version does none of that. It knows the type once and loops in C.
+
+Every standard arithmetic operator works this way. Addition, subtraction, multiplication, division, integer division, modulus, and exponentiation all apply elementwise. So do comparison operators. a > 5 gives a boolean array with True where the condition holds and False where it does not.
+
+Scalar operands are broadcast automatically. a + 10 adds ten to every element. a * 0.5 halves every element. The scalar is not expanded into a full array. NumPy reuses the value at each step of the compiled loop. That is both faster and more memory-efficient than creating a temporary array of tens.
+
+The one operator that surprises people is the asterisk. On arrays, a * b is elementwise multiplication. It is not matrix multiplication. Matrix multiplication uses the @ operator, or np.dot, or np.matmul. Confusing the two gives an array of the same shape but entirely wrong values, with no error or warning.
+
+This module covers the arithmetic operators, the comparison operators, and the difference between elementwise and matrix multiplication. It also covers the NumPy functions like np.sqrt and np.exp that apply elementwise and replace the math-module equivalents for array inputs.
+
+
 `a + b` adds the arrays elementwise. So do `-`, `*`, `/`, `//`, `%` and `**`. A scalar applies to each element: `a * 10` scales the whole array.
 
 The one to be careful with is `*`. On arrays it's **elementwise product**, not mat product. mat product is `@`. Confusing the two makes an array of the wrong shape or, worse, the right shape and the wrong numbers. That has its own module later.
@@ -2178,6 +2272,21 @@ title: Broadcasting
 intro: Two rules that decide whether shapes combine, and why a wrong guess costs gigabytes.
 
 ## Everyone already uses it
+
+If you have ever added a scalar to an array, you have already used broadcasting. NumPy stretched the scalar to match the shape of the array without creating a copy. That stretch is broadcasting. The general rules extend the same idea to arrays of different shapes.
+
+Broadcasting matters because it eliminates temporary arrays. Without it, adding a bias to every row of a matrix would require you to tile the bias vector into a full matrix first. That tile allocates memory, fills it with copies, and then gets thrown away after the addition. Broadcasting skips all of that. The bias vector is reused in place.
+
+The rules are mechanical. NumPy compares shapes from the trailing axis backward. Two dimensions are compatible if they are equal or if one of them is one. A missing dimension is treated as one. When a dimension is one, that axis is stretched to match the other array. If any pair of dimensions is neither equal nor one, the operation raises a ValueError.
+
+The most common broadcasting patterns cover the cases you encounter daily. A scalar with any array. A 1-D array with a 2-D array along one axis. A column vector with a row vector to produce a 2-D result. Each of these follows the same rules, and once you can predict the output shape, you can write the code without trial and error.
+
+Shape errors from broadcasting are among the clearest error messages in NumPy. The message names the two shapes and says they are not compatible. If you see one, print the shapes of both operands and walk through the rules. The fix is usually a reshape or a newaxis to add the missing dimension.
+
+The common mistake is adding a dimension in the wrong place. A (3,) array broadcast with a (4, 3) array works along columns. The same array reshaped to (3, 1) would broadcast along rows. The position of the one decides the axis of the stretch. Getting that right is the whole skill.
+
+This module covers the broadcasting rules, the common patterns, how to predict the output shape, and how to add dimensions with np.newaxis or reshape to make two arrays compatible.
+
 
 `a + 10` on a `(2, 3)` array adds ten to each element. Conceptually the scalar is stretched to `(2, 3)`. nothing is copied and NumPy simply reuses the value as it walks.
 
@@ -2543,6 +2652,21 @@ title: Boolean Masking
 intro: A compare gives an array of True and False - and that array is an index.
 
 ## A comparison is elementwise
+
+Boolean masking is one of the most used features in NumPy. It lets you select, count, and modify elements based on a condition, without writing a loop. The idea is simple: a comparison produces a boolean array, and that array selects elements from the original.
+
+The comparison step follows the same elementwise rules as arithmetic. a > 5 compares each element to 5 and returns an array of True and False values with the same shape as a. Two arrays of the same shape can be compared elementwise too. a > b gives True wherever the left element exceeds the right one.
+
+The selection step uses the boolean array as an index. a[a > 5] returns a 1-D array containing only the elements where the condition was True. The result is always 1-D because the True positions may not form a regular grid. That is different from slicing, which preserves the shape.
+
+Combining conditions uses the bitwise operators, not the Python keywords. The and keyword does not work on arrays because Python tries to evaluate the whole array as a single boolean, which is ambiguous. The ampersand operator works elementwise. The same applies to the pipe for or and the tilde for not. Every combined condition needs parentheses around each part because bitwise operators bind tighter than comparisons.
+
+Boolean masks are also useful for counting. True is 1 and False is 0. mask.sum() counts the True entries. mask.mean() gives the fraction. np.any(mask) checks whether at least one element is True. np.all(mask) checks whether every element is True.
+
+Assignment through a mask modifies only the selected elements. a[a < 0] = 0 clips negative values to zero. That is a common pattern for cleaning data in place.
+
+This module covers comparisons, selection, combination, counting, and assignment through boolean masks. These operations appear in virtually every NumPy script and carry over directly to pandas, where boolean Series serve the same role.
+
 
 `a > 5` doesn't give one answer. It gives a boolean array with one entry per element.
 
@@ -2910,6 +3034,21 @@ title: Fancy Indexing
 intro: Selecting by a list of spots - reordering, repeating. A result whose shape follows the index.
 ## Indexing with an array
 
+Fancy indexing selects elements by passing an array of indices instead of a single integer or a slice. The result contains the elements at those positions, in the order the indices specify. That order can be anything. You can repeat indices, reverse them, or pick an arbitrary subset.
+
+The key difference from slicing is that fancy indexing always returns a copy, not a view. A slice shares memory with the original array. An index array does not. That distinction matters when you assign through the result. Assigning through a slice modifies the original. Assigning through a fancy index modifies a copy, and the original is unchanged.
+
+Fancy indexing works in multiple dimensions. For a 2-D array, two index arrays select individual elements. a[[0, 2], [1, 3]] gives the elements at (0,1) and (2,3), not a sub-matrix. Getting a sub-matrix requires np.ix_, which turns the two 1-D arrays into an open mesh that selects all combinations.
+
+The combination of fancy indexing and boolean masking is common. You find the indices where a condition holds with np.where, and then use those indices to select from another array. np.where with a single argument returns a tuple of index arrays, one per dimension. np.where with three arguments acts as a vectorised if-else.
+
+argsort returns indices that sort an array. You can use those indices with fancy indexing to reorder the original and any parallel arrays. That is how you sort a matrix by one column: argsort the column, then index the whole matrix with the result.
+
+One pitfall is repeated indices in assignment. a[[0, 0, 0]] += 1 does not increment a[0] three times. It increments it once because the additions are not accumulated. np.add.at is the correct way to accumulate repeated assignments.
+
+This module covers fancy indexing in one and multiple dimensions, the copy-versus-view distinction, np.ix_ for cross-product selection, np.where for conditional selection, and the pitfalls of repeated indices in assignment.
+
+
 Give an int array where you'd most times give a number. You get those elements back:
 
 ```python
@@ -3253,6 +3392,21 @@ title: Aggregations and axis
 intro: sum, mean and max - and the one arg that decides what they mean.
 
 ## The default collapses everything
+
+Aggregation functions reduce an array to a smaller result. sum adds all elements. mean computes the average. min and max find the extremes. By default, each of these operates on the entire array and returns a single number, regardless of the array's shape.
+
+That default is often not what you want. A 2-D array of sales by city and month needs a sum per city, not one grand total. The axis parameter tells the aggregation which dimension to collapse. axis=0 collapses rows, giving one result per column. axis=1 collapses columns, giving one result per row.
+
+The axis convention trips people up because collapsing along axis 0 gives a result with as many entries as there are columns, not as many as there are rows. The way to remember it is that the axis number is the dimension that disappears. axis=0 removes the row dimension. The columns survive.
+
+keepdims preserves the collapsed dimension as a size-one axis instead of removing it. That is useful when you want to broadcast the result back against the original array. A column mean with keepdims=True has shape (1, n) and can be subtracted from the original (m, n) array directly. Without keepdims, the result has shape (n,), and the broadcast rules treat it as a row, not a column.
+
+NumPy provides both function and method forms for most aggregations. np.sum(a) and a.sum() do the same thing. The method form is shorter. The function form accepts array-like inputs that are not yet arrays. Use whichever reads better in context.
+
+Some aggregations have nan-aware variants. np.nansum ignores NaN values instead of propagating them to the result. np.nanmean does the same for the mean. The regular versions return NaN if any element is NaN, which is correct but often not what you want when the NaN represents missing data.
+
+This module covers the common aggregation functions, the axis parameter, keepdims, and the nan-aware variants. The examples use 2-D arrays so that the axis behaviour is visible. Understanding axis here carries over directly to pandas, where the same parameter does the same thing.
+
 
 `a.sum()` with no args adds each element, what the shape, and returns a single value.
 
@@ -3614,6 +3768,21 @@ intro: Which steps give you a second window onto the same numbers, and why it ma
 
 ## One buffer, several descriptions
 
+Understanding views and copies is the single most important thing for writing correct NumPy code. A view shares memory with the original array. A copy has its own memory. The difference is invisible when you only read. It shows up the moment you write.
+
+Every slice creates a view. That means modifying a slice modifies the original array. This is a performance feature. Copying a gigabyte array every time you take a slice would be wasteful. But it is also a correctness hazard. If you pass a slice to a function and that function writes to it, the original array changes. Nothing warns you.
+
+An array is a block of contiguous memory plus a description. The description records the starting address, the shape, the dtype, and the strides. Strides say how many bytes to step for each axis. A view is a new description of the same block. Making a view changes the strides and the shape but not the data. That is why views are free to create. No data is copied.
+
+Transpose is a view. Reshape is a view when the result is contiguous. Fancy indexing is a copy. Boolean indexing is a copy. np.array always creates a copy. np.asarray creates a view when the input is already an array with the right dtype.
+
+The distinction matters for three reasons. First, correctness. Writing through a view changes the original. Writing through a copy does not. Second, memory. Views use no extra memory. Copies double it. Third, performance. Creating a view is instant. Creating a copy takes time proportional to the array size.
+
+np.shares_memory tells you whether two arrays share the same underlying buffer. It is the definitive check. When you are unsure, call it. When debugging an unexpected mutation, call it on every array that might be a view of the one that changed.
+
+This module covers how views are created, how copies are created, how to tell the difference, and how to force a copy when you need one. The examples show mutations propagating through views and stopping at copies.
+
+
 An array is a block of memory plus a description. Where it starts, what shape it has. How many bytes to step for each axis. Those steps are the **strides**.
 
 A **view** is a new description of the same block. Making one is free. Writing through it changes what every other description of that block sees.
@@ -3972,6 +4141,21 @@ intro: Joining along an existing axis or a new one. Why those are other function
 
 ## Two different questions
 
+Combining arrays is something you do constantly. The data arrives in pieces, and at some point you need a single array that holds all of it. NumPy gives you two families of functions for this, and choosing the wrong one gives you an array with the wrong number of dimensions.
+
+Concatenate joins arrays along an existing axis. Two (3, 4) arrays concatenated on axis 0 give (6, 4). The axis already existed. It just got longer. That is the operation you want when stacking more rows onto a matrix or appending more time steps to a signal.
+
+Stack joins arrays along a new axis. Two (3, 4) arrays stacked give (2, 3, 4). A new axis of length 2 was added at the front. That is the operation you want when collecting separate images into a batch or collecting separate feature vectors into a matrix.
+
+The difference is exactly one dimension. After concatenate, ndim stays the same. After stack, ndim goes up by one. If your result has an unexpected extra dimension, you probably used stack when you meant concatenate, or vice versa.
+
+hstack and vstack are convenience wrappers. vstack is concatenate along axis 0. hstack is concatenate along axis 1. They exist because the axis parameter can be confusing, and "vertical" and "horizontal" are easier to picture. column_stack handles the common case of turning 1-D arrays into columns of a 2-D array.
+
+Splitting is the reverse of stacking. np.split divides an array into equal pieces along an axis. np.array_split handles unequal pieces. hsplit and vsplit are the convenience wrappers. These are less commonly used, but they appear when you need to process chunks of data separately.
+
+This module covers concatenate, stack, hstack, vstack, column_stack, split, and the common patterns for combining and dividing arrays. The examples show the shape of the result in each case, because the shape is the thing you need to verify.
+
+
 You've a few arrays and want one. There are two distinct things that could mean. NumPy gives them split functions rather than guessing.
 
 **`concatenate`** joins along an axis that already exists. Two `(2, 3)` arrays concatenated on axis 0 give `(4, 3)`. More rows, same number of dims.
@@ -4323,6 +4507,21 @@ title: Transpose and Moving Axes
 intro: Reordering axes without moving a single byte.
 ## Strides again
 
+Transposing an array swaps its axes. For a 2-D array, rows become columns and columns become rows. For higher-dimensional arrays, the axes are permuted in a specified order. The operation is instant because no data is moved. NumPy simply changes the strides and the shape in the array description.
+
+That zero-cost property is worth understanding. A 2-D array with shape (1000, 2000) uses the same memory as its transpose. np.shares_memory confirms that the transpose is a view of the original. Writing to the transpose changes the original, because they are the same block of bytes with different descriptions.
+
+The strides tell NumPy how many bytes to step for each axis. A C-contiguous (1000, 2000) float64 array has strides (16000, 8). Each row is 16000 bytes long. Each element within a row is 8 bytes. The transpose swaps the strides to (8, 16000). Now stepping along the first axis moves 8 bytes, which walks through what used to be columns.
+
+For 2-D arrays, the shorthand a.T is the standard notation. For higher dimensions, np.transpose with an axes argument gives you full control. np.swapaxes swaps exactly two axes, which is simpler when that is all you need.
+
+The practical consequence of strides is memory layout. A C-contiguous array has its last axis changing fastest. A Fortran-contiguous array has its first axis changing fastest. A transposed C-contiguous array is Fortran-contiguous. Operations that scan along the wrong axis are slower because they jump through memory instead of walking sequentially.
+
+That performance difference is small for most work. It matters for tight numerical loops and for interoperating with libraries that expect a specific memory order. np.ascontiguousarray copies the data into C order when you need it.
+
+This module covers transpose for 2-D and higher-dimensional arrays, the strides that make it free, the memory-order conventions, and swapaxes and moveaxis for targeted axis manipulation. The examples verify the view property and show how strides change.
+
+
 An array knows how many bytes to step for each axis. Transposing swaps those numbers along with the shape. The underlying buffer is untouched.
 
 That is why `a.T` on a gigabyte array returns instantly. It's a view, and `np.shares_memory(a, a.T)` confirms it.
@@ -4660,6 +4859,21 @@ title: Sorting and Searching
 intro: sort, argsort and searchsorted, and why the arg version is often the one you need.
 
 ## Copy or in place
+
+NumPy provides two ways to sort an array. np.sort returns a new sorted array. The method a.sort modifies the array in place and returns None. That distinction follows NumPy's general convention: the function form is non-destructive, the method form mutates.
+
+Knowing which one you used matters because in-place sorting on a view changes the underlying array. If you have a slice of a larger array and sort it in place, the original array sees those rows rearranged. That is sometimes the intent and sometimes a bug. The function form avoids the question by always returning a copy.
+
+For multi-dimensional arrays, the axis parameter decides which axis to sort along. The default is the last axis, which sorts each row independently in a 2-D array. axis=0 sorts each column independently. Neither rearranges whole rows or whole columns. If you want to sort rows by the values in one column, you need argsort.
+
+argsort returns the indices that would sort the array. You can then use those indices to reorder both the array and any related arrays in the same way. That pattern is how you sort a matrix by one column while keeping the rows intact.
+
+searchsorted finds insertion points in a sorted array. Given a sorted array and a set of values, it returns the index where each value would go to keep the array sorted. That is useful for binning, for assigning labels to ranges, and for any task where you have boundaries and need to know which bin a value falls into.
+
+partition is a faster alternative when you need only the k smallest or largest values and do not care about their order. It rearranges the array so that the element at position k is where it would be in a fully sorted array, with smaller elements before it and larger elements after. That is an O(n) operation rather than O(n log n).
+
+This module covers sort, argsort, searchsorted, partition, and argpartition. The examples show sorting in one and two dimensions and the relationship between argsort and fancy indexing.
+
 
 `np.sort(a)` returns a new sorted array and leaves `a` alone. `a.sort()` sorts `a` itself and returns `None`.
 
@@ -5023,6 +5237,21 @@ title: Unique Values and Set Operations
 intro: Counting distinct values, checking arrays, and rebuilding the first.
 
 ## unique
+
+Finding distinct values is one of the first things you do with categorical or integer data. How many different ids are there? What are the distinct labels? Are there values in one array that are missing from another? NumPy's set operations answer these questions on arrays directly, without converting to Python sets.
+
+np.unique returns the distinct values from an array, sorted. The sorting is not optional. That matters because it means the output order does not match the input order. If you need the values in the order they first appeared, you can use the return_index parameter and sort by those indices, but the default behaviour is sorted output.
+
+Two things about unique catch people. First, it flattens multi-dimensional arrays before finding unique values. A 2-D array of shape (3, 4) gives a 1-D array of unique values, not unique rows. Finding unique rows requires axis=0, which was added later and is less well known. Second, floating-point values that differ by tiny rounding errors are treated as distinct. Rounding before calling unique avoids spurious duplicates.
+
+The return parameters give you extra information without a second pass. return_counts gives the frequency of each unique value. return_index gives the position of the first occurrence. return_inverse gives an array that reconstructs the original from the unique values. These are cheaper than calling unique once and then searching for each value separately.
+
+The set operations -- intersect1d, union1d, setdiff1d, and setxor1d -- work on sorted unique arrays. They answer questions like "which values are in both arrays", "which values are in the first but not the second", and "which values are in exactly one of the two". Each returns a sorted 1-D array.
+
+in1d and its modern replacement isin test membership. Given two arrays, isin returns a boolean array showing which elements of the first are present in the second. That boolean array can be used directly as a mask for filtering.
+
+This module covers unique with its return parameters, the set operations, and isin. The examples show common use cases: deduplication, frequency counting, filtering by membership, and comparing two datasets for overlap.
+
 
 `np.unique(a)` returns the distinct values, **sorted**, as a 1-D array.
 
@@ -5397,6 +5626,21 @@ title: Random Numbers
 intro: The modern gen API, and how to make results reproducible.
 
 ## Two APIs, one of them legacy
+
+Random number generation in NumPy has a clear best practice, but the legacy interface still appears in most tutorials and examples. Knowing both is necessary for reading existing code. Using the new one is better for writing new code.
+
+The legacy interface uses module-level functions: np.random.rand, np.random.randint, np.random.normal, np.random.seed. They all share a single hidden global generator. Setting the seed in one place affects every call everywhere. That makes reproducibility fragile. Two libraries that both call np.random.seed can interfere with each other.
+
+The new interface creates explicit generator objects. rng = np.random.default_rng(42) gives you a generator seeded with 42. rng.random, rng.integers, rng.normal are methods on that object. Each generator carries its own state. Two generators with different seeds are independent. That makes testing predictable and parallel code safe.
+
+The method names differ between the two interfaces. The legacy randint includes the low endpoint and excludes the high. The new integers includes both by default. That catches people who switch between the two without reading the signature.
+
+Beyond the interface question, random number generation in NumPy is fast because it generates arrays directly. Calling rng.normal(size=1000000) gives you a million samples in one call. Calling it in a loop, once per iteration, is a hundred times slower. The size parameter is not a convenience. It is the intended way to generate batches.
+
+Distributions beyond uniform and normal are available: exponential, poisson, binomial, beta, gamma, and many others. Each takes the distribution parameters and a size argument. Sampling from a discrete set uses rng.choice, which handles replacement, weights, and multi-dimensional output.
+
+This module covers the new generator API, the most common distributions, shuffling and permutation, and the reasons to avoid the legacy interface in new code. The examples use explicit generators throughout.
+
 
 You'll see both in the wild.
 
@@ -5796,6 +6040,19 @@ intro: mat product, solving systems, and why you should almost never invert a ma
 
 ## @ versus *
 
+Linear algebra operations in NumPy trip people up because the notation looks almost right but means something different. The asterisk on two matrices gives elementwise multiplication. The at-sign gives matrix multiplication. Both produce valid arrays of plausible shape. Only one is the operation you intended.
+
+Matrix multiplication has its own operator because it is fundamentally different from elementwise operations. Elementwise multiplication pairs corresponding elements and gives a result of the same shape. Matrix multiplication sums products along the inner dimension and gives a result whose shape depends on both inputs. For two (3, 3) arrays, both operations return (3, 3), but the values are entirely different.
+
+The at-sign operator was added in Python 3.5 specifically for this purpose. Before that, you had to write np.dot or np.matmul, which are less readable in expressions with multiple terms. The three forms do the same thing for 2-D arrays. For higher dimensions, matmul and @ broadcast over batch dimensions, while dot does not.
+
+Beyond the product, NumPy provides the common linear algebra operations in the np.linalg module. Solving a linear system is np.linalg.solve, which is faster and more numerically stable than computing the inverse and multiplying. Computing the inverse is np.linalg.inv. Determinant is np.linalg.det. Eigenvalues and eigenvectors are np.linalg.eig or np.linalg.eigh for symmetric matrices.
+
+Checking the result of a linear algebra computation is important because floating-point arithmetic introduces rounding errors. The product of a matrix and its inverse is not exactly the identity matrix. It is close to it. np.allclose checks whether two arrays are equal within a tolerance, and it is the right way to verify such results.
+
+This module covers the @ operator, np.dot, np.linalg.solve, inv, det, eig, and the norm function. The examples use small matrices where you can verify the result by hand. The focus is on the operations that appear in everyday data work, not on the full scope of numerical linear algebra.
+
+
 `*` is elementwise. `@` is mat product.
 
 Both are valid on two square mats of the same size. They give fully other answers. Nothing raises, nothing warns. The result of the wrong one is a plausible-looking mat of the right shape.
@@ -6139,6 +6396,19 @@ title: NaN and Missing Data
 intro: The value that isn't equal to itself. The functions that exist because of it.
 
 ## Not equal to itself
+
+NaN is a floating-point value defined by the IEEE 754 standard. Its defining property is that every comparison involving NaN returns False, including equality with itself. That property is not a NumPy design choice. It is a rule built into the hardware.
+
+The consequence is that the usual ways of checking for a value do not work. a == np.nan is False even when a is NaN. The in keyword does not find NaN in a list reliably. The only correct way to test for NaN is np.isnan, which was designed to handle the special case. pandas wraps this in pd.isna, which also handles None and pd.NA.
+
+NaN propagates through arithmetic. Any operation that touches a NaN produces NaN. The sum of a thousand numbers plus one NaN is NaN. The mean of a clean dataset with one corrupted entry is NaN. That propagation is a safety feature. It ensures that missing data does not silently disappear from the result. But it also means that a single NaN in a large array can make the entire result useless.
+
+NumPy provides nan-aware aggregation functions for exactly this reason. np.nansum ignores NaN values and sums the rest. np.nanmean computes the mean of the non-NaN values. np.nanstd, np.nanmin, np.nanmax do the same for their respective statistics. The regular versions propagate NaN. The nan-aware versions skip it. Choosing between them depends on whether you want missing data to be loud or quiet.
+
+NaN is a float. Integer arrays cannot hold NaN. If you need missing values in an integer array, you must either use a float dtype and accept the type change, or use a masked array, or use pandas nullable integer types. That limitation is the reason why a pandas integer column with one missing value turns into float64.
+
+This module covers NaN arithmetic, detection with np.isnan, the nan-aware aggregation functions, and the practical consequences for integer and boolean arrays. It also covers np.inf, which behaves differently from NaN in comparisons and arithmetic.
+
 
 `np.nan` is a floating-point value defined by the IEEE 754 standard to represent "not a number". Its defining property is that **each compare involving it's False**, including equality with itself.
 
@@ -6490,6 +6760,21 @@ title: Performance and Memory
 intro: Where the time and the bytes really go.
 
 ## The order to try things
+
+Performance tuning in NumPy follows a predictable order, and the biggest gains come from the simplest changes. The most expensive mistake is to optimise the wrong thing first.
+
+The first question is whether there is still a Python loop. A for-loop over array elements drops from compiled code into the Python interpreter, which is roughly a hundred times slower. Replacing the loop with a vectorised operation gives you that factor back. Most NumPy performance problems are this problem, and most people skip it to look for fancier solutions.
+
+The second question is dtype width. An array of small integers stored as int64 uses eight times the memory of int8. An array of moderate floats stored as float64 uses twice the memory of float32. Smaller dtypes mean more elements fit in CPU cache at once, and that speeds up every operation that touches the array. The speedup is typically 1.5x to 2x, on top of the memory savings.
+
+The third question is memory layout. Operations that walk through contiguous memory are faster than operations that jump around. A transposed array or a column slice of a C-contiguous array is not contiguous along the access direction. Making a contiguous copy with np.ascontiguousarray before a tight loop can help, but only if the loop is long enough to repay the copy.
+
+The fourth question is temporary arrays. An expression like a * b + c creates a temporary array for a * b, then creates another for the addition. For large arrays, those temporaries cost time and memory. np.multiply(a, b, out=result) reuses an existing array and avoids the allocation. numexpr can fuse the whole expression into one pass.
+
+The fifth and last question is whether NumPy is the right tool. For very large data that does not fit in memory, memory-mapped arrays or chunked processing help. For operations that are hard to vectorise, writing a small C or Cython extension, or using Numba's JIT compiler, can close the gap.
+
+This module works through the list in order, with timing measurements that show the payoff of each step. The point is not just what to do, but what to do first.
+
 
 Most NumPy speed work comes down to four questions, roughly in order of payoff:
 
@@ -6855,6 +7140,21 @@ title: Saving and Loading Arrays
 intro: npy, npz, text and bytes, and which one to reach for.
 
 ## The native format
+
+NumPy arrays need to be saved to disk and loaded back frequently. Intermediate results, preprocessed datasets, trained model weights, and test fixtures all need persistent storage. NumPy provides its own binary format and also supports text formats for interoperability.
+
+The native format is the .npy file. np.save writes a short header with the dtype, shape, and byte order, followed by the raw bytes of the array. np.load reads it back. The round trip is lossless. The dtype and shape are preserved exactly. An int16 array comes back as int16, not as int64. A (3, 4, 5) array comes back with the same shape. There is no parsing cost because the file is just the bytes.
+
+For multiple arrays, np.savez writes a .npz file, which is a zip archive of .npy files. Each array is stored under a name. np.savez_compressed applies compression, which helps when the data has patterns that compress well, like arrays with many repeated values or many zeros.
+
+Text formats are useful for interoperability with tools that cannot read .npy files. np.savetxt writes a CSV-like format. np.loadtxt reads it back. The round trip is not lossless. Floating-point values are written as text and parsed back, which can change the last decimal digit. Integer arrays come back as floats unless you specify the dtype. Text files are also much larger and much slower to read and write than binary ones.
+
+The choice between formats depends on who will read the file. If the reader is another Python script, .npy is better in every way. If the reader is R, Julia, or a spreadsheet, text or a more portable binary format like HDF5 is necessary. If the file will be version-controlled, text diffs better but takes more space.
+
+np.load with allow_pickle=False is a security consideration. Pickle files can execute arbitrary code on load. The default in current NumPy versions already disables pickle, but older code may not. Never load an untrusted .npy file with allow_pickle=True.
+
+This module covers np.save, np.load, np.savez, np.savetxt, np.loadtxt, and the trade-offs between binary and text formats. The examples show round-trip preservation and the pitfalls of text serialisation.
+
 
 `np.save(path, a)` writes a `.npy` file: a short header showing dtype, shape and byte order, followed by the raw bytes.
 

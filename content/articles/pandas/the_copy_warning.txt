@@ -3,6 +3,17 @@ intro: Why an set that looks right silently does nothing.
 
 ## The problem
 
+Chained indexing is the source of one of the most confusing errors in pandas. The code looks correct. It selects rows, then assigns a value. Sometimes it works. Sometimes it silently does nothing. The outcome depends on whether an intermediate object shares memory with the original frame or is an independent copy.
+
+That unpredictability is the real issue. If it always failed, you would learn the pattern and avoid it. If it always worked, there would be no problem. Because it depends on internal memory layout, the same code can behave differently depending on the dtypes, the size of the frame, or the version of pandas.
+
+The SettingWithCopyWarning was added to catch this. It appears when pandas detects that an assignment might have landed on a temporary object. The warning is accurate in intent but confusing in practice. It fires on code that is fine and sometimes misses code that is not.
+
+The fix is straightforward. Use a single loc or iloc expression for combined selection and assignment. That avoids the intermediate object entirely. The assignment goes directly into the original frame, with no ambiguity about where the write lands.
+
+This module explains why the problem exists, what the warning means, and how to write assignments that are unambiguous. It also covers the copy-on-write mode introduced in newer pandas versions, which changes the default behaviour so that every indexing operation returns an independent copy. That eliminates the ambiguity at the cost of requiring an explicit copy when you want shared memory.
+
+
 ```python
 df[df["age"] < 30]["age"] = 99
 ```

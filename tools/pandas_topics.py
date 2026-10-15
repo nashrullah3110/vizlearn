@@ -232,6 +232,17 @@ intro: Columns with names, types and an index. Why that differs from a 2-D array
 
 ## Two structures
 
+pandas gives you two objects: the Series and the DataFrame. A Series holds one column of data. A DataFrame holds many columns side by side. Each column keeps its own type. An age column stays integer while a name column stays string. That per-column typing is the single biggest difference from a NumPy array, where one type covers the whole block.
+
+Real-world data almost always mixes types. A customer table has text names, integer ids, float balances and boolean flags. pandas treats each column on its own terms. You do arithmetic on the numbers and string cleaning on the text, in the same frame, without converting anything.
+
+The price of that flexibility is alignment. pandas tracks labels on rows and columns. Those labels follow the data through every operation. Two Series add up by matching their labels, not their positions. That is a safety feature, but it surprises anyone used to positional arrays.
+
+This module shows what a Series is, what a DataFrame is, and where the index enters the picture. The rest of the track builds on those three ideas. Grasping them here saves confusion in every later module.
+
+The code examples are short and print their output. Change a value, rerun, and watch what moves. That is faster than reading a longer explanation.
+
+
 `Series` is a one-dimensional array of values **plus an index** of labels.
 
 `DataFrame` is a set of Series sharing one index. Each column has its own dtype.
@@ -580,6 +591,16 @@ title: The Index
 intro: The labelled axis that participates in almost each step.
 
 ## What it is
+
+The index is the feature most people ignore until it causes a bug. It sits on every Series and every DataFrame. By default it looks like row numbers, so nothing about it seems worth thinking about. Then a filter, a merge or a group-by produces an unexpected result, and the index is the reason.
+
+Understanding the index early prevents a category of confusion that otherwise recurs for months. Almost every "pandas is broken" question on forums traces back to index behaviour the author did not expect.
+
+An index is an immutable, ordered set of labels. One label per row. It can hold integers, strings, timestamps, or tuples. It participates in alignment, selection, joins and reshaping. When two Series are added, pandas matches their index labels. When a merge runs, the index can serve as the join key.
+
+The default RangeIndex of 0, 1, 2 hides all of this. It makes the index look like a row counter. For a freshly created frame, it behaves like one. After a single filter, the positions and labels diverge, and code that assumed they were the same gives wrong answers or raises a KeyError.
+
+This module covers what the index is, how it sticks to rows through filtering, how alignment uses it, and how to reset it when you need positional access again. The examples are short and show the index before and after each operation, so the behaviour is visible rather than implied. Each one prints the index explicitly so you can track how labels move, stick and sometimes surprise you.
 
 each Series and each DataFrame carries an index. An sorted set of labels, one per row. A DataFrame also has an index for its columns.
 
@@ -948,6 +969,18 @@ intro: From dicts, records, arrays and files, and which orientation each assumes
 
 ## The two orientations
 
+Building a DataFrame is the first thing you do in pandas. The constructor accepts many input shapes. Dicts, lists of dicts, NumPy arrays, other DataFrames, even a single scalar with an explicit index. Each shape implies a different orientation, and picking the wrong one gives you a transposed result with no error.
+
+The most common mistake is mixing up column-oriented and row-oriented input. A dict of lists treats each key as a column name. A list of dicts treats each dict as a row. Both produce a valid frame. If you expected one and wrote the other, every downstream number is wrong, and nothing warns you.
+
+Knowing which constructor form matches your data source prevents a class of silent bug. Data from an API usually arrives as a list of records. Parallel arrays from a computation are columns. CSV files go through a reader. Each path has a natural form. Choosing it means the frame comes out right on the first try.
+
+This module covers the main forms, what each tolerates in terms of missing keys and mismatched lengths, and how dtype inference works at construction time. The last point matters because a column that starts as the wrong type stays wrong until you fix it, and most people do not check.
+
+The examples build small frames and print them. That is faster than loading a file when you want to see what a constructor does with a particular input shape. After working through them, you should be able to look at any input and predict the shape and dtypes of the resulting frame.
+
+Later modules cover reading from CSV and Parquet files, which is how most real data enters pandas. This module focuses on constructing frames from in-memory objects, which is the skill you need for testing, prototyping, and building fixtures.
+
 Almost each confusion about making a DataFrame comes from one question: does this input show **columns** or **rows**?
 
 `pd.DataFrame({"a": [1,2,3], "b": [4,5,6]})` shows columns. Each key is a column name and each value is the entire column. This is the most common form and the one to reach for when you've parallel lists.
@@ -1310,6 +1343,22 @@ title: Looking at Data
 intro: The six calls to make before writing any analysis.
 
 ## Why this comes before anything else
+
+Every analysis starts with assumptions about the data. The column names, the types, the number of rows, whether values are missing, whether strings are clean. Those assumptions are almost never written down, and they are frequently wrong.
+
+A column you expected to hold integers might hold strings because of one malformed row. A date column might be plain text. A categorical column might have four spellings of the same city. An id column might have lost its leading zeros during import. None of these problems raise an error. They produce plausible output that is quietly incorrect.
+
+The fix is a short inspection routine you run before writing any logic. Six calls cover almost everything: shape, dtypes, head, describe, value_counts and isna. Together they take under a minute. They surface the problems that would otherwise cost hours of debugging later.
+
+Skipping inspection is the single most expensive habit in data work. Not because each bug is hard to fix, but because the bug is invisible until something downstream gives an answer that looks wrong. By then you have built logic on top of a broken assumption, and finding the root cause means unwinding all of it.
+
+This module walks through the six calls, explains what each one catches, and shows examples of the problems they reveal. After this, running the routine should be automatic. It is the cheapest investment in any pandas workflow.
+
+Making inspection a habit also helps when you revisit code months later. The printed output in your notebook tells you what the data looked like, even if the file has changed since.
+
+The calls are cheap individually and cheaper together. None of them modify the frame. None of them require understanding the domain. You can run the full routine before knowing what question the analysis will answer. That is the point: the routine catches problems that are independent of the question.
+
+Most people learn this the hard way. A report goes out, a number looks wrong, and the root cause is a dtype that was never checked. Running the routine once would have caught it. That experience, repeated a few times, is what makes inspection automatic.
 
 Most pandas bugs aren't bugs in pandas. They're assumptions about the data that were never checked. A column that is text where you expected numbers, an identifier that lost its leading zeros, a group with four spellings, a date column that is still strings.
 
@@ -1727,6 +1776,19 @@ intro: Label or spot, and the endpoint rule that differs between them.
 
 ## The distinction
 
+pandas gives you two explicit accessors for selecting rows and columns. One works by label. The other works by position. They look similar, they accept similar syntax, and on a fresh frame they return the same rows. That last point is the trap.
+
+The difference only shows up after the index has changed. A filter, a sort, a merge, a set_index call -- any of these can make the index labels diverge from the positional order. At that point, label-based and position-based selection refer to different rows, and code that assumed they were interchangeable breaks.
+
+Using bare brackets on a DataFrame is ambiguous. A string selects a column. A slice selects rows by position. A boolean Series selects rows by mask. Three different meanings for one syntax. The explicit accessors remove that ambiguity. They cost a few extra characters and prevent a category of bug.
+
+This module explains the label-versus-position split, the endpoint rule that differs between the two, and the cases where each one is the right choice. It also covers the SettingWithCopy trap that appears when you chain selection and assignment without using the accessor.
+
+The examples use frames with non-default indexes so the difference is visible. On a RangeIndex frame, every example would work with either accessor, which is exactly why people get confused when the index later changes.
+
+Getting comfortable with these two accessors is worth the effort. They appear in almost every pandas script. Knowing which one you mean, and writing it explicitly, makes the code both correct and readable.
+
+
 `.loc` selects by **label** &mdash; the values in the index.
 
 `.iloc` selects by **spot** &mdash; where the row sits, from 0.
@@ -2125,6 +2187,19 @@ print("   original still has", len(df), "rows")'''),
 title: Filtering Rows
 intro: Masks, isin, between and query, and the parenthesis rule that catches all.
 ## A mask is a Series
+
+Filtering in pandas does not work like filtering a Python list. There is no loop, no if-statement, no list comprehension. Instead, a comparison produces a boolean Series, and that Series is handed to the frame to select rows.
+
+That two-step process is worth understanding on its own terms. The comparison step and the selection step are separate operations. You can store the mask in a variable, inspect it, combine it with other masks, count how many rows it matches, and reuse it. A mask is data, not a control-flow instruction.
+
+Combining masks uses bitwise operators, not the Python keywords. The and-keyword does not work on Series. You write the ampersand instead. The same applies to or and not. Every combined mask needs parentheses around each part, because the bitwise operators bind tighter than comparison operators. Leaving out the parentheses gives a TypeError or, worse, a wrong result.
+
+This pattern repeats everywhere in pandas. Once you are comfortable with masks, group-by filters, conditional assignment, and flagging all use the same idea. A boolean Series aligned to the data by index.
+
+The module also covers isin for membership checks, between for range checks, and query for string-based filtering. Each is a convenience wrapper around the mask pattern. Knowing the underlying pattern makes the wrappers obvious rather than mysterious.
+
+Filtering is the step you will do most often. Almost every analysis starts by narrowing the data to the subset that matters. Getting this right means every downstream result is computed on the right rows.
+
 
 `df["age"] >= 25` doesn't return rows. It returns a boolean Series, one value per row, carrying the same index as the frame.
 
@@ -2528,6 +2603,17 @@ intro: Why an set that looks right silently does nothing.
 
 ## The problem
 
+Chained indexing is the source of one of the most confusing errors in pandas. The code looks correct. It selects rows, then assigns a value. Sometimes it works. Sometimes it silently does nothing. The outcome depends on whether an intermediate object shares memory with the original frame or is an independent copy.
+
+That unpredictability is the real issue. If it always failed, you would learn the pattern and avoid it. If it always worked, there would be no problem. Because it depends on internal memory layout, the same code can behave differently depending on the dtypes, the size of the frame, or the version of pandas.
+
+The SettingWithCopyWarning was added to catch this. It appears when pandas detects that an assignment might have landed on a temporary object. The warning is accurate in intent but confusing in practice. It fires on code that is fine and sometimes misses code that is not.
+
+The fix is straightforward. Use a single loc or iloc expression for combined selection and assignment. That avoids the intermediate object entirely. The assignment goes directly into the original frame, with no ambiguity about where the write lands.
+
+This module explains why the problem exists, what the warning means, and how to write assignments that are unambiguous. It also covers the copy-on-write mode introduced in newer pandas versions, which changes the default behaviour so that every indexing operation returns an independent copy. That eliminates the ambiguity at the cost of requiring an explicit copy when you want shared memory.
+
+
 ```python
 df[df["age"] < 30]["age"] = 99
 ```
@@ -2915,6 +3001,18 @@ title: Adding and Removing Columns
 intro: assign, drop, rename, and the alignment that decides what a new column holds.
 
 ## Bracket assignment
+
+Adding and removing columns is the most common mutation you perform on a DataFrame. New columns hold computed results, flags, cleaned versions of existing data, or values from a lookup table. Dropped columns remove noise from downstream operations.
+
+The simplest form is bracket assignment. It writes a new column if the name does not exist and overwrites an existing one if it does. There is no confirmation, no warning, and no undo. That silent overwrite is a real hazard in longer scripts where you cannot see the full column list.
+
+The assigned value can be a Series, a scalar, or an array. A scalar broadcasts to every row. A Series aligns on the index, which means mismatched indexes produce NaN in the gaps rather than raising an error. An array must match the frame length exactly or pandas raises a ValueError.
+
+Understanding alignment during assignment prevents a common surprise. If you compute a value from a filtered subset and assign it back, the result has NaN wherever the filter excluded a row. That is correct behavior, but it catches people who expected the values to fill in order rather than by label.
+
+This module covers bracket assignment, the assign method for chaining, insert for positional placement, drop for removal, and rename for changing column names. Each returns a new object by default, which matters for method chaining and for avoiding accidental mutation of a shared frame.
+
+The examples show each operation on small frames so you can see the before and after. Pay attention to how alignment works during assignment, because that is where most surprises come from.
 
 `df["total"] = df["qty"] * df["price"]` adds a column at the end.
 
@@ -3332,6 +3430,19 @@ intro: object, group and the nullable types.
 
 ## Why this matters early
 
+The dtype of each column decides three things: how much memory the column uses, what operations work on it, and how missing values behave. Getting the dtype right at load time is cheap. Fixing it after building logic on top of the wrong type is expensive and error-prone.
+
+Memory is the most visible consequence. A column of country codes stored as object takes roughly ten times the memory of the same column stored as category. Multiply that by a few such columns and a large dataset, and the frame may not fit in memory at all. The fix is often a single astype call per column.
+
+Speed follows memory. Operations on object columns fall back to per-element Python. Operations on native numeric or categorical columns use compiled code. The difference is not subtle. It can be a factor of ten on a group-by or a value_counts, simply from changing the dtype.
+
+Missing-value handling also depends on the dtype. Classic NumPy int columns cannot hold NaN, so a single missing value promotes the entire column to float64. That changes the printed output and can break downstream comparisons. The nullable integer types solve this, but they require an explicit dtype at read time.
+
+Checking dtypes is part of the inspection routine for a reason. A quick look at the output of df.dtypes after loading tells you whether a column is the type you expected. If it is object when you expected int64, something in the data prevented the inference, and that something is worth finding now rather than later.
+
+This module covers the common dtype problems, how to diagnose them, and how to fix them with astype, pd.to_numeric, and the dtype argument at read time.
+
+
 A frame that doesn't fit in memory can't be analysed at all. The usual reason a frame is larger than expected isn't the number of rows. It's one or two columns stored in the widest possible type.
 
 Fixing dtypes is often the gap between a dataset that loads and one that doesn't. It takes one line per column.
@@ -3705,6 +3816,17 @@ title: Missing Data
 intro: Finding it, counting it, and the choice that matters more than the code.
 
 ## Three markers
+
+Missing data appears in almost every real dataset. A sensor drops a reading, a survey question goes unanswered, a join brings in rows that have no match. How you handle those gaps shapes every downstream result. An uncounted NaN in a mean, a silent drop in a merge, a column that turned float because of one absent value -- each of these is a missing-data problem wearing a different face.
+
+pandas uses more than one marker for "missing" because of how Python and NumPy interact. NumPy has NaN for floats but nothing for integers or booleans. Python has None, which works in object columns but not in numeric ones. The newer nullable types use pd.NA, which works everywhere but behaves differently in boolean logic. Knowing which marker you have matters less than knowing that isna catches all three.
+
+The first question to answer is how much data is missing and where. A column with five percent NaN needs a different plan from a column with eighty percent NaN. A column where gaps cluster in one time period tells a different story from one where gaps are scattered at random.
+
+Before choosing a fill strategy, you need those numbers. This module starts with counting, then covers the three main options: dropping rows, filling with a fixed value, and interpolating. Each has a correct use case and a common misuse. Dropping rows when the remaining data is biased gives biased results. Filling with the mean when the data has groups gives a mean that belongs to no group.
+
+The goal is not to eliminate every NaN. It is to make a deliberate choice about each one, knowing how that choice affects the analysis.
+
 
 pandas has more than one form of "missing", for historical reasons.
 
@@ -4094,6 +4216,19 @@ title: Duplicates
 intro: Finding repeated rows and deciding which one to keep.
 
 ## duplicated marks the copies
+
+Duplicate rows appear for many reasons. A data source sends the same record twice. A join multiplies rows because of a many-to-many key nobody expected. A concat stacks two exports that overlap in time. An append inside a loop adds the same batch on every iteration.
+
+Finding duplicates is easy. The harder part is deciding what counts as a duplicate and which copy to keep. Two rows might match on every column, or they might match only on an id while differing on a timestamp. The first case is a true copy. The second might be an update history where you want the latest version. The subset parameter controls which columns matter.
+
+Ignoring duplicates biases every aggregate. A duplicated sale doubles the revenue for that product. A duplicated survey response shifts the distribution. The effect is proportional to how many copies exist and how different they are from the rest. In small datasets the effect is obvious. In large ones it hides inside plausible-looking totals.
+
+Checking for duplicates belongs in the inspection routine, right after shape and dtypes. A quick df.duplicated().sum() tells you whether the problem exists. If it does, the next step is to look at the actual rows, decide on a subset and a keep rule, and document the choice.
+
+This module covers duplicated for detection, drop_duplicates for removal, and the subset and keep parameters that control both. It also covers the case where duplicates are expected and meaningful -- for example, a log where the same event can fire many times.
+
+The examples show what happens to aggregates before and after deduplication. That makes the cost of ignoring the problem concrete. A single duplicated row in the right place can shift an average, inflate a total, or change which product ranks first.
+
 
 `df.duplicated()` returns a boolean Series: `True` for a row that has been seen before, `False` for its first case.
 
@@ -4530,6 +4665,19 @@ intro: The .str accessor, and what it does with missing values.
 
 ## Why the accessor exists
 
+Text data in pandas is stored as a column of Python string objects. Each cell is an independent object sitting somewhere in memory, connected to the column by a pointer. That storage model is why string columns are slow and memory-heavy compared to numeric columns.
+
+You could process strings with a Python loop or with apply. Both work. Both are slow, because they call Python once per cell. The str accessor provides vectorised string methods that push the loop into compiled code where possible, and that return a properly aligned Series with NaN for missing entries.
+
+Beyond speed, the accessor gives you a readable, chainable syntax. Cleaning a name column might take three calls: strip whitespace, convert to lowercase, replace internal spaces with underscores. With the accessor, that is one chained expression. Without it, that is three separate apply calls or a lambda that does all three steps and is harder to read.
+
+The accessor also handles missing values consistently. Every str method returns NaN for a missing input rather than raising or returning an empty string. That means you can chain string operations on a column with gaps and get NaN in the result where the input was NaN. No special handling required.
+
+String cleaning is a large part of real-world data work. Names arrive in mixed case, with extra whitespace, with inconsistent separators. Codes arrive with trailing spaces that make exact matches fail. Categories have multiple spellings. The str accessor is how you fix all of these at column scale.
+
+This module covers the most-used methods: strip, lower, upper, contains, replace, extract, split and len. It also covers when to convert a text column to the category dtype for better performance on repeated values.
+
+
 A Series of strings is a column of Python string objects. You could loop over them. `apply(str.strip)` would work. Both are slow and neither reads well.
 
 `.str` exposes the string methods so they apply to the whole column: `s.str.strip()`, `s.str.lower()`, `s.str.len()`.
@@ -4953,6 +5101,19 @@ intro: Parsing them, the .dt accessor, and why a text date breaks all downstream
 
 ## They arrive as text
 
+Date and time handling is one of the areas where pandas adds the most value. A DatetimeIndex lets you select by month name, aggregate by week, compute rolling windows over calendar periods, and shift values by business days. None of that works until the column is actually a datetime type.
+
+The problem is that dates almost always arrive as text. A CSV file has no date type. It has strings. The reader does not guess which strings are dates unless you tell it to. A column that looks like dates and sorts like dates is still a column of strings, and every date-aware operation will fail or give wrong results.
+
+Detecting this is straightforward. If df.dtypes shows object for a column you expected to hold dates, it is text. Fixing it is one call to pd.to_datetime. After that, the column gains the dt accessor, which exposes year, month, weekday, hour and dozens of other properties.
+
+The format argument matters when dates are not in ISO format. pd.to_datetime with no format uses a parser that guesses. That parser is slow on large columns and can guess wrong when day and month are ambiguous. Passing the format string explicitly is both faster and safer.
+
+Timezone handling adds another layer. A naive datetime has no timezone. An aware datetime does. Mixing the two in a comparison or a merge raises or gives wrong results. The usual pattern is to parse as naive, then localize to the correct zone, then convert to UTC for storage and analysis.
+
+This module covers parsing, the dt accessor, timezone handling, and the common mistakes that come from leaving dates as text. It starts with detection because the hardest part of the problem is noticing you have it.
+
+
 `read_csv` doesn't parse dates unless you tell it to. A date column comes in as `object`. All you do with it's then string action wearing a date's clothes.
 
 Sorting is lexical. For ISO format. `YYYY-MM-DD`. That happens to give the right answer. This Is why the problem often goes unnoticed until the data arrives in another format. `"15/01/2024"` sorts before `"01/03/2024"` as text, and there's no error.
@@ -5327,6 +5488,19 @@ title: Sorting and Ranking
 intro: sort_values, nlargest and rank, and where the missing values end up.
 
 ## sort_values
+
+Sorting is one of the most common operations in data analysis. You sort to find the largest values, to put records in chronological order, to group related rows visually, or to prepare data for a report. pandas provides sort_values for sorting by column values and sort_index for sorting by the index labels.
+
+The distinction between stable and unstable sorting matters more than most people realize. An unstable sort can rearrange rows that have equal values in the sort column. That rearrangement is not random, but it is not guaranteed to preserve the original order either. If you sort by region and then by date within each region, an unstable sort on date after a sort on region can scramble the regions. Passing both keys in a single sort_values call avoids the issue.
+
+Missing values go to the end of the sorted result by default, regardless of the sort direction. That behaviour is usually what you want, but it is worth knowing about. The na_position parameter lets you move them to the beginning if your use case requires it.
+
+The result of sort_values is a new DataFrame with the original index labels preserved. That means the index after sorting is not 0, 1, 2. It is whatever the labels were before. Positional code that assumes sorted order starts at index 0 will break. Use reset_index if you need positional access after sorting.
+
+rank assigns ordinal positions without rearranging the data. It is useful when you need a ranking column alongside the original order. The method parameter controls how ties are handled: average, min, max, first, or dense. Each gives a different sequence for tied values.
+
+This module covers sort_values with single and multiple keys, ascending and descending directions, stable sorting, na_position, sort_index, nlargest, nsmallest, and rank. These are the tools you reach for whenever order matters.
+
 
 `df.sort_values("sales")` sorts by one column. A list sorts by a few, in order. `ascending` takes a matching list so each key can have its own direction:
 
@@ -5736,6 +5910,19 @@ intro: Split, apply, combine - the step that is the reason to use pandas.
 
 ## The three steps
 
+Group-by is the operation that justifies learning pandas. Without it, computing a subtotal per category requires a loop, a dict for accumulation, a decision about what to do with missing keys, and another loop to format the output. With group-by, it is one line.
+
+The concept is simple: split the rows into groups based on a key, apply a function to each group, and combine the results. The split is implicit. You never see the individual groups unless you ask for them. The apply step is where the actual computation happens. The combine step assembles the results into a Series or a DataFrame.
+
+Understanding these three steps separately makes the output predictable. The split step decides how many groups you get. The apply step decides the shape of each group's result. The combine step decides the shape of the final output. A sum gives one number per group, so the result is a Series with one row per group. A describe gives multiple numbers per group, so the result is a DataFrame.
+
+The key column becomes the index of the result. That is why the output of a group-by often looks different from the input. If you want a flat frame with the key as a regular column, pass as_index=False. That parameter exists precisely because the default behaviour surprises people who expected a DataFrame and got a Series with a named index.
+
+You can group by multiple columns by passing a list. The result then has a MultiIndex with one level per key. You can also group by a computed value, a cut result, or a boolean mask. Anything that maps each row to a group label works as a key.
+
+This module covers the basic pattern, multiple keys, selecting columns before aggregating, and the methods that apply to a GroupBy object. Once you see the split-apply-combine pattern, every aggregation question becomes a question about which function to apply and which key to split on.
+
+
 `df.groupby("city")["sales"].sum()` does three things:
 
 **Split** the rows into groups by the key.
@@ -6142,6 +6329,19 @@ intro: Group statistics broadcast back to each row.
 
 ## The shape decides the method
 
+The previous module covered group-by with agg, which returns one row per group. That is the right tool when you want a summary table. But many real tasks need the group statistic broadcast back to every row. Normalising sales by each store's total, flagging rows above the group average, ranking within each category -- all of these need a value per original row, not per group.
+
+That is what transform does. It computes a statistic per group and returns a Series with the same index as the input. The result aligns to the original frame and can be assigned as a new column directly. No merge is needed, and the alignment is handled by the index.
+
+The common alternative is to compute the agg result and then merge it back. That works, but it is slower, harder to read, and introduces a join key that must match exactly. Transform does the same thing in one step because it knows the group boundaries from the split.
+
+filter is the third method. It returns the original rows, but only for groups that pass a test. Keep only cities where total sales exceed a threshold. Keep only categories with more than ten records. The test applies to the group, and the result is a subset of the original rows.
+
+Knowing which method to use is almost always obvious once you ask what shape you want. One row per group means agg. One row per original row means transform. A subset of the original rows means filter. That decision tree covers the vast majority of group-by tasks.
+
+This module covers transform with built-in functions and with lambdas, filter with group-level tests, and the cases where agg and a merge are still the better option. The examples show the same problem solved with each approach, so the differences are concrete.
+
+
 Three group-by steps differ only in the shape of what they return. Choosing between them is nearly always obvious once you ask what shape you want.
 
 `agg` returns **one row per group**. A summary table.
@@ -6530,6 +6730,20 @@ title: Counting and Binning
 intro: value_counts, cut and crosstab.
 
 ## value_counts
+
+Counting is the first step in understanding any categorical column. Before you compute a mean or build a model, you need to know how many distinct values exist, how they are distributed, and whether any of them are misspelled or unexpectedly rare.
+
+value_counts answers all of those questions in one call. It returns a Series indexed by the distinct values, sorted by frequency, highest first. A quick glance tells you the dominant category, the tail of rare values, and whether anything looks like a data-entry error.
+
+Three parameters change what value_counts tells you. normalize gives proportions instead of raw counts, which is what you need when comparing datasets of different sizes. dropna controls whether missing values appear in the output. By default they are hidden, which is exactly the wrong behaviour when you are looking for data quality problems. sort set to False preserves the natural order of the values, which matters for ordinal categories.
+
+Beyond single-column counts, value_counts on a DataFrame counts distinct combinations of all columns. That is a quick way to find duplicated records or to see which pairs of categories appear together.
+
+Binning extends counting to continuous variables. You cannot count distinct values of a float column because every value is unique. cut divides the range into equal-width bins. qcut divides it into equal-count bins. Both return a categorical Series that you can then pass to value_counts or groupby.
+
+crosstab shows the joint distribution of two categorical columns as a matrix. It is equivalent to a pivot of value_counts, but the syntax is more direct. Adding margins gives row and column totals. Adding normalize gives proportions along rows, columns, or the whole table.
+
+This module covers value_counts with its parameters, cut and qcut for binning, and crosstab for joint distributions. These are the tools you reach for in the first five minutes of any exploratory analysis.
 
 The most-used single method in exploratory work. The first thing to run on any cat column.
 
@@ -6921,6 +7135,19 @@ title: apply, map and Vectorising
 intro: The escape hatch, what it costs, and the form that often replaces it.
 
 ## Three different things
+
+pandas has several methods that apply a function to data, and their names are easy to confuse. map, apply and applymap (now called DataFrame.map) look similar in small examples but differ in what they operate on, how they handle missing values, and how fast they run.
+
+The confusion matters because choosing the wrong one is either slow, incorrect, or both. Series.map with a dict is a fast lookup. Series.apply with a lambda is a slow Python loop disguised as a pandas call. DataFrame.apply with axis=1 iterates over every row in Python, which is the slowest operation you can write in pandas. Knowing which one you are using, and whether a vectorised alternative exists, is the difference between a script that finishes in a second and one that takes a minute.
+
+The first question to ask is whether the operation has a vectorised form. Multiplying by two, comparing to a threshold, extracting the year from a date -- all of these have array-level implementations that run in compiled code. Using apply for any of them is correct but unnecessarily slow.
+
+The second question is what the function operates on. map works on single values. apply on a Series works on single values. apply on a DataFrame works on whole columns or whole rows, depending on the axis parameter. The axis parameter is a common source of mistakes because the default is columns, not rows.
+
+This module covers map for substitution, apply for per-element and per-row computation, and the vectorised replacements that make apply unnecessary in most cases. It also covers applymap and its renaming, for completeness.
+
+The examples measure the speed difference between apply and the vectorised alternative. That makes the cost of the wrong choice concrete rather than theoretical. If you take one thing from this module, let it be the habit of always checking whether a vectorised form exists before reaching for apply.
+
 
 `Series.map` looks each value up in a dict, a Series, or a function. It's for **substitution**.
 
@@ -7317,6 +7544,21 @@ title: Stacking Frames with concat
 intro: Adding rows or columns from another frame.
 ## Two directions
 
+Combining DataFrames is one of the tasks you do most often. Data arrives in batches, in separate files, or from different sources. At some point you need a single frame that holds all of it. concat is the tool for that job when the frames share the same structure.
+
+concat works in two directions. Stacking rows makes the result taller. Stacking columns makes it wider. The direction depends on the axis parameter. The default is rows, which is the common case: you have two frames with the same columns and you want all the rows in one place.
+
+The part that trips people is alignment. When stacking rows, concat aligns by column name. If the two frames have different columns, the result has the union of both, with NaN where a frame lacked a column. That is the outer join behaviour. Passing join="inner" keeps only the columns present in both frames.
+
+When stacking columns, concat aligns by the index. Mismatched index labels get NaN. That means two frames from different filters of the same source may align correctly, while two frames from different sources may not. Checking the index before stacking prevents surprises.
+
+The keys parameter adds a level to the index identifying which frame each row came from. That is useful for tracing rows back to their source after the concat. It also produces a MultiIndex, which you may or may not want.
+
+ignore_index resets the result to a clean 0-based index. That is the right choice when the original indexes are meaningless row numbers that would otherwise collide.
+
+This module covers concat in both directions, the join parameter, keys, ignore_index, and the verify_integrity flag that catches duplicate index labels before they cause problems downstream. It also explains when concat is the wrong tool and merge is the right one.
+
+
 `pd.concat([a, b])` stacks **rows**: the result is taller.
 
 `pd.concat([a, b], axis=1)` stacks **columns**: the result is wider.
@@ -7690,6 +7932,21 @@ title: merge and join
 intro: SQL-style joins, and the copy key that silently times your rows.
 
 ## The four kinds
+
+Merging is how you combine two DataFrames that share a key column but hold different information. One frame has customer ids and names. Another has customer ids and orders. A merge on the id column produces a single frame with names and orders side by side. That is the same operation as a SQL join, and pandas borrows the vocabulary.
+
+The four join types decide what happens to keys that appear on only one side. The choice between them is the single most important decision in a merge, and the default is the one that causes the most silent data loss.
+
+An inner join keeps only keys present in both frames. Rows from either side that have no match are discarded. That means the output can have fewer rows than either input. If you expected to keep every customer and just add order data, an inner join quietly drops the customers who never ordered.
+
+A left join keeps every row from the left frame and fills with NaN where the right frame had no match. This is usually what you want when enriching a table with a lookup. The row count of the result matches the left input, unless keys are duplicated on the right side.
+
+A right join is the mirror image. An outer join keeps every key from both sides.
+
+Duplicate keys are the other major hazard. If a key appears three times on the left and twice on the right, the merge produces six rows for that key. The result is larger than either input, and nothing warns you. Checking the row count after a merge catches this immediately.
+
+This module covers merge with all four join types, single and multiple keys, indicator for diagnosing unmatched rows, and validate for catching duplicate keys before they multiply your data.
+
 
 `merge` mixes two frames on one or more key columns. `how` decides what happens to keys that appear on only one side.
 
@@ -8096,6 +8353,21 @@ intro: Long to wide and back, and when each shape is right.
 
 ## Two shapes
 
+Most data problems that feel complicated are actually shape problems. The data holds the right information but in the wrong layout. A column that should be a row. A value that should be a column header. A pair of columns that should be a single column of key-value pairs. Reshaping is the tool for converting between these layouts.
+
+The two fundamental shapes are long and wide. Long form has one observation per row with columns naming the variable and holding the value. Wide form has one subject per row with a column per variable. Neither is more correct. They serve different purposes.
+
+Long form is better for storage, joins and group-by. Adding a new variable adds rows, not columns. No schema change is needed. Missing combinations simply do not appear as rows. Most databases, most plotting libraries, and most statistical tools expect long form.
+
+Wide form is better for reading. A table with years across the top is what you put in a report or a spreadsheet. People scan columns faster than they scan long lists of rows. Wide form is also what you need when computing correlations between variables, because each variable must be its own column.
+
+pivot_table converts from long to wide. melt converts from wide to long. They are inverses of each other. Applying one and then the other gets you back to where you started, minus any information lost to aggregation.
+
+The tricky part of pivot is what happens when multiple rows map to the same cell. If two rows both say city=Delhi, year=2024, there is no unique value to put in the cell. pivot raises. pivot_table applies an aggregation function, with mean as the default. That silent averaging is worth knowing about.
+
+This module covers pivot_table, melt, and the stack and unstack methods that do the same work on the index rather than on columns. The examples use small frames where the transformation is visible.
+
+
 The same data can be laid out two ways.
 
 **Long** (or tidy) has one row per finding, with columns naming the var and holding the value. City, year, sales. Four rows for two cities over two years.
@@ -8481,6 +8753,21 @@ title: The MultiIndex
 intro: More than one level on an axis, and when to flatten it away.
 
 ## It arrives whether you asked or not
+
+A MultiIndex is an index with more than one level. It appears whenever a pandas operation produces labels that have structure. That happens more often than you might expect, and it surprises people who did not ask for it.
+
+The most common source is group-by with multiple keys. Grouping by city and year gives a result with a two-level index: city on the outer level, year on the inner. The result prints with a hierarchical layout, and selecting from it requires different syntax than selecting from a flat index.
+
+concat with keys adds a level naming the source frame. agg with multiple functions gives multi-level columns. stack and unstack move levels between the row index and the column index. All of these produce a MultiIndex without you writing the word MultiIndex anywhere.
+
+The practical question is usually not how to build one but how to work with one you already have. Selecting a single value requires a tuple. Selecting all rows for one outer-level value uses xs or a cross-section. Selecting by position still works with iloc, which ignores the labels entirely.
+
+The most common fix is to flatten the MultiIndex and go back to a simple frame. reset_index moves index levels back to columns. For multi-level columns, joining the levels into a single string is the usual approach.
+
+Knowing when to keep a MultiIndex and when to flatten it depends on what you are doing next. Plotting and exporting usually want a flat frame. Further aggregation and selection sometimes benefit from the hierarchical structure. The default choice, when you are unsure, is to flatten. You can always re-group later.
+
+This module covers how a MultiIndex is created, how to select from it, how to flatten it, and the methods that move levels between rows and columns.
+
 
 Almost no one makes a MultiIndex on purpose. It appears as the result of steps you were doing anyway:
 
@@ -8890,6 +9177,21 @@ intro: resample, rolling and shift.
 
 ## The index does the work
 
+Time series analysis in pandas depends almost entirely on having a DatetimeIndex. Without one, none of the time-aware methods work. resample raises. Rolling windows with time-based spans refuse to run. Date-based selection returns nothing useful.
+
+Setting up the DatetimeIndex is a two-step process. First, parse the date column with pd.to_datetime. Second, set it as the index with set_index. People skip the second step more often than the first, because the frame already has a datetime column and seems ready to use. But resample and time-based loc selections operate on the index, not on an arbitrary column.
+
+Once the index is a timeline, pandas can do things that would otherwise require substantial code. Select all rows in March 2024 with a string slice. Aggregate daily data to monthly totals. Compute a seven-day rolling average. Shift values forward by one business day. Each of these is one line.
+
+resample is the time-series equivalent of group-by. The groups are calendar periods rather than column values. Downsampling aggregates, like monthly totals from daily data. Upsampling creates new periods and fills them, like daily values from monthly observations.
+
+Rolling windows compute statistics over a sliding window of time. A 30-day moving average, a 7-day maximum, a rolling standard deviation. The window can be specified as a number of rows or as a time span. Time-based windows handle irregular data correctly because they measure actual calendar time, not row count.
+
+shift moves values forward or backward by a number of periods. It is how you compute period-over-period changes. The difference between this month and last month is a subtraction of the original and the shifted version. pct_change wraps that pattern into a single method.
+
+This module covers setting up the DatetimeIndex, resample for aggregation and upsampling, rolling for moving statistics, and shift for period comparisons. The examples use daily and monthly data to show the mechanics clearly.
+
+
 all in this module depends on the frame having a `DatetimeIndex`. `resample` raises without one. Time-based windows have nothing to measure against.
 
 `df.set_index("date")` after `pd.to_datetime` is the usual setup. It's the step people skip before wondering why `resample` won't run.
@@ -9261,6 +9563,19 @@ title: Reading and Writing Files
 intro: read_csv's args, and the ones that prevent a class of bug.
 
 ## Inference is convenient and lossy
+
+Reading data from files is the starting point of most pandas work. The reader functions, especially read_csv, are designed to be convenient. They guess column types, parse values, and produce a usable frame with minimal configuration. That convenience comes at a cost: the guesses are often wrong, and the errors are silent.
+
+Three problems appear in almost every project that uses read_csv without explicit type instructions. Leading zeros in identifier columns disappear because the column is read as integers. Date columns remain as text because the reader does not guess date formats. A single missing value in an integer column promotes it to float64, and every id prints with a trailing decimal point.
+
+Each of these problems is fixed by passing the right argument at read time. dtype forces a column to a specific type. parse_dates names the columns that should be converted to datetime. na_values specifies which strings represent missing data. These arguments cost a few lines, and they prevent hours of debugging.
+
+The read step is also where you control memory usage. A file with ten million rows and fifty columns might be too large to load in full. usecols reads only the columns you need. nrows reads only the first N rows for testing. dtype with smaller numeric types cuts memory by half or more.
+
+Writing data back to files has its own set of choices. to_csv is the most portable format but the slowest and the most lossy. to_parquet preserves dtypes, handles nested data, and is much faster for large files. The choice depends on who will read the file. If the reader is another pandas script, Parquet is better in every way. If the reader is Excel or a person, CSV is the right choice.
+
+This module covers read_csv with the arguments that prevent the common problems, read_excel and read_parquet for other formats, and the matching to_ methods for writing. The emphasis is on the arguments that matter, not on listing every parameter.
+
 
 `read_csv` guesses a dtype per column. That is why it's pleasant to use and why the same three problems appear in almost each project.
 
@@ -9696,6 +10011,20 @@ intro: Where the time really goes, in the order worth fixing it.
 
 ## The order to work in
 
+Performance tuning in pandas follows a predictable order. The biggest gains come from the simplest changes, and the biggest mistake is starting with the hardest optimisation while ignoring the obvious one.
+
+The most common performance problem is per-row Python. An apply call with axis=1, an iterrows loop, or a list comprehension that processes one row at a time. Each of these drops out of compiled code and into the Python interpreter, which is roughly a hundred times slower. Replacing the loop with a vectorised column operation gives you that factor back.
+
+The second item on the list is dtype sizing. A column of country codes stored as object takes ten times the memory of the same column stored as category. A column of small integers stored as int64 takes eight times the memory of int8. Halving the memory often doubles the speed, because the data fits in cache more often.
+
+The third item is filtering early. If your analysis uses only rows from 2024, filtering at the top of the pipeline means every subsequent step processes fewer rows. That is free speed. The later the filter, the more work pandas does on rows you throw away.
+
+The fourth item is reducing unnecessary copies. Each operation that returns a new DataFrame allocates memory and copies data. In a long pipeline, that adds up. Using inplace where it exists, or assigning back to the same variable, can reduce the copying.
+
+The fifth and last item is reaching past pandas entirely. For very large data, Polars and DuckDB are faster. For numeric computation on uniform arrays, dropping to NumPy avoids the overhead of index alignment. These tools solve problems that pandas was not designed for.
+
+This module works through the list in order, with timing measurements that show the payoff of each step. The point is not just what to do, but what to do first.
+
 Pandas speed work is unusually predictable. In descending order of payoff:
 
 1. **Drop per-row Python.** Worth 10&ndash;100x, and it's nearly always the whole problem.
@@ -10114,6 +10443,21 @@ title: Method Chaining
 intro: Writing a pipeline as one formula.
 
 ## What it buys
+
+Method chaining is a style where each step in a data pipeline is a method call on the result of the previous step. Instead of assigning intermediate variables, you write one expression that flows from input to output. The result reads top to bottom, in the order the operations happen.
+
+The practical benefit is readability. A chained pipeline shows the sequence of transformations in one place. You can see what goes in, what happens at each step, and what comes out. Intermediate variables break that flow. They force you to invent names, and each name is one more thing to track.
+
+The second benefit is safety. Each step in a chain operates on the result of the previous step. There is no risk of accidentally using a stale variable from an earlier version of the pipeline. In a script with many intermediate frames, reordering steps can introduce a bug where one step reads a variable that was overwritten by another. Chaining avoids that because there are no variables to overwrite.
+
+The cost is debugging. A chain that fails gives you one traceback for the whole expression. Breaking the chain into named steps lets you inspect each intermediate result. The practical compromise is to develop in steps, then chain once the logic is settled.
+
+pandas supports chaining because most methods return a new object. query, assign, sort_values, groupby, rename, reset_index -- all return a DataFrame or Series that the next method can act on. The assign method exists specifically for chaining. It adds or replaces columns and returns the modified frame.
+
+pipe extends chaining to functions that are not DataFrame methods. Any function that takes a DataFrame as its first argument and returns one can be called inside a chain via pipe. That includes your own functions, which means a chain can mix built-in pandas methods with custom logic.
+
+This module covers the basics of chaining, assign, pipe, and the patterns that make chains readable. It also covers the cases where chaining is the wrong choice: when the pipeline needs conditional branches or when a step is easier to read as a named variable.
+
 
 Most pandas methods return a new object. This Means they compose:
 

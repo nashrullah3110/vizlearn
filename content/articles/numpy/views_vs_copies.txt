@@ -3,6 +3,21 @@ intro: Which steps give you a second window onto the same numbers, and why it ma
 
 ## One buffer, several descriptions
 
+Understanding views and copies is the single most important thing for writing correct NumPy code. A view shares memory with the original array. A copy has its own memory. The difference is invisible when you only read. It shows up the moment you write.
+
+Every slice creates a view. That means modifying a slice modifies the original array. This is a performance feature. Copying a gigabyte array every time you take a slice would be wasteful. But it is also a correctness hazard. If you pass a slice to a function and that function writes to it, the original array changes. Nothing warns you.
+
+An array is a block of contiguous memory plus a description. The description records the starting address, the shape, the dtype, and the strides. Strides say how many bytes to step for each axis. A view is a new description of the same block. Making a view changes the strides and the shape but not the data. That is why views are free to create. No data is copied.
+
+Transpose is a view. Reshape is a view when the result is contiguous. Fancy indexing is a copy. Boolean indexing is a copy. np.array always creates a copy. np.asarray creates a view when the input is already an array with the right dtype.
+
+The distinction matters for three reasons. First, correctness. Writing through a view changes the original. Writing through a copy does not. Second, memory. Views use no extra memory. Copies double it. Third, performance. Creating a view is instant. Creating a copy takes time proportional to the array size.
+
+np.shares_memory tells you whether two arrays share the same underlying buffer. It is the definitive check. When you are unsure, call it. When debugging an unexpected mutation, call it on every array that might be a view of the one that changed.
+
+This module covers how views are created, how copies are created, how to tell the difference, and how to force a copy when you need one. The examples show mutations propagating through views and stopping at copies.
+
+
 An array is a block of memory plus a description. Where it starts, what shape it has. How many bytes to step for each axis. Those steps are the **strides**.
 
 A **view** is a new description of the same block. Making one is free. Writing through it changes what every other description of that block sees.

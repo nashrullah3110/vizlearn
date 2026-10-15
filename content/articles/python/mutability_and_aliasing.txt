@@ -2,8 +2,6 @@ title: Mutability and Aliasing: A Practical Guide
 intro: A name in Python is a label attached to an object, not a box holding a value. Once that clicks, a whole family of confusing action turns obvious.
 
 ## Assignment does not copy
-
-
 ```python
 a = [1, 2, 3]
 b = a
@@ -12,10 +10,23 @@ print(a)  # [1, 2, 3, 4]
 ```
 
 
-`b = a` attaches a second label to the same list. There's one list and two names for it. A change through either name is visible through both. `a is b` is `True`. This Is the test for "the same object" not `==`. This Asks about contents.
+`b = a` attaches a second label to the same list. There is one list and two names for it. A change through either name is visible through both. `a is b` is `True`. That is the test for "same object," not `==`, which checks contents.
 
-To get a second list, ask for one: `a[:]`, `list(a)` or `a.copy()`.
+To get a separate list, ask for one: `a[:]`, `list(a)`, or `a.copy()`.
 
+This behavior is called aliasing, and it is the source of some of the most confusing bugs beginners encounter. You think you have two independent lists, but you have one list with two names. Append to one and both grow. Sort one and both rearrange. Clear one and both become empty.
+
+The reason Python works this way is performance. Lists can be large. If every assignment made a full copy, a simple function call would duplicate the entire list. Instead, assignment just creates a new reference to the same object. Copying happens only when you ask for it explicitly.
+
+Mutability means an object can be changed after it is created. Lists, dictionaries, and sets are mutable. Strings, integers, floats, and tuples are immutable. You cannot change a character in a string or an element in a tuple. Any operation that appears to modify an immutable object actually creates a new one.
+
+The distinction matters most with function arguments. When you pass a list to a function, the function receives a reference to your list, not a copy. If the function modifies the list, your original changes too. That is sometimes intentional and sometimes a bug. If the function is not supposed to modify the list, pass a copy: `f(my_list[:])` or `f(my_list.copy())`.
+
+Rebinding and mutating are different operations, and confusing them is a common source of errors. `x = [1, 2, 3]` followed by `x = [4, 5, 6]` rebinds `x` to a new list. The old list still exists if another variable points to it. `x.append(4)` mutates the existing list. The question is: does this line change what `x` points to, or does it change the object `x` already points to?
+
+Default arguments make this worse. `def f(items=[]):` creates one list object at function definition time. Every call that uses the default shares that same list. If the function appends to it, the next call sees the leftover items. The fix is `def f(items=None):` followed by `if items is None: items = []`.
+
+This page covers aliasing, mutability versus immutability, how function arguments share references, rebinding versus mutating, and the mutable default argument trap.
 ## Rebinding versus mutating
 
 This is the gap that shows the rest:

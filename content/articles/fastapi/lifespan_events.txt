@@ -2,6 +2,18 @@ title: Lifespan Events
 intro: Work that happens once per process rather than once per request. Where a link pool belongs.
 ## Two lifetimes
 
+A lifespan is the period between your application starting and stopping. Lifespan events are the places where you run code at each end of that period. On startup you might open a database pool or load a machine learning model. On shutdown you close the pool and flush anything pending.
+
+This is different from per-request work. A request lasts milliseconds, and you would not want to build a connection pool for each one. Some resources are expensive to create and meant to be shared. The lifespan is where those belong, created once and reused by every request.
+
+This article starts with the two lifetimes, per request and per process, and how to tell which one a resource needs. It then shows the shape of a lifespan function, which uses the same yield pattern you may know from dependencies. Code before the yield runs at startup, and code after it runs at shutdown.
+
+You will also read what the server actually does when it starts and stops, which clears up a lot of confusion about timing. A section covers the fact that lifespan runs once per worker process, so a server with four workers runs it four times. That affects anything you load into memory.
+
+The article ends with how to reach the shared resource from inside a handler, through the application state, so your endpoints can use what startup created.
+
+Older FastAPI code used separate startup and shutdown event handlers. You will still meet them in tutorials and existing projects. The article explains why the single lifespan function replaced them, and how to read the older style if you inherit it. A good rule of thumb: if something is slow to build and safe to share, it belongs here. If it holds data for one user, it does not. Each section is short and ends with a habit you can apply straight away. You finish knowing where each shared resource belongs, how to build it once, and how to release it cleanly when the server stops.
+
 Almost all in this track has been per request: a body, a session, a user, a background task.
 
 Some things aren't. A DB link **pool** is created once and used by each request. So is an HTTP client, a machine-learning model, a cache client, a loaded config.

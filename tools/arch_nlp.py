@@ -55,8 +55,8 @@ intro: A model with no hidden layer and no labels that learns, from nothing but 
 
 ## The setup: text labels itself
 
-Guided learning needs labels. Text has none, and annotating enough of it to
-learn word meanings isn't a project anyone was going to finish.
+Guided learning needs labels. Text has none, and manually annotating enough
+of it to learn word meanings is not a project anyone was going to finish.
 
 The distributional hypothesis supplies the way out: **words that appear in
 similar contexts have similar meanings**. That isn't a claim about semantics,
@@ -353,8 +353,9 @@ intro: Start from the corpus-wide count mat instead of one window at a time. Fit
 
 ## Two families, one goal
 
-By 2014 there were two ways to get word vectors and they came from different
-traditions.
+Word vectors turn words into lists of numbers so that words with similar
+meanings land near each other. By 2014 there were two ways to get them, and
+they came from different traditions.
 
 **Count-based** methods build a word-by-word co-hit mat over the
 whole corpus and factorise it. LSA and its relatives. They use the

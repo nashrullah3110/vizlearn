@@ -924,26 +924,26 @@ The fit is so willing to move a long way to reduce one large residual,
 even at the cost of small grows across every other point. That isn't a bug
 in the setup. It's what the goal function asks for.
 
-## Leverage: where it sits matters as much as how far off it is
+## Hat values: where it sits matters as much as how far off it is
 
 Drag the point up while keeping it near the middle of the x range, then drag it
 up while keeping it at the far right. The second spot moves the line much
 more.
 
-That difference is **leverage**. A regression line pivots roughly about the mean
-of x, so a point near that mean is close to the pivot and has little turning
-effect no matter how far off it's vertically. A point at the extreme of x sits
+That difference is the **hat value**. A regression line pivots roughly about the
+mean of x, so a point near that mean is close to the pivot and has little turning
+effect no matter how far off it is vertically. A point at the extreme of x sits
 at the end of a long lever.
 
 The gap is worth having in three words:
 
 - **Outlier** &mdash; unusual in y, a large residual.
-- **High leverage** &mdash; unusual in x, far from the pivot.
+- **High hat value** &mdash; unusual in x, far from the pivot.
 - **Influential** &mdash; both, so dropping it changes the model. This is the
   one that matters, and Cook's distance is the standard way to measure it.
 
-A high-leverage point that happens to lie on the trend is harmless. A moderate
-outlier in the middle is harmless. The combination isn't.
+A point with a high hat value that happens to lie on the trend is harmless. A
+moderate outlier in the middle is harmless. The combination isn't.
 
 ## Before you remove anything
 
@@ -989,8 +989,8 @@ often a sign the column was on the wrong scale.
 
 ## Why position matters as much as distance
 
-The reason one far-off point wrecks a fit and another leaves it alone is leverage,
-and squared error is what makes it bite. Least squares cuts the *sum of
+The reason one far-off point wrecks a fit and another leaves it alone is the hat
+value, and squared error is what makes it bite. Least squares cuts the *sum of
 squared* residuals, so a point twice as far off adds four times the fine
 and one ten times as far adds a hundred times. The line will travel a
 long way to reduce a single large residual. But a regression line pivots roughly
@@ -1003,9 +1003,9 @@ its vertical error applies:
 |large residual, at the extreme of x|large &mdash; the end of a long lever|
 
 That gives three distinct things worth separating: an **outlier** is unusual in y,
-**high leverage** is unusual in x, and only their combination &mdash;
-**influential** &mdash; really moves the model. This Is what Cook's distance
-measures. A high-leverage point sitting on the trend is harmless. A mid-range
+**a high hat value** is unusual in x, and only their combination &mdash;
+**influential** &mdash; really moves the model. This is what Cook's distance
+measures. A point with a high hat value sitting on the trend is harmless. A mid-range
 outlier is harmless. The far-right outlier is the one that quietly rewrites the
 answer. Which is also why "delete any of it beyond three standard deviations" is
 self-defeating: the outlier has already inflated the standard deviation the rule
@@ -1022,12 +1022,12 @@ These aren't outliers. They're missing values wearing a number.
 **Dropping points until the model fits.** At that stage the model shows the
 pick, not the effect.
 
-**Checking only y.** High-leverage points can be plain in y and still
+**Checking only y.** Points with high hat values can be plain in y and still
 dominate the fit.
 
 ## An outlier and an influential point are not the same thing
 
-One far-out row can leave a fit untouched while another moves it fully. The difference is leverage, and it's computable.
+One far-out row can leave a fit untouched while another moves it fully. The difference is the hat value, and it is computable.
 
 ```python-run
 import numpy as np
@@ -1061,7 +1061,7 @@ print("x=5 is the mean of x, so that point has no lever at all: it pushed")
 print("the whole line up without tilting it. the edge point tilted it.")
 ```
 
-The next block computes leverage and Cook's distance to show how influence is measured.
+The next block computes hat values and Cook's distance to show how influence is measured.
 
 ```python-run
 import numpy as np
@@ -1102,7 +1102,7 @@ print("  high leverage -- unusual x. dangerous whether or not y is odd.")
 print("  influential  -- actually moved the fit. Cook's D measures this.")
 ```
 
-The next block shows how robust estimators handle the same outlier.
+The next block shows how resistant estimators handle the same outlier.
 
 ```python-run
 import numpy as np
@@ -2530,12 +2530,21 @@ intro: The plot that answers whether to collect more data. Saves you from collec
 
 ## What is plotted
 
+A learning curve answers a single question: will more data help? The answer
+saves real money. Collecting and labelling another 50,000 rows is expensive.
+If the model has already stopped improving, that cost is wasted. The curve
+tells you before you spend it.
+
 Train the model on 40 examples, record the error on those examples and on a
 held-out validation set. Repeat with 80, 120, and so on. Plot both against
-training-set size.
+training-set size. Grey is training error, orange is validation error.
 
-Grey is training error, orange is validation error. The **shape** of the pair is
-the diagnosis, and the diagnosis is more handy than either number alone.
+The **shape** of the pair is the diagnosis, and the diagnosis is more
+useful than either number alone. A gap that keeps closing says more data
+will help. A gap that has already flattened says it will not. Two lines
+that sit high and close together say the model itself is the problem,
+not the data. This page walks through each of those shapes and what to
+do about them.
 
 ## Underfitting
 
@@ -3894,14 +3903,20 @@ intro: Why neighbour-preserving plots look so much better than PCA. Which parts 
 
 ## A note on what this page runs
 
-The layout here is a **simplified neighbour-preserving optimisation** &mdash;
-attract each point toward its nearest neighbours in the first space, repel
-all else. It isn't t-SNE: there's no perplexity, no
-Student-t kernel, no KL divergence being minimised.
+High-dimensional data is hard to think about. You cannot plot 50
+columns on a flat screen. PCA does it by choosing the two directions
+with the most spread, but that projection can hide clusters that sit
+in the other 48 dimensions. t-SNE and UMAP take a different approach:
+they try to keep nearby points nearby, and let everything else land
+wherever it lands. The result often shows clusters that PCA misses.
 
-What it copies faithfully is the action that matters: local structure is
-preserved, and the distances between groups stop meaning any of it. The
-[PCA module](pca.html) covers the linear method properly.
+The layout on this page is a **simplified neighbour-preserving
+optimisation** &mdash; attract each point toward its nearest neighbours in
+the original space, repel all else. It is not t-SNE: there is no
+perplexity, no Student-t kernel, no KL divergence being minimised.
+What it copies faithfully is the action that matters: local structure
+is preserved, and the distances between groups stop meaning anything.
+The [PCA module](pca.html) covers the linear method properly. The controls on this page let you watch both approaches side by side.
 
 ## Two different jobs
 

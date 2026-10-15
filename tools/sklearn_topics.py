@@ -226,7 +226,21 @@ intro: scikit-learn has one interface and about two hundred methods behind it. L
 
 ## The problem it solves
 
+scikit-learn is a Python library for machine learning. It covers classification, regression, clustering, dimensionality reduction and preprocessing. Every algorithm in it follows the same interface: three methods named `fit`, `predict` and `transform`.
+
+That consistency is the library's main contribution. You learn the interface once. After that, switching from a linear regression to a random forest is a one-line change. The surrounding code stays the same.
+
+The library sits on top of NumPy and SciPy. It expects numeric arrays as input and returns numeric arrays as output. It does not handle data loading, feature engineering from raw text, or deep learning. Those boundaries are deliberate. They keep the API small and predictable.
+
+Most mistakes in applied machine learning are not about the algorithm. They are about how data reaches the algorithm and how the result is measured. scikit-learn's design reflects that. It spends more surface area on splitting data, building pipelines and scoring predictions than on any single model.
+
+This page covers the interface itself. The three methods, the naming conventions, the shape rules and the two kinds of estimator. Once those are familiar, each later page adds one estimator or one evaluation technique. None of them changes how you call it.
+
+The library ships with small datasets for testing. It also ships with generators that produce synthetic data of a chosen shape. Both are useful for checking that your code runs before pointing it at real data.
+
 each machine-learning library has to answer the same question. How does a program hand data to an method and get an answer back. scikit-learn answered it once, in 2007. Then made each method in the library answer it the same way.
+
+The result is that `fit`, `predict` and `transform` are almost the whole API. A linear regression, a random forest, a support-vector machine and a k-means clustering all expose the same three methods. The code around a model doesn't change when the model does.
 
 The result is that `fit`, `predict` and `transform` are almost the whole API. A linear regression, a random forest, a support-vector machine and a k-means clustering all expose the same three methods. The code around a model doesn't change when the model does.
 
@@ -492,6 +506,12 @@ print("samples per class:", [int((bunch.target == c).sum()) for c in range(3)])
 intro: Before any model can be fitted, the data has to be two objects of just the right shape. Almost each first error on this track is one of the two this page ends with.
 
 ## The shape the library insists on
+
+Before you can fit any model, the data must be in the shape scikit-learn expects. That shape is rigid and the library will not guess when it is wrong. Understanding the rules up front saves time that would otherwise go to debugging shape errors.
+
+Every estimator in the library receives its data the same way. A features matrix and a target vector. The features matrix is always two-dimensional. The target vector is always one-dimensional. These constraints hold whether you have five rows or five million.
+
+The data can come from a CSV, a database, a pandas DataFrame or one of the bundled toy datasets. The source does not matter. What matters is the final array shape that reaches `fit`. Getting it right is mechanical once you know the two rules.
 
 scikit-learn takes two things: a two-dimensional `X` and a one-dimensional `y`.
 
@@ -761,6 +781,14 @@ print("is predicting the past from the future.")
 intro: A model's score on the data it learned from tells you how well it stored, not how well it works. The split is what turns one into the other.
 
 ## The problem it solves
+
+Every machine-learning model needs to be tested on data it has not seen during training. Without that separation, you cannot tell whether the model has learned a real pattern or simply memorised the answers.
+
+`train_test_split` is the function that creates that separation. It takes your features and targets, shuffles the rows, and returns four arrays: training features, test features, training targets, test targets. One function call replaces several lines of index slicing.
+
+The split must happen before any preprocessing. Scaling, encoding or imputing on the full dataset and then splitting leaks information from the test rows into the training set. That leak inflates the score and hides the true error rate. The order matters more than the split ratio.
+
+This page covers the call itself, the parameters that control the split, and the situations where a random split is not enough. Time-ordered data, grouped observations and stratified sampling each need a different approach. Knowing when the simple split applies and when it does not is half the value.
 
 A model that has seen a row can copy its answer. That isn't a find about the model. It's a property of having been shown the answer.
 
@@ -1049,6 +1077,12 @@ intro: The model whose params you can read, whose failures are visible. Whose co
 
 ## What it is fitting
 
+Linear regression is the first model most people try. It is fast, interpretable and often good enough for problems where the relationship between features and target is roughly proportional.
+
+The model assigns one coefficient to each feature. Each coefficient says how much the target changes when that feature increases by one unit, holding everything else constant. That directness is why linear regression remains popular even when fancier models score higher. You can read the fitted model and explain it to someone who has never heard of machine learning.
+
+It also serves as a baseline. If a complex model barely beats a linear one, the extra complexity is probably not worth it. Running linear regression first gives you a floor to compare against.
+
 Linear regression finds one number per feature, plus an intercept, such that adding them up predicts the target as closely as possible.
 
 For one feature that is a straight line through a scatter of points. For three features it's a plane in four dims. This No one can picture and which behaves just the same way arithmetically. Times each feature by its coeff, add the intercept, and that is the guess.
@@ -1325,6 +1359,14 @@ print("so an error metric is negated to make bigger mean better.")
 intro: R-squared is the default and rarely the right answer. Choosing the metric is choosing which mistakes you care about.
 
 ## The metric is a statement about what matters
+
+A regression model returns numbers. Judging those numbers requires a metric. The choice of metric is not a formality. Different metrics reward different behaviour, and a model that looks good on one can look poor on another.
+
+scikit-learn ships with a dozen regression metrics. Each one condenses the list of residuals into a single number. The residuals are the same in each case: predicted minus actual, for every row. What changes is how those residuals are combined.
+
+Understanding the main three -- MAE, RMSE and R-squared -- is enough for most work. Each answers a slightly different question. MAE asks how far off the average guess is. RMSE asks the same thing but penalises large misses more heavily. R-squared asks how much better the model is than always guessing the mean.
+
+Choosing the wrong metric does not break anything. It just gives you a number that does not match what you actually care about. A model tuned on RMSE will tolerate many small errors to avoid one large one. A model tuned on MAE will spread the errors more evenly. Neither is better in the abstract. The right choice depends on what a mistake costs in your application.
 
 each regression metric summarises the same thing. The gaps between guesses and actuals. And they differ in how they weigh those gaps. That weighting isn't a technical detail. It's a claim about which errors are worse. The claim should come from the problem rather than from habit.
 
@@ -1626,6 +1668,14 @@ print("which is exactly what logistic regression is limited to.")
 intro: The classifier to try first, what the problem. It's fast, it makes chances rather than bare labels. It gives every other model a number to beat.
 
 ## Why it is called regression
+
+Logistic regression is the standard first classifier. It is fast to train, produces probabilities rather than just labels, and its coefficients are interpretable. For many tabular classification tasks it is the right starting point.
+
+Despite the name, logistic regression is a classifier. It predicts which class a sample belongs to. The confusion is that the underlying arithmetic is a linear regression on a transformed target. The transformation is what makes it a classifier rather than a regression model.
+
+The model also serves as a strong baseline. If a random forest or gradient-boosted tree barely beats logistic regression on your data, the extra complexity may not be worth the cost. Running logistic regression first tells you how much room there is for improvement.
+
+This page covers the name, the probabilities, the coefficients, the scaling requirement and the parameters worth knowing. It also covers the multi-class case and the question of whether the probabilities the model outputs can be trusted.
 
 The name is the first confusion and it has a real explanation. Logistic regression is a classifier. It predicts which class a sample belongs to. But the thing being fitted linearly isn't the class.
 
@@ -1940,6 +1990,14 @@ intro: A single train/test split gives you one number drawn from a spread you ne
 
 ## The problem with one split
 
+A single train/test split gives you one score. That score depends on which rows happened to land in each set. A different random seed would give a different number. Cross-validation addresses this by running multiple splits and reporting all the scores.
+
+The idea is straightforward. Divide the data into `k` equal parts. Train on `k-1` of them, test on the remaining one. Repeat `k` times, each time holding out a different part. The result is `k` scores instead of one.
+
+This gives you a mean and a spread. The mean is a better estimate of how the model performs in general. The spread tells you how sensitive the score is to which rows were held out. A tight spread means the model is stable. A wide spread means the result depends heavily on the particular data.
+
+Cross-validation does not produce a final trained model. It produces an estimate of how well a model of this type, trained on this much data, tends to perform. You still fit a final model on all the data after deciding which approach to use.
+
 A held-out test set answers the question honestly. It answers it once, on one given random pick of rows.
 
 Run the split again with a different seed and the score moves. The editors on this page show six splits of the same data giving scores from 0.9737 to 0.9912. A spread of nearly two points, on an easy dataset with a few hundred rows. On a smaller or harder dataset the spread is much wider.
@@ -2229,6 +2287,14 @@ print("so ignoring a class entirely scores 0.5 rather than 0.99.")
 intro: A model can be 99% accurate and fully useless. Which metric you report is a statement about which mistakes you're willing to make.
 
 ## Why accuracy misleads
+
+Accuracy is the metric most people reach for first. It counts how many predictions were correct and divides by the total. That simplicity is appealing but misleading on any dataset where the classes are not evenly split.
+
+Classification problems in practice are rarely balanced. Fraud accounts for a fraction of a percent of transactions. Disease affects a small share of screened patients. Equipment fails on a tiny share of cycles. In each case, a model that always predicts the majority class gets a high accuracy while catching none of the cases you actually care about.
+
+The metrics that matter for imbalanced data are precision, recall and F1. Precision answers: of the cases the model flagged, how many were real. Recall answers: of the real cases, how many did the model find. F1 balances the two. Each tells you something accuracy hides.
+
+This page starts with accuracy's failure mode, then covers precision, recall, F1 and the classification report. It also covers the averaging strategies that apply when there are more than two classes.
 
 Fit is the proportion of guesses that were correct. It's the default that `score()` returns. On weighed data it's a reasonable summary. On imbalanced data it's close to worthless.
 
@@ -2545,6 +2611,14 @@ intro: each classification metric is a fraction found from four numbers. Looking
 
 ## What the table is
 
+A single accuracy number hides where the model goes wrong. The confusion matrix shows exactly where each mistake happens. It breaks the predictions down by class and by error type, so you can see whether the model confuses cats with dogs or misses a rare class entirely.
+
+Reading a confusion matrix is a skill worth building early. Every other classification metric -- precision, recall, F1, specificity -- can be computed from the four cells of a binary confusion matrix. Once you can read the table, the formulas follow naturally.
+
+The matrix also helps you decide what to fix. If false positives are high, the model is too aggressive. If false negatives are high, it is too cautious. Adjusting the threshold or rebalancing the classes targets one at the expense of the other. The confusion matrix is what tells you which direction to push.
+
+This page covers the table layout, the naming convention, the multi-class extension and the normalised display that makes comparison easier.
+
 The confusion mat cross-tabulates what was true against what was predicted. Rows are the actual classes, columns are the predicted ones. Each cell counts how many samples fell into that combination.
 
 The main-line is where the two agree. Correct guesses. All off the main-line is a mistake. *which* off-main-line cell it lands in tells you what kind.
@@ -2835,6 +2909,16 @@ print("cannot change which split they choose.")
 intro: Half the models in the library are seriously damaged by unscaled features and half are fully indifferent. Knowing which is which saves both wasted work and silently bad results.
 
 ## What scaling does
+
+Features in a dataset often have different units and different ranges. Age might run from 0 to 100. Income might run from 20,000 to 500,000. A distance-based model like k-nearest neighbours treats both columns equally. Without scaling, the column with the larger numbers dominates every distance calculation.
+
+Scaling puts each column on a comparable range. It does not change the information in the data. It changes the numbers so that no single column drowns out the others by sheer magnitude.
+
+Not every model needs scaling. Tree-based models split on one feature at a time and are unaffected by the scale of the others. Linear models, SVMs and neural networks all benefit from it. Knowing which models need scaling and which do not saves you from both unnecessary work and silent errors.
+
+The most common mistake with scaling is fitting the scaler on the full dataset before splitting. The scaler then learns the mean and standard deviation of the test rows, and the test score is no longer honest. The scaler must be fitted on the training set only. A pipeline handles this automatically.
+
+This page covers what the standard scaler does, why some models need it, and how to apply it without leaking information across the train-test boundary.
 
 `StandardScaler` learns two numbers per column. The mean and the standard deviation. And transforms by subtracting the first and cutting by the second. The result has mean 0 and standard deviation 1 in each column.
 
@@ -3147,6 +3231,16 @@ print("appears only in the held-out part is handled, not crashed on.")
 intro: each estimator in scikit-learn takes numbers. Turning "london" into a number is easy. Doing it without inventing a fact that isn't in the data takes one choice.
 
 ## Why it cannot be skipped
+
+Real-world data almost always contains categorical columns. City names, product types, colour labels, yes/no flags. These columns carry useful information, but scikit-learn cannot accept strings as input. Every column must be numeric before it reaches `fit`.
+
+There are several ways to turn a category into a number. Each one makes a different claim about the data. Setting London=0, Paris=1, Berlin=2 says there is an order. One-hot encoding avoids that by making a new binary column for each category.
+
+The wrong encoding does not raise an error. It runs and gives a model false data. A linear model trained on ordinal city names will treat Berlin as twice Paris. That is nonsense, and the model has no way to know it.
+
+The right choice depends on the column and the model. Ordinal encoding is right for groups that have a real order, like size. One-hot is right for groups with no order. Target encoding helps when there are many groups and one-hot would make too many columns.
+
+This page covers each encoding, the mistakes each one stops, and how to put them in a pipeline. It also covers the `drop` setting in one-hot encoding and why it matters for linear models.
 
 scikit-learn's estimators operate on numeric arrays. A column of strings raises rather than being converted automatically. The error. `couldn't convert string to float`. Is one of the first anyone meets on real data.
 
@@ -3471,6 +3565,16 @@ print("which is how a search can treat a whole step as a hyperparameter.")
 intro: A pipeline isn't a convenience. It's the mechanism that makes each score in this track honest. Using one turns a rule you've to note into a property of the code.
 
 ## What it is
+
+Most machine-learning workflows have several preprocessing steps before the model. Imputing missing values, encoding categories, scaling features. Without a pipeline, each step is a separate call. Each call must be applied in the right order, to the right data, at the right time. Mistakes in that sequence are common and hard to spot.
+
+A pipeline bundles those steps into a single object. It applies them in order during `fit` and again during `predict`. Because the whole sequence is one object, it can be passed to `cross_val_score`, `GridSearchCV` or any other tool that expects an estimator. The preprocessing runs inside the cross-validation loop, which is the only way to get an honest score.
+
+The alternative -- scaling the full dataset, then splitting, then fitting -- leaks information from the test set into the training set. That leak inflates the score. A pipeline prevents it by design. Each fold sees only the training rows during `fit_transform` and applies the learned transformation to the test rows during `transform`.
+
+Pipelines also make deployment simpler. You save one object that contains both the preprocessing and the model. At prediction time, you call `predict` on the pipeline and it handles every step. There is no risk of forgetting to scale or encode at serving time.
+
+This page covers building a pipeline, inspecting its steps, and combining it with a column transformer for mixed-type data. It also covers the `make_pipeline` shortcut and the `set_output` method that preserves DataFrame column names.
 
 A `Pipeline` chains transformers together and ends with an estimator. The result behaves as a single estimator.
 
@@ -3806,6 +3910,16 @@ intro: Every other failure in machine learning makes the score worse. This one m
 
 ## What it is
 
+Data leakage is information from the future or from the test set reaching the model during training. It makes the model look better than it actually is. The score goes up, confidence goes up, and the model fails in production.
+
+Leakage is harder to catch than other mistakes because it produces good numbers. A bug that crashes or gives a low score gets noticed quickly. A bug that gives a suspiciously high score gets celebrated. That asymmetry is why leakage causes more real-world damage than any other modelling error.
+
+The most common form is preprocessing before splitting. Scaling the full dataset, imputing with the global median, encoding with frequencies computed on all rows. Each of these lets the test set influence the training process. The resulting score is optimistic by an amount you cannot measure without fixing the leak and rerunning.
+
+A second common form is using features that carry information about the target that would not be available at prediction time. A hospital-readmission model that includes the discharge summary, which was written after the readmission decision, is an example. The feature is predictive precisely because it was created after the event.
+
+This page covers both forms, shows how to detect them, and explains why cross-validation alone does not protect you.
+
 Leakage is info reaching the model during training that it won't have when it's really used.
 
 The defining property is the direction of the error. Overfitting, a bad metric, an unlucky split. These give results that look worse than the model is, or at least ambiguous. Leakage makes results that look *better*. So it doesn't trigger the instinct that a thing is wrong. It triggers satisfaction.
@@ -4110,6 +4224,14 @@ print("when absence itself carries the signal, throwing it away costs you.")
 intro: A gap in the data is two problems: the estimator won't run. The gap itself may have been telling you a thing.
 
 ## Why it has to be handled
+
+Real datasets almost always have missing values. A sensor drops a reading, a survey respondent skips a question, a join produces nulls where records do not match. The gaps are part of the data, and handling them is part of the modelling work.
+
+scikit-learn does not fill missing values for you. Most estimators raise an error when they encounter a NaN. That design is deliberate. There is more than one way to fill a gap, and the choice affects the model. Filling with the mean preserves the column's average but shrinks its variance. Filling with the median is less affected by outliers. Filling with a constant like -1 creates a new category that the model can split on.
+
+The right strategy depends on why the data is missing and what the model will do with it. A column where missingness itself is informative -- for example, income is missing because the respondent refused to answer -- should not be filled with the median. The fact that it is missing carries signal.
+
+This page covers the imputation strategies scikit-learn provides, the tree-based models that handle NaN natively, and the common mistake of imputing before splitting.
 
 Almost each estimator in scikit-learn raises `ValueError: Input X holds NaN` rather than guessing. That refusal is deliberate. There's no universally correct fill. Silently choosing one would hide a choice that changes the model.
 
@@ -4459,6 +4581,14 @@ intro: A pipeline applies each step to each column. Real tables need scaling on 
 
 ## The problem
 
+Real tables have mixed types. Some columns are numeric, some are categorical, and each type needs different preprocessing. A scaler makes no sense on a city-name column. A one-hot encoder makes no sense on a temperature column. Applying the same transformer to every column either crashes or produces nonsense.
+
+`ColumnTransformer` solves this by routing each group of columns to its own transformer. You specify which columns get which treatment. The transformer applies each sub-pipeline to its columns and concatenates the results into a single array. Because `ColumnTransformer` is itself a transformer, it fits into a `Pipeline` as one step. That keeps the routing inside the cross-validation loop, which prevents the preprocessing leak.
+
+Without a column transformer, the usual workaround is to slice the DataFrame, transform each slice, and concatenate manually. That works for a single train-test split. It breaks under cross-validation because the slicing and transforming happen outside the fold loop. The test-fold statistics leak into the training set.
+
+This page covers building a column transformer, combining it with a pipeline, inspecting the output columns, and handling columns that should be passed through or dropped.
+
 A `Pipeline` is a sequence applied to all of `X`. That works when the columns are homogeneous and breaks right away on a real table.
 
 Numeric columns want imputing with a median and scaling. cat columns want imputing with a constant and one-hot encoding. Applying a scaler to a text column raises. Applying an encoder to a smooth one makes a column per distinct value, which is nonsense.
@@ -4791,6 +4921,14 @@ intro: Two failures that look similar in a single number and need opposite treat
 
 ## The two failures
 
+Every model sits somewhere on a spectrum between too simple and too complex. Too simple means it cannot capture the pattern in the data. Too complex means it captures the pattern plus the noise. The first is underfitting. The second is overfitting. Telling them apart is the most important diagnostic skill in machine learning.
+
+The fix for overfitting is more constraint: lower depth, stronger regularisation, more data, fewer features. The fix for underfitting is less constraint: higher depth, weaker regularisation, more features, a more flexible model family. Applying the wrong fix makes things worse. Adding regularisation to an underfitting model pushes it further from the pattern.
+
+The diagnostic is the gap between the training score and the test score. A large gap means overfitting. A small gap with a low score means underfitting. This page shows both in practice, with learning curves that make the gap visible as a function of training-set size.
+
+Understanding this trade-off also tells you when to stop tuning. If the training score is high and the test score is close to it, the model is doing as well as it can on this data. More tuning will not help. More or better features might.
+
 **Overfitting** is learning the training data rather than the pattern in it. The model captures noise, coincidences and details exact to the rows it was shown, none of which recur. Training score high, test score much lower.
 
 **Underfitting** is the opposite: the model is too simple, or too constrained, to represent the structure that is there. It does badly on the training data and equally badly on the test data.
@@ -5102,6 +5240,14 @@ print("of units leaves the tree identical.")
 intro: The only model in this track whose fitted form a person can read and check. That readability comes with an instability that shows why trees are almost always used in groups.
 
 ## How it works
+
+Decision trees are one of the most interpretable models in machine learning. You can print the tree, read the splits, and explain every prediction to someone with no technical background. That transparency is why they remain popular even when other models score higher.
+
+A decision tree learns a set of if-then rules from the data. Each rule tests one feature against one threshold. The rules are arranged in a tree structure: the first rule splits all the data, each subsequent rule splits a subset. At the bottom, each leaf holds a prediction.
+
+Trees require no scaling and handle both numeric and categorical features naturally. They are fast to train, fast to predict, and easy to visualise. They also overfit aggressively. An unconstrained tree will memorise the training data perfectly. Controlling depth, minimum samples per leaf and minimum impurity decrease is how you trade accuracy for generalisation.
+
+Understanding trees matters even if you plan to use random forests or gradient boosting. Both are built from trees. The parameters that control a single tree -- `max_depth`, `min_samples_leaf`, `min_samples_split` -- are the same parameters that control the trees inside an ensemble.
 
 A choice tree asks a series of yes/no questions about one feature at a time. Each answer sends the sample down a branch. At the bottom, a leaf holds a guess. The majority class for a classifier, the mean target for a regressor.
 
@@ -5442,6 +5588,12 @@ intro: The previous module ended with a model that changes its mind when you res
 
 ## The idea
 
+A random forest is an ensemble of decision trees. It fits many trees on slightly different versions of the data and averages their predictions. The average is almost always more accurate than any single tree.
+
+Random forests are the default first model for many practitioners. They work on classification and regression, handle numeric and categorical features, require little tuning, and resist overfitting better than single trees. On tabular data, they are competitive with gradient-boosted trees and far simpler to configure.
+
+The forest's main parameter is the number of trees. More trees give a better average, up to a point of diminishing returns. The cost is linear in the number of trees, but the trees are independent and can be fitted in parallel across CPU cores.
+
 A single choice tree is unstable: the greedy choice at each node is decided by a handful of rows. A different sample makes a different tree. That instability is variance, and variance is error.
 
 Blending free guesses reduces variance. If the trees made *the same* errors, blending would achieve nothing. If their errors are partly free, the errors cancel and the signal lives. So the whole design problem is making the trees disagree.
@@ -5779,6 +5931,16 @@ print("scoring= is a decision about the problem, not a formality.")
 intro: Settings have to be chosen by reading rather than by taste. The tools that do it are simple. The number they report is the part that needs care.
 
 ## What is being searched
+
+Every estimator has parameters that you set before calling `fit`. These are hyperparameters. The number of neighbours in KNN, the regularisation strength in logistic regression, the maximum depth of a tree. The model does not learn them from the data. You choose them.
+
+Choosing well matters. The right hyperparameters can double a model's score. The wrong ones can make a good algorithm look useless. Manual tuning works for one or two parameters, but it is slow, hard to reproduce, and easy to fool yourself with.
+
+scikit-learn provides two search tools: `GridSearchCV` and `RandomizedSearchCV`. Both try a set of hyperparameter values, evaluate each combination with cross-validation, and keep the best. The difference is how they choose the combinations. Grid search tries every combination on a predefined list. Random search samples from distributions.
+
+Grid search is thorough but expensive. The number of fits is the product of all the list lengths times the number of folds. Three parameters with five values each and five folds means 375 fits. Random search is cheaper and often finds a good setting faster, because it does not waste fits on parameters that turn out not to matter.
+
+Both search objects follow the estimator interface. They have `fit`, `predict` and `score`. You can drop them into a pipeline or use them inside nested cross-validation.
 
 Settings are the settings you pass to the constructor: `C`, `max_depth`, `n_neighbors`, `alpha`. They aren't learned from the data during `fit`. A thing outside the fit has to choose them.
 
@@ -6123,6 +6285,14 @@ intro: each classifier in this track has been making a choice on your behalf at 
 
 ## The hidden default
 
+Most classifiers in scikit-learn can output probabilities, not just class labels. `predict_proba` returns the estimated chance of each class for every row. `predict` takes those probabilities and applies a threshold to turn them into labels.
+
+The default threshold is 0.5. If the predicted probability of the positive class is above 0.5, the model says positive. Otherwise it says negative. That threshold is baked into `predict` and there is no parameter to change it.
+
+On balanced data with equal misclassification costs, 0.5 is reasonable. On imbalanced data, or when one kind of mistake is more expensive than the other, 0.5 is almost never the right choice. A fraud-detection model at 0.5 will miss most fraud. A medical-screening model at 0.5 will miss most disease. Lowering the threshold catches more positives at the cost of more false alarms.
+
+Moving the threshold does not retrain the model. The fitted probabilities stay the same. You are just changing where the line is drawn between "flag" and "skip". The editors on this page show how the same model produces very different confusion matrices at different thresholds.
+
 `predict()` calls `predict_proba()` and applies a threshold of 0.5. That is the whole of it. The first editor confirms the two are the same.
 
 There's nothing principled about 0.5. It's the point where the two classes are equally likely. This Would be the right cut only if the classes were equally frequent *and* the two kinds of mistake cost the same. Neither is often true.
@@ -6458,6 +6628,16 @@ intro: The notable class is often the rare one. Four remedies exist, they aren't
 
 ## What goes wrong
 
+Class imbalance is present in most real classification problems. Fraud is rare. Equipment failure is rare. Disease is rare. Click-through is rare. The class you care about is almost always the minority.
+
+A standard classifier trained on imbalanced data will mostly predict the majority class. It gets a high accuracy by ignoring the minority entirely. The accuracy number looks good, the model is useless, and nothing in the default output warns you.
+
+The issue is not that the algorithm is broken. The algorithm is doing exactly what it was told: minimise the overall error rate. On data with 2% positives, predicting all negative gives 98% accuracy. That is the correct optimum of the wrong objective.
+
+Fixing imbalance requires changing the objective, changing the data, or changing the threshold. scikit-learn supports all three. `class_weight="balanced"` adjusts the loss function. `RandomOverSampler` and `RandomUnderSampler` adjust the data. Moving the decision threshold adjusts the trade-off between false positives and false negatives.
+
+This page covers the symptoms, the diagnostics and the remedies. It also covers why you should check whether imbalance is actually hurting before applying a fix.
+
 When one class is rare, the model has almost no incentive to find it. Predicting the majority for all is right 98% of the time. The loss function. Which counts each row equally. Says that is great.
 
 The first editor shows the result: 96% fit. 3 of 49 positives found. The confusion mat makes it concrete, with 46 misses and zero false alarms. That isn't a broken fit. It's a correct optimisation of the wrong goal.
@@ -6772,6 +6952,14 @@ print("n_init=10 (the default) keeps the best of ten:", round(good.inertia_, 1))
 intro: each model so far was told the answers. This one is given features and asked to find structure - which is a truly different job. One whose results are much harder to check.
 
 ## The algorithm
+
+K-means is the most common clustering algorithm. It groups data points into `k` clusters by minimising the distance from each point to its cluster centre. You choose `k` in advance. The algorithm does the rest.
+
+Clustering is unsupervised learning. There is no target column. The model finds structure in the features alone. That makes it useful for segmentation, anomaly detection and exploratory analysis. It also makes it harder to evaluate, because there is no ground truth to compare against.
+
+K-means works best on data where the clusters are roughly spherical and roughly equal in size. It struggles with elongated clusters, clusters of very different densities, and clusters that overlap. Knowing these limits helps you decide whether k-means is the right tool or whether you need something like DBSCAN or Gaussian mixture models instead.
+
+The algorithm is sensitive to feature scales. A column measured in thousands will dominate a column measured in single digits. Scaling before clustering is almost always necessary. It is also sensitive to the initial placement of the centres, which is why scikit-learn runs the algorithm several times with different starting positions and keeps the best result.
 
 Choose `k`. Place `k` centres. Assign each point to its nearest centre, move each centre to the mean of the points assigned to it, and repeat until nothing moves.
 
@@ -7104,6 +7292,14 @@ print("saved %d bytes - the pipeline and its threshold together" % len(blob))
 intro: Twenty-two modules, applied to one small dataset in the order you'd really do it. Nothing here is new. The sequence is the point.
 
 ## The order
+
+This page puts the earlier modules together into one end-to-end workflow. The dataset is small and deliberately messy: mixed types, missing values and imbalanced classes. The point is the sequence of steps, not the final score.
+
+Each step in a machine-learning project depends on the one before it. Exploring the data tells you what preprocessing to apply. Splitting comes before preprocessing so the test set stays untouched. A baseline model tells you whether a tuned model is worth the effort. Evaluation on the test set comes last, and happens exactly once.
+
+Skipping a step or reordering the sequence introduces errors that do not raise exceptions. Scaling before splitting leaks test-set statistics. Tuning without a baseline means you cannot tell whether the improvement came from the model or from the hyperparameters. Evaluating on the test set more than once turns it into a validation set.
+
+The six editors on this page are one continuous script. They share a single interpreter. Each one uses variables that the previous one created. Running them out of order raises a `NameError`. That constraint is intentional. It mirrors the dependency structure of a real project.
 
 **Look. Split. Build. Check. Tune. Report.**
 

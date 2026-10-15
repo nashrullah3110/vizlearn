@@ -2,6 +2,18 @@ title: Dependencies with yield
 intro: Setup before the handler, teardown after it, and the transaction pattern that falls out.
 ## The shape
 
+A dependency with yield is one that does work before your handler runs and again after it finishes. The code before the yield is setup. The value after the yield is what the handler receives. The code after the yield is cleanup. It is how you open a database session, hand it to the handler, and close it afterward.
+
+You need this whenever a resource must be released. A connection left open, a transaction left half done, or a file never closed will cause trouble that appears later and far from its cause. Putting the cleanup next to the setup keeps the pair together, so neither is forgotten.
+
+This article starts with the basic shape and what each part does. It then explains a key promise: teardown always runs, even when the handler raises an error. That guarantee is what makes the pattern safe. You will also see how that interacts with exceptions and what the cleanup code can and cannot do about them.
+
+A practical example follows, the transaction pattern. The session commits if the handler succeeds and rolls back if it fails, all in one small function. This is the form you will use most.
+
+The article closes with nesting and order, which tells you which cleanup runs first when several dependencies stack up, and with how caching applies so the same resource is not opened twice in one request.
+
+If you have used Python's context managers, the idea will feel familiar. It is the same pattern of setup, use, and cleanup, adapted to the life of a single request. Reading this article will also make several later topics easier to follow, including testing and lifespan events. Each section is short and ends with a habit you can apply straight away. You finish with a reliable way to manage database sessions, files, and other resources, and with a clear sense of what happens when something fails halfway through a request.
+
 ```python
 def get_session():
     db = Session()

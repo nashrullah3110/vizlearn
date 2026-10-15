@@ -3,6 +3,19 @@ intro: Parsing them, the .dt accessor, and why a text date breaks all downstream
 
 ## They arrive as text
 
+Date and time handling is one of the areas where pandas adds the most value. A DatetimeIndex lets you select by month name, aggregate by week, compute rolling windows over calendar periods, and shift values by business days. None of that works until the column is actually a datetime type.
+
+The problem is that dates almost always arrive as text. A CSV file has no date type. It has strings. The reader does not guess which strings are dates unless you tell it to. A column that looks like dates and sorts like dates is still a column of strings, and every date-aware operation will fail or give wrong results.
+
+Detecting this is straightforward. If df.dtypes shows object for a column you expected to hold dates, it is text. Fixing it is one call to pd.to_datetime. After that, the column gains the dt accessor, which exposes year, month, weekday, hour and dozens of other properties.
+
+The format argument matters when dates are not in ISO format. pd.to_datetime with no format uses a parser that guesses. That parser is slow on large columns and can guess wrong when day and month are ambiguous. Passing the format string explicitly is both faster and safer.
+
+Timezone handling adds another layer. A naive datetime has no timezone. An aware datetime does. Mixing the two in a comparison or a merge raises or gives wrong results. The usual pattern is to parse as naive, then localize to the correct zone, then convert to UTC for storage and analysis.
+
+This module covers parsing, the dt accessor, timezone handling, and the common mistakes that come from leaving dates as text. It starts with detection because the hardest part of the problem is noticing you have it.
+
+
 `read_csv` doesn't parse dates unless you tell it to. A date column comes in as `object`. All you do with it's then string action wearing a date's clothes.
 
 Sorting is lexical. For ISO format. `YYYY-MM-DD`. That happens to give the right answer. This Is why the problem often goes unnoticed until the data arrives in another format. `"15/01/2024"` sorts before `"01/03/2024"` as text, and there's no error.

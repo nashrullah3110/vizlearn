@@ -3,6 +3,20 @@ intro: Where the time really goes, in the order worth fixing it.
 
 ## The order to work in
 
+Performance tuning in pandas follows a predictable order. The biggest gains come from the simplest changes, and the biggest mistake is starting with the hardest optimisation while ignoring the obvious one.
+
+The most common performance problem is per-row Python. An apply call with axis=1, an iterrows loop, or a list comprehension that processes one row at a time. Each of these drops out of compiled code and into the Python interpreter, which is roughly a hundred times slower. Replacing the loop with a vectorised column operation gives you that factor back.
+
+The second item on the list is dtype sizing. A column of country codes stored as object takes ten times the memory of the same column stored as category. A column of small integers stored as int64 takes eight times the memory of int8. Halving the memory often doubles the speed, because the data fits in cache more often.
+
+The third item is filtering early. If your analysis uses only rows from 2024, filtering at the top of the pipeline means every subsequent step processes fewer rows. That is free speed. The later the filter, the more work pandas does on rows you throw away.
+
+The fourth item is reducing unnecessary copies. Each operation that returns a new DataFrame allocates memory and copies data. In a long pipeline, that adds up. Using inplace where it exists, or assigning back to the same variable, can reduce the copying.
+
+The fifth and last item is reaching past pandas entirely. For very large data, Polars and DuckDB are faster. For numeric computation on uniform arrays, dropping to NumPy avoids the overhead of index alignment. These tools solve problems that pandas was not designed for.
+
+This module works through the list in order, with timing measurements that show the payoff of each step. The point is not just what to do, but what to do first.
+
 Pandas speed work is unusually predictable. In descending order of payoff:
 
 1. **Drop per-row Python.** Worth 10&ndash;100x, and it's nearly always the whole problem.

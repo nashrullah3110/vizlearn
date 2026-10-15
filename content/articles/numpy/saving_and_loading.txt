@@ -3,6 +3,21 @@ intro: npy, npz, text and bytes, and which one to reach for.
 
 ## The native format
 
+NumPy arrays need to be saved to disk and loaded back frequently. Intermediate results, preprocessed datasets, trained model weights, and test fixtures all need persistent storage. NumPy provides its own binary format and also supports text formats for interoperability.
+
+The native format is the .npy file. np.save writes a short header with the dtype, shape, and byte order, followed by the raw bytes of the array. np.load reads it back. The round trip is lossless. The dtype and shape are preserved exactly. An int16 array comes back as int16, not as int64. A (3, 4, 5) array comes back with the same shape. There is no parsing cost because the file is just the bytes.
+
+For multiple arrays, np.savez writes a .npz file, which is a zip archive of .npy files. Each array is stored under a name. np.savez_compressed applies compression, which helps when the data has patterns that compress well, like arrays with many repeated values or many zeros.
+
+Text formats are useful for interoperability with tools that cannot read .npy files. np.savetxt writes a CSV-like format. np.loadtxt reads it back. The round trip is not lossless. Floating-point values are written as text and parsed back, which can change the last decimal digit. Integer arrays come back as floats unless you specify the dtype. Text files are also much larger and much slower to read and write than binary ones.
+
+The choice between formats depends on who will read the file. If the reader is another Python script, .npy is better in every way. If the reader is R, Julia, or a spreadsheet, text or a more portable binary format like HDF5 is necessary. If the file will be version-controlled, text diffs better but takes more space.
+
+np.load with allow_pickle=False is a security consideration. Pickle files can execute arbitrary code on load. The default in current NumPy versions already disables pickle, but older code may not. Never load an untrusted .npy file with allow_pickle=True.
+
+This module covers np.save, np.load, np.savez, np.savetxt, np.loadtxt, and the trade-offs between binary and text formats. The examples show round-trip preservation and the pitfalls of text serialisation.
+
+
 `np.save(path, a)` writes a `.npy` file: a short header showing dtype, shape and byte order, followed by the raw bytes.
 
 `np.load(path)` reads it back the same way. Dtype and shape live, `int16` comes back as `int16`. There's no parsing cost because there's nothing to parse.

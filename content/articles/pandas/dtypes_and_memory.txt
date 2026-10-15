@@ -3,6 +3,19 @@ intro: object, group and the nullable types.
 
 ## Why this matters early
 
+The dtype of each column decides three things: how much memory the column uses, what operations work on it, and how missing values behave. Getting the dtype right at load time is cheap. Fixing it after building logic on top of the wrong type is expensive and error-prone.
+
+Memory is the most visible consequence. A column of country codes stored as object takes roughly ten times the memory of the same column stored as category. Multiply that by a few such columns and a large dataset, and the frame may not fit in memory at all. The fix is often a single astype call per column.
+
+Speed follows memory. Operations on object columns fall back to per-element Python. Operations on native numeric or categorical columns use compiled code. The difference is not subtle. It can be a factor of ten on a group-by or a value_counts, simply from changing the dtype.
+
+Missing-value handling also depends on the dtype. Classic NumPy int columns cannot hold NaN, so a single missing value promotes the entire column to float64. That changes the printed output and can break downstream comparisons. The nullable integer types solve this, but they require an explicit dtype at read time.
+
+Checking dtypes is part of the inspection routine for a reason. A quick look at the output of df.dtypes after loading tells you whether a column is the type you expected. If it is object when you expected int64, something in the data prevented the inference, and that something is worth finding now rather than later.
+
+This module covers the common dtype problems, how to diagnose them, and how to fix them with astype, pd.to_numeric, and the dtype argument at read time.
+
+
 A frame that doesn't fit in memory can't be analysed at all. The usual reason a frame is larger than expected isn't the number of rows. It's one or two columns stored in the widest possible type.
 
 Fixing dtypes is often the gap between a dataset that loads and one that doesn't. It takes one line per column.

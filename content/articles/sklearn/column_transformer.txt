@@ -3,6 +3,14 @@ intro: A pipeline applies each step to each column. Real tables need scaling on 
 
 ## The problem
 
+Real tables have mixed types. Some columns are numeric, some are categorical, and each type needs different preprocessing. A scaler makes no sense on a city-name column. A one-hot encoder makes no sense on a temperature column. Applying the same transformer to every column either crashes or produces nonsense.
+
+`ColumnTransformer` solves this by routing each group of columns to its own transformer. You specify which columns get which treatment. The transformer applies each sub-pipeline to its columns and concatenates the results into a single array. Because `ColumnTransformer` is itself a transformer, it fits into a `Pipeline` as one step. That keeps the routing inside the cross-validation loop, which prevents the preprocessing leak.
+
+Without a column transformer, the usual workaround is to slice the DataFrame, transform each slice, and concatenate manually. That works for a single train-test split. It breaks under cross-validation because the slicing and transforming happen outside the fold loop. The test-fold statistics leak into the training set.
+
+This page covers building a column transformer, combining it with a pipeline, inspecting the output columns, and handling columns that should be passed through or dropped.
+
 A `Pipeline` is a sequence applied to all of `X`. That works when the columns are homogeneous and breaks right away on a real table.
 
 Numeric columns want imputing with a median and scaling. cat columns want imputing with a constant and one-hot encoding. Applying a scaler to a text column raises. Applying an encoder to a smooth one makes a column per distinct value, which is nonsense.

@@ -55,13 +55,20 @@ intro: Three ideas, stacked, that put face spotting on a 700 MHz laptop in 2001.
 
 ## The problem is the number of windows
 
+Before deep learning, real-time face detection looked impossible. GPUs were
+slow, and a webcam needed answers in 66 milliseconds. The Viola-Jones
+detector, published in 2001, solved it with three ideas: cheap features
+built from pixel sums, a cascade that rejects most windows after one or two
+checks, and a boosting algorithm that selects the right features
+automatically. This page walks through each of those ideas.
+
 A finder has to answer one question. Is there a face here? &mdash;
 at each spot and each scale in the image. For a 384&times;288 frame,
 scanning with a 24&times;24 window at 11 scales gives roughly **180,000
 windows**. At 15 frames per second that is 2.7 million classifications each
 second, and all of them will be answered "no".
 
-That framing shows the whole design. Viola and Jones didn't build an
+That framing shows the whole design. Viola and Jones did not build an
 accurate face classifier and then speed it up. They built a system whose cost
 is dominated by how quickly it can say *no*, and then made saying no almost
 free.
@@ -355,6 +362,11 @@ title: VGG-16
 intro: One kernel size, one stride, sixteen weighted layers. A param budget almost fully in the wrong place.
 
 ## The whole design, in one rule
+
+VGG-16 is worth studying not because it is fast &mdash; it is not &mdash; but
+because it proved that a simple, repeated structure can beat a complicated
+one. Almost every later architecture borrows the idea of stacking small
+filters instead of using large ones.
 
 Before VGG, convolutional architectures were a grab bag of kernel sizes:
 AlexNet opened with an 11&times;11 stride-4 convolution, followed by 5&times;5s

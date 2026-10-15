@@ -225,6 +225,12 @@ intro: A thin layer over two ideas you can learn apart - and almost nothing that
 
 ## Two libraries wearing one name
 
+FastAPI sits between two libraries that do most of the work. Pydantic handles data validation. Starlette handles HTTP routing, requests, and responses. FastAPI's own contribution is the glue: it reads your function signatures, works out where each parameter comes from, and generates API documentation from the same type annotations.
+
+That separation matters when you debug. A 422 validation error is a Pydantic question. A route that does not match is a Starlette question. FastAPI itself is responsible for wiring parameters to the right source. Knowing these boundaries saves you a lot of time.
+
+This article starts with the two libraries underneath and what each one provides. It then looks at the ASGI interface that makes a FastAPI app a single async function. From there it covers how annotations become contracts, how validation runs before your handler, and what the framework generates without any extra code. The final sections address common misconceptions and where to look when something breaks.
+
 A great deal of what people call "FastAPI magic" isn't FastAPI at all.
 
 **Pydantic** does the check. FastAPI has no check code of its own. It reads your annotations, hands the request body to a model. Converts the resulting `ValidationError` into a 422 response. each coercion rule, each error `type`, each constraint you can write is Pydantic's.
@@ -593,6 +599,16 @@ title: Your First Endpoint, and What the Decorator Really Does
 intro: How a function turns a route, what happens to the return value. The sorting rule that catches all once.
 
 ## The decorator does not wrap anything
+
+An endpoint is a Python function that answers one kind of request at one address. You write the function, add a decorator that names the method and the path, and FastAPI does the rest. The first one is the smallest useful program you can write with the framework, and it teaches more than its size suggests.
+
+The decorator looks like it wraps your function, but it does not. It registers the function in a table of routes and hands the function back untouched. That is why you can still call it directly in a test. Once you see this, a lot of behavior stops feeling like magic.
+
+This article walks through what happens to the value you return and how it becomes JSON. It then covers status codes and why the default is rarely the right one for creation. After that it explains route order, the rule that decides which handler wins when two paths could match the same URL. It closes with how to describe what you built so the generated docs make sense, and a short note on designing paths that age well.
+
+If you only read one thing here, read the part on route order. It is the mistake that catches nearly everyone exactly once, and it is easy to avoid once you know it exists.
+
+You do not need any earlier FastAPI experience to follow it. A basic grasp of Python functions is enough, and every idea is introduced as it comes up. Keep a terminal open if you want to try the examples as you read.
 
 ```python
 @app.get("/modules")
@@ -976,6 +992,18 @@ title: Path Parameters: Values From the URL
 intro: One annotation gives you extraction, conversion, check and docs.
 
 ## The mechanism
+
+A path parameter is a piece of the URL that changes from one request to the next. In /users/42, the 42 is the part that varies. You mark that part with curly braces in the route and give the function an argument with the same name. FastAPI hands you the value.
+
+The useful part is what happens before your function runs. The raw text from the URL is a string. If you annotate the argument as an integer, FastAPI converts it and rejects anything that is not a number. The client gets a clear error, and your code only ever sees valid data. The same annotation also feeds the generated documentation.
+
+This article starts with the mechanism: how the name in the path is matched to the argument in the function. It then explains why path parameters are always required, which follows from how a URL is built. You will see how the coercion rules you may know from Pydantic apply here too, and how to read the error when a value fails.
+
+After that come constraints. The Path function lets you set limits such as a minimum value or a length. The article also shows how an enum restricts a parameter to a closed set of allowed values, which is a tidy way to handle things like status names or categories.
+
+By the end you should be able to design URLs that carry identifiers safely and predict exactly what a client will see when it sends something odd.
+
+Path parameters are also the first place where you see how much work one annotation can do. The same line that names the type also drives the conversion, the error message, and the entry in the docs. That pattern repeats across the whole framework, so understanding it here pays off later. If you have used Pydantic before, the rules will feel familiar. If you have not, each rule is explained as it appears. Plan on a slow read, because the details are small but they decide how your URLs behave in practice. Each section ends with a small habit you can apply right away, so you finish with working knowledge and not only theory.
 
 A name in braces in the route path turns an arg to your function:
 
@@ -1367,6 +1395,18 @@ title: Query Parameters: Everything After the Question Mark
 intro: Optional by default, converted by annotation, and where most of an API's flexibility lives.
 
 ## How FastAPI decides
+
+A query parameter is a named value placed after the question mark in a URL, like page=2 or sort=name. Clients use them to filter, sort, search, and page through results. They are optional by nature, because a URL works fine without them. That makes them the main place where an API gets its flexibility.
+
+In FastAPI you declare a query parameter by adding a function argument that does not appear in the path. The framework notices that and reads it from the query string. Give it a default and it becomes optional. Leave the default off and it becomes required. The type annotation controls conversion, exactly as it does for path parameters.
+
+This article begins with how FastAPI decides where each argument comes from, since the rule is short and worth memorizing. It then covers required versus optional parameters and what a default really means. From there it moves to constraints with the Query function, which lets you set limits on length, value ranges, and patterns.
+
+You will also see how lists work, because a query string can repeat a name. Booleans get their own section, since clients write them in many ways and FastAPI accepts several. Closed sets with enums come next.
+
+The article ends by putting these pieces together into the shape of a typical listing endpoint, with filters, sorting, and paging. That final example is the one you will probably copy into your own projects, so it is worth reading slowly.
+
+Query parameters look simple, and the basics are. The trouble starts when an endpoint needs five optional filters, a sort order, and a page size, and each one needs sensible limits. Handling that cleanly is what separates a tidy API from a tangled one. This article gives you the habits to keep it tidy. You will also see how the generated docs show each parameter, so clients can discover every option without reading your code. Each section is short and ends with a habit you can apply straight away, so you finish with working knowledge and not only theory.
 
 Look at a handler's signature and FastAPI classifies each param:
 
@@ -1794,6 +1834,18 @@ intro: all the Pydantic track taught, applied to an HTTP request.
 
 ## One annotation
 
+A request body is the data a client sends along with a request, usually as JSON. You see it on POST, PUT, and PATCH calls, where the client needs to give the server something more structured than a few values in a URL. A new user, an order, or a set of settings all arrive this way.
+
+FastAPI handles bodies with the tool you already know from Pydantic. You write a model that describes the fields and their types. You use that model as the annotation on a function argument. The framework reads the incoming JSON, validates it against the model, and gives you a real object. If the data is wrong, your handler never runs.
+
+This article starts with that single annotation and what it does behind the scenes. It then looks at how failures happen first, before any of your code, and what the client sees. You will see how structure works for nested data, and how a body, a path parameter, and a query parameter can all appear on the same endpoint without confusion.
+
+A common design question follows: should one model serve both input and output? The article argues for two models and explains why. It finishes with unknown keys, the extra fields a client might send that your model never mentioned, and the choices you have for handling them.
+
+Read this one carefully if you build any API that accepts data. The model you write here is the contract your clients depend on.
+
+If you have not read the Pydantic track, a quick look at it first will help. The model syntax is the same, and this article assumes you are comfortable reading a class with typed fields. Each section is short and ends with a habit you can apply straight away, so you finish with working knowledge and a clear picture of how bodies behave.
+
 ```python
 @app.post("/modules", status_code=201)
 def create(module: ModuleIn):
@@ -2195,6 +2247,18 @@ title: Response Models: Deciding What Leaves
 intro: Declaring the response docs the endpoint and, more usefully, stops things escaping.
 
 ## The default is generous
+
+A response model describes the shape of what your endpoint sends back. You declare it once, and FastAPI uses it in three ways. It documents the response, it checks that your return value matches, and it removes anything that should not leave the server. That last job is the one people underestimate.
+
+Without a response model, FastAPI sends whatever you return. That is generous, and it can be dangerous. Return a database record that includes a password hash, and the hash goes out with the rest. A response model is a filter that makes this kind of leak much harder to cause by accident.
+
+This article begins with that generous default and why it deserves your attention. It then shows how to declare the shape and what changes in the generated docs. After that you will see how the framework checks your work, and what happens when your data does not fit the model you promised.
+
+Trimming the output comes next. You will learn how to leave out fields that are unset, fields that hold default values, or fields you name directly. The article closes with a point that guides good API design: input and output are different questions, and they usually need different models.
+
+If you have ever worried about what your API might expose, this is the article that gives you a dependable answer.
+
+Think of the response model as the last gate before data leaves your server. Your database layer may hold far more than a client should see, such as internal flags, timestamps, or private notes. The model decides what passes through. It also gives clients a dependable promise about the shape of every reply. That promise is what lets frontend developers build against your API without guessing. Each section is short and ends with a habit you can apply straight away, so you finish with working knowledge and a safer API.
 
 Without a response model, FastAPI serialises what your handler returns.
 
@@ -2618,6 +2682,18 @@ intro: Where the check error comes from, what each part means. How to reshape it
 
 ## Where it comes from
 
+A 422 response means the server understood your request but refused it because the data was wrong. In FastAPI you will see it constantly, especially while building. A missing field, a string where a number belongs, or a value outside its limits all produce one. The response body explains exactly what went wrong, if you know how to read it.
+
+The error comes from Pydantic, which does the checking, and FastAPI wraps it in a standard JSON shape. Each problem becomes an entry in a list. Each entry says where the problem is, what kind of problem it is, and a human message. Once you know the layout, you can fix most failures in seconds.
+
+This article starts with where the error comes from and why it appears before your handler runs. It then explains the first element of each entry, the location, which tells you whether the problem was in the body, the query, the path, or a header. You will see what an error looks like when many fields fail at once.
+
+It then compares 422 with other errors you might confuse it with, such as 400 and 404, so you can tell which layer is complaining. The later sections show how to reshape the response for your own clients, and how to write tests that confirm bad input is rejected.
+
+Learning to read a 422 quickly is one of the best debugging habits you can build.
+
+Keep a real 422 response next to you as you read, since the examples map directly onto it. Each section is short and ends with a habit you can apply the next time a request fails, so you finish with working knowledge and not only theory.
+
 A 422 isn't a thing FastAPI invents. It's a Pydantic `ValidationError`, caught at the boundary and rendered as JSON.
 
 The `detail` array is `e.errors()` from the Pydantic track, with one addition: `loc` is prefixed by the part of the request the value came from. So a field error in the body has `loc: ["body", "minutes"]` rather than just `["minutes"]`.
@@ -3021,6 +3097,18 @@ title: HTTP Methods and Routing
 intro: What each verb promises, and how the router decides which handler runs.
 ## A resource is one name and several operations
 
+HTTP methods are the verbs of a web request. GET asks for data. POST creates something. PUT replaces it, PATCH changes part of it, and DELETE removes it. Routing is the step where the server looks at the method and the path together and decides which function should answer.
+
+FastAPI gives you one decorator for each method, and the router matches requests against them in order. The combination of method and path picks the handler. Two handlers can share a path as long as their methods differ, which is how a single resource supports several operations.
+
+This article begins with that idea: a resource is one name with several operations attached. A path like /orders can list orders with GET and create one with POST. It then covers the promises each verb makes. Some are safe, meaning they change nothing. Some are idempotent, meaning repeating them has the same effect as doing them once. Clients, caches, and proxies rely on those promises, so breaking them causes real trouble.
+
+The next section explains the difference between a 404 and a 405. One says the path does not exist. The other says the path exists but not for that method. Mixing them up wastes debugging time.
+
+The article ends with route order and how to inspect the routes your app registered, which is useful when a request lands somewhere you did not expect.
+
+These ideas are older than FastAPI, and they apply to any web framework. Learning them here gives you a base that carries over. It also helps you design endpoints that other developers can guess without reading the docs, which is the mark of a well-built API. Each section is short and ends with a habit you can apply straight away, so you finish with working knowledge of how requests reach their handlers.
+
 The same path with other methods is the central idea of an HTTP API. `/modules/7` names a thing. `GET`, `PUT` and `DELETE` are what you can do to it.
 
 FastAPI gives you a decorator per verb. Registering a few against one path is normal rather than a special case.
@@ -3334,6 +3422,16 @@ title: Headers and Cookies
 intro: The parts of a request that are neither path, query nor body. What each is properly for.
 
 ## Reading a header
+
+Headers and cookies carry information about a request that is neither part of the path, nor the query string, nor the body. A header might say what format the client wants, which browser it is, or who it claims to be. A cookie is a small value the browser stores and sends back on every later request to the same site.
+
+FastAPI reads both with the same annotation approach you use elsewhere. You declare an argument, mark it as a header or a cookie, and the framework extracts and converts the value. One detail surprises people: header names use hyphens, while Python names cannot. FastAPI converts underscores to hyphens for you.
+
+This article starts with reading a single header and what the conversion rules are. It then explains what headers are for, so you can tell which information belongs there rather than in a query string. After that it covers cookies, how a browser sends them, and how you read one.
+
+The article also looks at the other direction. Your response can set headers and cookies too, which is how a server hands a session or a caching hint to the client. You will see the proper way to do this without building a full response by hand.
+
+It closes with authentication. Checking a token in a header is something many endpoints share, so it belongs in a dependency instead of being repeated in every handler.
 
 ```python
 def whoami(x_token: str = Header(default=None)):
@@ -3666,6 +3764,16 @@ for label, spec in [
 title: Form Data and File Uploads
 intro: What a browser form really sends. Why it's neither JSON nor a query string.
 ## Three body formats
+
+A browser form does not send JSON. When a user submits an HTML form, the browser packs the fields into a different format, and when the form includes a file, it uses yet another. FastAPI can read both, but you have to say so, because the default assumption is that a body is JSON.
+
+This matters whenever you build a login page, a contact form, or anything that lets users upload a picture or a document. It also matters when you call your own API from tools that send forms. Getting the format wrong produces confusing errors that look like validation failures but are really a mismatch of expectations.
+
+This article starts with the three body formats you will meet: JSON, URL-encoded forms, and multipart forms. It then shows the Form function, which tells FastAPI to read a field from a form body. A rule follows that trips many people up: one request has one body and one content type, so you cannot mix JSON and form fields in the same call.
+
+Next comes the small extra package that FastAPI needs before it can parse forms at all, and the error you see if it is missing. The last section covers UploadFile, the class that represents an uploaded file. It handles large files sensibly by spooling them to disk instead of loading everything into memory.
+
+After reading, you will know which format a request uses and how to declare it correctly.
 
 An HTTP request has one body. For an API there are three ways it's often coded.
 
@@ -4029,6 +4137,16 @@ print("documented responses:",
 title: Status Codes
 intro: Which number to return when, and why 200-for-all discards data the client already understands.
 ## The class matters more than the number
+
+A status code is the three-digit number at the start of every HTTP response. It tells the client, in a form machines understand, whether the request worked, and if not, whose fault it was. Clients, browsers, proxies, and monitoring tools all read it before they look at the body.
+
+Returning 200 for everything throws that information away. A client that gets 200 with an error message inside has to parse the body to find out something the status line could have said immediately. Using the right code makes your API easier to use and easier to monitor.
+
+This article begins with the idea that the class of the number matters more than the exact value. Codes starting with 2 mean success, 4 means the client made a mistake, and 5 means the server did. You can get most decisions right just from that.
+
+It then picks out the success codes worth using, such as 201 for creation and 204 for a response with no content. The same treatment goes to the 4xx codes worth telling apart, including 401, 403, 404, and 409.
+
+A dedicated section compares 422, 400, and 409, since those three cause the most debate. FastAPI uses 422 for validation, and the article explains when you should choose something different. You will leave with a short list of codes that covers nearly every real endpoint.
 
 Before the exact code, a client reads the class.
 
@@ -4422,6 +4540,18 @@ print("raised    :", c.post("/modules", json={"title": "Vectors"}).json())'''),
 title: Error Handling
 intro: HTTPException, custom handlers, and keeping HTTP out of the code that does the work.
 ## The ordinary case
+
+Error handling is the part of an API that decides what a client sees when something goes wrong. A missing record, a rule that was broken, or a bug in your own code all need a response. If you plan for them, clients get clear messages. If you do not, they get a confusing mix of formats.
+
+FastAPI gives you HTTPException for the ordinary case. You raise it with a status code and a message, and the framework turns it into a JSON response. That covers a lot. As your app grows, you will want more control over the shape of every error and over where in the code each one gets raised.
+
+This article starts with the ordinary case and what the client receives. It then shows how to add headers to an error, which some protocols require. After that it explains how to replace the default error envelope with one that matches the rest of your API, so every failure has the same structure.
+
+A larger idea follows. Your business logic should not know about HTTP. It should raise its own errors, such as a missing item or a conflict, and the edge of your app should translate those into status codes. That keeps the core clean and testable.
+
+The last section covers the catch-all handler for errors nobody predicted, and how to make sure it logs the problem without leaking details to the client.
+
+Good error handling is mostly a matter of deciding things once, in one place. Each section is short and ends with a habit you can apply straight away. You finish knowing where each kind of error should be raised, translated, and logged, and why that split keeps your code easy to change.
 
 ```python
 raise HTTPException(status.HTTP_404_NOT_FOUND, "Module not found")
@@ -4841,6 +4971,18 @@ title: APIRouter
 intro: Splitting an app before main.py turns the file no one wants to open.
 
 ## The problem it solves
+
+An APIRouter is a group of related endpoints that you define in its own file and attach to the main app later. It works like a small app of its own. It has routes, tags, and dependencies, but it does not run by itself. You plug it into the real app, and its routes join the rest.
+
+You need one as soon as your project grows past a handful of endpoints. Everything in a single main.py works at first. Then the file reaches a thousand lines, two people edit it at once, and nobody wants to open it. Routers let you split the work by topic, so users, orders, and billing each get a home.
+
+This article starts with the problem a router solves and why the single-file approach stops scaling. It then explains that a router is a mini-app, with most of the same decorators you already know. You will see the shape a project usually takes once it is split, with a folder of routers and a short main file.
+
+The later sections cover details that save repetition. A prefix can be added when you include the router, so each endpoint does not repeat the same start of the path. Dependencies can be attached to a whole section, so authentication is declared once instead of fifty times.
+
+Read this when your project begins to feel crowded. The idea is simple, and the payoff is a codebase that stays easy to navigate.
+
+Nothing about a router is hard, but the choices around it are easy to get wrong early and painful to change later. This article gives you a layout you can adopt on day one. It also explains why each part is there, so you can adjust it for your own project instead of copying it blindly. If your app already feels crowded, you can apply these ideas one router at a time, with no need for a big rewrite. Each section is short and ends with a habit you can apply straight away, so you finish with a layout that is ready to use.
 
 each FastAPI project starts as one file. One file works for perhaps twenty routes. Past that it turns the file everybody edits, each change conflicts, and no one can find anything.
 
@@ -5274,6 +5416,18 @@ title: Dependency Injection
 intro: Declaring what an endpoint needs and letting the framework supply it.
 ## The whole idea
 
+Dependency injection means that a function declares what it needs, and something else supplies it. In FastAPI, you write a small function that produces a value, such as a database session or the current user. You then list that function as a parameter of your endpoint. The framework calls it first and passes in the result.
+
+This solves a common problem. Many endpoints need the same things, and writing the setup code in every handler is tedious and easy to get wrong. With dependencies, the setup lives in one place. Your handler stays short and focuses on its own job.
+
+This article begins with the whole idea in its simplest form, using the Depends function. It then shows that a dependency can see the request, so it can read headers, query values, and cookies just as a handler can. A dependency can also raise an error, which stops the request before your handler ever runs. That is how authentication usually works.
+
+The next section explains caching within a request. If two parts of the same request ask for the same dependency, FastAPI runs it once and shares the result. That detail affects database sessions in particular.
+
+The article ends by looking at what dependency injection replaces. Global variables, repeated setup code, and hand-written decorators all become unnecessary. Once the idea clicks, you will use it in nearly every endpoint.
+
+The term sounds heavy, and in some languages it is. In FastAPI it is light. A dependency is only a function, and the injection is only a parameter. There is no container to configure and no registry to maintain. That simplicity is why the feature gets used everywhere, from authentication to database access to shared query helpers. Each section is short and ends with a habit you can apply straight away, so you finish with working knowledge and a feature you will reach for daily.
+
 ```python
 def pagination(limit: int = 10, offset: int = 0):
     return {"limit": min(limit, 100), "offset": offset}
@@ -5686,6 +5840,18 @@ title: Dependencies with yield
 intro: Setup before the handler, teardown after it, and the transaction pattern that falls out.
 ## The shape
 
+A dependency with yield is one that does work before your handler runs and again after it finishes. The code before the yield is setup. The value after the yield is what the handler receives. The code after the yield is cleanup. It is how you open a database session, hand it to the handler, and close it afterward.
+
+You need this whenever a resource must be released. A connection left open, a transaction left half done, or a file never closed will cause trouble that appears later and far from its cause. Putting the cleanup next to the setup keeps the pair together, so neither is forgotten.
+
+This article starts with the basic shape and what each part does. It then explains a key promise: teardown always runs, even when the handler raises an error. That guarantee is what makes the pattern safe. You will also see how that interacts with exceptions and what the cleanup code can and cannot do about them.
+
+A practical example follows, the transaction pattern. The session commits if the handler succeeds and rolls back if it fails, all in one small function. This is the form you will use most.
+
+The article closes with nesting and order, which tells you which cleanup runs first when several dependencies stack up, and with how caching applies so the same resource is not opened twice in one request.
+
+If you have used Python's context managers, the idea will feel familiar. It is the same pattern of setup, use, and cleanup, adapted to the life of a single request. Reading this article will also make several later topics easier to follow, including testing and lifespan events. Each section is short and ends with a habit you can apply straight away. You finish with a reliable way to manage database sessions, files, and other resources, and with a clear sense of what happens when something fails halfway through a request.
+
 ```python
 def get_session():
     db = Session()
@@ -6083,6 +6249,18 @@ print("and nothing in its signature says so.")'''),
 title: Sub-dependencies
 intro: Dependencies that depend on dependencies, and the tree resolved before your handler runs.
 ## The same syntax, one level down
+
+A sub-dependency is a dependency that itself depends on something else. For example, a function that returns the current user might need the token from the header, and a function that checks admin rights might need the current user. Each piece asks for what it needs, and the framework builds the chain.
+
+This lets you assemble behavior from small, reusable parts. Instead of one large function that reads a token, loads a user, and checks permissions, you write three small ones that each do a single job. Each can be tested alone and reused in different combinations.
+
+This article starts with the syntax, which is the same as for any dependency, just applied one level down. Nothing new needs learning there. It then explains how the cache covers the whole tree. If two branches both need the same dependency, it runs once per request, and both receive the same value.
+
+The next section covers failures. When a dependency deep in the chain raises an error, the whole request stops at that point, and nothing after it runs. This is what makes authentication checks reliable, since the handler cannot be reached by accident.
+
+The article ends with a practical use: layering permissions. You will build up from a logged-in user, to an active user, to an admin, with each level adding one rule on top of the last. It is a clean way to express access control.
+
+A useful way to think about it is as a recipe. The final dish needs a prepared ingredient, and that ingredient needs its own preparation. You list each step once, and FastAPI works out the order. This is also where mistakes in design show up quickly. If a chain becomes hard to follow, that is a sign to split it differently, and the article gives guidance on spotting this early. Each section is short and ends with a habit you can apply straight away, so you finish with working knowledge of how chains are built.
 
 A dependency is a function whose params are request params. And `Depends` is a request param. So a dependency can depend on another:
 
@@ -6507,6 +6685,18 @@ print("Identical behaviour. Reach for the class when it holds something.")'''),
 title: Class Dependencies
 intro: Anything callable works. This Is how a dependency gets config of its own.
 ## Callables, not functions
+
+A class dependency is a dependency written as a class instead of a function. The idea rests on a Python fact: anything you can call counts as a callable, and classes are callable. When you pass a class to Depends, FastAPI creates an instance for each request and passes its parameters from the request, just as it would for a function.
+
+This matters when a dependency has configuration of its own. A pagination helper might need a default page size. A permission check might need to know which role to require. A class lets you set those options once and reuse the object in many endpoints, with each use configured differently.
+
+This article starts with the idea that callables work, not only functions, and why that opens up more options. It then describes what a class buys you over a plain function, including grouped parameters and attributes you can read in the handler. A section follows on configured instances, where you create an object with settings and give that object to Depends.
+
+Timing is the next topic. You will see when the construction happens, once per request or once per app, and why that affects what you can safely store inside. The article finishes with returning a model, which keeps the result clean and well described in the docs.
+
+If your dependencies keep growing extra arguments, a class is often the neater answer.
+
+You do not need to be an expert in object-oriented design to use this feature. The classes involved are small, usually just an initializer that stores a few values. The benefit is practical: less repeated code, clearer names in your handlers, and settings that live next to the logic that uses them. Along the way you will see how this approach compares with closures and with simple functions, so you can choose the lightest tool that does the job. Not every dependency needs to be a class. Many are better left as plain functions, and the article is clear about where the line falls. Each section is short and ends with a habit you can apply straight away, so you finish with working knowledge and a clear rule for choosing between the two forms.
 
 `Depends` takes a callable. A function is the obvious one. A class is a callable too. Calling it makes an instance.
 
@@ -6970,6 +7160,18 @@ title: Router and Global Dependencies
 intro: Protecting a section without each endpoint repeating itself - and the endpoint that would else be forgotten.
 ## Three places to declare one
 
+Some rules apply to many endpoints at once. Every route in the admin section needs an admin user. Every route in the app might need an API key. Repeating the same dependency on each handler works, but it is tedious, and it creates a risk: the one endpoint you forget is the one left unprotected.
+
+FastAPI lets you declare a dependency at a higher level, so it covers a whole group of routes. You can attach it to a single decorator, to an entire router, or to the whole application. The framework runs it for every matching request, before the handler.
+
+This article starts with the three places you can declare one and how each differs in reach. It then explains an important detail: a dependency declared this way runs, but its value is not injected into your handler. If you need the value, you must still ask for it in the function. That distinction confuses many readers at first.
+
+A section follows on the argument for the router form, which is usually the best balance. It protects a whole section by default, and a missing line in one handler cannot undo it. The article ends with practical advice on when to use each level, based on how many routes share the rule and how likely it is to change.
+
+Read this if you care about security that does not depend on anyone's memory.
+
+There is a security angle that makes this topic worth more than its length suggests. Protection that depends on every developer remembering to add a line will fail eventually. Protection that is built into the structure of the app does not. A new endpoint added to a protected router is covered from its first request, even if its author never thought about authentication. That is a far safer default. The article also looks at the cost, which is that a rule applied broadly is harder to opt out of, and shows how to handle the few endpoints that need to be public. Login and health checks are typical examples. Each section is short and ends with a habit you can apply straight away. You finish knowing which level suits each rule, and how to confirm in a test that the protection is really in place.
+
 A dependency can be attached at three levels, all with the same arg:
 
 ```python
@@ -7353,6 +7555,18 @@ print("lifecycle:", log)'''),
 title: Dependency Overrides
 intro: Swapping a dependency for a test, and why that makes the whole tier hands-on.
 ## The mechanism
+
+A dependency override replaces one dependency with another, for the whole app, while it is running. Its main use is testing. Your real database dependency connects to a real database. During a test, you want it to return a fake or an in-memory one. An override swaps it without touching your endpoint code.
+
+This is one of the best reasons to use dependency injection at all. Because endpoints ask for what they need instead of creating it, you can change what they receive from outside. There is no patching of modules and no tricks with imports. You set a single entry in a dictionary.
+
+This article starts with the mechanism itself: the dictionary on the app, and what you put into it. It then explains why it matters for the way you design and test code. You will learn that the key is the function object, not its name, so you must reference the original function exactly as the endpoint did.
+
+Next comes reach. An override applies to the whole dependency tree, so a replaced function is swapped everywhere it appears, even in sub-dependencies. It also works at the router and app levels. Overrides stay in place until you clear them, so the article closes with how to reset them after each test.
+
+With this technique, tests become fast, isolated, and honest about what they check.
+
+You will see short examples that you can paste into your own test files. The aim is to leave you with a pattern that works the same way on a small project and on a large one. Many teams adopt this single technique and find that their test suites become both faster and easier to read, because each test states plainly what it replaces and why. It also removes the need for patching tools that rely on import paths. Those tools tend to break when you move code, whereas an override keeps working because it points at the function itself. Each section is short and ends with a habit you can apply straight away, so you finish with working knowledge of this technique.
 
 ```python
 app.dependency_overrides[get_db] = fake_db
@@ -7738,6 +7952,18 @@ title: async def or def
 intro: Where your handler runs, and the one mistake that turns a fast framework into a slow one.
 ## Two placements, one interface
 
+FastAPI lets you write an endpoint as either async def or plain def. Both work, and both look the same to a client. The difference is where your code runs. An async handler runs directly on the event loop. A plain handler is sent to a pool of worker threads so it does not block that loop.
+
+This choice decides how well your app handles many users at once. A fast framework can still be slowed badly by one mistake, which is doing slow, blocking work inside an async function. While that work runs, the event loop cannot serve anyone else, and the entire app appears frozen.
+
+This article starts with the two placements and the single interface that hides them. It then explains why an event loop is fast in the first place, because the rule makes more sense once you know the reason. You will see the mistake in detail: calling a blocking library from inside an async handler.
+
+A short, clear rule follows. Use async def when everything inside is awaited, and plain def when you call code that blocks. Dependencies follow the same logic according to how they are defined, which the article covers as well.
+
+Many developers pick one style at random and never think about it. A few minutes here can save you from a performance problem that is hard to trace later.
+
+You do not need to be a concurrency expert. A basic picture of one worker serving many requests by switching between them is enough, and the article builds that picture from scratch. Each section is short and ends with a habit you can apply straight away. You finish with a clear rule for choosing between the two forms, and with the warning signs that tell you a handler is blocking the loop when it should not be.
+
 FastAPI accepts both:
 
 ```python
@@ -8116,6 +8342,20 @@ print("trail:", trail)'''),
 title: Background Tasks
 intro: Work that should happen after the response has gone. The point at which it needs a real queue instead.
 ## The mechanism
+
+A background task is work that runs after the response has already been sent. The client gets its answer quickly, and the slower job carries on afterward. Typical examples are sending a confirmation email, writing an audit log, or resizing an image. The user does not need to wait for any of them.
+
+FastAPI includes a simple tool for this called BackgroundTasks. You ask for it in your handler, add a function to it, and the framework runs that function once the response goes out. It needs no extra services or setup, which makes it very convenient for small jobs.
+
+This article starts with the mechanism and how little code it takes. It then explains ordering precisely, so you know exactly when the task starts relative to the response and to any cleanup in your dependencies. That timing is more subtle than it seems.
+
+An honest section follows on what background tasks are not. They are not a job queue. They run inside the same process, they vanish if the server restarts, and they have no retry or tracking. The next section explains when to move to a real queue, and what signs tell you it is time.
+
+The article ends with failure. If a background task raises an error, the client has already received a success response, so nobody will see the problem unless you log it. You will learn how to handle that sensibly.
+
+Use this tool freely for light work, and know where its limits are.
+
+It is a small feature with a clear purpose. Used well, it keeps your endpoints quick and your code simple. Used for the wrong job, it hides problems until production. Knowing the difference is the goal here, and a few minutes of reading will give you that. Each section is short and ends with a habit you can apply straight away. You finish knowing which jobs fit this tool, which ones do not, and how to notice when a task has failed without anyone telling you.
 
 ```python
 @app.post("/signup", status_code=201)
@@ -8533,6 +8773,18 @@ title: Lifespan Events
 intro: Work that happens once per process rather than once per request. Where a link pool belongs.
 ## Two lifetimes
 
+A lifespan is the period between your application starting and stopping. Lifespan events are the places where you run code at each end of that period. On startup you might open a database pool or load a machine learning model. On shutdown you close the pool and flush anything pending.
+
+This is different from per-request work. A request lasts milliseconds, and you would not want to build a connection pool for each one. Some resources are expensive to create and meant to be shared. The lifespan is where those belong, created once and reused by every request.
+
+This article starts with the two lifetimes, per request and per process, and how to tell which one a resource needs. It then shows the shape of a lifespan function, which uses the same yield pattern you may know from dependencies. Code before the yield runs at startup, and code after it runs at shutdown.
+
+You will also read what the server actually does when it starts and stops, which clears up a lot of confusion about timing. A section covers the fact that lifespan runs once per worker process, so a server with four workers runs it four times. That affects anything you load into memory.
+
+The article ends with how to reach the shared resource from inside a handler, through the application state, so your endpoints can use what startup created.
+
+Older FastAPI code used separate startup and shutdown event handlers. You will still meet them in tutorials and existing projects. The article explains why the single lifespan function replaced them, and how to read the older style if you inherit it. A good rule of thumb: if something is slow to build and safe to share, it belongs here. If it holds data for one user, it does not. Each section is short and ends with a habit you can apply straight away. You finish knowing where each shared resource belongs, how to build it once, and how to release it cleanly when the server stops.
+
 Almost all in this track has been per request: a body, a session, a user, a background task.
 
 Some things aren't. A DB link **pool** is created once and used by each request. So is an HTTP client, a machine-learning model, a cache client, a loaded config.
@@ -8941,6 +9193,16 @@ title: Testing
 intro: A client that calls the app right. What a good FastAPI test suite really asserts.
 ## No server involved
 
+Testing a FastAPI app is easier than most people expect. The framework ships with a test client that calls your application directly, in the same process, without starting a server or opening a network port. You write a normal test function, make a request, and check the response.
+
+This is valuable because it makes tests fast and reliable. A suite of hundreds of endpoint tests can run in seconds. There are no ports to clash, no processes to clean up, and no waiting for a server to boot. You test the real routing, validation, and serialization, which is exactly where bugs tend to hide.
+
+This article starts with how the client works and why no server is involved. It then covers what a good test should assert. Checking the status code is the minimum. The shape of the body, the headers, and the error details tell you much more about whether the behavior is right.
+
+Overrides are the next topic, and they are the heart of the approach. By replacing a dependency, you can feed the app a fake database or a fixed user, and keep the test isolated. You will also see how to test a single router alone, without the rest of the app.
+
+The article ends with lifespan in tests, which needs one small adjustment so that startup and shutdown code actually runs. After reading, you will have a pattern you can reuse for every project. Reading this one carefully pays off, because the same pattern repeats in every test file you write.
+
 `TestClient` doesn't start anything. It builds the ASGI scope a server would build, calls your use. Turns the response messages back into an object with `.status_code` and `.json()`.
 
 That is why FastAPI tests are fast: no socket, no port, no process, no waiting for a thing to come up. A test suite of a few hundred endpoint tests runs in seconds.
@@ -9318,6 +9580,18 @@ for p in params:
 title: OpenAPI and the Docs
 intro: The doc your annotations make. How much of an API's usability is decided by it.
 ## What is generated
+
+OpenAPI is a standard way to describe an HTTP API in a machine-readable file. It lists every path, every method, every parameter, and every response. FastAPI builds that file for you automatically, from your annotations, and then uses it to serve interactive documentation pages at /docs and /redoc.
+
+You get this for free, and it is worth taking seriously. Documentation is often the first thing another developer sees of your API. If it is clear, they can try calls straight from the browser. If it is vague, they will ask you questions or give up. The same file can also generate client libraries and feed testing tools.
+
+This article starts with what is generated and where you can look at it. It then explains the header of the document, with the title, version, and description that identify your API. After that it covers tags, which group endpoints into sections so a large API stays readable.
+
+The highest-value addition comes next: examples. A realistic sample request and response teaches more than a paragraph of explanation. The article shows how to add them to your models and endpoints. It closes with documenting failures, so the docs list the error responses a client should expect and not only the success case.
+
+A few small additions here can turn passable documentation into something people enjoy using.
+
+The documentation pages are also a testing tool. You can fill in parameters and send real requests from the browser, which makes them a fast way to check your own work while you build. Each section is short and ends with a habit you can apply straight away. You finish knowing how to turn the generated pages into real documentation that answers questions before anyone has to ask them, and that stays accurate as your code changes.
 
 `app.openapi()` returns one OpenAPI doc showing each route: paths, methods, params, request bodies, response shapes, status codes, descriptions and examples.
 
@@ -9745,6 +10019,18 @@ print("internal dump   :", u.model_dump())'''),
 title: Security Basics
 intro: Authentication as a dependency, what a token really is. The mistakes that matter most.
 ## Authentication is a dependency
+
+Security in an API comes down to two questions. Who is making this request, and are they allowed to do it? The first is authentication, and the second is authorization. FastAPI does not force a particular answer. It gives you building blocks, and the most useful of them is the dependency.
+
+This matters because mistakes here are costly. A missing check, a weak comparison, or a token that is trusted without verification can expose every user's data. Most breaches come from small errors in basic steps, not from clever attacks. Getting the fundamentals right protects you from the majority of them.
+
+This article starts with the idea that authentication is a dependency. You write one function that reads the credentials and returns the user or raises an error, and every protected endpoint asks for it. It then explains the difference between 401 and 403, which are often mixed up. One means the caller is not identified. The other means they are identified but not permitted.
+
+Next it describes what a token actually is, in plain terms. A section follows on a point that surprises many people: a valid signature is not the same as a valid token, since expiry and purpose also matter. The article ends with comparing secrets safely, because an ordinary equality check can leak information through timing.
+
+This is an introduction to the habits that matter, and not a complete security course.
+
+The goal is to give you a sound mental model and a few patterns you can trust. For anything that handles money or health data, you should also rely on well-reviewed libraries and, ideally, a professional review of the design. Each section is short and ends with a habit you can apply straight away. You finish with a clear set of practices for identifying callers, deciding what they may do, and avoiding the small slips that cause most real incidents.
 
 all from the dependencies tier applies here, and this is the case that justifies it.
 
@@ -10199,6 +10485,18 @@ print("missing:", c.get("/modules/99").status_code)'''),
 title: Project Structure
 intro: How the pieces are arranged once the use is more than one file.
 ## The layout
+
+Project structure is how you arrange your files and folders so a growing app stays easy to understand. FastAPI does not require any layout. A single file works for a demo. Once you have users, orders, and billing, though, where each piece of code lives starts to decide how quickly you can change anything.
+
+A good structure answers a simple question: if I need to change this behavior, where do I look? When the answer is obvious, new teammates become useful faster, and reviews get shorter. When it is not, the same logic gets copied into three places and drifts apart.
+
+This article starts with a layout that works for most projects and the reasoning behind each folder. It then argues that main.py should be boring. It creates the app, includes the routers, and does little else. Interesting logic belongs elsewhere.
+
+The next section covers grouping by resource inside a shallow layer structure. You keep a few clear layers, such as routers, services, and schemas, but you do not let them grow deep. Then comes a rule for dividing the work: handlers translate between HTTP and your domain, and services do the real work. That separation keeps your business logic free of web concerns and easy to test.
+
+None of this is mandatory. It is a set of defaults that tend to hold up as a project doubles in size, then doubles again.
+
+You will not find a single correct answer here, because teams differ. What you will find is a set of trade-offs, explained plainly, along with the problems each choice tends to cause as a project grows. The article is most useful when you are about to start a new service, or when an existing one has started to feel awkward to work in. Either way, a little planning now costs far less than a large reshuffle later, when other people depend on your import paths. Each section is short and ends with a habit you can apply straight away, so you finish with a layout you can adopt and adjust.
 
 Nothing here is clever, and that is the point.
 

@@ -2216,7 +2216,7 @@ averaged, so nothing is invented that wasn't there.
 
 The cost is blockiness. Neighbouring output pixels that map to the same input
 pixel are the same, so enlarging makes flat squares with hard steps between
-them. main-line edges come out as staircases.
+them. Straight edges come out as staircases.
 
 That is often just right. Pixel art must be scaled with nearest neighbour or
 it stops being pixel art. A segmentation mask where pixel value 3 means "road"
@@ -2230,10 +2230,9 @@ For each output pixel, find the four input pixels nearby its spot and
 take a weighted mean, with weights from how close the spot is to each.
 Linear in one direction, then linear in the other. Hence bilinear.
 
-main-lines become smooth, grads stay gradual, and the staircase disappears.
-The cost is softness: an mean of neighbours is by meaning less extreme
-than its inputs, so hard edges are pulled apart into ramps. Enlarge by a large
-factor and the result isn't blocky but mushy.
+Edges become smooth and the staircase goes away. The cost is softness: a blend
+of nearby pixels is always softer than the originals, so sharp edges turn into
+ramps. Enlarge by a large factor and the result is blurry, not blocky.
 
 Switch between the two above with the downscale factor set high. The same
 info is present in both. Only the guessing strategy differs, and it's
@@ -2286,28 +2285,28 @@ output point landing at fraction (0.25, 0.75) inside a cell whose corners are 10
 |bottom edge: 30&middot;0.75 + 40&middot;0.25|32.5|
 |down: 12.5&middot;0.25 + 32.5&middot;0.75|**27.5**|
 
-The output, 27.5, is a value that appears nowhere in the input &mdash; and that is
-the whole point for a photo. Here It smooths the staircase nearest-neighbour
-would leave. It's also just why a *label mask* must never be resized this way:
-if 3 means "road" and 5 means "building", their bilinear mean of 4 might mean
-a thing else fully, because a class index is a name, not a quantity, and names
-don't mean. Nearest neighbour. This Copies the single closest pixel, is the
-only correct choice there. Shrinking is a third case again: naively keeping each
-second pixel aliases &mdash; a striped pattern can vanish or invert &mdash; so it
-needs an mean (area interpolation) before sampling, not an interpolation between
-samples.
+The output 27.5 is a value that never appeared in the input. That is the whole
+point for a photo: it smooths the staircase that nearest neighbour would leave.
 
-Bicubic extends the same idea to sixteen nearby pixels with a cubic weight that
-overshoots slightly at edges, adding a little local contrast &mdash; which is why
-photo editors default to it and also why it can leave faint halos beside
-high-contrast edges. Shrinking is the failure people meet as a mysterious bug
-elsewhere: keeping each second pixel of an alternating pattern can return a solid
-field of one colour, because detail finer than the new sampling grid reappears as a
-false pattern &mdash; aliasing, the same effect as moiré on a striped shirt on video.
-The cure is to mean before sampling (area interpolation, or a Gaussian blur first,
-which is what an image pyramid does), and it matters for machine learning
-in detail, because a dataset resized by naive sampling carries artefacts that vary
-with the first detail and a network will happily learn them.
+But a *label mask* must never be resized this way. If 3 means "road" and 5
+means "sky", a blend of 4 might be a class that is neither. Class labels are
+names, not amounts, and names cannot be mixed. Use nearest neighbour for masks.
+
+Shrinking is a third case. Keeping each second pixel can alias &mdash; a striped
+pattern can vanish or flip &mdash; so you need to blur first (area method), not
+guess between samples.
+
+Bicubic uses sixteen nearby pixels with a cubic weight that overshoots slightly
+at edges. That adds a little local contrast, which is why photo editors default
+to it. The overshoot can also leave faint halos beside sharp edges.
+
+Shrinking trips people up in a different way. Keeping each second pixel of a
+stripe pattern can return a solid block of one colour, because detail finer than
+the new grid shows up as a false pattern. That is aliasing &mdash; the same
+effect as moiré on a striped shirt on video. The fix is to blur before sampling
+(area method, or a Gaussian blur, which is what an image pyramid does). It
+matters for ML too: a dataset resized by naive sampling carries false patterns
+that vary with the input detail, and a network will learn them.
 
 ## Where it goes wrong
 

@@ -2,6 +2,20 @@ title: Background Tasks
 intro: Work that should happen after the response has gone. The point at which it needs a real queue instead.
 ## The mechanism
 
+A background task is work that runs after the response has already been sent. The client gets its answer quickly, and the slower job carries on afterward. Typical examples are sending a confirmation email, writing an audit log, or resizing an image. The user does not need to wait for any of them.
+
+FastAPI includes a simple tool for this called BackgroundTasks. You ask for it in your handler, add a function to it, and the framework runs that function once the response goes out. It needs no extra services or setup, which makes it very convenient for small jobs.
+
+This article starts with the mechanism and how little code it takes. It then explains ordering precisely, so you know exactly when the task starts relative to the response and to any cleanup in your dependencies. That timing is more subtle than it seems.
+
+An honest section follows on what background tasks are not. They are not a job queue. They run inside the same process, they vanish if the server restarts, and they have no retry or tracking. The next section explains when to move to a real queue, and what signs tell you it is time.
+
+The article ends with failure. If a background task raises an error, the client has already received a success response, so nobody will see the problem unless you log it. You will learn how to handle that sensibly.
+
+Use this tool freely for light work, and know where its limits are.
+
+It is a small feature with a clear purpose. Used well, it keeps your endpoints quick and your code simple. Used for the wrong job, it hides problems until production. Knowing the difference is the goal here, and a few minutes of reading will give you that. Each section is short and ends with a habit you can apply straight away. You finish knowing which jobs fit this tool, which ones do not, and how to notice when a task has failed without anyone telling you.
+
 ```python
 @app.post("/signup", status_code=201)
 def signup(email: str, tasks: BackgroundTasks):

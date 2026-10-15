@@ -3,6 +3,16 @@ intro: A pipeline isn't a convenience. It's the mechanism that makes each score 
 
 ## What it is
 
+Most machine-learning workflows have several preprocessing steps before the model. Imputing missing values, encoding categories, scaling features. Without a pipeline, each step is a separate call. Each call must be applied in the right order, to the right data, at the right time. Mistakes in that sequence are common and hard to spot.
+
+A pipeline bundles those steps into a single object. It applies them in order during `fit` and again during `predict`. Because the whole sequence is one object, it can be passed to `cross_val_score`, `GridSearchCV` or any other tool that expects an estimator. The preprocessing runs inside the cross-validation loop, which is the only way to get an honest score.
+
+The alternative -- scaling the full dataset, then splitting, then fitting -- leaks information from the test set into the training set. That leak inflates the score. A pipeline prevents it by design. Each fold sees only the training rows during `fit_transform` and applies the learned transformation to the test rows during `transform`.
+
+Pipelines also make deployment simpler. You save one object that contains both the preprocessing and the model. At prediction time, you call `predict` on the pipeline and it handles every step. There is no risk of forgetting to scale or encode at serving time.
+
+This page covers building a pipeline, inspecting its steps, and combining it with a column transformer for mixed-type data. It also covers the `make_pipeline` shortcut and the `set_output` method that preserves DataFrame column names.
+
 A `Pipeline` chains transformers together and ends with an estimator. The result behaves as a single estimator.
 
 That last sentence is the key one. A pipeline has `fit`, `predict` and `score`. Anywhere a model can go. `cross_val_score`, `GridSearchCV`, a pickle file, a check loop. A whole pipeline can go instead, with no changes to the nearby code.
