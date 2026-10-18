@@ -1,0 +1,91 @@
+title: Exploding and Vanishing Gradients
+intro: Why depth breaks gradient descent, and what you can do about it.
+
+## Context first
+
+Training a deep network means passing a loss signal backward through every layer. Each layer multiplies the incoming gradient by its own local derivative. Chain enough multiplications together and the product either shrinks toward zero or grows toward infinity. This is the exploding and vanishing gradient problem, and it is the single biggest reason deep networks were considered untrainable before the modern toolkit of initialisation, normalisation and residual connections existed. You will meet it the moment you stack more than a handful of layers, and you will meet it again every time you train a recurrent network over long sequences.
+
+## The chain rule is a product
+
+[Backpropagation](backpropagation.html) computes gradients by applying the chain rule layer after layer. For a network with L layers the gradient of the loss with respect to the first layer's weights is roughly:
+
+dL/dW_1 = (dL/da_L) * (da_L/da_{L-1}) * ... * (da_2/da_1) * (da_1/dW_1)
+
+Each factor da_{k}/da_{k-1} depends on the weight matrix and the activation derivative at that layer. The gradient at layer 1 is therefore the product of L-1 such factors. Products of many numbers amplify small biases. If the typical factor is slightly below 1, the product shrinks exponentially. If it is slightly above 1, it grows exponentially. Only when each factor is close to exactly 1 does the product stay in a useful range.
+
+## Vanishing gradients
+
+When weights are small or activations saturate, each factor is less than 1. After 50 layers the gradient reaching the first layer can be 0.95^50 &asymp; 0.08 of the signal at the last layer. After 100 layers it is 0.95^100 &asymp; 0.006. The early layers receive almost no learning signal. Their weights barely move, so they learn nothing while the final layers train normally. You see this as a loss curve that plateaus early, even though the network has enough capacity.
+
+The sigmoid activation made this worse. Its derivative peaks at 0.25 and falls toward zero for large inputs. Every saturated neuron multiplies the gradient by a number near zero. ReLU largely solved this particular cause because its derivative is exactly 1 for positive inputs.
+
+## Exploding gradients
+
+When weights are large the factors exceed 1 and the product grows exponentially. After a few dozen layers the gradient can reach thousands or millions. A single optimiser step moves the weights so far that the next forward pass produces `inf` or `NaN`. Training crashes in one update. You will recognise this by a loss that suddenly jumps to `NaN` after training normally for a while.
+
+Exploding gradients are especially common in recurrent networks. An RNN shares one weight matrix across every time step, so backpropagating through 100 time steps means multiplying by the same matrix 100 times. If its largest singular value exceeds 1, the product explodes. This is why [gradient clipping](gradient_clipping.html) became standard practice for RNNs and transformers.
+
+## Seeing it with numbers
+
+```python
+import numpy as np
+
+rng = np.random.default_rng(42)
+
+for scale, label in [(0.5, "vanishing"), (1.5, "exploding")]:
+    W = rng.normal(0, scale, (4, 4))
+    grad = np.ones(4)
+    print(f"--- {label} (weight scale {scale}) ---")
+    for layer in range(1, 21):
+        grad = W.T @ grad
+        norm = np.linalg.norm(grad)
+        bar = "#" * min(int(norm), 60)
+        print(f"  layer {layer:2d}  gradient norm {norm:12.4f}  {bar}")
+    print()
+```
+
+Run this and you will see the gradient norm either collapse to near zero or shoot into the millions within 20 layers.
+
+## What keeps gradients in range
+
+Five techniques address the problem, each at a different point.
+
+**Proper initialisation.** [Xavier initialisation](weight_initialization.html) sets the variance of each weight matrix so the expected magnitude of the forward pass and the backward pass stay constant across layers. He initialisation does the same but accounts for ReLU zeroing half the outputs. Without good initialisation the problem starts on the very first forward pass.
+
+**Batch and layer normalisation.** [Batch normalisation](batch_normalization.html) rescales layer outputs to zero mean and unit variance during training. This prevents activations from drifting into saturated regions and keeps each factor in the chain close to 1. Layer normalisation does the same per sample, which matters when batch sizes are small.
+
+**Residual connections.** A residual block computes y = x + F(x). The gradient through the skip path is exactly 1, so even if F contributes a vanishing gradient the total gradient is at least 1. This is the reason ResNets can be hundreds of layers deep without the gradient collapsing.
+
+**Gradient clipping.** [Gradient clipping](gradient_clipping.html) caps the gradient norm before the optimiser applies it. It does not fix the root cause but it prevents the one catastrophic update that crashes training. Standard in RNNs and transformers.
+
+**Gating mechanisms.** LSTMs and GRUs replace the plain recurrent multiplication with gates that learn when to let gradients pass and when to block them. The cell state in an LSTM can carry a gradient unchanged across many time steps, which is why LSTMs largely solved the vanishing gradient problem for sequences.
+
+## Where it is worst
+
+Recurrent networks are the worst case. An RNN with a sequence of length T multiplies by the same weight matrix T times during backpropagation through time. T = 100 is common, and T = 1000 appears in speech and music. The probability that a product of 100 matrices stays in a useful range without gating or clipping is near zero.
+
+Very deep feed-forward networks hit the same wall, though residual connections have made this rare in practice. Before ResNet, training a 50-layer convolutional network was genuinely difficult.
+
+## Questions people ask
+
+**Is vanishing or exploding more dangerous?** Exploding is more visible because training crashes with `NaN`. Vanishing is more insidious because training appears to work, just badly. Early layers silently stop learning.
+
+**Does batch normalisation fix vanishing gradients completely?** It helps enormously but does not guarantee stable gradients in arbitrarily deep networks. Residual connections are more reliable for extreme depth.
+
+**Why did ReLU help?** Its derivative is 1 for positive inputs, so it does not shrink the gradient the way sigmoid (max derivative 0.25) does. The "dying ReLU" problem is a separate issue where a neuron outputs zero for all inputs and stops learning entirely.
+
+**Can I detect the problem during training?** Yes. Log the gradient norm at each layer. If the first-layer norm is orders of magnitude smaller than the last-layer norm, gradients are vanishing. If any norm spikes to thousands, they are exploding.
+
+**What does the visualisation show?** The interactive above lets you set a weight scale and a number of layers. It multiplies gradients backward through the chain and shows how they shrink (vanishing) or grow (exploding) layer by layer.
+
+**Do transformers suffer from this?** Transformers use residual connections and layer normalisation, which keep gradients stable. They still clip gradients as insurance, but the architecture is designed to avoid the problem by construction.
+
+## Recap in one screen
+
+- The gradient at early layers is a product of one factor per layer.
+- Factors below 1 make the product vanish. Factors above 1 make it explode.
+- Xavier/He initialisation keeps the factors near 1 at the start.
+- Batch normalisation prevents activations from drifting.
+- Residual connections add a gradient path of exactly 1.
+- Gradient clipping caps the damage when all else fails.
+- RNNs are the worst case; gating (LSTM, GRU) and clipping are both essential there.

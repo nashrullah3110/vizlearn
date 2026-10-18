@@ -153,6 +153,8 @@ DESCRIPTIONS = {
         "Feed a sentence word by word into a recurrent network and watch the hidden state carry context from each step to the next.",
     "natural_language_processing/n_gram.html":
         "Slide an n-gram window across text and see how counting short sequences lets a model guess which word comes next.",
+    "natural_language_processing/text_classification_with_naive_bayes.html":
+        "Type a sentence and watch Naive Bayes score each word's evidence for positive or negative, then classify.",
     "natural_language_processing/stemming_vs_lemmatization.html":
         "Compare a stemmer chopping suffixes against a lemmatizer resolving proper dictionary forms of the very same words.",
     "natural_language_processing/text_normalization_pipeline.html":
@@ -340,6 +342,10 @@ DESCRIPTIONS = {
         "One change to the attention mask splits the transformer family in two. See what "
         "each token may look at, and which training objective that permits.",
 
+    "deep_learning/exploding_and_vanishing_gradient.html":
+        "Watch gradients shrink to zero or explode to infinity as they flow backward through "
+        "a chain of layers.",
+
     "deep_learning/gradient_clipping.html":
         "Step a weight down a parabola and inject one exploding gradient. Without clipping "
         "the weight flies off; with it, the update is capped and training survives.",
@@ -487,6 +493,8 @@ DESCRIPTIONS = {
         "Apply erosion and dilation to a binary mask, then combine them into opening, closing, gradient and top-hat to clean segmentation output.",
     "computer_vision/global_average_pooling.html":
         "Replace a flatten layer with global average pooling, count the parameters removed, and see why modern CNNs skip the large dense head.",
+    "computer_vision/pooling_in_cnn.html":
+        "Slide a 2x2 or 3x3 window across a feature map, take the max or average at each position, and watch the output shrink.",
     "computer_vision/grad_cam.html":
         "Compute a Grad-CAM heatmap from gradients flowing into the last convolutional layer, then overlay it to see which regions drove the prediction.",
     "computer_vision/harris_corners.html":

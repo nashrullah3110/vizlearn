@@ -2724,6 +2724,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "computer_vision/pooling_in_cnn.html",
+  "title": "Pooling Layers in CNNs",
+  "cat": "Computer Vision",
+  "q": [
+   {
+    "t": "What does this module say about “What pooling does”?",
+    "ans": "A convolutional layer produces a feature map the same size as its input (when padded). Stack several layers and the maps stay large, the memory stays high, and every later operation is expensive. Pooling fixes that by summarising small regions into single values."
+   },
+   {
+    "t": "What does this module say about “Max pooling”?",
+    "ans": "Max pooling keeps the strongest activation in each window. If one pixel in a 2x2 block fired at 0.9 and the other three were near zero, the output is 0.9. The feature was detected somewhere in that region, and max pooling records that fact."
+   },
+   {
+    "t": "What does this module say about “Average pooling”?",
+    "ans": "Average pooling takes the mean of every value in the window. If the four pixels are 0.9, 0.1, 0.0, and 0.2, the output is 0.3. The strong activation is diluted by its quiet neighbours."
+   }
+  ]
+ },
+ {
   "path": "computer_vision/rgb_image_processing.html",
   "title": "RGB Image Processing",
   "cat": "Computer Vision",
@@ -5222,6 +5241,25 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "Both layers have one row per token and both are learning what tokens mean, so sharing them is natural as well as cheaper."
+   }
+  ]
+ },
+ {
+  "path": "deep_learning/exploding_and_vanishing_gradient.html",
+  "title": "Exploding and Vanishing Gradients",
+  "cat": "Deep Learning",
+  "q": [
+   {
+    "t": "What does this module say about “Context first”?",
+    "ans": "Training a deep network means passing a loss signal backward through every layer. Each layer multiplies the incoming gradient by its own local derivative. Chain enough multiplications together and the product either shrinks toward zero or grows toward infinity."
+   },
+   {
+    "t": "What does this module say about “Gradient Magnitudes”?",
+    "ans": "With weight scale 1.0, gradients pass through unchanged. Move the slider to break the balance."
+   },
+   {
+    "t": "What does this module say about “The chain rule is a product”?",
+    "ans": "Backpropagation computes gradients by applying the chain rule layer after layer. For a network with L layers the gradient of the loss with respect to the first layer's weights is roughly:"
    }
   ]
  },
@@ -15067,6 +15105,25 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What is meant by “Stemming the query but not the index” here?",
     "ans": "(or vice versa) in a search system, so nothing matches."
+   }
+  ]
+ },
+ {
+  "path": "natural_language_processing/text_classification_with_naive_bayes.html",
+  "title": "Text Classification with Naive Bayes",
+  "cat": "NLP",
+  "q": [
+   {
+    "t": "What does this module say about “What Naive Bayes assumes”?",
+    "ans": "You have a document and a set of possible class labels. Naive Bayes treats the document as a bag of words and assumes every word is conditionally independent of every other word given the class. That assumption is plainly false. The word \"not\" changes the meaning of every word that follows it, and \"New\" before \"York\" is not the same as \"New\" before \"idea\". The model ignores all of that."
+   },
+   {
+    "t": "What does this module say about “Why log-probabilities”?",
+    "ans": "Multiplying many small probabilities together produces numbers so small that floating-point arithmetic rounds them to zero. A document with 200 words can push the product below 10 −300 , which underflows in 64-bit floating point."
+   },
+   {
+    "t": "What does this module say about “Laplace smoothing”?",
+    "ans": "A word that never appeared in positive training documents gets P(word | positive) = 0. One zero anywhere makes the entire product zero, so the model ignores all the other evidence. A single unseen word vetoes the entire classification."
    }
   ]
  },

@@ -3466,7 +3466,7 @@ Schmidt makes them at right angles without changing what they span.
 length 1.
 
 **Second vector**: it points partly along `q1` and partly perpendicular to it.
-[Project](maps.html) it onto `q1`, subtract that map, and what is
+[Project](projections.html) it onto `q1`, subtract that projection, and what is
 left is at right angles by build. Norm it to get `q2`.
 
 The visualisation draws each step. The dashed grey lines are the originals. The

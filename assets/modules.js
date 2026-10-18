@@ -612,6 +612,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Shrink a feature map with max, average or min pooling and see how downsampling keeps the signal but discards the detail."
  },
  {
+  "title": "Pooling Layers in CNNs",
+  "path": "computer_vision/pooling_in_cnn.html",
+  "category": "Computer Vision",
+  "topic": "computer-vision",
+  "icon": "eye",
+  "desc": "Slide a 2x2 or 3x3 window across a feature map, take the max or average at each position, and watch the output shrink."
+ },
+ {
   "title": "RGB Image Processing",
   "path": "computer_vision/rgb_image_processing.html",
   "category": "Computer Vision",
@@ -1250,6 +1258,14 @@ window.VIZLEARN_MODULES = [
   "topic": "dl",
   "icon": "network",
   "desc": "Replace a one-hot vector with a learned embedding lookup, compare the memory and compute saved, and see why every NLP pipeline starts here."
+ },
+ {
+  "title": "Exploding and Vanishing Gradients",
+  "path": "deep_learning/exploding_and_vanishing_gradient.html",
+  "category": "Deep Learning",
+  "topic": "dl",
+  "icon": "network",
+  "desc": "Watch gradients shrink to zero or explode to infinity as they flow backward through a chain of layers."
  },
  {
   "title": "Feature Scaling & Weight Bias",
@@ -3650,6 +3666,14 @@ window.VIZLEARN_MODULES = [
   "topic": "nlp",
   "icon": "comments",
   "desc": "Compare a stemmer chopping suffixes against a lemmatizer resolving proper dictionary forms of the very same words."
+ },
+ {
+  "title": "Text Classification with Naive Bayes",
+  "path": "natural_language_processing/text_classification_with_naive_bayes.html",
+  "category": "NLP",
+  "topic": "nlp",
+  "icon": "comments",
+  "desc": "Type a sentence and watch Naive Bayes score each word's evidence for positive or negative, then classify."
  },
  {
   "title": "Text Encoding Techniques in NLP",

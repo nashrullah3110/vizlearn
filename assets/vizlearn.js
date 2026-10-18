@@ -409,6 +409,23 @@
     });
   }
 
+  function initReadingBar() {
+    if (!document.querySelector('[data-vz-prose]')) return;
+    var bar = document.createElement('div');
+    bar.className = 'vz-progress';
+    document.body.appendChild(bar);
+    var ticking = false;
+    function update() {
+      var h = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.width = h > 0 ? (window.scrollY / h * 100).toFixed(1) + '%' : '0%';
+      ticking = false;
+    }
+    window.addEventListener('scroll', function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    update();
+  }
+
   function boot() {
     initProgress();
     initShare();
@@ -416,6 +433,7 @@
     initCheatSheet();
     initPointerCancel();
     decorateVisited(document);
+    initReadingBar();
   }
 
   if (document.readyState === 'loading') {
