@@ -3,9 +3,11 @@ intro: Multiply word probabilities under each class label and pick the winner. T
 
 ## What Naive Bayes assumes
 
-You have a document and a set of possible class labels. Naive Bayes treats the document as a bag of words and assumes every word is conditionally independent of every other word given the class. That assumption is plainly false. The word "not" changes the meaning of every word that follows it, and "New" before "York" is not the same as "New" before "idea". The model ignores all of that.
+You have a document and a set of class labels. Naive Bayes treats the document as a bag of words. It assumes every word is independent of every other word, given the class. That is plainly false. "Not" changes the sense of every word after it, and "New York" is not the same as "New idea". The model ignores all of that.
 
-The payoff is that the joint probability of all the words factorises into a product of individual word probabilities, which you can estimate from counts alone. No optimiser, no matrix algebra, no GPU. One pass through the training data builds the whole model.
+The payoff: the joint probability of all the words splits into a product of single-word probabilities. You can get those from counts alone. No optimiser, no matrix algebra, no GPU. One pass through the data builds the whole model.
+
+This makes Naive Bayes one of the fastest classifiers to train and one of the simplest to understand. The maths fits on one line, and the code fits in a single function.
 
 ## The maths
 
@@ -13,48 +15,48 @@ For a document d made of words w<sub>1</sub>, w<sub>2</sub>, &hellip;, w<sub>n</
 
 P(class | d) &prop; P(class) &times; &prod; P(w<sub>i</sub> | class)
 
-P(class) is the prior: the fraction of training documents that belong to that class. P(w<sub>i</sub> | class) is the likelihood: how often the word w<sub>i</sub> appears in documents of that class. You compute both from counts, multiply them together, and pick the class with the highest score.
+P(class) is the prior: how big a share of training docs belong to that class. P(w<sub>i</sub> | class) is how often word w<sub>i</sub> shows up in docs of that class. Get both from counts, multiply, and pick the class with the top score.
 
-That is the entire algorithm. The visualisation above lets you type a sentence and watch each word contribute evidence for or against each class.
+That is the full method. The widget above lets you type a phrase and watch each word push for or against each class.
 
 ## Why log-probabilities
 
-Multiplying many small probabilities together produces numbers so small that floating-point arithmetic rounds them to zero. A document with 200 words can push the product below 10<sup>&minus;300</sup>, which underflows in 64-bit floating point.
+Multiplying many small numbers gives a result so tiny that the computer rounds it to zero. A document with 200 words can push the product below 10<sup>&minus;300</sup>. That underflows in 64-bit floating point.
 
-The fix is to work in log space. Since log is monotonic, the class that maximises the product also maximises the sum of logs:
+The fix: work in log space. Log is monotonic, so the class that wins the product also wins the sum of logs:
 
 log P(class | d) = log P(class) + &sum; log P(w<sub>i</sub> | class)
 
-Addition is cheaper than multiplication and never underflows. This is what every practical implementation does, and what the visualisation above shows.
+Addition is cheaper than multiplication and never underflows. Every real implementation does this, and the widget above shows it.
 
 ## Laplace smoothing
 
-A word that never appeared in positive training documents gets P(word | positive) = 0. One zero anywhere makes the entire product zero, so the model ignores all the other evidence. A single unseen word vetoes the entire classification.
+A word that never appeared in positive training docs gets P(word | positive) = 0. One zero in the product makes the whole product zero. One unseen word vetoes the entire call.
 
-<strong>Laplace smoothing</strong> (add-1 smoothing) fixes this by adding a pseudocount of 1 to every word count:
+<strong>Laplace smoothing</strong> (add-1 smoothing) fixes this by adding 1 to every word count:
 
 P(w | class) = (count(w, class) + 1) / (total words in class + V)
 
-V is the vocabulary size. The denominator grows by V to keep the probabilities summing to 1. The effect is that no word ever has zero probability. The cost is that rare words get a slight boost relative to their true frequency, but this is almost always worth it.
+V is the vocab size. The bottom grows by V so the numbers still sum to 1. No word ever has zero probability. The price: rare words get a slight boost, but this is almost always worth it.
 
-You can generalise to add-&alpha; smoothing by using a fractional pseudocount. &alpha; = 1 is the most common choice.
+You can swap 1 for a smaller &alpha; to smooth less. &alpha; = 1 is the most common choice.
 
 ## Where it works and where it fails
 
 Naive Bayes works well for:
 
-- **Spam filtering.** The bag-of-words model is a natural fit because spam is mostly about which words appear, not their exact arrangement.
-- **Sentiment analysis.** Words like "excellent", "terrible" and "disappointing" carry strong class signal on their own.
-- **Topic classification.** Documents about sport contain sport words; documents about politics contain politics words.
-- **Medical text triage.** Routing clinical notes by specialty based on keyword frequency.
+- **Spam filtering.** Bag-of-words is a natural fit because spam is about which words appear, not their exact order.
+- **Sentiment.** Words like "excellent", "terrible" and "bad" carry strong class signal on their own.
+- **Topic sorting.** Sport docs contain sport words; politics docs contain politics words.
+- **Medical triage.** Routing clinic notes by specialty based on word counts.
 
 It struggles when:
 
-- **Word order matters.** "The movie was not good" and "The movie was good, not bad" have overlapping word sets but opposite meanings. Naive Bayes cannot distinguish them.
-- **Words interact.** "Hot dog" means something different from "hot" and "dog" separately.
-- **Classes are defined by absence.** Some categories are defined less by which words appear and more by which words do not. A bag-of-words model has no natural way to represent that.
+- **Word order matters.** "The movie was not good" and "The movie was good, not bad" share most words but mean different things. Naive Bayes cannot tell them apart.
+- **Words interact.** "Hot dog" means something else than "hot" and "dog" on their own.
+- **Classes depend on absence.** Some groups are defined by which words do *not* appear. A bag-of-words model has no good way to capture that.
 
-For tasks where order matters, [n-grams](n_gram.html) partially help by treating bigrams as features. For richer representations, [embeddings](what_are_embeddings.html) capture meaning that word counts miss, and [text encoding](why_text_encoding_is_needed_in_nlp.html) explains why the conversion from text to numbers is needed at all.
+When order matters, [n-grams](n_gram.html) help a bit by treating word pairs as features. For deeper meaning, [embeddings](what_are_embeddings.html) capture what counts miss, and [text encoding](why_text_encoding_is_needed_in_nlp.html) explains why you need to turn text into numbers at all.
 
 ## A Naive Bayes classifier from scratch
 
@@ -62,7 +64,6 @@ For tasks where order matters, [n-grams](n_gram.html) partially help by treating
 import math
 from collections import Counter, defaultdict
 
-# ---- tiny training set ----
 train = [
     ("I love this movie", "positive"),
     ("great film and wonderful acting", "positive"),
@@ -70,11 +71,9 @@ train = [
     ("awful movie I hated it", "negative"),
 ]
 
-# ---- build counts ----
 class_counts = Counter()
 word_counts  = defaultdict(Counter)
 vocab = set()
-
 for text, label in train:
     words = text.lower().split()
     class_counts[label] += 1
@@ -85,7 +84,6 @@ for text, label in train:
 V = len(vocab)
 total = sum(class_counts.values())
 
-# ---- classify a new document ----
 def classify(text):
     words = text.lower().split()
     scores = {}
@@ -103,24 +101,32 @@ for label, s in scores.items():
     print(f"  {label}: {s:.4f}")
 ```
 
-The code uses Laplace smoothing (the +1 in the numerator) and works entirely in log space. It trains in one pass and classifies in time proportional to the document length times the number of classes.
+The code uses Laplace smoothing (the +1 in the top) and works in log space. It trains in one pass and classifies in time that grows with the document length times the number of classes.
+
+## When to pick it
+
+Naive Bayes is a good first try for any text sorting task. It trains fast, needs little data, and gives a strong baseline. If the baseline is good enough, ship it. If not, you know the floor. Swap in logistic regression or a neural model later and compare against the Naive Bayes score.
+
+In a real pipeline you often keep Naive Bayes as a cheap first filter. A spam system, for instance, might run Naive Bayes on every message and only send the uncertain ones to a slower, more accurate model. This two-stage design keeps latency low while still catching the hard cases.
+
+Scikit-learn makes it one line: `MultinomialNB().fit(X_train, y_train)`. The input X is usually a count matrix from `CountVectorizer`, where each row is a document and each column is a word. The fit call builds the log-probability table in a single pass.
 
 ## Questions people ask
 
-**Is Naive Bayes actually "naive"?**
-Yes. The conditional independence assumption is almost never true for real language. But the classifier needs correct rankings, not correct probabilities, and the independence assumption rarely changes which class scores highest.
+**Is Naive Bayes really "naive"?**
+Yes. Words in real text are not independent. But the classifier needs the right ranking, not the right probability, and the wrong assumption rarely flips the winner.
 
-**When should I use Naive Bayes over logistic regression?**
-When you have very little training data, many features, or need a fast baseline. Naive Bayes has fewer parameters to estimate, so it handles sparse high-dimensional data well. With enough data, logistic regression usually wins on accuracy.
+**When to pick it over logistic regression?**
+When you have little data, many features, or need a fast baseline. Fewer weights to fit means it handles sparse data well. With enough data, logistic regression usually wins.
 
-**Does Naive Bayes work with TF-IDF features?**
-The multinomial variant uses raw counts. If you want TF-IDF, the complement Naive Bayes variant or a simple logistic regression is a better match. Scikit-learn provides both.
+**Does it work with TF-IDF?**
+The basic form uses raw counts. If you want TF-IDF, complement Naive Bayes or logistic regression is a better fit. Scikit-learn has both.
 
-**What is the difference between multinomial and Bernoulli Naive Bayes?**
-Multinomial uses word counts. Bernoulli uses binary presence or absence. For short texts like tweets, Bernoulli sometimes works better because repeated words add little information.
+**Multinomial vs Bernoulli — what is the difference?**
+Multinomial uses word counts. Bernoulli uses just yes or no — did the word appear? For short texts like tweets, Bernoulli can work better because repeats add little info.
 
-**Can Naive Bayes handle more than two classes?**
-Yes. The formula generalises to any number of classes. You compute P(class) and the word likelihoods for each class independently, then pick the class with the highest score.
+**Can it handle more than two classes?**
+Yes. The formula works for any number of classes. You compute the prior and the word scores for each class on its own, then pick the top one.
 
-**Why does Naive Bayes still appear in production systems?**
-Because it trains in milliseconds, classifies in microseconds, and gives a strong baseline. Many production spam filters and content classifiers still use it, sometimes as the first stage of a pipeline that escalates uncertain cases to a heavier model.
+**Why does it still show up in production?**
+It trains in milliseconds, classifies in microseconds, and gives a strong floor. Many spam filters and content classifiers still run it, sometimes as the first stage that sends hard cases to a heavier model.

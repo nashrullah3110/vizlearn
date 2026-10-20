@@ -622,7 +622,7 @@ This article walks through what happens to the value you return and how it becom
 
 If you only read one thing here, read the part on route order. It is the mistake that catches nearly everyone exactly once, and it is easy to avoid once you know it exists.
 
-You do not need any earlier FastAPI experience to follow it. A basic grasp of Python functions is enough, and every idea is introduced as it comes up. Keep a terminal open if you want to try the examples as you read.
+You do not need any earlier FastAPI experience to follow it. A basic grasp of Python functions is enough, and every idea is introduced as it comes up. Keep a terminal open if you want to try the examples as you read. Each example is self-contained and prints its own output.
 
 ```python
 @app.get("/modules")
@@ -1488,7 +1488,7 @@ The upper bound isn't decoration. Without it, `?limit=1000000` is a valid reques
 
 ## Lists
 
-A query string expresses multiple values by repeating the key: `?tag=maths&tag=vectors`. Annotate the param as a list and you get one:
+A query string expresses multiple values by repeating the key: `?tag=maths&amp;tag=vectors`. Annotate the param as a list and you get one:
 
 ```python
 tag: List[str] = Query(default=[])
@@ -1496,7 +1496,7 @@ tag: List[str] = Query(default=[])
 
 The `Query(default=[])` is needed rather than a bare `= []`. Without the clear marker FastAPI would read a list annotation as a request body.
 
-Items are converted on their own, so `List[int]` given `?id=1&id=2` gives you `[1, 2]` and `?id=abc` gives a 422 pointing at the offending item.
+Items are converted on their own, so `List[int]` given `?id=1&amp;id=2` gives you `[1, 2]` and `?id=abc` gives a 422 pointing at the offending item.
 
 Comma-split values &mdash; `?tags=a,b,c` &mdash; are **not** handled on its own. They're one string holding commas. If your API takes that form, split it in a checker. Be aware you're choosing a rule that the repeated-key form already solves.
 
@@ -1655,7 +1655,7 @@ Each one is easy to add, hard to drop. Interacts with every other. The disciplin
 
 <strong>How do I make a query parameter required?</strong> Give it no default value. A parameter with a default, or with None as the default, is optional.
 
-<strong>How do I accept a list of values like ?tag=a&tag=b?</strong> Annotate with Query, for example tags: list[str] = Query(default=[]). Without Query, a list is read as a body.
+<strong>How do I accept a list of values like ?tag=a&amp;tag=b?</strong> Annotate with Query, for example tags: list[str] = Query(default=[]). Without Query, a list is read as a body.
 
 <strong>Which values count as true for a bool parameter?</strong> FastAPI accepts true, 1, on, yes and their false counterparts, ignoring case. Anything else returns a 422.
 
@@ -3909,7 +3909,7 @@ An HTTP request has one body. For an API there are three ways it's often coded.
 
 **Multipart** (`multipart/form-data`) is what a form with a file input sends. It carries a few named parts, each with its own headers. This Is how a file and its metadata travel together.
 
-FastAPI needs to be told which. A model param means JSON. `Form()` means one of the form encodings. `UploadFile` means a file part in a multipart body.
+FastAPI needs to be told which. A model param means JSON. `Form()` means one of the form encodings. `UploadFile` means a file part in a multipart body. Getting this wrong is a common source of confusing 422 errors.
 
 ## Form()
 
@@ -4294,7 +4294,7 @@ Before the exact code, a client reads the class.
 
 That first digit drives real action in code you didn't write: HTTP libraries retry 5xx and not 4xx, caches store 2xx, monitoring alerts on 5xx. A client's error handling branches on it before looking at anything else.
 
-Returning 200 with `{"error": "not found"}` throws all of that away. each caller now has to parse your body to discover a thing the protocol had a field for, retries do the wrong thing. Your error rate looks like zero on each dashboard.
+Returning 200 with `{"error": "not found"}` throws all of that away. each caller now has to parse your body to discover a thing the protocol had a field for, retries do the wrong thing. Your error rate looks like zero on each dashboard. Pick the right code and the protocol carries the meaning for you.
 
 ## The 2xx ones worth using
 
@@ -9919,7 +9919,7 @@ The documentation pages are also a testing tool. You can fill in parameters and 
 
 It's assembled from things you already wrote. The path in the decorator, the params in the signature, the models, the constraints, the docstrings. There's no split specification to maintain and no way for it to drift. It *is* the code.
 
-FastAPI serves it at `/openapi.json`, renders it at `/docs` (Swagger UI) and `/redoc` (ReDoc).
+FastAPI serves it at `/openapi.json`, renders it at `/docs` (Swagger UI) and `/redoc` (ReDoc). Both pages update as your code changes.
 
 ## The header
 

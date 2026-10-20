@@ -3384,7 +3384,7 @@ This page covers each encoding, the mistakes each one stops, and how to put them
 
 scikit-learn's estimators operate on numeric arrays. A column of strings raises rather than being converted automatically. The error. `couldn't convert string to float`. Is one of the first anyone meets on real data.
 
-The conversion isn't mechanical, because there's more than one way to do it and they encode different claims about the data. Getting it wrong doesn't raise. It makes a model that has been told a thing false.
+The conversion isn't mechanical, because there's more than one way to do it and they encode different claims about the data. Getting it wrong doesn't raise. It makes a model that has been told a thing false. The model trains on the false claim and gives you results that look normal. The mistake shows only when you check the encoding.
 
 ## The mistake to avoid
 

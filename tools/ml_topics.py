@@ -409,6 +409,16 @@ It has no error message. Nothing crashes, nothing warns, and the only symptom is
 that the number is better than you expected. Which isn't a symptom
 anyone investigates.
 
+The most common form is fitting a preprocessing step on the whole dataset
+before splitting. A scaler learns a mean and a standard deviation. If
+those numbers include the test rows, the test score measures how well the
+model exploits a summary it should never have seen.
+
+A feature that could not exist at prediction time is the second common
+form. A column filled in after the outcome was decided hands the model
+the answer directly. Both forms run without complaint, and the only
+sign is a score that looks too good.
+
 ## Watch it happen, on data with nothing in it
 
 The dataset behind the chart is 300 rows and a few hundred columns of pure
@@ -1566,16 +1576,25 @@ intro: Four counts in a table, three ratios drawn from them. One slider that mov
 ## One model, many scores
 
 A classifier doesn't output a class. It outputs a **score** &mdash; how
-plus it thinks each case is. And a class only appears once you compare
+positive it thinks each case is. A class only appears once you compare
 that score against a threshold.
 
-The histogram shows both spreads: actual negatives in grey, actual
-positives in orange, shared in the middle because the model is good and not
-perfect. The dashed line is the threshold.
+That threshold is your choice, not the model's. Moving it changes which
+cases count as positive and which as negative.
+The model stays the same. Only the line moves, and every metric shifts
+with it.
 
-Move it. each number below the chart changes, and the model hasn't been
-retrained. The scores are properties of the threshold as much as of the model,
-which is the single most handy thing to understand here.
+Precision, recall and F1 are not fixed numbers for a model. They are
+functions of the threshold. You can trade one for another by sliding it,
+and that trade-off matters more than any formula.
+
+The histogram shows both spreads: actual negatives in grey, actual
+positives in orange, overlapping because no model is perfect. The
+dashed line is the threshold.
+
+Move it. Every number below the chart changes, and the model hasn't been
+retrained. The scores are properties of the threshold as much as of the
+model, which is the single most important thing to understand here.
 
 ## The four counts
 
@@ -2382,6 +2401,15 @@ This lopsidedness is the normal case, not a contrived one. In most models one or
 two settings dominate and the rest are close to noise, and you often do
 not know in advance which is which.
 
+Grid search picks values in a regular lattice. Every point in a column
+shares the same value of the important axis. Most of the budget is spent
+varying a parameter that barely matters.
+
+Random search spends the same budget differently. Each trial picks each
+parameter independently, so every trial tests a new value of the axis
+you care about. The coverage where it counts is far finer, at no extra
+cost.
+
 ## Count the distinct values
 
 Set the method to **Grid** with 16 trials. Sixteen points appear in a 4&times;4
@@ -2659,11 +2687,13 @@ intro: The plot that answers whether to collect more data. Saves you from collec
 A learning curve answers a single question: will more data help? The answer
 saves real money. Collecting and labelling another 50,000 rows is expensive.
 If the model has already stopped improving, that cost is wasted. The curve
-tells you before you spend it.
+tells you before you spend it. It takes minutes to plot and can save weeks
+of wasted effort.
 
 Train the model on 40 examples, record the error on those examples and on a
 held-out validation set. Repeat with 80, 120, and so on. Plot both against
 training-set size. Grey is training error, orange is validation error.
+The gap between them is the signal.
 
 The **shape** of the pair is the diagnosis, and the diagnosis is more
 useful than either number alone. A gap that keeps closing says more data
@@ -4105,6 +4135,8 @@ with the most spread, but that projection can hide clusters that sit
 in the other 48 dimensions. t-SNE and UMAP take a different approach:
 they try to keep nearby points nearby, and let everything else land
 wherever it lands. The result often shows clusters that PCA misses.
+The price is that cluster spacing in the plot becomes arbitrary. You
+can read neighbourhoods, not distances.
 
 The layout on this page is a **simplified neighbour-preserving
 optimisation** &mdash; attract each point toward its nearest neighbours in
@@ -4448,8 +4480,11 @@ retraining, which gives a different model and answers a different question.
 Shuffling keeps the same fitted model and the same input shape, so the only thing
 that changed is whether that column carries signal.
 
-Because it needs nothing but guesses, it works on any model at all &mdash;
-linear, forest, grad-boosted, neural network.
+Because it needs nothing but predictions, it works on any model at all
+&mdash; linear, forest, grad-boosted, neural network. You do not need
+access to the model's internals or any knowledge of how it works. All
+you need is the ability to score it on a dataset and to shuffle one
+column at a time. That makes it one of the first tools worth trying.
 
 ## Reading the chart
 
@@ -5112,6 +5147,23 @@ where the model said 0.8, were about 80% really plus?
 A model can be great at one and terrible at the other, and this isn't an
 edge case &mdash; it's the normal situation.
 
+Think of a weather app that says 80% chance of rain. If you collect every
+day it said 80%, roughly 80 of those 100 days should actually have rain.
+That is calibration. A model that says 80% but is only right 60% of the
+time is over-confident. Its ranking might still be fine: rainy days might
+consistently score higher than dry ones. But the number itself is wrong,
+and any decision that trusts the number inherits that error.
+
+This matters whenever a predicted probability feeds a downstream choice.
+Setting a [threshold](threshold_tuning.html), computing an expected value,
+or communicating a risk to a person all depend on the number meaning what
+it says. A well-ranked but badly calibrated model will mislead each of
+those uses. Most classifiers ship miscalibrated out of the box. Neural
+networks tend to be over-confident. Random forests tend to be too cautious
+at the extremes. Checking calibration is a separate step, and fixing it is
+a separate technique. Neither AUC nor accuracy will warn you that the
+probabilities are off.
+
 ## The slider proves it
 
 Drag the temperature control and watch the curve deform. That control performs
@@ -5119,19 +5171,13 @@ Drag the temperature control and watch the curve deform. That control performs
 Cutting by a number less than one sharpens each score toward 0 or 1. Cutting
 by a number greater than one flattens them toward 0.5.
 
-Critically, this is a **monotonic** change. It never changes the order of
-any two guesses. each ranking metric &mdash; AUC, mean precision,
-any of it based on sorting. Is **the same at each setting of that
-slider**, while the trust curve swings from badly too sure to badly
-too shy.
+This is a **monotonic** change. It never swaps the order of any two scores. Every ranking metric &mdash; AUC, mean precision, anything based on sorting &mdash; stays **the same** at every slider setting. But the trust curve swings from far too sure to far too shy.
 
-Which is the point. If you only ever look at AUC, you've no info about
-calibration at all.
+That is the point. If you only look at AUC, you learn nothing about calibration.
 
 ## Reading the diagram
 
-guesses are binned by trust, and each bin plots mean trust against
-seen rate.
+Scores are binned by trust. Each bin plots the mean trust against the true rate.
 
 **On the diagonal**: calibrated.
 
@@ -5140,46 +5186,30 @@ the time. This is the common failure, and the damaging one.
 
 **Above the diagonal**: under-confident. The model hedges when it should not.
 
-**ECE** &mdash; expected calibration error &mdash; is the mean vertical
-distance, weighted by how many points fall in each bin. It's the number in the
-readout, and it's a summary that can hide compensating errors: a curve that is
-above the main-line in one region and below in another can report a small ECE.
-Look at the curve, not only the number.
+**ECE** &mdash; expected calibration error &mdash; is the mean gap, weighted by how many points fall in each bin. It is the number in the readout. It can hide errors that cancel out: a curve above the line in one range and below in another may still show a small ECE. Look at the curve, not just the number.
 
 ## Why models come out miscalibrated
 
-**Modern neural networks are too sure**, and increasingly so as they get
-larger. Training to cut cross-entropy on data it can fit just right pushes
-outputs toward 0 and 1 long after the fit has stopped raising.
+**Neural networks are too sure**, and more so as they get bigger. Training to cut cross-entropy on data the model can fit perfectly pushes outputs toward 0 and 1 long after the loss has stopped improving.
 
-**Support vector machines** give distances from a hyperplane, not
-chances, and passing them through a sigmoid doesn't make them
-chances.
+**SVMs** give distances from a line, not chances. Passing them through a sigmoid does not make them chances.
 
-**Naive Bayes** is famously too sure because its freedom assumption
-times linked evidence as though it were free.
+**Naive Bayes** is too sure because it treats linked evidence as if it were independent.
 
-**Random forests** tend to be too shy at the extremes, because blending
-many trees pulls guesses toward the middle.
+**Random forests** tend to be too shy at the extremes. Blending many trees pulls scores toward the middle.
 
-Logistic regression, fitted on well-given features, is often close to
-calibrated &mdash; it optimises just this.
+Logistic regression, fitted on good features, is often close to calibrated &mdash; it optimises exactly this.
 
 ## Fixing it
 
 All three methods fit a correction on a **held-out** set, never on the training
 data.
 
-**Platt scaling.** Fit a logistic regression to map scores to chances. One
-or two params, works on small validation sets, assumes the distortion is
-sigmoid-shaped.
+**Platt scaling.** Fit a logistic regression to map scores to chances. One or two parameters. Works on small sets. Assumes a sigmoid-shaped distortion.
 
-**Temperature scaling.** The single-param version, and the standard for
-neural networks. Because it changes no rankings, fit and AUC are ensured
-untouched &mdash; a rare free lunch.
+**Temperature scaling.** The one-parameter version, and the standard for neural networks. It changes no rankings, so fit and AUC stay the same &mdash; a rare free lunch.
 
-**Isotonic regression.** Fits any monotonic mapping. More flexible, and needs
-a lot more data or it overfits the validation set.
+**Isotonic regression.** Fits any monotonic mapping. More flexible, but needs more data or it overfits the validation set.
 
 ## When it matters
 

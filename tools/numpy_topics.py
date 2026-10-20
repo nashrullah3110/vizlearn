@@ -2747,9 +2747,9 @@ Combining conditions uses the bitwise operators, not the Python keywords. The an
 
 Boolean masks are also useful for counting. True is 1 and False is 0. mask.sum() counts the True entries. mask.mean() gives the fraction. np.any(mask) checks whether at least one element is True. np.all(mask) checks whether every element is True.
 
-Assignment through a mask modifies only the selected elements. a[a < 0] = 0 clips negative values to zero. That is a common pattern for cleaning data in place.
+Assignment through a mask modifies only the selected elements in place. a[a < 0] = 0 clips negative values to zero. That is a common and readable pattern for cleaning dirty data in place.
 
-This module covers comparisons, selection, combination, counting, and assignment through boolean masks. These operations appear in virtually every NumPy script and carry over directly to pandas, where boolean Series serve the same role.
+This module covers comparisons, selection, combination, counting, and assignment through boolean masks. These operations appear in virtually every NumPy script and carry over directly to pandas, where boolean Series serve the exact same role.
 
 
 `a > 5` doesn't give one answer. It gives a boolean array with one entry per element.

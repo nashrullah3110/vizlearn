@@ -3,17 +3,22 @@ intro: Getting the effect of a large batch out of a device that can't hold one.
 
 ## Why it works
 
-The loss over a batch is the mean of the per-example losses, and differentiation
-is linear. So the grad of the batch is the mean of the per-example
-grads.
+Large batches improve training stability and convergence for many models. But a
+large batch needs memory, and GPU memory is fixed. If your target batch does not
+fit on your card, you cannot just wish for more VRAM.
 
-That means the sum can be built in pieces. Run a forward and backward pass on 16
-examples, keep the grads, run another 16, add to them, and after 16 rounds
-you've just the grad of a 256-example batch. Step the tuner once.
+Gradient accumulation solves this without extra hardware. The key insight is
+that differentiation is linear. The gradient of a mean loss over a batch equals
+the mean of the per-example gradients. That mean can be built in pieces.
 
-**The resulting update is the same**. Not similar, the same up to
-floating-point sorting &mdash; to what a single 256-example batch would have
-made.
+Run a forward and backward pass on 16 examples. Store the gradients. Run
+another 16 and add to the stored gradients. After 16 such rounds you hold
+exactly the gradient of a 256-example batch. Step the optimiser once.
+
+**The resulting update is mathematically identical.** It is not an
+approximation. Up to floating-point ordering, it produces the same parameter
+change that a single 256-example batch would have produced. You trade wall-clock
+time for memory, nothing else.
 
 ## What actually consumes the memory
 

@@ -614,7 +614,7 @@ An index is an immutable, ordered set of labels. One label per row. It can hold 
 
 The default RangeIndex of 0, 1, 2 hides all of this. It makes the index look like a row counter. For a freshly created frame, it behaves like one. After a single filter, the positions and labels diverge, and code that assumed they were the same gives wrong answers or raises a KeyError.
 
-This module covers what the index is, how it sticks to rows through filtering, how alignment uses it, and how to reset it when you need positional access again. The examples are short and show the index before and after each operation, so the behaviour is visible rather than implied. Each one prints the index explicitly so you can track how labels move, stick and sometimes surprise you.
+This module covers what the index is, how it sticks to rows through filtering, how alignment uses it, and how to reset it when you need positional access again. The examples are short and show the index before and after each operation, so the behaviour is visible rather than implied. Each one prints the index explicitly so you can track how labels move, stick and sometimes surprise you. That visibility makes the behaviour concrete rather than abstract.
 
 each Series and each DataFrame carries an index. An sorted set of labels, one per row. A DataFrame also has an index for its columns.
 
@@ -2268,7 +2268,7 @@ This pattern repeats everywhere in pandas. Once you are comfortable with masks, 
 
 The module also covers isin for membership checks, between for range checks, and query for string-based filtering. Each is a convenience wrapper around the mask pattern. Knowing the underlying pattern makes the wrappers obvious rather than mysterious.
 
-Filtering is the step you will do most often. Almost every analysis starts by narrowing the data to the subset that matters. Getting this right means every downstream result is computed on the right rows.
+Filtering is the step you will do most often. Almost every analysis starts by narrowing the data to the subset that matters. Getting this right means every downstream result is computed on the right rows. If you filter wrong, every number downstream carries the mistake forward.
 
 
 `df["age"] >= 25` doesn't return rows. It returns a boolean Series, one value per row, carrying the same index as the frame.
@@ -2915,7 +2915,7 @@ Copy-on-write drops the ambiguity fully and turns the default in pandas 3.0. Wri
 
 ## Questions people ask
 
-<strong>What does SettingWithCopyWarning actually mean?</strong> pandas cannot tell whether you are writing to a copy or to a view of the original frame. Your assignment may not reach the frame you meant to change.
+<strong>What does SettingWithCopyWarning actually mean?</strong> pandas cannot tell if you are writing to a copy or to a view of the original frame. Your assignment may not reach the frame you meant to change.
 
 <strong>How do I make the warning go away properly?</strong> Call .copy() when you intend an independent subset, or use a single df.loc[mask, 'col'] = value when you intend to modify the original.
 
@@ -3106,7 +3106,7 @@ The simplest form is bracket assignment. It writes a new column if the name does
 
 The assigned value can be a Series, a scalar, or an array. A scalar broadcasts to every row. A Series aligns on the index, which means mismatched indexes produce NaN in the gaps rather than raising an error. An array must match the frame length exactly or pandas raises a ValueError.
 
-Understanding alignment during assignment prevents a common surprise. If you compute a value from a filtered subset and assign it back, the result has NaN wherever the filter excluded a row. That is correct behavior, but it catches people who expected the values to fill in order rather than by label.
+Understanding alignment during assignment prevents a common surprise. If you compute a value from a filtered subset and assign it back, the result has NaN wherever the filter excluded a row. That is correct behavior, but it catches people who expected the values to fill in order rather than by label. You will see NaN in places you expected values, and the index explains why.
 
 This module covers bracket assignment, the assign method for chaining, insert for positional placement, drop for removal, and rename for changing column names. Each returns a new object by default, which matters for method chaining and for avoiding accidental mutation of a shared frame.
 
@@ -4361,7 +4361,7 @@ Duplicate rows appear for many reasons. A data source sends the same record twic
 
 Finding duplicates is easy. The harder part is deciding what counts as a duplicate and which copy to keep. Two rows might match on every column, or they might match only on an id while differing on a timestamp. The first case is a true copy. The second might be an update history where you want the latest version. The subset parameter controls which columns matter.
 
-Ignoring duplicates biases every aggregate. A duplicated sale doubles the revenue for that product. A duplicated survey response shifts the distribution. The effect is proportional to how many copies exist and how different they are from the rest. In small datasets the effect is obvious. In large ones it hides inside plausible-looking totals.
+Ignoring duplicates biases every aggregate. A duplicated sale doubles the revenue for that product. A duplicated survey response shifts the distribution. You may not notice until an aggregate looks wrong and you trace it back. The effect is proportional to how many copies exist and how different they are from the rest. In small datasets the effect is obvious. In large ones it hides inside plausible-looking totals.
 
 Checking for duplicates belongs in the inspection routine, right after shape and dtypes. A quick df.duplicated().sum() tells you whether the problem exists. If it does, the next step is to look at the actual rows, decide on a subset and a keep rule, and document the choice.
 
@@ -7378,9 +7378,9 @@ pandas has several methods that apply a function to data, and their names are ea
 
 The confusion matters because choosing the wrong one is either slow, incorrect, or both. Series.map with a dict is a fast lookup. Series.apply with a lambda is a slow Python loop disguised as a pandas call. DataFrame.apply with axis=1 iterates over every row in Python, which is the slowest operation you can write in pandas. Knowing which one you are using, and whether a vectorised alternative exists, is the difference between a script that finishes in a second and one that takes a minute.
 
-The first question to ask is whether the operation has a vectorised form. Multiplying by two, comparing to a threshold, extracting the year from a date -- all of these have array-level implementations that run in compiled code. Using apply for any of them is correct but unnecessarily slow.
+The first question to ask is whether the operation has a vectorised form. Multiplying by two, comparing to a threshold, extracting the year from a date -- all of these have array-level implementations that run in compiled code. Using apply for any of them is correct but unnecessarily slow. You can usually tell by checking whether the function needs the whole row or just one column.
 
-The second question is what the function operates on. map works on single values. apply on a Series works on single values. apply on a DataFrame works on whole columns or whole rows, depending on the axis parameter. The axis parameter is a common source of mistakes because the default is columns, not rows.
+The second question is what the function operates on. map works on single values. apply on a Series works on single values. apply on a DataFrame works on whole columns or whole rows, depending on the axis parameter. The axis parameter is a common source of mistakes because the default is columns, not rows. That default surprises people more than any other parameter in pandas.
 
 This module covers map for substitution, apply for per-element and per-row computation, and the vectorised replacements that make apply unnecessary in most cases. It also covers applymap and its renaming, for completeness.
 
@@ -7804,7 +7804,7 @@ The part that trips people is alignment. When stacking rows, concat aligns by co
 
 When stacking columns, concat aligns by the index. Mismatched index labels get NaN. That means two frames from different filters of the same source may align correctly, while two frames from different sources may not. Checking the index before stacking prevents surprises.
 
-The keys parameter adds a level to the index identifying which frame each row came from. That is useful for tracing rows back to their source after the concat. It also produces a MultiIndex, which you may or may not want.
+The keys parameter adds a level to the index identifying which frame each row came from. That is useful for tracing rows back to their source after the concat. You can also use it to filter back to a single source later. It also produces a MultiIndex, which you may or may not want.
 
 ignore_index resets the result to a clean 0-based index. That is the right choice when the original indexes are meaningless row numbers that would otherwise collide.
 
@@ -9060,7 +9060,7 @@ The most common fix is to flatten the MultiIndex and go back to a simple frame. 
 
 Knowing when to keep a MultiIndex and when to flatten it depends on what you are doing next. Plotting and exporting usually want a flat frame. Further aggregation and selection sometimes benefit from the hierarchical structure. The default choice, when you are unsure, is to flatten. You can always re-group later.
 
-This module covers how a MultiIndex is created, how to select from it, how to flatten it, and the methods that move levels between rows and columns.
+This module covers how a MultiIndex is created, how to select from it, how to flatten it, and the methods that move levels between rows and columns. The examples use small frames so every level is visible in the output.
 
 
 Almost no one makes a MultiIndex on purpose. It appears as the result of steps you were doing anyway:

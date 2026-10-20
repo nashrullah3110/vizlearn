@@ -1934,7 +1934,8 @@ that same shape, because a sample of one *is* a draw from the group.
 
 Now drag `n` upward. By 5 the two humps have merged. By 30 the right-hand panel
 is a clean bell, and the fitted normal curve sits on top of the resampled
-histogram. Nothing about the group changed.
+histogram. Nothing about the group changed. Only the sample size changed,
+and the sampling distribution followed.
 
 ## Three things it is not
 
@@ -2388,10 +2389,15 @@ You draw a sample and find its mean. Draw a different sample and you get a
 different mean. The statistic is itself a random quantity, and it has a
 spread: the **sampling spread**.
 
-This is the conceptual step all in inference rests on. It's also the one
+This is the conceptual step all of inference rests on. It's also the one
 that is easy to skip, because you only ever draw one sample and
 never see the spread at all. You reason about what *would* happen
 across the samples you didn't take.
+
+Every confidence interval and every p-value depends on this reasoning.
+They ask how far your estimate might wander if you repeated the study.
+That question has an answer only once you accept that the estimate has a
+distribution. The width of that distribution is the standard error.
 
 The left panel makes it visible by really doing it: 800 samples drawn, each
 mean plotted. That histogram is the sampling distribution of the mean, and it's
@@ -2911,6 +2917,11 @@ intro: The most used and most misread number in statistics, defined just enough 
 **The null hypothesis** is a exact, boring claim: no effect, no difference,
 nothing happening. It's exact on purpose, because a exact claim implies a
 spread for the test statistic.
+
+The null must be specific enough to produce a distribution. If you cannot
+say what the statistic should look like when nothing is happening, there
+is nothing to test against. That specificity is what makes the whole
+method work.
 
 That spread is the curve. It's what the statistic would look like across
 repeated samples **if the null were true**. each use of a p-value inherits that

@@ -122,6 +122,16 @@ That is the whole method. Blurring, sharpening, edge spotting and
 embossing aren't different methods. They're the same method with
 different numbers in the grid.
 
+This idea sits at the heart of every convolutional neural network. Each
+layer applies dozens or hundreds of kernels. The network learns which
+numbers to put in each grid during training.
+
+Before CNNs, engineers chose the numbers by hand. Decades of image
+processing built a library of named kernels, each with a known effect.
+The visualisation above lets you try them yourself. Change the preset
+and watch the output. Nine numbers decide whether the image looks
+blurred, sharp, or reduced to bare edges.
+
 ## Reading a kernel
 
 The identity kernel is the easiest to reason about:
@@ -1596,11 +1606,21 @@ intro: The two ops that shape a binary mask. The four things you build from them
 
 ## Operating on shape, not brightness
 
-each filter so far has treated the image as a field of numbers. Morphological
-ops treat it as a **set of pixels**. The foreground &mdash; and
+Each filter so far has treated the image as a field of numbers. Morphological
+ops treat it as a **set of pixels** &mdash; the foreground &mdash; and
 ask geometric questions about that set. They're defined for binary images,
 which is why the visualisation above thresholds first and why the binarise
 control sits alongside the others.
+
+You will find these ops in nearly every image pipeline that works with
+masks. After you threshold a photo, the mask is rarely clean. Noise
+leaves stray white pixels in the background. Shadows leave holes inside
+objects. Erosion and dilation fix both kinds of damage without moving
+the boundaries of things that were correct.
+
+The two ops are opposites. Erosion shrinks foreground regions. Dilation
+grows them. Run one after the other and you get a cleaner mask at
+roughly the same size.
 
 The tool is a **structuring element**: a small shape, often a square or a
 disc, that gets placed over each pixel in turn. What happens next depends on
@@ -3669,6 +3689,17 @@ intro: One convolution split into two. Why almost each model that runs on a phon
 
 ## What a full convolution is doing
 
+Standard convolutions are the workhorse of convolutional neural networks.
+They work well, but they are expensive. As models grow deeper and wider,
+the parameter count climbs fast. Most of that cost comes from one
+design choice: mixing spatial neighbours and channels in a single step.
+
+Depthwise separable convolutions split that one step into two cheaper
+ones. The total result is nearly the same. The total cost drops by
+roughly a factor of nine. This trade-off is why phone-friendly models
+like MobileNet exist at all. You keep the same input and output shapes
+but spend far fewer parameters to get there.
+
 A 3&#215;3 convolution from 64 channels to 128 does two jobs at once. At each
 output spot it looks at a 3&#215;3 spatial zone, and it mixes
 all 64 input channels. Each of the 128 output channels needs its own set of
@@ -4601,6 +4632,13 @@ to fit it?
 
 The output is now a fixed-size tensor, and the regression target is a small
 offset instead of an abs spot.
+
+This idea appeared in Faster R-CNN and quickly became the default for
+object detection. Models like SSD, YOLOv2 and RetinaNet all build on
+it. The anchor set acts as a prior over box shapes. It tells the
+network what sizes and aspect ratios to expect. If you choose anchors
+that match your data, the offsets stay small and training converges
+faster.
 
 ## What the visualisation shows
 
@@ -6400,10 +6438,23 @@ intro: A heatmap of which regions a network used, built from grads it already fi
 ## The question
 
 A network says "cat". Which part of the image made it say that?
+You cannot read the answer from the raw weights. A trained network
+holds millions of parameters. No single one points at a region in
+the input. You need a method that traces the prediction back to the
+image.
 
 Grad-CAM answers with a heatmap, and it does so using quantities the network
-makes anyway during backpropagation. This Is why it works on any
+makes anyway during backpropagation. This is why it works on any
 convolutional architecture without retraining or modification.
+
+The name stands for Gradient-weighted Class Activation Mapping. The
+idea is to weight each feature map by how much it contributed to the
+class score, then add the weighted maps together. Regions that drove
+the prediction light up. Regions that played no part stay dark.
+
+The result is coarse, usually the size of the last feature map. It
+tells you which part of the image the model relied on, not which exact
+pixel. That is enough to spot a model that looks at the wrong thing.
 
 ## The recipe
 
@@ -6720,11 +6771,23 @@ intro: Three tasks, one scene, and the two questions that separate them.
 
 ## Two questions
 
-each segmentation task colours in pixels. What differs is the answer to two
-questions:
+Image classification tells you what is in a picture. Object detection
+tells you where each thing is, with a box around it. Segmentation goes
+one step further. It labels every single pixel in the frame.
+
+That pixel-level output is what self-driving cars, medical imaging tools
+and satellite analysis all depend on. A bounding box is too coarse when
+you need the exact boundary of a tumour or the precise edge of a road.
+
+All three segmentation tasks colour in pixels. What differs is the
+answer to two questions:
 
 1. Do two objects of the same class get **separate identities**?
 2. Does the **background** get labelled?
+
+Your answer picks the task. Semantic says no to separate ids and yes to
+background. Instance says yes to ids but skips background. Panoptic says
+yes to both.
 
 Switch between the three settings above and watch the two discs and the
 background. That is the entire taxonomy, visible in one scene.

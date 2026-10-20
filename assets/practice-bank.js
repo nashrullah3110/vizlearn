@@ -2730,15 +2730,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “What pooling does”?",
-    "ans": "A convolutional layer produces a feature map the same size as its input (when padded). Stack several layers and the maps stay large, the memory stays high, and every later operation is expensive. Pooling fixes that by summarising small regions into single values."
+    "ans": "A conv layer makes a feature map the same size as its input (when padded). Stack a few layers and the maps stay large, memory stays high, and every later step is costly. Pooling fixes that by summing up small patches into single values."
    },
    {
     "t": "What does this module say about “Max pooling”?",
-    "ans": "Max pooling keeps the strongest activation in each window. If one pixel in a 2x2 block fired at 0.9 and the other three were near zero, the output is 0.9. The feature was detected somewhere in that region, and max pooling records that fact."
+    "ans": "Max pooling keeps the strongest value in each tile. If one pixel in a 2x2 block fired at 0.9 and the other three were near zero, the output is 0.9. The feature was found somewhere in that patch, and max pooling records that fact."
    },
    {
     "t": "What does this module say about “Average pooling”?",
-    "ans": "Average pooling takes the mean of every value in the window. If the four pixels are 0.9, 0.1, 0.0, and 0.2, the output is 0.3. The strong activation is diluted by its quiet neighbours."
+    "ans": "Average pooling takes the mean of every value in the tile. If the four pixels are 0.9, 0.1, 0.0, and 0.2, the output is 0.3. The strong peak is spread out by its quiet neighbours."
    }
   ]
  },
@@ -5251,7 +5251,7 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “Context first”?",
-    "ans": "Training a deep network means passing a loss signal backward through every layer. Each layer multiplies the incoming gradient by its own local derivative. Chain enough multiplications together and the product either shrinks toward zero or grows toward infinity."
+    "ans": "Training a deep network means passing a loss signal backward through every layer. Each layer multiplies the incoming gradient by its own local derivative. Chain enough of these together and the product either shrinks toward zero or grows toward infinity."
    },
    {
     "t": "What does this module say about “Gradient Magnitudes”?",
@@ -5259,7 +5259,7 @@ window.VIZLEARN_PRACTICE = [
    },
    {
     "t": "What does this module say about “The chain rule is a product”?",
-    "ans": "Backpropagation computes gradients by applying the chain rule layer after layer. For a network with L layers the gradient of the loss with respect to the first layer's weights is roughly:"
+    "ans": "Backpropagation computes gradients by the chain rule, layer after layer. For a network with L layers the gradient at the first layer looks like:"
    }
   ]
  },
@@ -15115,15 +15115,15 @@ window.VIZLEARN_PRACTICE = [
   "q": [
    {
     "t": "What does this module say about “What Naive Bayes assumes”?",
-    "ans": "You have a document and a set of possible class labels. Naive Bayes treats the document as a bag of words and assumes every word is conditionally independent of every other word given the class. That assumption is plainly false. The word \"not\" changes the meaning of every word that follows it, and \"New\" before \"York\" is not the same as \"New\" before \"idea\". The model ignores all of that."
+    "ans": "You have a document and a set of class labels. Naive Bayes treats the document as a bag of words. It assumes every word is independent of every other word, given the class. That is plainly false. \"Not\" changes the sense of every word after it, and \"New York\" is not the same as \"New idea\". The model ignores all of that."
    },
    {
     "t": "What does this module say about “Why log-probabilities”?",
-    "ans": "Multiplying many small probabilities together produces numbers so small that floating-point arithmetic rounds them to zero. A document with 200 words can push the product below 10 −300 , which underflows in 64-bit floating point."
+    "ans": "Multiplying many small numbers gives a result so tiny that the computer rounds it to zero. A document with 200 words can push the product below 10 −300 . That underflows in 64-bit floating point."
    },
    {
     "t": "What does this module say about “Laplace smoothing”?",
-    "ans": "A word that never appeared in positive training documents gets P(word | positive) = 0. One zero anywhere makes the entire product zero, so the model ignores all the other evidence. A single unseen word vetoes the entire classification."
+    "ans": "A word that never appeared in positive training docs gets P(word | positive) = 0. One zero in the product makes the whole product zero. One unseen word vetoes the entire call."
    }
   ]
  },

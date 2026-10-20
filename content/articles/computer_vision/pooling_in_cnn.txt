@@ -3,35 +3,35 @@ intro: After a convolution extracts features, pooling shrinks the map so the nex
 
 ## What pooling does
 
-A convolutional layer produces a [feature map](feature_map_in_cnn.html) the same size as its input (when padded). Stack several layers and the maps stay large, the memory stays high, and every later operation is expensive. Pooling fixes that by summarising small regions into single values.
+A conv layer makes a [feature map](feature_map_in_cnn.html) the same size as its input (when padded). Stack a few layers and the maps stay large, memory stays high, and every later step is costly. Pooling fixes that by summing up small patches into single values.
 
-The idea is simple. Divide the feature map into non-overlapping windows, usually 2x2. Replace each window with one number. The output is half the width and half the height, one quarter the area. That quarter carries most of the signal, because nearby pixels in a feature map tend to carry similar information.
+The idea is simple. Split the feature map into tiles, usually 2x2. Replace each tile with one number. The output is half the width and half the height — one quarter the area. That quarter keeps most of the signal, because nearby pixels in a feature map tend to hold similar info.
 
-Two rules dominate: take the maximum of the window, or take the average. Both shrink the map. They differ in what survives the shrinking.
+Two rules dominate: take the max of the tile, or take the mean. Both shrink the map. They differ in what survives.
 
 ## Max pooling
 
-Max pooling keeps the strongest activation in each window. If one pixel in a 2x2 block fired at 0.9 and the other three were near zero, the output is 0.9. The feature was detected somewhere in that region, and max pooling records that fact.
+Max pooling keeps the strongest value in each tile. If one pixel in a 2x2 block fired at 0.9 and the other three were near zero, the output is 0.9. The feature was found somewhere in that patch, and max pooling records that fact.
 
-This makes max pooling tolerant to small shifts. Move a feature one pixel to the right and the same window still captures it. The output does not change. That property is called translation invariance, and it is one reason pooling layers exist.
+This makes max pooling tolerant to small shifts. Move a feature one pixel right and the same tile still catches it. The output stays the same. That trait is called shift invariance, and it is one reason pooling layers exist.
 
-Max pooling was the default for years. VGG-16 uses five 2x2 max-pool layers, each halving the spatial dimensions. LeNet-5, the architecture that started modern CNNs, also used a form of it.
+Max pooling was the default for years. VGG-16 uses five 2x2 max-pool layers, each halving the map size. LeNet-5, the model that started modern CNNs, also used a form of it.
 
 ## Average pooling
 
-Average pooling takes the mean of every value in the window. If the four pixels are 0.9, 0.1, 0.0, and 0.2, the output is 0.3. The strong activation is diluted by its quiet neighbours.
+Average pooling takes the mean of every value in the tile. If the four pixels are 0.9, 0.1, 0.0, and 0.2, the output is 0.3. The strong peak is spread out by its quiet neighbours.
 
-Average pooling preserves the overall energy of the map better than max pooling. When the goal is to keep a smooth summary rather than a sharp peak, it is the better choice. [Global average pooling](global_average_pooling.html) is the extreme case: one average per channel across the entire spatial extent, used at the end of modern networks to replace the flatten-and-dense head.
+Average pooling keeps the overall energy of the map better than max pooling. When you want a smooth summary rather than a sharp peak, it is the better pick. [Global average pooling](global_average_pooling.html) is the extreme case: one mean per channel across the whole spatial area, used at the end of modern networks in place of flatten-and-dense.
 
-For intermediate layers, max pooling is more common than average pooling, because classification networks care more about whether a feature appeared than about its average strength.
+For middle layers, max pooling is more common. Classification networks care more about whether a feature showed up than about its mean strength.
 
 ## How the window slides
 
-The pooling window slides across the feature map exactly like a convolution filter, controlled by [stride](strides_in_cnn.html). The standard setting is stride equal to pool size. A 2x2 pool with stride 2 covers every pixel exactly once. A 3x3 pool with stride 3 does the same at a coarser scale.
+The pooling tile slides across the map just like a conv filter, set by [stride](strides_in_cnn.html). The usual rule is stride equal to pool size. A 2x2 pool with stride 2 hits every pixel once. A 3x3 pool with stride 3 does the same at a coarser scale.
 
-You can set stride smaller than the pool size to get overlapping windows. A 3x3 pool with stride 2 overlaps by one column and one row at each step. AlexNet used this (3x3 pool, stride 2), and it gave a small accuracy gain over non-overlapping pooling at the cost of a larger output.
+You can set stride smaller than the pool size to get overlap. A 3x3 pool with stride 2 overlaps by one pixel at each step. AlexNet used this (3x3 pool, stride 2). It gave a small gain over plain tiling at the cost of a bigger output.
 
-The output dimension follows the same formula as strided convolution:
+The output size follows the same formula as strided convolution:
 
 ```
 output = floor((input - pool_size) / stride) + 1
@@ -41,27 +41,27 @@ A 32x32 map with a 2x2 pool and stride 2 gives 16x16. A 32x32 map with a 3x3 poo
 
 ## Why pooling matters
 
-**Shrinks the map.** Each 2x2 pool layer quarters the spatial area. Two pool layers reduce it to a sixteenth. That cuts the compute and memory for every later layer by the same factor.
+**Shrinks the map.** Each 2x2 pool quarters the area. Two pools cut it to a sixteenth. That saves the same factor in compute and memory for every later layer.
 
-**Builds translation invariance.** Small shifts in the input move features within a pooling window but do not change the pooled output. This means the network does not need to learn the same feature at every possible pixel offset.
+**Adds shift tolerance.** Small shifts in the input move features inside a tile but do not change the output. The network does not need to learn the same feature at every pixel offset.
 
-**Grows the receptive field.** After pooling, each unit in the next convolutional layer covers a larger region of the original image. A 3x3 filter after one 2x2 pool sees a 6x6 patch of the input. After two pools it sees a 12x12 patch. Pooling is one of the two ways a network gains a wide enough view to recognise whole objects (depth is the other).
+**Grows the receptive field.** After pooling, each unit in the next conv layer covers a bigger patch of the original image. A 3x3 filter after one 2x2 pool sees 6x6 of the input. After two pools it sees 12x12. Pooling is one of the two ways a network gets a wide enough view to see whole objects (depth is the other).
 
-**Has no learnable parameters.** The operation is fixed: take the max or the mean. No weights, no gradients for the pooling layer itself. This makes pooling cheap and impossible to overfit.
+**Has no learned weights.** The rule is fixed: take the max or the mean. No weights, no gradients for the pool layer itself. This makes pooling cheap and immune to overfitting.
 
 ## Where pooling goes wrong
 
-**Too aggressive pooling loses detail.** A single 2x2 pool is fine. Three in a row reduce a 64x64 map to 8x8. Five reduce it to 2x2. At that point the network cannot distinguish objects that differ only by spatial arrangement. Tasks like segmentation and detection need that detail, which is why U-Net and feature pyramid networks add skip connections to recover the resolution pooling destroyed.
+**Too much pooling loses detail.** One 2x2 pool is fine. Three in a row shrink a 64x64 map to 8x8. Five shrink it to 2x2. At that point the network cannot tell apart objects that differ only by layout. Tasks like segmentation need that detail, which is why U-Net and feature pyramid networks add skip paths to bring back the lost resolution.
 
-**Pooling too early** throws away spatial structure the early layers have not yet finished extracting. The standard pattern is convolution, activation, then pool, in that order.
+**Pooling too early** throws away structure the early layers have not yet finished finding. The standard order is conv, then activation, then pool.
 
-**Ignoring stride settings.** If your stride is smaller than the pool size, you get overlapping windows and a larger output than you expected. If stride equals 1, pooling barely shrinks anything.
+**Wrong stride.** If your stride is less than the pool size, you get overlap and a bigger output than you expected. If stride is 1, pooling barely shrinks anything.
 
 ## Pooling versus strided convolution
 
-Modern architectures sometimes replace pooling with a strided convolution. A [stride](strides_in_cnn.html) of 2 in a convolution also halves each dimension, and the filter weights are learned. The argument is that downsampling is a decision, and a learned decision beats a fixed rule.
+Modern designs sometimes swap pooling for a strided conv. A [stride](strides_in_cnn.html) of 2 in a conv also halves each side, and the filter weights are learned. The case for it: downsampling is a choice, and a learned choice may beat a fixed rule.
 
-The counter-argument is simplicity. Pooling has zero parameters, is fast, and gives a small amount of built-in shift tolerance. In practice both approaches work. ResNet uses strided convolutions; EfficientNet mixes both. The gap between the two is smaller than the design around them.
+The case against: pooling has zero weights, is fast, and gives built-in shift tolerance. In practice both work. ResNet uses strided convs; EfficientNet mixes both. The gap between the two is smaller than the design around them.
 
 ```python-run
 import numpy as np

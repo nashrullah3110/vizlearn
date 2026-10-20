@@ -1426,13 +1426,23 @@ intro: The one make in SQL that can follow a chain of unknown length.
 
 ## Why plain SQL cannot do this
 
-A self-join resolves one level of a hierarchy. Two joins resolve two. To resolve
-five you write five, and to resolve "but many there are" you can't write
-any of it at all. The number of joins would have to depend on data the
-query hasn't read yet.
+Many real data sets contain chains. Employees report to managers. Categories
+nest inside categories. Parts contain sub-parts. You need to follow the chain
+from any starting point to the end, wherever that end turns out to be.
 
-A **recursive CTE** drops that limit. It runs a query, feeds the result back
-into itself, and keeps going until a round makes nothing new.
+A self-join resolves one level of a hierarchy. Two joins resolve two. To resolve
+five you write five. To resolve "however many there are" you cannot write
+anything at all. The number of joins would have to depend on data the
+query has not read yet.
+
+This is not a minor gap. Organisation charts, bill-of-materials queries, and
+threaded comment trees all have unbounded depth. A fixed number of joins
+cannot express them. The query would need to grow as the data grows, and
+standard SQL has no loop construct to make that happen.
+
+A **recursive CTE** removes that limit. It runs a query, feeds the result back
+into itself, and keeps going until a round produces nothing new. The depth
+is decided at run time by the data, not at write time by you.
 
 ## The two halves
 
@@ -2197,17 +2207,26 @@ intro: What one transaction is allowed to see while another is still running.
 
 ## The dial
 
-The I in ACID is alone: the degree to which concurrent transactions are kept
-from seeing each other's work in progress.
+When two transactions run at the same time, each one can interfere with the
+other. One writes a row that the other is reading. One inserts a row that
+changes the other's result set. The database has to decide how much of this
+interference to allow.
 
-Perfect alone is easy to define. Run each transaction one after
-another &mdash; and unacceptable because a DB serving one
-transaction at a time serves almost no one. So the standard defines a dial with
-four settings, given not by what they do but by which **outliers** they
-permit.
+The I in ACID stands for isolation: the degree to which concurrent transactions
+are kept from seeing each other's work in progress.
+
+Perfect isolation is easy to define. Run every transaction one after
+another. It is also unacceptable, because a database serving one
+transaction at a time serves almost no one. So the SQL standard defines a dial
+with four settings. Each setting is named not by what it does but by which
+**anomalies** it still permits.
+
+The trade-off is direct. More isolation means fewer surprises but less
+concurrency. Less isolation means more throughput but more risk of inconsistent
+reads. Choosing a level means choosing which anomalies you can tolerate.
 
 Step through the timeline above at each of the four levels. The schedule never
-changes. What A sees changes at nearly each step.
+changes. What A sees changes at nearly every step.
 
 ## The three anomalies
 
@@ -4412,18 +4431,23 @@ intro: Why the DB that runs your use is the wrong one for your dashboards.
 
 ## Two workloads
 
-**OLTP** &mdash; online transaction processing &mdash; is the use
-DB. Many concurrent links, each doing a thing small: fetch this
+Most databases serve one of two patterns. Knowing which one you face tells you
+what storage layout will work and what will not.
+
+**OLTP** &mdash; online transaction processing &mdash; is the production
+database. Many concurrent connections, each doing something small: fetch this
 order, insert this payment, update this status. Queries touch few rows and
-often want all of a row's columns. Latency per query matters enormously.
+often want every column of those rows. Latency per query matters enormously.
 
 **OLAP** &mdash; online analytical processing &mdash; is the reporting workload.
-Few concurrent users, each asking a thing huge: revenue by region by month
-for three years. Queries touch millions of rows and often want three or four
-columns out of fifty. Throughput matters. A query taking two seconds instead of
-two hundred milliseconds is fine.
+Few concurrent users, each asking something large: revenue by region by month
+for three years. Queries touch millions of rows but only read three or four
+columns out of fifty. Throughput matters more than latency. A query taking two
+seconds instead of two hundred milliseconds is acceptable.
 
-These want opposite things, and the disagreement is about physical layout.
+These two patterns want opposite things from disk. OLTP wants fast access to
+entire rows. OLAP wants fast scans of single columns. The disagreement is about
+physical layout, and that is what makes the storage engine choice matter.
 
 ## How rows are stored
 
@@ -4684,21 +4708,26 @@ intro: The one schema design that analytical DBs are really optimised for.
 
 ## Two kinds of table
 
-A star schema splits all into facts and dims, and the split is
-sharper than it first sounds.
+A star schema organises a data warehouse around a single idea: separate what
+happened from the context it happened in. Every table is one or the other, and
+the split is sharper than it first sounds.
 
-A **fact** is a reading of a thing that happened. One row per sale, per
+A **fact** table records something that happened. One row per sale, per
 click, per sensor reading. It holds numbers you want to aggregate &mdash;
-quantity, amount, duration &mdash; and foreign keys pointing at the dims.
-Almost nothing else. Fact tables are huge and narrow.
+quantity, amount, duration &mdash; and foreign keys pointing at dimension
+tables. Almost nothing else. Fact tables are huge and narrow.
 
-A **dim** shows the context of a fact. The product dim holds the
-name, category, brand, supplier. The date dim holds the day, month,
-quarter, day of week, whether it was a holiday. dim tables are small and
-wide, and mostly text.
+A **dimension** table describes the context of a fact. The product dimension
+holds the name, category, brand, and supplier. The date dimension holds the day,
+month, quarter, day of week, and whether it was a holiday. Dimension tables are
+small and wide, and mostly text.
 
-Drawn out, the fact table sits in the middle with dims radiating from it,
-which is where the name comes from.
+Drawn on a diagram, the fact table sits in the centre with dimensions radiating
+outward like points of a star. That shape is where the name comes from.
+
+This layout is deliberately denormalised. You will see repeated text in
+dimension tables. That repetition is the point: it keeps every analytical query
+to a single join pattern rather than a chain of lookups.
 
 ## Why it is shaped that way
 

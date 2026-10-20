@@ -998,7 +998,7 @@ intro: scatter() versus plot(), and the two extra dims you get for free.
 
 A scatter plot shows the relationship between two numeric variables. Each point is one observation. The pattern of points -- its shape, its spread, its density -- tells you whether the variables are related, and how.
 
-Scatter plots are the standard chart for correlation. A tight diagonal cloud suggests a linear relationship. A curve suggests a nonlinear one. A uniform cloud suggests none. No other chart type shows this as directly.
+Scatter plots are the standard chart for correlation. A tight diagonal cloud suggests a linear relationship. A curve suggests a nonlinear one. A uniform cloud suggests none. No other chart type shows this as directly. You can spot clusters, gaps, and outliers in a single glance.
 
 matplotlib offers two ways to draw scatter points, and they are not interchangeable. `ax.plot` with a marker style is faster and simpler when every point looks the same. `ax.scatter` is slower but lets you map a third and fourth variable to size and colour. Choosing the right one depends on what the chart needs to show.
 
@@ -1424,7 +1424,7 @@ A bar chart compares quantities across categories. Each bar's length encodes a v
 
 Bar charts are the right choice when the data is categorical and the comparison is between totals. Revenue by region, count by category, score by team. They are not the right choice for time series, where a line chart preserves the continuity between points, or for distributions, where a histogram handles continuous bins.
 
-The most common mistake in bar charts is choosing vertical bars when the labels are long. Category names are words, and words need horizontal space. On a vertical chart each label is squeezed into the width of one bar. Rotating the labels 45 degrees is a workaround that makes the chart harder to read. Horizontal bars give each label a full line.
+The most common mistake in bar charts is choosing vertical bars when the labels are long. Category names are words, and words need horizontal space. On a vertical chart each label is squeezed into the width of one bar. Rotating the labels 45 degrees is a workaround that makes the chart harder to read. Horizontal bars give each label a full line. You notice the difference the moment a label runs longer than two words.
 
 Sorting matters. A bar chart with categories in alphabetical order forces the reader to search for the largest and smallest. Sorting by value makes the ranking visible at a glance. The exception is categories with a natural order, like months or age groups, where the sequence carries meaning.
 
@@ -1436,7 +1436,7 @@ The zero-baseline rule is worth learning early. A bar's visual weight is proport
 
 For cat data, **flat is often better**. The reason is typography. Group labels are words, words are wide, and a vertical chart has only a bar's width in which to put each one. The usual workarounds. Rotating labels 45 degrees, truncating them, shrinking the font. All make the chart harder to read.
 
-`barh` gives each label a full line of flat space, reading left to right like text.
+`barh` gives each label a full line of flat space, reading left to right like text. This alone makes more bar charts readable than any other single change.
 
 Vertical bars remain right when the x axis is sorted and quantitative-ish. Months, years, bins of a spread. There the order carries meaning and the labels are short.
 
@@ -1456,7 +1456,7 @@ Bar charts are read by checking lengths. Compare is much easier when the bars ar
 
 Unless the group order means a thing. Months, sizes, a fixed scale. Sort by value. It costs one line with `np.argsort` and changes the chart from a thing to be studied into a thing to be glanced at.
 
-With `barh`, note that bars are drawn from the bottom up. Sorting **ascending** puts the largest bar at the top. This Is where the eye starts.
+With `barh`, note that bars are drawn from the bottom up by default. Sorting **ascending** puts the largest bar at the top of the chart. This is where the eye starts, and it makes the ranking obvious at a glance.
 
 ## Labelling
 
@@ -1845,7 +1845,7 @@ intro: hist() and the bin count that changes what the data appears to say.
 
 A histogram shows the distribution of a single numeric variable. It groups the values into bins and draws a bar for each bin whose height represents the count of values in that range. The shape of the distribution -- symmetric, skewed, bimodal, uniform -- is visible at a glance.
 
-Histograms answer the question "how is this variable spread?" They show where the data clusters, where it thins out, and whether there are gaps or outliers. A summary statistic like the mean hides all of that. A histogram shows it.
+Histograms answer the question "how is this variable spread?" They show where the data clusters, where it thins out, and whether there are gaps or outliers. A summary statistic like the mean hides all of that. A histogram shows it. You see the full range of the data, not just one number standing in for it.
 
 The bin count controls the level of detail. Too few bins and the shape is lost. Too many bins and the noise dominates. There is no single correct number of bins. The right count depends on the sample size and the question you are asking. matplotlib provides several automatic rules, and this page covers when each one is appropriate.
 
@@ -9529,7 +9529,7 @@ That silence is by design. matplotlib draws what you tell it to draw. If the dat
 
 This page collects the mistakes that produce a chart which renders without error but does not show the right thing. Each section starts with the symptom, explains why it happens, and gives the fix. The mistakes are sorted from most common to least.
 
-The page also covers mistakes of interpretation: charts that display the data correctly but mislead the reader. A truncated y axis, a rainbow colourmap, a dual-axis chart with misaligned scales. These are not bugs in your code. They are bugs in your chart's argument. Knowing the difference matters because the fix is different. A display bug is a code change. An interpretation bug is a design change.
+The page also covers mistakes of interpretation: charts that display the data correctly but mislead the reader. A truncated y axis, a rainbow colourmap, a dual-axis chart with misaligned scales. These are not bugs in your code. They are bugs in your chart's argument. Knowing the difference matters because the fix is different. A display bug is a code change. An interpretation bug is a design change. You will meet both kinds in every project you share with others.
 
 Debugging a figure that looks wrong starts with three questions. Did the draw call run? Is the data what you think it is? Are the limits showing the right range? Answering all three takes a few seconds and locates the problem in most cases.
 
@@ -9557,13 +9557,13 @@ This page collects the mistakes that come up over and over. Each one has a sympt
 
 The mistakes fall into a few groups. State bugs, where the current axes or figure is not the one you expect. Layout bugs, where saved output is cropped or overlapping. Scale bugs, where the axis misrepresents the data. And label bugs, where tick labels attach to the wrong positions. Each group has a pattern, and once you see the pattern you stop making the mistake.
 
-Nearly all of these mistakes go away if you use the object-oriented interface and pass an explicit axes every time. That is the single best habit this page can teach you. The pyplot shorthand is fine for a quick look in a notebook. Anything you plan to save or share with others should name its axes.
+Nearly all of these mistakes go away if you use the object-oriented interface and pass an explicit axes every time. That is the single best habit this page can teach you. The pyplot shorthand is fine for a quick exploratory look in a notebook. Anything you plan to save or share with others should name its axes explicitly.
 
 `plt.plot` draws on the **current** axes. After `plt.subplots(1, 2)`, the current axes is the last one created. A stray `plt.plot` goes to the right-hand panel even though you meant the left.
 
 In a notebook it is worse. The current figure is what the last cell created. With out-of-order runs, that is not always the cell above.
 
-`ax.plot(...)` removes the question. This is the practical reason the object-oriented API is worth the extra characters.
+`ax.plot(...)` removes the question entirely. This is the single most practical reason the object-oriented API is worth the extra characters you type.
 
 ## Cropped output
 

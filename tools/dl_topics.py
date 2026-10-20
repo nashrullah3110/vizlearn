@@ -478,16 +478,22 @@ intro: Turning an autoencoder into a thing you can sample from. The two forces t
 
 ## The problem with a plain autoencoder
 
-An [autoencoder](autoencoders.html) maps each input to a single point in the
-latent space, and nothing organises those points. Nearby codes need not decode
-to similar things, and the space between clusters is undefined territory.
+An [autoencoder](autoencoders.html) compresses an input to a short code and
+reconstructs from it. That is useful for dimensionality reduction. But if you
+want to generate new data, you need to sample from the latent space, and a
+plain autoencoder gives you no way to do that reliably.
 
-So you can't make. Pick a random latent vector and decode it, and you
-almost certainly land a place the decoder was never trained, and the output is
-noise.
+The reason is that nothing organises the codes. Each input maps to a single
+point. Nearby points need not decode to similar things. The gaps between
+clusters are undefined territory where the decoder was never trained.
 
-A VAE fixes this by making the latent space **smooth and bounded** &mdash;
-by build, not by hope.
+Pick a random vector in that space and decode it. You will almost certainly
+land somewhere the decoder has never seen. The output is noise.
+
+A VAE fixes this by making the latent space **smooth and continuous** &mdash;
+by construction, not by luck. It forces the encoder to spread each input
+across a region instead of a point, and it pulls every region toward a shared
+prior. The result is a space you can sample from and get meaningful output.
 
 ## Encoding to a distribution
 
@@ -1491,15 +1497,21 @@ intro: Getting a useful shape out of raw data by turning the data into its own t
 
 ## The pretext
 
-Labels cost money. Raw data is free. Self-taught learning makes a task from
-the data itself, one that forces the model to grasp the content.
+Labels cost money. For every ImageNet there are a hundred unlabelled data sets
+that no one can afford to annotate. Self-supervised learning sidesteps the cost
+by making a task from the data itself, one that forces the model to understand
+the content without a single human label.
 
-The contrastive version is simple. Take an image, make two changed views, and
-train the model to place them close. Push every other image's views far away.
+The contrastive version of this idea is straightforward. Take an image. Make two
+augmented views of it &mdash; a crop, a colour shift, a blur. Train the model to
+place those two views close together in an embedding space. At the same time,
+push every other image's views far away.
 
-If the model can tell that a crop and a colour-shifted copy of the same photo
-go together &mdash; and tell them apart from a thousand other photos &mdash;
-it has had to learn what the photo is *of*.
+If the model can recognise that a cropped and a colour-shifted copy of the same
+photo belong together &mdash; and distinguish them from a thousand other photos
+&mdash; it has had to learn what the photo actually depicts. The representation
+it builds along the way transfers to downstream tasks, often matching or beating
+a supervised baseline trained on a fraction of the labelled data.
 
 ## InfoNCE
 
@@ -2561,16 +2573,24 @@ intro: Training in half the bits, the failure that causes. The one-line trick th
 
 ## Why bother
 
-Modern accelerators run half-precision mat times a few times faster
-than single-precision ones, and half-precision tensors take half the memory.
-That means bigger batches, bigger models, and a real speed-up on the same
+GPU memory is the bottleneck for most training runs. If you could cut the
+memory each number takes in half, you could double your batch size or train a
+model twice as wide on the same card. That is what half-precision arithmetic
+offers.
+
+Modern accelerators run fp16 matrix multiplications several times faster than
+fp32 ones. Half-precision tensors also take half the memory. Together, that
+means bigger batches, bigger models, and a measurable speed-up on the same
 hardware.
 
-The catch is the format. **fp32** has 8 exponent bits and 23 mantissa bits.
-**fp16** has 5 and 10, giving a smallest normal value around
-10&#8315;&#8309. And a max of 65,504.
+The catch is the number format. **fp32** has 8 exponent bits and 23 mantissa
+bits, covering a wide dynamic range. **fp16** has only 5 exponent bits and 10
+mantissa bits. Its smallest normal value is around 10&#8315;&#8309;, and its
+maximum is just 65,504.
 
-Both ends of that range are a problem. The small end is the one that bites.
+Both ends of that range cause trouble. Large values overflow. Small values
+round to zero. The small end is the one that matters during training, because
+gradients routinely fall below fp16's floor.
 
 ## Watch the gradients disappear
 
@@ -2888,17 +2908,22 @@ intro: Getting the effect of a large batch out of a device that can't hold one.
 
 ## Why it works
 
-The loss over a batch is the mean of the per-example losses, and differentiation
-is linear. So the grad of the batch is the mean of the per-example
-grads.
+Large batches improve training stability and convergence for many models. But a
+large batch needs memory, and GPU memory is fixed. If your target batch does not
+fit on your card, you cannot just wish for more VRAM.
 
-That means the sum can be built in pieces. Run a forward and backward pass on 16
-examples, keep the grads, run another 16, add to them, and after 16 rounds
-you've just the grad of a 256-example batch. Step the tuner once.
+Gradient accumulation solves this without extra hardware. The key insight is
+that differentiation is linear. The gradient of a mean loss over a batch equals
+the mean of the per-example gradients. That mean can be built in pieces.
 
-**The resulting update is the same**. Not similar, the same up to
-floating-point sorting &mdash; to what a single 256-example batch would have
-made.
+Run a forward and backward pass on 16 examples. Store the gradients. Run
+another 16 and add to the stored gradients. After 16 such rounds you hold
+exactly the gradient of a 256-example batch. Step the optimiser once.
+
+**The resulting update is mathematically identical.** It is not an
+approximation. Up to floating-point ordering, it produces the same parameter
+change that a single 256-example batch would have produced. You trade wall-clock
+time for memory, nothing else.
 
 ## What actually consumes the memory
 
