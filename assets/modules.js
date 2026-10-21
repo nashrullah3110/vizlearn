@@ -25,7 +25,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive Bellman-Ford lesson - edge relaxation over V-1 passes, negative weight handling, and negative cycle detection."
+  "desc": "Relax every edge V-1 times to find shortest paths with negative weights, then run one extra pass to detect negative cycles."
  },
  {
   "title": "Big-O Notation and Time Complexity",
@@ -33,7 +33,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive Big-O notation lesson - compare O(1), O(log n), O(n), O(n log n), O(n squared) and O(2^n) growth curves and real operation counts."
+  "desc": "Compare O(1) through O(2^n) on the same input and see why constants vanish and growth rate is all that matters at scale."
  },
  {
   "title": "Binary Search",
@@ -49,7 +49,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive binary search tree lesson - insert, search and delete with the path highlighted, in-order traversal, and how sorted input degrades a BST."
+  "desc": "Insert, search and delete in a BST and watch it degenerate into a linked list when values arrive sorted — the case balance fixes."
  },
  {
   "title": "Breadth First Search",
@@ -57,7 +57,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Learn Breadth-First Search (BFS) with a beginner-friendly interactive binary tree visualization, examples, and guided practice on VizLearn."
+  "desc": "Traverse a tree level by level using a queue, and see why BFS finds the shortest path in an unweighted graph by construction."
  },
  {
   "title": "Bubble Sort",
@@ -81,7 +81,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive cycle detection lesson - Floyd's tortoise and hare on a linked list, plus finding the cycle entry point."
+  "desc": "Run Floyd's tortoise-and-hare algorithm on a linked list and find the cycle entry point in O(n) time and O(1) space."
  },
  {
   "title": "Depth First Search",
@@ -105,7 +105,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive divide and conquer lesson - see the recursion tree, the master theorem, and why splitting gives O(n log n)."
+  "desc": "Split a problem in half, recurse, combine — and see how halving at each level gives merge sort its O(n log n) guarantee."
  },
  {
   "title": "Dynamic Programming",
@@ -113,7 +113,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive dynamic programming lesson - memoisation versus tabulation, with the DP table filling cell by cell for Fibonacci, knapsack and edit distance."
+  "desc": "Cache subproblem results so they are solved once, not millions of times, and watch Fibonacci drop from exponential to linear."
  },
  {
   "title": "Fibonacci Search",
@@ -129,7 +129,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive graph representation lesson - adjacency matrix versus adjacency list, with live memory and lookup cost as graph density changes."
+  "desc": "Store a graph as an adjacency matrix, adjacency list or edge list and see how the choice changes the cost of every algorithm on it."
  },
  {
   "title": "Greedy Algorithms",
@@ -137,7 +137,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive greedy algorithm lesson - activity selection and coin change, including a case where the greedy choice provably fails."
+  "desc": "Take the locally best option at each step and see when that greedy choice is provably optimal — and when it quietly fails."
  },
  {
   "title": "Hash Tables and Hashing",
@@ -145,7 +145,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive hash table lesson - see keys hash into buckets, force collisions, compare chaining with open addressing, and watch load factor trigger a resize."
+  "desc": "Hash a key into an array index for O(1) lookup and see how collisions, load factor and resizing keep the constant-time promise."
  },
  {
   "title": "Heap Sort",
@@ -153,7 +153,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive heap sort lesson - heapify then repeatedly extract the maximum, sorting in place with guaranteed O(n log n)."
+  "desc": "Build a max-heap and extract the largest element n times for a guaranteed O(n log n) sort — no worst case, no extra memory."
  },
  {
   "title": "Heaps and Priority Queues",
@@ -161,7 +161,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive heap lesson - sift-up and sift-down shown on both the tree and its array form, plus how a priority queue powers Dijkstra."
+  "desc": "Maintain a complete binary tree where the smallest element is always at the root, with O(log n) insert and extract-min."
  },
  {
   "title": "Insertion Sort",
@@ -185,7 +185,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive KMP string matching lesson - build the LPS failure table and watch the pattern shift without backing up the text pointer."
+  "desc": "Build a failure function from the pattern and scan the text in O(n + m) total, never re-reading a character after a mismatch."
  },
  {
   "title": "Linear Search",
@@ -201,7 +201,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive linked list lesson - insert and delete with animated pointer rewiring, and a direct cost comparison against arrays."
+  "desc": "Store elements in nodes linked by pointers and trade O(1) random access for O(1) insertion at any known position."
  },
  {
   "title": "Merge Sort",
@@ -217,7 +217,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive minimum spanning tree lesson - Kruskal and Prim side by side, with union-find cycle checks and the cut property explained."
+  "desc": "Connect every vertex at minimum total cost with Kruskal's edge-sorting and Prim's vertex-growing approaches side by side."
  },
  {
   "title": "Python Dictionary Lab",
@@ -249,7 +249,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive queue data structure lesson - enqueue and dequeue with FIFO order, circular queues, and why BFS needs a queue while DFS needs a stack."
+  "desc": "Add at the back, remove from the front — FIFO ordering — and see how swapping a stack for a queue turns DFS into BFS."
  },
  {
   "title": "Quick Sort",
@@ -265,7 +265,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive radix sort lesson - LSD digit passes with stable bucketing, and why non-comparison sorting can beat O(n log n)."
+  "desc": "Sort integers digit by digit with zero comparisons and beat the O(n log n) lower bound that comparison-based sorts cannot escape."
  },
  {
   "title": "Recursion and the Call Stack",
@@ -273,7 +273,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive recursion lesson - watch call stack frames build and unwind, see stack overflow, and compare naive against memoised Fibonacci."
+  "desc": "Watch each recursive call push a frame onto the call stack, and see the values computed on the way back up, not the way down."
  },
  {
   "title": "Selection Sort",
@@ -289,7 +289,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive sliding window technique - fixed and variable windows, with the running total updated by add and remove instead of recomputation."
+  "desc": "Slide a fixed or variable-size window across an array, updating a running total to replace an O(n*k) nested loop with O(n)."
  },
  {
   "title": "Stacks (LIFO)",
@@ -297,7 +297,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive stack data structure lesson - push and pop with LIFO order, plus a live bracket-matching demo and the call stack connection."
+  "desc": "Push, pop and peek at the top of a LIFO structure, and see how the call stack, bracket matching and DFS all share this idea."
  },
  {
   "title": "Topological Sort",
@@ -305,7 +305,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive topological sort lesson - Kahn's algorithm with in-degree tracking, plus cycle detection when no valid order exists."
+  "desc": "Order a directed graph so every edge points forward, and detect when a cycle makes that ordering impossible."
  },
  {
   "title": "Trie (Prefix Tree)",
@@ -313,7 +313,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive trie lesson - insert words that share prefixes, search, and see autocomplete find all completions from one node."
+  "desc": "Store strings as paths through a tree so words sharing a prefix share those nodes, making autocomplete an O(L) walk."
  },
  {
   "title": "Two Pointers",
@@ -321,7 +321,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive two pointers technique - pair sum on a sorted array, palindrome check and container with most water, each stepped through."
+  "desc": "Move two indices through a sorted array in one pass and replace an O(n-squared) nested loop with O(n) and no extra space."
  },
  {
   "title": "Union-Find (Disjoint Set)",
@@ -329,7 +329,7 @@ window.VIZLEARN_MODULES = [
   "category": "Algorithms",
   "topic": "dsa",
   "icon": "layers",
-  "desc": "Interactive union-find lesson - union by rank and path compression shown live, with the near-constant inverse Ackermann complexity."
+  "desc": "Merge and query disjoint sets in near-constant time with union by rank and path compression — the engine inside Kruskal's MST."
  },
  {
   "title": "Coroutines, Tasks and await",
@@ -409,7 +409,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Explore a convolutional neural network layer by layer in 3D - see how filters, feature maps and pooling turn pixels into predictions."
+  "desc": "Walk through a convolutional neural network layer by layer in 3D: filters, feature maps, pooling and the classification head."
  },
  {
   "title": "Calculating Parameters in CNN",
@@ -417,7 +417,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn how to calculate the number of parameters in Convolutional Neural Networks with this interactive visualizer on VizLearn."
+  "desc": "Count a CNN's trainable parameters layer by layer and see why image size never appears in the formula — only the filter shape does."
  },
  {
   "title": "Colour Spaces: RGB and HSV",
@@ -449,7 +449,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn how Data Loaders work in Convolutional Neural Networks, why we use batches, and how shuffling and augmentation impact training."
+  "desc": "See how a DataLoader batches, shuffles and augments images on the fly so the GPU never sits idle waiting for the next batch."
  },
  {
   "title": "Depthwise Separable Convolution",
@@ -481,7 +481,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn how Fully Connected (Dense) Layers work in Convolutional Neural Networks with an interactive visualizer on VizLearn."
+  "desc": "Flatten a CNN's feature maps into a 1D vector and feed it through a dense layer that mixes spatial features into a class decision."
  },
  {
   "title": "Global Average Pooling against Flatten",
@@ -537,7 +537,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn how Neural Networks process images by flattening 2D pixels into 1D arrays with this interactive visualization on VizLearn."
+  "desc": "Unroll a 2D pixel grid into a 1D vector and see what spatial information flattening destroys — and why CNNs exist to avoid it."
  },
  {
   "title": "Image Data Augmentation",
@@ -593,7 +593,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn how Padding works in Convolutional Neural Networks with an interactive visualizer showing 'Valid' vs 'Same' padding on VizLearn."
+  "desc": "Add zero-padding around an image and watch the output keep its spatial dimensions instead of shrinking with every convolution layer."
  },
  {
   "title": "Parameter Sharing in CNN",
@@ -601,7 +601,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn what Parameter Sharing is in Convolutional Neural Networks and why it makes deep learning efficient on VizLearn."
+  "desc": "Slide one small filter across every spatial position and compare its 9 parameters to the millions a fully connected layer would need."
  },
  {
   "title": "Pooling Layer",
@@ -633,7 +633,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn how the ReLU (Rectified Linear Unit) activation function works in Convolutional Neural Networks with this interactive visualizer on VizLearn."
+  "desc": "Apply ReLU to a feature map and watch every negative value drop to zero, the single nonlinearity that makes deep networks trainable."
  },
  {
   "title": "Real-time Edge Detection",
@@ -697,7 +697,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn how Strides work in Convolutional Neural Networks with an interactive visualizer showing how step size downsamples feature maps on VizLearn."
+  "desc": "Increase the stride from 1 to 2 and watch the feature map shrink to a quarter of its area in a single convolution step."
  },
  {
   "title": "Template Matching",
@@ -721,7 +721,7 @@ window.VIZLEARN_MODULES = [
   "category": "Computer Vision",
   "topic": "computer-vision",
   "icon": "eye",
-  "desc": "Learn how Transfer Learning works in Convolutional Neural Networks, select models, and selectively unfreeze layers for fine-tuning."
+  "desc": "Swap the classification head of a pretrained CNN, freeze the base, and fine-tune on your dataset with a fraction of the data."
  },
  {
   "title": "U-Net",
@@ -833,7 +833,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Interactive SQL CTE lab - see how WITH clauses turn nested subqueries into readable pipelines, and step through a recursive CTE iteration by iteration."
+  "desc": "Name a subquery with WITH so the logic reads top to bottom, and see how a recursive CTE walks a tree row by row."
  },
  {
   "title": "Composite and Covering Indexes",
@@ -857,7 +857,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Interactive DDL lab - build a table with CREATE TABLE, apply ALTER, TRUNCATE and DROP, and see the effect on schema and data."
+  "desc": "Create, alter and drop tables with DDL, and see how constraints — NOT NULL, UNIQUE, FOREIGN KEY — enforce data quality at the edge."
  },
  {
   "title": "DML in SQL",
@@ -865,7 +865,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Interactive DML lab - run INSERT, UPDATE, DELETE and SELECT against a live table, see affected rows highlighted, and practise COMMIT and ROLLBACK."
+  "desc": "Run INSERT, UPDATE, DELETE and SELECT on a live table and see why a missing WHERE clause can wipe every row in one statement."
  },
  {
   "title": "Datatypes in SQL",
@@ -873,7 +873,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Interactive SQL datatypes lab - integer ranges and overflow, CHAR vs VARCHAR storage, FLOAT vs DECIMAL precision loss, dates and NULL."
+  "desc": "Choose between INT, BIGINT, DECIMAL and VARCHAR, and see why storing money in FLOAT silently corrupts your arithmetic."
  },
  {
   "title": "Deadlocks",
@@ -937,7 +937,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Interactive SQL LIMIT and OFFSET lab - page through results, see why ORDER BY is mandatory, and understand the cost of deep offsets."
+  "desc": "Page through a result set with LIMIT and OFFSET, and hit the two traps: missing ORDER BY and the linear scan at high page numbers."
  },
  {
   "title": "MVCC: How Readers Avoid Blocking Writers",
@@ -1017,7 +1017,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Interactive SQL regular expression lab - test REGEXP patterns live against table rows and compare them with LIKE pattern matching."
+  "desc": "Match patterns that LIKE cannot express — character classes, quantifiers and anchors — applied directly inside a SQL WHERE clause."
  },
  {
   "title": "Replication, Read Replicas and Lag",
@@ -1129,7 +1129,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Interactive NoSQL lab - compare document, key-value, column-family and graph databases against a relational model of the same data."
+  "desc": "Compare document, key-value, wide-column and graph databases and see which relational guarantee each one drops to gain something else."
  },
  {
   "title": "What are Relational Databases?",
@@ -1137,7 +1137,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Interactive introduction to relational databases - primary keys, foreign keys, normalisation and the update anomalies that flat tables cause."
+  "desc": "Store data in normalised tables linked by foreign keys and see how one update in one row propagates correctly through every join."
  },
  {
   "title": "Where Clause in SQL",
@@ -1145,7 +1145,7 @@ window.VIZLEARN_MODULES = [
   "category": "Database",
   "topic": "db",
   "icon": "database",
-  "desc": "Interactive SQL WHERE clause lab with a real predicate parser - comparisons, AND OR NOT, IN, BETWEEN, LIKE and NULL handling evaluated live."
+  "desc": "Filter rows one at a time with WHERE and see how NULL turns a comparison into UNKNOWN — the trap behind most wrong SQL results."
  },
  {
   "title": "Activation Functions in DL",
@@ -1401,7 +1401,7 @@ window.VIZLEARN_MODULES = [
   "category": "Deep Learning",
   "topic": "dl",
   "icon": "network",
-  "desc": "Interactive visualization of CPU vs GPU in deep learning. Learn how batch size and parallelism affect training speed on VizLearn."
+  "desc": "Sweep batch size from 1 to 256 and watch the GPU crossover: too small and the CPU wins, large enough and thousands of cores pay off."
  },
  {
   "title": "Neural Network Visualizer",
@@ -1761,7 +1761,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Interactive Byte Pair Encoding lab - train real BPE merges on your own corpus and see how any word gets segmented into subword tokens."
+  "desc": "Merge the most frequent character pair, repeat, and build the subword vocabulary GPT-style models use to tokenise any text."
  },
  {
   "title": "Causal Language Modeling",
@@ -1905,7 +1905,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Interactive walkthrough of the LLM text pipeline - tokenization, token IDs, embeddings, positional encoding, self-attention and logits, with live computed values."
+  "desc": "Follow a prompt through tokenisation, embedding, positional encoding, transformer layers, softmax and sampling — one token out."
  },
  {
   "title": "Hybrid Search: Dense + Sparse (Reciprocal Rank Fusion)",
@@ -1945,7 +1945,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Interactive knowledge distillation lab - soften teacher logits with temperature, compare hard labels to soft targets, and watch KL divergence guide a student model."
+  "desc": "Train a small student on the teacher's soft probability distribution and recover most of the accuracy at a fraction of the size."
  },
  {
   "title": "LoRA in LLMs",
@@ -1953,7 +1953,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Interactive LoRA lab - see how low-rank adapters replace full fine-tuning, how rank controls trainable parameters, and what a rank-limited update can represent."
+  "desc": "Freeze the base model and train two thin matrices whose product approximates the full weight update — 10,000x fewer parameters."
  },
  {
   "title": "Maximal Marginal Relevance (MMR)",
@@ -2001,7 +2001,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Interactive quantization lab for LLMs - map FP32 weights to INT8 or INT4, see quantization error, outlier effects and real model memory savings."
+  "desc": "Snap 32-bit weights to 8-bit or 4-bit levels and fit a 70B-parameter model on a single consumer GPU, with the accuracy cost shown."
  },
  {
   "title": "Query Rewriting and HyDE",
@@ -2129,7 +2129,7 @@ window.VIZLEARN_MODULES = [
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
-  "desc": "Interactive Masked Language Modeling lab - mask tokens in a sentence and see how a bidirectional model like BERT predicts them from left and right context."
+  "desc": "Hide 15 percent of tokens and train the model to reconstruct them using both sides of the sentence — BERT's pretraining objective."
  },
  {
   "title": "What is Precision@k?",
@@ -3097,7 +3097,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive Bayes theorem lesson - the medical test paradox shown as a natural frequency grid, with adjustable base rate, sensitivity and specificity."
+  "desc": "Update a prior belief with new evidence and see why a 99%-accurate test still gives mostly false positives when the condition is rare."
  },
  {
   "title": "Bernoulli, Binomial and Poisson",
@@ -3169,7 +3169,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive derivatives lesson - drag a point along a curve, shrink the secant to a tangent, and see the limit definition of the derivative in action."
+  "desc": "Shrink the gap between two points until the secant becomes the tangent — the single idea every gradient-based optimiser is built on."
  },
  {
   "title": "Determinant",
@@ -3209,7 +3209,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Learn the equation of a line using an interactive 2D and 3D visualizer. Understand slope and intercept with real examples, live calculations, and guided practice."
+  "desc": "Drag slope and intercept and watch y = mx + c respond. See slope-intercept, point-slope and standard form describe the same line."
  },
  {
   "title": "Expectation and Variance",
@@ -3225,7 +3225,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive exponentials lesson - growth versus decay, the number e, doubling time, and why exponential always beats polynomial eventually."
+  "desc": "See why multiplying by a constant at each step starts slow then turns vertical — the shape behind softmax and vanishing gradients."
  },
  {
   "title": "Hypothesis Testing and p-values",
@@ -3273,7 +3273,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive logarithms lesson - explore log curves for any base, the product-to-sum rule, and why log scales tame huge ranges."
+  "desc": "Turn a product of tiny probabilities into a sum of manageable numbers — the reason loss functions and learning-rate plots use logs."
  },
  {
   "title": "Markov Chains",
@@ -3297,7 +3297,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive matrix multiplication - click an output cell to see the row and column that produce it, with the shape rule enforced live."
+  "desc": "Compute each entry as a row-times-column dot product and see why the shape rule and GPU parallelism make this the engine of deep learning."
  },
  {
   "title": "Maximum Likelihood Estimation",
@@ -3313,7 +3313,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive lesson on mean, mode and median - see how skew and outliers pull the three averages apart, and which one to trust."
+  "desc": "Compare three measures of typical: the mean that outliers drag, the median that resists them, and the mode that works on categories."
  },
  {
   "title": "Mean, Variance and Standard Deviation",
@@ -3321,7 +3321,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive lesson on mean, variance and standard deviation - drag data points, see deviations squared, sigma bands and z-scores computed live."
+  "desc": "Measure centre with the mean and spread with variance and standard deviation — the two numbers every normalisation layer uses."
  },
  {
   "title": "Partial Derivatives and the Gradient",
@@ -3329,7 +3329,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive partial derivatives and gradient lesson - explore a 2D surface, see partial slopes along each axis, and the gradient arrow pointing uphill."
+  "desc": "Take one derivative per variable, bundle them into the gradient vector, and see why it points straight uphill on any loss surface."
  },
  {
   "title": "Probability Basics",
@@ -3337,7 +3337,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive probability basics - sample spaces, events, AND vs OR, independence, and the law of large numbers demonstrated by simulation."
+  "desc": "Count outcomes, combine events with addition and multiplication rules, and see why a fair coin owes you nothing after ten heads."
  },
  {
   "title": "Projections",
@@ -3409,7 +3409,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive chain rule lesson - see how derivatives multiply through composed functions, and why this is exactly what backpropagation computes."
+  "desc": "Multiply local derivatives of nested functions link by link — the exact arithmetic backpropagation performs through every layer."
  },
  {
   "title": "The Jacobian and the Hessian",
@@ -3425,7 +3425,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive normal distribution lesson - adjust mean and standard deviation, see the 68-95-99.7 rule, z-scores, and the central limit theorem by sampling."
+  "desc": "Two numbers — mean and standard deviation — define the bell curve. The 68-95-99.7 rule and why the CLT makes this shape unavoidable."
  },
  {
   "title": "Type I and Type II Errors",
@@ -3449,7 +3449,7 @@ window.VIZLEARN_MODULES = [
   "category": "Maths",
   "topic": "maths",
   "icon": "sigma",
-  "desc": "Interactive lesson on vectors and the dot product - drag vectors, see magnitude, angle, projection, and why the dot product changes sign at 90 degrees."
+  "desc": "Multiply matching components and sum to get a number that measures how much two vectors point the same way — behind every forward pass."
  },
  {
   "title": "ASCII Character Codes",
@@ -3465,7 +3465,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Unroll an RNN, run the forward pass, then watch gradients flow backwards through every timestep — with the chain-rule product computed live. On VizLearn."
+  "desc": "Unroll an RNN's loop into T copies and send the gradient backward through each timestep, watching it shrink or explode along the way."
  },
  {
   "title": "Candidate Memory in LSTM",
@@ -3473,7 +3473,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Interactive walkthrough of the candidate memory layer in an LSTM - see how tanh proposes new signed content for the cell state and why it saturates."
+  "desc": "The LSTM layer that manufactures new content: tanh outputs between -1 and +1 for the input gate to accept or reject element by element."
  },
  {
   "title": "Encoder-only vs Decoder-only (BERT vs GPT)",
@@ -3529,7 +3529,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Follow a word through the full representation pipeline — token ID, one-hot vector, dense embedding — interactively on VizLearn."
+  "desc": "Trace the four-stage chain from a raw word to a token ID to a one-hot vector to the dense embedding a network can multiply."
  },
  {
   "title": "How are Embeddings Generated?",
@@ -3537,7 +3537,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Train word embeddings live in your browser: watch random vectors organize themselves into semantic clusters as co-occurring words pull together. On VizLearn."
+  "desc": "Predict a word from its neighbours with Skip-gram or CBOW and watch the weight matrix converge into vectors where meaning is geometry."
  },
  {
   "title": "Input Gate in LSTM",
@@ -3545,7 +3545,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Interactive walkthrough of the Input Gate in an LSTM cell - see how the sigmoid gate controls which candidate values are written into the cell state."
+  "desc": "A sigmoid layer that scales the candidate vector element by element, deciding how much new information each memory slot accepts."
  },
  {
   "title": "Interactive 3D RNN Visualizer",
@@ -3553,7 +3553,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "See how a recurrent neural network processes a sequence step by step, carrying hidden state from one time step to the next."
+  "desc": "Step through a recurrent neural network in 3D as it processes a sequence, carrying hidden state from one timestep to the next."
  },
  {
   "title": "Limitations of ANN with Sequential Data",
@@ -3561,7 +3561,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Discover why plain feed-forward neural networks struggle with sequences: fixed input size, order blindness, and no memory. Interactive demos on VizLearn."
+  "desc": "See the three ways a feed-forward network fails on sequences: fixed input size, order blindness, and no memory between steps."
  },
  {
   "title": "Machine Translation with an Encoder-Decoder",
@@ -3601,7 +3601,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Compare Min-Max scaling and Z-Score standardization on a live time series, and see how outliers distort each, on VizLearn."
+  "desc": "See why batch normalisation breaks on variable-length sequences and how layer normalisation fixes it by computing stats per sample."
  },
  {
   "title": "Output Gate in LSTM",
@@ -3633,7 +3633,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn what a standard RNN cell is with a beginner-friendly interactive visualization of its memory states and data flow."
+  "desc": "Unroll a recurrent cell across a sequence and see a 50-token sentence become a 50-layer deep network sharing one set of weights."
  },
  {
   "title": "Self-Attention",
@@ -3657,7 +3657,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "See how a sliding window turns a raw sequence into supervised training pairs (X, y), step by step, on VizLearn."
+  "desc": "Slide a window across a raw time series to turn one long stream into the (X, y) supervised training pairs a model requires."
  },
  {
   "title": "Stemming vs Lemmatization",
@@ -3681,7 +3681,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Compare Label Encoding, One-Hot, Bag-of-Words and TF-IDF on a live corpus you can edit, side by side, on VizLearn."
+  "desc": "Climb from label encoding to one-hot to bag-of-words to TF-IDF, and see which information each rung preserves and which it drops."
  },
  {
   "title": "Text Normalization Pipeline",
@@ -3713,7 +3713,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Play with the recurrent weight and sequence length to see gradients vanish or explode — with live decay curves and a log-scale view. On VizLearn."
+  "desc": "Watch a gradient shrink by a factor of 0.7 at each timestep until the learning signal at the start of the sentence is near zero."
  },
  {
   "title": "What are Embeddings?",
@@ -3721,7 +3721,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Explore a 2D map of word embeddings: click words to measure similarity and run the famous king − man + woman analogy, on VizLearn."
+  "desc": "Replace sparse one-hot vectors with short dense vectors where similar words sit close together and vector arithmetic encodes meaning."
  },
  {
   "title": "What is LSTM?",
@@ -3729,7 +3729,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn what an LSTM cell is with a beginner-friendly interactive visualization of its internal gates, memory states, and data flow."
+  "desc": "Add a cell state that flows through addition instead of matrix multiplication, plus three gates that learn when to remember and forget."
  },
  {
   "title": "What is a Bidirectional Layer?",
@@ -3737,7 +3737,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Learn what a Bidirectional layer is with a beginner-friendly interactive visualization of forward and backward passes."
+  "desc": "Run one RNN forward and another backward, concatenate their outputs, and give every position context from both sides of the sequence."
  },
  {
   "title": "What is a GRU?",
@@ -3745,7 +3745,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Step a sentence through a GRU and watch the update and reset gates blend old memory with new input. Compare parameter counts with LSTM. On VizLearn."
+  "desc": "Merge the LSTM's three gates into two and its two states into one — same gating idea, 75 percent of the parameters, close accuracy."
  },
  {
   "title": "What is a Recurrent Cell?",
@@ -3753,7 +3753,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Step a sentence through a recurrent cell one word at a time and watch the hidden state — the network's memory — evolve. On VizLearn."
+  "desc": "Process one token at a time and pass a fixed-size hidden state forward — the loop that lets a small network read any-length input."
  },
  {
   "title": "What is a Sequence?",
@@ -3761,7 +3761,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Understand what sequential data is and why order matters, with an interactive shuffle experiment on VizLearn."
+  "desc": "See why 'dog bites man' and 'man bites dog' differ: order carries meaning, and models that ignore it lose the most important signal."
  },
  {
   "title": "Why Text Encoding is Needed in NLP",
@@ -3769,7 +3769,7 @@ window.VIZLEARN_MODULES = [
   "category": "NLP",
   "topic": "nlp",
   "icon": "comments",
-  "desc": "Feed raw text into a neuron and watch the math break — then encode it and watch it work. An interactive first-principles demo on VizLearn."
+  "desc": "A neuron computes w*x + b — multiplication needs numbers. See why every NLP pipeline starts by converting words into vectors."
  },
  {
   "title": "Word Cloud Generator",

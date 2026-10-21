@@ -1263,6 +1263,184 @@ DESCRIPTIONS = {
         "Split data into training and test sets with train_test_split, and see why scoring a model on the data it memorised tells you nothing.",
     "sklearn/what_is_scikit_learn.html":
         "Learn the fit/predict/transform interface that every scikit-learn estimator shares, and see why one API covers two hundred algorithms.",
+
+    # --- Computer Vision (missing descriptions) -------------------------
+    "computer_vision/calculating_parameters_in_cnn.html":
+        "Count a CNN's trainable parameters layer by layer and see why image size never appears in the formula — only the filter shape does.",
+    "computer_vision/cnn.html":
+        "Walk through a convolutional neural network layer by layer in 3D: filters, feature maps, pooling and the classification head.",
+    "computer_vision/data_loaders_in_cnn.html":
+        "See how a DataLoader batches, shuffles and augments images on the fly so the GPU never sits idle waiting for the next batch.",
+    "computer_vision/how_dense_layer_works_in_cnn.html":
+        "Flatten a CNN's feature maps into a 1D vector and feed it through a dense layer that mixes spatial features into a class decision.",
+    "computer_vision/how_neural_network_process_images.html":
+        "Unroll a 2D pixel grid into a 1D vector and see what spatial information flattening destroys — and why CNNs exist to avoid it.",
+    "computer_vision/how_relu_works_in_cnn.html":
+        "Apply ReLU to a feature map and watch every negative value drop to zero, the single nonlinearity that makes deep networks trainable.",
+    "computer_vision/padding_in_cnn.html":
+        "Add zero-padding around an image and watch the output keep its spatial dimensions instead of shrinking with every convolution layer.",
+    "computer_vision/parameter_sharing_in_cnn.html":
+        "Slide one small filter across every spatial position and compare its 9 parameters to the millions a fully connected layer would need.",
+    "computer_vision/strides_in_cnn.html":
+        "Increase the stride from 1 to 2 and watch the feature map shrink to a quarter of its area in a single convolution step.",
+    "computer_vision/transfer_learning_with_cnn.html":
+        "Swap the classification head of a pretrained CNN, freeze the base, and fine-tune on your dataset with a fraction of the data.",
+
+    # --- Database (missing descriptions) --------------------------------
+    "database/common_table_expressions_in_sql.html":
+        "Name a subquery with WITH so the logic reads top to bottom, and see how a recursive CTE walks a tree row by row.",
+    "database/datatypes_in_sql.html":
+        "Choose between INT, BIGINT, DECIMAL and VARCHAR, and see why storing money in FLOAT silently corrupts your arithmetic.",
+    "database/ddl_in_sql.html":
+        "Create, alter and drop tables with DDL, and see how constraints — NOT NULL, UNIQUE, FOREIGN KEY — enforce data quality at the edge.",
+    "database/dml_in_sql.html":
+        "Run INSERT, UPDATE, DELETE and SELECT on a live table and see why a missing WHERE clause can wipe every row in one statement.",
+    "database/limit_and_offset_in_sql.html":
+        "Page through a result set with LIMIT and OFFSET, and hit the two traps: missing ORDER BY and the linear scan at high page numbers.",
+    "database/regular_expressions_in_sql.html":
+        "Match patterns that LIKE cannot express — character classes, quantifiers and anchors — applied directly inside a SQL WHERE clause.",
+    "database/what_are_non_relational_databases.html":
+        "Compare document, key-value, wide-column and graph databases and see which relational guarantee each one drops to gain something else.",
+    "database/what_are_relational_databases.html":
+        "Store data in normalised tables linked by foreign keys and see how one update in one row propagates correctly through every join.",
+    "database/where_clause_in_sql.html":
+        "Filter rows one at a time with WHERE and see how NULL turns a comparison into UNKNOWN — the trap behind most wrong SQL results.",
+
+    # --- Deep Learning (missing descriptions) ---------------------------
+    "deep_learning/model_training_on_cpu_vs_gpu.html":
+        "Sweep batch size from 1 to 256 and watch the GPU crossover: too small and the CPU wins, large enough and thousands of cores pay off.",
+
+    # --- DSA (missing descriptions) -------------------------------------
+    "dsa/bellman_ford.html":
+        "Relax every edge V-1 times to find shortest paths with negative weights, then run one extra pass to detect negative cycles.",
+    "dsa/big_o_notation.html":
+        "Compare O(1) through O(2^n) on the same input and see why constants vanish and growth rate is all that matters at scale.",
+    "dsa/binary_search_trees.html":
+        "Insert, search and delete in a BST and watch it degenerate into a linked list when values arrive sorted — the case balance fixes.",
+    "dsa/breadth_first_search.html":
+        "Traverse a tree level by level using a queue, and see why BFS finds the shortest path in an unweighted graph by construction.",
+    "dsa/cycle_detection.html":
+        "Run Floyd's tortoise-and-hare algorithm on a linked list and find the cycle entry point in O(n) time and O(1) space.",
+    "dsa/divide_and_conquer.html":
+        "Split a problem in half, recurse, combine — and see how halving at each level gives merge sort its O(n log n) guarantee.",
+    "dsa/dynamic_programming.html":
+        "Cache subproblem results so they are solved once, not millions of times, and watch Fibonacci drop from exponential to linear.",
+    "dsa/graph_representations.html":
+        "Store a graph as an adjacency matrix, adjacency list or edge list and see how the choice changes the cost of every algorithm on it.",
+    "dsa/greedy_algorithms.html":
+        "Take the locally best option at each step and see when that greedy choice is provably optimal — and when it quietly fails.",
+    "dsa/hash_tables.html":
+        "Hash a key into an array index for O(1) lookup and see how collisions, load factor and resizing keep the constant-time promise.",
+    "dsa/heap_sort.html":
+        "Build a max-heap and extract the largest element n times for a guaranteed O(n log n) sort — no worst case, no extra memory.",
+    "dsa/heaps_and_priority_queues.html":
+        "Maintain a complete binary tree where the smallest element is always at the root, with O(log n) insert and extract-min.",
+    "dsa/kmp_string_matching.html":
+        "Build a failure function from the pattern and scan the text in O(n + m) total, never re-reading a character after a mismatch.",
+    "dsa/linked_lists.html":
+        "Store elements in nodes linked by pointers and trade O(1) random access for O(1) insertion at any known position.",
+    "dsa/minimum_spanning_tree.html":
+        "Connect every vertex at minimum total cost with Kruskal's edge-sorting and Prim's vertex-growing approaches side by side.",
+    "dsa/queues.html":
+        "Add at the back, remove from the front — FIFO ordering — and see how swapping a stack for a queue turns DFS into BFS.",
+    "dsa/radix_sort.html":
+        "Sort integers digit by digit with zero comparisons and beat the O(n log n) lower bound that comparison-based sorts cannot escape.",
+    "dsa/recursion_and_call_stack.html":
+        "Watch each recursive call push a frame onto the call stack, and see the values computed on the way back up, not the way down.",
+    "dsa/sliding_window.html":
+        "Slide a fixed or variable-size window across an array, updating a running total to replace an O(n*k) nested loop with O(n).",
+    "dsa/stacks.html":
+        "Push, pop and peek at the top of a LIFO structure, and see how the call stack, bracket matching and DFS all share this idea.",
+    "dsa/topological_sort.html":
+        "Order a directed graph so every edge points forward, and detect when a cycle makes that ordering impossible.",
+    "dsa/trie_prefix_tree.html":
+        "Store strings as paths through a tree so words sharing a prefix share those nodes, making autocomplete an O(L) walk.",
+    "dsa/two_pointers.html":
+        "Move two indices through a sorted array in one pass and replace an O(n-squared) nested loop with O(n) and no extra space.",
+    "dsa/union_find.html":
+        "Merge and query disjoint sets in near-constant time with union by rank and path compression — the engine inside Kruskal's MST.",
+
+    # --- Gen AI (missing descriptions) ----------------------------------
+    "gen_ai/byte_pair_encoding_tokenizer.html":
+        "Merge the most frequent character pair, repeat, and build the subword vocabulary GPT-style models use to tokenise any text.",
+    "gen_ai/how_llms_process_text.html":
+        "Follow a prompt through tokenisation, embedding, positional encoding, transformer layers, softmax and sampling — one token out.",
+    "gen_ai/knowledge_distillation_in_llms.html":
+        "Train a small student on the teacher's soft probability distribution and recover most of the accuracy at a fraction of the size.",
+    "gen_ai/lora_in_llms.html":
+        "Freeze the base model and train two thin matrices whose product approximates the full weight update — 10,000x fewer parameters.",
+    "gen_ai/masked_language_modeling.html":
+        "Hide 15 percent of tokens and train the model to reconstruct them using both sides of the sentence — BERT's pretraining objective.",
+    "gen_ai/quantization_in_llms.html":
+        "Snap 32-bit weights to 8-bit or 4-bit levels and fit a 70B-parameter model on a single consumer GPU, with the accuracy cost shown.",
+
+    # --- Maths (missing descriptions) -----------------------------------
+    "maths/bayes_theorem.html":
+        "Update a prior belief with new evidence and see why a 99%-accurate test still gives mostly false positives when the condition is rare.",
+    "maths/derivatives_and_slope.html":
+        "Shrink the gap between two points until the secant becomes the tangent — the single idea every gradient-based optimiser is built on.",
+    "maths/equation_of_line.html":
+        "Drag slope and intercept and watch y = mx + c respond. See slope-intercept, point-slope and standard form describe the same line.",
+    "maths/exponentials.html":
+        "See why multiplying by a constant at each step starts slow then turns vertical — the shape behind softmax and vanishing gradients.",
+    "maths/logarithms.html":
+        "Turn a product of tiny probabilities into a sum of manageable numbers — the reason loss functions and learning-rate plots use logs.",
+    "maths/matrix_multiplication.html":
+        "Compute each entry as a row-times-column dot product and see why the shape rule and GPU parallelism make this the engine of deep learning.",
+    "maths/mean_mode_and_median.html":
+        "Compare three measures of typical: the mean that outliers drag, the median that resists them, and the mode that works on categories.",
+    "maths/mean_variance_standard_deviation.html":
+        "Measure centre with the mean and spread with variance and standard deviation — the two numbers every normalisation layer uses.",
+    "maths/partial_derivatives_and_gradient.html":
+        "Take one derivative per variable, bundle them into the gradient vector, and see why it points straight uphill on any loss surface.",
+    "maths/probability_basics.html":
+        "Count outcomes, combine events with addition and multiplication rules, and see why a fair coin owes you nothing after ten heads.",
+    "maths/the_chain_rule.html":
+        "Multiply local derivatives of nested functions link by link — the exact arithmetic backpropagation performs through every layer.",
+    "maths/the_normal_distribution.html":
+        "Two numbers — mean and standard deviation — define the bell curve. The 68-95-99.7 rule and why the CLT makes this shape unavoidable.",
+    "maths/vectors_and_dot_product.html":
+        "Multiply matching components and sum to get a number that measures how much two vectors point the same way — behind every forward pass.",
+
+    # --- NLP (missing descriptions) -------------------------------------
+    "natural_language_processing/backpropagation_through_time.html":
+        "Unroll an RNN's loop into T copies and send the gradient backward through each timestep, watching it shrink or explode along the way.",
+    "natural_language_processing/candidate_memory_in_lstm.html":
+        "The LSTM layer that manufactures new content: tanh outputs between -1 and +1 for the input gate to accept or reject element by element.",
+    "natural_language_processing/how_are_embeddings_generated.html":
+        "Predict a word from its neighbours with Skip-gram or CBOW and watch the weight matrix converge into vectors where meaning is geometry.",
+    "natural_language_processing/how_words_are_represented_in_neural_networks.html":
+        "Trace the four-stage chain from a raw word to a token ID to a one-hot vector to the dense embedding a network can multiply.",
+    "natural_language_processing/input_gate_in_lstm.html":
+        "A sigmoid layer that scales the candidate vector element by element, deciding how much new information each memory slot accepts.",
+    "natural_language_processing/limitations_of_ann_with_sequential_data.html":
+        "See the three ways a feed-forward network fails on sequences: fixed input size, order blindness, and no memory between steps.",
+    "natural_language_processing/normalization_techniques_for_sequential_data.html":
+        "See why batch normalisation breaks on variable-length sequences and how layer normalisation fixes it by computing stats per sample.",
+    "natural_language_processing/rnn.html":
+        "Step through a recurrent neural network in 3D as it processes a sequence, carrying hidden state from one timestep to the next.",
+    "natural_language_processing/rnn_architecture.html":
+        "Unroll a recurrent cell across a sequence and see a 50-token sentence become a 50-layer deep network sharing one set of weights.",
+    "natural_language_processing/sequential_data_preparation_with_sliding_window.html":
+        "Slide a window across a raw time series to turn one long stream into the (X, y) supervised training pairs a model requires.",
+    "natural_language_processing/text_encoding_techniques_in_nlp.html":
+        "Climb from label encoding to one-hot to bag-of-words to TF-IDF, and see which information each rung preserves and which it drops.",
+    "natural_language_processing/vanishing_gradient_problem_in_rnn.html":
+        "Watch a gradient shrink by a factor of 0.7 at each timestep until the learning signal at the start of the sentence is near zero.",
+    "natural_language_processing/what_are_embeddings.html":
+        "Replace sparse one-hot vectors with short dense vectors where similar words sit close together and vector arithmetic encodes meaning.",
+    "natural_language_processing/what_is_a_gru.html":
+        "Merge the LSTM's three gates into two and its two states into one — same gating idea, 75 percent of the parameters, close accuracy.",
+    "natural_language_processing/what_is_a_recurrent_cell.html":
+        "Process one token at a time and pass a fixed-size hidden state forward — the loop that lets a small network read any-length input.",
+    "natural_language_processing/what_is_a_sequence.html":
+        "See why 'dog bites man' and 'man bites dog' differ: order carries meaning, and models that ignore it lose the most important signal.",
+    "natural_language_processing/what_is_bi_directional_layer.html":
+        "Run one RNN forward and another backward, concatenate their outputs, and give every position context from both sides of the sequence.",
+    "natural_language_processing/what_is_lstm.html":
+        "Add a cell state that flows through addition instead of matrix multiplication, plus three gates that learn when to remember and forget.",
+    "natural_language_processing/why_text_encoding_is_needed_in_nlp.html":
+        "A neuron computes w*x + b — multiplication needs numbers. See why every NLP pipeline starts by converting words into vectors.",
 }
 
 # The named-architecture modules (tools/arch_topics.py) write their own, one

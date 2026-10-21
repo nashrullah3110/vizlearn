@@ -19,7 +19,7 @@
  *
  * Third-party requests - analytics, ads, fonts - are not touched at all.
  */
-const CACHE = 'vizlearn-d7047f1e9d';
+const CACHE = 'vizlearn-f00f6d5b06';
 const CORE = [
   "./offline.html",
   "./assets/vizlearn.css",
