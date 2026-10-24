@@ -4,9 +4,11 @@ Every module page's written article lives here, one file per page:
 
     content/articles/<track>/<slug>.txt   ->   <track>/<slug>.html
 
-The files were seeded from the articles the pages already carried, so nothing
-was rewritten from scratch — `tools/check_content.py` compares each file
-against the committed page and fails if a sentence went missing.
+These text files are the editable source of truth for their pages. They began
+as extracted page copy, but articles are now actively rewritten and expanded
+here; do not use the extraction script to overwrite them. The generated maths
+lesson builder preserves existing files and uses its embedded copy only to
+bootstrap a source file for a newly added lesson.
 
 ## The format
 
@@ -56,12 +58,14 @@ sections with the same heading rather than duplicating them.
 
 ## Where the work stands
 
-The articles are being expanded to 2000+ words each — the long-form target.
-`tools/wordcount.py` is the worklist: it prints every page still under target,
-shortest first.
+There is no fixed word-count target for articles. Use `tools/wordcount.py` to
+find short pages for review, not to decide quality: a low count is a prompt to
+check for missing definitions, worked examples, comparisons, use cases, or
+limitations. Expand only where the lesson needs more explanation; do not add
+padding to reach a number.
 
-    python3 tools/wordcount.py                  # everything still short
-    python3 tools/wordcount.py maths --all      # one track, including done
+    python3 tools/wordcount.py                  # shortest pages first
+    python3 tools/wordcount.py maths --all      # one track, including all pages
 
 Two pages have no content file: `computer_vision/cnn.html` and
 `natural_language_processing/rnn.html`. Their prose sits directly in the page

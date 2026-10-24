@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Content for 20 generated lessons in the 47-page maths track.
+"""Visualisation data and bootstrap copy for 20 generated maths lessons.
 
-This module stores each lesson's visualisation and article source. The other
-27 lessons are authored in the same track's content/articles/maths directory.
-Together they provide the linear algebra, calculus, probability, and
+All 47 editable article texts live in content/articles/maths. This module
+keeps the visualisation configurations and a fallback article copy used only
+when a new generated lesson does not yet have its text file. Together the
+track's lessons teach the linear algebra, calculus, probability, and
 statistics used by later machine-learning modules.
 
 These are demonstrations rather than simulations - nothing is fitted, and

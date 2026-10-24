@@ -21,6 +21,24 @@ For each page:
 - Add a small number of relevant primary sources and internal links at the point they help. Link to the original paper, official documentation, standards, or authoritative source for claims that need attribution or are easy to get wrong. Do not add citations decoratively.
 - Ensure prose, code, diagrams, controls, readouts, worked examples, and answer keys agree with one another.
 
+### Completeness before concision
+
+Concise means removing repetition, not removing the lesson. Do not optimize for a low word count. A page is too short when a learner must leave it to learn the core definition, distinguish nearby ideas, understand how to use the method, or see why the example works.
+
+For each topic, identify the essential questions a beginner needs answered and make sure the complete article answers them in plain language:
+
+1. **What is it?** State the formal or operational definition, name the objects involved, and explain the notation and units. Define prerequisite terms when the page depends on them.
+2. **How does it work?** Explain the key relationship or procedure; do not leave a formula unexplained. Say what each symbol means and why the steps are valid.
+3. **How do I use or recognize it?** Give a worked example with the important intermediate steps, then explain when this concept or method is useful.
+4. **What is it easy to confuse with?** For neighboring concepts, state the actual difference and when to choose each. Use a compact comparison table when it makes a real choice clearer.
+5. **What are the limits?** State assumptions, edge cases, failure modes, and common misinterpretations that change the answer.
+
+Not every topic needs equal space for every question. Choose the parts that matter for the topic, but do not omit a foundational definition, a meaningful worked example, or an important distinction just to make a page short. The opening/Overview should orient the reader; it must not be the only place where the article defines its subject. The remaining article body should develop the idea with enough detail to teach it after the reader scrolls past the visualiser.
+
+As a diagnostic, ordinary concept lessons will often need roughly 500–900 words of article prose, and advanced or multi-part topics may need more. This is a planning range, not a target or a quality score. A shorter lesson is acceptable only after checking that it still defines the concept, teaches a complete example, explains relevant choices and limits, and has no unexplained jargon. Never add filler to reach a number.
+
+For topics that compare several methods or terms (for example mean, median, and mode; confidence intervals and hypothesis tests; covariance and correlation; or cross-entropy and KL divergence), name and define every item, compare how each behaves, and give a practical selection rule. Do not imply that a vague phrase such as “what is typical” is a substitute for those definitions.
+
 Google does not set a preferred word count. Do not treat the repository's old 2,000-word target, the quality scanner's 800-word threshold, or the presence of a table/code/formula as a definition of quality. A concise page can be complete; a long page can still be thin or repetitive.
 
 ## Choose the teaching layout per page

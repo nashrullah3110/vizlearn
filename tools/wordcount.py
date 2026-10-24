@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Rendered word count per article, shortest first.
 
-The long-form target is 2000+ words a page, so this is the worklist:
+Use the output to find pages that may need a completeness review, not as a
+pass/fail threshold or a reason to add padding:
 
-    python3 tools/wordcount.py            # every page under target
+    python3 tools/wordcount.py            # every page, shortest first
     python3 tools/wordcount.py maths      # one track
-    python3 tools/wordcount.py --all      # everything, including done
 """
 
 import html
@@ -16,8 +16,6 @@ import prose
 from lib_catalog import ROOT
 
 TAGS = re.compile(r"<[^>]+>")
-TARGET = 2000
-
 # Code is not prose. The Pydantic and FastAPI articles carry their examples
 # inline - a runnable editor holds its program in a <script> and a static
 # block in a <pre> - and counting those made a 900-word article report as
@@ -37,16 +35,13 @@ def count(entry):
 
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    show_all = "--all" in sys.argv
     rows = sorted((count(e), r) for r, e in prose.load(ROOT).items()
                   if not args or any(r.startswith(a) for a in args))
 
-    under = [r for r in rows if r[0] < TARGET]
-    for n, rel in (rows if show_all else under):
+    for n, rel in rows:
         print("  %5d  %s" % (n, rel))
-    done = len(rows) - len(under)
     total = sum(n for n, _ in rows)
-    print("pages   : %d  (%d at target, %d to go)" % (len(rows), done, len(under)))
+    print("pages   : %d  (sorted shortest first; counts are diagnostic only)" % len(rows))
     print("words   : %d total, %d average" % (total, total // max(len(rows), 1)))
     return 0
 

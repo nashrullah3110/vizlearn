@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Render the 20 generated lessons in the 47-page maths track.
+"""Render the 20 generated visualisations in the 47-page maths track.
 
-The visualisations and their article sources live in tools/math_topics.py;
-the other 27 lessons are maintained as article sources in
-content/articles/maths. These foundations support the machine-learning
-modules that use linear algebra, calculus, probability, and statistics.
+Visualisation configs live in tools/math_topics.py; all editable article
+sources live in content/articles/maths. These foundations support the
+machine-learning modules that use linear algebra, calculus, probability, and
+statistics.
 
 These are demonstrations rather than simulations: nothing is fitted, and the
 arithmetic is the subject. The SVD is a real decomposition of the matrix on
@@ -158,8 +158,13 @@ def main():
     art_dir = os.path.join(ROOT, "content", "articles", DIR)
     os.makedirs(art_dir, exist_ok=True)
     for t in TOPICS:
-        open(os.path.join(art_dir, "%s.txt" % t["slug"]), "w",
-             encoding="utf-8").write(t["article"].strip() + "\n")
+        # The text file is the editable source of truth. Keep the embedded
+        # article only as a bootstrap for a newly added topic; rewriting an
+        # existing file here would silently discard editorial improvements.
+        article_path = os.path.join(art_dir, "%s.txt" % t["slug"])
+        if not os.path.exists(article_path):
+            with open(article_path, "w", encoding="utf-8") as article_file:
+                article_file.write(t["article"].strip() + "\n")
 
     index = os.path.join(ROOT, "index.html")
     src = open(index, encoding="utf-8").read()
@@ -171,7 +176,7 @@ def main():
     open(index, "w", encoding="utf-8").write(src[:start] + block + src[end:])
 
     print("maths pages written : %d" % len(TOPICS))
-    print("articles written : %d" % len(TOPICS))
+    print("article sources checked : %d" % len(TOPICS))
     print("catalog          : %d entries added, %d total in the track"
           % (added, len(data[TOPIC_KEY]["courses"])))
     return 0
