@@ -31,6 +31,8 @@ Do not force every page to begin with a full-screen visualiser. Identify the pag
 
 Use when changing a parameter or stepping through a process is the clearest way to understand the concept. Keep the visualisation prominent near the top, after the title and a concise orientation. Give the learner one specific thing to try or observe. Put the explanation immediately before or after the relevant interaction; do not make the reader search below a long prose block to learn what the controls mean.
 
+Choose whether the Overview belongs before or after the visualisation based on the teaching sequence. When the learner can understand the opening idea better by manipulating the visualiser first, put the Overview and its contents list directly below the complete visualiser. In this repository, `tools/build_lede.py` supports the page marker `<!-- VIZLEARN:LEDE:AFTER -->` for that placement; insert it after the widget and keep the normal generated lede markers intact. Keep the title and one-sentence orientation above the widget so the page is not an unexplained tool.
+
 ### Code-led
 
 Use when the goal is to write, read, debug, or compare code. Put a runnable, minimal example near the explanation it teaches. Introduce what to run and what output or behavior to notice. Explain important lines and show a useful variation or failure case where relevant. Do not show the same full code once in a static block and again in an editor unless the two views have distinct purposes.
@@ -50,6 +52,14 @@ Use when neither a large visualiser nor a code editor is the best opening—for 
 - Preserve focus visibility, readable contrast, meaningful heading order, and reduced-motion preferences. Avoid horizontal overflow from code or tables; provide a usable scroll container when needed.
 - Prefer a readable text measure and clear spacing over maximising the amount of content visible at once. Keep code and its explanation close together.
 - Preserve working module navigation, experiments, checks, and app features unless the user asks to change them or they actively obstruct the lesson.
+
+### Page width and mathematical readability
+
+- Align the visualiser and article's **outer bands** to the same content container. Do not let a global prose-width cap shrink the whole article card when the visualiser is intentionally full width.
+- Keep running paragraphs at a comfortable measure (roughly 65–90 characters per line where practical), even when the article card spans the visualiser's width. Let diagrams, tables, code, and display equations use the wider band when that improves comprehension.
+- Set important equations apart from prose when they need more room. Use consistent spacing, a readable math/monospace face, clear operator and subscript rendering, and sufficient contrast. Long equations must wrap or scroll within their own container on narrow screens; they must never widen the page.
+- Use inline notation only for short expressions that remain easy to scan. Explain symbols near the equation, and provide an accessible text equivalent when the markup uses visual-only notation.
+- Review the rendered page at desktop and phone widths. Check that the article card and visualiser align edge to edge, paragraph lines remain readable, display equations are visually distinct, and no formula or control causes horizontal page overflow.
 
 ## Research and citations
 
@@ -77,7 +87,7 @@ The generated HTML is not generally the source of truth. Before editing, inspect
 - The article sources live in `content/articles/<track>/<slug>.txt` when that file exists. The text format is parsed by `tools/prose.py`; it supports headings, paragraphs, lists, tables, inline links, code, and selected runnable-code fences.
 - Some articles are still declared in `tools/articles.py`. Check that source before editing a generated HTML page. The article builder renders content into `VIZLEARN:ARTICLE` markers; a later build can overwrite direct HTML edits.
 - Some pages have article prose directly in their HTML and may not be handled by the normal article generator. Follow the source path documented in `content/README.md` and the page's markers before changing them.
-- `tools/build_lede.py` moves the first article section into the page's Overview/lede area. Keep this first section concise and non-duplicative; preserve it as useful orientation rather than deleting the only explanation at the top.
+- `tools/build_lede.py` moves the first article section into the page's Overview/lede area. By default it places the Overview near the title; use the optional `<!-- VIZLEARN:LEDE:AFTER -->` marker after a visualiser when the lesson should move from title/orientation to interaction and then to Overview. Keep the first section concise and non-duplicative; preserve it as useful orientation rather than deleting the only explanation.
 - Experiment sections are parsed to create runnable buttons. Preserve recognized experiment headings and bold control labels exactly as they appear in the page's real controls. Do not silently rename a control or change its valid range.
 - Generated content lives between `VIZLEARN:*` markers. Edit the source, then use the documented build workflow when the user has requested repository changes. Do not hand-edit generated blocks as a substitute for source edits.
 - Protect existing user work. Inspect `git status` first, preserve uncommitted edits and untracked article sources, and do not reset, overwrite, or discard them. Do not run extract/seed commands with force or generators that rewrite unrelated pages without first establishing their effects.
@@ -89,7 +99,7 @@ The generated HTML is not generally the source of truth. Before editing, inspect
 2. **Inventory pages by teaching mode and risk.** Classify modules as visualiser-led, code-led, mixed, or concept-first. Record for each page its source file, overview/lede, main sections, interactive/code elements, citations, internal links, and any duplication or factual concerns. Flag pages with errors or missing content rather than making up material.
 3. **Settle representative patterns.** Revise a small, varied sample: at least one visualiser-led page, one code-led page, one mixed page, and one concept-first page. Inspect the rendered pages at desktop and mobile sizes. Use those examples to settle content order and visual treatment; do not impose one full-screen hero layout on all modules.
 4. **Rewrite in manageable batches.** Work track by track or in similarly reviewable groups. Remove repeated intros and filler; teach the idea plainly; add an example only when it clarifies; research and link important claims; add relevant internal links; and retain valid interactive hooks. Keep an audit trail of pages completed, uncertain facts, broken demos, and source gaps.
-5. **Improve the UI in shared components where possible.** Make article typography, line length, spacing, heading hierarchy, code treatment, tables, and demo placement readable. Prefer shared CSS/components for common behavior, with page-level choices for the teaching mode. Avoid altering unrelated hub or application UI.
+5. **Improve the UI in shared components where possible.** Make article typography, line length, spacing, heading hierarchy, code treatment, tables, equations, and demo placement readable. Align the article and visualiser outer widths where intended while preserving a comfortable paragraph measure. Prefer shared CSS/components for common behavior, with page-level choices for the teaching mode. Avoid altering unrelated hub or application UI.
 6. **Resolve sitewide contradictions in scope.** Derive the module count from the actual catalog rather than hardcoding it in multiple places. Reconcile the hero statistic, track totals, descriptions, sitemap/build copy, and repository README when those surfaces are included in the requested task.
 7. **Review the rendered outcome.** Use the site's actual build process and inspect representative output from every layout pattern. Verify content is not duplicated between the lede and article, links resolve, code fences and citations render correctly, experiments still match controls, mobile order is understandable, and shared styles work. Report anything that could not be checked. Do not equate an internal word-count or build audit with AdSense approval.
 8. **Report honestly.** Summarize the kinds of changes made, pages covered, checks performed, exceptions, and remaining uncertain or unsupported claims. State clearly that approval depends on Google's review and cannot be guaranteed.
@@ -104,6 +114,7 @@ Before calling a page finished, ask:
 - Are the example, explanation, code, interaction, and answer key consistent and correct?
 - Are citations authoritative and attached to the claims they support? Do internal links genuinely help the learning path?
 - Is the page readable on mobile and usable without a mouse?
+- Do the article and visualiser align at their outer edges, and do display equations remain legible without causing page overflow?
 - Did the edit add real explanatory value instead of length, keyword variants, or template sections?
 
 If a fact cannot be verified or a demo appears wrong, mark it for investigation and avoid presenting a guess as fact.

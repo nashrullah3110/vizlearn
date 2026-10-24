@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lift the article's opening section above the visualisation.
+"""Lift the article's opening section into an Overview lede.
 
 Measured, the first real paragraph on a module page started around 1270px down
 - roughly two screens, behind the control panel, the plot and the readouts.
@@ -12,8 +12,10 @@ section is *moved*, and a slot marker is left where it came from so a rebuild
 can put it back before recomputing. That keeps the step idempotent on the
 hand-written pages, whose articles no other generator rewrites.
 
-Runs after build_articles.py (it needs the finished article) and after
-build_seo.py (it anchors on the byline block).
+By default the lede follows the title description. Pages with
+`VIZLEARN:LEDE:AFTER` place it at that marker instead, typically after a
+visualiser. Runs after build_articles.py (it needs the finished article) and
+after build_seo.py (the default placement anchors on the byline block).
 """
 
 import html
@@ -36,6 +38,10 @@ SRC_BEGIN = "<!-- VIZLEARN:LEDE:SRC -->"
 SRC_END = "<!-- VIZLEARN:LEDE:/SRC -->"
 SRC = re.compile(re.escape(SRC_BEGIN) + r"(.*?)" + re.escape(SRC_END), re.S)
 SLOT = "<!-- VIZLEARN:LEDE:SLOT -->"
+# Optional per-page placement anchor. Pages that teach best through direct
+# manipulation can put the Overview below their complete visualiser instead
+# of using the default title-area placement.
+AFTER_MARKER = "<!-- VIZLEARN:LEDE:AFTER -->"
 
 LEAD = re.compile(r"<!-- VIZLEARN:BYLINE:END -->\s*<p\b[^>]*>.*?</p>", re.S)
 H3 = re.compile(r"<h3\b([^>]*)>(.*?)</h3>", re.S)
@@ -260,10 +266,15 @@ def process(rel):
     src = src[:first_start] + SLOT + src[first_end:]
     block = render(first, rest)
 
-    lead = LEAD.search(src)
-    if not lead:
-        return bail("no-anchor")
-    src = src[: lead.end()] + "\n" + block + src[lead.end():]
+    after = src.find(AFTER_MARKER)
+    if after >= 0:
+        at = after + len(AFTER_MARKER)
+        src = src[:at] + "\n" + block + src[at:]
+    else:
+        lead = LEAD.search(src)
+        if not lead:
+            return bail("no-anchor")
+        src = src[: lead.end()] + "\n" + block + src[lead.end():]
 
     open(path, "w", encoding="utf-8").write(src)
     return "ok"

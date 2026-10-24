@@ -25,8 +25,10 @@ next build overwrites it from here.
 
 ## Two sections the build reads
 
-- The **first** section is moved above the visualisation as the Overview lede
-  by `tools/build_lede.py`, so keep it short and introductory.
+- The **first** section is moved into the Overview lede by
+  `tools/build_lede.py`, so keep it short and introductory. By default it sits
+  near the title; pages that should show a visualiser before the Overview can
+  put `<!-- VIZLEARN:LEDE:AFTER -->` after the complete widget in the HTML.
 - The **experiments** section — headed "Guided experiments", "Try this above",
   "Experiments to try" or similar — is parsed by `tools/build_labs.py` to
   build the Run buttons and the presets they drive. The **bold** control names
