@@ -22,6 +22,29 @@ LABS = {
 # Groundwork - maths
 # =========================================================================
 
+"maths/logarithms.html": {"check": [
+    {"q": "What does log₂(8) = 3 mean?",
+     "options": ["2 × 8 = 3", "2 raised to the third power is 8",
+                 "8 raised to the second power is 3", "The graph has slope 3"],
+     "answer": 1,
+     "why": "A logarithm gives the exponent: 2³ = 8, so log₂(8) = 3."},
+    {"q": "Which expression equals log_b(pq), for positive p and q?",
+     "options": ["log_b(p) × log_b(q)", "log_b(p) + log_b(q)",
+                 "log_b(p + q)", "log_p(b) + log_q(b)"],
+     "answer": 1,
+     "why": "The product rule turns multiplication inside one logarithm into addition of two logarithms with the same base."},
+    {"q": "Which x-values are allowed in a real-valued log_b(x)?",
+     "options": ["All real x", "Only x ≥ 0", "Only x > 0", "Only integers"],
+     "answer": 2,
+     "why": "A real logarithm requires a positive input. At x = 0 and for negative x it is undefined."},
+    {"q": "What does changing the logarithm's base do to its value?",
+     "options": ["It rescales the output by a constant factor",
+                 "It changes the input domain to include zero",
+                 "It turns sums into products", "It changes the curve into a straight line"],
+     "answer": 0,
+     "why": "The change-of-base formula is log_b(x) = ln(x) / ln(b), so changing the base rescales the output."},
+]},
+
 "maths/equation_of_line.html": {"check": [
     {"q": "In y = mx + c, what does c control?",
      "options": ["How steep the line is",

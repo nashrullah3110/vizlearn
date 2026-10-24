@@ -131,6 +131,15 @@ SPECS = {
         "packages": "numpy",
         "label": "NumPy",
         "filename": "example_%02d.py",
+        "overrides": {
+            # This example uses only Python's standard math module; loading
+            # NumPy would add download cost and mislabel the editor.
+            "logarithms": {
+                "packages": "",
+                "label": "Python",
+                "filename": "logarithms.py",
+            },
+        },
     },
     "natural_language_processing": {
         # numpy alone. attention, the LSTM gates, positional encoding and
