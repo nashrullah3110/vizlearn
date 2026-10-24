@@ -5,9 +5,9 @@ intro: What does s[2:6] cost, and is it a view or a copy?
 
 `s[a:b]` <strong>copies</strong> the selected characters into a new string. It costs O(b &minus; a) time and the same in memory.
 
-Python strings are immutable, and slicing does not create a lightweight view onto the first. It allocates a new object and copies the bytes. Understanding that is the difference between code that scales and code that quietly becomes quadratic.
+Python strings are immutable, and slicing does not create a lightweight view onto the first. It allocates a new string and copies the selected data. Understanding that is the difference between code that scales and code that quietly becomes quadratic.
 
-This is the same reason `bytes` slicing copies. NumPy arrays and `memoryview` objects are the standard options when you need views. They point into existing memory without copying. This page measures the cost of repeated slicing, shows where it turns O(n) code into O(n&sup2;), and covers the patterns that avoid it. It also benchmarks `bytes` slicing against `memoryview` for the cases where a zero-copy view is available.
+This is the same reason `bytes` slicing copies. NumPy arrays and `memoryview` objects are the standard options when you need views. They point into existing memory without copying.
 
 ```python-run
 s = "hello world"
@@ -16,7 +16,7 @@ print(s[:])          # returns s itself: an identical immutable object needs no 
 print(s[::2])        # 'hlowrd' -- a copy, with a step
 print(s[::-1])       # 'dlrow olleh' -- reversal, O(n)
 ```
-`s[:]` is the one exception, and it is an implementation optimisation rather than a rule to depend on:. This is because the string is immutable, a full-slice copy can safely return the first object.
+`s[:]` is the one exception, and it is an implementation optimisation rather than a rule to depend on, because the string is immutable, a full-slice copy can safely return the first object.
 
 |Operation|Cost|
 |---|---|
@@ -130,7 +130,7 @@ print(is_palindrome_fast("racecar"), is_palindrome_fast("hello"))
 
 ## Copy, not view
 
-Some languages hand you a slice that points into the first buffer. So taking one is O(1). Python does not: <code>s[2:6]</code> allocates a new string object and memcpys four characters into it. The cost is tied to to the slice, not to the first.
+Some languages hand you a slice that points into the first buffer. So taking one is O(1). Python does not: <code>s[2:6]</code> allocates a new string object and memcpys four characters into it. The cost depends on the slice length, not the source length.
 
 You can prove it from the interpreter: the id differs, and mutating is impossible anyway. So there is no aliasing to observe. What you can measure is the time, which is what the editor below does.
 
@@ -204,7 +204,7 @@ For the underlying ideas, see <a href="../python/strings_and_slicing.html">strin
 
 <strong>Is `s[:]` free?</strong> In CPython it returns the same object, because immutability makes copying pointless. Do not build an algorithm on that guarantee.
 
-<strong>Is slicing a list the same?</strong> Yes for cost &mdash; O(k) and a new list &mdash; but the copy is <em>shallow</em>. The new list holds the same element references.
+<strong>Is slicing a list the same?</strong> Yes for cost &mdash; O(k) and a new list &mdash; but the copy is <em>shallow</em>. The new list holds references to the same elements.
 
 <strong>Does negative indexing cost more?</strong> No. `s[-1]` is `s[len(s)-1]`, computed arithmetically.
 
@@ -221,3 +221,8 @@ For the underlying ideas, see <a href="../python/strings_and_slicing.html">strin
 - Use `startswith`, `in`, and `find(sub, pos)` rather than slicing to inspect a region.
 - `memoryview` over `bytes` gives true O(1) slicing; there is no `str` the same.
 - CPython stores strings at 1, 2 or 4 bytes per character. So `len` and indexing are O(1).
+
+## Sources and next steps
+
+- Source: [CPython source, Unicode object implementation](https://github.com/python/cpython/blob/main/Objects/unicodeobject.c)
+- Continue with [reverse a string](reverse-a-string.html), which builds on this idea.

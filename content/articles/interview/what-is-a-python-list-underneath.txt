@@ -3,19 +3,19 @@ intro: What is a Python list actually implemented as, and why does that make app
 
 ## A dynamic array of pointers
 
-A Python list is a contiguous C array of pointers to objects, plus a length and a capacity.
+In CPython, a list is a contiguous array of pointers to objects, plus a length and an allocated capacity. Other Python implementations may use different internals.
 
 <p class="mono-font">[ptr, ptr, ptr, ptr, &mdash;, &mdash;, &mdash;]&nbsp;&nbsp;length 4, capacity 7</p>
 
 Two facts follow, and between them they explain every speed trait a list has.
 
-<strong>It is contiguous,</strong> so `lst[i]` is a single offset calculation &mdash; O(1) &mdash; and iteration reads sequential memory. This CPU prefetchers handle very well.
+<strong>It is contiguous,</strong> so `lst[i]` is a single offset calculation &mdash; O(1) &mdash; and iteration reads sequential memory, which tends to make good use of CPU caches.
 
-<strong>It holds pointers, not values.</strong> A list can contain objects of different types,. This is because every slot is the same size no matter what it points at. That flexibility costs memory: 8 bytes per pointer plus the object itself.
+<strong>It holds pointers, not values.</strong> A list can contain objects of different types because every slot stores a pointer of the same size, regardless of the object it refers to. On a typical 64-bit CPython build, each pointer occupies 8 bytes, in addition to the object itself.
 
 It is emphatically <strong>not</strong> a linked list, despite the name. There are no per-element next pointers, and indexed access is constant time.
 
-This page shows the over-allocation strategy that makes `append` amortised O(1), measures `insert(0, x)` against `append` so the O(n) cost is a number. Rather than a claim, and covers `deque` as the other when you need fast operations at both ends.
+The interactive example shows list over-allocation and compares `append` with `insert(0, x)`. For fast operations at both ends, use `collections.deque`.
 
 
 ## Run it
@@ -197,7 +197,7 @@ For the underlying ideas, see <a href="../dsa/lists_in_python.html">lists</a>, <
 
 <strong>By how much does it grow?</strong> Roughly 12.5% over-allocation, not doubling. A compromise between memory and copy frequency.
 
-<strong>Why can a list hold mixed types?</strong> Because it stores pointers. And every pointer is the same size any it points at.
+<strong>Why can a list hold mixed types?</strong> Because it stores pointers. And every pointer is the same size whatever it points to.
 
 <strong>Does `del lst[i]` free memory?</strong> It removes the reference and shifts the remainder. The object is freed when nothing references it.
 
@@ -210,3 +210,8 @@ For the underlying ideas, see <a href="../dsa/lists_in_python.html">lists</a>, <
 - Append is O(1) amortised because of over-allocation; operations at the front are O(n) because all of it shifts.
 - Holding references is why `b = a` shares, `copy()` is shallow, and `[[0]*3]*3` repeats one row.
 - For homogeneous numeric data, NumPy or `array.array` stores raw values and uses a fraction of the memory.
+
+## Sources and next steps
+
+- Source: [CPython source, list implementation](https://github.com/python/cpython/blob/main/Objects/listobject.c)
+- Continue with [list versus tuple versus deque](list-versus-tuple-versus-deque.html), which builds on this idea.

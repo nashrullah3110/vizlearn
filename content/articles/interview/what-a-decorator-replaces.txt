@@ -3,11 +3,11 @@ intro: What does the @ syntax do, and why do decorated functions need functools.
 
 ## The question, and what it is testing
 
-<code>@shout</code> above <code>def greet</code> is exactly <code>greet = shout(greet)</code>. The name now means any the decorator returned. Often a wrapper function. So the first's name and docstring are gone unless you copy them across with <code>functools.wraps</code>.
+<code>@shout</code> above <code>def greet</code> is exactly <code>greet = shout(greet)</code>. After decoration, the name refers to whatever the decorator returns, often a wrapper function. Use <code>functools.wraps</code> to preserve the wrapped function's metadata.
 
-<p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
 
-The three things interviewers want to hear: first, `@decorator` is syntactic sugar for reassignment, not magic. It calls the decorator with the function and binds the name to the result. Second, that reassignment replaces `__name__`, `__doc__`, and `__module__`, which breaks introspection and logging unless `functools.wraps` copies them onto the wrapper. Third, a decorator **with arguments** like `@repeat(3)` is a function that returns a decorator. This adds a third nesting level. The outermost takes the argument, the middle takes the function. And the innermost is the wrapper that runs. Most decorator bugs come from confusing which layer does what. This page shows the metadata before and after wrapping, shows the `wraps` fix, and builds a parameterised decorator step by step so the three layers are visible.
+
+The three things interviewers want to hear: first, `@decorator` is syntactic sugar for reassignment, not magic. It calls the decorator with the function and binds the name to the result. Second, that reassignment replaces `__name__`, `__doc__`, and `__module__`, which breaks introspection and logging unless `functools.wraps` copies them onto the wrapper. Third, a decorator **with arguments** like `@repeat(3)` is a function that returns a decorator. This adds a third nesting level. The outermost takes the argument, the middle takes the function. And the innermost is the wrapper that runs. Most decorator bugs come from confusing which layer does what.
 
 ## Run it
 
@@ -99,7 +99,7 @@ greet = shout(greet)</code></pre><p>Which tells you three things at once. It run
 
 ## Why wraps exists
 
-<p>If the decorator returns a new function, the name now means that function. And it has its own <code>__name__</code>, its own empty <code>__doc__</code> and its own signature. All of it that reads those breaks quietly: <code>help()</code> becomes useless, documentation tools generate entries for a function called <code>wrapper</code>, and test frameworks that discover by name misbehave.</p><p><code>functools.wraps</code> is a decorator for your wrapper that copies <code>__name__</code>, <code>__doc__</code>, <code>__module__</code>, <code>__qualname__</code> and <code>__dict__</code> across, and sets <code>__wrapped__</code> to the first. That last one is what lets <code>inspect.signature</code> report the real signature rather than <code>(*args, **kwargs)</code>.</p>
+<p>If the decorator returns a new function, the name now means that function. And it has its own <code>__name__</code>, its own empty <code>__doc__</code> and its own signature. Code that reads these attributes can break quietly: <code>help()</code> becomes useless, documentation tools generate entries for a function called <code>wrapper</code>, and test frameworks that discover by name misbehave.</p><p><code>functools.wraps</code> is a decorator for your wrapper that copies <code>__name__</code>, <code>__doc__</code>, <code>__module__</code>, <code>__qualname__</code> and <code>__dict__</code> across, and sets <code>__wrapped__</code> to the first. That last one is what lets <code>inspect.signature</code> report the real signature rather than <code>(*args, **kwargs)</code>.</p>
 
 ## Decorators that take arguments
 
@@ -115,7 +115,7 @@ greet = shout(greet)</code></pre><p>Which tells you three things at once. It run
 
 ## The follow-up: what else can decorate
 
-<p>Anything callable. A class with <code>__call__</code> is a common choice when the decorator needs state. A cache, a call count, a registry &mdash;. This is because instance attributes are tidier than <code>nonlocal</code>. And the standard library's own decorators are worth naming: <code>functools.lru_cache</code> for <a href="../interview/memoisation-with-a-dictionary.html">memoisation</a>, <code>property</code>, <code>staticmethod</code>, <code>classmethod</code>, <code>contextlib.contextmanager</code> and <code>dataclasses.dataclass</code>. Which returns the same class with methods added. Rather than a wrapper, proving the return value need not be a function at all.</p>
+<p>Anything callable. A class with <code>__call__</code> is a common choice when the decorator needs state. For example, a callable object can keep a cache or call count in instance attributes instead of using <code>nonlocal</code>. And the standard library's own decorators are worth naming: <code>functools.lru_cache</code> for <a href="../interview/memoisation-with-a-dictionary.html">memoisation</a>, <code>property</code>, <code>staticmethod</code>, <code>classmethod</code>, <code>contextlib.contextmanager</code> and <code>dataclasses.dataclass</code>. Which returns the same class with methods added. Rather than a wrapper, proving the return value need not be a function at all.</p>
 
 ## What to say out loud
 
@@ -183,3 +183,8 @@ For the underlying ideas, see <a href="../python/functions_and_return.html">func
 - The one-line answer: @shout above def greet is exactly greet = shout(greet).
 - Worth trying: Remove the @functools.wraps line and call help(greet2). What disappears is what each documentation tool also loses.
 - Worth trying: Stack @shout and @repeat(2) in both orders. The one nearest the def wraps first, and the outputs differ.
+
+## Sources and next steps
+
+- Source: [Python language reference, function definitions and decorators](https://docs.python.org/3/reference/compound_stmts.html#function-definitions)
+- Continue with [closures and late binding](closures-and-late-binding.html), which builds on this idea.

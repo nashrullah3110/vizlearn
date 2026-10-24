@@ -3,11 +3,9 @@ intro: What does yield do, and how is a generator different from a function that
 
 ## The question, and what it is testing
 
-<code>yield</code> turns the function into a <strong>factory for paused stack frames</strong>. Calling it runs nothing; each <code>next()</code> runs the body up to the next yield and freezes it there. The sequence is produced on demand, so memory is constant in the length. And it can only be walked once. That one-shot nature is the source of most generator bugs in production code.
+<code>yield</code> turns the function into a <strong>factory for paused stack frames</strong>. Calling it runs nothing; each <code>next()</code> runs the body up to the next yield and freezes it there. Values are produced on demand instead of building the whole result at once. A generator object is one-shot; if you need to iterate repeatedly or index the results, materialise them in a list.
 
-<p>Interviewers use this one because the answer separates people who have read the language from people who have only used it. Nothing here is obscure; all of it is observable, which is what the editor below is for.</p>
 
-This page shows the three states a generator moves through &mdash; created, suspended, exhausted &mdash; the one-shot limitation that catches people when they try to iterate twice. And the memory difference between a generator and a list at a million items. It also covers `yield from` for delegating to another generator, `send()` for two-way communication, and generator expressions as the inline form. The code blocks measure each claim with `sys.getsizeof` and timing so the advantages are numbers rather than assertions. Each state transition is driven by hand with `next()` so you can see the exact point where execution pauses and resumes.
 
 ## Run it
 
@@ -87,11 +85,11 @@ print("so the real gap is larger still.")
 
 ## The follow-up you should expect
 
-<p>"What is the difference between a generator and an iterator?" An iterator is the protocol. Anything with <code>__next__</code> and <code>__iter__</code>. A generator is the easiest way to get one, written as a function instead of a class. Every generator is an iterator; most iterators in real code are generators.</p><p>And "what does a generator expression change?" Nothing but the syntax: <code>(x*x for x in xs)</code> is the same object as the the same <code>yield</code> function. This is worth knowing because it means <code>sum(x*x for x in xs)</code> never builds the list at all.</p>
+<p>"What is the difference between a generator and an iterator?" An iterator is the protocol. Anything with <code>__next__</code> and <code>__iter__</code>. A generator function is one common way to implement an iterator; classes and built-in objects can implement the protocol directly too.</p><p>And "what does a generator expression change?" Nothing but the syntax: <code>(x*x for x in xs)</code> creates a generator object without building a list. That is why <code>sum(x*x for x in xs)</code> can process the values as it iterates.</p>
 
 ## What to say out loud
 
-<p>A function with yield returns a generator instead of running. Each next() resumes the body until the next yield, so values are produced lazily and memory stays constant but long the sequence is. The trade is that it is one-shot and has no len() - if I need to iterate twice or index it, I need a list.</p>
+<p>A function with yield returns a generator instead of running. Each next() resumes the body until the next yield, so values are produced lazily without storing the whole sequence. Memory still depends on any state the generator retains. The trade is that it is one-shot and has no len() - if I need to iterate twice or index it, I need a list.</p>
 
 <p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence. Then talking for another minute until something wrong comes out.</p>
 
@@ -158,3 +156,8 @@ For the underlying ideas, see <a href="../python/generators_and_yield.html">gene
 - Worth trying: Replace list(g) with a second next(g) and watch the state stay GEN_SUSPENDED until the body actually returns.
 - Worth trying: Add len(as_gen). The TypeError is the point: the length is not knowable without running it.
 - Worth trying: Wrap the generator in itertools.tee(as_gen, 2) to get two free iterators - and note it buffers. So it trades the memory back.
+
+## Sources and next steps
+
+- Source: [Python language reference, yield expressions](https://docs.python.org/3/reference/expressions.html#yield-expressions)
+- Continue with [what a decorator replaces](what-a-decorator-replaces.html), which builds on this idea.
