@@ -1,189 +1,25 @@
-title: Convexity and Optimisation Landscapes
-intro: The property that makes optimisation easy, what happens without it. Why deep learning works even so.
+title: Convexity and Optimisation
+intro: Convexity rules out hidden local minima: for a convex objective, every local minimum is global.
 
-## The definition
+## The chord condition
 
-A function is **convex** if, for any two points on it, the straight line
-joining them lies on or above the curve. A bowl is convex. A mountain range is
-not.
+A set is convex when the line segment between any two of its points stays inside it. A function f is convex when its graph lies at or below every chord between two points:
 
-The equal statement in calculus: the second deriv is non-minus
-all over. In many dims, the [Hessian](jacobian_and_hessian.html) is
-positive semi-definite &mdash; all its eigenvals at least zero.
+<div class="vz-math-block" role="math" aria-label="f of t x plus one minus t y is at most t f x plus one minus t f y for t between zero and one">f(tx + (1−t)y) ≤ tf(x) + (1−t)f(y), &nbsp; 0 ≤ t ≤ 1</div>
 
-## Why it matters so much
+For a twice-differentiable one-variable function, f″(x) ≥ 0 everywhere on an interval is sufficient for convexity there. For a multivariable function, the Hessian must be positive semidefinite throughout the convex domain.
 
-One consequence carries the entire subject: **in a convex function, each local
-min is the global min.**
+## Why it helps—and what it cannot promise
 
-If you find a point where the grad is zero and the curvature is plus,
-you're done. Not "probably done" &mdash; done, with a proof.
+For a convex objective, any local minimum is global. This makes optimisation easier to reason about, though a minimum may still be non-unique and an algorithm may converge slowly. Many deep-learning objectives are non-convex; gradient methods can still find useful solutions, but convex guarantees do not apply. See [gradients](partial_derivatives_and_gradient.html) and [Hessians](jacobian_and_hessian.html).
 
-Set the bumpiness control to zero and try each starting point on the slider.
-each one settles to the same place. The init doesn't matter, the
-run is reproducible, and there's a ensure at the end of it.
+A learning rate controls update size, not convexity. On a simple quadratic, too large a step can oscillate or diverge even though the objective is convex.
 
-Now raise bumpiness. The curve grows local minima, and the starting point
-starts deciding the answer. Move the start slider at a fixed bumpiness and
-watch the final spot jump between basins &mdash; same function, same
-method, same learning rate, different answer.
+## Try this above
 
-## What convexity buys, concretely
+Compare a bowl-shaped curve with a curve that has multiple dips. Move the optimiser step size and observe convergence separately from the shape of the objective.
 
-**Ensured settling** to the global optimum, with known rates.
+## Sources and next steps
 
-**Reproducibility.** No dependence on init or on the order the data
-arrived in.
-
-**Certificates.** You can prove a answer is best rather than hoping.
-
-**Solid stopping.** A small grad really does mean you've arrived.
-
-This is why linear regression, logistic regression, SVMs with convex loss,
-ridge and lasso are all so well behaved. Their goals are convex, and the
-solvers come with theory rather than folklore.
-
-## And yet deep learning works
-
-Neural network losses are about as non-convex as functions get: millions of
-dims, vast numbers of stationary points, no ensures at all. By the
-arg above, training should be a lottery.
-
-It isn't, and the explanation that emerged is worth knowing.
-
-**Saddle points, not local minima, dominate.** In high dims, a stationary
-point needs *each* eigenval of the Hessian to be plus to be a local
-min. With millions of dims that is vanishingly unlikely. Almost each
-stationary point has some minus direction, making it a saddle. Saddles are
-escapable &mdash; the grad points away along the minus direction, and
-noise from mini-batching helps you find it.
-
-**The minima that exist are mostly similar.** Empirically, the many minima of a
-large network reach close loss. Which one you land in matters less than
-that you landed.
-
-**Overparameterisation flattens the landscape.** Wider networks have more paths
-down, and the loss surface turns easier rather than harder as room grows
-&mdash; which is the opposite of the intuition.
-
-## The learning rate
-
-The third control shows a separate failure that is often blamed on
-non-convexity.
-
-Turn the learning rate up with bumpiness at zero. A just right convex
-bowl &mdash; and descent still misbehaves, bouncing between the walls or
-diverging fully. Convexity ensures a unique min exists. It doesn't
-ensure your step size will find it.
-
-The safe step depends on curvature, which is what
-[the Hessian](jacobian_and_hessian.html) measures and what adaptive tuners
-guess.
-
-## The chord test, on numbers
-
-Convexity has a meaning you can check by hand: the straight line between any
-two points on the curve must lie on or above it. Take `f(x) = x&sup2;` and the
-points at `x = &minus;2` and `x = 4`.
-
-The chord's height at the midpoint is the mean of the endpoint values:
-`(f(&minus;2) + f(4)) / 2 = (4 + 16)/2 = 10`. The curve's height at that same
-midpoint, `x = 1`, is `f(1) = 1`.
-
-|at the midpoint x = 1|value|
-|---|---|
-|the chord|10|
-|the curve|1|
-
-The chord sits above the curve, by 9. It does so for *each* pair of points
-you pick &mdash; that is what makes `x&sup2;` convex, and why a single downhill
-walk finds its one min. Now try the same on `f(x) = 0.15x&sup2; + 3sin(2x)`:
-between two well-chosen points the chord dips *below* the curve, because the
-ripples bulge upward past the straight line. One such dip is enough to disqualify
-convexity, and it's just the bulge a descent path can get stuck behind. The
-test isn't a metaphor. It's an inequality you can test at any two points.
-
-The consequence is the one that separates the well-behaved models from the rest.
-Because `x&sup2;`-shaped goals pass the chord test all over, linear
-regression, logistic regression and SVMs with convex loss have a single min
-that each downhill path reaches. The answer doesn't depend on where you
-start. The rippled function fails the test a place, and that single failure is
-enough to trap a descent path in a basin that depends fully on its starting
-point, which is why a neural network gives a different answer on each restart.
-
-And yet deep networks train anyway, because in millions of dims almost
-each stationary point is a saddle rather than a trap &mdash; a genuine min
-needs each Hessian eigenval plus at once. This Is vanishingly unlikely
-&mdash; and mini-batch noise slides the tuner off the saddles it meets.
-
-## Where it goes wrong
-
-**given a convex loss makes the whole problem convex.** Squared error is
-convex in the guesses and non-convex in the weights of a network. What
-matters is convexity in the params being optimised.
-
-**Blaming non-convexity for a divergent run.** Check the learning rate first;
-it's often that.
-
-**Running once and trusting the result on a non-convex problem.** a few
-starts, or a schedule with restarts, is the min diligence.
-
-**Expecting convex theory to transfer.** Settling rates for convex problems
-say nothing about a deep network.
-
-## Questions people ask
-
-<strong>What is a convex function?</strong> One where the line segment between any two points on its graph lies on or above the graph. A bowl is convex and a double hump is not.
-
-<strong>Why does convexity matter?</strong> Every local minimum of a convex function is a global minimum. Gradient descent with a sensible step size cannot get stuck.
-
-<strong>How do I check convexity?</strong> For a twice-differentiable function, check that the Hessian is positive semi-definite everywhere. In one dimension, check that the second derivative is not negative.
-
-<strong>Is a neural network loss convex?</strong> No, it has many saddle points and local minima. Training works anyway because the minima found in practice tend to be nearly as good as each other.
-
-<strong>What is the effect of the learning rate?</strong> Too small and progress crawls, too large and the iterates overshoot or diverge. On a quadratic, anything above twice the inverse of the largest curvature diverges.
-
-<strong>Are convex problems always easy?</strong> They are reliably solvable, but size still matters. Convex problems with huge data need stochastic or specialised methods.
-
-## One function gradient descent cannot fail on, and one it can
-
-The same tuner, the same settings, run from many starting points on a convex function and then on a bumpy one. Convexity is the property that makes the starting point irrelevant.
-
-```python-run
-import numpy as np
-def descend(f, grad, x0, lr=0.05, steps=2000):
-    x = float(x0)
-    for _ in range(steps):
-        x -= lr * grad(x)
-    return x
-# convex: one bowl
-f1    = lambda x: (x - 3.0) ** 2 + 2.0
-grad1 = lambda x: 2 * (x - 3.0)
-# non-convex: a bowl with ripples
-f2    = lambda x: 0.15 * (x - 3.0) ** 2 + 3.0 * np.sin(2.0 * x)
-grad2 = lambda x: 0.30 * (x - 3.0) + 6.0 * np.cos(2.0 * x)
-starts = [-10.0, -5.0, -1.0, 0.0, 2.0, 6.0, 11.0]
-print("convex  f(x) = (x-3)^2 + 2")
-for s in starts:
-    x = descend(f1, grad1, s)
-    print("  start %6.1f -> x %8.4f   f %9.4f" % (s, x, f1(x)))
-print("  every start lands in the same place.")
-print()
-print("non-convex  f(x) = 0.15(x-3)^2 + 3 sin(2x)")
-found = []
-for s in starts:
-    x = descend(f2, grad2, s)
-    found.append(round(x, 3))
-    print("  start %6.1f -> x %8.4f   f %9.4f" % (s, x, f2(x)))
-best = min(found, key=lambda x: f2(x))
-print("  %d distinct minima.  best f=%.4f at x=%.3f" % (len(set(found)), f2(best), best))
-print()
-print("convex: one minimum, every path finds it. non-convex: many.")
-print("test: the chord between any two points never dips below the curve.")
-mids = np.linspace(0.05, 0.95, 19)
-for fn, name in ((f1, "convex"), (f2, "non-convex")):
-    chord = [(1-t)*fn(-2)+t*fn(8) for t in mids]
-    curve = [fn((1-t)*-2+t*8) for t in mids]
-    viol = sum(c < v-1e-9 for c, v in zip(chord, curve))
-    print("  %-11s chord below curve at %d of %d points" % (name, viol, len(mids)))
-```
+- [MIT OpenCourseWare: Convex Analysis and Optimization](https://ocw.mit.edu/courses/6-253-convex-analysis-and-optimization-spring-2012/) covers convex sets and functions.
+- See [Lagrange multipliers](lagrange_multipliers.html) for constrained optimisation.

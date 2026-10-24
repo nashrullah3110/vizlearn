@@ -1,194 +1,25 @@
-title: The Jacobian and the Hessian
-intro: The two mats of derivs each tuner is built on. Why one of them is almost never found.
+title: Jacobian and Hessian
+intro: The Jacobian collects first derivatives of a vector function; the Hessian collects second derivatives of a scalar function.
 
-## From one derivative to a table of them
+## First derivatives as a matrix
 
-For a function of one variable the deriv is one number: the slope. The
-[chain rule](the_chain_rule.html) and
-[partial derivs](partial_derivatives_and_gradient.html) modules cover
-that ground.
+For f: ℝⁿ → ℝᵐ, the Jacobian has one row per output and one column per input. Its entry Jᵢⱼ is ∂fᵢ/∂xⱼ. For a scalar output (m = 1), it contains the gradient components, with row-versus-column convention depending on notation.
 
-Real functions have many inputs and often many outputs, and the derivs
-have to be organised.
+<div class="vz-math-block" role="math" aria-label="Jacobian entry i j is partial f i by partial x j">Jᵢⱼ = ∂fᵢ / ∂xⱼ</div>
 
-**The grad** applies when there are many inputs and one output &mdash; a
-loss function. It's a vector holding one partial deriv per input, and it
-points in the direction of steepest grow.
+For f(x,y) = (x² + y, xy), the Jacobian is [[2x, 1], [y, x]]. It describes the best local linear approximation to the function near a point. The multivariable chain rule multiplies Jacobians in composition order; see [the chain rule](the_chain_rule.html).
 
-**The Jacobian** applies when there are many outputs too. It's a mat with
-one row per output and one column per input, entry (i, j) being how much output
-*i* changes when input *j* moves. A grad is a Jacobian with one row.
+## Curvature as a second-derivative matrix
 
-**The Hessian** is the mat of second derivs of a single-output
-function: entry (i, j) is the deriv of the *i*-th partial deriv with
-respect to input *j*. It shows how the grad changes as you move.
+For scalar f, the Hessian Hᵢⱼ = ∂²f/(∂xᵢ∂xⱼ). For f(x,y) = x² + 3y², H = [[2, 0], [0, 6]], so curvature is stronger along y. Positive curvature in every direction indicates a strict local minimum; mixed positive and negative curvature indicates a saddle, under the usual smoothness conditions.
 
-## What curvature buys you
+Newton's method uses curvature to choose a step, but a neural-network Hessian is enormous and can be indefinite. Large-scale optimisers therefore use approximations or first-order methods. See [matrix calculus](matrix_calculus.html) and [convexity](convexity_and_optimisation.html).
 
-The visualisation is one-dimensional. Here The grad and the Hessian are
-each a single number, so the tie is visible without any mat
-form.
+## Try this above
 
-The dashed line is the tangent. The first deriv. It says which way
-is downhill and how steeply, and it says nothing at all about how long that
-remains true.
+Compare the Jacobian entries as you move the input, then inspect how the Hessian changes the local curvature estimate.
 
-The second deriv is the missing piece. Drag the curvature control:
+## Sources and next steps
 
-**Large plus curvature** is a tight valley. The grad changes quickly, so
-a big step overshoots and lands on the far wall.
-
-**Small plus curvature** is a shallow bowl. The grad stays roughly
-constant, so a big step is safe and a small one wastes time.
-
-That is just the info a step size wants, and it's why an tuner
-that knows the curvature can choose its own step instead of being handed a
-learning rate.
-
-**Minus curvature** is a max in that direction. Descent will accelerate
-away from it, which is often what you want and is why saddle points are less
-dangerous than they sound.
-
-For a multivariable function the Hessian's eigenvals carry the same
-info per direction: all plus is a min, all minus a max,
-mixed signs a saddle.
-
-## Newton's method, and why nobody runs it on a network
-
-Knowing the curvature suggests an obvious improvement over gradient descent:
-step by the grad scaled by the inverse Hessian rather than by a fixed
-learning rate. That is **Newton's method**, and near a min it settles
-as n&sup2; &mdash; roughly doubling the correct digits each iteration, where
-gradient descent plods.
-
-It isn't used for neural networks, for a reason that is pure math.
-
-A model with *n* params has a Hessian with *n*&sup2; entries. At a million
-params that is 10&sup1;&sup2; numbers to store, and inverting it costs
-about *n*&sup3;. For a model with a billion params the Hessian doesn't fit
-in the observable universe, let alone in memory.
-
-So the field uses guesses. **L-BFGS** keeps a low-rank guess built
-from recent grads. **Adam** and its relatives keep a main-line guess
-&mdash; one number per param rather than a full mat &mdash; which is why
-they adapt a per-param step size and why they work at scale. Adam is
-at times given as a main-line guess to second-order optimisation,
-and that is a fair reading of what it does.
-
-## Backpropagation is Jacobians
-
-each layer of a network is a function with many inputs and many outputs, so
-each has a Jacobian. The chain rule says the deriv of the whole network is
-the product of them all.
-
-The order of that times is the whole trick. Timesing left to right
-&mdash; forward mode &mdash; keeps a full mat at each step. Timesing
-right to left &mdash; reverse mode. This Is backpropagation &mdash; starts
-from the scalar loss, so each mid stays a **vector**.
-
-That is why training is affordable. The cost of a backward pass is a small
-multiple of a forward pass, even so of how many params there are,
-because no Jacobian is ever formed in full.
-
-## The curvature test, on two functions
-
-In one dim a plus second deriv means a min and a minus one
-a max. In many dims the Hessian's *eigenvals* play that role, and two
-small examples show the whole classification.
-
-`f = x&sup2; + xy + y&sup2;` has Hessian `[[2, 1], [1, 2]]`, whose eigenvals are
-`2 + 1 = 3` and `2 &minus; 1 = 1`. Both plus. each direction curves
-upward, so the stationary point at the origin is a genuine min.
-
-`f = x&sup2; &minus; y&sup2;` has Hessian `[[2, 0], [0, &minus;2]]`, eigenvals
-`2` and `&minus;2`.
-
-|function|Hessian eigenvalues|the origin is|
-|---|---|---|
-|x&sup2; + xy + y&sup2;|3, 1 (all positive)|a minimum|
-|x&sup2; &minus; y&sup2;|2, &minus;2 (mixed sign)|a saddle|
-
-The mixed sign is the saddle: up along `x`, down along `y`, so the grad is
-zero without it being any kind of extremum. This is just the test
-[Cholesky](cholesky_and_positive_definiteness.html) performs cheaply &mdash; a
-good factorisation means all eigenvals are plus, confirming a min
-&mdash; and it's why, in the millions of dims of a network, stationary
-points are almost always saddles: needing *each* eigenval plus at once
-turns vanishingly unlikely.
-
-## Where it goes wrong
-
-**Trying to find a Hessian for a large model.** It doesn't fit. Use a
-main-line or low-rank guess.
-
-**given a zero grad means a min.** It means a stationary point. The
-Hessian's eigenvals tell you which kind.
-
-**Confusing the Jacobian with the grad.** The grad is the special case
-of one output. Frameworks expose `jacobian` and `grad` apart for just
-this reason.
-
-**Expecting second-order methods to be a drop-in win.** They shine on small,
-well-conditioned problems and on batch goals, not on stochastic
-mini-batch training where the curvature estimate is noise.
-
-## Questions people ask
-
-<strong>What is the Jacobian?</strong> It is the matrix of all first partial derivatives of a vector-valued function. Row i holds the gradient of output i, so it is the best linear approximation near a point.
-
-<strong>What is the Hessian?</strong> It is the matrix of second partial derivatives of a scalar function. It describes the curvature in every direction.
-
-<strong>What does the Hessian tell me at a critical point?</strong> If it is positive definite you have a local minimum, negative definite a local maximum, and mixed signs a saddle point.
-
-<strong>Why is the Hessian rarely used in deep learning?</strong> It has one entry per pair of parameters. A network with a million parameters would need a trillion-entry matrix, so first-order methods and approximations win.
-
-<strong>How is the Jacobian used in backpropagation?</strong> Each layer's backward pass multiplies the incoming gradient by that layer's Jacobian. Frameworks do it without ever forming the full matrix.
-
-<strong>Is the Hessian the Jacobian of something?</strong> Yes, it is the Jacobian of the gradient. That is why it is symmetric when the second derivatives are continuous.
-
-## First derivatives in a grid, second derivatives in another
-
-The Jacobian collects each first partial deriv of a vector function. The Hessian collects each second partial of a scalar one. Both are built here by number and checked against the closed form.
-
-```python-run
-import numpy as np
-# f: R^2 -> R^3
-def f(v):
-    x, y = v
-    return np.array([x ** 2 * y, 5 * x + np.sin(y), x * y ** 3])
-def jacobian(fn, v, h=1e-6):
-    base = fn(v)
-    cols = []
-    for i in range(len(v)):
-        step = np.zeros_like(v); step[i] = h
-        cols.append((fn(v + step) - base) / h)
-    return np.column_stack(cols)
-p = np.array([2.0, 1.0])
-print("Jacobian of f at (2, 1) -- 3 outputs by 2 inputs")
-print(np.round(jacobian(f, p), 4))
-x, y = p
-print("
-by hand:")
-print(np.round(np.array([[2*x*y, x**2], [5.0, np.cos(y)], [y**3, 3*x*y**2]]), 4))
-# g: R^2 -> R
-def g(v):
-    x, y = v
-    return x ** 3 + 2 * x * y ** 2 + y ** 3
-def hessian(fn, v, h=1e-4):
-    n = len(v)
-    H = np.zeros((n, n))
-    for i in range(n):
-        for j in range(n):
-            a, b = np.zeros(n), np.zeros(n)
-            a[i] = h; b[j] = h
-            H[i, j] = (fn(v + a + b) - fn(v + a) - fn(v + b) + fn(v)) / (h * h)
-    return H
-H = hessian(g, p)
-print("Hessian of g at (2, 1)")
-print(np.round(H, 3))
-print("it is symmetric:", np.allclose(H, H.T, atol=1e-3))
-print()
-eigs = np.round(np.linalg.eigvalsh(H), 4)
-print("eigenvalues %s -> %s" % (eigs,
-      "bowl (minimum)" if all(eigs > 0) else "saddle or dome"))
-```
+- [MIT OpenCourseWare: Multivariable Calculus](https://ocw.mit.edu/courses/18-02sc-multivariable-calculus-fall-2010/) covers multivariable derivatives and local approximations.
+- See [matrix calculus](matrix_calculus.html) for derivative shapes used in machine-learning code.

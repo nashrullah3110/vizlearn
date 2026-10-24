@@ -1,191 +1,23 @@
 title: Markov Chains
-intro: Memoryless processes, the spread they settle into, and why so many methods are one.
+intro: A Markov chain models step-by-step movement between states when the next state depends on the current one.
 
-## The property
+## Transition probabilities
 
-A process is **Markov** when the next state depends only on the current state,
-not on the path that led there. The present screens off the past.
+A chain has a state space and transition probabilities. With a row-vector convention, a transition matrix P has entries Pᵢⱼ = P(next state = j | current state = i); each row sums to 1. If πₜ is the row vector of state probabilities at time t, then πₜ₊₁ = πₜP.
 
-That is a strong assumption and a liberating one. Instead of a history of
-any length you carry one thing &mdash; where you're &mdash; and
-all about the future follows from it.
+For two states, sunny and rainy, a matrix such as [[0.8, 0.2], [0.4, 0.6]] says that a sunny day is followed by a sunny day with probability 0.8, while a rainy day is followed by a sunny day with probability 0.4. Starting from π₀ = [1, 0], after one step π₁ = [0.8, 0.2].
 
-## The transition matrix
+## The Markov assumption and long-run behavior
 
-Collect the chances into a mat `P`. Here `P[i][j]` is the chance of
-moving from state `i` to state `j`. each row sums to 1, because from any state
-you go a place, possibly back to where you were.
+The Markov property says the next state is conditionally independent of earlier history once the current state is known. It is a modelling assumption; if relevant history is omitted, the model may be inadequate.
 
-If the current spread over states is a row vector `d`, then after one step
-it's `d P`. After `k` steps, `d P^k`. That is all the math there's, and
-the visualisation is doing just it, forty steps at a time.
+A stationary distribution satisfies π = πP. Some chains converge to one from many starting states, but convergence is not automatic: reducible or periodic chains can behave differently. See [conditional probability](conditional_probability.html) for transition probabilities and [matrix multiplication](matrix_multiplication.html) for repeated transitions.
 
-## Convergence
+## Try this above
 
-Watch the three curves. They start apart. All the chance on one
-state &mdash; and within a few steps they flatten out and stop moving. The
-readout shows the last step changing things by around 10&#8315;&#185;&#8304;.
+Change one transition probability and keep each row normalised. Track how the state distribution evolves over several steps and whether it settles.
 
-Now change the starting state. The curves begin a place fully different
-and **arrive at the same values**.
+## Sources and next steps
 
-That limit is the **stationary spread**: the `pi` with `pi P = pi`. Read
-as an eigenvector problem, it's the left eigenvector of `P` with eigenval 1,
-and the [eigenval module](eigenvalues_and_eigenvectors.html) is the same
-mathematics in another costume.
-
-The settling isn't auto. It needs the chain to be **irreducible** &mdash;
-each state reachable from every other. And **aperiodic**, not trapped in
-a fixed cycle. Drag a transition chance to its min and settling
-slows visibly. A chain that couldn't leave a state at all would never mix.
-
-The speed is governed by the second-largest eigenval: the closer it's to 1,
-the slower the mixing. That number has a name, the *spectral gap*, and it's
-what people mean by a chain mixing slowly.
-
-## The whole thing on two states
-
-All above fits on a chain with two states, small enough to do on paper and
-still large enough to show all three claims.
-
-Weather, where a sunny day is often followed by another and rain clears half
-the time:
-
-|from \ to|sunny|rainy|
-|---|---|---|
-|**sunny**|0.9|0.1|
-|**rainy**|0.5|0.5|
-
-**The stationary spread, solved just.** &pi;P = &pi; on two states is
-just &pi;<sub>s</sub> = 0.9&pi;<sub>s</sub> + 0.5&pi;<sub>r</sub>, which
-rearranges to 0.1&pi;<sub>s</sub> = 0.5&pi;<sub>r</sub>, so
-&pi;<sub>s</sub> = 5&pi;<sub>r</sub>. With the two summing to 1 that gives
-**&pi; = (5/6, 1/6)**, or (0.8333, 0.1667). No iteration, no eigenval routine
-&mdash; two lines of algebra.
-
-**The same answer by iterating.** Start with certainty and times by P
-again and again:
-
-|step|from sunny|from rainy|
-|---|---|---|
-|0|(1.000, 0.000)|(0.000, 1.000)|
-|1|(0.900, 0.100)|(0.500, 0.500)|
-|2|(0.860, 0.140)|(0.700, 0.300)|
-|3|(0.844, 0.156)|(0.780, 0.220)|
-|4|(0.838, 0.162)|(0.812, 0.188)|
-|5|(0.835, 0.165)|(0.825, 0.175)|
-
-Two starting points that couldn't be further apart, settling on the same
-(0.8333, 0.1667). The chain forgets where it began. This Is the whole content of
-the claim that the limit doesn't depend on the start.
-
-**And the mixing speed. This Isn't a metaphor.** The eigenvals of a 2&times;2
-stochastic mat are 1 and (trace &minus; 1). So Here the second eigenval is
-0.9 + 0.5 &minus; 1 = **0.4**. Now measure how far the sunny column is from
-0.8333 at each step:
-
-0.1667, 0.0667, 0.0267, 0.0107, 0.0043, 0.0017
-
-Each is just 0.4 times the one before it. The second eigenval isn't merely
-*related* to the mixing rate. It **is** the factor by which the left error
-shrinks per step. A chain with a second eigenval of 0.99 needs 365
-steps to shrink the error as far as this one does in four. This Is why the spectral gap is the
-number MCMC practitioners worry about.
-
-One more reading falls out of &pi; for free. It's the one that makes the
-numbers concrete. The expected time to return to a state is
-**1 / &pi;<sub>i</sub>**, so rain recurs each 1 / (1/6) = **6 days** on average
-and sun each 1 / (5/6) = **1.2 days**. The stationary spread isn't only
-the long-run share of time spent in each state. It's the reciprocal of how long
-you wait to come back to it.
-
-## Where they appear
-
-**PageRank** is the stationary distribution of a random surfer following links.
-The damping factor exists to make the chain irreducible. So A page with no
-outbound links can't swallow all the chance.
-
-**MCMC** &mdash; Metropolis-Hastings, Gibbs sampling, Hamiltonian Monte Carlo
-&mdash; runs the idea backwards: make a chain whose stationary spread
-*is* the posterior you want, run it, and treat the states it visits as samples.
-Nearly all Bayesian work is this.
-
-**Hidden Markov models** put a Markov chain behind readings you can see, and
-were the backbone of speech spotting for decades.
-
-**Reinforcement learning.** A Markov choice process is a Markov chain with
-actions and rewards attached. The "Markov" in MDP is this property, and it's
-what makes value functions of the state alone enough.
-
-**n-gram language models** are Markov chains over words &mdash; and their
-limitation is just the property: a bigram model can't note any of it
-beyond the previous word. This Is why long-range coherence needed a thing
-else.
-
-## Where it goes wrong
-
-**given the property holds.** Most real processes have memory. Widening the
-state to include recent history restores the property at the cost of a much
-larger state space.
-
-**given settling.** Check irreducibility and aperiodicity.
-
-**Stopping an MCMC run too early.** Samples before the chain has mixed reflect
-where you started, which is what burn-in discards and why settling
-diagnostics exist.
-
-**Confusing the stationary spread with the most likely state.** It's the
-long-run fraction of time spent in each state, not a guess of where the
-chain is now.
-
-## Questions people ask
-
-<strong>What is the Markov property?</strong> The next state depends only on the current state, not on how you got there. History is summarised entirely by where you are now.
-
-<strong>What is a transition matrix?</strong> A matrix whose entry (i, j) is the probability of moving from state i to state j. Each row sums to one.
-
-<strong>What is a stationary distribution?</strong> A distribution pi with pi times P equal to pi. If you start in it, you stay in it as the chain runs.
-
-<strong>When does a chain converge to a steady state?</strong> When it is irreducible and aperiodic: every state can reach every other, and it does not cycle with a fixed period.
-
-<strong>How do I compute the n-step probabilities?</strong> Raise the transition matrix to the n-th power. Entry (i, j) of P to the n is the chance of being in j after n steps from i.
-
-<strong>Where are Markov chains used?</strong> In PageRank, MCMC sampling, language modelling, queues and reinforcement learning, where states form a Markov decision process.
-
-## Walk the chain to its steady state
-
-A three-state weather chain, stepped forward until the spread stops moving, then checked against the eigenvector that predicts it.
-
-```python-run
-import numpy as np
-
-states = ["sunny", "cloudy", "rainy"]
-#  rows: from        to:  sunny cloudy rainy
-P = np.array([[0.80, 0.15, 0.05],     # from sunny
-              [0.30, 0.45, 0.25],     # from cloudy
-              [0.20, 0.35, 0.45]])    # from rainy
-
-print("each row sums to 1:", P.sum(axis=1))
-print()
-
-p = np.array([1.0, 0.0, 0.0])         # start certain it is sunny
-print("%5s  %8s %8s %8s" % ("step", *states))
-for step in range(9):
-    print("%5d  %8.4f %8.4f %8.4f" % (step, *p))
-    p = p @ P
-print()
-print("keep going and it stops moving:")
-for _ in range(200):
-    p = p @ P
-print("  steady state %s" % np.round(p, 6))
-print()
-print("the chain forgets where it started:")
-q = np.array([0.0, 0.0, 1.0])          # start certain it is rainy
-for _ in range(200):
-    q = q @ P
-print("  from rainy   %s" % np.round(q, 6))
-print()
-vals, vecs = np.linalg.eig(P.T)
-v = np.real(vecs[:, np.argmin(np.abs(vals - 1))])
-print("  left eigenvector for eigenvalue 1: %s" % np.round(v / v.sum(), 6))
-```
+- [MIT OpenCourseWare: Introduction to Probability and Statistics](https://ocw.mit.edu/courses/18-05-introduction-to-probability-and-statistics-spring-2014/) covers conditional probability and stochastic models.
+- Continue with [eigenvalues](eigenvalues_and_eigenvectors.html) to understand stationary distributions algebraically.

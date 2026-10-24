@@ -1,205 +1,25 @@
-title: Jensen's Inequality
-intro: Why blending before and after a curve gives different answers. What that difference is used for.
+title: Jensen’s Inequality
+intro: For a convex function, the function of an average is no greater than the average of the function values.
 
-## The statement
+## The inequality
 
-For a convex function `f` and a random variable `X`:
+If f is convex and X has a finite expectation, Jensen’s inequality states:
 
-```
-E[f(X)]  >=  f(E[X])
-```
+<div class="vz-math-block" role="math" aria-label="f of expected X is less than or equal to expected f of X">f(E[X]) ≤ E[f(X)]</div>
 
-Transform first and mean, and you get at least as much as blending first
-and transforming. For a concave function the inequality reverses.
+For f(x) = x², this says (E[X])² ≤ E[X²]. The difference is Var(X) ≥ 0. Equality holds when X is constant with probability one, or more generally when f is affine over the values X can take.
 
-## Why it is obvious once seen
+## Why averages can mislead
 
-Take a spread that puts half its weight at each of two points &mdash; the
-two grey dots in the visualisation.
+A convex penalty makes large deviations count disproportionately: applying the penalty after averaging is smaller than averaging the penalties. For concave functions the inequality reverses. This is useful in probability, statistics, and machine learning, but first check that the function is convex on the relevant domain and that the expectations exist.
 
-`f(E[X])` is the curve tested at the midpoint: the orange dot **on** the
-curve.
+For example, because log(x) is concave on x > 0, E[log X] ≤ log(E[X]). It is not valid to switch these expressions freely. See [expectation and variance](expectation_and_variance.html) and [convexity](convexity_and_optimisation.html).
 
-`E[f(X)]` is the mean of the two heights: the midpoint of the **chord**, the
-lighter dot above.
+## Try this above
 
-Convex means the chord lies above the curve. So the chord's midpoint is above
-the curve's point, which is the inequality, drawn.
+Compare f at the mean with the mean of f-values as the spread changes. For a convex curve, the latter should stay at least as large.
 
-Two controls change the gap. **Curvature**: flatten the function toward a
-straight line and the chord lies on the curve. The gap vanishes &mdash; for a
-linear `f`, expectation passes straight through. **Spread**: shrink the
-spread to a point and the two dots merge, and the gap vanishes again.
+## Sources and next steps
 
-The gap is zero just when the function is linear or the variable is constant,
-and grows with both.
-
-## Consequences worth having
-
-**The mean of ratios isn't the ratio of means.** `1/x` is convex on the
-positives, so `E[1/X] >= 1/E[X]`. Blending speeds in miles per hour to get
-mean pace is wrong in a exact, predictable direction, and the same trap
-appears in blending rates, ratios and per-unit costs throughout applied work.
-
-**AM-GM.** Applying Jensen to the concave logarithm gives that the math
-mean is at least the geometric mean, right away.
-
-**Log-loss and calibration.** `-log` is convex, so blending log-losses
-punishes confident mistakes far more than the raw error rate does. That is a
-design choice, and Jensen is why it works.
-
-**Portfolio returns.** Compounding is multiplicative, so the geometric mean is
-what you keep and the arithmetic mean is what gets advertised. Volatility drag
-is Jensen's gap.
-
-## The one that matters most
-
-Jensen is why **EM** and **variational inference** exist.
-
-Both want to raise a log-likelihood holding a sum inside a logarithm
-&mdash; `log sum_z p(x, z)`. Which doesn't break down and can't be
-optimised right.
-
-The move is to write that sum as an expectation, then use Jensen on the concave
-`log` in the other direction:
-
-```
-log E[ ... ]  >=  E[ log ... ]
-```
-
-The right-hand side is a **lower bound** on the thing you wanted, it breaks down
-into terms you can differentiate, and raising it can't fall the true
-goal.
-
-That bound is the ELBO. The evidence lower bound &mdash; and it's the
-goal a variational autoencoder trains on. EM alternates between tightening
-the bound and raising it. This Is just the two steps in
-[the Gaussian mixture module](../machine_learning/gaussian_mixture_models.html).
-
-The gap between the bound and the truth is the KL divergence between the
-rough posterior and the real one. This Ties Jensen right to
-[cross-entropy and KL](cross_entropy_and_kl_divergence.html): non-negativity of
-KL *is* Jensen applied to the log.
-
-## Where it goes wrong
-
-**Blending a transformed quantity and reporting it as the transform of the
-mean.** Log-scale means, rates and ratios all bite here.
-
-**Getting the direction wrong.** Convex up, concave down. `log` and `sqrt` are
-concave. `exp`, `x^2` and `1/x` (on positives) are convex.
-
-**given the bound is tight.** The ELBO can sit far below the true likelihood,
-and a rising ELBO doesn't prove the likelihood rose by as much.
-
-**Losing that equality needs linearity or a constant.** Nothing else gives
-it.
-
-## The average speed trap, worked
-
-Drive 60 km at 30 km/h, then another 60 km at 60 km/h. What was the mean
-speed?
-
-Almost everyone answers 45. Work it out instead:
-
-```
-first leg   60 km at 30 km/h  ->  2 hours
-second leg  60 km at 60 km/h  ->  1 hour
-                                 --------
-            120 km in 3 hours  ->  40 km/h
-```
-
-**40, not 45.** The answer is dragged toward the slower speed, because you spend
-twice as long travelling at it. The correct mean here is the harmonic mean,
-`2 / (1/30 + 1/60) = 40`.
-
-Jensen says this had to happen, and says which direction. Time per kilometre is
-`1/X`, and `1/x` is convex on the positives, so:
-
-```
-E[1/X]  >=  1/E[X]
-
-E[1/X]  = (1/30 + 1/60)/2 = 0.02500 hours per km
-1/E[X]  = 1/45            = 0.02222 hours per km
-```
-
-The time you really spend is governed by the left-hand side, and it's
-**bigger**. Over 120 km: 3.00 hours actual against 2.67 predicted by the naive
-mean. The trip is always at least as slow as the arithmetic mean suggests,
-and just as slow only when both speeds are equal &mdash; the equality case,
-where the spread merges to a point.
-
-The same shape appears wherever a rate is averaged: cost per unit, latency per
-request, price-to-earnings across a portfolio. **Blending a ratio and taking
-the ratio of means are different ops**, and Jensen tells you in
-advance which one comes out larger, without finding either.
-
-## Questions people ask
-
-**How do I note which way it points?** Picture the chord. Convex means the
-curve bends upward and each chord lies above it. So The mean of the heights
-(the chord) beats the height of the mean (the curve): `E[f(X)] >= f(E[X])`.
-Concave flips the picture and the inequality. If you can recall that `x`&sup2;
-is convex, one example settles it. The mean of squares exceeds the square
-of the mean, which is just the variance being non-minus.
-
-**When is it an equality?** In just two cases: `f` is linear over the range
-the variable really reaches, or the variable is a constant. any of it else and
-the gap is strictly plus. This is why linear changes pass cleanly
-through an expectation and nothing else does.
-
-**Is AM-GM really the same statement?** Yes. Apply Jensen to `log`, which is
-concave, and you get `log` of the mean at least the mean of the `log`s;
-exponentiate and that is the arithmetic mean dominating the geometric mean. The
-inequality you may have proved by induction at school is one substitution away.
-
-**Does it apply to medians too?** No. Jensen is a statement about expectations,
-and the median passes through any *monotone* function untouched &mdash;
-`median(f(X)) = f(median(X))` for growing `f`, convex or not. That difference
-is one hands-on reason to report a median when a quantity has been through a
-nonlinear change.
-
-**Where will this really bite me?** Wherever you mean a thing that was
-already a rate or a log. Blending log-chances and exponentiating gives
-the geometric mean, not the math one. Which is what perplexity is,
-and why it isn't the mean chance.
-
-## The average of the function is not the function of the average
-
-Three concrete cases where swapping those two ops changes the answer, including the one that quietly costs money.
-
-```python-run
-import numpy as np
-
-rng = np.random.default_rng(0)
-x = rng.normal(5.0, 2.0, 200_000)
-
-print("for a convex function, E[f(x)] >= f(E[x]):")
-for name, f in (("x^2", lambda v: v ** 2),
-                ("e^x/50", lambda v: np.exp(v) / 50),
-                ("|x-5|", lambda v: np.abs(v - 5.0))):
-    print("  f = %-7s E[f(x)] = %10.4f   f(E[x]) = %10.4f   gap %+9.4f"
-          % (name, f(x).mean(), f(x.mean()), f(x).mean() - f(x.mean())))
-print()
-print("for a concave function it flips the other way:")
-for name, f in (("log(x) ", lambda v: np.log(np.clip(v, 0.01, None))),
-                ("sqrt(x)", lambda v: np.sqrt(np.clip(v, 0.0, None)))):
-    print("  f = %-7s E[f(x)] = %10.4f   f(E[x]) = %10.4f   gap %+9.4f"
-          % (name, f(x).mean(), f(x.mean()), f(x).mean() - f(x.mean())))
-print()
-print("the gap is zero only for straight lines:")
-f = lambda v: 3 * v + 7
-print("  f = %-7s E[f(x)] = %10.4f   f(E[x]) = %10.4f   gap %+9.4f"
-      % ("3x+7", f(x).mean(), f(x.mean()), f(x).mean() - f(x.mean())))
-print()
-
-print("the expensive version -- returns compound, so they multiply:")
-returns = np.array([1.50, 0.60] * 10)          # +50%, then -40%, ten times
-print("  arithmetic mean return: %.4f  (looks like a %.0f%% gain per period)"
-      % (returns.mean(), 100 * (returns.mean() - 1)))
-print("  actually multiplied out: %.4f of your starting money" % returns.prod())
-print("  geometric mean:         %.4f" % returns.prod() ** (1 / len(returns)))
-print()
-print("log is concave, so the average of the logs sits below the log of the")
-print("average -- which is exactly the gap between the two 'mean returns'.")
-```
+- [MIT OpenCourseWare: Probability and Statistics](https://ocw.mit.edu/courses/18-05-introduction-to-probability-and-statistics-spring-2014/) covers expectations and inequalities.
+- Review [expectation and variance](expectation_and_variance.html) before applying Jensen’s inequality to random variables.

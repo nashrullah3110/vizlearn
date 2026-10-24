@@ -1,178 +1,25 @@
 title: Mean, Variance and Standard Deviation
-intro: Where the data sits, and how far it wanders &mdash; the two numbers behind every normalisation layer.
+intro: The mean locates a dataset’s centre; variance and standard deviation describe its spread.
 
-## The problem it solves
+## Calculate the summaries
 
-Two datasets can share the same average and still look nothing alike. The <strong>mean</strong> describes the centre. <strong>variance</strong> and <strong>standard deviation</strong> describe the spread. You need both to say anything useful about data.
+For values x₁,…,xₙ, the mean is x̄ = Σxᵢ/n. Population variance averages squared deviations from the population mean. For a sample, the usual unbiased estimator of population variance divides by n−1:
 
-The mean is the sum divided by the count. It is the balance point: if each value moved to the mean, the total would not change. Its weakness is sensitivity to outliers. A single extreme value can drag the mean far from where most of the data sits. It is why the median (the middle value) is often reported alongside it.
+<div class="vz-math-block" role="math" aria-label="sample variance equals sum of squared deviations from sample mean divided by n minus one">s² = Σᵢ(xᵢ−x̄)² / (n−1)</div>
 
-Variance measures how far the vals wander from the mean. It is the average of the squared deviations. Squaring has two purposes: it makes each deviation positive (so vals above and below the mean do not cancel out). And it penalises large deviations more than small ones. The result is in squared units. It is why standard deviation exists &mdash; it is the square root of the variance, bringing the spread back to the first units.
+For 2, 4, and 6, the mean is 4 and the squared deviations sum to 8. The population variance is 8/3; the sample variance is 4. The sample standard deviation is √4 = 2, in the same units as the data.
 
-In machine learning, these three counts appear all over. Normalisation layers subtract the mean and divide by the standard deviation, centering the data on zero with unit spread. Feature scaling does the same thing to input features so that a feature measured in thousands does not dominate one measured in fractions. Batch normalisation computes mean and variance across each mini-batch in training. It stabilises and accelerates convergence.
+## Why use n−1?
 
-The distinction between population and sample variance matters when the data is a sample from a more population. The sample variance divides by n&minus;1 instead of n (Bessel's correction). It corrects for the fact that a sample underestimates the true spread. NumPy's `np.var()` uses n by default. Pandas' `.var()` uses n&minus;1.
+When the sample mean is estimated from the same observations, deviations around it are constrained to sum to zero. Dividing by n−1 corrects the average squared deviation so it is unbiased for population variance under independent, identically distributed sampling with finite variance. It does not make the sample standard deviation unbiased in general.
 
-## The Three Formulas
+Variance and standard deviation are sensitive to outliers because deviations are squared. Compare with [median and quantiles](mean_mode_and_median.html), and see [expectation and variance](expectation_and_variance.html) for the random-variable definitions.
 
-Read variance as a recipe: measure how far each point sits from the mean, square those distances. And average them. The table below the plot does just these steps on your live data.
+## Try this above
 
-## Why Square the Deviations?
+Add a constant to every data point, then multiply every point by the same factor. Check how the mean and spread respond.
 
-Since raw deviations always cancel out. Points above the mean are positive, points below are negative. And by the definition of the mean they sum to <strong>just zero</strong> &mdash; each time, for each dataset. Check the &Sigma; row in the table.
+## Sources and next steps
 
-Squaring removes the signs so distances can accumulate. It also <em>weights large deviations far more heavily</em>: a point 4 away adds 16, while four points 1 away add 4 in total. This is precisely why a single outlier can dominate the variance &mdash; press the <strong>Outlier</strong> button and watch &sigma; jump.
-
-## Standard Deviation Is the Readable One
-
-Variance is in <em>squared</em> units &mdash; if your data is in kilograms, the variance is in kg&sup2;. It means nothing physically. Taking the square root returns you to the first units. So &sigma; can be read right off the same axis as the data. That is the just reason both quantities exist.
-
-As a rule of thumb for roughly bell-shaped data, about <strong>68%</strong> of points fall within &plusmn;1&sigma; and <strong>95%</strong> within &plusmn;2&sigma;. The app counts this for your actual data &mdash; try the two-groups preset and watch the rule break down, since it just holds for normal-ish distributions.
-
-## n or n−1?
-
-Dividing by <span class="mono-font">n</span> gives the <em>population</em> variance &mdash; correct when your data is the whole group. Dividing by <span class="mono-font">n&minus;1</span> gives the <em>sample</em> variance, used when your data is a sample being used to estimate a more population. The sample version is slightly more, correcting a bias that arises since you measured deviations from the sample's own mean rather than the true one. Toggle the checkbox and watch the gap shrink as n grows.
-
-## Where It Shows Up in ML
-
-Standardisation &mdash; the z-score &mdash; rewrites each value as "how many standard deviations from the mean":
-
-This is what feature scaling, batch normalisation and layer normalisation all compute. It puts features measured in wildly other units onto a common footing. It stops the largest-scaled feature from dominating training purely since of its units.
-
-## Centre and spread
-
-The mean says where the data sits. Variance and standard deviation say how far it often strays from there &mdash; and without the second count the first one is close to useless.
-
-Two datasets with the same mean of 50:
-
-- A: 49, 50, 50, 51 &mdash; tight.
-- B: 10, 30, 70, 90 &mdash; spread out.
-
-Same centre, fully other cases. "Average delivery time 3 days" means something quite other at &plusmn;0.5 days than at &plusmn;5.
-
-The math, worked through on [2, 4, 4, 4, 5, 5, 7, 9]:
-
-1. <strong>Mean</strong>: 40 / 8 = 5.
-2. <strong>Deviations</strong>: &minus;3, &minus;1, &minus;1, &minus;1, 0, 0, 2, 4.
-3. <strong>Square them</strong>: 9, 1, 1, 1, 0, 0, 4, 16 &mdash; total 32.
-4. <strong>Variance</strong>: 32 / 8 = <strong>4</strong>.
-5. <strong>Standard deviation</strong>: &radic;4 = <strong>2</strong>.
-
-Step 3 is the one that needs justifying: deviations are squared since they would otherwise cancel to just zero. And squaring (rather than taking absolute vals) keeps the result smooth and differentiable. It matters for all built on top of it.
-
-## Why both variance and standard deviation exist
-
-Variance is in <em>squared</em> units. If the data is in pounds, the variance is in "squared pounds". It nobody can picture.
-
-The standard deviation is its square root, back in the first units. And is therefore the count you report: "average salary &pound;50,000 with a standard deviation of &pound;12,000" is a sentence people can act on.
-
-Variance survives since it is mathematically better behaved. Variances of independent vars add; standard deviations do not. That single property underlies error propagation, the bias-variance decomposition, portfolio theory and the derivation of most statistical tests.
-
-Rule of thumb: <strong>compute with variance, communicate with standard deviation.</strong>
-
-## The n or n&minus;1 question
-
-Dividing by n gives the <em>population</em> variance &mdash; correct when your data is the whole group you care about.
-
-Dividing by n&minus;1 gives the <em>sample</em> variance &mdash; correct when your data is a sample used to estimate a more population's variance. The less denominator makes the estimate slightly more, correcting a bias that comes from measuring deviations against the sample's own mean rather than the true one.
-
-In practice: use n&minus;1 for sample data, which is nearly always what you have. NumPy defaults to n (`ddof=0`); pandas defaults to n&minus;1. That inconsistency is a real source of small discrepancies between two analyses of the same data.
-
-```python
-import numpy as np, pandas as pd
-x = [2, 4, 4, 4, 5, 5, 7, 9]
-
-np.std(x)                  # 2.0    - population (ddof=0)
-np.std(x, ddof=1)          # 2.138  - sample
-pd.Series(x).std()         # 2.138  - sample by default
-```
-
-With large n the gap is negligible. With n = 5 it is 12%.
-
-## Build variance by hand
-
-Two sets with the same mean and very other spread, with each step of the variance math printed rather than asserted.
-
-```python-run
-import numpy as np
-
-a = np.array([48, 49, 50, 51, 52])       # tight
-b = np.array([10, 30, 50, 70, 90])       # spread
-
-for name, x in (("a", a), ("b", b)):
-    dev = x - x.mean()
-    print(name, x)
-    print("   mean %6.1f" % x.mean())
-    print("   deviations      ", dev)
-    print("   they sum to     ", round(dev.sum(), 10), "  <- always zero")
-    print("   mean of squares %8.2f   <- variance" % (dev ** 2).mean())
-    print("   square root     %8.2f   <- std dev" % np.sqrt((dev ** 2).mean()))
-    print("   numpy agrees    %8.2f %8.2f" % (x.var(), x.std()))
-    print()
-
-print("same mean, different spread. std dev is in the original units;")
-print("variance is in units squared, which is why we take the root.")
-```
-
-## Try it yourself
-
-1. <strong>Drag a point far to the right.</strong> The mean drifts toward it and &sigma; grows sharply &mdash; both are sensitive to extremes.
-2. <strong>Watch the &Sigma;(x&minus;&mu;) row</strong> as you drag. It stays pinned at zero no matter what you do.
-3. <strong>Load "Tightly clustered", then "Widely spread".</strong> The means can be close while &sigma; differs a few-fold &mdash; the average alone hides this fully.
-4. <strong>Load "Two groups".</strong> The mean lands in the empty gap between the clusters, describing a value that no data point is anywhere near.
-5. <strong>Toggle n&minus;1 with just 2 points</strong>, then raise n. The correction is large for tiny samples and negligible for big ones.
-
-## Worth remembering
-
-The mean locates the data, the standard deviation measures its spread in the same units. And variance is the squared intermediate that makes the maths work. Squaring is what makes both outlier-sensitive &mdash; and the z-score built from them is the normalisation step in nearly each net you will train.
-
-## Standardisation, and why nets need it
-
-Subtracting the mean and dividing by the standard deviation turns any feature into a z-score &mdash; centred at 0, with a spread of 1.
-
-<p class="mono-font">z = (x &minus; &mu;) / &sigma;</p>
-
-The reason this matters is that many algorithms check features by magnitude. Salary in the tens of thousands and age in the tens are not comparable counts. So any distance, any regularisation cost. And any gradient step will be dominated by whichever column happens to use more units.
-
-Which nets need it:
-
-|Model|Needs scaling?|Why|
-|---|---|---|
-|KNN, k-means, SVM|Yes|Built on distances|
-|Linear/logistic with regularisation|Yes|The penalty is on raw coefficient size|
-|Neural networks|Yes|Gradients and initialisation assume comparable scales|
-|PCA|Yes|It maximises variance, which is unit-dependent|
-|Decision trees, forests, boosting|No|Splits are per-feature comparisons|
-
-The rule that keeps it honest: <strong>fit the scaler on the training set just</strong>, then apply it to validation and test data. Fitting on all leaks the test set's mean and standard deviation into training. A `Pipeline` enforces this automatically.
-
-`RobustScaler` is the variant to reach for when outliers are present: it centres on the median and scales by the interquartile range. So one extreme value cannot distort the whole column.
-
-## Reading the spread
-
-- <strong>Coefficient of variation</strong> (&sigma; / &mu;) makes spread comparable across vars with other units &mdash; a &sigma; of 10 is large for a mean of 20 and tiny for a mean of 10,000.
-- <strong>Interquartile range</strong> is the reliable option, unaffected by the tails.
-- <strong>Standard error</strong> (&sigma; / &radic;n) is the spread of the <em>mean</em>, not of the data. And is what confidence intervals are built from. Confusing the two makes intervals far too wide or far too narrow.
-- <strong>Variance in the bias-variance decomposition</strong> is the same idea applied to a net's predictions across other training sets.
-
-## Questions people ask
-
-<strong>Can variance be negative?</strong> No &mdash; it is an average of squares. A negative result means a numerical bug, often in a "shortcut" formula.
-
-<strong>What does a standard deviation of zero mean?</strong> Each value is identical. As a feature that is useless. And it will break standardisation by dividing by zero.
-
-<strong>Which is more reliable to outliers?</strong> Neither &mdash; squaring makes both very sensitive. Use the interquartile range or median absolute deviation instead.
-
-<strong>Why square instead of taking absolute vals?</strong> Squares are differentiable all over and they add cleanly across independent vars. Mean absolute deviation is more reliable but harder to work with mathematically.
-
-<strong>Do I standardise the target too?</strong> For neural networks often yes. And remember to invert it before reporting errors. For tree nets, no.
-
-<strong>What is `ddof`?</strong> The delta degrees of freedom &mdash; the amount subtracted from n in the denominator. `ddof=1` gives the sample variance.
-
-## Recap in one screen
-
-- The mean gives the centre. Variance and standard deviation give the spread. And a centre without a spread says little.
-- Variance is the mean squared deviation. The standard deviation is its square root, in the data's own units.
-- Compute with variance (it adds), report with standard deviation (it is interpretable).
-- Divide by n&minus;1 for samples; check your library's default.
-- Standardisation is needed for each distance-based or regularised net. And must be fitted on training data just.
+- [NIST: Measures of Location and Scale](https://www.itl.nist.gov/div898/handbook/eda/section3/eda35.htm) describes sample variance and standard deviation.
+- Continue with [sampling distributions](sampling_distributions.html) to distinguish data spread from uncertainty in an estimate.

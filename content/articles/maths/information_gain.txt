@@ -1,178 +1,23 @@
-title: Information Gain: A Practical Guide
-intro: How a decision tree decides what to ask, one question at a time.
+title: Information Gain
+intro: Information gain measures how much a split reduces uncertainty about a target variable.
 
-## Quick Context
+## Entropy before and after a split
 
-<a href="entropy_and_information.html" style="color: var(--accent-primary)">Entropy</a> measures how mixed a set of labels is: 1 bit for an still fifty-fifty split of two classes, 0 bits when each label is the same. Information gain is simply how much that count falls when you split the set in two.<p>A <a href="../machine_learning/decision_tree.html" style="color: var(--accent-primary)">decision tree</a> does nothing cleverer than this. At each node it tries each feature and each threshold, computes the gain for each. And keeps the winner. Then it repeats on both children until some stopping rule fires.</p> The formula is `Gain = H(parent) - weighted_avg(H(children))`: the parent's entropy minus the weighted average of the children's entropies after the split. There the weights are the fraction of samples going to each child. A gain of zero means the split did not reduce uncertainty at all. A gain equal to the parent's entropy means the split produced perfectly pure children. The Gini impurity is an option to entropy that measures the probability of misclassifying a randomly chosen item &mdash; it gives nearly identical splits in practice and is faster to compute (no logarithm). Scikit-learn defaults to Gini. CART uses Gini; ID3 and C4.5 use entropy. The gain ratio (used by C4.5) normalises information gain by the split's own entropy to penalise features with many distinct vals. It otherwise get inflated gain simply since they create many small, pure groups. This page computes information gain for a few candidate splits, shows the entropy math at each node. And covers the gain-ratio correction.
+For target labels Y, entropy is H(Y) = −Σᵧ p(y)log₂p(y). A feature split divides the data into groups. Information gain is the original entropy minus the weighted entropy remaining in those groups:
 
-## The formula
+<div class="vz-math-block" role="math" aria-label="information gain equals entropy of Y minus weighted sum over groups of entropy of Y given group">IG = H(Y) − Σₖ P(Gₖ)H(Y|Gₖ)</div>
 
-Gain = H(parent) &minus; [ (n&#7473;/n)&middot;H(left) + (n&#7523;/n)&middot;H(right) ]
+Suppose a balanced binary target has entropy 1 bit. A split that creates two pure groups has conditional entropy 0 and information gain 1 bit. A split that leaves both groups equally mixed gives no gain. Weighting by group size matters: a tiny pure group should not count as much as a large one.
 
-The weights matter. A child holding two points and a child holding eighteen do not deserve an equal say. So each child's entropy is weighted by the share of the data that landed in it. Without that weighting, a split that peels off one lucky point would look like a triumph.
+## The high-cardinality trap
 
-Gain is never negative, and it is zero when the split changes nothing &mdash; when both sides have the same label mix as the parent, the question told you nothing you did not now know.
+Information gain can favour features that create many small groups, including identifiers. A tree may appear to fit training data better while generalising worse. Validation, regularisation, and alternative criteria such as gain ratio can address this, depending on the task. Entropy itself is defined in [entropy and information](entropy_and_information.html); the [decision-tree lesson](../machine_learning/decision_tree.html) applies the split criterion.
 
-## How much did that question help?
+## Try this above
 
-Information gain measures how much a split reduces uncertainty. It is the gap between the entropy before a question is asked and the average entropy afterwards.
+Compare a balanced split with an uneven split and inspect the weighted child entropy. Then add a split that isolates individual records to see why raw information gain can overvalue it.
 
-<p class="mono-font">IG = H(parent) &minus; &Sigma; (n&#7522; / n) H(child&#7522;)</p>
+## Sources and next steps
 
-The weighting matters: a child holding 90% of the rows counts nine times as much as one holding 10%. Without it, a split that isolates two rows into a pure group would look brilliant.
-
-Worked through on 14 samples, 9 yes and 5 no:
-
-<strong>Parent entropy</strong>: &minus;(9/14)log&#8322;(9/14) &minus; (5/14)log&#8322;(5/14) = <strong>0.940 bits</strong>.
-
-<strong>Split on Outlook</strong>, giving three groups:
-
-|Branch|Rows|Yes|No|Entropy|
-|---|---|---|---|---|
-|Sunny|5|2|3|0.971|
-|Overcast|4|4|0|0.000|
-|Rain|5|3|2|0.971|
-
-Weighted entropy = (5/14)(0.971) + (4/14)(0) + (5/14)(0.971) = <strong>0.694</strong>.
-
-<strong>Information gain</strong> = 0.940 &minus; 0.694 = <strong>0.246 bits</strong>.
-
-The Overcast branch is the interesting one: entropy zero, a fully pure group. And the tree can stop there and make a leaf. That is what a genuinely useful question looks like.
-
-## How a tree uses it
-
-At each node the algorithm loops over each feature and, for numeric features, each candidate threshold. For each candidate it computes the information gain. And it keeps the best. Then it repeats on each child.
-
-This is a <strong>greedy</strong> procedure: it takes the locally best split without considering whether a slightly worse split now would enable a much better one later. Finding the globally best tree is computationally intractable. And in practice greedy splitting works well enough that nobody minds.
-
-Splitting continues until a stopping rule fires &mdash; a pure node, a max depth, too few samples to split. Or no split giving a worthwhile gain.
-
-|Criterion|Formula|Notes|
-|---|---|---|
-|Entropy / information gain|&minus;&Sigma; p log&#8322; p|Used by ID3 and C4.5|
-|Gini impurity|1 &minus; &Sigma; p&sup2;|Scikit-learn's default; no logarithm, so faster|
-|Gain ratio|IG / split entropy|Corrects the bias towards many-valued features|
-|Variance reduction|Reduction in MSE|The regression equivalent|
-
-Gini and entropy pick the same split the overwhelming majority of the time. This is not a decision worth agonising over. Depth and min leaf size matter far more.
-
-## The bias towards high-cardinality features
-
-Information gain has a systematic flaw: it favours features with many distinct vals, since splitting into many small groups almost guarantees pure children.
-
-The extreme case makes it obvious. Split on a customer ID column and each branch has just one row, each child is pure. And the information gain is maximal. The tree has learned a lookup table and will generalise to nothing.
-
-Two corrections:
-
-- <strong>Gain ratio</strong> divides the gain by the entropy of the split it. It is large when a feature gives many branches. C4.5 added this namely for the problem.
-- <strong>Binary splits.</strong> CART, and therefore scikit-learn, just ever splits into two groups. It limits how much a high-cardinality feature can exploit the bias.
-
-The same bias affects the feature importances a tree reports. Impurity-based weight inflates high-cardinality columns. It is why permutation weight &mdash; measured on held-out data &mdash; is the more trustworthy ranking.
-
-## Score each split
-
-A small dataset, each candidate split scored by information gain. The winning split is the one that leaves the least uncertainty behind.
-
-```python-run
-import numpy as np
-
-# five features, one label; only feature 0 is genuinely informative
-rng = np.random.default_rng(0)
-n = 400
-X = rng.integers(0, 2, size=(n, 5))
-y = np.where(rng.random(n) < np.where(X[:, 0] == 1, 0.9, 0.15), 1, 0)
-
-def entropy(labels):
-    if len(labels) == 0:
-        return 0.0
-    p = np.bincount(labels, minlength=2) / len(labels)
-    p = p[p > 0]
-    return -(p * np.log2(p)).sum()
-
-before = entropy(y)
-print("entropy before any split: %.4f bits" % before)
-print()
-for col in range(5):
-    left, right = y[X[:, col] == 0], y[X[:, col] == 1]
-    after = (len(left) * entropy(left) + len(right) * entropy(right)) / n
-    print("  split on feature %d: entropy after %.4f  ->  gain %.4f"
-          % (col, after, before - after))
-print()
-print("gain is never negative and is near zero for a feature that tells you")
-print("nothing. a decision tree tries every column like this and keeps the best.")
-```
-
-## Guided tour
-
-1. <strong>Look at the parent.</strong> Twenty students, 11 passed and 9 failed. So entropy before any split is 0.993 bits &mdash; almost a full bit, since the classes are nearly balanced and knowing nothing else you would be nearly guessing.
-2. <strong>Split badly on purpose.</strong> Drag <strong>Threshold</strong> down to 1.5. One student goes left and nineteen go right. So the right-hand child still reads 11 pass / 8 fail &mdash; almost just the parent &mdash; and the gain collapses to 0.060 bits. You learned something about one student and nothing about the rest.
-3. <strong>Now press Find The Best Split.</strong> The threshold jumps from 4.5 to 6.5, the peak of the gain curve. Everyone who studied more than six hours passed. So that child is pure &mdash; entropy just 0.000 &mdash; and the gain climbs from 0.181 to 0.414 bits.
-4. <strong>Read the curve.</strong> The less panel plots gain at each candidate threshold. It is jagged rather than smooth, since moving the threshold changes nothing at all until it crosses an actual data point. This is why trees just ever consider midpoints between observed vals.
-5. <strong>Switch features.</strong> Change <strong>Split On Feature</strong> to attendance and press Find The Best Split again. The best it can manage is 0.145 bits at 82.5% &mdash; a third of what hours bought. That comparison &mdash; best gain from feature 1 against best gain from feature 2 &mdash; is precisely the choice the tree makes at each node.
-6. <strong>Find a worthless split.</strong> Push the threshold to either extreme so that one side is empty. The gain drops to 0.000: a split that separates nothing tells you nothing.
-
-## Gini, and why the choice barely matters
-
-Many implementations measure impurity with the Gini index, <span class="mono-font">1 &minus; &Sigma; p&#7522;&sup2;</span>, rather than entropy. Both are zero for a pure node and maximal for an still mix. Gini avoids a logarithm and is marginally cheaper. In practice the two pick the same split the overwhelming majority of the time. And scikit-learn's default of Gini is a performance decision, not a statistical one.
-
-Entropy has the better story though: it is measured in bits. And gain is literally the count of bits of uncertainty the answer removed.
-
-## Where raw gain misleads
-
-- <strong>High-cardinality features.</strong> Split on a column of unique IDs and each child holds one row. So each child is pure and the gain is maximal &mdash; on a feature with no predictive value whatsoever. Gain ratio, which divides by the entropy of the split it, exists to punish just this.
-- <strong>Greed.</strong> The tree takes the best split now, never the pair of splits that would be best together. It is a greedy algorithm. And greedy is not best &mdash; XOR-shaped data defeats the first split fully.
-- <strong>Overfitting.</strong> Keep splitting and gain stays non-negative all the way down to one point per leaf, at which point the tree has memorised the training set. Depth limits, min samples per leaf and pruning are all answers to this.
-- <strong>Instability.</strong> Two candidate splits with nearly equal gain make the tree's choice a coin flip. And a other sample flips it. This variance is just what <a href="../machine_learning/random_forest.html" style="color: var(--accent-primary)">bagging</a> was built to average away.
-
-## Summing up
-
-Information gain is the drop in entropy a split buys: the parent's entropy minus the size-weighted average of its children's. The weighting is what stops a tiny lucky child from looking impressive. And the gain is zero just when the split leaves the label mix unchanged. A decision tree builds it by testing this quantity for each feature and each candidate threshold and taking the largest. It also explains its known weaknesses &mdash; the measure rewards splitting on high-cardinality columns, the search is greedy rather than globally best. And nothing in the gain it ever tells you to stop.
-
-## Beyond trees: mutual information
-
-Information gain, computed between a feature and the target rather than inside a tree, is just <strong>mutual information</strong> &mdash; how much knowing one var reduces uncertainty about the other.
-
-That makes it a general-purpose feature-choice tool with one clear advantage over correlation: it detects <em>any</em> dependence, not just linear ones.
-
-```python
-from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
-
-scores = mutual_info_classif(X, y, random_state=0)
-for name, s in sorted(zip(feature_names, scores), key=lambda t: -t[1])[:10]:
-    print(f"{name:<25} {s:.4f}")
-```
-
-A feature with a perfect parabolic relationship to the target has a correlation near zero and high mutual information. If you rank features by correlation alone, you will discard it.
-
-Three cautions. Mutual information is estimated, not computed just, for continuous vars &mdash; the estimate depends on binning or nearest-neighbour params. It scores features one at a time. So it misses combinations that just matter together. And a high score does not mean a net can use the feature, just that the information is present.
-
-## Common mistakes
-
-- <strong>Forgetting to weight the children.</strong> An unweighted average makes a tiny pure branch look decisive.
-- <strong>Letting an ID-like column into the features.</strong> It will win each split and learn nothing.
-- <strong>Reading impurity-based weight as truth.</strong> It is biased towards high-cardinality features and splits credit arbitrarily between correlated ones.
-- <strong>Growing without a stopping rule.</strong> A tree that splits until each leaf is pure has memorised the training data.
-- <strong>Assuming entropy is better than Gini</strong> since it looks more principled. They agree nearly always, and Gini is cheaper.
-- <strong>With information gain on continuous targets.</strong> Regression trees use variance reduction instead.
-
-## Questions people ask
-
-<strong>What is a good information gain?</strong> There is no absolute scale &mdash; it is relative to the parent's entropy and to what the other candidate splits reach. A gain of 0.05 bits from a parent at 0.1 is excellent. From a parent at 1.0 it is marginal.
-
-<strong>Can information gain be negative?</strong> No. The weighted average entropy of the children can never exceed the parent's. So the gain is zero at worst.
-
-<strong>Why does my tree pick a feature I think is useless?</strong> Often since it has many distinct vals. Or since it correlates with something that genuinely matters. Check the cardinality first.
-
-<strong>How does this handle missing vals?</strong> Implementations vary: C4.5 distributes the row fractionally across branches, CART uses surrogate splits. And LightGBM learns a default way per split.
-
-<strong>Is information gain used outside decision trees?</strong> Yes &mdash; as mutual information for feature choice, in text review for finding discriminative terms. And in active learning to choose the most informative case to label next.
-
-<strong>Does it work with more than two classes?</strong> Yes. The entropy formula sums over however many classes there are. Nothing else changes.
-
-## Recap in one screen
-
-- Information gain is the entropy before a split minus the weighted average entropy after it.
-- Weighting by branch size is key, or small pure branches dominate.
-- Trees choose the highest-gain split greedily at each node, then repeat.
-- The measure is biased towards features with many distinct vals &mdash; gain ratio and binary splits correct for it.
-- Computed against the target, it is mutual information. It detects non-linear dependence that correlation misses.
+- Quinlan, [“Induction of Decision Trees”](https://doi.org/10.1007/BF00116251), discusses information-based tree splitting.
+- See [cross-entropy and KL divergence](cross_entropy_and_kl_divergence.html) for related distribution comparisons.

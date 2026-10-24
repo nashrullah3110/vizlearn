@@ -1,169 +1,25 @@
 title: Quantiles and Percentiles
-intro: showing a spread by where its values sit rather than by blending them.
+intro: A quantile marks a position in an ordered distribution; a percentile expresses that position on a 0–100 scale.
 
-## The definition
+## Read a quantile
 
-The **q-th quantile** is the value below which a fraction `q` of the data falls.
-The 0.5 quantile is the median: half below, half above. The 0.9 quantile is the
-value 90% of the data sits below.
+The p-quantile is a value with roughly proportion p of observations at or below it. The median is the 0.5 quantile; the 25th and 75th percentiles are the first and third quartiles. For 1, 2, 4, 7, 9, the median is 4.5 under the common “average the two middle values” convention.
 
-**Percentiles** are the same idea on a 0&ndash;100 scale &mdash; the 90th
-percentile is the 0.9 quantile. **Quartiles** cut at 25, 50 and 75, cutting the
-data into four equal groups. **Deciles** cut into ten.
+<div class="vz-math-block" role="math" aria-label="the p quantile has approximately p proportion of observations at or below it">Q(p): approximately p of the distribution lies at or below Q(p)</div>
 
-## Why not just use the mean
+There are several accepted sample-quantile conventions, especially for small datasets. Software may interpolate between adjacent observations differently, so name the convention when exact reproducibility matters.
 
-A mean is a balance point. It moves when any of it moves. A quantile depends
-only on **order**, and that makes it solid.
+## Why quantiles are useful
 
-Add a single huge value to a dataset and the mean shifts, possibly a lot.
-The median barely moves at all. The new value is simply "one more above
-the middle", even so of how far above.
+Quantiles describe location without assuming a symmetric distribution and are less affected by extreme observations than the mean. The interquartile range, Q(0.75) − Q(0.25), measures the middle half of the data. A percentile rank is not the same as a percentage of correct answers; it describes relative position in a reference distribution.
 
-That is why median income is reported rather than mean income, why latency is
-reported at percentiles, and why the [box plot](#) below exists.
+Use quantiles to report skewed measurements, thresholds, and prediction intervals. See [mean, median, and mode](mean_mode_and_median.html) and [confidence intervals](confidence_intervals.html).
 
-The **IQR** &mdash; Q3 minus Q1 &mdash; is the spread measure that follows from
-the same idea. It covers the middle half of the data, and it's unaffected by
-any of it in the tails. Standard deviation, being built from squared distances
-from the mean, is the opposite: one extreme value moves it a lot.
+## Try this above
 
-## Reading the box plot
+Change the requested percentile and inspect which observations fall below it. Try a small sample to see where software conventions can differ.
 
-The second panel is assembled from the quartiles in the first, and each part
-of it has a meaning:
+## Sources and next steps
 
-**The box** spans Q1 to Q3. So It holds the middle 50% of the data.
-
-**The line inside** is the median. Its spot within the box shows skew: off
-centre means the spread leans.
-
-**The whiskers** reach the furthest data points still within 1.5 &times; IQR of
-the box edge.
-
-**The dots** are all beyond that.
-
-The 1.5 is a **rule**, not a test. It comes from Tukey, and for a normal
-spread it flags about 0.7% of points. Points beyond it are worth
-inspecting, and calling them "outliers" makes a claim the rule can't support
-&mdash; a skewed spread makes them by build rather than by
-error.
-
-Grow the sample size and the number of flagged points grows roughly in
-proportion. That alone shows the rule is descriptive.
-
-## Percentiles in practice
-
-**Latency.** No one reports mean response time, because one slow request buried
-in a million is invisible in a mean and obvious at p99. Services are given
-at p50, p95, p99 and p999 just because the tail is what users notice.
-
-A trap follows right away: **percentiles don't mean.** The p99 of two
-servers isn't the mean of their p99s. Aggregating percentiles needs the
-underlying spreads or a structure like a t-digest.
-
-**Quantile regression** predicts a chosen quantile rather than the mean. handy
-when the cost of over- and under-guess differ, or when you want a
-guess interval right.
-
-**Quantile binning** turns a smooth feature into equal-sized buckets, which
-is solid to skew in a way that equal-width binning isn't.
-
-**Feature scaling.** `QuantileTransformer` maps a feature to a uniform or normal
-spread through its quantiles, and is unaffected by outliers in a way
-standardisation isn't.
-
-## A wrinkle worth knowing
-
-There's no single agreed meaning of a sample quantile. With 10 data points,
-"the value below which 25% falls" doesn't land on an reading, and there are
-a few defensible interpolations. NumPy offers nine methods. R offers the same
-nine. The defaults differ between languages, and between `numpy.percentile` and
-some SQL engines.
-
-For large samples the differences are negligible. For small ones they aren't,
-and two tools can legitimately report different quartiles for the same data.
-
-## The definition ambiguity, on ten numbers
-
-The wrinkle deserves numbers, because it's where two tools disagree on the same
-data. Take the ten values `1, 2, 3, &hellip;, 10` and ask for the 25th
-percentile. "The value below which 25% falls" doesn't land on an reading, and
-the defensible answers differ:
-
-|method|25th percentile|how|
-|---|---|---|
-|linear interpolation|3.25|position `(n&minus;1)&middot;0.25 = 2.25`, so a quarter of the way from the 3rd value to the 4th|
-|nearest-rank|3|the smallest value with at least 25% at or below it|
-
-Both are correct. They answer slightly different questions about what a
-"percentile" of a finite sample means. NumPy's default is the linear method, and
-it offers nine in total. Other tools default differently, which is why
-`numpy.percentile` and a SQL engine can report different quartiles for the same
-column. For a thousand points the gap between methods is negligible. For ten it's
-0.25 out of a range of 9. This Is enough to change a choice. State the method
-when the sample is small and the number matters.
-
-The reason to care sits in the tail. A service's latency is reported at p95 and
-p99 just because one slow request in a thousand is invisible in a mean and
-obvious in a high percentile. And those percentiles can't be averaged
-across servers, because the p99 of two machines isn't the mean of their p99s.
-Aggregating them needs the underlying spreads or a structure like a
-t-digest. Blending them understates the tail each time. This Is the one error
-this whole topic exists to prevent.
-
-There's also no single agreed meaning of a sample quantile: on ten points the
-"value below which 25% falls" is a matter of interpolation, and NumPy alone offers
-nine methods. On large samples the choice is negligible. On small ones two honest
-tools can report different quartiles for the same data.
-
-## Where it goes wrong
-
-**Blending percentiles.** The single most common error, and it always
-understates the tail.
-
-**Reading whisker points as errors.** The rule is a drawing rule.
-
-**Checking box plots of very different sample sizes.** More data means more
-flagged points, mechanically.
-
-**given your language's default matches another's.** State the method when it
-matters.
-
-## Questions people ask
-
-<strong>What is the difference between a quantile and a percentile?</strong> They are the same idea on different scales. The 0.9 quantile is the 90th percentile: the value below which 90 percent of the data lies.
-
-<strong>Is the median a quantile?</strong> Yes, it is the 0.5 quantile, the 50th percentile and the second quartile.
-
-<strong>Why do different tools give different percentiles?</strong> There are several conventions for interpolating between data points when the position falls between two values. The differences shrink as the sample grows.
-
-<strong>Why use the median instead of the mean?</strong> The median ignores how extreme the extremes are. A single huge outlier moves the mean a lot and the median hardly at all.
-
-<strong>What is the interquartile range?</strong> It is the 75th percentile minus the 25th. It measures spread in the middle half of the data and is the basis of the box plot whiskers.
-
-<strong>How should I report skewed data like latency?</strong> Give percentiles such as p50, p95 and p99. The mean hides the slow tail, which is what users actually feel.
-
-## Nobody experiences the mean
-
-Ten thousand response times with a long tail. The mean and the median tell one story. P95 and p99 tell the one your users live in.
-
-```python-run
-import numpy as np
-
-rng = np.random.default_rng(2)
-# response times in ms: mostly fast, a long tail
-ms = np.concatenate([rng.normal(90, 15, 9500), rng.normal(700, 200, 500)])
-ms = np.clip(ms, 1, None)
-
-print("10,000 requests")
-print("  mean   %7.1f ms" % ms.mean())
-print("  median %7.1f ms" % np.median(ms))
-print()
-for q in (50, 75, 90, 95, 99, 99.9):
-    print("  p%-5s %7.1f ms" % (q, np.percentile(ms, q)))
-print()
-print("the mean sits at %.1f, which %.1f%% of requests are faster than."
-      % (ms.mean(), (ms < ms.mean()).mean() * 100))
-print("nobody experiences the mean. they experience p95.")
-```
+- [NIST: Quantiles and Percentiles](https://www.itl.nist.gov/div898/handbook/prc/section2/prc262.htm) discusses quantile definitions.
+- Continue with [mean, median, and mode](mean_mode_and_median.html) to compare location summaries.

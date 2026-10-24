@@ -1,193 +1,25 @@
 title: Singular Value Decomposition
-intro: The factorisation that works on each mat. The one worth knowing if you only learn one.
+intro: SVD factors any real matrix into rotations or reflections and axis-wise scaling, exposing its most important directions.
 
-## What every matrix does
+## The factorisation
 
-Take the unit circle and apply any 2&times;2 mat. The result is always an
-ellipse. Not at times &mdash; always, for each mat there's.
+Every real m × n matrix A can be written as A = UΣVᵀ. The columns of U and V are orthonormal directions; the nonnegative diagonal entries of Σ are singular values, ordered from largest to smallest. Right singular vectors in V describe input directions; the matching columns of U show their output directions.
 
-That is a strong claim, and the SVD is the reason it holds. each mat can be
-written as three ops in sequence:
+<div class="vz-math-block" role="math" aria-label="A equals U Sigma V transpose">A = UΣVᵀ</div>
 
-```
-A  =  U  Sigma  V'
-```
-
-Read right to left. This Is the order they apply:
-
-**V'** rotates. A rotation does nothing to a circle. This Is why stage 2 in the
-visualisation looks the same to stage 1. But watch the two spokes, which
-do move. It's choosing which directions are about to be stretched.
-
-**Sigma** stretches along the axes, by the **singular values**. This is where
-the circle turns an ellipse.
-
-**U** rotates the ellipse into its final orientation.
-
-Step through the four stages above and the claim stops being abstract. What
-you set the four mat entries to, the shape at stage 3 is an axis-aligned
-ellipse, each time.
-
-## The singular values
-
-They're the lengths of the ellipse's semi-axes, always non-minus, and
-usually listed largest first.
-
-**The largest** is how much the mat can stretch any vector &mdash; its gain
-in the worst case.
-
-**The smallest** is how much it can squash one.
-
-**Their ratio** is the **rule number**, and it's the single most handy
-number in the readout. A rule number near 1 means the mat treats all
-directions roughly alike. A large one means it nearly flattens some direction,
-and solving any of it involving that mat will amplify error along it. Drag the
-entries until the two singular values are far apart and watch the ellipse become
-a sliver.
-
-**A zero singular value** means the mat truly flattens a direction: the
-ellipse collapses to a line segment, the mat is singular, and it has no
-inverse.
-
-## Why not eigenvectors
-
-The [eigendecomposition](eigenvalues_and_eigenvectors.html) is the more famous
-factorisation, and the SVD is the more handy one, for three reasons.
-
-**It always exists.** Eigendecomposition needs a square mat, and even
-then not each square mat has one. The SVD exists for each mat of each
-shape, including a 1000&times;3.
-
-**Its bases are unit-perp.** Eigenvectors need not be at right angles, and when
-they're nearly parallel the breakdown is by number fragile. U and V are
-[unit-perp](basis_span_and_orthogonality.html) by build.
-
-**Its values are real and non-minus.** Eigenvals of a real mat can be
-complex. Singular values never are.
-
-For a even plus-definite mat the two coincide. This Is why they
-are so often confused.
+A vector along a right singular direction is mapped to the matching left direction, scaled by its singular value. A zero singular value marks a collapsed direction. Unlike eigendecomposition, SVD applies to rectangular matrices and does not require the matrix to be symmetric.
 
 ## Low-rank approximation
 
-The property that makes the SVD indispensable: keep only the largest *k*
-singular values, set the rest to zero, and times back. The result is
-provably the best rank-*k* guess of the first mat, in the
-least-squares sense. Not a good one &mdash; the best.
+Keeping only the k largest singular values gives the best rank-k approximation to A in the usual Frobenius and spectral norms. This supports compression and denoising, but small singular values are not automatically noise: choosing k requires evidence from the data and task. The rank is the number of nonzero singular values (or values above a numerical tolerance).
 
-That single fact underwrites a surprising amount:
+For a small example, A = [[3, 0], [0, 1]] already has singular values 3 and 1: its first axis is stretched three times as much as the second. See [rank](rank_and_linear_independence.html), [projections](projections.html), and [PCA](eigenvalues_and_eigenvectors.html).
 
-**PCA** is the SVD of the mean-centred data mat. The principal components
-are the right singular vectors and the shown variances are the squared
-singular values, which is why any PCA setup you look inside is calling
-an SVD.
+## Try this above
 
-**Image compression** keeps the top singular values of the pixel mat.
+Reduce the number of retained singular directions and compare the reconstructed matrix with the original. Observe which structure disappears first.
 
-**Latent semantic analysis** factors a term-doc mat and reads the
-retained dims as topics.
+## Sources and next steps
 
-**Recommender systems** factor a sparse user-item mat into a low-rank
-product.
-
-**Noise reduction** works on the assumption that signal focuses in the
-large singular values and noise spreads through the small ones.
-
-## Singular values by hand, from A'A
-
-You rarely find an SVD on paper. But Seeing where the singular values come
-from drops the mystery. The singular values of `A` are the square roots of the
-eigenvals of `A'A`. Take `A = [[3, 0], [4, 5]]`:
-
-`A'A = [[9 + 16,  20], [20,  25]] = [[25, 20], [20, 25]]`.
-
-A even `2&times;2` `[[a, b], [b, a]]` has eigenvals `a + b` and
-`a &minus; b`, here `45` and `5`. So the singular values are:
-
-|singular value|from|
-|---|---|
-|&sigma;&#8321; = &radic;45 &asymp; 6.708|the largest stretch A applies|
-|&sigma;&#8322; = &radic;5 &asymp; 2.236|the smallest|
-
-Their ratio, `&radic;(45/5) = 3`, is the rule number: `A` stretches its most
-sensitive direction three times more than its least. That is why the unit circle
-turns an ellipse with semi-axes 6.708 and 2.236, and why the singular values
-are always real and non-minus. They're square roots of eigenvals of
-`A'A`, which is even positive semi-definite for any `A`. Eigenvals of `A`
-itself could be complex or minus. The SVD's numbers never are, which is half
-the reason it's the factorisation to reach for.
-
-This is the machinery under PCA. This Is nothing more than the SVD of the
-mean-centred data: the principal directions are the right singular vectors and the
-variance each shows is its singular value squared. Keeping only the largest few
-&mdash; setting the small singular values to zero and timesing back &mdash;
-gives the provably best low-rank guess of the data. This Is the same
-op behind image compression, latent-semantic analysis and recommender
-factorisations. The small singular values are where noise focuses, so
-dropping them often sharpens the signal rather than degrading it.
-
-## Where it goes wrong
-
-**Losing to centre before PCA.** Without subtracting the mean, the first
-component points at the mean rather than at the direction of greatest variance.
-
-**Reading a rule number as an error.** It's a sensitivity: it says how
-much input error can be amplified, not how much has been.
-
-**given singular values are eigenvals.** They're the eigenvals of A'A,
-square-rooted. Not the same object, and not equal except in special cases.
-
-**finding the full SVD when you want the top few.** For a large sparse mat
-a truncated solver is orders of magnitude cheaper.
-
-## Questions people ask
-
-<strong>What does the SVD actually give me?</strong> It factors any matrix as U times S times V transpose: a rotation, a stretch along the axes, and another rotation. The singular values in S say how much stretch each direction gets.
-
-<strong>How is SVD different from eigendecomposition?</strong> SVD works on any matrix, including non-square ones, and uses orthogonal factors. Eigendecomposition needs a square matrix and may not have orthogonal eigenvectors.
-
-<strong>How do I get the best low-rank approximation?</strong> Keep the k largest singular values and zero the rest. The Eckart-Young theorem says no other rank-k matrix is closer in the Frobenius or spectral norm.
-
-<strong>How does SVD relate to PCA?</strong> PCA on centred data is the SVD of that data matrix. The right singular vectors are the principal directions and squared singular values give the variances.
-
-<strong>What does a tiny singular value tell me?</strong> The matrix is nearly rank-deficient in that direction. A large ratio of biggest to smallest signals an ill-conditioned problem.
-
-<strong>Is SVD expensive?</strong> Full SVD costs about the cube of the smaller dimension. For large matrices use truncated or randomised SVD to get only the top k components.
-
-## Rebuild a matrix from its biggest pieces
-
-SVD splits any mat into a stack of rank-one layers sorted by importance. Keeping only the first few is what compression and PCA really do.
-
-```python-run
-import numpy as np
-
-rng = np.random.default_rng(0)
-# a matrix that is really rank 2, with a little noise on top
-A = np.outer(rng.normal(size=40), rng.normal(size=25)) * 5.0
-A += np.outer(rng.normal(size=40), rng.normal(size=25)) * 2.0
-A += rng.normal(size=(40, 25)) * 0.05
-
-U, s, Vt = np.linalg.svd(A, full_matrices=False)
-
-print("A is %d x %d" % A.shape)
-print("first 8 singular values:", np.round(s[:8], 4))
-print()
-print("each is the 'size' of one rank-one layer. two are large, the rest are noise.")
-print()
-total = (s ** 2).sum()
-print("%5s %14s %14s %12s" % ("k", "kept variance", "reconstr. err", "numbers stored"))
-for k in (1, 2, 3, 5, 10, 25):
-    Ak = (U[:, :k] * s[:k]) @ Vt[:k]
-    kept = (s[:k] ** 2).sum() / total
-    err = np.linalg.norm(A - Ak) / np.linalg.norm(A)
-    stored = k * (A.shape[0] + A.shape[1] + 1)
-    print("%5d %13.4f%% %14.6f %12d" % (k, 100 * kept, err, stored))
-print("%5s %13s %14s %12d" % ("full", "100%", "0", A.size))
-print()
-print("k=2 stores %d numbers instead of %d and loses almost nothing."
-      % (2 * (40 + 25 + 1), A.size))
-print()
-print("singular values are never negative, and U and V are orthonormal:")
-print("  U.T @ U close to I:", np.allclose(U.T @ U, np.eye(U.shape[1])))
-print("  V.T @ V close to I:", np.allclose(Vt @ Vt.T, np.eye(Vt.shape[0])))
-```
+- [NumPy linalg.svd](https://numpy.org/doc/stable/reference/generated/numpy.linalg.svd.html) documents the computed factorisation and conventions.
+- See [QR decomposition](qr_decomposition.html) for a related factorisation used in solving least-squares problems.

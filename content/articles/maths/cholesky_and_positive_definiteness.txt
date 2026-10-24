@@ -1,208 +1,23 @@
-title: Cholesky and Positive-Definiteness
-intro: A mat square root, what it needs to exist. Why its failure is more handy than its success.
+title: Cholesky Factorisation and Positive Definiteness
+intro: A symmetric positive-definite matrix factors as LLᵀ, enabling efficient solves and correlated sampling.
 
-## The factorisation
+## Positive definiteness
 
-For a even plus-definite mat `C` there's a lower tri `L`
-with:
+A real symmetric matrix A is positive-definite when xᵀAx > 0 for every nonzero x. Geometrically, its quadratic form is an upward bowl in every direction. Positive-definiteness implies positive eigenvalues and makes many optimisation and probability calculations well behaved.
 
-```
-C  =  L L'
-```
+The Cholesky factorisation writes A = LLᵀ, where L is lower triangular with positive diagonal entries. For a 2 × 2 example, A = [[4, 2], [2, 3]] factors as L = [[2, 0], [1, √2]], since LLᵀ = A. Solving Ax = b then becomes two triangular solves rather than a general matrix solve.
 
-`L` is unique if its main-line is taken plus, and it's the nearest thing a
-mat has to a square root. For a 2&times;2 it's short enough to write out
-whole:
+## Where it is used—and where it fails
 
-```
-L11 = sqrt(C11)
-L21 = C21 / L11
-L22 = sqrt(C22 - L21^2)
-```
+Cholesky is used to sample multivariate normal data and to solve symmetric positive-definite systems. A covariance matrix is positive semidefinite in exact arithmetic; it may be singular when variables are redundant, so ordinary Cholesky can fail. Round-off or noisy estimates can also make a theoretically valid matrix appear slightly indefinite. Diagnose the matrix and the model before adding a small diagonal term; regularisation changes the problem.
 
-That last line carries the whole story. If `C22 - L21^2` is minus there's no
-real square root, and the method stops.
+See [covariance and correlation](covariance_and_correlation.html), [matrix transformations](matrix_as_transformation.html), and [QR decomposition](qr_decomposition.html) for related tools.
 
-## Positive-definite
+## Try this above
 
-A even mat is **positive definite** when `x' C x > 0` for each non-zero
-`x`, which is equal to all its eigenvals being strictly plus.
+Adjust the matrix entries until the quadratic form stops being positive in every direction. Compare the positive-definite case with a singular or indefinite example.
 
-For a covariance mat this isn't a detail. `x' C x` is the variance of
-the combination `x` of your variables, and a variance can't be minus. A
-mat that fails the test isn't showing any spread that exists.
+## Sources and next steps
 
-Drag the link control toward &plusmn;1. Past the boundary the readout
-reports failure, and a link of 1.2 isn't a thing: no
-pair of random variables can be more than just right linked.
-
-**The factorisation failing is the test.** Cholesky costs about `n^3 / 3`
-ops, roughly half a general LU factorisation, and about a tenth of what
-finding the eigenvals costs. When a routine needs to know whether a mat
-is positive definite, it attempts a Cholesky and watches for the minus square
-root.
-
-## Generating correlated randomness
-
-This is where the factor earns its keep. Take free standard normals `z`
-and find `L z`. The result has covariance:
-
-```
-Cov(Lz)  =  L Cov(z) L'  =  L I L'  =  L L'  =  C
-```
-
-just the covariance you asked for. The scatter in the visualisation is
-made this way, and the two orange segments are the columns of `L` &mdash;
-the axes the free noise gets mapped onto.
-
-That single trick underlies Monte Carlo modelling of linked risk factors,
-sampling from a multivariate normal, and the reparameterisation trick in
-variational autoencoders.
-
-## Where else it appears
-
-**Gaussian processes.** Fitting one needs solving a system with the kernel
-mat and finding its log-determinant. Cholesky gives both: the solve by
-tri substitution, and the log-determinant as twice the sum of the logs of
-`L`'s main-line. It's the math-heavy core of GP regression.
-
-**Linear systems** with a even plus-definite mat &mdash; twice as
-fast as LU and by number stable without pivoting.
-
-**Optimisation.** Newton steps need to solve with the
-[Hessian](jacobian_and_hessian.html), and a good Cholesky confirms the
-Hessian is positive definite. This Confirms the step direction is a descent
-direction. A failure signals a saddle, and modified Newton methods react to
-just that signal.
-
-**Whitening.** `L^-1 x` transforms linked data into unlinked data with
-unit variance.
-
-## When it fails on data that should be fine
-
-An guessed covariance mat can come out not-quite-plus-definite for
-reasons that are math rather than conceptual.
-
-**More variables than readings.** The estimate is singular by build:
-with 100 variables and 50 samples the mat has rank at most 50.
-
-**just right collinear columns.** One variable is a combination of others, so
-some direction has truly zero variance.
-
-**Floating point.** A mat that is positive definite in exact math can
-have a tiny minus eigenval after rounding.
-
-The standard repairs: add a small multiple of the identity to the main-line
-&mdash; *jitter*, or *ridge*, and the same idea as
-[ridge regression](../machine_learning/ridge_and_lasso_regression.html). Use a shrinkage estimator
-such as Ledoit-Wolf. Or clip the minus eigenvals to zero and reassemble.
-
-## Cholesky by hand, and the failure
-
-The three formulas are short enough to run on a 2&times;2. Take
-`C = [[4, 2], [2, 5]]`:
-
-`L&#8321;&#8321. = &radic;4 = 2`. `L&#8322;&#8321. = 2 / L&#8321;&#8321. = 1`.
-`L&#8322;&#8322. = &radic;(5 &minus; 1&sup2;) = &radic;4 = 2`.
-
-So `L = [[2, 0], [1, 2]]`. Timesing back, `L L' = [[4, 2], [2, 5]]` &mdash;
-the first. The whole story is in that last square root: `C&#8322;&#8322;`
-minus what the first column already accounts for must be non-minus for a real
-`L` to exist.
-
-Now feed it a mat that is even but not positive definite,
-`B = [[1, 2], [2, 1]]`. The last step asks for `&radic;(1 &minus; 2&sup2;) =
-&radic;(&minus;3)`, which has no real value, and the factorisation stops. That is
-not a bug &mdash; it's the test. `B` fails because `x = (1, &minus;1)` gives
-`x' B x = 1 &minus; 4 + 1 = &minus;2 < 0`. `B` isn't a covariance of any of it:
-no set of variables has a minus variance. The cheap `n&sup3;/3` factorisation
-is how a routine decides plus-definiteness, just because it breaks
-just when the property fails.
-
-That is also why an guessed covariance mat at times fails the factorisation
-when it "should" work: with more variables than readings the estimate is
-singular by build, and a truly collinear pair gives some direction zero
-variance, so the last square root reaches zero or below. The standard repair
-&mdash; adding a small multiple of the identity, the same idea as ridge
-regression &mdash; nudges each eigenval up just enough to make the square roots
-real again, at the cost of admitting you changed the model.
-
-It's worth stressing why the factorisation is the test of choice: at about
-`n&sup3;/3` ops it's half the cost of a general LU breakdown and a
-fraction of finding the eigenvals. So A routine that needs to know whether a
-mat is positive definite simply attempts the Cholesky and watches for the
-minus square root.
-
-## Where it goes wrong
-
-**Passing a non-even mat.** Most setups read only one triangle
-and will silently return nonsense.
-
-**Treating failure as a bug.** It's often the data telling you a thing.
-
-**Adding jitter without recording it.** You've changed the model. Say by how
-much.
-
-**Using it on a mat that is only positive semi-definite.** A zero eigenval
-gives a zero on `L`'s main-line. Any of it that then cuts by it fails.
-
-## Questions people ask
-
-<strong>What is a Cholesky decomposition?</strong> It factors a symmetric positive definite matrix A as L times L transpose, where L is lower triangular. It is like a square root for matrices.
-
-<strong>What does positive definite mean?</strong> x transpose A x is positive for every nonzero x. Equivalent tests are all eigenvalues positive, or the Cholesky factorisation succeeding.
-
-<strong>Why use Cholesky to solve systems?</strong> It costs about half as much as LU and needs no pivoting. It is the standard approach for covariance and kernel matrices.
-
-<strong>How do I sample correlated random numbers?</strong> Compute L from the covariance matrix, draw independent standard normals z and use L times z. The result has the covariance you wanted.
-
-<strong>Why does Cholesky fail on my covariance matrix?</strong> Rounding or near-duplicate features make it only semi-definite. Add a small jitter to the diagonal, such as 1e-6, to restore definiteness.
-
-<strong>Can I use it on a matrix that is not symmetric?</strong> No, it assumes symmetry and reads only one triangle. Symmetrise first, or use LU.
-
-## Half a matrix, and what it costs to have one
-
-Cholesky finds a tri L with L @ L.T equal to your mat -- but only if the mat is positive definite. Here is what that rule rules out.
-
-```python-run
-import numpy as np
-
-A = np.array([[ 4.0,  2.0,  1.0],
-              [ 2.0,  5.0,  3.0],
-              [ 1.0,  3.0,  6.0]])
-
-print("A is symmetric:", np.allclose(A, A.T))
-print("eigenvalues:", np.round(np.linalg.eigvalsh(A), 4), " <- all positive")
-print()
-L = np.linalg.cholesky(A)
-print("L (lower triangular):")
-print(np.round(L, 4))
-print()
-print("L @ L.T rebuilds A:", np.allclose(L @ L.T, A))
-print()
-print("positive definite means x.T @ A @ x > 0 for every non-zero x:")
-rng = np.random.default_rng(0)
-vals = [x @ A @ x for x in rng.normal(size=(2000, 3))]
-print("  2000 random x: smallest quadratic form %.6f" % min(vals))
-print()
-
-B = np.array([[1.0, 2.0],
-              [2.0, 1.0]])
-print("B = [[1,2],[2,1]] is symmetric but its eigenvalues are",
-      np.round(np.linalg.eigvalsh(B), 4))
-x = np.array([1.0, -1.0])
-print("  x = [1,-1] makes the quadratic form negative: %.1f" % (x @ B @ x))
-print("  so no real L can exist -- L @ L.T is always positive semi-definite.")
-LB = np.linalg.cholesky(B)
-print("  cholesky(B) returns:", LB.ravel())
-print("  usable:", not np.isnan(LB).any())
-print()
-print("  (CPython's numpy raises LinAlgError here; this WASM build hands back")
-print("   NaN instead, so check the result rather than relying on an exception.)")
-print()
-print("this is why covariance matrices are always positive semi-definite:")
-print("x.T @ Cov @ x is the variance of a projection, and variance cannot be")
-print("negative. it is also how correlated samples are generated:")
-z = rng.normal(size=(5, 3))
-print(np.round(z @ L.T, 3))
-```
+- [NumPy linalg.cholesky](https://numpy.org/doc/stable/reference/generated/numpy.linalg.cholesky.html) states the factorisation and positive-definite requirement.
+- Review [eigenvalues](eigenvalues_and_eigenvectors.html) to connect positive definiteness with positive eigenvalues.

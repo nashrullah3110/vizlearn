@@ -1,214 +1,25 @@
 title: Matrix Calculus
-intro: The short list of identities behind each grad you'll write. The dim check that makes them safe.
+intro: Matrix calculus keeps track of both derivative values and their shapes when functions take vectors and matrices.
 
-## Why it needs its own name
+## Start with a scalar loss
 
-Nothing here is new calculus. Differentiating `x'Ax` is the
-[product rule](the_chain_rule.html) and
-[partial derivs](partial_derivatives_and_gradient.html) applied to a sum,
-and you could always expand into indices and grind it out.
+Let x be a column vector and A a fixed matrix. For f(x) = ½xᵀAx, the gradient is ½(A + Aᵀ)x. If A is symmetric, this simplifies to Ax. The symmetry condition matters; writing Ax without it is a common error.
 
-What mat calculus adds is **form that stays compact** as the objects grow,
-plus a small collection of identities worth storing so you never expand
-any of it.
+<div class="vz-math-block" role="math" aria-label="gradient with respect to x of one half x transpose A x equals one half A plus A transpose times x">∇ₓ(½xᵀAx) = ½(A + Aᵀ)x</div>
 
-The demo on this page is on purpose one-dimensional. The calculus
-underneath is the same in any number of dims. It's only the shapes that
-change, and the shapes are the part you've to be careful about.
+For A = I, f(x) = ½‖x‖² and ∇f = x. A gradient descent step is x ← x − ηx, where η is the learning rate. The gradient has the same shape as x, which is a useful implementation check.
 
-## The shape rule
+## Shapes and conventions
 
-The single most handy fact, and the one that catches almost each mistake:
+A scalar differentiated with respect to a vector gives a vector; a vector-valued function differentiated with respect to a vector gives a Jacobian matrix. Authors differ on whether gradients are written as rows or columns, so read the convention and verify dimensions before multiplying. The [Jacobian and Hessian lesson](jacobian_and_hessian.html) defines these arrays; the [chain rule](the_chain_rule.html) explains how they compose.
 
-**The grad of a scalar for a thing has the same shape as that
-a thing.**
+In a neural network, matrix calculus expresses how a scalar loss changes through matrix multiplications and activation functions. Derivatives must flow through the transpose implied by the chosen vector convention; shape checking catches many mistakes, but it cannot replace checking the mathematical definition.
 
-A loss is a scalar. Differentiate it by a 784&times;128 weight mat and the
-result is 784&times;128. By a length-128 bias vector, and it's length 128.
+## Try this above
 
-This is why gradient descent can write `W -= lr * dW` at all: the update has to
-have the same shape as the thing it updates. It's also the fastest debugging
-tool available. If a hand-derived grad comes out the wrong shape, the
-derivation is wrong, and you know before running any of it.
+Change the vector and matrix entries and compare the displayed derivative with the symmetric and nonsymmetric cases.
 
-Two rules exist for laying out derivs &mdash; numerator layout and
-denominator layout &mdash; and they differ by a transpose. Papers rarely say
-which they use. The shape rule resolves it each time: whichever orientation
-matches the param is the one meant.
+## Sources and next steps
 
-## The identities
-
-Almost all reduces to these:
-
-| Expression | Derivative with respect to x |
-|---|---|
-| `a'x` | `a` |
-| `x'a` | `a` |
-| `x'x` | `2x` |
-| `x'Ax` | `(A + A')x`, which is `2Ax` when A is symmetric |
-| `Ax` (Jacobian) | `A` |
-
-And two more, for a mat:
-
-| Expression | Derivative with respect to W |
-|---|---|
-| `a'Wb` | `ab'` |
-| `tr(W'A)` | `A` |
-
-The pattern in the first table is worth noticing: they're the mat versions
-of `d(ax)/dx = a` and `d(ax^2)/dx = 2ax`. The `(A + A')` appears because both
-copies of `x` in `x'Ax` contribute, and when `A` is even they contribute
-the same way.
-
-## Working an example
-
-Least squares, from the identities alone.
-
-```
-L = ||Ax - b||^2 = (Ax - b)'(Ax - b)
-  = x'A'Ax - 2b'Ax + b'b
-```
-
-Differentiate term by term. The first is `x'Mx` with `M = A'A`, which is
-even, giving `2A'Ax`. The second is linear in `x`, giving `-2A'b`. The
-third has no `x`.
-
-```
-dL/dx = 2A'Ax - 2A'b
-```
-
-Set it to zero and you've the normal equations, `A'Ax = A'b` &mdash; the
-formula [the QR module](qr_decomposition.html) then shows why you shouldn't
-solve right.
-
-## The layer everyone needs
-
-For a linear layer `y = Wx + b` with loss `L`:
-
-```
-dL/dW  =  (dL/dy) x'        an outer product
-dL/db  =  dL/dy
-dL/dx  =  W' (dL/dy)        passed back to the previous layer
-```
-
-Three lines, and they're the whole of backpropagation through a dense layer.
-
-Check them against the shape rule. If `dL/dy` is `m`-long and `x` is `n`-long,
-the outer product is `m`&times;`n`. The shape of `W`. And `W'` is
-`n`&times;`m`, so `W'(dL/dy)` is `n`-long, matching `x`. each term lands where
-it should, and if it doesn't, a thing is transposed.
-
-The transpose in that last line is why the backward pass is at times given
-as running the network in reverse: the same weights, applied the other way
-round.
-
-## One gradient, worked and checked
-
-The identities are worth exercising on numbers. Take `f(x) = x'Ax` with
-`A = [[2, 1], [1, 3]]` (even) at `x = (1, 2)`. The rule says the grad is
-`(A + A')x = 2Ax`:
-
-`2Ax = 2 &middot; (2&middot;1 + 1&middot;2,  1&middot;1 + 3&middot;2) =
-2 &middot; (4, 7) = (8, 14)`.
-
-Check it against the meaning by nudging each input. `f(1, 2) =
-2 + 2&middot;2 + 3&middot;4 = 18`. Grow `x&#8321;` by a small `h`: the change
-in `f` cut by `h` approaches 8. Grow `x&#8322;`: it approaches 14. The
-partial derivs are the grad's components, and they match the identity
-term for term.
-
-The shape rule catches the error you're most likely to make. `f` is a scalar and
-`x` is length 2, so `df/dx` must be length 2. Which `(8, 14)` is. Had a
-derivation made a 2&times;2 or a scalar, it would be wrong before any
-math was checked. That single check. Does the grad have the shape
-of the thing it differentiates &mdash; resolves the numerator-versus-denominator
-layout ambiguity each time, because only one orientation matches the param.
-
-The same check scales straight to a network layer. For `y = Wx + b`, the weight
-grad is the outer product `(dL/dy) x'`: if the outgoing error is `m`-long and
-the input `n`-long, that product is `m&times;n`. The shape of `W` &mdash;
-so the update `W -= lr &middot; dW` type-checks by build. Get a transpose
-wrong and the shapes stop matching before any number is found. This Is why the
-shape rule is the fastest debugging tool a backward pass has.
-
-That transpose in the input grad, `W'(dL/dy)`, is why the backward pass is
-given as running the network in reverse: the same weights, applied the other
-way round, carrying the error back to the layer before.
-
-None of this is new calculus. Differentiating `x'Ax` is the product rule
-applied to a sum &mdash; but the compact form and the handful of stored
-identities are what let you write a grad down without expanding into indices
-each time.
-
-## Where it goes wrong
-
-**Mixing layout rules mid-derivation.** Pick one, and use the shape rule
-to check.
-
-**Losing that `x'Ax` gives `(A + A')x`.** The shortcut `2Ax` is only valid
-for even `A`.
-
-**Deriving without checking shapes.** It costs seconds and catches most errors.
-
-**Trusting a hand deriv without a numeric check.** Compare against a
-finite difference on a small random input. each framework ships a grad
-checker for this, and it's worth using when writing a custom op.
-
-## Questions people ask
-
-<strong>What is the gradient of a scalar with respect to a vector?</strong> A vector of the same shape holding each partial derivative. It points in the direction of steepest increase.
-
-<strong>What is the shape rule?</strong> The derivative of a scalar loss with respect to a matrix has the same shape as that matrix. If your result has a different shape, something is transposed.
-
-<strong>What is the gradient of x transpose A x?</strong> (A + A transpose) times x, which reduces to 2 A x when A is symmetric.
-
-<strong>What is the gradient of the least-squares loss?</strong> For the loss squared norm of (X w - y), it is 2 X transpose (X w - y). Setting it to zero gives the normal equations.
-
-<strong>What is the gradient of a linear layer?</strong> For y = W x + b, the gradient with respect to W is the outer product of the upstream gradient and x. The gradient with respect to x is W transpose times the upstream gradient.
-
-<strong>How can I check my derivation?</strong> Compare with a finite-difference gradient on a small random example. Autodiff libraries also provide gradient check tools.
-
-## The four gradients you keep meeting
-
-each rule here is checked by number rather than quoted. These four cover most of what a backward pass finds.
-
-```python-run
-import numpy as np
-rng = np.random.default_rng(0)
-def num_grad(fn, x, h=1e-6):
-    g = np.zeros_like(x)
-    it = np.nditer(x, flags=["multi_index"])
-    while not it.finished:
-        i = it.multi_index
-        up, dn = x.copy(), x.copy()
-        up[i] += h; dn[i] -= h
-        g[i] = (fn(up) - fn(dn)) / (2 * h)
-        it.iternext()
-    return g
-x = rng.normal(size=4)
-a = rng.normal(size=4)
-A = rng.normal(size=(4, 4))
-A = A + A.T                      # symmetric, so the quadratic rule is clean
-checks = [
-    ("d(a.T x)/dx = a",
-     lambda v: a @ v,            lambda v: a),
-    ("d(x.T x)/dx = 2x",
-     lambda v: v @ v,            lambda v: 2 * v),
-    ("d(x.T A x)/dx = 2Ax  (A symmetric)",
-     lambda v: v @ A @ v,        lambda v: 2 * A @ v),
-    ("d(||x||)/dx = x/||x||",
-     lambda v: np.linalg.norm(v), lambda v: v / np.linalg.norm(v)),
-]
-for name, fn, closed in checks:
-    n, c = num_grad(fn, x), closed(x)
-    print("%-38s max diff %.2e" % (name, np.abs(n - c).max()))
-print("now the one that matters: a linear layer's weight gradient.")
-W, inp, target = rng.normal(size=(3,4)), rng.normal(size=4), rng.normal(size=3)
-def loss(Wm):
-    return ((Wm @ inp - target) ** 2).sum()
-err = W @ inp - target
-closed_w = 2 * np.outer(err, inp)
-print("  numeric vs outer(2*error, input): max diff %.2e"
-      % np.abs(num_grad(loss, W) - closed_w).max())
-print("the gradient has the same shape as W because it is outer(error, input).")
-```
+- [MIT OpenCourseWare: Matrix Calculus for Machine Learning and Beyond](https://ocw.mit.edu/courses/18-s096-matrix-calculus-for-machine-learning-and-beyond-january-iap-2023/) discusses matrix derivatives and conventions.
+- Review [matrix multiplication](matrix_multiplication.html) before tracing a derivative through a layer.

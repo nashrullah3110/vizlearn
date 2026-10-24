@@ -1,190 +1,25 @@
-title: Distance Metrics: A Practical Guide
-intro: Choosing what "close" means, which is the first modelling decision in half of machine learning.
+title: Distance Metrics
+intro: A distance rule defines which points count as close; scaling and geometry can change the answer.
 
-## Quick Context
+## Common ways to measure distance
 
-A surprising count of algorithms do nothing but check distances. <a href="../machine_learning/knn.html" style="color: var(--accent-primary)">KNN</a> finds the nearest points, k-means assigns each point to the nearest centre, hierarchical clustering merges the closest pair. And a vec database retrieves the closest embeddings.
+For points x and y, L2 distance is straight-line distance, L1 sums coordinate differences, and L∞ takes the largest coordinate difference:
 
-All of them take "distance" as an input, not an output. Change the metric and the same data yields other neighbours, other clusters and other results. Which makes it a modelling choice worth grasp rather than a default worth accepting. Euclidean distance is the straight-line distance (the hypotenuse): it is the default in [KNN](../machine_learning/knn.html), [K-Means](../sklearn/kmeans_clustering.html). And anywhere "distance" is unqualified. Manhattan distance sums the full gaps along each axis, like walking a city grid: it is less sensitive to outliers than Euclidean since it does not square the gaps. [Cosine similarity](../gen_ai/dot_product_vs_cosine_similarity.html) measures the angle between vecs rather than the gap between their endpoints. It makes it the standard metric for text embeddings and high-dim sparse data where magnitude is noise. Minkowski distance transfers both Euclidean (p=2) and Manhattan (p=1) through a param p. And Chebyshev distance (p approaching infinity) uses just the largest single-axis gap. In high dimensions, all pairwise distances converge to roughly the same value. The "curse of dimensionality" &mdash; and distance-based ways like KNN break down. Dimensionality reduction or switching to a learned metric can help. This page finds all four metrics on the same pair of points, shows how the unit circle changes shape under each metric. And covers the curse of dimensionality with a worked case.
+<div class="vz-math-block" role="math" aria-label="L p distance is the p norm of x minus y">dₚ(x,y) = ‖x − y‖ₚ</div>
 
-## The four you will really meet
+For x = (0, 0) and y = (3, 4), L2 gives 5, L1 gives 7, and L∞ gives 4. Each metric answers a different geometric question. L2 is natural for isotropic geometry; L1 is useful when coordinate-wise movement or sparse differences matter; L∞ measures the worst coordinate gap.
 
-Euclidean &nbsp; d = &radic;( &Sigma; (p&#7522; &minus; q&#7522;)&sup2; )
+Cosine distance compares direction rather than magnitude, so it is useful for normalised text or image embeddings. It is not a metric in every common definition: 1 − cosine similarity can fail the triangle inequality. Check the assumptions of an algorithm that requires a true metric.
 
-Straight-line distance. The one everybody means by default. And the <a href="vector_norms.html" style="color: var(--accent-primary)">L2 norm</a> of the gap.
+## Scale before comparing
 
-Manhattan &nbsp; d = &Sigma; |p&#7522; &minus; q&#7522;|
+If one feature is measured in thousands and another in fractions, Euclidean distance may be dominated by the first feature. Standardising features can help, but it changes the meaning of distance and should be based on the task and training data. See [standard deviation](mean_variance_standard_deviation.html) and [vectors and the dot product](vectors_and_dot_product.html).
 
-Sum of the axis-aligned steps. The distance a taxi drives on a street grid. The L1 norm of the gap.
+## Try this above
 
-Chebyshev &nbsp; d = max |p&#7522; &minus; q&#7522;|
+Move the points along one axis and compare the metric readouts. Then change one coordinate by a much larger amount to see which rule is most sensitive to that gap.
 
-The single largest coordinate gap, ignoring all the others. The L&infin; norm. And how a king moves on a chessboard.
+## Sources and next steps
 
-Cosine &nbsp; d = 1 &minus; (p &middot; q) / (‖p‖ ‖q‖)
-
-The odd one out. It measures the <em>angle</em> between the two vecs as seen from the origin. And takes no account of how long either is.
-
-## A few ways to measure "far apart"
-
-Distance is the foundation of clustering, nearest-neighbour ways, anomaly detection and most retrieval systems. And there is more than one sensible definition.
-
-|Metric|Formula|Picture|
-|---|---|---|
-|Euclidean|&radic;&Sigma;(x&#7522; &minus; y&#7522;)&sup2;|Straight line, as the crow flies|
-|Manhattan|&Sigma;\|x&#7522; &minus; y&#7522;\||Along a street grid|
-|Chebyshev|max\|x&#7522; &minus; y&#7522;\||The largest single-axis gap|
-|Cosine|1 &minus; cos&theta;|Angle, ignoring length|
-|Hamming|Count of differing positions|Categorical or binary data|
-|Jaccard|1 &minus; \|A&cap;B\| / \|A&cup;B\||Sets and their overlap|
-
-For the points (0, 0) and (3, 4):
-
-- Euclidean: &radic;(9 + 16) = <strong>5</strong>
-- Manhattan: 3 + 4 = <strong>7</strong>
-- Chebyshev: max(3, 4) = <strong>4</strong>
-
-All three are legitimate answers to "how far apart are these". And which is correct depends fully on what movement is possible in your problem.
-
-## Choosing between them
-
-<strong>Euclidean</strong> is the default and the right choice for continuous, well-scaled features in a modest count of dimensions. It is what k-means cuts and what most distance-based nets assume.
-
-<strong>Manhattan</strong> is more reliable to outliers, since it does not square the gaps. One wildly other feature does not dominate the total. It also holds up somewhat better in high dimensions. And is the natural choice when features are genuinely free axes that cannot be traded off against each other.
-
-<strong>Cosine</strong> ignores magnitude fully and checks way. It is the standard for text, embeddings and any sparse high-dim form, since a long document should not be far from a short document about the same subject.
-
-<strong>Hamming</strong> and <strong>Jaccard</strong> apply where the data is categorical or set-valued. Checking binary fingerprints, tag sets. Or which products two customers bought.
-
-The Minkowski distance unifies the first three with a param p: p = 1 is Manhattan, p = 2 is Euclidean. And p &rarr; &infin; is Chebyshev. Scikit-learn exposes just this as the `p` argument.
-
-## Scaling is not optional
-
-Each distance except cosine adds up per-feature gaps. So a feature with a large numeric range dominates the total.
-
-Salary (20,000&ndash;200,000) against age (18&ndash;80): two people differing by 35 years and &pound;500 have a squared distance of 1,225 + 250,000. The age gap adds 0.5% of the total. Age has effectively been deleted from the net.
-
-Standardise, or scale to a range, before finding any distance. This is the most common reason KNN, k-means and DBSCAN "do not work". And it is a one-line fix.
-
-The tied trap is <strong>correlated features</strong>. Three near-duplicate columns count that information three times in the distance. Mahalanobis distance handles this well by with the inverse covariance grid. Measuring distance in units of the data's own spread. Which is why it is the standard choice for multivariate outlier detection.
-
-## Exploration guide
-
-1. <strong>Read the classic triangle.</strong> Leave P at (1, 1) and Q at (4, 5). Euclidean reads just 5 &mdash; the 3-4-5 triangle. While Manhattan reads 7 and Chebyshev reads 4. Three answers, same two points.
-2. <strong>Find where they agree.</strong> Set <strong>Point Q y</strong> to 1 so the points share a row. Now Euclidean, Manhattan and Chebyshev all read the same count, since just one coordinate differs and there is nothing left to disagree about.
-3. <strong>Watch the rings.</strong> With Show Equal-Distance Rings on, notice their shapes: a circle for Euclidean, a diamond for Manhattan, a square for Chebyshev. Each point on a ring is just the same distance from P <em>according to that metric</em>. It is what "same distance" really means.
-4. <strong>Make cosine ignore you.</strong> Drag the <strong>Stretch Q Outward</strong> slider from 0.2 to 3. All three geometric distances change enormously. Cosine distance does not move at all, since Q is sliding along a fixed way and the angle never changes.
-5. <strong>Then change the angle.</strong> Now drag <strong>Point Q y</strong>. Cosine finally responds &mdash; it is the just thing it responds to.
-6. <strong>Check the ordering.</strong> Drag the points anywhere. Chebyshev is never more than Euclidean. And Euclidean is never more than Manhattan. That ordering holds for each pair of points, in each dimension.
-
-## When cosine is the right answer
-
-Cosine dominates text and embedding work. And the reason is set. In a bag-of-words form, a long document has more counts all over than a short one on the same subject. Euclidean distance reads that as "far apart". Cosine reads the way of the vec. The <em>mix</em> of words rather than the volume. And correctly calls them close.
-
-The same logic applies to embeddings. There magnitude often encodes something like frequency or confidence rather than meaning. That is why vec databases index by cosine similarity. And why <a href="../natural_language_processing/what_are_embeddings.html" style="color: var(--accent-primary)">embedding</a> comparisons are almost always angular.
-
-One useful fact: on vecs scaled to unit length, ranking by cosine and ranking by Euclidean distance give just the same order. Many systems scale once up front and then use whichever is faster.
-
-## The curse of dimensionality
-
-Distances behave strangely as dimensions increase. And it affects each distance-based way.
-
-In high-dim space, the distance to the nearest point and the distance to the furthest point turn proportionally close. With 1,000 features, "nearest neighbour" can be barely nearer than average. And any way built on that ranking degrades towards guessing.
-
-The feel: adding a dimension adds another positive term to each distance. So all distances grow. And they grow at close rates, compressing the tied gaps.
-
-Three real replies:
-
-1. <strong>Reduce first.</strong> PCA to 20&ndash;50 parts before KNN or k-means. It often improves both speed and score.
-2. <strong>Select features.</strong> Each irrelevant column adds pure noise to each distance.
-3. <strong>Switch metric.</strong> Cosine and Manhattan hold up better than Euclidean in very high dimensions.
-
-This is also why embeddings work despite having hundreds of dimensions: they are trained so that meaningful ways carry the variation, rather than being raw, mostly-irrelevant measurements.
-
-## Failure modes
-
-- <strong>Not scaling the features.</strong> The single most common error. A feature measured in thousands adds thousands of units to each distance. So your metric silently turns "gap in that one feature". Standardise before measuring.
-- <strong>With Euclidean on text counts.</strong> It confuses document length with topic. Use cosine.
-- <strong>Treating cosine as a proper metric.</strong> Cosine distance does not satisfy the triangle inequality. So algorithms that rely on that property for correctness or for pruning cannot use it right.
-- <strong>Mixing categorical and numeric features in one Euclidean distance.</strong> The gap between two one-hot categories is not comparable to a gap in a continuous var. Use a mixed metric such as Gower.
-
-## Four metrics, three other winners
-
-The same query point against the same three candidates. Which one counts as "nearest" is decided by the metric, not by the data.
-
-```python-run
-import numpy as np
-
-query = np.array([1.0, 1.0, 1.0, 1.0])
-cands = {
-    "A  spread over all dims": np.array([1.5, 1.4, 1.4, 1.3]),
-    "B  one big difference":   np.array([1.0, 1.0, 1.0, 2.4]),
-    "C  same direction, 4x":   np.array([4.0, 4.0, 4.0, 4.0]),
-}
-
-def cosine(u, v):
-    return 1 - u.dot(v) / (np.linalg.norm(u) * np.linalg.norm(v))
-
-metrics = {
-    "euclidean": lambda c: np.linalg.norm(c - query),
-    "manhattan": lambda c: np.abs(c - query).sum(),
-    "chebyshev": lambda c: np.abs(c - query).max(),
-    "cosine":    lambda c: cosine(query, c),
-}
-
-print("%-24s %10s %10s %10s %10s" % ("candidate", *metrics))
-for name, c in cands.items():
-    print("%-24s %10.4f %10.4f %10.4f %10.4f"
-          % (name, *[f(c) for f in metrics.values()]))
-print()
-print("nearest neighbour, according to each:")
-for mname, f in metrics.items():
-    winner = min(cands, key=lambda k: f(cands[k]))
-    print("  %-10s -> %s" % (mname, winner))
-print()
-print("manhattan forgives one big error and punishes many small ones;")
-print("euclidean does the reverse; cosine ignores length entirely, so it")
-print("calls a point four times further away a perfect match.")
-print()
-print("in high dimensions everything drifts equally far away:")
-rng = np.random.default_rng(0)
-for dim in (2, 10, 100, 1000):
-    pts = rng.random((500, dim))
-    d = np.linalg.norm(pts - pts[0], axis=1)[1:]
-    print("  %4dd: nearest %.3f, farthest %.3f, ratio %.3f"
-          % (dim, d.min(), d.max(), d.max() / d.min()))
-```
-
-## Worth remembering
-
-Euclidean, Manhattan and Chebyshev are the L2, L1 and L&infin; norms of the gap between two points, always ordered Chebyshev &le; Euclidean &le; Manhattan and agreeing just when a single coordinate differs. Their equal-distance rings are a circle, a diamond and a square. It is what makes them disagree. Cosine is a other kind of measure fully. It checks way from the origin and ignores magnitude. It is why stretching a vec leaves it unchanged and why it is the standard for text and embeddings. Whichever you choose, scale the features first, since an unscaled metric measures units rather than similarity.
-
-## What makes something a metric
-
-A proper distance metric satisfies four conditions: it is never negative, it is zero just between identical points, it is symmetric. And it obeys the triangle inequality. Going via a third point is never shorter.
-
-That last condition is not pedantry: it is what lets spatial indexes such as KD-trees and ball trees to prune the search space and answer nearest-neighbour queries quickly.
-
-Cosine <em>similarity</em> is not a metric (it is a similarity, not a distance). And cosine <em>distance</em> (1 &minus; similarity) does not satisfy the triangle inequality either. Which is why libraries often scale vecs and use Euclidean distance instead, since on unit vecs the two give the same ranking.
-
-## Questions people ask
-
-<strong>Which metric should I use by default?</strong> Euclidean on scaled continuous features. Cosine for text and embeddings. Hamming or Jaccard for categorical and set data.
-
-<strong>Does the metric change the clusters?</strong> Much. Running k-means with cosine distance on the same data can give fully other groups. And note that standard k-means assumes Euclidean. So switching metric strictly means switching algorithm.
-
-<strong>Can I mix numeric and categorical features?</strong> Gower distance handles mixed types by mixing per-feature measures. One-hot coding plus Euclidean is the common approximation and treats each category as equally distant.
-
-<strong>Why is cosine used for embeddings?</strong> Since the length of an embedding often reflects frequency or confidence rather than meaning. And the way is what carries the semantics.
-
-<strong>Is squared Euclidean distance ever used?</strong> Often. It avoids the square root, is cheaper. And gives the same ranking. k-means cuts just this.
-
-<strong>How do I speed up nearest-neighbour search?</strong> KD-trees below about 20 dimensions, ball trees a little beyond. And approximate ways (HNSW, IVF) for anything large or high-dim.
-
-## Recap in one screen
-
-- Distance has a few definitions. Euclidean, Manhattan, cosine, Hamming and Jaccard each fit other data.
-- Scale your features first &mdash; unscaled columns hijack each distance math.
-- Cosine ignores magnitude and checks way. It is what text and embeddings need.
-- Correlated features are double-counted. Mahalanobis distance corrects for that.
-- In very high dimensions all distances converge. Reduce dimensionality before relying on them.
+- [SciPy distance functions](https://docs.scipy.org/doc/scipy/reference/spatial.distance.html) documents common vector distances and their conventions.
+- Continue with [vector norms](vector_norms.html) to see how distances inherit the geometry of a norm.

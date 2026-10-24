@@ -1,194 +1,23 @@
-title: Eigenvalues and Eigenvectors: A Practical Guide
-intro: The directions a transformation leaves alone, and why PCA is built on them.
+title: Eigenvalues and Eigenvectors
+intro: An eigenvector keeps its direction under a linear map; its eigenvalue is the scale factor along that direction.
 
-## Quick Context
+## The defining relationship
 
-A <a href="matrix_as_transformation.html" style="color: var(--accent-primary)">grid moves space</a>. Almost each vec it touches gets both stretched <em>and</em> rotated. It comes out pointing somewhere new.
+For a square matrix A, a nonzero vector v is an eigenvector when Av = λv. The scalar λ is its eigenvalue. A map may stretch, shrink, or reverse v, but it does not turn it into a different direction.
 
-But for most matrices there are a small count of special ways where the rotation does not happen. A vec along one of those ways comes out pointing just the same way, just longer or shorter. Those ways are the <strong>eigenvectors</strong>. And the amount each is stretched by is its <strong>eigenvalue</strong>.
+For A = [[2, 0], [0, 3]], the coordinate axes are eigenvectors: (1, 0) has eigenvalue 2 and (0, 1) has eigenvalue 3. A vector not on either axis generally changes direction. Eigenvectors are not unique in length; every nonzero multiple of one is also an eigenvector.
 
-The setting equation is Av = &lambda;v: applying the grid A to the vec v gives the same vec scaled by &lambda;. Finding the eigenvalues means solving det(A &minus; &lambda;I) = 0. It is a polynomial of degree n for an n &times; n grid. Once the eigenvalues are known, each eigenvector is found by solving the linear system (A &minus; &lambda;I)v = 0.
+## Finding and interpreting them
 
-An eigenvalue of 2 means the change doubles lengths along that way. An eigenvalue of &minus;1 means it reverses way without changing length. An eigenvalue of 0 means the change collapses that way fully. The grid is singular. And the eigenvector points along the dimension that is destroyed.
+Eigenvalues satisfy det(A − λI) = 0; for each eigenvalue, solve (A − λI)v = 0 to find its eigenvectors. Some real matrices have complex eigenvalues, so not every transformation has a real eigenvector direction. Symmetric real matrices are especially useful: they have real eigenvalues and an orthonormal eigenbasis.
 
-PCA is built right on eigenvalues and eigenvectors. The covariance grid of a dataset is symmetric. It guarantees real eigenvalues and orthogonal eigenvectors. The eigenvector with the largest eigenvalue points in the way of greatest variance. The second largest gets the most left variance perpendicular to the first. And so on. Projecting the data onto the top k eigenvectors is dimensionality reduction. The core of PCA. And the eigenvalues tell you how much variance each part explains.
+PCA uses eigenvectors of a covariance matrix to identify directions of variance. In practice, singular value decomposition is often preferred for numerical stability, especially for rectangular data; see [SVD](singular_value_decomposition.html) and [covariance](covariance_and_correlation.html). Eigenvalues describe scaling along special directions, not every feature of a transformation.
 
-## The definition, and what it is really saying
+## Try this above
 
-A v = &lambda; v
+Change the matrix and watch which vectors keep their direction. Compare their stretch factors with the eigenvalue readouts.
 
-Read it as an equation of behaviours rather than symbols. The left-hand side is "apply the whole change to v". The right-hand side is "just scale v by a count". A vec satisfying this is one for which the whole grid. All four entries, all that rotating and shearing. Collapses into a single multiplication.
+## Sources and next steps
 
-That is why they matter. Along an eigenvector, a complicated change turns arithmetic.
-
-## Finding them
-
-Rearranging `Av = &lambda;v` gives `(A &minus; &lambda;I)v = 0`. It has a non-zero solution just when the grid `A &minus; &lambda;I` is singular. That is, when its determinant is zero:
-
-<p class="mono-font">det(A &minus; &lambda;I) = 0</p>
-
-For a 2&times;2 grid that is a quadratic in &lambda;. So there are two eigenvalues (possibly repeated, possibly complex). For n&times;n it is a degree-n polynomial. And solving it by hand stops being sensible almost at once.
-
-```python
-import numpy as np
-
-A = np.array([[3, 1], [0, 2]])
-values, vectors = np.linalg.eig(A)
-
-values          # [3., 2.]
-vectors[:, 0]   # the eigenvector for lambda = 3
-```
-
-Two facts worth carrying: the eigenvalues sum to the trace (the diagonal total) and multiply to the determinant. Both are quick sanity checks on a found result.
-
-## The ways a change does not turn
-
-Multiply a grid by a vec and the vec often moves and rotates. For a few special ways, it does not rotate at all. It just stretches or shrinks.
-
-<p class="mono-font">A v = &lambda; v</p>
-
-`v` is an <strong>eigenvector</strong>: a way the change leaves pointing the same way. `&lambda;` is its <strong>eigenvalue</strong>: how much it is stretched along that way.
-
-A worked case. For A = [[3, 1], [0, 2]], try v = [1, 0]:
-
-<p class="mono-font">A [1, 0]&#7488. = [3, 0]&#7488. = 3 &times; [1, 0]&#7488;</p>
-
-Same way, three times as long. So [1, 0] is an eigenvector with eigenvalue 3.
-
-Reading the eigenvalues tells you what the change does:
-
-|Eigenvalue|Effect along that direction|
-|---|---|
-|&lambda; &gt; 1|Stretch|
-|&lambda; = 1|Unchanged|
-|0 &lt; &lambda; &lt; 1|Shrink|
-|&lambda; = 0|Collapsed to a point &mdash; the matrix is singular|
-|&lambda; &lt; 0|Flipped and scaled|
-
-## Why this is the heart of PCA
-
-PCA is just the eigendecomposition of the covariance grid.
-
-The covariance grid describes how the data spreads. Its eigenvectors are the ways of that spread. And its eigenvalues are how much variance lies along each one. Sort by eigenvalue, keep the largest few. And you have compressed the data while preserving as much variation as possible.
-
-That is the whole algorithm. The explained-variance percentages that PCA reports are the eigenvalues divided by their total.
-
-The same breakdown powers other tools:
-
-- <strong>Spectral clustering</strong> uses the eigenvectors of a graph's Laplacian to find groups that k-means cannot.
-- <strong>PageRank</strong> is the principal eigenvector of the web's link grid.
-- <strong>Vibration and stability review</strong> reads resonant modes as eigenvectors and their frequencies as eigenvalues.
-- <strong>Recurrent network stability</strong> depends on the largest eigenvalue of the recurrent weight grid: above 1 the state explodes, below 1 it vanishes. The direct cause of exploding and vanishing gradients through time.
-
-## Symmetric matrices, and why they are pleasant
-
-Covariance matrices, link matrices and Gram matrices are all symmetric. And symmetric matrices have unusually good properties:
-
-- All eigenvalues are real, with no complex counts to worry about.
-- Eigenvectors for distinct eigenvalues are orthogonal &mdash; at right angles.
-- They can be written as `A = QΛQᵀ` with Q orthogonal. So the inverse of Q is just its transpose.
-
-That orthogonality is why principal parts are uncorrelated with each other. It is the property that makes them useful as replacement features.
-
-Use `np.linalg.eigh` rather than `eig` for symmetric matrices: it is faster, more exact. And returns the eigenvalues in sorted order.
-
-## See a vec survive the transform
-
-For most vecs a grid changes both way and length. For an eigenvector it just changes the length. And the eigenvalue is by how much.
-
-```python-run
-import numpy as np
-
-A = np.array([[2.0, 1.0], [1.0, 2.0]])
-values, vectors = np.linalg.eig(A)
-
-print("eigenvalues :", values.round(4))
-print("eigenvectors (columns):"); print(vectors.round(4))
-print()
-for i in range(2):
-    v = vectors[:, i]
-    print("A @ v%d = %s" % (i, (A @ v).round(4)))
-    print("  %.2f * v%d = %s   <- the same vector, only scaled"
-          % (values[i], i, (values[i] * v).round(4)))
-print()
-print("an eigenvector is a direction the matrix does not rotate.")
-```
-
-## Guided tests
-
-1. <strong>Hunt for them by hand.</strong> Drag the <strong>Probe Angle</strong> slider slowly and watch the "turned by" readout. For most angles the orange pic points somewhere other from the white probe. At two angles it drops to zero and the two arrows lie on top of each other. Those are the eigenvectors, found the hard way.
-2. <strong>Let it find them.</strong> Click <strong>Snap to an Eigenvector</strong> and the probe jumps to a way where the turn is just 0&deg;. Click again to jump to the other one.
-3. <strong>See the whole picture.</strong> Click <strong>Sweep All Ways</strong> and watch the probe rotate through a full circle while the pic swings around at a other rate, crossing it just twice.
-4. <strong>Check the identities.</strong> Drag any entry slider and watch the cross-checks panel. trace always equals &lambda;&#8321;+&lambda;&#8322. And det always equals &lambda;&#8321;&middot;&lambda;&#8322;, for each grid you can reach.
-5. <strong>Make them perpendicular.</strong> Set the <strong>Preset</strong> to Symmetric. The two eigenvectors are now at just 90&deg; to each other. Any grid with b = c has this property. And it is the reason PCA gives axes at right angles.
-6. <strong>Make each way an eigenvector.</strong> Set the <strong>Preset</strong> to Uniform scale. Now nothing rotates at all, whatever the probe angle, since a uniform scale stretches each way by the same factor.
-7. <strong>Take them away fully.</strong> Set the <strong>Preset</strong> to Rotation. Real eigenvalues vanish and Real? reads no. A rotation turns <em>each</em> way. So there is nothing left for it to leave alone.
-
-## Why symmetric matrices are special
-
-When b = c the grid is symmetric. And three things turn guaranteed rather than lucky: the eigenvalues are always real, the eigenvectors are always perpendicular. And the grid can always be diagonalised.
-
-This is not a curiosity. <a href="mean_variance_standard_deviation.html" style="color: var(--accent-primary)">Covariance</a> matrices are symmetric by construction, since the covariance of x with y is the same count as the covariance of y with x. PCA is precisely the eigendecomposition of a covariance grid. And the guarantee above is what makes its principal parts perpendicular and its variances real, positive counts. The whole way rests on this property.
-
-## Where else they turn up
-
-- <strong>PCA</strong> &mdash; eigenvectors of the covariance grid are the ways of greatest variance. The eigenvalues are how much variance each one carries.
-- <strong>PageRank</strong> &mdash; the ranking is the dominant eigenvector of the link grid.
-- <strong>Stability</strong> &mdash; repeatedly applying a grid makes vecs blow up if the largest |&lambda;| exceeds 1 and shrink to nothing if it is below. This is the exploding-and-vanishing-gradient story in a other vocabulary.
-- <strong>Conditioning</strong> &mdash; the ratio of the largest to smallest eigenvalue tells you how stretched the loss surface is. It is what makes plain gradient descent zig-zag.
-
-## Traps worth knowing
-
-- <strong>Expecting each grid to have real eigenvectors.</strong> Rotations have none. A negative discriminant is not an error.
-- <strong>Forgetting eigenvectors have no fixed length.</strong> If v is an eigenvector so is 2v and &minus;v. Just the way is found. It is why implementations give unit vecs and the sign can differ between libraries.
-- <strong>Assuming perpendicularity in general.</strong> That is guaranteed just for symmetric matrices. The Generic preset shows two eigenvectors that are not at right angles.
-- <strong>Running PCA on unscaled features.</strong> The covariance grid is dominated by whichever feature has the largest units. So the first part just points at it. Standardise first.
-
-## In one line
-
-An eigenvector is a way a change does not rotate. And its eigenvalue is the factor it is stretched by. So along an eigenvector the whole grid collapses into a single multiplication. For a 2&times;2 grid they follow from the trace and determinant alone. And always satisfy &lambda;&#8321;+&lambda;&#8322. = trace and &lambda;&#8321;&lambda;&#8322; = det. A negative discriminant means no real eigenvectors exist. It is just the case for a rotation. Symmetric matrices are guaranteed real eigenvalues and perpendicular eigenvectors. And since covariance matrices are symmetric, that guarantee is what PCA is built on.
-
-## Eigen, singular vals, and which to use
-
-Eigendecomposition needs a square grid. Real data is rarely square. It is n samples by p features.
-
-<strong>Singular value breakdown</strong> transfers the idea to any grid:
-
-<p class="mono-font">A = U &Sigma; V&#7488;</p>
-
-The singular vals in &Sigma; play the role of eigenvalues. And V's columns are ways in feature space. For a covariance grid the two coincide: the singular vals are the square roots of the eigenvalues.
-
-In practice, PCA implementations use SVD on the centred data grid rather than forming the covariance grid and decomposing it, since it is numerically more stable and avoids squaring the condition count. Scikit-learn's `PCA` does just this.
-
-SVD also does jobs eigendecomposition cannot: low-rank approximation for compression, grid completion for recommender systems. And pseudo-inverses for least squares problems with no unique solution.
-
-## Real notes
-
-- <strong>Scale before decomposing.</strong> Eigenvalues of a covariance grid depend on units. So an unscaled column with a large range dominates the first part.
-- <strong>Signs are arbitrary.</strong> An eigenvector and its negation describe the same way. Do not read meaning into which one a library returns.
-- <strong>Order is not guaranteed</strong> by `np.linalg.eig`. Sort clearly, or use `eigh` for symmetric matrices.
-- <strong>Repeated eigenvalues</strong> mean the corresponding eigenvectors are not unique. Any rotation within that subspace works. So single part ways turn meaningless.
-- <strong>Very small eigenvalues</strong> show near-collinear features and an ill-conditioned grid. There solving linear systems turns numerically unreliable.
-
-## Questions people ask
-
-<strong>Can a grid have no eigenvectors?</strong> Over the real counts, yes. A pure rotation turns each way. So it has no real eigenvectors. Over the complex counts, each square grid has them.
-
-<strong>What does a zero eigenvalue mean?</strong> The change collapses that way fully. The grid is singular and has no inverse.
-
-<strong>How many eigenvalues does an n&times;n grid have?</strong> Just n, counting repeats and complex vals.
-
-<strong>Why are eigenvectors often scaled?</strong> Since any scalar multiple of an eigenvector is also an eigenvector. Fixing the length to 1 makes the answer unique up to sign.
-
-<strong>Is this just for PCA?</strong> No. Spectral clustering, PageRank, graph review, differential equations, quantum mechanics and network stability all use the same breakdown.
-
-<strong>How does this relate to the determinant?</strong> The determinant is the product of the eigenvalues. It is why a zero eigenvalue means a zero determinant and a singular grid.
-
-## Recap in one screen
-
-- An eigenvector is a way a grid does not rotate. Its eigenvalue is the factor it is stretched by.
-- Solve `det(A - λI) = 0` for the eigenvalues, then find each eigenvector. Or call a library.
-- The eigenvalues sum to the trace and multiply to the determinant.
-- PCA is the eigendecomposition of the covariance grid: eigenvectors are parts, eigenvalues are explained variance.
-- Symmetric matrices have real eigenvalues and orthogonal eigenvectors. It is why parts are uncorrelated.
-- SVD transfers the idea to non-square matrices and is what implementations really use.
+- [MIT OpenCourseWare: Linear Algebra](https://ocw.mit.edu/courses/18-06sc-linear-algebra-fall-2011/) covers eigenvalues, eigenvectors, and symmetric matrices.
+- Continue with [SVD](singular_value_decomposition.html) for a decomposition that also handles rectangular matrices.

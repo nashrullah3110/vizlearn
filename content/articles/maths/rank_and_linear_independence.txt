@@ -1,162 +1,23 @@
-title: Rank and Linear Independence: A Practical Guide
-intro: How many directions a matrix actually has, as opposed to how many columns it was written with.
+title: Rank and Linear Independence
+intro: Rank counts how many independent directions remain in a matrix's columns or rows.
 
-## What rank tells you about a matrix
+## Independence means no redundancy
 
-A matrix can have more columns than it has independent ways. One column might be a copy of another. Or a weighted sum of two others. And in that case it adds nothing new. The rank counts just the ways that are genuinely other &mdash; the ones you could not build from the rest.
+Vectors are linearly independent when the only combination that sums to zero uses all-zero coefficients. If one vector can be built from the others, it adds no new direction. The rank of a matrix is the dimension of its column space; it also equals the dimension of its row space.
 
-Two columns are <strong>linearly independent</strong> when neither one can be built out of the other. When they are, the combinations <span class="mono-font">s&middot;c&#8321; + t&middot;c&#8322;</span> sweep out the whole plane. When one is a multiple of the other, all you can build lies on a single line, no matter how hard you pull on s and t.
+For A = [[1, 2], [2, 4]], the second column is twice the first, so the columns are dependent and rank(A) = 1. The map can produce points on a line, but not fill the plane. For a square matrix, full rank is equivalent to a nonzero determinant; see [determinants](determinant.html).
 
-The <strong>rank</strong> is the count of genuinely independent ways &mdash; the dimension of what the columns can reach. Two columns can have rank 2, rank 1. Or rank 0 if both are zero. They can never have rank 3. It is the first useful fact: rank is capped by the count of rows as well as the count of columns.
+## What rank reveals
 
-Rank appears all over once you start looking. A system of equations has a unique solution just when the coefficient matrix has full rank. A [matrix inverse](identity_inverse_transpose.html) exists just at full rank. PCA keeps the top-ranked ways and drops the rest.
+Rank tells you the number of independent constraints or representable directions. A low-rank data matrix has redundancy that can sometimes be compressed; [singular value decomposition](singular_value_decomposition.html) reveals the dominant directions. Rank also predicts whether Ax = b has a unique solution, many solutions, or no solution, but the answer depends on consistency and the number of unknowns as well as rank.
 
-## Ways of saying the same thing
+Exact rank is sensitive to tiny floating-point noise. Numerical software therefore uses a tolerance when deciding which singular values count as zero. A nearly dependent matrix may be formally full-rank yet poorly conditioned.
 
-For a square matrix, all of these are one statement:
+## Try this above
 
-- the columns are linearly dependent;
-- the <a href="determinant.html" style="color: var(--accent-primary)">determinant</a> is zero;
-- the rank is less than the count of columns;
-- the matrix has no inverse;
-- <span class="mono-font">Ax = 0</span> has a solution other than x = 0;
-- at least one <a href="eigenvalues_and_eigenvectors.html" style="color: var(--accent-primary)">eigenvalue</a> is zero.
+Make one vector a multiple of another and watch the rank drop. Then perturb one component slightly; notice how exact dependence differs from near-dependence.
 
-Column rank always equals row rank. It is a genuinely surprising theorem: the count of independent columns and the count of independent rows are the same count, whatever shape the matrix is.
+## Sources and next steps
 
-## How many ways really survive
-
-The <strong>rank</strong> of a matrix is the count of genuinely independent ways in it &mdash; how many dimensions of information it carries, as opposed to how many columns it has.
-
-Take three columns: [1, 2], [2, 4] and [0, 1]. The second is just twice the first, so it adds nothing. There are three columns and just <strong>two</strong> independent ways. So the rank is 2.
-
-A set of vectors is <strong>linearly independent</strong> when none of them can be written as a combination of the others. Independent vectors each point somewhere new. Dependent ones are redundant.
-
-The consequences are immediate:
-
-- A matrix with rank equal to its less dimension is <strong>full rank</strong>. And is as informative as its shape lets.
-- Anything less is <strong>rank deficient</strong>: some columns are redundant. And the matrix collapses space.
-- A square matrix is invertible just when it is full rank.
-
-## Finding it, and what it costs when it is low
-
-```python
-import numpy as np
-
-A = np.array([[1, 2, 0],
-              [2, 4, 1]])
-np.linalg.matrix_rank(A)      # 2 - the second column is twice the first
-```
-
-Under the hood, `matrix_rank` counts singular vals above a tolerance rather than doing exact arithmetic. It is the right way in floating point: real data is never just dependent, just nearly so.
-
-Where rank deficiency bites:
-
-<strong>Linear regression.</strong> The normal equation needs `XᵀX` to be invertible. It needs X to have full column rank. Perfectly correlated features &mdash; or a one-hot encoding that kept each level alongside an intercept &mdash; make it singular. And the fit either fails or returns arbitrary coefficients.
-
-<strong>Any distance or covariance math.</strong> Redundant columns count the same information a few times, distorting distances and inflating the apparent dimensionality.
-
-<strong>PCA.</strong> The count of non-zero eigenvalues <em>is</em> the rank. If your 50-column dataset has rank 12, you can drop to 12 parts with no loss at all.
-
-## Independence in practice: the dummy var trap
-
-The most common rank problem in applied work is not exotic. One-hot encode a three-category column into three indicator columns and they always sum to 1 &mdash; which is just what the intercept column now is. Four columns, three independent ways, rank deficient.
-
-The fix is to drop one level as a reference. It is why `OneHotEncoder(drop="first")` exists and why it matters for linear nets with an intercept.
-
-Other everyday sources:
-
-- A feature and the same feature in other units (metres and centimetres).
-- Sub-scores plus their total in the same feature set.
-- A percentage column alongside its numerator and denominator.
-- More features than samples, which guarantees rank deficiency no matter content.
-
-That last case &mdash; wide, short data, common in genomics and text &mdash; is why regularisation is not optional there. Ridge and elastic net remain solvable when ordinary least squares cannot be.
-
-## Count the real ways
-
-Three matrices, and rank counting what is genuinely independent rather than how many rows were written down.
-
-```python-run
-import numpy as np
-
-independent = np.array([[1.0, 0.0], [0.0, 1.0]])
-dependent = np.array([[1.0, 2.0], [2.0, 4.0]])
-tall = np.array([[1.0, 2.0], [2.0, 4.0], [3.0, 6.0]])
-
-for name, M in [("independent rows", independent),
-                ("row 2 = 2 x row 1", dependent),
-                ("three rows, all multiples", tall)]:
-    print("%-26s shape %s  rank %d"
-          % (name, M.shape, np.linalg.matrix_rank(M)))
-print()
-print("rank counts genuinely different directions, not rows.")
-print("three rows spanning one direction still has rank 1.")
-print()
-print("rank <= min(rows, columns), always.")
-```
-
-## Try it yourself
-
-1. <strong>Start independent.</strong> c&#8321; = (2, 1), c&#8322; = (1, 2). The determinant is 3, the rank is 2. And the reachable dots fill the plane in a lattice.
-2. <strong>Collapse it.</strong> Press <strong>Make Column 2 A Multiple Of Column 1</strong>. c&#8322; turns 1.5&times;c&#8321; = (3.0, 1.5), the determinant goes to just 0 and each dot falls onto one line. Adding a second column bought you nothing.
-3. <strong>Nudge it back.</strong> Move <strong>Column 2 y</strong> by a single notch. The rank jumps straight back to 2 &mdash; rank is a count. So it does not degrade gradually, it steps. That is also why "nearly dependent" needs a other measure fully.
-4. <strong>Try the near-miss.</strong> Set c&#8322; to (3.0, 1.6) instead: the determinant is 0.20, technically rank 2. And the lattice is stretched into a nearly-flat sliver. This is what collinear features look like. And why a fit on them is unstable.
-5. <strong>Zero a column.</strong> Set both of c&#8322;'s parts to 0. Rank 1 again: a zero column adds no way at all.
-6. <strong>Zero both.</strong> Rank 0, and the just reachable point is the origin.
-
-## Where this bites in practice
-
-- <strong>The dummy var trap.</strong> One-hot encode a category into k columns and keep an intercept. And the k dummies sum to the intercept column just. The design matrix is rank deficient, <span class="mono-font">X&#7488;X</span> is singular. And ordinary least squares has no unique solution. Dropping one dummy fixes it.
-- <strong>Duplicated features.</strong> Height in cm and height in inches are one way written twice. The rank does not go up; the instability does.
-- <strong>More features than rows.</strong> With p &gt; n the rank is at most n. So the columns are guaranteed dependent and the net can fit the training data perfectly for reasons that have nothing to do with the data. Regularisation is the standard answer.
-- <strong>Low-rank approximation.</strong> Keeping just the strongest few ways of a matrix is what <a href="../machine_learning/pca.html" style="color: var(--accent-primary)">PCA</a> does. And what the "low rank" in <a href="../gen_ai/lora_in_llms.html" style="color: var(--accent-primary)">LoRA</a> means: a big weight update approximated by the product of two thin matrices, since the update did not need each way.
-
-## Worth remembering
-
-Rank counts the independent ways a matrix's columns really provide. It is the dimension of all they can reach. Full rank means the span is as large as it could be and the matrix is invertible. A drop in rank means one column was a combination of the others, the determinant is zero. And both the inverse and the unique solution to Ax = b disappear together. Rank is a count and therefore steps rather than slides. So "nearly dependent" is a split and more real concern &mdash; it is what collinear features, duplicated columns and the dummy var trap all give. And why low-rank structure is something worth exploiting on purpose.
-
-## Rank, span, and basis
-
-Three tied ideas complete the picture.
-
-The <strong>span</strong> of a set of vectors is all you can reach by scaling and adding them. Two independent vectors in 3-D span a plane. Three span the whole space.
-
-A <strong>basis</strong> is a minimal set that spans the space &mdash; independent, with nothing redundant. Any vector in the space is one unique combination of them.
-
-The <strong>rank</strong> is the dimension of the span of the columns. So rank, span and basis are three views of the same fact: how much room the vectors really cover.
-
-The rank-nullity theorem ties it together: for an m&times;n matrix, `rank + nullity = n`. There the nullity is the dimension of the space that gets collapsed to zero. Each dimension either survives or is destroyed. And the two counts add up to the input's dimension.
-
-## Low-rank approximation, the useful side of rank deficiency
-
-Being rank deficient is not always a problem &mdash; sometimes it is the goal.
-
-SVD lets you take a large matrix and keep just the strongest k ways, giving the best possible rank-k approximation. That single idea underlies a few familiar applications:
-
-- <strong>Pic compression.</strong> A 1000&times;1000 pic kept at rank 50 stores 5% of the counts and often looks nearly identical, since natural pics are dominated by a few strong ways.
-- <strong>Recommender systems.</strong> A user-item ratings matrix is assumed to be about low rank &mdash; a few latent taste factors explain most preferences &mdash; and the missing entries are filled by reconstructing from those factors.
-- <strong>Noise reduction.</strong> Signal often lives in the strong ways and noise is spread across the weak ones. So truncating the small singular vals cleans the data.
-- <strong>LoRA fine-tuning.</strong> Large language nets are adapted by learning a low-rank update to the weight matrices, training a tiny fraction of the params. The whole way is named after this property.
-
-## Questions people ask
-
-<strong>How do I check for redundant features?</strong> Check `matrix_rank(X)` with the count of columns. A correlation matrix and variance inflation factors give a more interpretable per-feature view.
-
-<strong>What is the max possible rank?</strong> The less of the count of rows and columns. A 100&times;5 matrix cannot have rank above 5.
-
-<strong>Does rank deficiency always break a net?</strong> It breaks anything needing a matrix inverse. Trees, forests and regularised linear nets cope. Ordinary least squares does not.
-
-<strong>What is the gap between rank and dimension?</strong> Dimension describes a space. Rank describes how much of a space a particular matrix reaches.
-
-<strong>Why do libraries use a tolerance?</strong> Since floating-point data is never just dependent. Vals below the tolerance are treated as zero, which is the just sensible convention.
-
-<strong>Is high rank always better?</strong> For information, yes. For compression, no &mdash; low rank is precisely what makes approximation and factorisation work.
-
-## Recap in one screen
-
-- Rank counts the genuinely independent ways in a matrix. It may be fewer than its columns.
-- Linearly dependent vectors are redundant. Independent ones each add a new way.
-- Full rank means invertible for a square matrix. And a solvable least-squares problem for a tall one.
-- The dummy var trap, duplicated features and wide short data are the everyday causes of rank deficiency.
-- Deliberate low-rank approximation powers compression, recommenders, denoising and LoRA fine-tuning.
+- [MIT OpenCourseWare: Linear Algebra](https://ocw.mit.edu/courses/18-06sc-linear-algebra-fall-2011/) develops rank, column spaces, and independence.
+- See [basis and span](basis_span_and_orthogonality.html) for how independent vectors form coordinates.

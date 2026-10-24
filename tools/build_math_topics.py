@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Render the generated maths modules from tools/math_topics.py.
+"""Render the 20 generated lessons in the 47-page maths track.
 
-The maths track was the thinnest on the site and the one everything else
-leans on. Pages across the site used orthogonality, SVD, convexity and
-sampling distributions as though they had been introduced; none of them had.
-PCA is the sharpest case - it assumes an eigendecomposition and an SVD, and
-only the first was taught anywhere.
+The visualisations and their article sources live in tools/math_topics.py;
+the other 27 lessons are maintained as article sources in
+content/articles/maths. These foundations support the machine-learning
+modules that use linear algebra, calculus, probability, and statistics.
 
 These are demonstrations rather than simulations: nothing is fitted, and the
 arithmetic is the subject. The SVD is a real decomposition of the matrix on
@@ -110,6 +109,7 @@ def page(t):
                 </div>
             </div>
         </div>
+        <!-- VIZLEARN:LEDE:AFTER -->
     </main>
 """ % {
         "crumb": shell.breadcrumb_bar([("Home", PREFIX + "index.html"),
@@ -127,7 +127,10 @@ def page(t):
         </div>
     </section>
 """
-    return head + shell.header(PREFIX) + main + mount + shell.close(PREFIX)
+    header = shell.header(PREFIX).replace(
+        '<body class="flex flex-col min-h-screen light-mode">',
+        '<body class="maths-learning-page flex flex-col min-h-screen light-mode">')
+    return head + header + main + mount + shell.close(PREFIX)
 
 
 def catalog_entry(existing):

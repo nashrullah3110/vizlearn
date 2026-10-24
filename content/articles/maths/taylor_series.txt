@@ -1,195 +1,25 @@
 title: Taylor Series
-intro: Replacing a hard function with a polynomial. Being precise about where that is allowed.
+intro: A Taylor polynomial approximates a smooth function near a chosen point using its derivatives there.
 
-## The construction
+## Build the approximation
 
-Pick a point. Build a polynomial that agrees with the function there, then also
-agrees with its slope, then its curvature, then the next deriv, and so on.
+Around x = a, the degree-n Taylor polynomial is a sum of derivative terms:
 
-```
-f(x)  ~  f(a) + f'(a)(x-a) + f''(a)(x-a)^2/2! + f'''(a)(x-a)^3/3! + ...
-```
+<div class="vz-math-block" role="math" aria-label="Taylor polynomial sum from k zero to n of f kth derivative at a times x minus a to k divided by k factorial">Tₙ(x) = Σₖ₌₀ⁿ f⁽ᵏ⁾(a)(x−a)ᵏ/k!</div>
 
-Each term pins down one more deriv at `a`. The factorials are there
-because differentiating `(x-a)^k` again and again makes `k!`, and cutting by it
-cancels just.
+For eˣ around a = 0, every derivative equals 1, so T₃(x) = 1 + x + x²/2 + x³/6. At x = 0.1 this gives 1.10517, close to e^0.1 ≈ 1.10517. Near the expansion point, higher-degree terms often improve the approximation.
 
-Set the terms control to 0 and step it upward. At 0 you've a flat line
-at the right height. At 1, the tangent. At 2, a parabola that also has the
-right bend. Each step hugs the curve a little further out.
+## Local does not mean universal
 
-## Local, and only local
+The error depends on the function, expansion point, and distance from that point. A Taylor series may converge only within a limited interval; a finite polynomial can become inaccurate far away. Use the remainder bound or compare with the original function over the range where the approximation will be used.
 
-The readout gives how far the guess stays within 0.1 of the truth, and
-this is the number worth watching.
+Optimisers use first- and second-order Taylor approximations to estimate how a loss changes after a parameter step. Newton's method uses local curvature; see [Jacobians and Hessians](jacobian_and_hessian.html). The derivative definition is the first-order version; see [derivatives and slope](derivatives_and_slope.html).
 
-More terms extend the range. They don't make it infinite, and the extension
-gets slower. The polynomial agrees just right at the expansion point and gets
-worse with distance, always &mdash; the whole build is built from
-info at a single point. So It can't know any of it about elsewhere.
+## Try this above
 
-Move the expansion point and the region of match moves with it. That is the
-right mental model: a Taylor series is a statement about a zone.
+Increase the polynomial degree and move x farther from the expansion point. Compare the approximation error near and far from that point.
 
-## Where it earns its keep
+## Sources and next steps
 
-**Second-order optimisation.** Newton's method is just the two-term
-expansion of the loss: rough it as a quadratic near the current point,
-jump to that quadratic's min, repeat. All in
-[the Hessian module](jacobian_and_hessian.html) is this idea.
-
-**Small-angle guesses.** `sin(x) ~ x` for small `x` is the one-term
-expansion, and it's why pendulum equations are solvable at all.
-
-**Backpropagation's justification.** The chain rule is exact, but the arg
-that a small weight change makes a proportional loss change is a first-order
-expansion.
-
-**numeric methods.** Finite differences, Runge-Kutta integrators and most
-error bounds are derived by expanding and discarding.
-
-**exp, log, sin in a standard library.** Not looked up in a table. Tested
-from a truncated series with a range reduction in front of it.
-
-## Where it fails
-
-Switch the function control to `1 / (1 + x squared)`.
-
-This function is smooth all over on the real line &mdash; no kinks, no
-asymptotes, differentiable as many times as you like. Yet expand it about 0 and
-add terms, and beyond about x = 1 the guess doesn't merely fail to
-improve. It gets **worse** with each term added.
-
-The reason is invisible from the real line. Viewed over the complex numbers the
-function has poles at *i* and *&minus;i*, distance 1 from the origin, and the
-radius of settling is the distance to the nearest singularity wherever it
-sits. That radius is 1, and no number of real terms escapes it.
-
-This is the Runge effect, and its lesson is hands-on: **smooth on the reals
-doesn't mean a Taylor series settles all over.** Adding terms isn't
-always progress.
-
-## Where it goes wrong
-
-**Extrapolating far from the expansion point.** The error grows with distance,
-and past the radius of settling it grows without bound.
-
-**given more terms is always better.** Not past the radius, and not
-by number &mdash; high-order terms involve large factorials and cancelling
-quantities, which loses precision in floating point.
-
-**Expanding about the wrong point.** Expand about where you'll test. A
-series about 0 is the wrong tool for guessing at x = 5.
-
-**Losing smoothness is needed.** The function needs derivs of each
-order at the expansion point. `|x|` has none at 0. There's no series there.
-
-## e to the x, worked by hand
-
-Expand `e^x` about `a = 0`. each deriv of `e^x` is `e^x`, and `e^0 = 1`,
-so each coeff is `1/k!` and the series is as clean as they come:
-
-```
-e^x  ~  1 + x + x^2/2 + x^3/6 + x^4/24 + ...
-```
-
-Test it at `x = 1`. Here The true value is 2.718282, adding one term at a
-time:
-
-|terms|value|error|
-|---|---|---|
-|1|1.0000|1.7183|
-|2|2.0000|0.7183|
-|3|2.5000|0.2183|
-|4|2.6667|0.0516|
-|5|2.7083|0.0099|
-|6|2.7167|0.0016|
-
-Six terms and the error is under a tenth of a percent. Now the *same six terms*
-at `x = 3`, where the truth is 20.0855:
-
-|terms|value|error|
-|---|---|---|
-|1|1.000|19.09|
-|2|4.000|16.09|
-|3|8.500|11.59|
-|4|13.000|7.09|
-|5|16.375|3.71|
-|6|18.400|1.69|
-
-Still 8% out. The reason is visible in the term itself: the `k`-th term is
-`x^k / k!`, so the numerator grows like `3^k` while the factorial doesn't
-overtake it until `k` passes 3. Near the expansion point the terms shrink from
-the start. Far from it they **grow first and shrink later**, and you've to
-push through that bulge before the series is any use. Matching at `x = 3` the
-fit six terms gave at `x = 1` takes eleven.
-
-That is the whole "local, and only local" claim, in numbers: the same
-polynomial, unchanged, is great at one distance and unusable at three times
-it. It's also why real setups do **range reduction** first &mdash;
-`e^3` is found as `e^0.25` raised to a power, not by expanding at 3.
-
-## Questions people ask
-
-**Taylor or Maclaurin?** A Maclaurin series is a Taylor series with the
-expansion point at zero. That is the entire difference, and it's why the two
-words are used almost alike.
-
-**How many terms do I need?** What makes the first term you dropped small
-enough. For a well-behaved alternating series the remainder is bounded by the
-size of that next term. This Makes it a truly hands-on stopping rule.
-Or else use the Lagrange remainder. This Bounds the error by the largest
-`(n+1)`-th deriv anywhere between the expansion point and where you're
-testing &mdash; and that bound is why the error grows with distance.
-
-**Why does 1/(1 + x&sup2;) break at x = 1 when it's smooth all over?**
-Because the real line is the wrong place to look. Allow complex numbers and the
-function blows up at `x = i` and `x = -i`, both at distance 1 from the origin.
-A power series settles inside a *disc* reaching the nearest singularity in the
-complex plane, so the radius here is 1 even so of how well behaved the
-function looks on the reals. The failure is real. The cause is elsewhere.
-
-**Is the Taylor polynomial the best polynomial guess?** No, and this
-surprises people. It's the best one *at the expansion point*, where it matches
-as many derivs as it has terms. Across an interval it's often beaten
-comfortably by a minimax or Chebyshev fit. This Spreads the error evenly
-instead of concentrating fit at one spot. numeric libraries use those,
-not Taylor, for just this reason.
-
-**Does a Taylor series always settle to the function?** Not always. The
-standard counterexample is `e^(-1/x^2)` extended by zero at the origin: each
-deriv there's 0, so its series is the same way 0. This Agrees with the
-function at just one point. Smooth isn't enough. The property that makes the
-series work is called being *analytic*.
-
-## Rebuild a function from its derivatives
-
-Terms added one at a time, with the error after each. The guess is great near the expansion point and hopeless far from it.
-
-```python-run
-import numpy as np
-import math
-
-def taylor_exp(x, terms):
-    return sum(x ** k / math.factorial(k) for k in range(terms))
-
-print("e^x built term by term, at x = 0.5")
-true = np.exp(0.5)
-for t in range(1, 7):
-    approx = taylor_exp(0.5, t)
-    print("  %d term(s): %.10f   error %.2e" % (t, approx, abs(approx - true)))
-print("  exact    : %.10f" % true)
-print()
-print("the same 6 terms, further from x = 0:")
-for x in (0.5, 1.0, 2.0, 5.0, 10.0):
-    approx, true = taylor_exp(x, 6), np.exp(x)
-    print("  x=%5.1f  approx %14.4f  true %14.4f  relative error %8.2f%%"
-          % (x, approx, true, 100 * abs(approx - true) / true))
-print()
-print("first-order approximations you have already used:")
-for x in (0.01, 0.1, 0.5):
-    print("  sin(%.2f) = %.6f, and x = %.6f      (error %.2e)"
-          % (x, np.sin(x), x, abs(np.sin(x) - x)))
-    print("  ln(1+%.2f) = %.6f, and x = %.6f     (error %.2e)"
-          % (x, np.log(1 + x), x, abs(np.log(1 + x) - x)))
-```
+- [MIT OpenCourseWare: Single Variable Calculus](https://ocw.mit.edu/courses/18-01sc-single-variable-calculus-fall-2010/) covers Taylor polynomials and error.
+- Continue with [the chain rule](the_chain_rule.html) for derivatives of composed functions.

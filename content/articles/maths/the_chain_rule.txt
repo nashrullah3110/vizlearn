@@ -1,171 +1,25 @@
 title: The Chain Rule
-intro: Derivatives of nested functions multiply &mdash; and that fact is the entire mechanism of backpropagation.
+intro: When one function depends on another, their rates of change multiply.
 
-## Before the details
+## Differentiate a composition
 
-When a function feeds into another &mdash; <span class="mono-font">y = f(g(x))</span> &mdash; a change in <span class="mono-font">x</span> must travel through <em>both</em> to reach <span class="mono-font">y</span>. The chain rule says the sensitivities simply multiply.
+If y = f(g(x)), a small change in x first changes g, then changes f. The chain rule multiplies those two rates:
 
-The formula is dy/dx = (dy/du) &middot; (du/dx). There u = g(x) is the intermediate var. Each factor is a local derivative &mdash; how much the output changes per unit of input at that single link &mdash; and the product gives the global derivative end to end.
+<div class="vz-math-block" role="math" aria-label="derivative of f of g of x equals f prime of g of x times g prime of x">d/dx f(g(x)) = f′(g(x))g′(x)</div>
 
-This extends to any depth. If y depends on u, u on v. And v on x, then dy/dx = (dy/du)(du/dv)(dv/dx): one factor per link, multiplied. A neural network with 100 layers is a 100-link chain. And backpropagation is nothing more than the chain rule applied systematically from the loss back to the first weight.
+For y = (3x + 1)², the outer function squares its input and the inner function is 3x + 1. Therefore y′ = 2(3x + 1)·3 = 6(3x + 1). At x = 1, the derivative is 24.
 
-The chain rule is also why gradients can vanish or explode. If each local derivative is 0.9, the product after 100 layers is 0.9^100 &asymp; 2.66 &times; 10^&minus;5 &mdash; the gradient reaching the first layer is negligible. If each local derivative is 1.1, the product is 1.1^100 &asymp; 13,781 &mdash; the gradient explodes. Activation functions (ReLU instead of sigmoid), residual connections (which add a shortcut with derivative 1) and gradient clipping all exist to keep these products in a usable range.
+## Why backpropagation uses it
 
-Grasp the chain rule as multiplication of local sensitivities makes the rest of calculus-based optimisation straightforward: the gradient of any composition is the product of the parts, computed one link at a time.
+A neural network is a composition of functions. The chain rule propagates the loss derivative from the output through each layer to its parameters. Each local derivative contributes a factor; products that are consistently tiny or large can cause vanishing or exploding gradients. Activation choices, initialization, and normalization influence this behavior, but the chain rule itself is exact.
 
-## The Gear Analogy
+For several variables, the same idea uses Jacobian matrices: derivatives compose by matrix multiplication. See [partial derivatives and gradients](partial_derivatives_and_gradient.html) and [Jacobians and Hessians](jacobian_and_hessian.html).
 
-Picture two gears. Turning the first makes the second turn 3&times; as fast. That second gear drives a third at 2&times;. Turn the first gear once and the last one spins <strong>6</strong> times &mdash; the ratios multiplied.
+## Try this above
 
-Derivatives are just these ratios: <em>how much does the output move per unit of input?</em> Press <strong>Nudge x</strong> and watch a small change in x give a change in u. It gives a change in y &mdash; each link scaling the one before.
+Change the inner and outer rates separately. Notice that if either local derivative is zero, the derivative through the whole composition is zero at that point.
 
-## Reading the Diagram
+## Sources and next steps
 
-The chain strip shows <span class="mono-font">x &rarr; u &rarr; y</span> with each link's local derivative underneath. The app also computes a <strong>numeric check</strong> &mdash; the slope measured by really nudging x by a tiny amount &mdash; and it always matches the product. The rule is not an approximation.
-
-## This is backpropagation
-
-A neural network is a deeply nested function. Input goes into layer 1, whose output goes into layer 2. And so on until the loss:
-
-<p class="mono-font">loss = L(f&#8323;(f&#8322;(f&#8321;(x))))</p>
-
-To update a weight in layer 1 you need the derivative of the loss with respect to that weight &mdash; and it is a chain of factors, one per layer between the weight and the loss.
-
-Backpropagation is that computation done well. Rather than recomputing the chain apart for each weight, it works backwards from the loss, carrying the accumulated product with it and handing each layer the factor it needs. This is why training a network costs roughly twice a forward pass rather than one pass per param.
-
-## Why Deep Networks Struggle
-
-Multiplying many counts together is unstable. If each local derivative is <strong>less than 1</strong>, the product shrinks toward zero &mdash; the <em>vanishing gradient</em>. If each is greater than 1, it explodes.
-
-Choose the <strong>sigmoid</strong> outer function and slide x outwards. Its derivative never exceeds 0.25. So stacking ten sigmoid layers scales the gradient by at most 0.25&#185;&#8304. &asymp; 0.00000095. That is precisely why ReLU replaced sigmoid in deep networks. And why LSTMs added a gated path that avoids repeated multiplication.
-
-## Rates that multiply
-
-The chain rule handles functions inside functions. And the intuition is a chain of gears.
-
-If a car travels twice as fast as a bicycle. And the bicycle travels three times as fast as a walker, then the car is six times faster than the walker. Rates through a chain multiply.
-
-Written formally, for y = f(g(x)):
-
-<p class="mono-font">dy/dx = dy/du &times; du/dx&nbsp;&nbsp;&nbsp;where u = g(x)</p>
-
-The `du` cancels, which is a helpful (if slightly informal) way to remember it.
-
-A worked case. Let y = (3x + 1)&sup2;.
-
-- Outer function: u&sup2;, so dy/du = 2u = 2(3x + 1).
-- Inner function: 3x + 1, so du/dx = 3.
-- Multiply: dy/dx = 2(3x + 1) &times; 3 = <strong>18x + 6</strong>.
-
-Check it by expanding first: (3x + 1)&sup2; = 9x&sup2; + 6x + 1, whose derivative is 18x + 6. The same answer, and the chain rule got there without expanding &mdash; which matters when the expansion is impossible.
-
-## Deeper chains
-
-The rule composes for any depth. For y = f(g(h(x))):
-
-<p class="mono-font">dy/dx = f&prime;(g(h(x))) &times; g&prime;(h(x)) &times; h&prime;(x)</p>
-
-Each layer adds one factor, tested at the value flowing into it. Take y = e<sup>sin(x&sup2;)</sup>:
-
-- Outer: e<sup>u</sup> &rarr; e<sup>sin(x&sup2;)</sup>
-- Middle: sin(v) &rarr; cos(x&sup2;)
-- Inner: x&sup2; &rarr; 2x
-
-Multiply all three: dy/dx = e<sup>sin(x&sup2;)</sup> &middot; cos(x&sup2;) &middot; 2x.
-
-The procedure never changes: differentiate the outermost function keeping its inside intact, then multiply by the derivative of the inside, and repeat.
-
-## Vanishing and exploding gradients, explained by multiplication
-
-Since the chain rule multiplies, a deep network multiplies many counts together &mdash; and multiplication of many small or large counts is unstable.
-
-If each layer adds a factor around 0.25 (the max slope of the sigmoid), then after ten layers the gradient reaching the first layer is 0.25&#185;&#8304. &asymp; <strong>0.000001</strong>. The early layers barely move, and the network effectively refuses to train. That is the <strong>vanishing gradient</strong> problem.
-
-If each factor is around 2 instead, ten layers give 2&#185;&#8304. = 1024. And weights explode into `NaN`. That is <strong>exploding gradients</strong>.
-
-All in the standard modern toolkit is a response to this arithmetic:
-
-- <strong>ReLU</strong> adds a factor of just 1 on the active side. So the product does not shrink.
-- <strong>Residual connections</strong> add a path where the factor is 1, giving the gradient a shortcut back.
-- <strong>Batch and layer normalisation</strong> keep the activations in a range where the factors stay near 1.
-- <strong>Gradient clipping</strong> caps the size right, which is standard in recurrent networks.
-
-## Exploration guide
-
-1. <strong>Start with g = 2x+1, f = u&sup2;.</strong> The product of local slopes matches the numeric check just.
-2. <strong>Press Nudge.</strong> Watch a small &Delta;x turn a more &Delta;u and then a more &Delta;y &mdash; magnification compounding through the chain.
-3. <strong>Set the inner function to sin(x)</strong> and slide to where its slope is zero. The <em>total</em> derivative collapses to zero too &mdash; one flat link kills the whole chain, however steep the others are.
-4. <strong>Switch the outer to sigmoid</strong> and push x to &plusmn;3. dy/du shrinks toward nothing: the saturation that stalls deep networks.
-
-## The short of it
-
-Nested functions multiply their slopes. That gives you the derivative of arbitrarily deep compositions &mdash; and since multiplication compounds, it also explains why gradients vanish or explode in deep networks.
-
-## Working an case through a tiny network
-
-Take a single neuron: `z = wx + b`, `a = sigmoid(z)`. And squared-error loss `L = (a &minus; y)&sup2;`.
-
-To find how the loss changes with the weight, chain three factors:
-
-<p class="mono-font">dL/dw = dL/da &times; da/dz &times; dz/dw</p>
-
-- dL/da = 2(a &minus; y) &mdash; how the loss responds to the output.
-- da/dz = a(1 &minus; a) &mdash; the sigmoid's derivative, expressed neatly in terms of its own output.
-- dz/dw = x &mdash; how the pre-activation responds to the weight.
-
-So dL/dw = 2(a &minus; y) &middot; a(1 &minus; a) &middot; x.
-
-Put counts in: x = 2, w = 0.5, b = 0, y = 1. Then z = 1, a = 0.731, and the loss is 0.072.
-
-dL/dw = 2(0.731 &minus; 1) &times; 0.731 &times; 0.269 &times; 2 = &minus;0.211.
-
-Negative, so raising w reduces the loss &mdash; and gradient descent duly moves w upwards. Notice too that `a(1 &minus; a)` is at most 0.25. And is far less when the neuron is saturated near 0 or 1. A confidently wrong sigmoid neuron therefore learns very slowly. It is precisely the argument for cross-entropy loss, whose derivative cancels that term.
-
-## Multiply the two rates
-
-The chain rule's answer against a numerical one. And the two factors it multiplies shown apart.
-
-```python-run
-import numpy as np
-
-# h(x) = sin(x^2).  dh/dx = cos(x^2) * 2x
-def inner(x): return x ** 2
-def outer(u): return np.sin(u)
-
-x = 1.3
-exact = np.cos(x ** 2) * 2 * x
-
-h = 1e-6
-numeric = (outer(inner(x + h)) - outer(inner(x))) / h
-
-print("d/dx sin(x^2) at x = %.1f" % x)
-print("  chain rule : cos(x^2) * 2x = %.8f" % exact)
-print("  numerically                = %.8f" % numeric)
-print()
-print("the two factors, separately:")
-print("  d(outer)/du at u=x^2 : %.6f" % np.cos(x ** 2))
-print("  d(inner)/dx at x     : %.6f" % (2 * x))
-print("  product              : %.6f" % (np.cos(x ** 2) * 2 * x))
-```
-
-## Questions people ask
-
-<strong>Why is it called the chain rule?</strong> Since the derivatives form a chain of factors, one per nested function.
-
-<strong>Do I need to apply it manually in PyTorch?</strong> No &mdash; `loss.backward()` does it. Knowing the rule is what lets you diagnose vanishing gradients and understand why designs are shaped as they are.
-
-<strong>What is the multivariable version?</strong> When a var influences the output through a few paths, you sum the contributions of each path. That is what makes backpropagation through a branching graph work.
-
-<strong>How does this relate to the product rule?</strong> They answer other questions: the product rule is for functions multiplied together, the chain rule for functions nested inside each other. Deep networks use both.
-
-<strong>Why do residual connections help?</strong> They add an identity path whose derivative is 1. So the product along the shortest route never shrinks &mdash; the gradient always has a clean way back.
-
-<strong>Can gradients vanish with ReLU?</strong> Less easily. But yes &mdash; a neuron stuck on the negative side adds a factor of just 0 and stops learning fully. Leaky ReLU exists to avoid that.
-
-## Recap in one screen
-
-- The chain rule multiplies rates: dy/dx = dy/du &times; du/dx.
-- Differentiate the outer function leaving the inside alone, then multiply by the inside's derivative.
-- A neural network is nested functions. So backpropagation is the chain rule applied backwards through the layers.
-- Many factors below 1 multiply to nothing (vanishing gradients). Many above 1 explode.
-- ReLU, residual connections, normalisation and clipping all exist to keep those factors near 1.
+- [MIT OpenCourseWare: Single Variable Calculus](https://ocw.mit.edu/courses/18-01sc-single-variable-calculus-fall-2010/) covers differentiation rules including composition.
+- See [matrix calculus](matrix_calculus.html) for the vector-valued version used in neural networks.
