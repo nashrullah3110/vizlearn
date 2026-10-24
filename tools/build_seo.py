@@ -132,6 +132,9 @@ FALLBACK_DESC = {
 GENERATED_DESC = {"index.html"}
 
 CDN_TAILWIND = re.compile(r'[ \t]*<script src="https://cdn\.tailwindcss\.com"></script>\n?')
+HOME_LINK = re.compile(
+    r'(?P<start>href=["\'])(?:\.\./)*index\.html(?P<fragment>#[^"\']*)?(?P<end>["\'])',
+    re.I)
 CDN_FA = re.compile(r'[ \t]*<link[^>]*font-awesome[^>]*>\n?')
 INLINE_TW_CONFIG = re.compile(
     r'[ \t]*<script>\s*tailwind\.config\s*=\s*\{.*?\}\s*</script>\n?', re.S)
@@ -518,6 +521,13 @@ def generated_description(rel, mods):
     return None
 
 
+def normalize_home_links(src):
+    """Use the canonical root URL instead of splitting visits onto index.html."""
+    return HOME_LINK.sub(
+        lambda m: m.group("start") + "/" + (m.group("fragment") or "") + m.group("end"),
+        src)
+
+
 # Pages carrying a noindex: Tier 2 modules, the labs and the app pages.
 # The policy itself lives in tools/indexing.py; this name is kept because
 # the sitemap and the audit read it from here.
@@ -540,6 +550,7 @@ def main():
         rel = os.path.relpath(f, ROOT)
         prefix = "../" * rel.count("/")
         src = open(f, encoding="utf-8").read()
+        src = normalize_home_links(src)
 
         # strip anything we are replacing
         src = GENERATED.sub("", src)

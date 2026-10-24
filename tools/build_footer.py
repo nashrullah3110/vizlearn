@@ -78,7 +78,7 @@ def build(prefix):
         '    <footer class="vz-footer">\n'
         '        <div class="vz-footer-inner">\n'
         '            <div class="vz-foot-col vz-foot-brand">\n'
-        '                <a href="%(p)sindex.html" class="vz-foot-logo">'
+        '                <a href="/" class="vz-foot-logo">'
         'viz<span>learn</span></a>\n'
         '                <p class="vz-foot-blurb">Interactive visual explainers for AI, '
         'machine learning, algorithms and the maths underneath them.</p>\n'

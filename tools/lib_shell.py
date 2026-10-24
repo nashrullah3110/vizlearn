@@ -111,7 +111,7 @@ def header(prefix, back_label="Home"):
     <header class="glass-header sticky top-0 z-50">
         <div class="flex justify-center py-3 px-4 md:px-8">
             <div class="flex flex-col md:flex-row items-center justify-between w-full max-w-7xl gap-3 md:gap-4">
-                <a href="%(p)sindex.html" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
+                <a href="%(home)s" class="text-2xl font-bold flex-shrink-0 tracking-tight flex items-center gap-3 select-none cursor-pointer no-underline" style="color: var(--text-main)">
                     <div class="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.8)] animate-pulse"></div>
                     <span>viz<span style="color: var(--text-muted); font-weight: 300;">learn</span></span>
                 </a>
@@ -123,7 +123,7 @@ def header(prefix, back_label="Home"):
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <a href="%(p)sindex.html" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)" aria-label="Back to %(back)s">
+                    <a href="%(home)s" class="hidden md:flex items-center gap-2 text-sm font-medium mono-font hover:text-green-400 transition-colors px-3 py-2 rounded-full" style="color: var(--text-muted)" aria-label="Back to %(back)s">
                         %(backicon)s
                     </a>
                     <button id="themeToggle" class="w-10 h-10 rounded-full flex items-center justify-center focus:outline-none transition-colors flex-shrink-0" style="color: var(--text-muted)" aria-label="Toggle Dark/Light Mode">
@@ -134,7 +134,7 @@ def header(prefix, back_label="Home"):
             </div>
         </div>
     </header>
-""" % {"p": prefix, "search": SEARCH_ICON, "back": html.escape(back_label),
+""" % {"p": prefix, "home": "/", "search": SEARCH_ICON, "back": html.escape(back_label),
        "backicon": BACK_ICON, "sun": SUN_ICON, "moon": MOON_ICON}
 
 
@@ -182,6 +182,8 @@ def breadcrumb_bar(items):
     for i, (label, href) in enumerate(items):
         if i:
             out.append('<span aria-hidden="true">/</span>')
+        if label == "Home":
+            href = "/"
         if href:
             out.append('<a href="%s" class="hover:text-green-400 transition-colors">%s</a>'
                        % (href, html.escape(label)))

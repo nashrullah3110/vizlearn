@@ -68,8 +68,8 @@ def render(key, css, body, wide=False, app=False):
             '        <div class="vz-lab-head">\n'
             '            <h1>%s</h1>\n'
             '            <p>%s</p>\n'
-            '            <a class="vz-lab-home" href="%sindex.html">&larr; VizLearn</a>\n'
-            '        </div>\n' % (tool["title"], tool["lead"], PREFIX)
+            '            <a class="vz-lab-home" href="/">&larr; VizLearn</a>\n'
+            '        </div>\n' % (tool["title"], tool["lead"])
         )
         main = """
     <main class="flex-1 w-full">

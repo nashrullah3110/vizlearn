@@ -104,7 +104,7 @@ BODY = """
                 almost everything else on the site assumes. Each one only leans on
                 the ones before it.</p>
                 <ol class="vz-s-start">%(starters)s</ol>
-                <p>From there, the <a href="%(p)sindex.html#learning-path">Learning
+                <p>From there, the <a href="/#learning-path">Learning
                 Path</a> continues the same route across tracks, and the
                 <a href="%(p)smap/">concept map</a> shows what each module builds
                 on. Your progress is tracked automatically as you open modules,

@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-"""Restructure index.html: remove the intro band, add the hub sections.
+"""Build the homepage's featured lessons and supporting sections.
 
-The hub opened with four blocks of prose before it reached a single module,
-which is backwards for a site whose argument is that you should go and push a
-slider. It now opens on sixteen featured modules, each with a two-sentence
-reason to open it (tools/home_copy.py), then the track cards, and keeps the
-explanatory material below them. A chart of modules per track used to sit
-below as well; the track cards carry the same numbers, and it repeated all
-eighteen track links twice.
+The opening presents six concrete lessons, then a short route for new visitors.
+The full track catalogue follows. Secondary study tools sit after the catalogue
+so they do not compete with the first choice.
 
 Everything this writes lives between VIZLEARN:HUB markers and is replaced on
 re-run, so it is safe in the build chain. The intro band it removes is
@@ -43,9 +39,12 @@ END_BOT = "<!-- VIZLEARN:HUB-BOTTOM:END -->"
 TOP_BLOCK = re.compile(r"[ \t]*" + re.escape(BEGIN_TOP) + r".*?" + re.escape(END_TOP) + r"\n?", re.S)
 BOT_BLOCK = re.compile(r"[ \t]*" + re.escape(BEGIN_BOT) + r".*?" + re.escape(END_BOT) + r"\n?", re.S)
 INTRO_BAND = re.compile(r'\s*<section class="vz-intro-band".*?</section>', re.S)
+STUDY_TOOLS_NAV = re.compile(r'\s*<nav aria-label="Study tools".*?</nav>\s*', re.S)
+MODULE_STAT = re.compile(r'(<(?:span|strong) id="stat-modules">)\d+(</(?:span|strong)>)')
+TRACK_STAT = re.compile(r'(<(?:span|strong) id="stat-tracks">)\d+(</(?:span|strong)>)')
 
 ANCHOR_TOP = '<main id="course-container"'
-ANCHOR_BOT = '<footer class="vz-footer"'
+ANCHOR_BOT = "<!-- VIZLEARN:FOOTER:BEGIN"
 
 
 def esc(s):
@@ -57,7 +56,7 @@ def esc(s):
 # --------------------------------------------------------------------------
 
 def featured():
-    """Sixteen modules across the tracks, two sentences each.
+    """Six strong interactive examples, with concise reasons to open them.
 
     This was "Start here": the first module of six tracks, title only. The
     homepage now opens on the track cards below it, so this is the place for
@@ -73,16 +72,43 @@ def featured():
             raise SystemExit("featured module not in the catalog: %s" % path)
         cards.append(
             '<div class="vzx-panel vzx-start-card"><span class="vzx-start-track">%s</span>'
-            '<h3 class="vzx-start-title"><a href="%s">%s</a></h3>'
+            '<h3 class="vzx-start-title"><a href="%s" data-vz-path="%s">%s</a></h3>'
             '<p class="vzx-start-p">%s</p></div>'
-            % (esc(m["category"]), esc(path), esc(m["title"]), esc(blurb)))
-    return ('<section class="vzx-sec" aria-labelledby="vzx-start-h"><div class="vzx-wrap">'
+            % (esc(m["category"]), esc(path), esc(path), esc(m["title"]), esc(blurb)))
+    return ('<section class="vzx-sec" id="featured-lessons" aria-labelledby="vzx-start-h"><div class="vzx-wrap">'
             '<p class="vzx-kicker">Featured</p>'
-            '<h2 class="vzx-h" id="vzx-start-h">Sixteen places to start</h2>'
-            '<p class="vzx-sub">One or two from each of the main tracks, chosen because '
-            'the visualisation does the explaining. Every one runs in the browser, with '
-            'the written guide underneath.</p><div class="vzx-start">%s</div></div></section>'
-            % "".join(cards))
+            '<h2 class="vzx-h" id="vzx-start-h">Try a concept for yourself</h2>'
+            '<p class="vzx-sub">Choose one of six hands-on lessons. Change an input, see '
+            'what changes, then read the explanation and code.</p>'
+            '<div class="vzx-start vzx-featured-grid">%s</div>%s</div></section>'
+            % ("".join(cards), learning_path_prompt()))
+
+
+def learning_path_prompt():
+    return ('<div class="vzx-route-prompt"><div><p class="vzx-kicker">New here?</p>'
+            '<h3>Follow a guided learning route</h3>'
+            '<p>Choose a goal and get a suggested order, with your progress saved in this browser.</p>'
+            '</div><div class="vzx-route-actions">'
+            '<a class="vzx-btn vzx-btn-solid" href="#learning-path">Choose a learning path</a>'
+            '<a class="vzx-btn vzx-btn-ghost" href="#tracks">I know what I want to learn</a>'
+            '</div></div>')
+
+
+def study_tools():
+    links = [
+        ("map/", "Concept map"),
+        ("practice/", "Practice quiz"),
+        ("glossary/", "Glossary"),
+        ("whats-new/", "What's new"),
+    ]
+    items = "".join('<a href="%s">%s</a>' % (esc(url), esc(label))
+                    for url, label in links)
+    return ('<section class="vzx-sec vzx-tools-sec" aria-labelledby="vzx-tools-h">'
+            '<div class="vzx-wrap"><p class="vzx-kicker">Study tools</p>'
+            '<h2 class="vzx-h" id="vzx-tools-h">Keep exploring</h2>'
+            '<p class="vzx-sub">Use the concept map to find connections, quiz yourself, '
+            'or look up a term.</p><nav class="vzx-tool-links" aria-label="Study tools">'
+            '%s</nav></div></section>' % items)
 
 
 def how_it_works():
@@ -131,15 +157,14 @@ def faq():
             '<div class="vzx-faq">%s</div></div></section>' % items)
 
 
-def cta(n_mods):
+def cta(n):
     return ('<section class="vzx-sec vzx-sec-cta"><div class="vzx-wrap"><div class="vzx-cta">'
-            '<h2 class="vzx-h" style="margin-top:0">Open one and push a slider</h2>'
-            '<p class="vzx-sub" style="margin:0 auto">That is the whole pitch. %d modules, '
-            'all of them running the real computation, none of them asking you for '
-            'anything first.</p><div class="vzx-cta-row">'
-            '<a class="vzx-btn vzx-btn-solid" href="dsa/big_o_notation.html">Start with Big-O</a>'
-            '<a class="vzx-btn vzx-btn-ghost" href="map/">Browse the concept map</a>'
-            '</div></div></div></section>' % n_mods)
+            '<h2 class="vzx-h" style="margin-top:0">Ready for another idea?</h2>'
+            '<p class="vzx-sub" style="margin:0 auto">Pick up a guided route or browse all '
+            '%d interactive lessons across %d tracks.</p><div class="vzx-cta-row">'
+            '<a class="vzx-btn vzx-btn-solid" href="#learning-path">Choose a learning path</a>'
+            '<a class="vzx-btn vzx-btn-ghost" href="#tracks">Browse all tracks</a>'
+            '</div></div></div></section>' % (n["modules"], n["tracks"]))
 
 
 HUB_JS = """<script>
@@ -166,13 +191,19 @@ def main():
 
     removed = bool(INTRO_BAND.search(src))
     src = INTRO_BAND.sub("", src)
+    src = STUDY_TOOLS_NAV.sub("\n", src)
     src = TOP_BLOCK.sub("", src)
     src = BOT_BLOCK.sub("", src)
 
+    # Keep visible counts accurate even if JavaScript is unavailable. Runtime
+    # rendering still recalculates them from courseData.
+    src = MODULE_STAT.sub(r"\g<1>%d\g<2>" % n["modules"], src, count=1)
+    src = TRACK_STAT.sub(r"\g<1>%d\g<2>" % n["tracks"], src, count=1)
+
     top = "%s\n%s\n%s\n    " % (BEGIN_TOP, featured(), END_TOP)
-    bottom = "%s\n%s%s%s\n%s\n%s\n    " % (
+    bottom = "%s\n%s%s%s%s\n%s\n%s\n    " % (
         BEGIN_BOT,
-        how_it_works(), faq(), cta(n["modules"]), HUB_JS, END_BOT)
+        how_it_works(), study_tools(), faq(), cta(n), HUB_JS, END_BOT)
 
     at = src.find(ANCHOR_TOP)
     if at == -1:
@@ -185,7 +216,7 @@ def main():
     src = src[:at] + bottom + src[at:]
 
     open(INDEX, "w", encoding="utf-8").write(src)
-    print("hub sections    : featured modules above the tracks, steps/questions below")
+    print("hub sections    : six featured lessons, track catalog, learning route, study tools")
     print("intro band      : %s" % ("removed" if removed else "already gone"))
     print("numbers         : %d modules, %d tracks (from the catalog)"
           % (n["modules"], n["tracks"]))

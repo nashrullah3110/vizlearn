@@ -52,7 +52,7 @@ PAGES = {
          "<p>The %(modules)d modules are grouped into %(tracks)d tracks, and within a track they are "
          "ordered so that each module only leans on ideas introduced before it. Every page "
          "links to the previous and next step, so a track can be read straight through.</p>"
-         "<p>If you are starting from nothing, the <a href=\"index.html#learning-path\">"
+         "<p>If you are starting from nothing, the <a href=\"/#learning-path\">"
          "Learning Path</a> is a curated 25-module route that crosses tracks &mdash; the "
          "maths everything assumes, then the machine learning core, then enough of each "
          "specialism to choose one.</p>"),

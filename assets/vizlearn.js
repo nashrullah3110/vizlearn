@@ -78,6 +78,109 @@
     writeProgress(store);
   }
 
+  function trackEvent(name, params) {
+    if (typeof window.gtag === 'function') window.gtag('event', name, params || {});
+  }
+
+  function installEngagementTracking() {
+    var adjusted = new WeakSet();
+    var path = currentPath() || window.location.pathname;
+
+    document.addEventListener('click', function (e) {
+      var target = e.target.closest && e.target.closest('a, button');
+      if (!target) return;
+
+      if (target.matches('#topic-nav [data-topic]')) {
+        trackEvent('topic_selected', { topic: target.dataset.topic });
+      }
+      if (target.matches('[data-home-search]')) {
+        trackEvent('search_suggestion_selected', { page_path: '/' });
+      }
+      if (target.matches('a[href="#learning-path"]')) {
+        trackEvent('learning_path_opened', { page_path: '/' });
+      }
+      if (target.matches('a[href="#tracks"]')) {
+        trackEvent('track_browse_opened', { page_path: '/' });
+      }
+      if (target.matches('.search-dropdown-item')) {
+        trackEvent('lesson_open', {
+          page_path: path,
+          target_path: target.getAttribute('href')
+        });
+      }
+      if (target.matches('a.vz-pn-next[rel="next"]')) {
+        trackEvent('lesson_continue', { page_path: path, next_path: target.getAttribute('href') });
+        return;
+      }
+      if (target.matches('.vz-related a.vz-card')) {
+        trackEvent('related_lesson_open', {
+          page_path: path,
+          target_path: target.dataset.vzPath || target.getAttribute('href')
+        });
+      } else if (target.matches('a[data-vz-path], a.vz-step[href]')) {
+        trackEvent('lesson_open', {
+          page_path: path,
+          target_path: target.dataset.vzPath || target.getAttribute('href')
+        });
+      }
+
+      var run = target.closest('.py-run-btn, .js-run-btn, .html-run-btn, .sql-run-btn, [data-vz-run]');
+      if (run) {
+        var type = run.matches('.js-run-btn') ? 'javascript' :
+          run.matches('.html-run-btn') ? 'html' :
+          run.matches('.sql-run-btn') ? 'sql' :
+          run.matches('[data-vz-run]') ? 'experiment' : 'python';
+        trackEvent('code_run', { page_path: path, code_type: type });
+      }
+    });
+
+    function noteControl(e) {
+      var control = e.target;
+      if (!control || !control.matches ||
+          !control.matches('input[type="range"], input[type="checkbox"], select') ||
+          adjusted.has(control)) return;
+      adjusted.add(control);
+      var kind = control.matches('input[type="range"]') ? 'slider' :
+        control.matches('input[type="checkbox"]') ? 'checkbox' : 'select';
+      trackEvent('visualizer_interaction', { page_path: path, control_type: kind });
+    }
+    document.addEventListener('input', noteControl);
+    document.addEventListener('change', noteControl);
+
+    var search = document.getElementById('searchInput') ||
+      document.getElementById('appSearchInput');
+    if (search) {
+      var searchTimer;
+      search.addEventListener('input', function () {
+        window.clearTimeout(searchTimer);
+        var value = search.value.trim();
+        if (!value) return;
+        searchTimer = window.setTimeout(function () {
+          var bucket = value.length < 4 ? '1-3' : value.length < 9 ? '4-8' : '9+';
+          var visible = search.id === 'appSearchInput' ?
+            document.querySelectorAll('#searchDropdown .search-dropdown-item').length :
+            Array.prototype.filter.call(
+              document.querySelectorAll('#course-container .course-wrapper'),
+              function (item) { return item.getClientRects().length > 0; }
+            ).length;
+          trackEvent('site_search', { query_length: bucket, results: visible });
+        }, 700);
+      });
+    }
+
+    if (window.location.pathname === '/') {
+      try {
+        var seen = Object.keys(readProgress()).length;
+        if (seen && !sessionStorage.getItem('vizlearn_home_return_tracked')) {
+          trackEvent('homepage_return_visit', { visited_modules_bucket: seen > 5 ? '6+' : String(seen) });
+          sessionStorage.setItem('vizlearn_home_return_tracked', '1');
+        }
+      } catch (e) {
+        // Analytics should never make the page depend on browser storage.
+      }
+    }
+  }
+
   // --- icons ---------------------------------------------------------------
 
   var ICONS = {
@@ -428,6 +531,7 @@
 
   function boot() {
     initProgress();
+    installEngagementTracking();
     initShare();
     initSave();
     initCheatSheet();

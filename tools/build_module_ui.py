@@ -185,8 +185,8 @@ def prevnext(prev, nxt, root_prefix):
         )
     if nxt:
         out.append(
-            '<a class="vz-pn vz-pn-next" href="%s%s" rel="next">'
-            '<span class="vz-pn-text"><span class="vz-pn-label">Next</span>'
+            '<a class="vz-pn vz-pn-next" href="%s%s" rel="next" data-vz-continue>'
+            '<span class="vz-pn-text"><span class="vz-pn-label">Continue learning</span>'
             '<span class="vz-pn-title">%s</span></span>%s</a>'
             % (root_prefix, nxt["path"], html.escape(nxt["title"]), svg("right"))
         )

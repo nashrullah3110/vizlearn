@@ -133,30 +133,14 @@ TRACK_BLURBS = {
 # The featured modules, in the order shown. Two sentences each: what you do
 # on the page, then what it shows you.
 FEATURED = [
-    ("maths/vectors_and_dot_product.html",
-     "Drag two vectors around the plane and read their magnitude, angle and "
-     "projection as they move. The dot product turns negative the moment the "
-     "angle passes 90 degrees, and you can watch it happen."),
     ("maths/bayes_theorem.html",
      "A positive result from a 99% accurate test can still mean you are "
      "probably fine. Adjust the base rate on a grid of real people and the "
      "paradox stops being one."),
-    ("machine_learning/train_test_split.html",
-     "Score a model on the data it was trained on, then on data it has never "
-     "seen, and compare. The gap between the two numbers is the whole reason "
-     "a test set exists."),
     ("machine_learning/knn.html",
      "Drop a point on the plane and let its nearest neighbours vote on its "
      "class. Change k and the decision boundary goes from jagged to smooth in "
      "front of you."),
-    ("machine_learning/pca.html",
-     "Rotate a line through a cloud of points until it captures the most "
-     "variance it can. That angle is the first principal component, and what "
-     "the line misses is what you lose."),
-    ("deep_learning/neural_network.html",
-     "Add layers and neurons and watch the parameter count climb with each "
-     "choice. Then follow one input forward through weights, biases and "
-     "activations to a prediction."),
     ("deep_learning/backpropagation.html",
      "Run a small computational graph forward, then backward, one local "
      "gradient at a time. Every gradient is checked against a finite "
@@ -165,35 +149,12 @@ FEATURED = [
      "Put constant, logarithmic, linear, n log n, quadratic and exponential "
      "growth on the same axes. Real operation counts sit beside the curves, so "
      "the notation turns into numbers."),
-    ("dsa/dijkstras.html",
-     "Watch Dijkstra's algorithm settle one node at a time, always the closest "
-     "unsettled one. The shortest-path tree grows outward until the "
-     "destination is reached."),
     ("natural_language_processing/attention_mechanism.html",
      "See why squeezing a whole sentence into one context vector loses "
      "information. Attention lets the decoder re-weigh every input word at "
      "each step, shown as a full alignment matrix."),
-    ("gen_ai/embeddings_and_vector_search.html",
-     "Run an exact nearest-neighbour search, then a partitioned one, on the "
-     "same embeddings. Comparisons collapse while recall slips a little - the "
-     "trade every vector database makes."),
     ("gen_ai/rag.html",
      "Ask about a product no model has heard of and watch retrieval score "
      "every chunk. The winners go into the prompt, and a guess becomes an "
      "answer with sources."),
-    ("database/joins_in_sql.html",
-     "Join two tables with INNER, LEFT, RIGHT and FULL, and see exactly which "
-     "rows each one keeps. The NULLs a LEFT join produces stop being a "
-     "surprise."),
-    ("computer_vision/convolution_kernels.html",
-     "Slide a 3x3 kernel across an image by hand, multiplying and summing at "
-     "each position. Blur and edge detection fall out of nine numbers."),
-    ("numpy/broadcasting.html",
-     "Add a row to a column and watch NumPy stretch both into a grid without "
-     "copying either. Two rules decide when that works, and when it quietly "
-     "builds an array far larger than you meant."),
-    ("python/list_comprehensions.html",
-     "Rewrite a loop that appends to a list as one expression, and run both. "
-     "Then add a condition and a transformation, and see where a comprehension "
-     "stops being the clearer choice."),
 ]

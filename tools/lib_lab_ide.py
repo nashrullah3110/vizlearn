@@ -29,6 +29,6 @@ def head(title, lead, prefix="../"):
         '        <div class="vz-lab-head">\n'
         '            <h1>%s</h1>\n'
         '            <p>%s</p>\n'
-        '            <a class="vz-lab-home" href="%sindex.html">&larr; VizLearn</a>\n'
-        '        </div>\n' % (title, lead, prefix)
+        '            <a class="vz-lab-home" href="/">&larr; VizLearn</a>\n'
+        '        </div>\n' % (title, lead)
     )
