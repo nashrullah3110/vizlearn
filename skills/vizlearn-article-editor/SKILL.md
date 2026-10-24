@@ -55,11 +55,12 @@ Use when neither a large visualiser nor a code editor is the best opening—for 
 
 ### Page width and mathematical readability
 
-- Align the visualiser and article's **outer bands** to the same content container. Do not let a global prose-width cap shrink the whole article card when the visualiser is intentionally full width.
+- Compare the left and right edges of all major page bands: visualiser, Overview, article, runnable labs, check-yourself/quiz cards, code sections, and follow-up content. Align their **outer widths** to the same content container unless the page has a clear reason to separate them. Check shared max-width tokens on each component; widening the article alone can leave the generated practice panels visibly narrower.
+- On wide screens, use a two-column grid for independent quiz/check questions when it improves use of the aligned content width and each question remains easy to read. Stack questions at narrow widths and preserve consistent gaps and borders across rows.
 - Keep running paragraphs at a comfortable measure (roughly 65–90 characters per line where practical), even when the article card spans the visualiser's width. Let diagrams, tables, code, and display equations use the wider band when that improves comprehension.
 - Set important equations apart from prose when they need more room. Use consistent spacing, a readable math/monospace face, clear operator and subscript rendering, and sufficient contrast. Long equations must wrap or scroll within their own container on narrow screens; they must never widen the page.
 - Use inline notation only for short expressions that remain easy to scan. Explain symbols near the equation, and provide an accessible text equivalent when the markup uses visual-only notation.
-- Review the rendered page at desktop and phone widths. Check that the article card and visualiser align edge to edge, paragraph lines remain readable, display equations are visually distinct, and no formula or control causes horizontal page overflow.
+- Review the rendered page at desktop and phone widths. Check that every major band aligns edge to edge, two-column questions have a clean reading order, paragraph lines remain readable, display equations are visually distinct, and no formula or control causes horizontal page overflow.
 
 ## Research and citations
 
@@ -114,7 +115,8 @@ Before calling a page finished, ask:
 - Are the example, explanation, code, interaction, and answer key consistent and correct?
 - Are citations authoritative and attached to the claims they support? Do internal links genuinely help the learning path?
 - Is the page readable on mobile and usable without a mouse?
-- Do the article and visualiser align at their outer edges, and do display equations remain legible without causing page overflow?
+- Do the visualiser, article, and practice/check panels share the intended outer width? Do any two-column questions remain easy to scan and stack well on mobile?
+- Do display equations remain legible without causing page overflow?
 - Did the edit add real explanatory value instead of length, keyword variants, or template sections?
 
 If a fact cannot be verified or a demo appears wrong, mark it for investigation and avoid presenting a guess as fact.

@@ -48,6 +48,13 @@ LABS = {
      "why": "w·x + b is y = mx + c with more inputs. Weights play the role of "
             "slopes and the bias plays the role of the intercept, which is why "
             "a perceptron can only ever draw a straight boundary."},
+    {"q": "For y = 3x + 2, what changes if the intercept becomes 4 and the slope stays 3?",
+     "options": ["The line shifts up by 2 units",
+                 "The line becomes steeper",
+                 "The line becomes vertical",
+                 "The slope changes to 4"],
+     "answer": 0,
+     "why": "The intercept sets y when x = 0. Increasing c from 2 to 4 shifts every point up by 2 without changing the slope."},
 ]},
 
 "maths/vectors_and_dot_product.html": {"check": [
