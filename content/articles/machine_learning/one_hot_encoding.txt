@@ -1,24 +1,20 @@
 title: Understanding One-Hot Encoding
-intro: A deep explore converting categorical data into a machine-readable format.
+intro: One-hot encoding represents each category with a binary feature. It avoids inventing an order between labels, though the feature matrix can grow wide for high-cardinality data.
 
-## Core Concept
+## What one-hot encoding represents
 
-One-Hot Coding is a basic trick in data preprocessing, used to turn class-based vars into a numerical format that machine learning algorithms can understand. It takes a column with class-based data. It has been label encoded. And then splits the column into multiple columns. The counts are replaced by 1s and 0s, depending on which column has what value.
+One-hot encoding turns a categorical feature into binary indicator columns. For a colour feature with values red, green, and blue, it creates `is_red`, `is_green`, and `is_blue`; a red row becomes `[1, 0, 0]`. Unlike arbitrary integer IDs, this representation does not tell a linear or distance-based model that blue is “twice” red or that green lies between them.
 
-The reason counts alone are not enough is that a label-encoded column imposes a false ordering. If "red" is 0, "green" is 1 and "blue" is 2, the net sees blue as being "more" than red by a factor of two. And green as halfway between them. For a linear net, this means the coefficient for colour encodes a slope along a nonexistent axis. One-hot coding removes that problem by giving each group its own binary column: the "red" column is 1 when the value is red and 0 otherwise. And the same for green and blue.
-
-The cost is dim count. A column with 1,000 groups gives 1,000 binary columns, most of which are zero for any given row. For high-cardinality features like postal codes or product IDs, this creates a sparse, high-dim grid that slows training and can overfit. Options for high-cardinality columns include target coding, hashing and embedding layers, each trading a other kind of information loss for a less form.
-
-In scikit-learn, `OneHotEncoder` handles this and integrates with pipelines. Setting `handle_unknown="ignore"` ensures that a group absent from the training set does not crash the encoder at prediction time. It simply gets a row of zeros. Setting `drop="first"` removes one column per feature to avoid multicollinearity in linear nets.
+The trade-off is width. A feature with many distinct categories creates many sparse columns. Scikit-learn's `OneHotEncoder` can keep the output sparse and handle categories that were not seen during fitting. For high-cardinality features, consider grouping rare categories, feature hashing, or a carefully validated target encoder. See [label encoding](label_encoding.html) for the contrast.
 
 ## How It Works: The Feel
 
-Imagine you have a feature like "Color" with groups: "Red", "Green", and "Blue". A machine learning net can't work with these text labels right. One-Hot Coding transforms this single "Color" column into three new columns, one for each group: "Is_Red", "Is_Green", and "Is_Blue".
+Imagine you have a feature like "Color" with groups: "Red", "Green", and "Blue". A machine learning model cannot use these text labels directly. One-Hot Coding transforms this single "Color" column into three new columns, one for each group: "Is_Red", "Is_Green", and "Is_Blue".
 
 - For a data point where the color is "Red", the "Is_Red" column will be <code class="mono-font/50 px-1.5 py-0.5 rounded">1</code>, while "Is_Green" and "Is_Blue" will be <code class="mono-font/50 px-1.5 py-0.5 rounded">0</code>.
 - If the color is "Green", the "Is_Green" column gets the <code class="mono-font/50 px-1.5 py-0.5 rounded">1</code>. And the others get <code class="mono-font/50 px-1.5 py-0.5 rounded">0</code>.
 
-This creates a sparse binary vec where just one bit is "hot" (set to 1), clearly and unambiguously showing the first group without implying any ordinal link between the groups.
+This creates a sparse binary vector where just one bit is "hot" (set to 1), clearly and unambiguously showing the first group without implying any ordinal link between the groups.
 
 ## One column turns a few
 
@@ -31,15 +27,15 @@ One-hot coding replaces a class-based column with one new column per group, each
 |Manchester|0|1|0|
 |Leeds|0|0|1|
 
-What this buys you is the absence of a lie. Label coding says London=0, Manchester=1, Leeds=2. And a linear net reads that as an order and a spacing. One-hot says nothing except "this row is London". Each group sits the same distance from each other. It is the honest form of an unordered set.
+What this buys you is the absence of a lie. Label coding says London=0, Manchester=1, Leeds=2. And a linear model reads that as an order and a spacing. One-hot says nothing except "this row is London". Each group sits the same distance from each other. It is the honest form of an unordered set.
 
-The net can now learn a split coefficient for each city. In a linear net, `is_London` might get +45 and `is_Leeds` &minus;12, meaning London adds &pound;45k to a price and Leeds subtracts &pound;12k. Those are readable counts, which is a real secondary gain.
+A linear model can now learn a separate coefficient for each city. In a linear model, `is_London` might get +45 and `is_Leeds` &minus;12, meaning London adds &pound;45k to a price and Leeds subtracts &pound;12k. Those coefficients can also be easier to interpret.
 
 ## The dummy var trap
 
 Here is a subtlety that catches people in regression and confuses all else.
 
-If a row must be just one of London, Manchester or Leeds, then the three columns always sum to 1. That means any one of them can be worked out from the other two. They are perfectly collinear. And if the net also has an intercept, there are infinitely many equally good coefficient sets. The grid turns non-invertible and the coefficients turn unstable or arbitrary.
+If a row must be just one of London, Manchester or Leeds, then the three columns always sum to 1. That means any one of them can be worked out from the other two. They are perfectly collinear. And if the model also has an intercept, there are infinitely many equally good coefficient sets. The grid turns non-invertible and the coefficients turn unstable or arbitrary.
 
 The fix is to drop one group. It turns the <strong>reference level</strong>. With London dropped, `is_Manchester = 0` and `is_Leeds = 0` means London. And each left coefficient reads as "compared to London".
 
@@ -51,28 +47,28 @@ enc = OneHotEncoder(drop="first",              # avoid the dummy trap
                     sparse_output=True)        # do not materialise the zeros
 ```
 
-Whether you need `drop="first"` depends on the net. Linear and logistic regression with an intercept: yes. Regularised nets, trees, forests, boosting and neural networks: no. And dropping a level can really hurt, since smoothing penalises the left groups asymmetrically tied to the hidden reference.
+Whether you need `drop="first"` depends on the model. Linear and logistic regression with an intercept: yes. Regularised models, trees, forests, boosting and neural networks: no. And dropping a level can really hurt, since smoothing penalises the left groups asymmetrically tied to the hidden reference.
 
 ## The cost: width, sparsity and memory
 
 One-hot coding is safe and it is costly. And the expense is a function of cardinality.
 
-A column with 5 groups adds 5 columns. A postcode column with 2,000 distinct vals adds 2,000 columns, of which 1,999 are zero in each row. Three consequences follow:
+A column with 5 groups adds 5 columns. A postcode column with 2,000 distinct values adds 2,000 columns, of which 1,999 are zero in each row. Three consequences follow:
 
 - <strong>Memory.</strong> Stored densely, 1 million rows &times; 2,000 columns of floats is 16 GB. Stored sparsely &mdash; just the spots of the ones. It is a few megabytes. Always keep high-cardinality one-hot output sparse.
 - <strong>Stats.</strong> A group appearing in 20 of 1,000,000 rows gives its column almost nothing to learn from. So the coefficient is mostly noise.
-- <strong>Trees suffer namely.</strong> A binary column can just ever give the split "is it this group or not". So a tree needs many splits to isolate a group of groups that a single native class-based split would handle at once. This is why LightGBM and CatBoost's native group handling often beats one-hot on tree nets.
+- <strong>Trees can require more splits.</strong> A binary column can offer a split such as "is it this group or not". So a tree needs many splits to isolate a group of groups that a single native class-based split would handle at once. This is why LightGBM and CatBoost's native group handling often beats one-hot on tree models.
 
 Two real mitigations. Group rare groups into an explicit "other" bucket. Anything under about 1% of rows is often a candidate. And above roughly 50 groups, look at target coding or learned embeddings instead.
 
 ## Test in the Live Panel
 
-The interactive visualization on this page lets you see this process in action. Follow these steps to build a strong mental net:
+The interactive visualization on this page lets you see this process in action. Follow these steps to build a strong mental model:
 
 1. <strong>Initial State:</strong> Click the "Encode Corpus" button with the default text. Observe the "Vocabulary" size and the "Vec Length". Notice how each unique word from the input text turns part of the vocabulary.
-2. <strong>Analyze the Vecs:</strong> Look at the made vecs. For each word (token), you'll see a vec of 0s and a single 1. The spot of the '1' corresponds to that word's index in the sorted vocabulary. For case, if the vocabulary is <code>['deep', 'fascinating', 'is', 'learning', 'machine']</code>, the word "is" will be shown as <code>[0, 0, 1, 0, 0]</code>.
-3. <strong>Add New Words:</strong> Add a new sentence to the input, like "AI is the future". Click "Encode Corpus" again. What happens to the "Vec Length" and "Vocabulary" count? All existing vecs are now longer to accommodate the new words ('ai', 'the', 'future'). This shows a key challenge with One-Hot Coding: the dim count raises with vocabulary size.
-4. <strong>Add Repetition:</strong> Add a sentence that reuses existing words, such as "deep learning is powerful". Notice that the vocabulary size doesn't increase as much. But the total count of vecs does. This highlights the efficiency of reusing existing vocabulary entries.
+2. <strong>Analyze the Vecs:</strong> Look at the encoded vectors. For each word (token), you'll see a vec of 0s and a single 1. The spot of the '1' corresponds to that word's index in the sorted vocabulary. For case, if the vocabulary is <code>['deep', 'fascinating', 'is', 'learning', 'machine']</code>, the word "is" will be shown as <code>[0, 0, 1, 0, 0]</code>.
+3. <strong>Add New Words:</strong> Add a new sentence to the input, like "AI is the future". Click "Encode Corpus" again. What happens to the "Vec Length" and "Vocabulary" count? All existing vecs are now longer to accommodate the new words ('ai', 'the', 'future'). This shows a key challenge with One-Hot Coding: the number of features grows with vocabulary size.
+4. <strong>Add Repetition:</strong> Add a sentence that reuses existing words, such as "deep learning is powerful". Notice that the vocabulary size doesn't increase as much. But the total number of vecs does. This highlights the efficiency of reusing existing vocabulary entries.
 
 ## Pseudocode Logic
 
@@ -104,12 +100,12 @@ function oneHotEncode(corpus):
 - <strong>No Ordinality:</strong> It doesn't create a false order or ranking between groups. It is a common issue with simple label coding.
 - <strong>Interpretability:</strong> The resulting vecs are easy to interpret. Each column clearly corresponds to a set group. <h4 class="font-bold mb-2">Disadvantages</h4>
 
-- <strong>High Dim count (Curse of Dim count):</strong> If you have many unique groups (a large vocabulary), it creates a huge count of new features. This can slow down net training and sometimes hurt performance.
+- <strong>High dimensionality (curse of dimensionality):</strong> If you have many unique groups (a large vocabulary), it creates a huge number of new features. This can slow down model training and sometimes hurt performance.
 - <strong>Sparsity:</strong> The resulting grid is sparse (mostly zeros). It can be computationally inefficient to store and process.
 
 ## Beyond One-Hot Coding
 
-While One-Hot Coding is a great starting point, for more complex tasks, especially in Natural Language Handling (NLP), more advanced tricks like <strong>Word Embeddings (e.g., Word2Vec, GloVe, FastText)</strong> are used. These ways represent words as dense, low-dim vecs that get semantic links (e.g., the vecs for "king" and "queen" are closer to each other). One-Hot Coding, in contrast, treats each word as equally other from all others.
+While One-Hot Coding is a great starting point, for more complex tasks, especially in Natural Language Handling (NLP), more advanced tricks like <strong>Word Embeddings (e.g., Word2Vec, GloVe, FastText)</strong> are used. These methods represent words as dense, low-dimensional vectors that can capture semantic relationships (e.g., the vecs for "king" and "queen" are closer to each other). In contrast, distinct one-hot vectors are equally distant from one another.
 
 ## Choosing between the encodings
 
@@ -126,7 +122,7 @@ The embedding option is worth a moment. Instead of 2,000 sparse columns, learn a
 
 ## Getting it right in a pipeline
 
-The single most common one-hot bug in production is a column-count mismatch: training data had 40 cities, today's batch has 38. And the net gets a grid of the wrong width.
+The single most common one-hot bug in production is a column-count mismatch: training data had 40 cities, today's batch has 38. And the model gets a grid of the wrong width.
 
 The fix is to fit the encoder once and reuse the fitted object. Never to call `pd.get_dummies` apart on training and serving data. It is what causes this.
 
@@ -145,7 +141,7 @@ model.fit(X_train, y_train)      # the encoder's vocabulary is now fixed
 model.predict(X_new)             # unseen categories become all-zero rows
 ```
 
-`handle_unknown="ignore"` is what stops an unfamiliar city from crashing the service: the row simply gets zeros across all the city columns. It the net reads as "none of the known cities". Not ideal, but far better than an exception at request time.
+`handle_unknown="ignore"` is what stops an unfamiliar city from crashing the service: the row simply gets zeros across all the city columns. It the model reads as "none of the known cities". Not ideal, but far better than an exception at request time.
 
 ## Why not just count the groups
 
@@ -262,14 +258,18 @@ print("  with drop='first': %d columns instead of %d"
 
 <strong>How many groups are too many?</strong> There is no hard line. But past 50 the sparsity starts to hurt and past a few hundred it often dominates. Measure it: check one-hot against target coding by cross-validation rather than guessing.
 
-<strong>What about missing vals?</strong> Encode them as their own group. A blank field is often informative. And folding it into the most common group destroys that information.
+<strong>What about missing values?</strong> Encode them as their own group. A blank field is often informative. And folding it into the most common group destroys that information.
 
-<strong>Does one-hot coding cause overfitting?</strong> Indirectly. Adding hundreds of columns to a net with limited rows gives it more ways to fit noise. Smoothing and rare-group grouping are the usual answers.
+<strong>Does one-hot coding cause overfitting?</strong> Indirectly. Adding hundreds of columns to a model with limited rows gives it more ways to fit noise. Smoothing and rare-group grouping are the usual answers.
 
 ## Recap in one screen
 
 - One column per group, just one 1 per row, no invented ordering.
-- Drop one level for linear nets with an intercept. Keep all levels for regularised nets and trees.
+- Drop one level for linear models with an intercept. Keep all levels for regularised models and trees.
 - Cardinality is the cost: width, sparsity and thin stats per column.
-- Keep the grid sparse, group rare vals. And consider target coding or embeddings above ~50 groups.
+- Keep the grid sparse, group rare values. And consider target coding or embeddings above ~50 groups.
 - Fit the encoder once, inside a pipeline. And set `handle_unknown="ignore"` before it reaches production.
+
+## Further reading
+
+For implementation details, see the [Encoding categorical features](https://scikit-learn.org/stable/modules/preprocessing.html#encoding-categorical-features). Continue with [label encoding](label_encoding.html) to connect this topic to a related part of the workflow.

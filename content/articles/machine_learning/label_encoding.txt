@@ -1,13 +1,13 @@
 title: Decoding Label Encoding
-intro: Machine learning models are mathematical functions; they understand numbers, not text. Before we can train a model on categorical data (like city names, product types, or sentiments), we must convert that text into a numerical format. <strong>Label Encoding</strong> is one of the simplest techniques to achieve this. It works by assigning a unique integer to each unique category or "label" in your dataset.
+intro: Label encoding maps category names to integer identifiers. Those IDs are safe as labels, but can mislead a model when treated as ordered numeric features.
 
 ## Turning categories into integers. And when that goes wrong
 
-Machine learning nets are math-based functions. They understand counts, not text. Before we can train a net on categorical data (like city names, product types, or sentiments), we must turn that text into a numerical format. <strong>Label Coding</strong> is one of the simplest tricks to reach this. It works by giving a unique integer to each unique category or "label" in your dataset. The coding is straightforward: sort the unique vals, give 0 to the first, 1 to the second. And so on. Scikit-learn's `LabelEncoder` does just this. The danger is that the integers carry an unintended ordering. The net treats 2 as "greater than" 1. It is meaningless for categories like city names. A tree-based net can split on `city <= 3` and still work. But a linear net or neural network will interpret the counts as magnitudes and learn spurious links. [One-hot coding](one_hot_encoding.html) avoids this by creating a binary column for each category, at the cost of more dimensionality. Label coding is safe for ordinal features (small/medium/large) where the order is real. And for the target column where the coding is just an internal label. This page encodes a sample corpus, shows the vocabulary and the resulting integer sequence. And covers the ordinal-vs-nominal distinction that decides which coding is right.
+Encoding replaces category names with numbers so an estimator can process them. The important choice is whether those numbers imply an order: an arbitrary integer ID is a class label, while an ordinal code represents a meaningful ranking. Confusing the two can make a model learn relationships that are not in the data.
 
 ## How It Works: Building the Vocabulary
 
-The process is straightforward and consists of two main steps. It you can see in action by clicking the "Encode Corpus" button above.
+The demo builds a vocabulary from its sample text, assigns each token an integer, and displays the resulting sequence. This illustrates token IDs; for ordinary categorical feature columns, use the feature encoders described below.
 
 <h4 class="font-bold" style="color: var(--text-main);">1. Create a Vocabulary</h4>
 
@@ -17,9 +17,9 @@ Once the vocabulary is built, the encoder assigns a unique integer ID to each wo
 
 ## Why text has to turn counts at all
 
-Each net you are likely to train is arithmetic underneath. Linear regression multiplies inputs by weights. A neural network does grid multiplications. Still a decision tree. It feels symbolic, is checking counts against thresholds.
+Most estimators operate on numeric feature values. Linear regression multiplies values by coefficients; a neural network applies matrix operations; and a decision tree compares values with split thresholds.
 
-None of that works on the string "London". So before any of it can happen, categorical columns have to be turned into counts. And label coding is the most direct way of doing it: give each distinct value an integer.
+Those operations cannot use a raw string such as "London". A categorical column therefore needs an encoding. Integer IDs are compact, but they are appropriate only when the estimator will not interpret arbitrary gaps or order as meaningful.
 
 |City|Encoded|
 |---|---|
@@ -29,31 +29,31 @@ None of that works on the string "London". So before any of it can happen, categ
 |London|0|
 |Leeds|2|
 
-Three rules make it predictable. The mapping is built from the vals seen in fitting, often sorted alphabetically. Each occurrence of the same value gets the same count. And the column stays one column wide. It is the property that makes it attractive for columns with hundreds of distinct vals.
+The mapping is learned from the categories seen during fitting. Each occurrence of a category gets the same ID, and the column remains one feature wide. This compact representation can be useful for high-cardinality categories when the estimator handles category IDs appropriately.
 
 ## The problem it creates, stated precisely
 
-The encoder has just told your net that Leeds (2) is twice Manchester (1). And that Manchester sits just halfway between London and Leeds. None of that is true. Nothing about the cities implies an order, let alone still spacing.
+For a distance-based or linear estimator, those IDs can imply false structure: Leeds (2) appears twice as far from London (0) as Manchester (1), and the codes suggest equal spacing. City names have no such numeric relationship.
 
-For nets that do arithmetic on feature vals, this invented ordering is a real distortion:
+For models that do arithmetic on feature values, this invented ordering is a real distortion:
 
-- <strong>Linear and logistic regression</strong> fit one coefficient for the column, forcing the effect of the city to be a straight line across the invented count sequence.
+- <strong>Linear and logistic regression</strong> fit one coefficient for the column, forcing the effect of the city to be a straight line across the invented integer sequence.
 - <strong>KNN and k-means</strong> find distances. So "London to Leeds" is now twice "London to Manchester".
 - <strong>Neural networks</strong> multiply the value by a weight and will happily learn spurious patterns from the ordering.
 
-For <strong>tree-based nets</strong> the damage is much less, since a tree just asks "is this value &le; 1.5?". It is a question about set membership rather than magnitude. A tree can carve out any subset of categories given enough splits. It just needs more splits than it would with a better coding.
+For <strong>tree-based models</strong>, a split such as `city_code <= 1.5` groups categories on one side of the threshold. Trees do not treat the distance between codes like a linear model does, but an arbitrary ordering can still require extra splits and behave differently from a categorical-aware method.
 
-So the real rule is not "never use label coding". It is: <strong>label coding for tree nets and for genuinely ordered categories, one-hot or target coding for all else.</strong>
+Use ordinal encoding when the order is real and the estimator can use that order sensibly. For nominal features, one-hot encoding is a safer general choice for linear and distance-based estimators. Target encoding is another option for high-cardinality data, but it must be fitted without leaking target information across validation folds; see [data leakage](data_leakage.html).
 
 ## When the order is real
 
-Some categories do have an order. And coding it as counts is not a distortion but a gift to the net.
+Some categories do have an order. And coding it as counts is not a distortion but a gift to the model.
 
 - Sizes: small &lt; medium &lt; large &rarr; 0, 1, 2.
 - Education: GCSE &lt; A-level &lt; degree &lt; postgraduate &rarr; 0, 1, 2, 3.
 - Satisfaction: poor &lt; fair &lt; good &lt; excellent &rarr; 0, 1, 2, 3.
 
-This is called <strong>ordinal coding</strong>. And the key gap from label coding is that you name the order rather than letting the alphabet decide. Left to it, `LabelEncoder` would map excellent&rarr;0, fair&rarr;1, good&rarr;2, poor&rarr;3. It scrambles the meaning fully.
+This is called <strong>ordinal encoding</strong>. You provide the intended order instead of letting alphabetical sorting choose it. For example, `LabelEncoder` would sort these labels alphabetically, which would not preserve the order from poor to excellent.
 
 ```python
 from sklearn.preprocessing import OrdinalEncoder
@@ -63,23 +63,23 @@ enc = OrdinalEncoder(categories=order)
 enc.fit_transform([["good"], ["poor"], ["excellent"]])   # [[2], [0], [3]]
 ```
 
-One thing ordinal coding still gets wrong: it assumes equal spacing. The step from "poor" to "fair" is treated as the same size as "good" to "excellent". It may not match reality. If that matters, encode with the actual vals. 1, 3, 7, 12. Or use a net that does not care about spacing.
+One thing ordinal coding still gets wrong: it assumes equal spacing. The step from "poor" to "fair" is treated as the same size as "good" to "excellent". It may not match reality. If that matters, encode with the actual values. 1, 3, 7, 12. Or use a model that does not care about spacing.
 
 ## The unseen-category trap
 
-This is the bug that reaches production. You fit the encoder on training data holding London, Manchester and Leeds. Three weeks later a row arrives with "Bristol". And the encoder raises `ValueError: y holds before unseen labels`. Your prediction service returns a 500.
+An encoder fitted on London, Manchester, and Leeds has no learned code for a new category such as Bristol. `LabelEncoder` raises a `ValueError` for an unseen label; in a prediction service, that can turn an ordinary new input into a failed request.
 
 Three defences, in raising order of robustness:
 
 1. Fit the encoder on the full set of known categories, not just the ones present in the training split. If you have a reference list of cities, use it.
 2. Use `OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)`. It maps anything unseen to a reserved code instead of raising.
-3. Collapse rare categories into an explicit "other" bucket in training. So the net has really learned what to do with an unfamiliar value.
+3. Collapse rare categories into an explicit "other" bucket in training. So the model has really learned what to do with an unfamiliar value.
 
-The tied trap is fitting the encoder apart on train and test. Fit once, on training data, then apply the same fitted object to all else. Refitting gives a other mapping. And your test set silently means something other from your training set.
+The related trap is fitting the encoder apart on train and test. Fit once on the training data and apply that mapping to validation, test, and production data. Fitting separate encoders can assign different IDs to the same category.
 
 ## Three encoders, and when each one is correct
 
-Ordinal, label and one-hot coding do close-looking things for other purposes. With the wrong one is a common and quiet mistake.
+These encoders serve different purposes. Choose based on whether categories are ordered, how the estimator uses numeric values, and how new categories will be handled.
 
 ```python-run
 import numpy as np
@@ -110,7 +110,7 @@ print("  alphabetically, x-large sorts last and large sorts second. the model")
 print("  is told large < medium < small < x-large, which is nonsense.")
 ```
 
-Now the same data through three encodings, showing how the choice affects a linear net versus a tree.
+Now the same data through three encodings, showing how the choice affects a linear model versus a tree.
 
 ```python-run
 import numpy as np
@@ -160,9 +160,9 @@ Use the interactive panel to understand the nuances of this trick.
 
 ## The Big Drawback: Unintended Ordinality
 
-While simple, Label Coding has a major flaw. Most machine learning nets will interpret the given integers as having an order or rank. For case, if you have categories 'Cat', 'Dog'. And 'Fish', they might be encoded as 0, 1, and 2.
+While simple, Label Coding has a major flaw. Most machine learning models will interpret the given integers as having an order or rank. For case, if you have categories 'Cat', 'Dog'. And 'Fish', they might be encoded as 0, 1, and 2.
 
-The net might incorrectly assume that 'Dog' (1) is "greater" than 'Cat' (0). Or that the gap between 'Fish' (2) and 'Cat' (0) is twice the gap between 'Dog' (1) and 'Cat' (0). This is an <strong>arbitrary ordinal link</strong> that doesn't exist in the first data. And it can mislead your net.
+The model might incorrectly assume that 'Dog' (1) is "greater" than 'Cat' (0). Or that the gap between 'Fish' (2) and 'Cat' (0) is twice the gap between 'Dog' (1) and 'Cat' (0). This is an <strong>arbitrary ordinal link</strong> that doesn't exist in the first data. And it can mislead your model.
 
 - <strong>When is it okay?</strong> Label Coding is suitable for categorical features that have a clear, inherent order (ordinal features), such as 'Low', 'Medium', 'High' or 'First Class', 'Second Class', 'Third Class'.
 - <strong>When should it be avoided?</strong> It should generally be avoided for features without a natural order (nominal features), like 'Country' or 'Color'. For these cases, <strong>One-Hot Coding</strong> is a much better choice as it creates a new binary feature for each category, avoiding any implied ranking.
@@ -178,9 +178,9 @@ The net might incorrectly assume that 'Dog' (1) is "greater" than 'Cat' (0). Or 
 |Hashing|A fixed number|No|Enormous cardinality where collisions are acceptable|
 |Learned embeddings|A chosen width|No|Neural networks with many categories|
 
-<strong>Target coding</strong> deserves a warning. Replacing each category with the average target value for that category is powerful and leaks badly if done carelessly: a category appearing once takes the target of its own row. And the net reads the answer straight off the feature. Always find it out-of-fold. And smooth rare categories towards the global average.
+<strong>Target coding</strong> deserves a warning. Replacing each category with the average target value for that category is powerful and leaks badly if done carelessly: a category appearing once takes the target of its own row. And the model reads the answer straight off the feature. Always find it out-of-fold. And smooth rare categories towards the global average.
 
-A quick heuristic for the everyday case: under about 10 categories, one-hot. Above 50 and with trees, label coding or the library's native categorical support. Above 50 and with a linear net or a network, target coding or learned embeddings.
+A quick heuristic for the everyday case: under about 10 categories, one-hot. Above 50 and with trees, label coding or the library's native categorical support. Above 50 and with a linear model or a network, target coding or learned embeddings.
 
 ## Questions people ask
 
@@ -188,16 +188,20 @@ A quick heuristic for the everyday case: under about 10 categories, one-hot. Abo
 
 <strong>Does the order of the integers matter for trees?</strong> Slightly. A tree can express any grouping eventually. But an ordering that happens to put close categories next to each other needs fewer splits. This is part of why target-statistic orderings help boosted trees.
 
-<strong>Is label coding the same as ordinal coding?</strong> Effectively the same step with a other intent. And in scikit-learn `LabelEncoder` works on a single target column while `OrdinalEncoder` works on feature matrices and lets you name the order. Use the second one for features.
+<strong>Is label coding the same as ordinal coding?</strong> Effectively the same step with another intent. And in scikit-learn `LabelEncoder` works on a single target column while `OrdinalEncoder` works on feature matrices and lets you name the order. Use the second one for features.
 
-<strong>What about missing vals?</strong> Decide deliberately. Treating "missing" as its own category is often correct. The fact that a field was left blank is often informative. Silently imputing it to the most common value throws that away.
+<strong>What about missing values?</strong> Decide deliberately. Treating "missing" as its own category is often correct. The fact that a field was left blank is often informative. Silently imputing it to the most common value throws that away.
 
-<strong>Will one-hot coding always be safer?</strong> Safer for linear nets. But with 10,000 distinct vals it gives 10,000 mostly-zero columns. It is slow, memory-hungry and gives each single column almost no data to learn from. Safety has a cost.
+<strong>Will one-hot coding always be safer?</strong> Safer for linear models. But with 10,000 distinct values it gives 10,000 mostly-zero columns. It is slow, memory-hungry and gives every column almost no data to learn from. Safety has a cost.
 
 ## Recap in one screen
 
-- Nets need counts. So categorical text has to be encoded.
+- models need counts. So categorical text has to be encoded.
 - Label coding assigns one integer per category and keeps the column width at one.
-- Those integers imply an order and a spacing that often do not exist. Harmless for trees, damaging for linear nets, KNN and networks.
+- Those integers imply an order and a spacing that often do not exist. Harmless for trees, damaging for linear models, KNN and networks.
 - Use it deliberately for ordered categories. And state the order yourself.
 - Fit the encoder once, on training data. And plan for categories you have never seen.
+
+## Further reading
+
+For implementation details, see the [Encoding categorical features](https://scikit-learn.org/stable/modules/preprocessing.html#encoding-categorical-features). Continue with [one-hot encoding](one_hot_encoding.html) to connect this topic to a related part of the workflow.

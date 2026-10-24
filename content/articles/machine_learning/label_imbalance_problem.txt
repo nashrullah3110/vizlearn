@@ -1,33 +1,33 @@
 title: The Accuracy Paradox
-intro: In many real-world scenarios, the data we care about is rare. Think of credit card fraud, rare disease detection, or critical system failures. In these datasets, the "normal" class vastly outnumbers the "anomaly" class. This is called <strong>Label Imbalance</strong>, and it creates a dangerous trap for machine learning models: <strong>The Accuracy Paradox</strong>.
+intro: Class imbalance makes accuracy hard to interpret because a model can predict the majority class and still score highly. Inspect class-specific metrics and error costs.
 
-## Why 99% score can mean a useless net
+## Why 99% score can mean a useless model
 
-In many real-world scenarios, the data we care about is rare. Think of credit card fraud, rare disease detection. Or critical system failures. In these datasets, the "normal" class vastly outnumbers the "anomaly" class. This is called <strong>Label Imbalance</strong>. And it creates a dangerous trap for machine learning nets: <strong>The Score Paradox</strong>. A net that predicts the majority class for each input reaches high score on imbalanced data while catching zero minority-class cases. The fix is not one thing but a combination: use metrics that expose the failure (precision, recall, F1, AUC rather than score), adjust the decision [threshold](../sklearn/probabilities_and_thresholds.html) to catch more positives, apply class weights so the loss penalises minority-class mistakes more heavily. Or resample the training data (oversample the minority with SMOTE, undersample the majority, or both). The choice depends on the cost of the two kinds of mistake: in fraud detection, missing a fraud (false negative) is far worse than flagging a legitimate transaction (false positive). So you push the threshold low and accept more false alarms. In spam filtering, the costs are closer to equal. This page trains a net on imbalanced data, shows the score paradox in action. And shows how threshold adjustment and class weighting recover the minority class.
+In many real-world scenarios, the data we care about is rare. Think of credit card fraud, rare disease detection. Or critical system failures. In these datasets, the "normal" class vastly outnumbers the "anomaly" class. This is called <strong>Label Imbalance</strong>. And it creates a dangerous trap for machine learning models: <strong>The Score Paradox</strong>. A model that predicts the majority class for each input reaches high score on imbalanced data while catching zero minority-class cases. The fix is not one thing but a combination: use metrics that expose the failure (precision, recall, F1, AUC rather than score), adjust the decision [threshold](../sklearn/probabilities_and_thresholds.html) to catch more positives, apply class weights so the loss penalises minority-class mistakes more heavily. Or resample the training data (oversample the minority with SMOTE, undersample the majority, or both). The choice depends on the cost of the two kinds of mistake: in fraud detection, missing a fraud (false negative) is far worse than flagging a legitimate transaction (false positive). So you push the threshold low and accept more false alarms. In spam filtering, the costs are closer to equal. This page trains a model on imbalanced data, shows the score paradox in action. And shows how threshold adjustment and class weighting recover the minority class.
 
 ## What is the Score Paradox?
 
-The Score Paradox occurs when a net reaches a very high score score but is fully useless in practice. This happens since the net learns to simply predict the majority class each single time. In a dataset with 99% normal transactions and 1% fraudulent ones, a net that always guesses "normal" will be 99% exact. It sounds great. But it has failed at its one key job: detecting fraud.
+The accuracy paradox occurs when a model has high accuracy but fails to identify the rare class. This happens when the model predicts the majority class every time. In a dataset with 99% normal transactions and 1% fraudulent ones, a model that always predicts "normal" has 99% accuracy. It sounds great. But it has failed at its main task: detecting fraud.
 
-This visualization shows the paradox by checking two nets:
+This visualization shows the paradox by checking two models:
 
-<h4 class="font-bold" style="color: var(--text-main);">1. The "Naive" Net</h4>
+<h4 class="font-bold" style="color: var(--text-main);">1. The "Naive" model</h4>
 
-This is a deliberately dumb net. Its just rule is: <strong>always predict Class 0 (the majority class)</strong>. It never predicts an anomaly. As you'll see, its score is deceptively high. <h4 class="font-bold" style="color: var(--text-main);">2. The Standard Trained Net</h4>
+This is a deliberately dumb model. Its just rule is: <strong>always predict Class 0 (the majority class)</strong>. It never predicts an anomaly. As you'll see, its score is deceptively high. <h4 class="font-bold" style="color: var(--text-main);">2. The Standard Trained model</h4>
 
-This is a standard Logistic Regression net. It tries to learn a decision edge to split the two classes based on the data. Watch how its behavior and metrics change as the dataset turns more imbalanced.
+This is a standard Logistic Regression model. It tries to learn a decision edge to split the two classes based on the data. Watch how its behavior and metrics change as the dataset turns more imbalanced.
 
 ## How badly the counts can mislead
 
 Take a fraud dataset: 100,000 transactions, 500 of them fraudulent. That is 0.5% positive.
 
-Now write the laziest possible net &mdash; `give "not fraud"` &mdash; and test it:
+Now write the laziest possible model &mdash; `give "not fraud"` &mdash; and test it:
 
 - Score: 99.5%
 - Fraud caught: 0 out of 500
 - Money saved: nothing
 
-This is the score paradox in its purest form. The count is excellent and the net is worthless, since score is dominated by the class you did not care about. Worse, a real net trained with a standard loss will drift towards this behaviour on its own: predicting the majority class is genuinely the fastest way to reduce average error. So that is where the solver goes.
+This is the score paradox in its purest form. The accuracy is high, but the model is useless for detecting fraud, since accuracy is dominated by the class you did not care about. Worse, a real model trained with a standard loss will drift towards this behaviour on its own: predicting the majority class is genuinely the fastest way to reduce average error. So that is where the solver goes.
 
 The confusion matrix tells the true story instantly:
 
@@ -36,9 +36,9 @@ The confusion matrix tells the true story instantly:
 |<strong>Actually fraud</strong>|0|500|
 |<strong>Actually legitimate</strong>|0|99,500|
 
-An empty column is the signature of a net that has learned to abstain. If you never look past score, you will never see it.
+An empty column is the signature of a model that has learned to abstain. If you never look past score, you will never see it.
 
-## Why nets collapse onto the majority class
+## Why models collapse onto the majority class
 
 Two mechanisms do the damage. And they are worth separating since they suggest other fixes.
 
@@ -46,12 +46,12 @@ Two mechanisms do the damage. And they are worth separating since they suggest o
 
 <strong>There is not enough of the minority to learn from.</strong> Still a perfectly balanced loss cannot conjure a pattern out of 500 cases spread across a complicated feature space. This is a data problem, not a weighting problem. And no amount of reweighting fixes it.
 
-Distinguishing the two is diagnostic. If the net does well on the training minority and poorly on the test minority, you have too few cases. If it does badly on both, the loss is drowning the signal and reweighting should help.
+Distinguishing the two is diagnostic. If the model does well on the training minority and poorly on the test minority, you have too few cases. If it does badly on both, the loss is drowning the signal and reweighting should help.
 
 ## Fixes, in the order worth trying
 
-1. <strong>Change the metric first.</strong> Before touching the data, stop reading score. Use precision, recall, F1, and PR-AUC. Half the time this alone changes which net you would have shipped.
-2. <strong>Move the threshold.</strong> A net that outputs chances is not committed to 0.5. Sweep the threshold and pick the point that meets your recall requirement. This costs nothing and is often the whole fix.
+1. <strong>Change the metric first.</strong> Before touching the data, stop reading score. Use precision, recall, F1, and PR-AUC. Half the time this alone changes which model you would have shipped.
+2. <strong>Move the threshold.</strong> A model that outputs chances is not committed to 0.5. Sweep the threshold and pick the point that meets your recall requirement. This costs nothing and is often the whole fix.
 3. <strong>Weight the classes.</strong> `class_weight="balanced"` multiplies each class's loss contribution by the inverse of its frequency. So 500 fraud cases count as much as 99,500 legitimate ones. Supported by most scikit-learn estimators and by the boosting libraries via `scale_pos_weight`.
 4. <strong>Resample.</strong> Undersample the majority (fast, discards data) or oversample the minority (keeps data, risks memorising duplicates). SMOTE creates synthetic minority points by interpolating between real ones. It works well on smooth numeric features and poorly on categorical or high-dimensional data.
 5. <strong>Collect more of the rare class.</strong> Unglamorous and by far the most effective when it is possible.
@@ -61,7 +61,7 @@ Two warnings that cost people weeks. <strong>Resample just the training set</str
 
 ## What 99% score is really worth
 
-On a 1% positive rate, a net that predicts "no" each time scores 99%. This measures what that net is worth. And what the useful metrics say instead.
+On a 1% positive rate, a model that predicts "no" each time scores 99%. This measures what that model is worth. And what the useful metrics say instead.
 
 ```python-run
 import numpy as np
@@ -104,7 +104,7 @@ print("the do-nothing model scores %.4f on accuracy and 0.0000 on every metric"
 print("that asks whether it found anything. that is the whole problem, in one row.")
 ```
 
-Still the real net misses most positives at the default threshold. And PR AUC degrades much faster than ROC AUC as imbalance deepens.
+Still the real model misses most positives at the default threshold. And PR AUC degrades much faster than ROC AUC as imbalance deepens.
 
 ```python-run
 import numpy as np
@@ -151,18 +151,18 @@ print("and check the confusion matrix before believing anything.")
 
 Use the interactive panel to build a strong intuition for this problem.
 
-1. <strong>Start with a Balanced Dataset (50%):</strong> With the "Class 0 %" slider at 50%, click "Generate & Train". Both classes are equal. The Standard Net learns a reasonable edge. And its score is a good reflection of its performance. The Naive Net's score is just 50%, correctly showing it's a poor net.
-2. <strong>Add Moderate Imbalance (85%):</strong> Move the slider to 85%. The Naive Net's score instantly jumps to 85%! It's now looking better than the Standard Net. Yet it hasn't caught a single anomaly (its Recall is 0%). Notice how the Standard Net's decision edge starts to shift, turning more biased towards the majority class. It's getting harder for it to correctly find anomalies.
-3. <strong>Create Severe Imbalance (99%):</strong> Push the slider to 99%. The Score Paradox is now in full effect. The Naive Net boasts 99% score, making it look nearly perfect. The Standard Net, overwhelmed by the majority class, gives up trying to find anomalies. Its edge is pushed far away. And it also classifies all as Class 0. Its score is also 99%, but its Recall is 0%. Both nets are now useless for finding the rare events we care about.
+1. <strong>Start with a Balanced Dataset (50%):</strong> With the "Class 0 %" slider at 50%, click "Generate & Train". Both classes are equal. The Standard model learns a reasonable edge. And its score is a good reflection of its performance. The Naive model's score is just 50%, correctly showing it's a poor model.
+2. <strong>Add Moderate Imbalance (85%):</strong> Move the slider to 85%. The Naive model's score instantly jumps to 85%! It's now looking better than the Standard model. Yet it hasn't caught a single anomaly (its Recall is 0%). Notice how the Standard model's decision edge starts to shift, turning more biased toward the majority class. It's getting harder for it to correctly find anomalies.
+3. <strong>Create Severe Imbalance (99%):</strong> Push the slider to 99%. The Score Paradox is now in full effect. The Naive model boasts 99% score, making it look nearly perfect. The Standard model, overwhelmed by the majority class, gives up trying to find anomalies. Its edge is pushed far away. And it also classifies all as Class 0. Its score is also 99%, but its Recall is 0%. Both models are now useless for finding the rare events we care about.
 
 ## Beyond Score: Why Recall and Precision Matter
 
-The paradox teaches us a critical lesson: <strong>score is not the right metric for imbalanced datasets</strong>. We need to look at metrics that tell us how well the net does on the minority class.
+The paradox teaches us a critical lesson: <strong>score is not the right metric for imbalanced datasets</strong>. We need to look at metrics that tell us how well the model does on the minority class.
 
-- <strong>Recall (Response):</strong> Of all the <em>actual</em> positive cases (anomalies), how many did the net correctly find? A Recall of 0%, like in our 99% imbalance test, means the net is fully blind to the minority class. This is often the most key metric in fraud or disease detection.
-- <strong>Precision:</strong> Of all the cases the net <em>predicted</em> as positive, how many were <em>really</em> positive? High precision means the net is trustworthy when it raises an alarm.
+- <strong>Recall (Response):</strong> Of all the <em>actual</em> positive cases (anomalies), how many did the model correctly find? A Recall of 0%, like in our 99% imbalance test, means the model is unable to identify to the minority class. This is often the most key metric in fraud or disease detection.
+- <strong>Precision:</strong> Of all the cases the model <em>predicted</em> as positive, how many were <em>really</em> positive? High precision means the model is trustworthy when it raises an alarm.
 
-When dealing with imbalanced data, always test your net with a <strong>Confusion Matrix</strong>. And pay close attention to Precision, Recall. And the F1-Score, especially for the rare class you are trying to find.
+When dealing with imbalanced data, always test your model with a <strong>Confusion Matrix</strong>. And pay close attention to Precision, Recall. And the F1-Score, especially for the rare class you are trying to find.
 
 ## Costs make the decision, not ratios
 
@@ -173,7 +173,7 @@ Suppose a missed fraud costs &pound;200 on average. And a false alarm costs &pou
 - Catching 400 of 500 frauds and raising 3,000 false alarms costs 100&times;200 + 3,000&times;5 = &pound;35,000.
 - Catching 300 and raising 500 false alarms costs 200&times;200 + 500&times;5 = &pound;42,500.
 
-The first net is better despite raising six times as many false alarms, since the asymmetry in costs is 40 to 1. Compute this curve across thresholds and the optimum is a count rather than an argument.
+The first model is better despite raising six times as many false alarms, since the asymmetry in costs is 40 to 1. Compute this curve across thresholds and the optimum is a decision grounded in the relative costs.
 
 This framing also settles the perennial "which metric?" debate. When you can put costs on the errors, expected cost <em>is</em> the metric. And precision, recall and F1 are just proxies for it.
 
@@ -194,14 +194,14 @@ This framing also settles the perennial "which metric?" debate. When you can put
 ## Recap in one screen
 
 - With rare positives, score measures the majority class and nothing else.
-- Nets drift towards predicting the majority since that genuinely cuts average loss.
+- models drift towards predicting the majority since that genuinely cuts average loss.
 - Fix the metric first, then the threshold, then the class weights, then the sampling.
 - Resample and synthesise just inside the training fold. Keep test on the real spread.
 - When you can price the two mistakes, expected cost beats each other metric.
 
 ## A worked threshold sweep
 
-Counts make the threshold argument concrete. Take a fraud net scored on 100,000 transactions holding 500 frauds. And read what happens as the threshold falls:
+Counts make the threshold argument concrete. Take a fraud model scored on 100,000 transactions holding 500 frauds. And read what happens as the threshold falls:
 
 |Threshold|Alerts raised|Frauds caught|Precision|Recall|
 |---|---|---|---|---|
@@ -210,8 +210,12 @@ Counts make the threshold argument concrete. Take a fraud net scored on 100,000 
 |0.20|2,400|420|0.18|0.84|
 |0.05|11,000|480|0.04|0.96|
 
-Nothing about the net changed across those four rows. Just the bar moved.
+Nothing about the model changed across those four rows. Just the bar moved.
 
-Which row is best depends fully on what happens after the alert. If a human reviews each alert and can handle 500 a day, row two is the just feasible option. If the alert triggers an automatic extra verification step that costs pennies and annoys the customer slightly, row three catches 140 more frauds for a cost most businesses would accept. If a missed fraud costs &pound;200 and a review costs &pound;5, row three's expected cost is 80&times;200 + 2,400&times;5 = &pound;28,000 against row two's 220&times;200 + 610&times;5 = &pound;47,050. And the eager net wins clearly.
+Which row is best depends fully on what happens after the alert. If a human reviews each alert and can handle 500 a day, row two is the just feasible option. If the alert triggers an automatic extra verification step that costs pennies and annoys the customer slightly, row three catches 140 more frauds for a cost most businesses would accept. If a missed fraud costs &pound;200 and a review costs &pound;5, row three's expected cost is 80&times;200 + 2,400&times;5 = &pound;28,000 against row two's 220&times;200 + 610&times;5 = &pound;47,050. And the eager model wins clearly.
 
-Give this table before you give a net comparison. It is often more decision-relevant than any single metric. And it costs one line of code from a chance column.
+Give this table before you give a model comparison. It is often more decision-relevant than any single metric. And it costs one line of code from a chance column.
+
+## Further reading
+
+For implementation details, see the [Classification metrics and baselines](https://scikit-learn.org/stable/modules/model_evaluation.html). Continue with [training with class imbalance](training_on_label_imbalanced_dataset.html) to connect this topic to a related part of the workflow.

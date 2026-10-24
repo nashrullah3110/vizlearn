@@ -1,27 +1,33 @@
 title: Training on Imbalanced Dataset: A Practical Guide
-intro: When 99% of your rows share one label, a model that always predicts that label scores 99%. Fixing imbalance means changing the data, the loss, or the threshold - and being honest about which metric you are reading.
+intro: When one class is rare, training objectives may favor the majority class. Reweighting, resampling, and threshold changes address different parts of that problem.
 
 ## Why imbalance breaks training
 
-Standard training cuts average loss over the dataset. When one class holds 99% of the rows, that average is dominated by it: predicting the bulk all over now reaches very low loss. So there is little gradient pressure to learn the small class at all.
+Standard training minimizes average loss over the dataset. When one class holds 99% of the rows, that average is dominated by it: predicting the majority class for every row can achieve low average loss. So the optimization may provide too little incentive to learn the minority class.
 
-The net is not malfunctioning. It is tuning just what you asked it to. And what you asked for was the wrong thing. You wanted the rare class detected. And you told it to minimise total error. It are other objectives whenever the classes are unequal.
+The model is optimizing the objective it was given. If the goal is to find rare cases, minimizing overall error may not put enough weight on that goal. Other objectives may be more appropriate when classes are unequal.
 
-This page covers the three families of fix &mdash; resampling, reweighting. And threshold adjustment &mdash; and the metrics that really tell you whether they helped. Score is useless on imbalanced data. Precision, recall, F1. And the area under the [precision-recall curve](precision_recall_and_f1.html) are the counts to read. The code blocks below train on a 99:1 dataset with and without each fix so you can check the confusion matrices side by side. And the visualisation above lets you adjust the class ratio interactively and watch the metrics respond in real time.
+This page compares resampling, reweighting, and threshold adjustment &mdash; and the metrics that really tell you whether they helped. Accuracy alone is misleading on imbalanced data. Read precision, recall, F1, and area under the [precision-recall curve](precision_recall_and_f1.html) instead. The code blocks below train on a 99:1 dataset with and without each fix so you can check the confusion matrices side by side. And the visualisation above lets you adjust the class ratio interactively and watch the metrics respond in real time.
 
-## The three families of fix
+## Three ways to address imbalance
 
-<strong>Resample the data.</strong> <em>Up-sampling</em> duplicates small rows &mdash; simple. And risks overfitting to the few cases you have. <strong>SMOTE</strong> improves on it by synthesising new small points along the lines between existing neighbours rather than copying. <em>Down-sampling</em> discards bulk rows. It balances the classes and throws away real information. It is fair when the bulk class is genuinely enormous.<strong>Reweight the loss.</strong> Give small errors a more weight, often inversely proportional to class rate. So one small mistake costs as much as ninety-nine bulk ones. This changes nothing about the data and is often the first thing to try. <span class="mono-font">class_weight="balanced"</span> in scikit-learn. Or <span class="mono-font">pos_weight</span> in a PyTorch loss. <strong>Focal loss</strong> goes more by down-weighting cases the net now classifies confidently, concentrating training on the hard cases.<strong>Move the threshold.</strong> Often the net’s chances are fine and just the 0.5 cutoff is wrong. Lowering it trades precision for recall without retraining anything. And choosing it from a precision-recall curve is often the cheapest real improvement on hand.
+There are three different interventions, and they solve different problems:
+
+- **Change the metric.** Use precision, recall, F1, or average precision to see whether the rare class is being detected. Accuracy alone can hide a model that predicts only the majority class.
+- **Change the training loss.** Class weights increase the penalty for mistakes on the rare class. Focal loss reduces the contribution of examples the model already handles confidently.
+- **Change the training data.** Oversampling duplicates or synthesizes minority-class examples; undersampling removes some majority-class examples. These choices change the training distribution and can increase overfitting or discard information.
+
+A fourth option changes the decision rule rather than training: lower or otherwise tune the classification threshold on validation data. This can improve recall at the cost of more false positives. Check the resulting confusion matrix and choose based on the cost of each error.
 
 ## Start by changing nothing about the data
 
-The instinct on seeing an imbalanced dataset is to resample it at once. That is often the third-best move. Two cheaper things come first. And often one of them is enough.
+The instinct on seeing an imbalanced dataset is to resample it at once. Resampling is not always the best first response. Two checks are cheaper and should come first; one may be enough.
 
-<strong>Change what you measure.</strong> If you are still reading score, no training change will help, since you cannot see the problem. Switch to precision, recall, F1 and PR-AUC. And look at the confusion grid right. Sometimes the net was now fine and just the report was broken.
+<strong>Change what you measure.</strong> If you evaluate only with accuracy, a training change may not address the actual failure. Switch to precision, recall, F1 and PR-AUC. And look at the confusion matrix. Sometimes the model is adequate for the task and only the metric was misleading.
 
-<strong>Change the threshold.</strong> A net that outputs chances has now learned a ranking. If it ranks fraud above legitimate deals well, the just thing wrong is that 0.5 is too high a bar for a class that makes up 0.5% of the data. Sweep the threshold, pick the point that meets your recall target. And you may be finished. At no training cost at all.
+<strong>Change the threshold.</strong> A model that outputs scores can rank examples. If it ranks fraud above legitimate deals well, the decision threshold may simply be too high for a class that makes up 0.5% of the data. Sweep the threshold, pick the point that meets your recall target. This may be enough to meet the chosen target without retraining.
 
-Just after those two should you change the training procedure. And when you do, weighting is the gentler intervention: it changes how much each row counts, without inventing or deleting rows.
+Only after trying those two should you change the training procedure. And when you do, weighting is the gentler intervention: it changes how much each row counts, without inventing or deleting rows.
 
 ## Weighting versus resampling
 
@@ -38,9 +44,9 @@ xgb = XGBClassifier(scale_pos_weight=len(y[y==0]) / len(y[y==1]))
 
 <strong>Down-sampling</strong> throws away bulk rows until the ratio improves. Fast, and it makes training much cheaper on very large datasets. But you are discarding real information. Fair when you have millions of bulk rows and can afford to lose some.
 
-<strong>Up-sampling</strong> duplicates small rows. Keeps all the data. But exact duplicates push memorisation. The net can fit those set rows rather than the pattern.
+<strong>Up-sampling</strong> duplicates minority-class rows. Keeps all the data. But exact duplicates push memorisation. The model can fit those set rows rather than the pattern.
 
-<strong>SMOTE</strong> creates new synthetic small points along the lines between existing small neighbours, instead of duplicating. It works best with continuous, well-scaled features and a moderate imbalance. It struggles with class-based features (the interpolated value is not a real group), with high dimensions (the interpolation is between points that were not really neighbours). And with noisy small points (it amplifies them).
+<strong>SMOTE</strong> creates new synthetic minority-class points along the lines between existing minority-class neighbours, instead of duplicating. It works best with continuous, well-scaled features and a moderate imbalance. It struggles with class-based features (the interpolated value is not a real group), with high dimensions (the interpolation is between points that were not really neighbours). And with noisy minority-class points (it amplifies them).
 
 |Approach|Data changed|Cost|Main risk|
 |---|---|---|---|
@@ -54,7 +60,7 @@ xgb = XGBClassifier(scale_pos_weight=len(y[y==0]) / len(y[y==1]))
 
 Resampling belongs <em>inside</em> the cross-validation fold, applied just to the training portion. And never to validation or test data.
 
-Get this wrong and the failure is spectacular but invisible: SMOTE applied before splitting creates synthetic points from rows that later land in the test set. The net then sees close relatives of test rows in training, scores 0.97. And collapses in production.
+Get this wrong and the failure is spectacular but invisible: SMOTE applied before splitting creates synthetic points from rows that later land in the test set. The model then sees close relatives of test rows in training, scores 0.97. And collapses in production.
 
 The safe pattern is an imbalanced-learn pipeline. It applies the sampler just in `fit`:
 
@@ -195,9 +201,9 @@ print("same thing for free, and it is reversible. start there.")
 ## Tests to try
 
 1. <strong>Start balanced.</strong> Set <strong>Class 0 Ratio</strong> to 50 and press <strong>Retrain Both Nets</strong>. Both classes are learned and the edge sits sensibly between them.
-2. <strong>Make it severe.</strong> Raise <strong>Class 0 Ratio</strong> to 95 and retrain. The edge shifts toward the small class and swallows it. Score stays high while the small class is barely detected.
-3. <strong>Apply a fix.</strong> With the ratio still at 95, choose a plan from <strong>Fix Plan</strong> and retrain. The edge moves back and small recall recovers, at some cost in precision.
-4. <strong>Push to the extreme.</strong> Set <strong>Class 0 Ratio</strong> to 99 and check with and without a fix. At this level the unmitigated net is close to a constant predictor.
+2. <strong>Make it severe.</strong> Raise <strong>Class 0 Ratio</strong> to 95 and retrain. The edge shifts toward the minority class and swallows it. Accuracy stays high while the minority class is barely detected.
+3. <strong>Apply a fix.</strong> With the ratio still at 95, choose a plan from <strong>Fix Plan</strong> and retrain. The edge moves back and recall improves, at some cost in precision.
+4. <strong>Push to the extreme.</strong> Set <strong>Class 0 Ratio</strong> to 99 and check with and without a fix. At this level the unmitigated model is close to a constant predictor.
 
 ## What often goes wrong
 
@@ -209,7 +215,7 @@ print("same thing for free, and it is reversible. start there.")
 
 ## The short version
 
-Imbalance is a mismatch between the average loss you are cutting and the rare-class detection you really want. Fix it by reweighting the loss (often first), resampling the training data (inside the fold, never before the split). Or simply moving the decision threshold. Then change the metric too. Score cannot show you whether any of it worked.
+Imbalance is a mismatch between the average loss you are cutting and the rare-class detection you really want. Fix it by reweighting the loss (often first), resampling the training data (inside the fold, never before the split). Or simply moving the decision threshold. Then change the metric too. Score cannot show you whether anything worked.
 
 ## When the class is very rare indeed
 
@@ -217,19 +223,19 @@ Below roughly one positive in a thousand, sorting starts to be the wrong framing
 
 <strong>Anomaly detection</strong> learns what normal looks like from the bulk class alone and flags departures from it. Isolation Forest, One-Class SVM and autoencoder reconstruction error are the usual tools. This works when the positives are heterogeneous. Many other kinds of unusual. Rather than one coherent pattern.
 
-<strong>A two-stage pipeline.</strong> A cheap, high-recall net first reduces millions of candidates to thousands. And a more costly, high-precision net then ranks those. This is how large-scale fraud and moderation systems are really built. And it sidesteps the problem of asking one net to be both sensitive and precise.
+<strong>A two-stage pipeline.</strong> A fast, high-recall model can reduce a large candidate set; a more expensive second-stage model can then rank the remaining cases. This is how large-scale fraud and moderation systems are really built. And it sidesteps the problem of asking one model to be both sensitive and precise.
 
 Whichever route you take, the test discipline is the same: a test set with the real prevalence, PR-AUC rather than ROC-AUC. And metrics reported at the operating point you will really deploy.
 
 ## Questions people ask
 
-<strong>Does `class_weight="balanced"` always help?</strong> No. It sometimes over-corrects, giving a net that flags far too much. Treat the weight as a hyperparameter and tune it rather than assuming the balanced setting is best.
+<strong>Does `class_weight="balanced"` always help?</strong> No. It sometimes over-corrects, giving a model that flags far too much. Treat the weight as a hyperparameter and tune it rather than assuming the balanced setting is best.
 
 <strong>Should I resample before or after splitting?</strong> After, always. And just the training part.
 
 <strong>Is SMOTE better than plain up-sampling?</strong> Often, on continuous numeric features. On class-based or very high-dim data it often is not. And plain up-sampling with strong smoothing can do better. Test both.
 
-<strong>What about making synthetic data with a net?</strong> GANs and close can give small-class cases. And this is used in some domains. It is far more effort than SMOTE and carries the same basic risk: the net learns the generator's idea of the class, not the world's.
+<strong>What about making synthetic data with a model?</strong> Generative models can produce synthetic minority-class examples in some settings. It is far more effort than SMOTE and carries the same basic risk: the model learns the generator's idea of the class, not the world's.
 
 <strong>Do neural networks need special handling?</strong> Yes. And focal loss is the standard answer. It down-weights easy, well-classified cases so training focuses on the hard ones. It was designed for object detection. There background boxes outnumber objects by a thousand to one.
 
@@ -242,3 +248,7 @@ Whichever route you take, the test discipline is the same: a test set with the r
 - SMOTE synthesises rather than duplicates. And suits continuous features with moderate imbalance.
 - Resample just inside training folds, stratify your splits, test on the real spread.
 - Below about 1 in 1,000, consider anomaly detection or a two-stage pipeline instead.
+
+## Further reading
+
+For implementation details, see the [Class-weight computation](https://scikit-learn.org/stable/modules/generated/sklearn.utils.class_weight.compute_class_weight.html). Continue with [why imbalance misleads accuracy](label_imbalance_problem.html) to connect this topic to a related part of the workflow.

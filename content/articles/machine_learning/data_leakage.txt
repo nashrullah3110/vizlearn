@@ -1,5 +1,5 @@
 title: Data Leakage
-intro: The mistake that makes your model look better and your results worthless.
+intro: Data leakage happens when training uses information that would not be available at prediction time. It creates scores that look better than real-world performance.
 
 ## What it is
 
@@ -30,11 +30,11 @@ whatsoever, and the only honest score is 50%.
 
 Set the control to **Once, dataset**. Five columns are picked by
 correlating each one with the label across all 300 rows, and only then is the
-data cross-validated. The reported fit is well above 50%, on data that
+data cross-validated. The reported accuracy is well above 50%, on data that
 holds nothing.
 
 Now set it to **Inside each fold**. The pick is redone within each fold's
-training rows, and the reported fit falls back to chance &mdash; 
+training rows, and the reported accuracy falls back to chance &mdash;
 slightly below it, which is worth a sentence of its own further down.
 
 Drag the number of columns up. The inflation grows: 40 pick columns buy a
@@ -47,11 +47,11 @@ is whether the rows being scored had a say in which columns were used.
 
 ## Why the honest number lands below 50%
 
-The correct setting reports a thing like 45%, not 50%, and that isn't a bug
+The correct setting reports a value near 45%, not 50%, and that isn't a bug
 in the demo.
 
 A column is chosen inside a fold because it happened to separate the classes in
-those training rows. On pure noise that gap is fully accidental, and
+those training rows. On pure noise that gap is entirely due to chance, and
 an accident large enough to win a search over hundreds of columns is an extreme
 one. Extremes regress: on the held-out rows, that column is as likely to lean
 the other way as this way, and the centroid built from the training rows then
@@ -59,16 +59,16 @@ points slightly the wrong direction.
 
 So selecting features on noise doesn't merely fail to help. It can actively
 mislead, and a model built on selected noise can score worse than one that
-skips the data fully. That is worth knowing on its own, and it's the
+uses no information from the held-out rows. That is worth knowing on its own, and it's the
 strongest available arg for checking whether a feature-pick step is
 earning its place.
 
 ## Why a scaler counts as a model
 
 The instinct that makes this feel harmless is that scaling is "just
-prep". But `StandardScaler` has params &mdash; a mean and a
-standard deviation &mdash; and it *learns* them from data. any of it that learns
-params from data must learn them from training data only.
+prep". But `StandardScaler` has parameters &mdash; a mean and a
+standard deviation &mdash; and it *learns* them from data. anything that learns
+parameters from data must learn them from training data only.
 
 The same arg applies to each step that looks at the data as a whole:
 
@@ -157,7 +157,7 @@ finding out later is much more costly than checking now.
 
 ## A model that scores well and knows nothing
 
-Select features using the whole dataset, then cross-validate. The score is great and fully fake. The data is pure noise.
+Select features using the whole dataset, then cross-validate. The score is high but entirely misleading. The data is pure noise.
 
 ```python-run
 import numpy as np
@@ -201,3 +201,7 @@ print("this is why every fit-like step belongs inside the pipeline. scalers,")
 print("imputers, encoders and selectors all learn from data, and all of them")
 print("leak if they learn from rows that are supposed to be unseen.")
 ```
+
+## Further reading
+
+For implementation details, see the [Cross-validation and preprocessing safely](https://scikit-learn.org/stable/modules/cross_validation.html). Continue with [machine-learning pipelines](ml_pipelines.html) to connect this topic to a related part of the workflow.

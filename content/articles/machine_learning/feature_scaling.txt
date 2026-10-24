@@ -1,5 +1,5 @@
 title: Feature Scaling
-intro: Why a column measured in pounds drowns out a column measured in years, and which models care.
+intro: Feature scaling puts numeric variables on comparable ranges. It matters for distance-based and regularized models, while most decision trees are largely unaffected.
 
 ## The problem is the units
 
@@ -27,7 +27,7 @@ is in effect one-dimensional, and no one asked for that.
 Switch to **StandardScaler**. Each column has its mean subtracted and is cut
 by its standard deviation, so both end up centred on 0 with a spread of about 1.
 The scatter turns roughly circular, both columns contribute comparably, and
-the fit in the readout moves.
+the model output in the readout changes.
 
 ```
 z = (x - mean) / std
@@ -48,7 +48,7 @@ the basis for choosing.
 | Output range | unbounded, roughly &minus;3 to 3 | exactly [0, 1] |
 | Uses | mean, standard deviation | minimum, maximum |
 | One extreme value | shifts the mean a little | compresses everything else |
-| Good for | most things, especially with outliers | bounded inputs, image pixels, neural nets |
+| Good for | most things, especially with outliers | bounded inputs, image pixels, neural networks |
 
 MinMax's weakness is worth stating plainly. Both statistics it uses are the most
 outlier-sensitive numbers available. One salary of ten million maps to 1.0 and
@@ -73,7 +73,7 @@ crushes each real salary into the bottom half of a per cent of the range.
 
 That last group surprises people, and the reason is worth having. A tree split
 asks `is income > 45000`. Rescale the column and the question turns
-`is income' > 0.53`. This Splits the rows into just the same two groups.
+`is income' > 0.53`. This splits the rows into the same two groups.
 Any monotonic change leaves each possible split unchanged, so the tree
 is the same. Scaling before a random forest isn't wrong. It's simply a
 no-op.
@@ -83,9 +83,9 @@ no-op.
 Fit the scaler on the **training data only**, then apply it to the test data
 without refitting.
 
-The mean and standard deviation are learned params. finding them from the
+The mean and standard deviation are learned parameters. finding them from the
 whole dataset lets info about the test set reach the model before it's
-tested, and the reported score stops being an guess of any of it. That is
+tested, and the reported score stops being an guess of anything. That is
 [data leakage](data_leakage.html), it's the most common serious mistake in
 applied machine learning, and it's why scalers belong inside a
 [pipeline](ml_pipelines.html) rather than being applied by hand.
@@ -93,7 +93,7 @@ applied machine learning, and it's why scalers belong inside a
 ## Standardising, and why trees do not care
 
 The fix is one formula applied per column, `z = (x - mean) / std`, and working it
-shows why some models transform fully and others not at all. Age spanning
+shows why scaling changes some models substantially but leaves tree splits essentially unchanged. Age spanning
 25-55 and income spanning 20,000-70,000, standardised:
 
 |raw|z-score|
@@ -104,10 +104,10 @@ shows why some models transform fully and others not at all. Age spanning
 |income 70,000|+1.7|
 
 Both columns now live on the same &minus;3-to-3 scale. A year of age and a
-standard-deviation of income count comparably in a Euclidean distance &mdash; where
+standard deviation of income contribute comparably to a Euclidean distance &mdash; where
 before, the income term's raw spread of 50,000 against age's 30 made age
 by number invisible to k-NN, k-means, SVM-RBF and PCA. A choice tree, by
-contrast, is fully unmoved: its split asks `is income > 45000`, which after
+contrast, is unaffected: its split asks `is income > 45000`, which after
 scaling turns `is income' > 0.53`, and that splits the rows into just the
 same two groups. Any monotonic rescaling leaves each possible split unchanged, so
 scaling before a random forest is a genuine no-op. Not wrong, just wasted
@@ -238,3 +238,7 @@ print()
 print("and always fit the scaler inside a pipeline -- fitting it on all the data")
 print("before splitting leaks the test set's mean and sd into training.")
 ```
+
+## Further reading
+
+For implementation details, see the [Preprocessing and feature scaling](https://scikit-learn.org/stable/modules/preprocessing.html). Continue with [machine-learning pipelines](ml_pipelines.html) to connect this topic to a related part of the workflow.

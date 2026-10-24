@@ -1,5 +1,5 @@
 title: Precision, Recall and F1
-intro: Four counts in a table, three ratios drawn from them. One slider that moves all of it.
+intro: Precision measures how many positive predictions are correct; recall measures how many actual positives are found. Their balance depends on the classification threshold and error costs.
 
 ## One model, many scores
 
@@ -35,12 +35,10 @@ All else is a ratio of these. The two that matter most divide by
 different denominators, which is just why they disagree.
 
 **Precision** = TP / (TP + FP). Of all you flagged, what fraction
-was right. The denominator is what *you* predicted. So Precision is damaged by
-false alarms.
+was right. The denominator is what *you* predicted. So False positives lower precision.
 
 **Recall** = TP / (TP + FN). Of all that was really there, what
-fraction you caught. The denominator is what *reality* held, so recall is
-damaged by misses.
+fraction you caught. False negatives lower recall.
 
 ## Why they trade off
 
@@ -50,7 +48,7 @@ negatives, and precision merges.
 
 Drag it to 0.90. Only the most confident cases are flagged, nearly all of them
 correct, and precision approaches 100%. But most real positives are below the
-line, and recall merges.
+line, and recall falls.
 
 You can't raise both by moving the threshold. The threshold only chooses
 where on the trade-off you sit. Raising both at once needs a better model
@@ -78,58 +76,43 @@ F1 = 2 * precision * recall / (precision + recall)
 ```
 
 That is the harmonic mean, and the choice of mean is the point. Take precision
-of 1.0 and recall of 0.01. A model that flags just one case and gets
-it right. The arithmetic mean is 0.505. This Sounds fair. F1 is 0.0198.
+of 1.0 and recall of 0.01. Consider a model with precision 1.0 and recall 0.01: it flags very few cases, all correctly, but misses almost every positive. The arithmetic mean is 0.505. This sounds fair. F1 is 0.0198.
 
-The harmonic mean is pulled toward the smaller number. So It stays low unless
-both are high. That makes it hard to game with a collapse model, which is
-just what a single summary number needs to be.
+The harmonic mean is pulled toward the smaller number. So it stays low unless
+both are high. That makes F1 low when either precision or recall is low, which is useful when both matter.
 
-F1 weights the two equally. This Is a choice and often the wrong one. F-beta
+F1 weights the two equally. This is a choice and often the wrong one. F-beta
 lets you weight recall &beta; times as much as precision. F2 favours recall, F0.5
 favours precision. If you've a reason to prefer one, use it.
 
 ## Why accuracy is on the readout and not in the headline
 
-Fit is (TP + TN) / all. It's the most natural metric and it's
-close to useless when the classes are unbalanced.
+Accuracy is (TP + TN) / all predictions. It is intuitive, but can be
+misleading when the classes are unbalanced.
 
 If 1% of transactions are fraudulent, predicting "never fraud" scores 99%
-fit while catching nothing at all. Precision and recall are both zero, which
+accuracy while catching nothing at all. Precision and recall are both zero, which
 is the honest description. [Imbalanced
 data](precision_recall_vs_roc.html) is where this matters most.
 
 ## The same model at two thresholds
 
-Precision and recall are properties of the threshold as much as the model, which a
-worked confusion mat makes concrete. The same classifier, the same scores, two
-cuts:
+The same classifier can produce very different precision and recall at different
+thresholds. Suppose 100 cases are positive:
 
 |threshold|caught (of 100 real)|false alarms|precision|recall|
 |---|---|---|---|---|
 |0.10 (permissive)|98|300|0.246|0.98|
 |0.90 (strict)|40|4|0.909|0.40|
 
-Drop the threshold and recall climbs toward 100% as almost all is flagged,
-but the flagged set fills with negatives and precision merges. Raise it and
-precision climbs as only confident cases live. But Most real positives fall
-below the line and recall merges. The threshold only chooses *where on the
-trade-off you sit* &mdash; raising both at once needs a better model, one whose
-plus and minus score spreads share less. F1 summarises a single
-point as the harmonic mean, `2PR/(P+R)`, and the choice of *harmonic* is the
-point: precision 1.0 with recall 0.01 means to a fair-looking 0.505
-arithmetically but an F1 of just 0.0198. The harmonic mean is dragged to
-the smaller number and refuses to reward a model that flags one case and hides.
-
-Which error to cut is a question about costs, never about which metric is
-"best". Recall matters more when a miss is costly. Screening for a serious
-disease, catching fraud &mdash; where a false alarm costs only a second look.
-Precision matters more when a false alarm is costly &mdash; suspending an
-account, paging a human at 3am. Where a miss is merely dealt with later. And
-fit, the most natural metric, is close to useless under imbalance: if 1% of
-transactions are fraud, predicting "never fraud" scores 99% while catching nothing,
-with precision and recall both zero telling the honest story the single fit
-number hides.
+At threshold 0.10, the model catches 98 of the 100 positives and also flags
+300 negatives. Precision is therefore `98 / (98 + 300) = 0.246`; recall is
+`98 / 100 = 0.98`. At threshold 0.90, it catches 40 positives and flags 4
+negatives: precision is `40 / 44 = 0.909`, while recall is `40 / 100 = 0.40`.
+The first setting misses few positives but sends many false alarms; the second
+is more selective but misses more positives. F1 combines precision and recall
+at one threshold, but it does not replace choosing a threshold based on the
+cost of each error.
 
 ## Where it goes wrong
 
@@ -160,7 +143,7 @@ model.
 
 ## The trade you cannot avoid
 
-Precision and recall pull in opposite directions. Sweeping the choice threshold shows just how much of one each unit of the other costs.
+Precision and recall trade off as the threshold changes. A useful operating point depends on the relative cost of false positives and false negatives.
 
 ```python-run
 import numpy as np
@@ -201,3 +184,7 @@ print("which one you optimise is a business decision, not a modelling one:")
 print("  a spam filter wants precision -- a false alarm loses real mail.")
 print("  a cancer screen wants recall  -- a miss is far worse than a recheck.")
 ```
+
+## Further reading
+
+For implementation details, see the [Classification metrics](https://scikit-learn.org/stable/modules/model_evaluation.html). Continue with [threshold tuning](threshold_tuning.html) to connect this topic to a related part of the workflow.

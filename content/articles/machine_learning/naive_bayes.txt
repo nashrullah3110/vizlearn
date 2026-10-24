@@ -1,9 +1,9 @@
 title: How Naive Bayes Works: A Step-by-Step Guide
-intro: Follow the "Calculation Story" as you click through the steps to see the logic unfold.
+intro: Naive Bayes applies Bayes’ rule with a conditional-independence assumption between features. The assumption is often imperfect, yet the method can work well for sparse data.
 
 ## How Bayes' theorem classifies with one bold assumption
 
-The <strong>Naive Bayes Classifier</strong> is a simple yet powerful algorithm for predictive modeling. It is based on <strong>Bayes' Theorem</strong> and is very useful for text classification, like spam filtering. Its core idea is to calculate the probability of a certain outcome (e.g., "Should I play tennis?") based on the evidence provided by a set of features (e.g., the weather outlook, temperature, and wind). The "naive" part is the independence assumption: the net treats each feature as if it adds to the probability independently of each other feature. In practice features are almost never independent &mdash; a sunny outlook correlates with more temperatures &mdash; but the classifier works surprisingly well regardless, since classification just needs to get the ranking of class probabilities right, not the probabilities them. Three variants handle other data types: Gaussian for continuous features, Multinomial for counts (the standard for text). And Bernoulli for binary presence/absence. All three are fast to train (one pass through the data to count frequencies) and fast to predict (a product of looked-up probabilities). It is why Naive Bayes stays the first net to try on a text classification task. This page walks through the math step by step on the classic "play tennis" dataset, shows the posterior for each class. And covers Laplace smoothing for the zero-frequency problem.
+The <strong>Naive Bayes Classifier</strong> is a simple yet powerful algorithm for predictive modeling. It is based on <strong>Bayes' Theorem</strong> and is very useful for text classification, like spam filtering. Its core idea is to calculate the probability of a certain outcome (e.g., "Should I play tennis?") based on the evidence provided by a set of features (e.g., the weather outlook, temperature, and wind). The "naive" part is the independence assumption: the model treats each feature as if it adds to the probability independently of each other feature. In practice features are almost never independent &mdash; a sunny outlook correlates with more temperatures &mdash; but the classifier works surprisingly well regardless, since classification just needs to get the ranking of class probabilities right, not the probabilities them. Three variants handle other data types: Gaussian for continuous features, Multinomial for counts (the standard for text). And Bernoulli for binary presence/absence. All three are fast to train (one pass through the data to count frequencies) and fast to predict (a product of looked-up probabilities). It is why Naive Bayes stays the first model to try on a text classification task. This page walks through the math step by step on the classic "play tennis" dataset, shows the posterior for each class. And covers Laplace smoothing for the zero-frequency problem.
 
 ## The "Naive" Assumption: A Key Simplification
 
@@ -29,7 +29,7 @@ The naive assumption cuts through this: <strong>assume each feature is independe
 
 <p class="mono-font">P(free, money, click | spam) = P(free|spam) &times; P(money|spam) &times; P(click|spam)</p>
 
-Each of those is a single count divided by another count. The whole net turns a table of frequencies, computable in one pass over the data.
+Each of those is a single count divided by another count. The whole model turns a table of frequencies, computable in one pass over the data.
 
 The assumption is, of course, false. "New" and "York" are wildly dependent. And yet the classifier works, since for <em>ranking</em> classes you do not need the probabilities to be right &mdash; you just need the right class to come out on top. The estimated probabilities are often far too extreme (0.9999 and close), while the decisions they lead to are sound. Trust the argmax, distrust the count. And calibrate if you need the count.
 
@@ -49,7 +49,7 @@ Spam wins. Normalising, 0.24 / (0.24 + 0.07) = 77% probability of spam.
 
 Now suppose the email also holds "meeting", a word that appeared in zero spam emails in training. P(meeting | spam) = 0. And the whole spam score is multiplied by zero &mdash; one unseen word has vetoed the whole math.
 
-The fix is <strong>Laplace smoothing</strong>: add 1 to each count (and the vocabulary size to each denominator). So no probability is ever just zero. With a vocabulary of 1,000 words, P(meeting | spam) turns 1/(30 + 1000) = 0.00097 instead of 0. Small, but survivable. Each real build does this by default. Scikit-learn calls the param `alpha`.
+The fix is <strong>Laplace smoothing</strong>: add 1 to each count (and the vocabulary size to each denominator). So no probability is ever just zero. With a vocabulary of 1,000 words, P(meeting | spam) turns 1/(30 + 1000) = 0.00097 instead of 0. Small, but survivable. Each real build does this by default. Scikit-learn calls the parameter `alpha`.
 
 The other build detail: multiplying thousands of small probabilities underflows to zero in floating point. So real implementations add logarithms instead of multiplying probabilities. Same ranking, no underflow.
 
@@ -58,7 +58,7 @@ The other build detail: multiplying thousands of small probabilities underflows 
 The interactive panel walks you through the exact steps the algorithm takes to make a prediction. Let's use the default input: <strong>Outlook=Sunny, Temp=Cool, Wind=Strong</strong>.
 
 1. <strong>Step 1: Calculate Prior Probabilities</strong> <p>First, the algorithm looks at the historical data (the "Knowledge Base") to find the total probability of each outcome. This is the "prior" belief before considering any new evidence.</p> <ul class="list-disc list-outside space-y-1 pl-5 mt-2"> <li><code>P(Play=Yes)</code>: Out of 14 total days, 'Play' was 'Yes' on 9 of them. So, P(Yes) = 9/14.</li> <li><code>P(Play=No)</code>: 'Play' was 'No' on 5 of them. So, P(No) = 5/14.</li> </ul>
-2. <strong>Step 2: Calculate Likelihoods for Each Feature</strong> <p>Next, for each class ('Yes' and 'No'), the algorithm calculates the probability of our set input features occurring. This is the "likelihood".</p> <ul class="list-disc list-outside space-y-1 pl-5 mt-2"> <li><strong>Likelihood for 'Yes':</strong> <ul class="list-circle list-outside space-y-1 pl-5 mt-1"> <li><code>P(Outlook=Sunny | Play=Yes)</code>: Among the 9 'Yes' days, 2 were 'Sunny'. (Prob = 2/9)</li> <li><code>P(Temp=Cool | Play=Yes)</code>: Among the 9 'Yes' days, 3 were 'Cool'. (Prob = 3/9)</li> <li><code>P(Wind=Strong | Play=Yes)</code>: Among the 9 'Yes' days, 3 were 'Strong'. (Prob = 3/9)</li> </ul> </li> <li><strong>Likelihood for 'No':</strong> <ul class="list-circle list-outside space-y-1 pl-5 mt-1"> <li><code>P(Outlook=Sunny | Play=No)</code>: Among the 5 'No' days, 3 were 'Sunny'. (Prob = 3/5)</li> <li><code>P(Temp=Cool | Play=No)</code>: Among the 5 'No' days, 1 was 'Cool'. (Prob = 1/5)</li> <li><code>P(Wind=Strong | Play=No)</code>: Among the 5 'No' days, 3 were 'Strong'. (Prob = 3/5)</li> </ul> </li> </ul> <p class="text-xs mt-2 opacity-80"><em>Note: The visualization uses Laplace Smoothing (adding 1 to the numerator and the count of unique feature vals to the denominator) to avoid zero-probability issues. So the exact fractions will look slightly other in the "Math Story".</em></p>
+2. <strong>Step 2: Calculate Likelihoods for Each Feature</strong> <p>Next, for each class ('Yes' and 'No'), the algorithm calculates the probability of our set input features occurring. This is the "likelihood".</p> <ul class="list-disc list-outside space-y-1 pl-5 mt-2"> <li><strong>Likelihood for 'Yes':</strong> <ul class="list-circle list-outside space-y-1 pl-5 mt-1"> <li><code>P(Outlook=Sunny | Play=Yes)</code>: Among the 9 'Yes' days, 2 were 'Sunny'. (Prob = 2/9)</li> <li><code>P(Temp=Cool | Play=Yes)</code>: Among the 9 'Yes' days, 3 were 'Cool'. (Prob = 3/9)</li> <li><code>P(Wind=Strong | Play=Yes)</code>: Among the 9 'Yes' days, 3 were 'Strong'. (Prob = 3/9)</li> </ul> </li> <li><strong>Likelihood for 'No':</strong> <ul class="list-circle list-outside space-y-1 pl-5 mt-1"> <li><code>P(Outlook=Sunny | Play=No)</code>: Among the 5 'No' days, 3 were 'Sunny'. (Prob = 3/5)</li> <li><code>P(Temp=Cool | Play=No)</code>: Among the 5 'No' days, 1 was 'Cool'. (Prob = 1/5)</li> <li><code>P(Wind=Strong | Play=No)</code>: Among the 5 'No' days, 3 were 'Strong'. (Prob = 3/5)</li> </ul> </li> </ul> <p class="text-xs mt-2 opacity-80"><em>Note: The visualization uses Laplace Smoothing (adding 1 to the numerator and the number of unique feature values to the denominator) to avoid zero-probability issues. So the exact fractions will look slightly other in the "Math Story".</em></p>
 3. <strong>Step 3: Mix and Calculate Scores</strong> <p>Now, we mix all. For each outcome, we multiply its prior probability by all of its likelihoods.</p> <ul class="list-disc list-outside space-y-1 pl-5 mt-2"> <li><code>Score(Yes) = P(Yes) * P(Sunny|Yes) * P(Cool|Yes) * P(Strong|Yes)</code></li> <li><code>Score(No) = P(No) * P(Sunny|No) * P(Cool|No) * P(Strong|No)</code></li> </ul>
 4. <strong>Step 4: Normalize and Predict</strong> <p>The scores are not final probabilities. To get a clean 0-100% result, we normalize them by dividing each score by the sum of both scores. The class with the more final probability is our prediction.</p>
 
@@ -71,15 +71,15 @@ The interactive panel walks you through the exact steps the algorithm takes to m
 |Gaussian|Continuous|Numeric features, assumed normal within each class|
 |Complement|Counts|Text with imbalanced classes; often beats multinomial|
 
-Gaussian Naive Bayes is the one to be careful with: it assumes each feature follows a bell curve within each class. On a heavily skewed feature such as income, that assumption is badly wrong. And a log transform beforehand often helps more than switching nets.
+Gaussian Naive Bayes is the one to be careful with: it assumes each feature follows a bell curve within each class. On a heavily skewed feature such as income, that assumption is badly wrong. And a log transform beforehand often helps more than switching models.
 
 ## Where it still earns its place
 
 Naive Bayes is old, and it is still deployed, for reasons that have not been undermined by anything newer:
 
-- <strong>Speed.</strong> Training is one pass of counting. On millions of documents it finishes while other nets are still loading.
-- <strong>Small data.</strong> With a few hundred labelled cases it often beats nets with more params to fit, since it has so few of its own.
-- <strong>Streaming.</strong> Counts update incrementally. So the net can learn continuously with no retraining step.
+- <strong>Speed.</strong> Training is one pass of counting. On millions of documents it finishes while other models are still loading.
+- <strong>Small data.</strong> With a few hundred labelled cases it often beats models with more parameters to fit, since it has so few of its own.
+- <strong>Streaming.</strong> Counts update incrementally. So the model can learn continuously with no retraining step.
 - <strong>Baselines.</strong> If your transformer cannot beat Naive Bayes on your text classification task, something is wrong with the pipeline, not with the transformer.
 - <strong>High dimensions.</strong> A vocabulary of 100,000 features is not a problem. Each adds one count per class.
 
@@ -189,9 +189,9 @@ print("fast enough to be the baseline you compare everything against.")
 
 <strong>Why does it work if the independence assumption is false?</strong> Since classification just needs the correct class to score highest. Correlated features distort the magnitude of the scores in the same way for all classes. It often leaves the ordering intact.
 
-<strong>What does `alpha` do?</strong> It is the smoothing constant. `alpha=1` is Laplace smoothing. Less vals trust the observed counts more. `alpha=0` reintroduces the zero-probability veto. Tune it &mdash; on small vocabularies it matters more than people expect.
+<strong>What does `alpha` do?</strong> It is the smoothing constant. `alpha=1` is Laplace smoothing. Less values trust the observed counts more. `alpha=0` reintroduces the zero-probability veto. Tune it &mdash; on small vocabularies it matters more than people expect.
 
-<strong>Can it handle continuous and categorical features together?</strong> Not in one standard estimator. Either bin the continuous features into categories. Or train split nets and mix their log-probabilities.
+<strong>Can it handle continuous and categorical features together?</strong> Not in one standard estimator. Either bin the continuous features into categories. Or train split models and mix their log-probabilities.
 
 <strong>Why are the predicted probabilities so extreme?</strong> Multiplying many correlated likelihoods double-counts evidence, pushing outputs towards 0 or 1. Apply isotonic or sigmoid calibration if you need trustworthy probabilities.
 
@@ -202,15 +202,19 @@ print("fast enough to be the baseline you compare everything against.")
 - Score each class by "how common is this class" times "how typical is this evidence for it". And pick the winner.
 - The naive assumption &mdash; features independent given the class &mdash; turns an impossible count into a product of easy ones.
 - Smoothing is mandatory, or a single unseen feature zeroes out a class.
-- Fast, tiny, excellent on text and small datasets. And a benchmark each heavier net should have to beat.
+- Fast, tiny, excellent on text and small datasets. And a benchmark each heavier model should have to beat.
 - Trust its decisions more than its probabilities.
 
 ## A last word on why it survives
 
 Naive Bayes is roughly as old as the field, is based on an assumption everyone agrees is false. And is still in production in spam filters, document routers and medical triage tools. That combination is worth grasp, since it teaches something general about modelling.
 
-The lesson is that a net does not have to be right to be useful &mdash; it has to be wrong in a way that does not affect the decision being made. The independence assumption distorts the magnitude of the probabilities. And the decision just depends on their order. So the error goes almost fully into a quantity nobody uses.
+The lesson is that a model does not have to be right to be useful &mdash; it has to be wrong in a way that does not affect the decision being made. The independence assumption distorts the magnitude of the probabilities. And the decision just depends on their order. So much of the error affects probability magnitudes, even when the predicted class remains the same.
 
-Check that with a net whose errors land right on the decision edge. And the gap in real value is enormous still if their stated assumptions look equally shaky.
+Check that with a model whose errors land right on the decision edge. And the gap in real value is enormous still if their stated assumptions look equally shaky.
 
-The second reason it survives is that its cost profile is unusual. Training is one pass of counting, memory is a table of frequencies. And prediction is a handful of additions in log space. On a device with no GPU, in a stream with no batch window. Or in a system that must update continuously, that profile beats a more exact net that cannot be deployed.
+The second reason it survives is that its cost profile is unusual. Training is a pass over the data to accumulate feature counts, and prediction combines log-probabilities. This can be inexpensive to deploy on a CPU or in a streaming system, although the independence assumption may limit predictive quality.
+
+## Further reading
+
+For implementation details, see the [Naive Bayes methods](https://scikit-learn.org/stable/modules/naive_bayes.html). Continue with [logistic regression](logistic_regression.html) to connect this topic to a related part of the workflow.
