@@ -9,10 +9,9 @@
  * to spin forever on a well-formed statement the way a Python `while True`
  * can, so the timeout a worker buys is not worth the message-passing.
  *
- * A page may hold several blocks - the database articles embed one per page
- * beside the prose, and the lab has one. They all share a single database, so
- * a CREATE in one block is visible to the next, which is what makes a page of
- * worked examples behave like one session.
+ * A page may hold several blocks. The lesson's visualizer blocks share one
+ * database; runnable prose examples opt into isolated databases so each
+ * sample has a clean schema and does not disturb the visualization.
  *
  * Markup the page supplies:
  *
@@ -36,8 +35,8 @@
     var roots = [].slice.call(document.querySelectorAll('[data-vz-sql]'));
     if (!roots.length) return;
 
-    // One seed for the page, wherever it is declared. Every block runs against
-    // the same database.
+    // The main lesson runner uses one shared seed. Runnable prose examples opt
+    // into a separate seeded database so schemas cannot collide.
     var seed = document.querySelector('.sql-seed');
 
     var SQL = null;      // the sql.js module
@@ -65,11 +64,35 @@
         return loading;
     }
 
-    function fresh() {
-        db = new SQL.Database();
-        if (seed && seed.textContent.trim()) {
-            try { db.run(seed.textContent); } catch (e) { /* seed is ours */ }
+    function fresh(root) {
+        var isolated = root && root.hasAttribute('data-vz-sql-isolated');
+        var activeDb = new SQL.Database();
+        var activeSeed = isolated ? root.querySelector('.sql-seed') : seed;
+        if (activeSeed && activeSeed.textContent.trim()) {
+            try { activeDb.run(activeSeed.textContent); } catch (e) { /* seed is ours */ }
         }
+        if (isolated) root.__vzSqlDb = activeDb;
+        else db = activeDb;
+        return activeDb;
+    }
+
+    function databaseFor(root) {
+        if (root.hasAttribute('data-vz-sql-isolated')) {
+            return root.__vzSqlDb || fresh(root);
+        }
+        return db || fresh();
+    }
+
+    function bindParameters(root) {
+        var fields = root.querySelectorAll('.sql-param-input');
+        if (!fields.length) return undefined;
+        var positional = [], named = {};
+        [].forEach.call(fields, function (field) {
+            var name = field.getAttribute('data-sql-param');
+            if (name === '?') positional.push(field.value);
+            else named[name] = field.value;
+        });
+        return positional.length ? positional : named;
     }
 
     // ---------------------------------------------------------------- render
@@ -87,22 +110,27 @@
                '<thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
     }
 
-    // Every schema panel on the page, not just one: blocks share a database, so
-    // a CREATE in the last block has to show up in the first block's panel too.
-    function drawSchema() {
-        var panels = document.querySelectorAll('.sql-schema');
-        if (!panels.length || !db) return;
+    // Shared lesson runners redraw every panel. Isolated prose examples only
+    // redraw the schema panel inside their own editor.
+    function drawSchema(root, activeDb) {
+        var isolated = root && root.hasAttribute('data-vz-sql-isolated');
+        var panels = isolated ? [root.querySelector('.sql-schema')] :
+            [].filter.call(document.querySelectorAll('.sql-schema'), function (panel) {
+                return !panel.closest('[data-vz-sql-isolated]');
+            });
+        panels = [].filter.call(panels, Boolean);
+        if (!panels.length || !activeDb) return;
         var out = '';
         try {
-            var res = db.exec("SELECT name FROM sqlite_master WHERE type='table' " +
+            var res = activeDb.exec("SELECT name FROM sqlite_master WHERE type='table' " +
                               "AND name NOT LIKE 'sqlite_%' ORDER BY name");
             var names = res.length ? res[0].values.map(function (r) { return r[0]; }) : [];
             if (!names.length) {
                 out = '<p class="sql-empty">No tables yet. Run a <code>CREATE TABLE</code> to make one.</p>';
             } else {
                 names.forEach(function (n) {
-                    var info = db.exec('PRAGMA table_info(' + JSON.stringify(n) + ')');
-                    var count = db.exec('SELECT COUNT(*) FROM ' + JSON.stringify(n));
+                    var info = activeDb.exec('PRAGMA table_info(' + JSON.stringify(n) + ')');
+                    var count = activeDb.exec('SELECT COUNT(*) FROM ' + JSON.stringify(n));
                     var rows = count.length ? count[0].values[0][0] : 0;
                     var cols = info.length ? info[0].values.map(function (c) {
                         return '<li><span class="sql-col">' + esc(c[1]) + '</span>' +
@@ -176,10 +204,10 @@
             if (!sql) { say('Nothing to run.'); return; }
             say('Running…');
             load().then(function () {
-                if (!db) fresh();
+                var activeDb = databaseFor(root);
                 var t0 = performance.now(), out = '';
                 try {
-                    var sets = db.exec(sql);
+                    var sets = activeDb.exec(sql, bindParameters(root));
                     if (!sets.length) {
                         /* exec() returns no result sets both for a statement
                          * that changed rows and for a SELECT that matched
@@ -191,7 +219,7 @@
                         if (lastIsQuery(sql)) {
                             out = '<p class="sql-ok">0 rows.</p>';
                         } else {
-                            var n = db.getRowsModified();
+                            var n = activeDb.getRowsModified();
                             out = '<p class="sql-ok">Statement ran. ' +
                                   (n ? n + (n === 1 ? ' row' : ' rows') + ' affected.' : 'No rows returned.') +
                                   '</p>';
@@ -209,7 +237,7 @@
                     say('Error');
                 }
                 result.innerHTML = out;
-                drawSchema();
+                drawSchema(root, activeDb);
             }).catch(function (e) {
                 result.innerHTML = '<pre class="sql-error">' + esc(e.message) + '</pre>';
                 say('Could not start SQLite');
@@ -225,10 +253,10 @@
         if (resetBtn) {
             resetBtn.addEventListener('click', function () {
                 load().then(function () {
-                    fresh();
+                    var activeDb = fresh(root);
                     result.innerHTML = '';
                     say('Database reset to the sample tables.');
-                    drawSchema();
+                    drawSchema(root, activeDb);
                 });
             });
         }
@@ -241,8 +269,16 @@
     // Show the starting schema without making anyone press Run first.
     load().then(function () {
         fresh();
+        roots.forEach(function (root) {
+            if (root.hasAttribute('data-vz-sql-isolated')) fresh(root);
+        });
         says.forEach(function (say) { say('Ready. Ctrl+Enter runs.'); });
-        drawSchema();
+        drawSchema(null, db);
+        roots.forEach(function (root) {
+            if (root.hasAttribute('data-vz-sql-isolated')) {
+                drawSchema(root, root.__vzSqlDb);
+            }
+        });
     }).catch(function () {
         says.forEach(function (say) { say('SQLite could not be loaded.'); });
     });

@@ -271,8 +271,35 @@ def sql_editor(code, spec):
     if "</script" in code.lower():
         raise SystemExit("a runnable block contains </script and would break out")
     seed = spec.get("seed", "").strip()
+    params = spec.get("params", {})
+    param_markup = []
+    named = list(dict.fromkeys(re.findall(r"(?<!:)([:@$][A-Za-z_]\w*)", code)))
+    if named:
+        for name in named:
+            value = params.get(name, "")
+            param_markup.append(
+                '<label class="sql-param"><span>Bind <code>%s</code></span>'
+                '<input class="sql-param-input" type="text" '
+                'data-sql-param="%s" value="%s" autocomplete="off"></label>'
+                % (html.escape(name), html.escape(name, quote=True),
+                   html.escape(str(value), quote=True)))
+    else:
+        positional_count = len(re.findall(r"(?<!\?)\?(?!\?)", code))
+        values = params.get("?", [])
+        if not isinstance(values, (list, tuple)):
+            values = [values]
+        for i in range(positional_count):
+            value = values[i] if i < len(values) else ""
+            param_markup.append(
+                '<label class="sql-param"><span>Bind <code>?%s</code></span>'
+                '<input class="sql-param-input" type="text" '
+                'data-sql-param="?" value="%s" autocomplete="off"></label>'
+                % (" (%d)" % (i + 1) if positional_count > 1 else "",
+                   html.escape(str(value), quote=True)))
+    params_html = ('<div class="sql-params" aria-label="Query parameters">%s</div>'
+                   % "".join(param_markup)) if param_markup else ""
     return (
-        '<div class="vz-db-sql" data-vz-sql>'
+        '<div class="vz-db-sql" data-vz-sql data-vz-sql-isolated>'
         '<script type="text/plain" class="sql-seed">%(seed)s</script>'
         '<div class="vz-code-bar"><span class="vz-code-dot"></span>'
         '<span>%(file)s</span><span class="vz-code-lang">%(lang)s</span></div>'
@@ -283,6 +310,7 @@ def sql_editor(code, spec):
         '<textarea class="vz-code-input sql-editor" aria-label="SQL editor"'
         ' spellcheck="false" autocapitalize="off" autocomplete="off">%(code)s</textarea>'
         '</div></div>'
+        '%(params)s'
         '<div class="sql-controls">'
         '<button type="button" class="sql-btn sql-btn-primary sql-run-btn">Run</button>'
         '<button type="button" class="sql-btn sql-reset-btn">Reset database</button>'
@@ -293,6 +321,7 @@ def sql_editor(code, spec):
         '<div class="sql-schema"></div>'
         '</div>'
     ) % {"seed": seed, "code": html.escape(code.rstrip()),
+         "params": params_html,
          "file": spec.get("filename", "query.sql"),
          "lang": spec.get("label", "SQLite")}
 

@@ -112,6 +112,37 @@ def render(title, entry, include_header=True):
     return "\n".join(parts)
 
 
+def ensure_sql_runner_scripts(src, rel):
+    """Load the shared SQL editor and code-highlighting runtime when needed.
+
+    Hand-built database pages do not all use the same page shell. A SQL editor
+    rendered from article prose still needs both scripts, so make the
+    dependency explicit in the page rather than relying on a particular
+    generator having included it already.
+    """
+    if not re.search(r'\bdata-vz-sql\b', src):
+        return src
+
+    page_dir = os.path.dirname(os.path.join(ROOT, rel))
+    tags = []
+    for asset in ("vizlearn-sql.js", "vizlearn-code.js"):
+        if re.search(r'<script\b[^>]*src=["\'][^"\']*%s["\']' % re.escape(asset), src):
+            continue
+        url = os.path.relpath(os.path.join(ROOT, "assets", asset), page_dir)
+        tags.append('    <script defer src="%s"></script>' % url.replace(os.sep, "/"))
+    if not tags:
+        return src
+
+    marker = "<!-- VIZLEARN:SCRIPTS:BEGIN -->"
+    if marker in src:
+        at = src.index(marker) + len(marker)
+        return src[:at] + "\n" + "\n".join(tags) + src[at:]
+    close = src.lower().rfind("</body>")
+    if close == -1:
+        return src
+    return src[:close] + "\n".join(tags) + "\n" + src[close:]
+
+
 # Pages whose own article is good, but had the generic skeleton bolted on to
 # the end of it. Their real sections are numbered "1." while every appended
 # filler section is numbered "1)", which makes them safe to strip.
@@ -175,6 +206,8 @@ def main():
                 missing += 1
                 continue
             src = src[: span[0]] + "\n" + block + "\n        " + src[span[1]:]
+
+        src = ensure_sql_runner_scripts(src, rel)
 
         open(path, "w", encoding="utf-8").write(src)
         done += 1

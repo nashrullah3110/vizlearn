@@ -4,10 +4,14 @@ intro: LIMIT caps the number of returned rows and OFFSET skips rows, but stable 
 ## A page is an ordered slice
 A query without `ORDER BY` has no guaranteed result order. If rows can tie on the sort key, add a unique tie-breaker so that repeated requests produce a stable sequence.
 
-<pre><code>SELECT order_id, created_at
+
+```sql-run
+SELECT order_id, created_at
 FROM orders
 ORDER BY created_at DESC, order_id DESC
-LIMIT 20 OFFSET 40;</code></pre>
+LIMIT 20 OFFSET 40;
+```
+
 
 This requests the third page of twenty rows. The unique `order_id` resolves ties between orders created at the same time. Without it, rows may move between pages even if the data changes little.
 
@@ -16,11 +20,15 @@ With a large offset, the engine may still need to find and skip all preceding ro
 
 For feeds with a stable key, keyset pagination can instead ask for rows after the last item from the previous page:
 
-<pre><code>SELECT order_id, created_at
+
+```sql-run
+SELECT order_id, created_at
 FROM orders
-WHERE (created_at, order_id) &lt; (:last_created_at, :last_id)
+WHERE (created_at, order_id) < (:last_created_at, :last_id)
 ORDER BY created_at DESC, order_id DESC
-LIMIT 20;</code></pre>
+LIMIT 20;
+```
+
 
 Tuple comparison and NULL behavior differ by engine; the equivalent can be written as explicit conditions. Keyset pagination is efficient for sequential browsing but does not directly jump to an arbitrary page number.
 
