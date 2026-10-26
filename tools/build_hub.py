@@ -83,71 +83,73 @@ def featured():
     return ('<section class="vzx-sec" id="featured-lessons" aria-labelledby="vzx-start-h"><div class="vzx-wrap">'
             '<p class="vzx-kicker">Featured</p>'
             '<h2 class="vzx-h" id="vzx-start-h">Try an idea, then choose what to learn next</h2>'
-            '<p class="vzx-sub">Move the query point and change k. The neighbours vote again each time.</p>'
+            '<p class="vzx-sub">Drag the query point, change the class count or k, then inspect the vote.</p>'
             '%s<div class="vzx-start vzx-featured-grid">%s</div>%s</div></section>'
             % (knn_demo(), "".join(cards), learning_path_prompt()))
 
 
-HOME_KNN_POINTS = [
-    (20, 24, "a"), (31, 35, "a"), (18, 50, "a"), (37, 27, "a"), (35, 48, "a"),
-    (62, 26, "b"), (76, 37, "b"), (67, 53, "b"), (84, 62, "b"), (59, 72, "b"),
-]
-
-
 def knn_demo():
-    """A small, self-contained KNN vote preview based on the full KNN lesson."""
-    points = "".join(
-        '<circle class="vz-home-knn-point is-%s" data-point="%d" data-x="%d" '
-        'data-y="%d" data-class="%s" cx="%d" cy="%d" r="7"/>'
-        % (kind, i, x, y, kind, 48 + x * 5.52, 300 - y * 2.68)
-        for i, (x, y, kind) in enumerate(HOME_KNN_POINTS)
-    )
+    """A compact version of the KNN lesson's drag, controls, plot, and vote panel."""
     grid = "".join(
-        '<line class="vz-home-knn-grid" x1="%d" y1="32" x2="%d" y2="300"/>' % (x, x)
-        for x in range(48, 601, 69)
+        '<line class="vz-home-knn-grid" x1="%d" y1="20" x2="%d" y2="480"/>' % (x, x)
+        for x in range(40, 761, 80)
     ) + "".join(
-        '<line class="vz-home-knn-grid" x1="48" y1="%d" x2="600" y2="%d"/>' % (y, y)
-        for y in range(32, 301, 54)
+        '<line class="vz-home-knn-grid" x1="40" y1="%d" x2="760" y2="%d"/>' % (y, y)
+        for y in range(40, 461, 60)
     )
     return (
         '<div class="vz-home-knn" id="home-knn" data-vz-home-demo="knn">'
-        '<div class="vz-home-knn-intro">'
+        '<div class="vz-home-knn-head"><div>'
         '<span class="vzx-start-track">Live preview · K-nearest neighbours</span>'
-        '<p>KNN predicts from nearby labelled points. Move the new point left or right; '
-        'the closest neighbours cast the vote.</p>'
-        '<a class="vz-home-knn-link" href="machine_learning/knn.html" '
-        'data-vz-path="machine_learning/knn.html">Open the full KNN lesson &rarr;</a>'
-        '</div>'
+        '<p>KNN predicts from the labels of nearby points. Drag the query, change k, and see the vote.</p>'
+        '</div><a class="vz-home-knn-link" href="machine_learning/knn.html" '
+        'data-vz-path="machine_learning/knn.html">Open the full KNN lesson &rarr;</a></div>'
+        '<div class="vz-home-knn-layout">'
+        '<aside class="vz-home-knn-controls" aria-label="KNN controls">'
+        '<label class="vz-home-knn-control" for="home-knn-classes">'
+        '<span>Classes <strong><output id="home-knn-classes-value">3</output></strong></span>'
+        '<input id="home-knn-classes" type="range" min="2" max="5" value="3" '
+        'aria-label="Number of classes"></label>'
+        '<label class="vz-home-knn-control" for="home-knn-k">'
+        '<span>Neighbours (k) <strong><output id="home-knn-k-value">5</output></strong></span>'
+        '<input id="home-knn-k" type="range" min="1" max="20" value="5" '
+        'aria-label="Number of nearest neighbours"></label>'
+        '<div class="vz-home-knn-actions">'
+        '<button type="button" id="home-knn-randomize">Randomize data</button>'
+        '<button type="button" id="home-knn-reset">Reset query</button>'
+        '<button type="button" id="home-knn-autoplay" aria-pressed="false">Auto-play</button>'
+        '</div></aside>'
         '<div class="vz-home-knn-playground">'
-        '<svg class="vz-home-knn-svg" viewBox="0 0 640 360" role="img" '
+        '<svg class="vz-home-knn-svg" id="home-knn-plot" viewBox="0 0 800 500" role="img" '
         'aria-labelledby="home-knn-title home-knn-desc" aria-describedby="home-knn-readout">'
         '<title id="home-knn-title">K-nearest neighbours classification demo</title>'
-        '<desc id="home-knn-desc">Blue and coral training points. A gold query point moves horizontally. '
-        'Dashed lines connect it to the selected nearest neighbours.</desc>'
-        '<rect class="vz-home-knn-bg" x="32" y="16" width="584" height="312" rx="8"/>'
-        '%s<line class="vz-home-knn-axis" x1="48" y1="300" x2="600" y2="300"/>'
-        '<line class="vz-home-knn-axis" x1="48" y1="32" x2="48" y2="300"/>'
-        '<g data-knn-links aria-hidden="true"></g><g data-knn-points>%s</g>'
-        '<circle class="vz-home-knn-query is-a" data-knn-query cx="324" cy="166" r="11"/>'
-        '<text class="vz-home-knn-axis-label" x="324" y="326" text-anchor="middle">Feature 1</text>'
-        '<text class="vz-home-knn-axis-label" transform="translate(19 166) rotate(-90)" text-anchor="middle">Feature 2</text>'
-        '</svg>'
-        '<div class="vz-home-knn-legend" role="group" aria-label="Plot legend">'
-        '<span><i class="is-a"></i> Class A</span><span><i class="is-b"></i> Class B</span>'
-        '<span><i class="is-query"></i> Query</span></div>'
-        '<div class="vz-home-knn-controls">'
-        '<label class="vz-home-knn-control" for="home-knn-k">'
-        '<span>Neighbours <strong>k = <output id="home-knn-k-value">5</output></strong></span>'
-        '<input id="home-knn-k" type="range" min="1" max="9" step="2" value="5" '
-        'aria-label="Number of neighbours, k"></label>'
-        '<label class="vz-home-knn-control" for="home-knn-x">'
-        '<span>Move query point <strong><output id="home-knn-x-value">50</output></strong></span>'
-        '<input id="home-knn-x" type="range" min="5" max="95" value="50" '
-        'aria-label="Move the query point from the blue class to the coral class"></label>'
+        '<desc id="home-knn-desc">Drag the query point around a two-feature plot. The nearest training points '
+        'are connected to it, and their class labels vote on its prediction.</desc>'
+        '<rect class="vz-home-knn-bg" x="0" y="0" width="800" height="500" rx="8"/>'
+        '%s<line class="vz-home-knn-axis" x1="40" y1="480" x2="760" y2="480"/>'
+        '<line class="vz-home-knn-axis" x1="40" y1="20" x2="40" y2="480"/>'
+        '<g data-knn-neighborhood aria-hidden="true"></g>'
+        '<g data-knn-links aria-hidden="true"></g>'
+        '<g data-knn-points aria-hidden="true"></g>'
+        '<circle class="vz-home-knn-halo" data-knn-halo cx="400" cy="250" r="20" aria-hidden="true"/>'
+        '<circle class="vz-home-knn-query" data-knn-query cx="400" cy="250" r="10" tabindex="0" '
+        'role="slider" aria-label="Query point. Use arrow keys to move it." aria-valuemin="0" '
+        'aria-valuemax="100" aria-valuenow="50" aria-valuetext="Feature 1 50, feature 2 50"/>'
+        '<text class="vz-home-knn-axis-label" x="400" y="495" text-anchor="middle">Feature 1</text>'
+        '<text class="vz-home-knn-axis-label" transform="translate(15 250) rotate(-90)" text-anchor="middle">Feature 2</text>'
+        '</svg><p class="vz-home-knn-hint">Drag the query point, or focus it and use the arrow keys.</p>'
+        '<div class="vz-home-knn-legend" data-knn-legend role="group" aria-label="Class legend"></div>'
         '</div>'
+        '<aside class="vz-home-knn-analysis" aria-label="Prediction and class votes">'
+        '<span class="vz-home-knn-analysis-label">Predicted class</span>'
+        '<div class="vz-home-knn-result" data-knn-result>Class B</div>'
+        '<h3>Neighbour votes</h3><div class="vz-home-knn-votes" data-knn-votes></div>'
         '<p class="vz-home-knn-readout" id="home-knn-readout" role="status" aria-live="polite">'
-        'Class A wins: 3 blue to 2 coral with k = 5. Move the point or change k to see the vote change.</p>'
-        '</div></div>' % (grid, points)
+        'Move the query point to see the closest neighbours and their votes.</p>'
+        '</aside></div>'
+        '<noscript><p class="vz-home-knn-readout">Enable JavaScript to try the demo, or '
+        '<a href="machine_learning/knn.html">open the full KNN lesson</a>.</p></noscript>'
+        '</div>' % grid
     )
 
 
@@ -249,59 +251,278 @@ HUB_JS = """<script>
     if (e.target.closest && e.target.closest('#themeToggle, .theme-toggle')) guard();
   }, true);
 
-  // A tiny KNN experiment lets first-time visitors try the same idea as the
-  // full lesson without loading a second page or another visualization bundle.
+  // The homepage sampler reuses the full KNN lesson's 2D query, neighbour,
+  // class-count, randomize, reset, motion, and vote interactions.
   var demo = document.querySelector('[data-vz-home-demo="knn"]');
   if (!demo) return;
-  var plot = demo.querySelector('.vz-home-knn-svg');
+  var plot = demo.querySelector('#home-knn-plot');
   var kInput = demo.querySelector('#home-knn-k');
-  var xInput = demo.querySelector('#home-knn-x');
+  var classesInput = demo.querySelector('#home-knn-classes');
   var kValue = demo.querySelector('#home-knn-k-value');
-  var xValue = demo.querySelector('#home-knn-x-value');
+  var classesValue = demo.querySelector('#home-knn-classes-value');
   var output = demo.querySelector('#home-knn-readout');
   var pointLayer = demo.querySelector('[data-knn-points]');
   var linkLayer = demo.querySelector('[data-knn-links]');
+  var neighborhoodLayer = demo.querySelector('[data-knn-neighborhood]');
   var query = demo.querySelector('[data-knn-query]');
-  if (!plot || !kInput || !xInput || !output || !pointLayer || !linkLayer || !query) return;
+  var halo = demo.querySelector('[data-knn-halo]');
+  var resultCard = demo.querySelector('[data-knn-result]');
+  var votesLayer = demo.querySelector('[data-knn-votes]');
+  var legend = demo.querySelector('[data-knn-legend]');
+  var randomizeButton = demo.querySelector('#home-knn-randomize');
+  var resetButton = demo.querySelector('#home-knn-reset');
+  var autoplayButton = demo.querySelector('#home-knn-autoplay');
+  if (!plot || !kInput || !classesInput || !output || !pointLayer || !linkLayer ||
+      !neighborhoodLayer || !query || !halo || !resultCard || !votesLayer || !legend) return;
 
-  var training = Array.prototype.map.call(pointLayer.querySelectorAll('[data-point]'), function (el) {
-    return {element:el, index:Number(el.dataset.point), x:Number(el.dataset.x),
-      y:Number(el.dataset.y), c:el.dataset.class};
-  });
-  function px(x) { return 48 + x * 5.52; }
-  function py(y) { return 300 - y * 2.68; }
-  function update() {
-    var k = Number(kInput.value);
-    var x = Number(xInput.value);
-    var q = {x:x, y:50};
-    var nearest = training.map(function (p, i) {
-      var dx = p.x - q.x, dy = p.y - q.y;
-      return {point:p, index:i, distance:dx * dx + dy * dy};
-    }).sort(function (a, b) { return a.distance - b.distance; }).slice(0, k);
-    var selected = new Set(nearest.map(function (n) { return n.index; }));
-    var votes = nearest.reduce(function (v, n) { v[n.point.c] += 1; return v; }, {a:0,b:0});
-    var winner = votes.a > votes.b ? 'a' : 'b';
-    training.forEach(function (p) {
-      p.element.classList.toggle('is-nearest', selected.has(p.index));
-    });
-    linkLayer.innerHTML = nearest.map(function (n) {
-      return '<line class="vz-home-knn-link-line" x1="' + px(q.x).toFixed(1) +
-        '" y1="' + py(q.y).toFixed(1) + '" x2="' + px(n.point.x).toFixed(1) +
-        '" y2="' + py(n.point.y).toFixed(1) + '"/>';
-    }).join('');
-    query.setAttribute('cx', px(q.x).toFixed(1));
-    query.setAttribute('cy', py(q.y).toFixed(1));
-    query.setAttribute('class', 'vz-home-knn-query is-' + winner);
-    kValue.value = k;
-    kValue.textContent = k;
-    xValue.value = x;
-    xValue.textContent = x;
-    output.textContent = 'Class ' + winner.toUpperCase() + ' wins: ' +
-      votes.a + ' blue to ' + votes.b + ' coral with k = ' + k + '. Move the point or change k to see the vote change.';
+  var ns = 'http://www.w3.org/2000/svg';
+  var colors = ['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6'];
+  var classNames = ['Class A', 'Class B', 'Class C', 'Class D', 'Class E'];
+  var state = {
+    trainingData: [], target: {x:400, y:250}, k:Number(kInput.value),
+    numClasses:Number(classesInput.value), dragging:false, autoplay:false,
+    frame:0, lastFrame:0, vx:3, vy:2.2
+  };
+  function svgElement(tag, attrs) {
+    var el = document.createElementNS(ns, tag);
+    Object.keys(attrs).forEach(function (key) { el.setAttribute(key, attrs[key]); });
+    return el;
   }
-  kInput.addEventListener('input', update);
-  xInput.addEventListener('input', update);
-  update();
+  function generateTrainingData() {
+    state.trainingData = [];
+    var margin = 30, usableWidth = 800 - margin * 2, usableHeight = 500 - margin * 2;
+    var sectionWidth = usableWidth / state.numClasses;
+    for (var c = 0; c < state.numClasses; c++) {
+      var cx = margin + sectionWidth * c + sectionWidth / 2;
+      var cy = 250 + (Math.random() - .5) * 200;
+      for (var i = 0; i < 12; i++) {
+        state.trainingData.push({
+          x:Math.max(margin, Math.min(800 - margin, cx + (Math.random() - .5) * sectionWidth * .8)),
+          y:Math.max(margin, Math.min(500 - margin, cy + (Math.random() - .5) * usableHeight * .8)),
+          classId:c, id:'train-' + c + '-' + i
+        });
+      }
+    }
+    kInput.max = Math.min(20, state.trainingData.length);
+    if (state.k > Number(kInput.max)) state.k = Number(kInput.max);
+    kInput.value = state.k;
+    kValue.textContent = state.k;
+  }
+  function nearestNeighbors() {
+    return state.trainingData.map(function (p) {
+      var dx = state.target.x - p.x, dy = state.target.y - p.y;
+      return {point:p, distance:Math.sqrt(dx * dx + dy * dy)};
+    }).sort(function (a, b) { return a.distance - b.distance; }).slice(0, state.k);
+  }
+  function classify(neighbors) {
+    var votes = state.trainingData.length ? Array(state.numClasses).fill(0) : [];
+    neighbors.forEach(function (n) { votes[n.point.classId] += 1; });
+    var winner = -1, max = -1, tie = false;
+    votes.forEach(function (count, index) {
+      if (count > max) { winner = index; max = count; tie = false; }
+      else if (count === max) tie = true;
+    });
+    return {winner:tie ? -1 : winner, votes:votes};
+  }
+  function updateLegend() {
+    legend.textContent = '';
+    for (var i = 0; i < state.numClasses; i++) {
+      var item = document.createElement('span');
+      var swatch = document.createElement('i');
+      swatch.style.backgroundColor = colors[i];
+      var name = document.createElement('span');
+      name.textContent = classNames[i];
+      item.appendChild(swatch);
+      item.appendChild(name);
+      legend.appendChild(item);
+    }
+    var queryItem = document.createElement('span');
+    var querySwatch = document.createElement('i');
+    querySwatch.className = 'is-query';
+    queryItem.appendChild(querySwatch);
+    queryItem.appendChild(document.createTextNode('Query'));
+    legend.appendChild(queryItem);
+  }
+  function updateAnalysis(result) {
+    var winner = result.winner;
+    var name = winner < 0 ? 'Tie / unsure' : classNames[winner];
+    var color = winner < 0 ? '#737373' : colors[winner];
+    resultCard.textContent = name;
+    resultCard.style.color = color;
+    resultCard.style.borderColor = color;
+    resultCard.style.backgroundColor = winner < 0 ? 'var(--input-bg)' : color + '18';
+    votesLayer.textContent = '';
+    result.votes.forEach(function (count, index) {
+      var row = document.createElement('div');
+      row.className = 'vz-home-knn-vote';
+      var label = document.createElement('span');
+      label.textContent = classNames[index];
+      label.style.color = colors[index];
+      var track = document.createElement('span');
+      track.className = 'vz-home-knn-vote-track';
+      var bar = document.createElement('span');
+      bar.className = 'vz-home-knn-vote-bar';
+      bar.style.width = (count / state.k * 100) + '%';
+      bar.style.backgroundColor = colors[index];
+      track.appendChild(bar);
+      var value = document.createElement('strong');
+      value.textContent = count;
+      row.appendChild(label);
+      row.appendChild(track);
+      row.appendChild(value);
+      votesLayer.appendChild(row);
+    });
+    output.textContent = winner < 0 ?
+      'With k = ' + state.k + ', the vote is tied. Move the query or change k.' :
+      'With k = ' + state.k + ', ' + name + ' wins with ' + result.votes[winner] +
+      ' of the ' + state.k + ' nearest neighbours.';
+  }
+  function updateTargetAccessibility() {
+    var x = Math.round(state.target.x / 800 * 100);
+    var y = Math.round(state.target.y / 500 * 100);
+    query.setAttribute('aria-valuenow', x);
+    query.setAttribute('aria-valuetext', 'Feature 1 ' + x + ', feature 2 ' + y);
+  }
+  function render() {
+    var neighbors = nearestNeighbors();
+    var result = classify(neighbors);
+    neighborhoodLayer.textContent = '';
+    linkLayer.textContent = '';
+    pointLayer.textContent = '';
+    if (neighbors.length) {
+      neighborhoodLayer.appendChild(svgElement('circle', {
+        cx:state.target.x, cy:state.target.y, r:neighbors[neighbors.length - 1].distance,
+        fill:'none', stroke:'var(--text-muted)', 'stroke-width':1,
+        'stroke-dasharray':'5 7', opacity:.45
+      }));
+    }
+    var neighborIds = new Set(neighbors.map(function (n) { return n.point.id; }));
+    neighbors.forEach(function (n) {
+      linkLayer.appendChild(svgElement('line', {
+        x1:state.target.x, y1:state.target.y, x2:n.point.x, y2:n.point.y,
+        stroke:colors[n.point.classId], 'stroke-width':2, opacity:.65
+      }));
+    });
+    state.trainingData.forEach(function (p) {
+      var isNeighbor = neighborIds.has(p.id);
+      if (isNeighbor) {
+        pointLayer.appendChild(svgElement('circle', {
+          cx:p.x, cy:p.y, r:13, fill:'none', stroke:colors[p.classId],
+          'stroke-width':2, opacity:.65
+        }));
+      }
+      pointLayer.appendChild(svgElement('circle', {
+        cx:p.x, cy:p.y, r:isNeighbor ? 7 : 6, fill:colors[p.classId],
+        class:'vz-home-knn-point'
+      }));
+    });
+    var fill = result.winner < 0 ? '#737373' : colors[result.winner];
+    halo.setAttribute('cx', state.target.x);
+    halo.setAttribute('cy', state.target.y);
+    halo.setAttribute('fill', fill);
+    query.setAttribute('cx', state.target.x);
+    query.setAttribute('cy', state.target.y);
+    query.setAttribute('fill', fill);
+    updateTargetAccessibility();
+    updateAnalysis(result);
+  }
+  function svgPosition(event) {
+    var point = plot.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    return point.matrixTransform(plot.getScreenCTM().inverse());
+  }
+  function pointerDown(event) {
+    var p = svgPosition(event);
+    var dx = p.x - state.target.x, dy = p.y - state.target.y;
+    if (Math.sqrt(dx * dx + dy * dy) > 34) return;
+    stopAutoPlay();
+    state.dragging = true;
+    if (plot.setPointerCapture) plot.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+  function pointerMove(event) {
+    if (!state.dragging) return;
+    var p = svgPosition(event);
+    state.target.x = Math.max(30, Math.min(770, p.x));
+    state.target.y = Math.max(30, Math.min(470, p.y));
+    render();
+    event.preventDefault();
+  }
+  function pointerUp() { state.dragging = false; }
+  function stopAutoPlay() {
+    if (!state.autoplay) return;
+    state.autoplay = false;
+    if (state.frame) cancelAnimationFrame(state.frame);
+    state.frame = 0;
+    autoplayButton.textContent = 'Auto-play';
+    autoplayButton.setAttribute('aria-pressed', 'false');
+    [classesInput, kInput, randomizeButton, resetButton].forEach(function (el) { el.disabled = false; });
+  }
+  function autoplayFrame(time) {
+    if (!state.autoplay) return;
+    if (time - state.lastFrame > 65) {
+      state.target.x += state.vx;
+      state.target.y += state.vy;
+      if (state.target.x < 35 || state.target.x > 765) state.vx *= -1;
+      if (state.target.y < 35 || state.target.y > 465) state.vy *= -1;
+      render();
+      state.lastFrame = time;
+    }
+    state.frame = requestAnimationFrame(autoplayFrame);
+  }
+  function toggleAutoPlay() {
+    if (state.autoplay) { stopAutoPlay(); return; }
+    state.autoplay = true;
+    state.lastFrame = 0;
+    autoplayButton.textContent = 'Stop';
+    autoplayButton.setAttribute('aria-pressed', 'true');
+    [classesInput, kInput, randomizeButton, resetButton].forEach(function (el) { el.disabled = true; });
+    state.frame = requestAnimationFrame(autoplayFrame);
+  }
+  function resetQuery() {
+    stopAutoPlay();
+    state.target.x = 400;
+    state.target.y = 250;
+    render();
+  }
+  classesInput.addEventListener('input', function () {
+    stopAutoPlay();
+    state.numClasses = Number(classesInput.value);
+    classesValue.textContent = state.numClasses;
+    generateTrainingData();
+    updateLegend();
+    render();
+  });
+  kInput.addEventListener('input', function () {
+    stopAutoPlay();
+    state.k = Number(kInput.value);
+    kValue.textContent = state.k;
+    render();
+  });
+  randomizeButton.addEventListener('click', function () { stopAutoPlay(); generateTrainingData(); updateLegend(); render(); });
+  resetButton.addEventListener('click', resetQuery);
+  autoplayButton.addEventListener('click', toggleAutoPlay);
+  plot.addEventListener('pointerdown', pointerDown);
+  window.addEventListener('pointermove', pointerMove, {passive:false});
+  window.addEventListener('pointerup', pointerUp);
+  window.addEventListener('pointercancel', pointerUp);
+  query.addEventListener('keydown', function (event) {
+    var step = event.shiftKey ? 8 : 32;
+    if (event.key === 'ArrowLeft') state.target.x = Math.max(30, state.target.x - step);
+    else if (event.key === 'ArrowRight') state.target.x = Math.min(770, state.target.x + step);
+    else if (event.key === 'ArrowUp') state.target.y = Math.max(30, state.target.y - step);
+    else if (event.key === 'ArrowDown') state.target.y = Math.min(470, state.target.y + step);
+    else return;
+    stopAutoPlay();
+    render();
+    event.preventDefault();
+  });
+  classesValue.textContent = state.numClasses;
+  kValue.textContent = state.k;
+  generateTrainingData();
+  updateLegend();
+  render();
 })();
 </script>"""
 
