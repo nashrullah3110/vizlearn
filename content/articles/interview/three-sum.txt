@@ -1,18 +1,11 @@
 title: 3Sum
 intro: Find all unique triples in an array that sum to zero.
 
-## The problem
+## The core idea
 
-Find all unique triplets in an array that sum to zero.
-
-<p class="mono-font">[&minus;1, 0, 1, 2, &minus;1, &minus;4]&nbsp;&rarr;&nbsp;[[&minus;1, &minus;1, 2], [&minus;1, 0, 1]]</p>
-
-Two words carry the difficulty. <strong>All</strong> means the answer is a list, not a single result. <strong>Unique</strong> means duplicate triplets must be suppressed &mdash; and with a duplicated `-1` in the input, that is where most implementations fail.
-
-The brute force is three nested loops: O(n³). The expected solution is O(n²). Sort the array first. Then fix each element in turn and run a two-pointer search on the remainder for a pair that sums to its negation &mdash; which is exactly the sorted version of [two-sum](two-sum.html). The sort is O(n log n), the outer loop is O(n), and each two-pointer pass is O(n), giving O(n²) total. The duplicate-skipping logic is where implementations break: after finding a valid triple, advance both pointers past any duplicates, and at the outer loop level skip any element equal to the previous one. Without those skips, the output contains repeated triples. The edge cases are: fewer than three elements (return empty), all zeros (one triple `[0,0,0]` if there are at least three). And all the same negative values (no triple sums to zero). The follow-up is 4Sum, which adds another outer loop and becomes O(n³).
+Three Sum returns unique triples whose values add to a target, usually zero. Sorting plus a fixed first value and two pointers reduces the search to O(n²); skipping duplicates is essential to unique output.
 
 ## Run it
-
 The two-pointer version against brute force with both operation counts, and the deduplication removed so you can see the duplicate triples it produces.
 
 ```python-run
@@ -94,8 +87,8 @@ def brute_force(values):
 
 print("brute force :", brute_force([-1,0,1,2,-1,-4])[0])
 ```
-## Sort, then fix one and two-pointer the rest
 
+## Sort, then fix one and two-pointer the rest
 ```python-run
 def three_sum(nums):
     nums.sort()
@@ -127,7 +120,6 @@ O(n²) time &mdash; an outer loop with an inner linear scan &mdash; and O(1) ext
 The structure is worth naming: <strong>reduce three-sum to n instances of two-sum on a sorted array.</strong> Fixing `nums[i]` turns "find three summing to zero" into "find two summing to `-nums[i]`". This two pointers solve in O(n).
 
 ## The duplicate handling, which is the whole difficulty
-
 Three separate skips are needed, and each addresses a different source of repeats.
 
 <strong>Duplicate first elements.</strong> `if i and nums[i] == nums[i-1]: continue`. Without it, `[-1, -1, 0, 1]` produces `[-1, 0, 1]` twice &mdash; once for each `-1`.
@@ -141,25 +133,21 @@ The alternative &mdash; collecting into a set of sorted tuples &mdash; also work
 The `if nums[i] > 0: break` line is a genuine optimisation rather than a correctness fix: once the smallest of the three is positive, no triplet can reach zero. So the rest of the loop is wasted.
 
 ## Reducing the third loop
-
 The brute force is three nested loops, O(n&sup3;). Fix the first element and the problem becomes "find two numbers summing to <code>-values[i]</code>" &mdash; which is Two Sum, and on sorted input Two Sum is two pointers in O(n).
 
 n iterations of an O(n) inner scan is O(n&sup2;), and the sort is O(n&nbsp;log&nbsp;n) so it disappears into that. Using a hash map for the inner search is also O(n&sup2;), and then deduplication is much harder &mdash; which is the argument for sorting.
 
 ## Deduplication is the real difficulty
-
 Two places need it. Skip a fixed element equal to the previous one, or every triple starting with that value is emitted twice. And after recording a triple, advance past any repeats of both pointer values, or the same triple is found again inside the same scan.
 
 Sorting is what makes both a simple adjacency check. Without it you would collect triples into a set of sorted tuples. Correct, and it allocates for every candidate.
 
 ## The early exits worth mentioning
-
 Once <code>values[i] &gt; 0</code> the smallest possible triple is already positive, so the scan can stop entirely. That is not a complexity improvement and it is a large constant on real input.
 
 The generalisation is kSum: fix an element and recurse down to the two-pointer base case, giving O(n^(k&minus;1)). Naming that shows you see the pattern rather than the single problem.
 
 ## Tracing the duplicates
-
 `[-1, 0, 1, 2, -1, -4]` sorted becomes `[-4, -1, -1, 0, 1, 2]`.
 
 |i|nums[i]|Window|Result|
@@ -174,7 +162,6 @@ Two triplets, no repeats. The skip at i = 2 is what prevents `[-1, 0, 1]` appear
 Walking that table aloud is a good way to show the solution in an interview, because it exercises exactly the case the duplicate handling exists for.
 
 ## Edge cases
-
 |Case|Result|
 |---|---|
 |Fewer than 3 elements|`[]`|
@@ -188,7 +175,6 @@ Walking that table aloud is a good way to show the solution in an interview, bec
 The `[0,0,0,0]` case is the cleanest test of the duplicate logic, and worth mentioning unprompted.
 
 ## The generalisation to k-sum
-
 The structure extends: fix k&minus;2 elements with nested loops, and two-pointer the last two.
 
 |Problem|Approach|Complexity|
@@ -202,7 +188,6 @@ The structure extends: fix k&minus;2 elements with nested loops, and two-pointer
 Four-sum has a better alternative worth knowing: hash all pairwise sums, then look for two pairs summing to the target &mdash; O(n²) time and O(n²) space, better than O(n³) when memory allows. That trade appears again in the "meet in the middle" technique for subset problems.
 
 ## The variants
-
 <strong>Three-sum closest.</strong> Find the triplet whose sum is nearest a target. Same structure, and instead of comparing against zero, track the smallest absolute difference. No duplicate handling needed, because only one answer is returned.
 
 <strong>Three-sum smaller.</strong> Count triplets with sum below a target. When `nums[i] + nums[lo] + nums[hi] < target`, every position between `lo` and `hi` also works. So add `hi - lo` and advance `lo`. That counting shortcut is the insight, and it keeps the whole thing O(n²).
@@ -211,47 +196,6 @@ Four-sum has a better alternative worth knowing: hash all pairwise sums, then lo
 
 <strong>Two-sum with a target other than zero.</strong> Trivially the same code with the comparison adjusted.
 
-## What it is testing
-
-<strong>Do you sort first?</strong> Sorting enables the two-pointer reduction, and it is the move that turns O(n³) into O(n²).
-
-<strong>Do you handle duplicates correctly?</strong> This is the actual assessment. Producing correct triplets with repeats is a fail.
-
-<strong>Do you see the reduction to two-sum?</strong> Saying "fix one element and this becomes two-sum on the rest" is the answer the interviewer is listening for.
-
-<strong>Do you state complexity precisely?</strong> O(n²), with the sort's O(n log n) absorbed.
-
-<strong>Do you find the early exit?</strong> Breaking when the smallest element is positive is a small example of attention.
-
-The transferable lesson is reduction: recognising that a harder problem is a loop around an easier one you already know. That habit applies far beyond this question.
-
-
-
-For the underlying ideas, see <a href="../dsa/two_pointers.html">two-pointer technique</a>, <a href="../dsa/big_o_notation.html">time complexity</a> and <a href="../python/sorted_with_key.html">sorting</a>.
-
-## Questions people ask
-
-<strong>What is the time complexity of three-sum?</strong> O(n squared). Sorting costs O(n log n), and the outer loop runs a linear two-pointer scan for each element.
-
-<strong>Why sort the array first?</strong> Sorting enables the two-pointer scan and puts duplicates next to each other, which makes skipping them simple.
-
-<strong>How do I avoid duplicate triplets?</strong> Skip an outer element equal to the previous one, and after recording a triplet advance the second pointer past repeats. The third value needs no skip, because the first two fix it.
-
-<strong>Why not use a hash set for every pair?</strong> It also reaches O(n squared) but needs extra space, and de-duplicating triplets is awkward. Two pointers on sorted input use O(1) extra space.
-
-<strong>Can I stop the outer loop early?</strong> Yes. Once the fixed element is positive, no three values after it can sum to zero in a sorted array.
-
-<strong>How does it generalise to four-sum?</strong> Add another outer loop, giving O(n cubed). In general k-sum costs O(n to the power k minus 1) with a two-pointer base case.
-
-## Recap in one screen
-
-- Sort, fix one element, and two-pointer the remainder &mdash; three-sum is n instances of two-sum.
-- O(n&sup2;) time, O(1) extra space beyond the output.
-- Skip duplicate first elements at the outer loop, and duplicate second elements after recording a triplet.
-- The third element needs no skip, because the first two determine it.
-- The pattern generalises: k&minus;2 loops plus two pointers, at O(n^(k&minus;1)).
-
 ## Sources and next steps
-
 - Source: [LeetCode 15, 3Sum](https://leetcode.com/problems/3sum/)
 - Continue with [two sum](two-sum.html), which builds on this idea.

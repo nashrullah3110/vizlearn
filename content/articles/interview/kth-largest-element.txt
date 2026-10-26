@@ -1,25 +1,11 @@
 title: Kth largest element
 intro: Find the kth largest element in an unsorted array.
 
-## The problem
+## The core idea
 
-Find the k-th largest element in an unsorted array. Note that this is the k-th largest by <em>value in sorted order</em>, counting duplicates &mdash; not the k-th distinct value.
-
-|Input|k|Answer|
-|---|---|---|
-|`[3, 2, 1, 5, 6, 4]`|2|5|
-|`[3, 2, 3, 1, 2, 4, 5, 5, 6]`|4|4|
-|`[1]`|1|1|
-|`[2, 2, 2]`|2|<strong>2</strong> &mdash; duplicates count separately|
-
-That last row is worth confirming aloud: if the question means the k-th <em>distinct</em> largest, the answer changes and so does the solution.
-
-Sorting gives it in one line and O(n log n). Two better approaches exist, and which is "better" depends on the constraints &mdash; which is what makes this a good interview question.
-
-A min-heap of size k runs in O(n log k): push each element, pop when the heap exceeds k, and the top of the heap at the end is the answer. It wins when k is small and you do not want to sort the full array. Quickselect partitions around a random pivot and recurses into only the side that contains position n&minus;k &mdash; O(n) expected time, O(n&sup2;) worst case, improved to guaranteed linear with median-of-medians pivot selection. Python's `heapq.nlargest(k, nums)[-1]` uses the heap approach internally.
+The kth-largest value is the element that would occupy index k−1 in descending order. Sorting is simple; a size-k min-heap or quickselect avoids fully sorting when only that rank is needed.
 
 ## Run it
-
 All three approaches with the number of elements each one stores, then timed on a large array so the O(k) memory claim and the O(n) average are both visible.
 
 ```python-run
@@ -91,8 +77,8 @@ def quickselect(values, k):
 
 print("quickselect :", quickselect([3,2,1,5,6,4], 2))
 ```
-## The three answers, in order
 
+## The three answers, in order
 <strong>Sort.</strong> O(n log n), one line, and the correct opening.
 
 ```python-run
@@ -123,7 +109,6 @@ Or in one line with the standard library, which uses exactly this strategy: `hea
 When k is small, O(n log k) is close to linear: finding the top 10 of a million elements does about 20 million comparisons rather than sorting all of them.
 
 ## Quickselect: expected O(n)
-
 Partition like quicksort, then recurse into only the side containing the answer. Because one half is discarded each time, the expected work is n + n/2 + n/4 + … = O(n).
 
 ```python-run
@@ -161,7 +146,6 @@ Expected O(n), worst case O(n²), O(1) extra space.
 Two other caveats worth stating: quickselect <strong>mutates the input array</strong>, which may not be acceptable, and it needs the whole array in memory, so it cannot process a stream.
 
 ## Three answers, and the reason to choose
-
 <p><strong>Sort and index.</strong> <code>sorted(a)[-k]</code>. O(n&nbsp;log&nbsp;n), one line, and the right answer in real code for any array that fits in memory.</p>
 
 <p><strong>Min-heap of size k.</strong> O(n&nbsp;log&nbsp;k) time and O(k) memory. The only one that works on a stream, or when n is far larger than memory.</p>
@@ -171,19 +155,16 @@ Two other caveats worth stating: quickselect <strong>mutates the input array</st
 Interviewers are usually listening for whether you notice the heap is bounded by k rather than n.
 
 ## Why a min-heap for the largest
-
 It feels backwards and it is the key idea. To keep the k <em>largest</em> values you need constant-time access to the <em>smallest</em> of the ones you kept, because that is the one to evict when something better arrives. A min-heap puts exactly that at the root.
 
 Once the heap is full, a value below the root cannot be in the top k, so it is discarded without being stored at all.
 
 ## Quickselect, briefly
-
 Partition around a pivot as quicksort does, then recurse into only the side containing position k. Because one side is discarded each time, the expected work is n + n/2 + n/4 + ... = O(n).
 
 Its worst case is O(n&sup2;) on a bad pivot sequence, so pick the pivot at random. Say that explicitly &mdash; "quickselect, with a random pivot" is a complete answer, and "quickselect" alone invites the follow-up about sorted input.
 
 ## Choosing between them
-
 |Approach|Time|Space|Mutates|Streaming|
 |---|---|---|---|---|
 |Sort|O(n log n)|O(n)|No (with `sorted`)|No|
@@ -203,7 +184,6 @@ The decision usually comes down to three questions, and asking them is a better 
 <strong>Median of medians</strong> guarantees O(n) worst case by choosing a provably good pivot. The constant factor is large enough that it loses to randomised quickselect in practice, and knowing it exists is the point &mdash; it is why "linear-time selection" is a solved problem in theory.
 
 ## The streaming variant
-
 "Design a class that returns the k-th largest element as numbers are added" is the natural follow-up, and it is where the heap becomes clearly correct:
 
 ```python-run
@@ -232,7 +212,6 @@ for v in [3,5,10,9,4]:
 Each `add` is O(log k) and memory stays at O(k) no matter how many numbers arrive. Quickselect cannot do this at all, which is the cleanest illustration of why the "best" algorithm depends on the access pattern rather than on the asymptotic bound alone.
 
 ## Related problems
-
 <strong>Top k frequent elements.</strong> Count with a `Counter`, then heap or quickselect on the counts. `Counter.most_common(k)` does it directly.
 
 <strong>K closest points to the origin.</strong> Identical structure with distance as the key; a max-heap of size k this time, since the k <em>smallest</em> are wanted.
@@ -245,47 +224,6 @@ Each `add` is O(log k) and memory stays at O(k) no matter how many numbers arriv
 
 The transferable idea: <strong>a bounded heap keeps the best k of an unbounded stream in O(k) memory.</strong> That is the pattern behind "top N" dashboards, leaderboards, and log analysis over data far larger than memory.
 
-## What it is testing
-
-<strong>Do you offer more than sorting?</strong> Sorting is the right first answer and the wrong last one.
-
-<strong>Do you understand why a min-heap finds the largest?</strong> The root must be the worst candidate, so it is the one evicted.
-
-<strong>Do you randomise the quickselect pivot?</strong> Without it, sorted input is O(n&sup2;).
-
-<strong>Do you ask about the constraints?</strong> Streaming, memory, and whether the input can be mutated each change the answer.
-
-<strong>Do you know `heapify` is O(n)?</strong> Cheaper than pushing n times.
-
-<strong>Do you clarify duplicates?</strong> K-th largest by position in sorted order, not k-th distinct value.
-
-
-
-For the underlying ideas, see <a href="../dsa/heaps_and_priority_queues.html">heaps</a>, <a href="../dsa/quick_sort.html">quickselect</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
-
-## Questions people ask
-
-<strong>What are the main ways to find the kth largest element?</strong> Sort and index in O(n log n), keep a min-heap of size k in O(n log k), or use quickselect for O(n) average. Interviewers usually want the heap, then a mention of quickselect.
-
-<strong>Why use a min-heap to find the largest elements?</strong> The heap holds the k largest seen so far, with the smallest of them on top. A new value larger than the top replaces it, so the top is the kth largest.
-
-<strong>What is quickselect's complexity?</strong> O(n) expected and O(n^2) worst case with bad pivots. A random pivot makes the worst case very unlikely, and it modifies the input array.
-
-<strong>When is the heap better than quickselect?</strong> When data arrives as a stream or is too large for memory, since the heap uses only O(k) space. Quickselect needs the whole array in memory.
-
-<strong>Does k = 1 or k = n need special handling?</strong> The heap approach handles them naturally, and k = 1 is just the maximum. State the assumption that 1 &lt;= k &lt;= n, and ask what to return otherwise.
-
-<strong>How do duplicates affect the answer?</strong> The kth largest counts duplicates, so [3, 3, 2] with k = 2 returns 3. If the question asks for the kth distinct value, deduplicate first.
-
-## Recap in one screen
-
-- Sorting is O(n log n) and the baseline to improve on.
-- A min-heap of size k gives O(n log k) time and O(k) space, and works on a stream.
-- Quickselect is O(n) expected with O(1) space, mutates the input, and needs a random pivot to avoid O(n&sup2;).
-- `heapify` an existing list in O(n) rather than pushing element by element.
-- Ask about streaming, memory and mutability &mdash; they determine which approach is right.
-
 ## Sources and next steps
-
 - Source: [LeetCode 215, Kth Largest Element in an Array](https://leetcode.com/problems/kth-largest-element-in-an-array/)
 - Continue with [top k frequent elements](top-k-frequent-elements.html), which builds on this idea.

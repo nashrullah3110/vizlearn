@@ -1,36 +1,11 @@
 title: What does slicing a string cost?
 intro: What does s[2:6] cost, and is it a view or a copy?
 
-## The answer, and why it matters for performance
+## The core idea
 
-`s[a:b]` <strong>copies</strong> the selected characters into a new string. It costs O(b &minus; a) time and the same in memory.
-
-Python strings are immutable, and slicing does not create a lightweight view onto the first. It allocates a new string and copies the selected data. Understanding that is the difference between code that scales and code that quietly becomes quadratic.
-
-This is the same reason `bytes` slicing copies. NumPy arrays and `memoryview` objects are the standard options when you need views. They point into existing memory without copying.
-
-```python-run
-s = "hello world"
-print(s[0:5])        # 'hello'  -- a new 5-character string
-print(s[:])          # returns s itself: an identical immutable object needs no copy
-print(s[::2])        # 'hlowrd' -- a copy, with a step
-print(s[::-1])       # 'dlrow olleh' -- reversal, O(n)
-```
-`s[:]` is the one exception, and it is an implementation optimisation rather than a rule to depend on, because the string is immutable, a full-slice copy can safely return the first object.
-
-|Operation|Cost|
-|---|---|
-|`s[i]`|O(1) &mdash; single character|
-|`s[a:b]`|O(b &minus; a)|
-|`s[:]`|O(1) in CPython &mdash; returns the same object|
-|`s[::-1]`|O(n)|
-|`len(s)`|O(1) &mdash; stored, not counted|
-|`s in t`|O(n &middot; m) worst case|
-|`s + t`|O(n + m) &mdash; a new string|
-
+Python string slicing creates a new string containing the selected characters; it is not a view. A slice of length k costs O(k) time and space, which can make repeated slicing quadratic.
 
 ## Run it
-
 The same scan written twice &mdash; once slicing on every iteration. Once carrying indices &mdash; timed at three sizes so the quadratic separates from the linear in front of you.
 
 ```python-run
@@ -71,8 +46,8 @@ def walk_with_index(text):
 
 print("moving an index      :", walk_with_index("algorithms"))
 ```
-## Where it becomes quadratic
 
+## Where it becomes quadratic
 The classic failure is slicing inside a loop:
 
 ```python-run
@@ -129,13 +104,11 @@ print(is_palindrome_fast("racecar"), is_palindrome_fast("hello"))
 `startswith` deserves the emphasis. `s[:len(p)] == p` allocates a copy before comparing; `s.startswith(p)` compares in place and short-circuits on the first mismatch. Same result, no allocation.
 
 ## Copy, not view
-
 Some languages hand you a slice that points into the first buffer. So taking one is O(1). Python does not: <code>s[2:6]</code> allocates a new string object and memcpys four characters into it. The cost depends on the slice length, not the source length.
 
 You can prove it from the interpreter: the id differs, and mutating is impossible anyway. So there is no aliasing to observe. What you can measure is the time, which is what the editor below does.
 
 ## Where it actually hurts
-
 One slice costs nothing worth thinking about. The problem is the shape where a slice is taken per iteration. Checking every substring, or peeling a character off the front:
 
 <p><code>while s: first, s = s[0], s[1:]</code></p>
@@ -143,13 +116,11 @@ One slice costs nothing worth thinking about. The problem is the shape where a s
 Each iteration copies the entire remainder, so an O(n) walk becomes O(n&sup2;). The same bug appears in recursive solutions that pass <code>s[1:]</code> down: correct, elegant, and quadratic.
 
 ## What to do instead
-
 Carry indices. Every algorithm on this track that scans text &mdash; two pointers, sliding window, KMP &mdash; keeps <code>i</code> and <code>j</code> into the first string and never slices inside the loop. Slice once at the end, when you need the answer as a string.
 
 If you truly need a zero-copy view over a large buffer, that exists. But only for bytes: <code>memoryview(b)</code> slices in O(1) and shares the underlying memory.
 
 ## Avoiding the copy fully
-
 <strong>`memoryview`</strong> gives a genuine zero-copy view &mdash; over `bytes`, not `str`:
 
 ```python-run
@@ -179,7 +150,6 @@ Compare with `s[pos:].find(",")`, which copies the remainder on every iteration.
 <strong>`io.StringIO`</strong> for incremental building, and `"".join(parts)` for assembling many pieces. One allocation instead of n.
 
 ## How Python stores strings
-
 Since version 3.3, CPython chooses the narrowest representation that fits the string's characters:
 
 |Content|Bytes per character|
@@ -200,29 +170,6 @@ Results worth knowing:
 
 For the underlying ideas, see <a href="../python/strings_and_slicing.html">strings and slicing</a>, <a href="../python/slicing_step_negatives.html">negative-step slices</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
 
-## Questions people ask
-
-<strong>Is `s[:]` free?</strong> In CPython it returns the same object, because immutability makes copying pointless. Do not build an algorithm on that guarantee.
-
-<strong>Is slicing a list the same?</strong> Yes for cost &mdash; O(k) and a new list &mdash; but the copy is <em>shallow</em>. The new list holds references to the same elements.
-
-<strong>Does negative indexing cost more?</strong> No. `s[-1]` is `s[len(s)-1]`, computed arithmetically.
-
-<strong>What about out-of-range slices?</strong> They clamp silently. `"abc"[0:100]` is `"abc"` &mdash; no error, unlike indexing.
-
-<strong>Is `s[::-1]` the fastest reversal?</strong> Yes for strings; `reversed(s)` gives a lazy iterator when you do not need the whole reversed string materialised.
-
-<strong>How do I slice without copying?</strong> Convert to `bytes` and use `memoryview`, or work with indices and functions that accept offsets.
-
-## Recap in one screen
-
-- `s[a:b]` allocates and copies: O(b &minus; a) in time and memory, not a view.
-- `s = s[1:]` in a loop, or `f(s[1:])` in recursion, is O(n&sup2;). Pass indices instead.
-- Use `startswith`, `in`, and `find(sub, pos)` rather than slicing to inspect a region.
-- `memoryview` over `bytes` gives true O(1) slicing; there is no `str` the same.
-- CPython stores strings at 1, 2 or 4 bytes per character. So `len` and indexing are O(1).
-
 ## Sources and next steps
-
 - Source: [CPython source, Unicode object implementation](https://github.com/python/cpython/blob/main/Objects/unicodeobject.c)
 - Continue with [reverse a string](reverse-a-string.html), which builds on this idea.

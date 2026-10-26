@@ -1,20 +1,11 @@
 title: Run-length string compression
 intro: Compress &#x27;aabcccccaaa&#x27; to &#x27;a2b1c5a3&#x27;. Return the original if the compressed form is not shorter.
 
-## The problem
+## The core idea
 
-Compress a character array in place by replacing runs of the same character with the character followed by its count. Counts of 1 are written as the character alone. Return the new length.
-
-<p class="mono-font">["a","a","b","b","c","c","c"]&nbsp;&rarr;&nbsp;["a","2","b","2","c","3"], length 6</p>
-<p class="mono-font">["a"]&nbsp;&rarr;&nbsp;["a"], length 1</p>
-<p class="mono-font">["a","b"]&nbsp;&rarr;&nbsp;["a","b"], length 2</p>
-
-Two details make it more than a formatting exercise. Counts of 1 are omitted, so `"ab"` does not become `"a1b1"`. And a count above 9 becomes <strong>several characters</strong> &mdash; 12 is `"1"` and `"2"` &mdash; which is where most implementations break.
-
-The straightforward approach builds a result with string concatenation (`+=`), which is O(n&sup2;) because strings are immutable and every `+=` copies everything accumulated so far. Using a list of parts and joining once at the end brings it to O(n). The in-place variant on a character array writes the compressed output into the same array from left to right using a write pointer, converting multi-digit counts to individual characters with `str(count)`.
+Run-length encoding stores each repeated character with its count. For the interview variant, write runs into a mutable array and return the compressed prefix only when it is shorter than the original.
 
 ## Run it
-
 The list-and-join version against the <code>+=</code> version, timed on a long input so the quadratic is visible, plus the in-place variant on a character array.
 
 ```python-run
@@ -88,8 +79,8 @@ chars=list("aabcccccaaa")
 n=compress_in_place(chars)
 print("in place  :", n, chars[:n])
 ```
-## The solution
 
+## The solution
 ```python-run
 def compress(chars):
     write = 0
@@ -125,7 +116,6 @@ Two mechanisms carry it:
 <strong>`for digit in str(count)`</strong> handles counts of any size. Writing `chars[write] = str(count)` puts a multi-character string into one slot, which is the bug for runs longer than nine.
 
 ## Why in-place is safe
-
 The natural worry is that writing over the array destroys data still to be read. It does not, and the reason is worth stating.
 
 For a run of length L, the output is 1 + digits(L) characters. That is at most L for every L &ge; 1:
@@ -143,23 +133,19 @@ So the compressed form is never longer than the input, and `write` never overtak
 That argument is what an interviewer wants to hear before you write the code, because it justifies the whole approach.
 
 ## The algorithm, and the trap inside it
-
 Two pointers: one at the start of the current run, one scanning forward while the character stays the same. When it changes, emit <code>char</code> and <code>count</code> and move on. One pass, O(n).
 
 The trap is what you emit <em>into</em>. <code>result += ch + str(n)</code> allocates a new string on every run, which makes the whole thing quadratic in the output length. Appending to a list and joining once is O(n). Interviewers ask this question partly to see which you reach for.
 
 ## Return the shorter one
-
 <p><code>"abc"</code> compresses to <code>"a1b1c1"</code>, which is twice as long. The specification almost always says to return the original when compression does not help, and the check is one comparison at the end.</p>
 
 A common refinement is to bail out early once the output has already exceeded the input length, since it can never recover.
 
 ## The in-place variant
-
 The harder version gives you a character array and asks you to compress it in place, returning the new length. Because the compressed form is never longer than the original when it wins, a read-pointer/write-pointer pair works: read scans runs, write emits behind it, and write never overtakes read. That is the same two-pointer shape as the in-place dedupe.
 
 ## Edge cases
-
 |Input|Output|Length|
 |---|---|---|
 |`[]`|`[]`|0|
@@ -174,7 +160,6 @@ The harder version gives you a character array and asks you to compress it in pl
 The run-of-10 and run-of-100 rows are the ones to test explicitly. An implementation that passes `"aabbccc"` and fails `"a" * 12` is the common outcome.
 
 ## The string version
-
 If the input is a string rather than a character array, in-place is impossible &mdash; strings are immutable &mdash; so build a list and join:
 
 ```python-run
@@ -225,7 +210,6 @@ print(compress_groupby("aabcccccaaa"))
 `groupby` groups <em>consecutive</em> equal items, which is exactly what run-length encoding needs &mdash; and is why it works here without sorting, unlike its usual grouping use.
 
 ## Run-length encoding in practice
-
 This is <strong>run-length encoding</strong>, one of the oldest compression schemes, and it is still used where the data has long runs.
 
 - <strong>Fax and bitonal images.</strong> Scanned documents are mostly white, giving very long runs. TIFF's Group 3 and 4 encodings are RLE-based.
@@ -237,45 +221,6 @@ Its weakness is equally clear: <strong>data without runs expands</strong>. Under
 
 Real formats handle it with escape codes distinguishing literal runs from repeated runs, which is what PackBits does.
 
-## What it is testing
-
-<strong>Do you handle multi-digit counts?</strong> The primary trap, and it is what separates a working solution from one that passes the sample.
-
-<strong>Do you omit counts of 1?</strong> The specification says so, and skipping it changes every answer.
-
-<strong>Do you justify in-place safety?</strong> Explaining that output never exceeds input is the reasoning step.
-
-<strong>Do you keep two independent pointers?</strong> Read and write advance at different rates, which is the pattern.
-
-<strong>Do you know it is run-length encoding,</strong> and where it is used and why it can expand data?
-
-
-
-For the underlying ideas, see <a href="../python/strings_and_slicing.html">strings</a>, <a href="../python/f_strings_and_formatting.html">f-strings</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
-
-## Questions people ask
-
-<strong>Why is writing in place safe?</strong> For a run of length L, the output uses one character plus the digits of L, and that is never more than L. The write pointer therefore never overtakes the read pointer.
-
-<strong>How do I handle counts of 10 or more?</strong> Write the count digit by digit, for example by iterating over `str(count)`. Writing the count as one character is the classic bug.
-
-<strong>Do I write a count of 1?</strong> No, standard versions skip it, so `"a"` stays `"a"`. Check the prompt, since some variants want `"a1"`.
-
-<strong>What are the time and space complexities?</strong> O(n) time and O(1) extra space when compressing in place. A version that builds a new string uses O(n) space.
-
-<strong>Can compression make the string longer?</strong> Yes, if the runs are short and counts are always written. Omitting counts of 1 keeps the output from exceeding the input in the in-place version.
-
-<strong>What is this technique called?</strong> Run-length encoding. It works well on data with long repeated runs and poorly on data without them.
-
-## Recap in one screen
-
-- Count each run, write the character, and write the count only when it exceeds 1.
-- Multi-digit counts must be written digit by digit &mdash; the main bug.
-- In place is safe because 1 + digits(L) &le; L for every run, so output never exceeds input.
-- Read and write pointers advance independently; read always stays ahead.
-- This is run-length encoding: excellent on data with long runs, and it expands data without them unless counts of 1 are omitted.
-
 ## Sources and next steps
-
 - Source: [LeetCode 443, String Compression](https://leetcode.com/problems/string-compression/)
 - Continue with [reverse a string](reverse-a-string.html), which builds on this idea.

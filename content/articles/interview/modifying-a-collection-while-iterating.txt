@@ -1,61 +1,11 @@
 title: Modifying a Collection While Iterating Over It
 intro: Why can&#x27;t you delete from a dict or a list while iterating it, and what should you do instead?
 
-## What goes wrong, and why
+## The core idea
 
-Removing items from a list while looping over it <strong>silently skips elements</strong>. It does not raise, which is what makes it dangerous. Dictionaries are stricter &mdash; they raise `RuntimeError` on the next iteration step &mdash; but lists just produce wrong answers.
-
-```python-run
-nums = [1, 2, 3, 4, 5, 6]
-for n in nums:
-    if n % 2 == 0:
-        nums.remove(n)
-
-print(nums)        # [1, 3, 5] -- looks correct
-
-nums = [1, 2, 2, 3]
-for n in nums:
-    if n == 2:
-        nums.remove(n)
-print(nums)        # [1, 2, 3] -- one 2 SURVIVED
-```
-The mechanism: list iteration is driven by an internal index. Removing element 1 shifts everything down one slot, and the index still advances. So the element that moved into the vacated position is never examined.
-
-|Step|Index|List|Sees|Action|
-|---|---|---|---|---|
-|1|0|`[1, 2, 2, 3]`|1|keep|
-|2|1|`[1, 2, 2, 3]`|2|remove &rarr; `[1, 2, 3]`|
-|3|2|`[1, 2, 3]`|3|keep &mdash; <strong>the second 2 was skipped</strong>|
-
-The list is now `[1, 2, 3]` and the loop is finished.
-
-<strong>Dictionaries and sets behave differently &mdash; they raise:</strong>
-
-```python-run
-d = {"a": 1, "b": 2}
-try:
-    for k in d:
-        if d[k] == 1:
-            del d[k]
-except RuntimeError as e:
-    print(type(e).__name__ + ":", e)
-print("dict is still:", d)
-```
-Which is far better, because the failure is loud. Dicts and sets track a version counter and detect the change. Lists do not, so they fail quietly instead.
-
-|Collection|Mutating during iteration|
-|---|---|
-|`list`|<strong>Silently skips elements</strong>|
-|`dict`|`RuntimeError` on size change|
-|`set`|`RuntimeError` on size change|
-|`deque`|`RuntimeError`|
-|Generator|Depends on the source|
-
-Note the dict wording: <em>size</em> change. Reassigning an existing key's value is allowed and safe; adding or deleting keys is not.
-
+Changing a collection while iterating can skip elements, raise an error, or make the traversal’s meaning unclear. Build a separate result, iterate over a snapshot, or collect changes and apply them afterward.
 
 ## Run it
-
 The dict raising, the list silently skipping on the same logical operation. And the three fixes all producing the answer the broken loop was supposed to give.
 
 ```python-run
@@ -119,8 +69,8 @@ for key in nested:
     nested[key].append(0)
 print("mutating values is legal:", nested)
 ```
-## The four correct approaches
 
+## The four correct approaches
 <strong>Build a new collection</strong> &mdash; clearest, and the default choice:
 
 ```python-run
@@ -180,14 +130,13 @@ for i in range(len(nums) - 1, -1, -1):
 
 print("removed backwards:", nums)
 ```
-## Two different failures
 
+## Two different failures
 A dictionary keeps a version counter and compares it on each step. So a size change during iteration is caught at once and loudly. That is a feature: the alternative is undefined behaviour, because a resize can move every entry to a different slot.
 
 A list has no such check. Deleting element i shifts everything after it one place left, while the loop's internal index advances. So the element that moved into position i is never visited. You get a wrong answer and no error at all. This is the harder bug to find.
 
 ## The fixes, in order of preference
-
 <p><strong>Build a new collection.</strong> <code>[x for x in items if keep(x)]</code> or <code>{k: v for k, v in d.items() if keep(k)}</code>. Nothing is mutated, the intent is explicit, and it is usually faster than repeated deletion.</p>
 
 <p><strong>Iterate over a snapshot.</strong> <code>for k in list(d):</code> or <code>for x in items[:]:</code>. Needed when you genuinely must mutate in place &mdash; because other references to the object are watching.</p>
@@ -195,13 +144,11 @@ A list has no such check. Deleting element i shifts everything after it one plac
 <p><strong>Filter in place backwards.</strong> Walking from the end means deletions only shift elements you have already passed. Correct, and worth knowing for when memory matters.</p>
 
 ## What counts as a change
-
 For a dict, only a <em>size</em> change trips the check. Assigning to an existing key is fine, which surprises people who expect any mutation to raise. Adding a key raises just as deletion does.
 
 Sets behave like dicts. <code>collections.deque</code> also raises. And modifying the object a variable points to &mdash; appending to a list stored as a dict value &mdash; is not a change to the dict. So it is perfectly legal.
 
 ## Which to choose
-
 |Situation|Approach|
 |---|---|
 |Filtering, no aliasing concerns|Comprehension &mdash; `nums = [...]`|
@@ -258,7 +205,6 @@ print("compacted:", nums[:write])
 O(n) time, O(1) extra space &mdash; the same pattern as "remove duplicates in place".
 
 ## Adding during iteration
-
 Growing a list while iterating it does not raise either &mdash; and it can loop forever:
 
 ```python-run
@@ -309,31 +255,6 @@ That is the correct shape for BFS, dependency resolution and crawling &mdash; an
 
 For the underlying ideas, see <a href="../python/dictionaries.html">dictionaries</a>, <a href="../python/for_loops_and_range.html">for loops</a> and <a href="../python/list_comprehensions.html">list comprehensions</a>.
 
-## Questions people ask
-
-<strong>Why does a list not raise like a dict?</strong> Lists have no version counter; iteration is a plain index. Dicts and sets track changes because rehashing could otherwise corrupt the traversal.
-
-<strong>Is `nums[:]` a deep copy?</strong> No, shallow &mdash; the new list holds the same element references. Fine for filtering, not for mutating the elements themselves.
-
-<strong>Can I change dict <em>values</em> while iterating?</strong> Yes. Only size changes raise.
-
-<strong>What about `for k, v in d.items()` and then `del`?</strong> Same error. Wrap in `list(d.items())`.
-
-<strong>Is iterating backwards a hack?</strong> No &mdash; it is correct and O(n). And it is the right choice when removing by index in place.
-
-<strong>What is fastest?</strong> A comprehension, usually &mdash; one pass, one allocation. And the loop runs in C.
-
-<strong>Does this apply to generators?</strong> A generator over a mutating source gives undefined results; materialise it first if the source will change.
-
-## Recap in one screen
-
-- Removing from a list while iterating silently skips elements, because the index advances past the shifted-down item.
-- Dicts and sets raise `RuntimeError` on a size change &mdash; a loud failure, which is better.
-- Prefer a comprehension; use `nums[:] = [...]` when the caller's object must be mutated.
-- For dictionaries, iterate `list(d)` to snapshot the keys first.
-- Growing a list while iterating it can loop forever &mdash; collect additions and `extend` afterwards, or use an explicit worklist.
-
 ## Sources and next steps
-
 - Source: [Python tutorial, modifying a collection while iterating](https://docs.python.org/3/tutorial/controlflow.html#for-statements)
 - Continue with [shallow versus deep copy](shallow-versus-deep-copy.html), which builds on this idea.

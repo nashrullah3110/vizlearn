@@ -1,26 +1,11 @@
 title: Valid parentheses
 intro: Check whether a string of brackets is balanced.
 
-## The problem
+## The core idea
 
-Given a string of brackets &mdash; `()`, `[]`, `{}` &mdash; determine whether they are correctly balanced and nested.
-
-|Input|Valid?|Why|
-|---|---|---|
-|`"()"`|Yes|Matched|
-|`"()[]{}"`|Yes|Sequential pairs|
-|`"([{}])"`|Yes|Properly nested|
-|`"(]"`|No|Wrong closing type|
-|`"([)]"`|No|Crossed &mdash; wrong nesting order|
-|`"("`|No|Never closed|
-
-Push every opening bracket onto a stack. When a closing bracket arrives, check that the stack is non-empty and that its top is the matching opener &mdash; if either check fails, the string is invalid. At the end, the stack must be empty (no unclosed brackets remain). The algorithm is O(n) time and O(n) space. The stack is the natural structure because brackets nest: the most recently opened bracket must close first, which is LIFO order. The three edge cases worth naming are: an empty string (valid by convention), a string with only closing brackets (the stack is empty when the first one arrives), and a string whose brackets all match but in the wrong nesting order (`"([)]"` &mdash; the `]` arrives when `(` is on top). A common follow-up is "minimum add to make valid," which counts the unmatched openers left on the stack plus the unmatched closers encountered during the scan. Another follow-up is generating all valid combinations of n pairs, which is a backtracking problem rather than a stack one.
-
-The fourth and fifth rows are what make this a stack problem rather than a counting problem, and they are the cases a weak solution gets wrong.
-
+Balanced brackets must match in type and nesting order. Because the latest unmatched opener must close first, a stack captures the required order; a count alone cannot distinguish crossed pairs.
 
 ## Run it
-
 The matcher with its stack printed at each step, run over inputs chosen so each of the three failure modes fires once, and a counter-based version that gets one of them wrong.
 
 ```python-run
@@ -62,8 +47,8 @@ def balanced_by_counting(text):
 
 print("counting only:", balanced_by_counting("([)]"), "<- says True, and it is not")
 ```
-## The solution
 
+## The solution
 ```python-run
 def is_valid(s):
     pairs = {")": "(", "]": "[", "}": "{"}
@@ -90,7 +75,6 @@ O(n) time, O(n) space. Four lines of logic, and each guards a specific failure:
 <strong>`return not stack`</strong> catches unclosed brackets &mdash; `"("`. This is the line people forget, and omitting it makes `"((("` valid.
 
 ## Why a counter does not work
-
 The tempting simplification is to count openings and closings and check they balance. It fails on two of the cases above.
 
 <strong>`"([)]"`</strong> has one of each bracket, and every count balances. It is invalid because the nesting crosses, and a counter cannot see order.
@@ -102,13 +86,11 @@ Three separate counters do not help either &mdash; the problem is that <strong>t
 Saying that explicitly is worth doing in an interview, because it shows you understand <em>why</em> rather than having memorised the solution.
 
 ## Why a stack and not a counter
-
 With one bracket type, counting works: increment on open, decrement on close, fail if it goes negative or ends non-zero. With several types it does not &mdash; <code>"([)]"</code> has balanced counts and is wrong.
 
 A stack captures the thing a counter loses: not just how many are open, but <em>which</em>, and in what order. Nesting is inherently last-in-first-out, which is exactly what a stack is.
 
 ## The three failure modes
-
 <p><strong>Mismatch.</strong> The popped opener does not correspond to the closer. <code>"(]"</code>.</p>
 
 <p><strong>Empty stack on a closer.</strong> A closer arrived with nothing open. <code>")("</code> &mdash; and forgetting this check gives an <code>IndexError</code> rather than a <code>False</code>.</p>
@@ -116,7 +98,6 @@ A stack captures the thing a counter loses: not just how many are open, but <em>
 <p><strong>Non-empty stack at the end.</strong> Openers never closed. <code>"((("</code> passes every in-loop check and is still unbalanced.</p>
 
 ## What it generalises to
-
 The same LIFO shape appears in every situation where the most recent unresolved item must be resolved first:
 
 - <strong>HTML and XML tag matching</strong> &mdash; `<div>` must close before its enclosing `<section>`.
@@ -128,7 +109,6 @@ The same LIFO shape appears in every situation where the most recent unresolved 
 Recognising the shape is what matters. When a problem says "matching", "nesting" or "most recent", a stack is usually the answer.
 
 ## The three failure modes, traced
-
 `"([)]"` &mdash; the case that separates a stack from a counter:
 
 |Character|Stack before|Action|Result|
@@ -153,7 +133,6 @@ Recognising the shape is what matters. When a problem says "matching", "nesting"
 Walking through those three in an interview covers every branch of the code, which is a concise way to demonstrate the solution is complete.
 
 ## Edge cases and variations
-
 |Case|Handling|
 |---|---|
 |Empty string|Valid &mdash; the loop does not run and the stack is empty|
@@ -166,7 +145,6 @@ Walking through those three in an interview covers every branch of the code, whi
 That last row is a good observation to volunteer: with only one bracket type, a counter works, and the stack is needed precisely because there are several types whose nesting must be tracked.
 
 ## The follow-ups
-
 <strong>"What if the input can contain other characters?"</strong> The code already ignores them. Confirm whether that is intended, or whether they should be an error.
 
 <strong>"Return the position of the first error."</strong> Track the index in the loop and return it instead of `False`. This is what an editor's bracket matcher does.
@@ -181,29 +159,6 @@ That last row is a good observation to volunteer: with only one bracket type, a 
 
 For the underlying ideas, see <a href="../dsa/stacks.html">stacks</a>, <a href="../python/dictionaries.html">dictionaries</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
 
-## Questions people ask
-
-<strong>Why is a stack the right structure?</strong> The most recently opened bracket must be closed first. That last-in-first-out rule is exactly what a stack provides.
-
-<strong>Why can't a simple counter work with several bracket types?</strong> A counter would accept `"([)]"`, which balances in number but nests wrongly. Order and type both matter.
-
-<strong>What are the failure cases to check?</strong> A closing bracket with an empty stack, a closing bracket of the wrong type, and a non-empty stack at the end. Missing the last one accepts `"("`.
-
-<strong>What are the time and space complexities?</strong> O(n) time. Space is O(n), because a string of only opening brackets pushes every character.
-
-<strong>How do I map closing brackets to openings?</strong> Use a dictionary such as `{')': '(', ']': '[', '}': '{'}`. Look up the popped value against it.
-
-<strong>Where else does this pattern appear?</strong> HTML tag matching, expression parsing and scope tracking in compilers. Whenever the latest item must resolve first, think stack.
-
-## Recap in one screen
-
-- Push openings; on a closing bracket, pop and check the type matches.
-- Four guards: push, empty-stack check, type check, and the final "stack must be empty".
-- A counter cannot solve it, because `"([)]"` balances numerically and nests wrongly &mdash; order matters.
-- O(n) time and O(n) space; the stack can reach the length of the input.
-- Same shape as tag matching, expression parsing and scope tracking &mdash; "most recent first" means stack.
-
 ## Sources and next steps
-
 - Source: [LeetCode 20, Valid Parentheses](https://leetcode.com/problems/valid-parentheses/)
 - Continue with [evaluate reverse Polish notation](evaluate-reverse-polish-notation.html), which builds on this idea.

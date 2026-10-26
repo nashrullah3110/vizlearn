@@ -1,12 +1,11 @@
 title: House robber: the 0-1 choice
 intro: Each house holds some money and you cannot rob two adjacent ones. What is the most you can take?
 
-## The question, and what it is testing
+## The core idea
 
-At each house there are exactly two options: <strong>skip it</strong> and keep the best from the previous house, or <strong>take it</strong> and add it to the best from two houses back. <code>best(i) = max(best(i-1), best(i-2) + house[i])</code> &mdash; and since nothing reaches further back than two, two variables replace the whole table. This is one of the cleanest examples of dynamic programming. The subproblem is "best total from the first i houses," the recurrence is one line, and the space optimisation is obvious from the recurrence itself. The greedy approach fails &mdash; always taking the largest available house misses better combinations &mdash; and the brute-force approach is exponential because it considers every subset of non-adjacent houses. The common follow-up is "house robber II," where the houses form a circle so the first and last are adjacent. The solution runs the same DP twice (excluding the first house and excluding the last) and takes the maximum.
+When adjacent houses cannot both be chosen, the best answer for each prefix is the better of skipping the current house or taking it plus the best non-adjacent prefix. This is a compact dynamic-programming recurrence.
 
 ## Run it
-
 Three implementations checked against each other, including the empty list.
 
 ```python-run
@@ -127,30 +126,21 @@ for houses in ([2, 3, 2], [1, 2, 3, 1], [5], [2, 7, 9, 3, 1]):
 ```
 
 ## Partition by the last decision
-
 <p>The same move as every other question in this group: look at the final choice. Either the last house was robbed or it was not.</p><p>If it was not, the answer is whatever was best for the houses before it &mdash; <code>best(i-1)</code>. If it was, its neighbour cannot have been, so the answer is its value plus the best for everything up to two houses back &mdash; <code>best(i-2) + house[i]</code>. Those two cases are exhaustive and disjoint, so the answer is the larger.</p><p>The base cases are worth stating explicitly, because off-by-ones here are common: <code>best(0) = 0</code> (no houses) and <code>best(1) = house[0]</code>. Indexing the table from 1 while the list is indexed from 0 is where the confusion comes from, and the rolling version below makes it disappear.</p>
 
 ## Why greedy fails, and what to check
-
 <p>"Take every other house" is the intuition, and it is wrong: <code>[2, 1, 1, 2]</code> gives 3 taking the odd positions, where taking the two 2s gives 4. "Always take the biggest remaining" is also wrong, for the same reason it fails in <a href="coin-change.html">coin change</a> &mdash; no lookahead.</p><p>The editor checks the DP against brute force over every valid subset on several inputs, including the empty list and a single house. That is worth doing rather than asserting, because the recurrence is short enough to look obviously right while being wrong at the edges.</p>
 
 ## The rolling version, and why it is the one to write
-
 <pre><code>skip = take = 0
 for h in houses:
     skip, take = max(skip, take), skip + h
 return max(skip, take)</code></pre><p>Two names, one pass, no indices. <code>skip</code> is the best with the current house not taken, <code>take</code> the best with it taken &mdash; and the simultaneous assignment is what makes it correct: <code>take</code> uses the <em>old</em> <code>skip</code>, which is exactly the two-houses-back value.</p><p>Writing it in two steps instead, without the tuple assignment, is the bug: updating <code>skip</code> first means <code>take</code> adds the current house to a value that already includes its neighbour. It is the same hazard as swapping without a temporary.</p>
 
 ## The circular variant
-
 <p>"Now the houses are in a circle." The first and last are adjacent, so they cannot both be robbed. The neat resolution is to run the linear solution twice: once on <code>houses[1:]</code> and once on <code>houses[:-1]</code>, then take the better. Every valid selection excludes at least one of the two ends, so one of the runs contains the optimum.</p><p>The single-house case needs a guard, because both slices are empty and the answer should be that house. That edge is the whole difficulty of the variant, and volunteering it is what an interviewer is listening for.</p>
 
-## What to say out loud
-
-<p>At each house I either skip it, keeping best(i-1), or take it and add house[i] to best(i-2), because the neighbour is then off limits. So best(i) is the max of those two. That is O(n) time, and because the recurrence only looks two back I keep two variables instead of an array, so O(1) space. If the houses are in a circle, the first and last are adjacent, so I run it twice - once excluding the first house, once excluding the last - and take the better.</p>
-
 ## Edge cases to raise
-
 <p>Volunteering these is most of what separates a correct answer from a good one.</p>
 
 <p><strong>Empty list.</strong> Zero, and a table version indexing <code>best[1]</code> raises before the loop starts.</p>
@@ -159,49 +149,6 @@ return max(skip, take)</code></pre><p>Two names, one pass, no indices. <code>ski
 
 <p><strong>Negative values.</strong> The recurrence still works, because skipping is always permitted - worth checking rather than assuming, and worth asking about if the problem says 'money'.</p>
 
-## The follow-ups interviewers ask
-
-<p><strong>"The houses are in a circle."</strong> The first and last are adjacent, so run the linear version twice - once without the first house, once without the last - and take the better. Every valid selection excludes an end, so one run contains the optimum. A single house needs its own guard.</p>
-
-<p><strong>"Houses arranged in a tree."</strong> Same take-or-skip decision, computed bottom-up: for each node return the best with it robbed and the best without, and combine at the parent. It is the natural escalation and it is where the two-value return pays off.</p>
-
-<p><strong>"No two houses within k of each other."</strong> <code>best(i-k-1) + house[i]</code>, and the rolling window grows from two variables to k+1. The recurrence is the same shape with a longer reach.</p>
-
-## Common wrong answers
-
-<p><strong>"Take every other house."</strong> Wrong on <code>[2,1,1,2]</code>: alternating gives 3 where taking the two 2s gives 4.</p>
-
-<p><strong>"Always take the largest remaining house."</strong> Greedy with no lookahead, and it fails for the same reason it fails in coin change.</p>
-
-<p><strong>"skip = max(skip, take); take = skip + h."</strong> Sequential instead of simultaneous, so <code>take</code> reads the <em>new</em> skip and adds the house to a value that already includes its neighbour. The editor prints 22 against the correct 12.</p>
-
-
-
-For the underlying ideas, see <a href="../dsa/dynamic_programming.html">dynamic programming</a>, <a href="../dsa/recursion_and_call_stack.html">recursion</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
-
-## Questions people ask
-
-<strong>What is the recurrence for house robber?</strong> <code>dp[i] = max(dp[i-1], dp[i-2] + nums[i])</code>. Either skip house i and keep the best so far, or rob it and add the best from two houses back.
-
-<strong>Why does greedy fail?</strong> Picking the largest house first can block two better neighbours. For [2, 7, 9, 3, 1] the best is 2 + 9 + 1 = 12, which a take-the-biggest rule does not find.
-
-<strong>What is the time and space complexity?</strong> O(n) time. Space is O(n) with a table and O(1) when you keep only the previous two values.
-
-<strong>How do you solve the circular street variant?</strong> Run the linear solution twice: once on houses 0 to n-2 and once on 1 to n-1, then take the larger. The first and last houses are adjacent, so they cannot both be robbed.
-
-<strong>What are the base cases and edge cases?</strong> Empty input returns 0, one house returns its value, and two houses return the larger. Handle these before the loop or start the rolling variables at 0.
-
-<strong>What pattern is this a member of?</strong> It is a one-dimensional DP where each state depends on a fixed number of earlier states. Partition by the last decision, as in climbing stairs and coin change.
-
-## Recap in one screen
-
-- Two options per house, and the recurrence is just the better of them.
-- Taking a house means the answer comes from two back, not one.
-- Nothing reads further back than two, which is why the table can go.
-- Worth trying: Add a negative house value and decide what should happen. The recurrence still works because skipping is always allowed, which is worth checking rather than assuming.
-- Worth trying: Change the rule to "no two houses within k of each other". The recurrence becomes best(i-k-1) + house[i], and the rolling window grows from two variables to k+1.
-
 ## Sources and next steps
-
 - Source: [LeetCode 198, House Robber](https://leetcode.com/problems/house-robber/)
 - Continue with [coin change and dynamic programming](coin-change.html), which builds on this idea.

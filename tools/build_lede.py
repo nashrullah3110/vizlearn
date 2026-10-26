@@ -247,7 +247,7 @@ def process(rel):
     # section heading in the article body so the overview stays an orientation,
     # not a replacement for the lesson.
     track = rel.split("/", 1)[0]
-    concise_track = track in ("dsa", "machine_learning", "database")
+    concise_track = track in ("dsa", "machine_learning", "database", "interview")
     if concise_track:
         section_start, section_end, _title = blocks[0]
         heading = H3.search(src, section_start, section_end)
@@ -292,14 +292,14 @@ def process(rel):
 
     first = src[first_start:first_end]
     # A list-led section is still an introduction; only length disqualifies it.
-    min_words = 30 if concise_track else 45
+    min_words = 24 if track == "interview" else (30 if concise_track else 45)
     if len(text_of(first).split()) < min_words:
         return bail("not-prose")
 
     slot_start = first_start if slot_start is None else slot_start
     slot_end = first_end if slot_end is None else slot_end
     src = src[:slot_start] + SLOT + src[slot_end:]
-    if concise_track and track != "database" and has_section_detail and heading:
+    if concise_track and track not in ("database", "interview") and has_section_detail and heading:
         # Keep the established DSA/ML presentation; database articles retain
         # the section heading so the detail following their short Overview has
         # a useful label.

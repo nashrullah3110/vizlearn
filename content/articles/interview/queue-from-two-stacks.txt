@@ -1,12 +1,11 @@
 title: Implement a queue using two stacks
 intro: Implement a FIFO queue using only stacks. What is the cost of each operation?
 
-## The question, and what it is testing
+## The core idea
 
-Two stacks: push onto the <strong>inbox</strong>, pop from the <strong>outbox</strong>. When the outbox is empty, pour the whole inbox into it &mdash; which reverses the order, turning LIFO into FIFO. Pouring <em>only when empty</em> is what makes dequeue <strong>O(1) amortised</strong>; pouring every time makes it O(n). The amortised argument is the core of the answer: each element is moved between stacks at most once in its lifetime, so n enqueue/dequeue pairs do at most 2n pushes and 2n pops total &mdash; O(1) per operation on average. The worst-case single dequeue is O(n) (the pour), but that n work pays for the next n&minus;1 dequeues which are O(1) each. Interviewers test whether you know the difference between amortised and average-case (amortised is a guarantee, not a probability), and whether you can explain why pouring on every dequeue would destroy the bound. The common follow-up is "implement a stack using two queues," which is the mirror problem: enqueue onto the non-empty queue, and to pop, move n&minus;1 elements to the other queue and return the last. That version has O(n) pop and O(1) push, with no amortised shortcut.
+A queue returns items in first-in, first-out order; a stack returns them last-in, first-out. Two stacks can implement a queue by reversing the inbox into an outbox only when the outbox is empty, preserving amortised O(1) operations.
 
 ## Run it
-
 FIFO through interleaved operations, which is the part worth checking.
 
 ```python-run
@@ -136,27 +135,18 @@ print("that is the amortised bound: O(n) in total, O(n) for one worst call.")
 ```
 
 ## Why reversing twice gives FIFO
-
 <p>A stack reverses what you put into it. Pour one stack into another and you have reversed it again, which restores the original order &mdash; so the item pushed first ends up on top of the second stack, which is exactly the front of a queue.</p><p>That is the whole trick, and it is worth stating in one sentence in an interview: <em>the inbox has them newest-first, the outbox has them oldest-first, and pouring is what converts between the two</em>.</p>
 
 ## The emptiness check is the entire complexity argument
-
 <p>The naive version pours on every dequeue &mdash; and, to keep enqueue working, pours back afterwards. That is O(n) per call and O(n&sup2;) for n dequeues. The editor below measures it: 400 operations cost 160,000 moves that way, against 400 the right way.</p><p>Pouring only when the outbox is empty means each element crosses once in its entire life. Total moves for n items is n, so the average cost per dequeue is constant even though one individual dequeue can touch every element. That is amortised O(1), and the distinction between "amortised O(1)" and "O(1) worst case" is what the follow-up question is about.</p>
 
 ## When amortised is not good enough
-
 <p>Amortised bounds are about totals, and some systems care about the worst single call. A real-time audio callback or a request with a latency budget cannot afford the one dequeue that moves ten thousand items, even if the average is fine.</p><p>The honest answer is that this structure cannot fix that &mdash; and naming the alternatives is what a strong answer does. Move a constant number of items per operation instead of all of them (incremental rebuilding), or use a structure that is O(1) worst case outright, which in Python is <code>collections.deque</code>. Which leads to the real-world footnote: nobody builds a queue from two stacks in production. The question is about reasoning, and it is fair to say so while still answering it.</p>
 
 ## The mirror question
-
 <p>"Now implement a stack using two queues." It is the same idea and strictly worse: one of the two operations has to become O(n), because a queue gives you the wrong end and no amount of shuffling amortises away. Either push moves everything into the second queue behind the new item, or pop moves n&minus;1 items across to reach the last one.</p><p>There is no trick that makes both O(1) here, and saying that directly is the right answer &mdash; the asymmetry between the two questions is the thing being tested.</p>
 
-## What to say out loud
-
-<p>One stack for incoming, one for outgoing. Enqueue pushes onto the inbox. Dequeue pops the outbox, and if the outbox is empty first it moves everything across, which reverses the order into FIFO. Enqueue is O(1); dequeue is O(1) amortised, because each element moves between the stacks exactly once in its lifetime, even though a single dequeue can be O(n).</p>
-
 ## Edge cases to raise
-
 <p>Volunteering these is most of what separates a correct answer from a good one.</p>
 
 <p><strong>Dequeue from empty.</strong> The outbox is empty and so is the inbox, so the pour moves nothing and the pop raises. Check it explicitly rather than letting an <code>IndexError</code> escape from an internal list.</p>
@@ -165,49 +155,6 @@ print("that is the amortised bound: O(n) in total, O(n) for one worst call.")
 
 <p><strong>Nobody ships this.</strong> <code>collections.deque</code> is O(1) at both ends and is what production code uses. Saying that while still answering the question shows you know why it is being asked.</p>
 
-## The follow-ups interviewers ask
-
-<p><strong>"What is the worst case for a single dequeue?"</strong> O(n) - the call that finds an empty outbox moves everything. The answer they want is the distinction: amortised O(1) is a statement about the total across n operations, not about any one of them.</p>
-
-<p><strong>"Now implement a stack from two queues."</strong> The mirror, and strictly worse: one of the two operations has to be O(n), because a queue hands you the wrong end and no shuffling amortises that away. Saying so directly is the right answer.</p>
-
-<p><strong>"How would you make dequeue O(1) worst case?"</strong> Not with this structure. Either move a constant number of items per operation (incremental rebuilding, which keeps both stacks partially filled), or use a structure that is O(1) outright - <code>collections.deque</code>, which is a doubly-linked list of blocks.</p>
-
-## Common wrong answers
-
-<p><strong>"Pour on every dequeue so the outbox is always current."</strong> Correct output, O(n) per call, O(n<sup>2</sup>) overall. The editor measures it as 160,000 moves against 400 for the same workload.</p>
-
-<p><strong>"Amortised O(1) means every operation is O(1)."</strong> It means the total for n operations is O(n). One call can still touch every element, which matters under a latency budget.</p>
-
-<p><strong>"Use one stack and reverse it when needed."</strong> Reversing is O(n) and you have to reverse back to keep pushing cheap - which is the eager version with extra steps.</p>
-
-
-
-For the underlying ideas, see <a href="../dsa/stacks.html">stacks</a>, <a href="../dsa/queues.html">queues</a> and <a href="../dsa/big_o_notation.html">amortised time</a>.
-
-## Questions people ask
-
-<strong>What is the time complexity of enqueue and dequeue?</strong> Enqueue is O(1). Dequeue is O(1) amortised, with a single O(n) worst case on the call that pours the inbox into the outbox.
-
-<strong>Why is dequeue amortised O(1) rather than O(n)?</strong> Each element is pushed to the inbox once, moved to the outbox once and popped once. Across n operations that totals a constant amount of work per element.
-
-<strong>When exactly should I move items between the stacks?</strong> Only when the outbox is empty. Pouring while it still holds items would put newer elements ahead of older ones and break first-in-first-out order.
-
-<strong>Why does pouring one stack into another reverse the order?</strong> A stack gives back items last-in-first-out, so the newest item lands at the bottom of the outbox. The oldest item ends up on top, which is the queue front.
-
-<strong>What is the usual bug when adding `peek()`?</strong> Forgetting the empty-outbox check. Peek needs the same pour step as dequeue before it reads the top.
-
-<strong>Can I build a stack from two queues the same way?</strong> Yes, but one of push or pop stays O(n) however you arrange it. Interviewers use that asymmetry to see if you understand why the queue version amortises.
-
-## Recap in one screen
-
-- Enqueue never reorders anything - it is always one push.
-- The pour happens only when the outbox is empty, and it reverses the order.
-- While the outbox has items, dequeue does no moving at all.
-- Worth trying: Add peek(). It needs the same emptiness check as dequeue, and forgetting it is the standard bug in this extension.
-- Worth trying: Try implementing a stack from two queues and count the moves. One of the two operations stays O(n) however you arrange it, which is the asymmetry worth being able to explain.
-
 ## Sources and next steps
-
 - Source: [LeetCode 232, Implement Queue using Stacks](https://leetcode.com/problems/implement-queue-using-stacks/)
 - Continue with [design a min stack](design-a-min-stack.html), which builds on this idea.

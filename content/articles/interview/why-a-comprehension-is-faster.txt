@@ -1,16 +1,11 @@
 title: Why is a comprehension faster than the same loop?
 intro: Is a list comprehension faster than an equivalent for loop, and if so why?
 
-## The question, and what it is testing
+## The core idea
 
-Both approaches are O(n). In CPython, a comprehension is often a little faster because it avoids some per-item Python-level work. The size of that difference depends on the interpreter version and what the loop does, so measure instead of relying on a fixed percentage.
-
-<p>The useful interview point is the distinction between algorithmic complexity and constant factors. A comprehension does not change how many elements must be processed; its syntax can make a simple transformation cheaper and clearer.</p>
-
-In CPython, bytecode inspection can show the list-building path used by each form, but instruction names and specialisation vary by Python version. A comprehension uses a specialised list-building path; do not treat an opcode count as a language guarantee. Any speed difference is a constant factor, and it shrinks when per-item work dominates the append overhead.
+A list comprehension usually runs faster than an equivalent Python loop because iteration and append work happen in optimized interpreter machinery. Prefer it when it remains clear; readability matters more than a small speedup.
 
 ## Run it
-
 Best-of-five timings, because these are noisy, and then the per-iteration bytecode of each form so the cause is visible rather than asserted.
 
 Best of five runs, because a single measurement here is a coin flip.
@@ -89,37 +84,18 @@ print(f"  the generator  {sys.getsizeof(i * i for i in range(N)):,} bytes")
 ```
 
 ## The difference, in bytecode
-
 <p>The loop performs an append call for each value. In CPython, the comprehension uses a specialised list-building path. The <code>dis</code> output above lets you inspect the exact bytecode for the interpreter running this page; those details can change between versions.</p>
 
 ## Why the number is smaller than people expect
-
 <p>Folklore puts comprehensions at two or three times faster. And that has not been true for a while. Two things narrowed it.</p><p>The <strong>specialising interpreter</strong> added in 3.11 rewrites hot instruction sequences in place. And a repeated attribute-lookup-then-call on the same type is exactly the pattern it specialises. So the loop's overhead shrank.</p><p>And in 3.12 comprehensions were <strong>inlined</strong> (PEP 709). Before that, a list comprehension created and called a hidden function object on every evaluation. Real overhead that partly cancelled the LIST_APPEND saving. Removing it made comprehensions faster in a way that has nothing to do with the append path.</p><p>So the answer to give is "a bit faster because of a per-iteration lookup and call", not a multiplier. The editor below measures it on whichever interpreter you are running.</p>
 
 ## When the loop is the right answer anyway
-
 <p>A comprehension has to be one expression. The moment the body needs a statement &mdash; a <code>try</code>, a <code>break</code>, a log line, two things per item &mdash; the loop is the only option, and forcing a comprehension produces the unreadable nested version everybody has met.</p><p>Choose for readability. One transformation and one filter often reads well as a comprehension; deeply nested conditions are usually clearer in a loop. And if the result is only going to be consumed once, the better answer is often neither. A generator expression skips building the list at all. That is a memory win rather than a speed one &mdash; the editor below measures the two as roughly equal in time &mdash; but constant memory against a list of a million items is a larger practical difference than the constant factor this page is about.</p>
 
 ## The follow-up: what about map and filter
-
 <p><code>map</code> performs iteration in C but still calls its function once per item. A built-in function such as <code>str</code> can make it competitive; a Python <code>lambda</code> still incurs a Python call per value. Compare both forms on the actual workload.</p>
 
-## What to say out loud
-
-<p>Both are linear, but CPython comprehensions can reduce per-item overhead. I would choose based on readability and use a generator expression when I do not need the list in memory, which saves memory rather than changing the overall time complexity.</p>
-
-<p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence. Then talking for another minute until something wrong comes out.</p>
-
-## What to notice while it runs
-
-<ul>
-<li>The loop's per-iteration bytecode contains <code>LOAD_ATTR</code> and <code>CALL</code>. The comprehension's does not.</li>
-<li>Both forms are O(n) &mdash; the difference is per-item overhead.</li>
-<li>The measured gap is modest, which is the honest answer to the question.</li>
-</ul>
-
 ## Edge cases to raise
-
 <p>Volunteering these is most of what separates a correct answer from a good one.</p>
 
 <p><strong>The measurement is noisy.</strong> The same code timed twice can differ by half. This is why the editor takes the best of five runs - and why quoting a single-run figure in an interview is a claim you cannot defend.</p>
@@ -128,50 +104,6 @@ print(f"  the generator  {sys.getsizeof(i * i for i in range(N)):,} bytes")
 
 <p><strong>Readability wins at the point where you have to re-read it.</strong> Two <code>for</code> clauses and a condition is usually the limit, and volunteering that boundary is a better answer than defending comprehensions broadly.</p>
 
-## The follow-ups interviewers ask
-
-<p><strong>"Do dict and set comprehensions work the same way?"</strong> Yes, with <code>MAP_ADD</code> and <code>SET_ADD</code> in place of <code>LIST_APPEND</code>. Same saving, same reasoning.</p>
-
-<p><strong>"In a nested comprehension, what order do the <code>for</code> clauses run in?"</strong> Left to right, outermost first - the same order you would write the nested loops. <code>[x for row in grid for x in row]</code> flattens; swapping the clauses is a <code>NameError</code>. This is a quick way to check yourself.</p>
-
-<p><strong>"Does a comprehension leak its loop variable?"</strong> Not in Python 3 - it has its own scope. So <code>i</code> does not survive. It did leak in Python 2, and the fix is worth knowing because PEP 709 in 3.12 inlined comprehensions again <em>without</em> reintroducing the leak.</p>
-
-## Common wrong answers
-
-<p><strong>"Comprehensions are three times faster."</strong> Not on a modern interpreter. The specialising interpreter in 3.11 narrowed the gap and the honest figure is a small constant factor - which the editor above measures on any version you are running.</p>
-
-<p><strong>"They run in C, so they are parallel."</strong> Neither half is true. It is the same bytecode interpreter, one item at a time.</p>
-
-<p><strong>"Always prefer a comprehension."</strong> Not when the body needs a statement. And not when the nesting makes it unreadable. Volunteering that limit is usually what the question is actually probing.</p>
-
-
-
-For the underlying ideas, see <a href="../python/list_comprehensions.html">list comprehensions</a>, <a href="../python/for_loops_and_range.html">for loops</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
-
-## Questions people ask
-
-<strong>Is a list comprehension really faster than a loop with `append`?</strong> Usually, by a modest amount. The comprehension skips the per-item attribute lookup and method call that the loop performs.
-
-<strong>Do both have the same complexity?</strong> Yes, both are O(n). The difference is a constant factor per item.
-
-<strong>Where does the speed difference come from?</strong> The loop's bytecode includes `LOAD_ATTR` and `CALL` for `out.append` on every iteration. The comprehension uses a dedicated list-append instruction.
-
-<strong>Does hoisting `append = out.append` close the gap?</strong> It narrows it, but measure on your interpreter, since modern versions optimise method calls. Do not assume the old advice still holds.
-
-<strong>Is `map` faster than a comprehension?</strong> With a built-in like `map(str, xs)` it can be slightly faster. With a `lambda` it is usually slower, since the function call overhead returns.
-
-<strong>Should I pick comprehensions for speed or readability?</strong> Pick them for readability on simple transforms. Switch to a loop when the logic needs several statements or early exits.
-
-## Recap in one screen
-
-- The loop's per-iteration bytecode contains LOAD_ATTR and CALL; the comprehension's does not.
-- Both forms are O(n) - the difference is per-item overhead.
-- The measured gap is modest, which is the honest answer to the question.
-- The one-line answer: Yes, by a little. And for a specific reason: the loop looks up out.
-- Worth trying: Hoist the lookup out of the loop with append = out.append and re-measure. This is classic advice and the result may surprise you on a modern interpreter - measure rather than assume.
-- Worth trying: Compare map(str, range(N)) against [str(i) for i in range(N)]. Then against map(lambda i: str(i), ...). The lambda undoes the advantage.
-
 ## Sources and next steps
-
 - Source: [Python documentation, list comprehensions](https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions)
 - Continue with [what is a Python list underneath](what-is-a-python-list-underneath.html), which builds on this idea.

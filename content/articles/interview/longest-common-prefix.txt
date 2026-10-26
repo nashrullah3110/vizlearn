@@ -1,31 +1,11 @@
 title: Longest common prefix
 intro: Find the longest common prefix of a list of strings.
 
-## The problem
+## The core idea
 
-Given a list of strings, find the longest prefix shared by all of them.
-
-|Input|Answer|
-|---|---|
-|`["flower", "flow", "flight"]`|`"fl"`|
-|`["dog", "racecar", "car"]`|`""` &mdash; nothing shared|
-|`["interspecies", "interstellar", "interstate"]`|`"inters"`|
-|`["abc"]`|`"abc"` &mdash; a single string is its own prefix|
-|`[]`|`""`|
-|`["", "abc"]`|`""` &mdash; an empty string forces an empty answer|
-
-Simple to state, and the interest is in how many correct approaches exist and which reads best.
-
-The horizontal approach takes the first string as a candidate prefix and shortens it character by character until every other string starts with it. The vertical approach compares character by character across all strings at the same position, stopping at the first mismatch. Both are O(S) where S is the total number of characters across all strings, but the vertical approach often terminates earlier because it stops as soon as any string disagrees, rather than checking each string against the full candidate.
-
-A third approach sorts the list first. After sorting, the longest common prefix of the entire list is the common prefix of just the first and last strings, because sorting by lexicographic order puts the most different strings at the ends. The sort costs O(S log n) where n is the number of strings, which is worse than the linear approaches for large inputs but produces clean, short code.
-
-Edge cases matter: an empty list returns an empty string, a list containing an empty string returns an empty string (no character can be common). And a single-string list returns that string itself. All three approaches handle these correctly if the loop bounds are right, and getting the bounds wrong on the empty-list case is the most common interview mistake.
-
-The problem tests string manipulation, loop control and edge-case reasoning. It is not about data structures or clever algorithms — the linear scan is optimal — so the signal an interviewer looks for is clean code that handles the boundaries correctly on the first attempt.
+The longest common prefix is the longest starting sequence shared by every string in a collection. Compare characters only until one word ends or a mismatch appears; an empty input has no prefix.
 
 ## Run it
-
 Three approaches on the same input with their character comparisons counted, so "horizontal versus vertical" is a measurement rather than a preference.
 
 ```python-run
@@ -78,8 +58,8 @@ def by_sorting(words):
 
 print("by sorting:", repr(by_sorting(["flower","flow","flight"])))
 ```
-## Vertical scanning
 
+## Vertical scanning
 Compare the same position across all strings, and stop at the first disagreement.
 
 ```python-run
@@ -102,7 +82,6 @@ The two conditions in the inner `if` are both necessary: `i >= len(other)` catch
 The early exit is what makes this fast in practice. If the first characters differ, it returns after one comparison, regardless of how long the strings are.
 
 ## Horizontal scanning
-
 Take the first string as a running answer, and shorten it against each subsequent string.
 
 ```python-run
@@ -124,7 +103,6 @@ Same O(S) worst case. Slower in the bad case &mdash; the `while` loop can shorte
 Both are acceptable answers. Vertical scanning exits earlier on the common case of an immediate mismatch; horizontal scanning is shorter. Being able to say which is better and why is what the comparison is for.
 
 ## The two shortcuts worth knowing
-
 <strong>Sort and compare the ends.</strong> After sorting lexicographically, the strings most unlike each other are first and last. So their common prefix is the answer for the whole list:
 
 ```python-run
@@ -151,23 +129,19 @@ print(os.path.commonprefix(["flower", "flow", "flight"]))   # 'fl'
 It is a character-wise prefix, not path-aware &mdash; `commonprefix(["/usr/lib", "/usr/local"])` returns `"/usr/l"`, which is not a directory. For paths, `os.path.commonpath` is the correct function. Mention it after writing the loop.
 
 ## The shrinking candidate
-
 The answer is a prefix of every string, so it is certainly a prefix of the first one. Start there and remove characters as each new word disagrees. Because it only shrinks, no backtracking is possible and one pass is enough.
 
 Two bounds to state: the answer is at most the length of the <em>shortest</em> string, and the total work is O(sum of all characters) in the worst case &mdash; usually far less, because the candidate collapses quickly on real input.
 
 ## The sorting trick
-
 Sort the list and compare only the first and last strings. In lexicographic order those two are the most different, so their common prefix is the whole list's. It is O(n&nbsp;log&nbsp;n&middot;m) &mdash; worse asymptotically, and a nice observation to offer as an alternative rather than as the answer.
 
 ## Vertical scanning, and tries
-
 The other framing compares column by column: check index 0 across every word, then index 1, stopping at the first disagreement. Same complexity, and it exits earlier when the prefix is short and the strings are long.
 
 If the question becomes "answer this repeatedly for many queries", the answer is a trie: insert every word, then walk down from the root while each node has exactly one child and ends no word. That is the structure this question is a warm-up for.
 
 ## The trie approach
-
 Insert every string into a trie, then walk down from the root while each node has exactly one child and is not the end of a word.
 
 ```python-run
@@ -211,7 +185,6 @@ The `not node.is_end` condition is easy to miss: for `["ab", "abc"]` the answer 
 |Binary search on length|O(S log m)|O(1)|Rarely|
 
 ## Edge cases
-
 |Case|Result|
 |---|---|
 |Empty list|`""` &mdash; guard first, or `strs[0]` raises|
@@ -225,7 +198,6 @@ The `not node.is_end` condition is easy to miss: for `["ab", "abc"]` the answer 
 The <strong>Unicode caveat</strong> is worth a sentence if the interviewer is interested: comparing code points means `"café"` written with a combining accent and `"café"` with a precomposed one share only `"caf"`. Normalising with `unicodedata.normalize("NFC", s)` first fixes it. Rarely required, and knowing it exists is the signal.
 
 ## Where it is used
-
 - <strong>Autocomplete.</strong> Given the typed prefix, the common prefix of all matches can be filled in automatically &mdash; which is what shell tab-completion does.
 - <strong>File path handling.</strong> Finding the common root directory of a set of paths, with `commonpath` rather than `commonprefix`.
 - <strong>IP routing.</strong> Longest-prefix matching on address bits, implemented as a trie over bits.
@@ -233,45 +205,6 @@ The <strong>Unicode caveat</strong> is worth a sentence if the interviewer is in
 - <strong>URL routing</strong> in web frameworks, matching the longest registered path prefix.
 - <strong>Compression.</strong> Front coding stores each string as a shared prefix length plus a suffix.
 
-## What it is testing
-
-<strong>Do you guard the empty list?</strong> `strs[0]` on an empty list raises, and it is the first line of the solution.
-
-<strong>Do you handle a short string?</strong> The `i >= len(other)` check, without which `["flower", "flow"]` raises `IndexError`.
-
-<strong>Can you compare approaches?</strong> Several are correct; choosing one and justifying it is the answer.
-
-<strong>Do you spot the early exit?</strong> Vertical scanning returns after one comparison when the first characters differ.
-
-<strong>Do you know when a trie earns its cost?</strong> Not for one query; yes for repeated prefix queries.
-
-
-
-For the underlying ideas, see <a href="../python/strings_and_slicing.html">string slicing</a>, <a href="../python/string_methods.html">string methods</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
-
-## Questions people ask
-
-<strong>How does vertical scanning work?</strong> Compare the characters at index 0 across all strings, then index 1, and stop at the first mismatch or the end of the shortest string. The characters seen so far are the prefix.
-
-<strong>What is the time complexity?</strong> O(S), where S is the total number of characters across all strings, in the worst case. In practice it stops at the first mismatch.
-
-<strong>What is the sorting shortcut?</strong> Sort the strings, then compare only the first and last. If they share a prefix, every string between them does too. Sorting costs O(n * m log n) so it is more a clever trick than a speedup.
-
-<strong>Why mention a trie?</strong> A trie answers prefix questions for many queries after one build, and the common prefix is the path from the root until a node branches or ends a word. It is overkill for a single call.
-
-<strong>What are the edge cases?</strong> An empty list returns an empty string, a single string returns itself, and any empty string in the list makes the prefix empty.
-
-<strong>What is the space complexity?</strong> O(1) extra for scanning, not counting the returned prefix. A trie uses O(S) space.
-
-## Recap in one screen
-
-- Vertical scanning compares position by position across all strings and exits on the first mismatch &mdash; O(S) time, O(1) space.
-- Check `i >= len(other)` as well as inequality, or a shorter string raises `IndexError`.
-- Guard the empty list before touching `strs[0]`.
-- Sorting and comparing only the first and last string works, at O(n log n &middot; m).
-- A trie is the right structure only when many prefix queries follow, not for one answer.
-
 ## Sources and next steps
-
 - Source: [LeetCode 14, Longest Common Prefix](https://leetcode.com/problems/longest-common-prefix/)
 - Continue with [implement substring search](implement-substring-search.html), which builds on this idea.

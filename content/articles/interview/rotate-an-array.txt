@@ -1,20 +1,11 @@
 title: Rotate an array by k
 intro: Rotate an array right by k positions, in place.
 
-## The problem
+## The core idea
 
-Rotate an array right by k positions, in place.
-
-<p class="mono-font">[1,2,3,4,5,6,7], k = 3&nbsp;&rarr;&nbsp;[5,6,7,1,2,3,4]</p>
-
-The Python one-liner is `nums[:] = nums[-k:] + nums[:-k]`, which allocates O(n) extra space. The interview version asks for O(1) extra space, and there is a neat answer.
-
-First, normalise k: `k %= len(nums)`. Rotating by the length is a no-op, and k can be larger than the array. Forgetting this is the most common bug.
-
-The O(1)-space solution uses three reversals: reverse the entire array, then reverse the first k elements, then reverse the rest. Each element moves exactly twice, every swap is in place. And the result is a clean rotation. The trick is not obvious the first time, but once you see it the proof is immediate. Reversing the whole array puts the right elements at the front in the wrong internal order. And the two partial reversals fix that order.
+A right rotation by k moves each item k positions, wrapping at the end. Three reversals achieve this in place: reverse the whole array, then reverse the first k elements and the remainder.
 
 ## Run it
-
 The three-reversal rotation printed after each step, checked against the slice version for every k from 0 to n, including the values larger than the array.
 
 ```python-run
@@ -80,8 +71,8 @@ try:
 except IndexError as e:
     print("k larger than len:", type(e).__name__ + ":", e, "- why the % matters")
 ```
-## The three-reversal trick
 
+## The three-reversal trick
 ```python-run
 def rotate(nums, k):
     n = len(nums)
@@ -117,19 +108,16 @@ Tracing `[1,2,3,4,5,6,7]` with k = 3:
 Why it works: reversing the whole array puts the last k elements at the front, in reverse order. And the first n&minus;k at the back, also reversed. Reversing each section separately un-reverses them. Every element ends where it should.
 
 ## Why three reversals work
-
 A right rotation by k moves the last k elements to the front and slides the rest along. Reversing the whole array puts those k at the front at once &mdash; but reversed. And the other block reversed too. Reversing each block separately undoes exactly that.
 
 Total work is 3&middot;n/2 swaps, so O(n) time, and the only storage is a couple of indices.
 
 ## The modulo, and the empty case
-
 <p><code>k %= n</code> first. A k larger than the array is a rotation of <code>k % n</code>, and without the modulo the block boundaries go out of range. A k that is a multiple of n leaves the array unchanged. This the modulo also handles for free.</p>
 
 Negative k is a left rotation. Python's <code>%</code> already returns a non-negative result for a positive divisor. So <code>k %= n</code> converts it correctly. A detail worth mentioning because it differs from C.
 
 ## The alternatives
-
 <strong>Slice assignment</strong> &mdash; the Pythonic answer, O(n) space:
 
 ```python-run
@@ -177,7 +165,6 @@ Correct, O(1) space, and much harder to get right &mdash; the outer loop exists 
 |`deque.rotate`|O(k)|O(1)|Best, if a deque is allowed|
 
 ## Edge cases
-
 |Case|Handling|
 |---|---|
 |`k = 0`|No change &mdash; return early|
@@ -192,7 +179,6 @@ The empty-array case is worth handling explicitly, because `%` by zero raises `Z
 Python's `%` on negatives is helpful here: `-3 % 7` is 4. So a negative k by itself becomes the equivalent right rotation. In languages where `%` follows the sign of the dividend, that needs an explicit adjustment &mdash; a good detail to mention.
 
 ## Rotating left, and by other units
-
 <strong>Left rotation by k</strong> is right rotation by `n - k`. Either convert, or reorder the three reversals: reverse the first k, reverse the rest, reverse the whole thing.
 
 <strong>Rotating a matrix by 90&deg;</strong> is a related classic and uses a similar decomposition: transpose, then reverse each row. Same idea &mdash; a rotation expressed as two simpler in-place operations.
@@ -204,7 +190,6 @@ Python's `%` on negatives is helpful here: `-3 % 7` is 4. So a negative k by its
 A neat related check: <strong>is B a rotation of A?</strong> Test whether `B in A + A`. This works because every rotation of A appears as a substring of A doubled.
 
 ## Where rotation appears in practice
-
 - <strong>Circular buffers.</strong> Ring buffers in audio, networking and logging are rotation by index arithmetic rather than by moving data &mdash; which is the better answer when it is available.
 - <strong>Round-robin scheduling</strong> and load balancing.
 - <strong>Caesar and rotation ciphers.</strong>
@@ -214,45 +199,6 @@ A neat related check: <strong>is B a rotation of A?</strong> Test whether `B in 
 
 The circular-buffer point is the practically important one: <strong>if you find yourself rotating an array repeatedly, you probably want an offset variable instead</strong>. Keeping a logical start index and computing `(i + offset) % n` on access is O(1) per rotation and moves no data at all.
 
-## What it is testing
-
-<strong>Do you normalise k?</strong> `k %= n` is the line most first attempts omit, and `k > n` is always in the test suite.
-
-<strong>Do you get O(1) space?</strong> The slice version is correct and allocates; the three-reversal version is the expected improvement.
-
-<strong>Do you know `nums[:] =` versus `nums =`?</strong> A real Python distinction, and rebinding silently fails to modify the caller's list.
-
-<strong>Can you explain <em>why</em> three reversals work?</strong> Reciting the steps is weaker than explaining that reversing the whole array places the sections correctly but internally backwards.
-
-<strong>Do you suggest an offset instead</strong> when told rotation happens often? That is the answer a systems-minded interviewer is hoping for.
-
-
-
-For the underlying ideas, see <a href="../python/slicing_step_negatives.html">slicing</a>, <a href="../dsa/big_o_notation.html">time complexity</a> and <a href="../python/tuples_and_unpacking.html">tuple unpacking</a>.
-
-## Questions people ask
-
-<strong>Why do I compute `k %= n` first?</strong> Rotating by n returns the original array, so only the remainder matters. It also stops k larger than the length from indexing out of range.
-
-<strong>How does the three-reversal trick work?</strong> Reverse the whole array, then reverse the first k elements and the remaining n minus k elements. Each reversal fixes one block's internal order, leaving the rotated result.
-
-<strong>What are the time and space complexities of that method?</strong> O(n) time, since each element is swapped a constant number of times, and O(1) extra space.
-
-<strong>Why does `nums = nums[-k:] + nums[:-k]` not work for in-place problems?</strong> It rebinds the local name to a new list and leaves the caller's list untouched. Use `nums[:] = ...` to modify the original object.
-
-<strong>How do I rotate left instead of right?</strong> A left rotation by k equals a right rotation by n minus k. Convert k and reuse the same routine.
-
-<strong>What if rotations happen many times?</strong> Store an offset and read elements at `(i + offset) % n`. That makes each rotation O(1) and moves no data.
-
-## Recap in one screen
-
-- Normalise with `k %= n` first; k can exceed the length. And that is always tested.
-- Reverse the whole array, then the first k, then the rest &mdash; O(n) time, O(1) space.
-- `nums[:] = ...` modifies in place; `nums = ...` only rebinds the local name.
-- Left rotation by k is right rotation by n&minus;k.
-- If rotation is frequent, keep an offset and index modulo n rather than moving data.
-
 ## Sources and next steps
-
 - Source: [LeetCode 189, Rotate Array](https://leetcode.com/problems/rotate-array/)
 - Continue with [remove duplicates in place](remove-duplicates-in-place.html), which builds on this idea.

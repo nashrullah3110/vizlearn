@@ -1,48 +1,11 @@
 title: When should you use a set instead of a list?
 intro: What does a set give you that a list does not, and how do you deduplicate while keeping order?
 
-## Deduplicating, three ways, and when to pick each one
+## The core idea
 
-A set gives you O(1) membership tests and automatic deduplication, but it drops insertion order and forbids unhashable values. A list preserves both and allows duplicates, but `in` is O(n). Choosing between them is a question of which guarantee you need
-
-```python-run
-items = [3, 1, 2, 3, 1]
-
-print(list(set(items)))                 # [1, 2, 3] - order LOST
-print(list(dict.fromkeys(items)))       # [3, 1, 2] - order PRESERVED
-print(sorted(set(items)))               # [1, 2, 3] - sorted
-```
-All three are O(n). The difference is what happens to the order, and choosing wrongly produces a bug that appears only when the output order matters to someone downstream.
-
-<strong>`set`</strong> is the fastest and gives no order guarantee. It looks sorted for small integers because of how they hash, which is a coincidence and not a guarantee &mdash; that coincidence is handles a lot of misplaced confidence.
-
-<strong>`dict.fromkeys`</strong> exploits the guarantee that dictionaries preserve insertion order, so the first occurrence of each value is kept in its original position. This is the idiomatic order-preserving deduplication in modern Python.
-
-<strong>Manual</strong>, when a key function is needed:
-
-```python-run
-class User:
-    def __init__(self, email): self.email = email
-    def __repr__(self): return "User(%s)" % self.email
-
-users = [User("a@x.com"), User("b@x.com"), User("a@x.com")]
-
-def dedupe_by(items, key):
-    seen, out = set(), []
-    for x in items:
-        k = key(x)
-        if k not in seen:
-            seen.add(k)
-            out.append(x)
-    return out
-
-print(dedupe_by(users, key=lambda u: u.email))   # unique by email, order kept
-```
-That last version is the one to reach for with objects, because it deduplicates by a chosen field while keeping the full object.
-
+A set stores unique hashable values and supports expected constant-time membership, but does not preserve duplicates. Use a list for order and repeats; use `dict.fromkeys` when deduplicating must keep insertion order.
 
 ## Run it
-
 The three deduplication idioms and what each does to order, the set operators against their loop equivalents. And the membership timing that motivates all of it.
 
 ```python-run
@@ -104,8 +67,8 @@ else:
     print(f"  set operator       : too fast to measure separately")
 print(f"  same answer        : {loop == operator}")
 ```
-## Why the set is fast
 
+## Why the set is fast
 A list must scan to know whether it already contains something &mdash; O(n) per check, so O(n²) to deduplicate by repeated scanning.
 
 A set hashes the value and looks in one place &mdash; O(1) on average, so O(n) overall.
@@ -133,7 +96,6 @@ Both versions preserve order. The first is quadratic and is what people write be
 Keeping the list <em>and</em> a set alongside it is the standard pattern: the list holds the ordered output, the set answers the membership question.
 
 ## The requirement: hashable elements
-
 Sets and dictionaries need hashable elements, so deduplication by value fails on mutable ones:
 
 ```python-run
@@ -157,7 +119,6 @@ For unhashable items, convert to a hashable canonical form:
 The JSON option works and is slow, and it is sensitive to types &mdash; `1` and `1.0` serialise differently. Prefer an explicit tuple of the fields that define identity.
 
 ## What you gain and what you give up
-
 <p><strong>Gain:</strong> membership in O(1) rather than O(n), and uniqueness enforced for free.</p>
 
 <p><strong>Give up:</strong> order, duplicates, indexing (<code>s[0]</code> is a <code>TypeError</code>), and the ability to hold unhashable elements. You cannot put a list in a set, though you can put a tuple.</p>
@@ -165,7 +126,6 @@ The JSON option works and is slow, and it is sensitive to types &mdash; `1` and 
 Converting costs O(n), so a single membership test on a small list is not worth it. More than a couple of tests, or a large collection, and it is.
 
 ## Deduplicating three ways
-
 <p><code>set(seq)</code> &mdash; fastest, order destroyed.</p>
 
 <p><code>sorted(set(seq))</code> &mdash; deduplicated and in sorted order, which is not the same as original order and is often what people accidentally ship.</p>
@@ -173,13 +133,11 @@ Converting costs O(n), so a single membership test on a small list is not worth 
 <p><code>list(dict.fromkeys(seq))</code> &mdash; deduplicated in <em>first-seen</em> order, one pass, and the one to remember. Dicts have preserved insertion order since 3.7, so this is a guarantee rather than a trick.</p>
 
 ## The operators that replace loops
-
 <p><code>a &amp; b</code> intersection, <code>a | b</code> union, <code>a - b</code> difference, <code>a ^ b</code> symmetric difference, <code>a &lt;= b</code> subset. Each replaces a loop with a membership test inside it &mdash; which is to say, each replaces an accidental O(n&middot;m) with an O(n + m).</p>
 
 "Which users are in A but not B" is <code>a - b</code>. Writing that as a comprehension over a list is the most common form of the quadratic trap.
 
 ## Choosing between the containers
-
 |&nbsp;|`list`|`set`|`dict`|
 |---|---|---|---|
 |Ordered|Yes|No|Yes (insertion)|
@@ -211,7 +169,6 @@ print(a.isdisjoint(b))  # False      no overlap
 Those replace loops. "Which users are in both groups?" is `a & b`, not a nested loop. And it runs in C at O(min(len(a), len(b))).
 
 ## Where deduplication goes wrong
-
 <strong>Assuming a set is sorted.</strong> `set([3, 1, 2])` may print as `{1, 2, 3}` for small integers because of how they hash. Add a string or a larger number and the illusion vanishes. Never rely on it.
 
 <strong>Deduplicating floats.</strong> `0.1 + 0.2` and `0.3` are different values, so they do not deduplicate. Round to a fixed precision first if that is the intent.
@@ -228,29 +185,6 @@ Those replace loops. "Which users are in both groups?" is `a & b`, not a nested 
 
 For the underlying ideas, see <a href="../python/sets_and_set_operations.html">sets</a>, <a href="../dsa/hash_tables.html">hash tables</a> and <a href="../dsa/lists_in_python.html">lists</a>.
 
-## Questions people ask
-
-<strong>Does `set` preserve order?</strong> No. Use `dict.fromkeys` when order matters.
-
-<strong>Which is fastest?</strong> `set()` is fastest, `dict.fromkeys` is close, and both are O(n). The quadratic list version is the one to avoid.
-
-<strong>Why is a set unhashable itself?</strong> It is mutable. `frozenset` is the hashable version and can be a set member.
-
-<strong>How do I deduplicate by one field?</strong> A `seen` set of that field's values, appending the full object when the field is new.
-
-<strong>Is a set always better than a list for membership?</strong> Above about ten elements, yes. Below that, a scan wins on constant factors.
-
-<strong>How do I deduplicate a huge stream?</strong> A set if it fits; a Bloom filter or HyperLogLog if approximate counting is acceptable.
-
-## Recap in one screen
-
-- `list(set(x))` loses order; `list(dict.fromkeys(x))` preserves it; both are O(n).
-- Deduplicating by scanning a growing list is O(n&sup2;) &mdash; keep a `seen` set alongside the output list.
-- Elements must be hashable; convert lists to tuples and dicts to sorted item tuples.
-- Set operations (`&`, `|`, `-`, `^`) replace nested loops and run in C.
-- Normalise case, whitespace and Unicode before deduplicating, and never assume a set is sorted.
-
 ## Sources and next steps
-
 - Source: [Python documentation, set types](https://docs.python.org/3/library/stdtypes.html#set-types-set-frozenset)
 - Continue with [why membership is slow on a list](why-is-in-slow-on-a-list.html), which builds on this idea.

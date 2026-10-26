@@ -1,14 +1,11 @@
 title: What does `yield` actually do?
 intro: What does yield do, and how is a generator different from a function that returns a list?
 
-## The question, and what it is testing
+## The core idea
 
-<code>yield</code> turns the function into a <strong>factory for paused stack frames</strong>. Calling it runs nothing; each <code>next()</code> runs the body up to the next yield and freezes it there. Values are produced on demand instead of building the whole result at once. A generator object is one-shot; if you need to iterate repeatedly or index the results, materialise them in a list.
-
-
+`yield` returns a value while preserving the function’s execution state for the next request. Calling a generator function creates a lazy iterator; its body runs only as the iterator is advanced.
 
 ## Run it
-
 The three states, the one-shot exhaustion, and the memory difference at a million items - printed rather than asserted.
 
 The three states, driven by hand.
@@ -72,37 +69,18 @@ print("so the real gap is larger still.")
 ```
 
 ## A generator is a paused frame
-
 <p>An ordinary function runs to a <code>return</code> and its stack frame is destroyed. A function containing <code>yield</code> does not run at all when you call it. You get a generator object that owns a frame which has never started.</p><p>Every <code>next()</code> resumes that frame, runs until the next <code>yield</code>, hands back the value, and freezes the frame again. Local variables, instruction pointer and all. That is the whole mechanism, and it is why <code>yield</code> can appear in the middle of a loop and still work. The loop variable survives between resumes. This is because the frame was never torn down.</p>
 
 ## What laziness buys, in one number
-
 <p>The list version of a million squares allocates a million integers and a million pointers before you read the first one. The generator version allocates one object with a frame in it. And the editor below prints both sizes: a few megabytes against about a hundred bytes.</p><p>The other half is <em>latency</em>. A generator can hand you its first item at once. This matters when the sequence is being read from a file or a network, and matters absolutely when the sequence is infinite. <code>itertools.count()</code> is a valid generator and an impossible list.</p>
 
 ## The three things you give up
-
 <p><strong>It is one-shot.</strong> Once exhausted, it stays exhausted. And a second <code>for</code> loop over it runs zero times without error. This is the bug people actually hit: passing a generator to two functions and finding the second one saw an empty sequence.</p><p><strong>No <code>len()</code>, no indexing, no slicing.</strong> The length is not known without running it. So there is nothing to report. <code>itertools.islice</code> is the slicing replacement.</p><p><strong>Exceptions surface late.</strong> A generator that will raise on its fourth item raises on the fourth <code>next()</code>. This may be a long way from where it was created. Inside a different function, or after a <code>with</code> block has already closed the file it was reading.</p>
 
 ## The follow-up you should expect
-
 <p>"What is the difference between a generator and an iterator?" An iterator is the protocol. Anything with <code>__next__</code> and <code>__iter__</code>. A generator function is one common way to implement an iterator; classes and built-in objects can implement the protocol directly too.</p><p>And "what does a generator expression change?" Nothing but the syntax: <code>(x*x for x in xs)</code> creates a generator object without building a list. That is why <code>sum(x*x for x in xs)</code> can process the values as it iterates.</p>
 
-## What to say out loud
-
-<p>A function with yield returns a generator instead of running. Each next() resumes the body until the next yield, so values are produced lazily without storing the whole sequence. Memory still depends on any state the generator retains. The trade is that it is one-shot and has no len() - if I need to iterate twice or index it, I need a list.</p>
-
-<p>Then stop. The commonest failure on a question like this is answering it correctly in one sentence. Then talking for another minute until something wrong comes out.</p>
-
-## What to notice while it runs
-
-<ul>
-<li>Calling the function runs <em>none</em> of the body &mdash; the state starts at <code>GEN_CREATED</code>.</li>
-<li>Each resume ends at a <code>yield</code>, which is why the frame is <em>suspended</em> rather than finished.</li>
-<li><code>GEN_CLOSED</code> is terminal: iterating again produces nothing, silently.</li>
-</ul>
-
 ## Edge cases to raise
-
 <p>Volunteering these is most of what separates a correct answer from a good one.</p>
 
 <p><strong>An exception raised inside the generator surfaces at the <code>next()</code> that triggers it</strong>, not where the generator was created - which can be in a different function. After the <code>with</code> block that opened the file has already closed it. Generators that read resources should own the <code>with</code>, not be handed an open handle.</p>
@@ -111,53 +89,6 @@ print("so the real gap is larger still.")
 
 <p><strong>Closing matters when there is cleanup.</strong> Abandoning a suspended generator in time runs its <code>finally</code> at collection time. This is not a schedule you control. <code>contextlib.closing</code> or an explicit <code>gen.close()</code> makes it deterministic.</p>
 
-## The follow-ups interviewers ask
-
-<p><strong>"What is the difference between a generator and an iterator?"</strong> An iterator is the protocol - anything with <code>__iter__</code> and <code>__next__</code>. A generator is the easiest way to produce one, written as a function rather than a class. Every generator is an iterator; most iterators you meet in real code are generators.</p>
-
-<p><strong>"What does <code>yield from</code> do?"</strong> Delegates to another iterable. This yields all of it it yields - and it forwards <code>send</code> and <code>throw</code> through to the inner generator. This is what made generator-based coroutines possible before <code>async def</code> existed.</p>
-
-<p><strong>"Can a generator receive values and produce them?"</strong> Yes: <code>value = yield</code> makes the yield an expression, and <code>gen.send(x)</code> resumes it with <code>x</code> as that expression's value. This is how generators were used as coroutines for a decade. And it is worth knowing exactly because <code>async</code> replaced it.</p>
-
-<p><strong>"How do you iterate a generator twice?"</strong> You do not. Either materialise it with <code>list()</code>, accepting the memory, or use <code>itertools.tee</code>. This buffers what the slower consumer has not read yet - so it trades the memory back in proportion to how far apart they get.</p>
-
-## Common wrong answers
-
-<p><strong>"It returns a list, just lazily."</strong> There is no list at any point. If the interviewer hears "list" they will ask what <code>len()</code> gives. And the answer is a <code>TypeError</code>.</p>
-
-<p><strong>"Generators are faster."</strong> Not reliably. Each item costs a <code>__next__</code> call, so in wall-clock terms a generator is often a little slower than building the list. The win is memory and first-item latency, and saying "faster" invites a measurement you will lose.</p>
-
-<p><strong>"You can index into it."</strong> You cannot. <code>itertools.islice</code> is the replacement, and it still has to walk the items it skips.</p>
-
-
-
-For the underlying ideas, see <a href="../python/generators_and_yield.html">generators</a>, <a href="../python/for_loops_and_range.html">for loops</a> and <a href="../python/functions_and_return.html">functions</a>.
-
-## Questions people ask
-
-<strong>What happens when I call a generator function?</strong> None of the body runs. You get a generator object in the created state, and code starts only on the first `next()`.
-
-<strong>What does `yield` do to the function's frame?</strong> It pauses the frame and hands a value to the caller. The local variables stay alive until the next resume.
-
-<strong>Why does iterating a generator twice give nothing the second time?</strong> After the body returns, the generator is closed, and a closed generator raises `StopIteration` immediately. Create a new one to iterate again.
-
-<strong>Why can't I call `len()` on a generator?</strong> Its length is unknown until the body has run to the end. You can convert to a list first, at the cost of holding every item.
-
-<strong>What is the memory benefit?</strong> A generator produces one item at a time, so memory stays constant regardless of how many values it yields.
-
-<strong>What does `itertools.tee` do for generators?</strong> It gives you independent iterators over one generator. It buffers the items one iterator has consumed and the other has not, so memory use grows.
-
-## Recap in one screen
-
-- Calling the function runs none of the body - the state starts at GEN_CREATED.
-- Each resume ends at a yield, which is why the frame is suspended rather than finished.
-- GEN_CLOSED is terminal: iterating again produces nothing, silently.
-- The one-line answer: yield turns the function into a factory for paused stack frames.
-- Worth trying: Replace list(g) with a second next(g) and watch the state stay GEN_SUSPENDED until the body actually returns.
-- Worth trying: Add len(as_gen). The TypeError is the point: the length is not knowable without running it.
-- Worth trying: Wrap the generator in itertools.tee(as_gen, 2) to get two free iterators - and note it buffers. So it trades the memory back.
-
 ## Sources and next steps
-
 - Source: [Python language reference, yield expressions](https://docs.python.org/3/reference/expressions.html#yield-expressions)
 - Continue with [what a decorator replaces](what-a-decorator-replaces.html), which builds on this idea.

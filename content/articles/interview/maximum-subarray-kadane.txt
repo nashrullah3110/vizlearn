@@ -1,18 +1,11 @@
 title: Maximum subarray sum (Kadane)
 intro: Find the contiguous subarray with the largest sum.
 
-## The problem
+## The core idea
 
-Find the contiguous subarray with the largest sum.
-
-<p class="mono-font">[&minus;2, 1, &minus;3, 4, &minus;1, 2, 1, &minus;5, 4]&nbsp;&nbsp;&rarr;&nbsp;&nbsp;6&nbsp;&nbsp;(from [4, &minus;1, 2, 1])</p>
-
-"Contiguous" is the word that makes it tractable. A subsequence version &mdash; any subset, not always adjacent &mdash; is trivial: take every positive number.
-
-The brute force checks every subarray: O(n²) with running sums, O(n³) if the sum is recomputed each time. Kadane's algorithm does it in one pass. The idea is a single variable `current` that tracks the best sum ending at each position: `current = max(nums[i], current + nums[i])`. If extending the previous subarray would make the sum worse than starting fresh at `nums[i]`, start fresh. The global best is the maximum of `current` across all positions. This is O(n) time and O(1) space. The recurrence is a dynamic programming formulation where the subproblem is "maximum sum ending here," and the transition is the one-line max above. The edge case is all-negative arrays: the answer is the largest (least negative) single element, and Kadane handles this naturally. This is because `max(nums[i], current + nums[i])` always considers starting fresh. A version that returns 0 for all-negative input is solving a different problem (allowing the empty subarray). The follow-up is returning the actual subarray, not just its sum. This requires tracking the start and end indices when `current` resets or `best` is updated.
+The maximum-subarray problem asks for a non-empty contiguous range with the greatest sum. Kadane’s algorithm either extends the previous range or starts again at the current value, while tracking the best sum seen.
 
 ## Run it
-
 Kadane with the running values printed at each element. Then the index-tracking version. Then the zero-set up variant getting an all-negative array wrong.
 
 ```python-run
@@ -61,8 +54,8 @@ def kadane_from_zero(values):
 
 print("seeded at 0   :", kadane_from_zero([-3,-1,-2]), "<- wrong for all-negative")
 ```
-## Kadane's algorithm
 
+## Kadane's algorithm
 ```python-run
 def max_subarray(nums):
     best = current = nums[0]
@@ -90,7 +83,6 @@ print("current is now:", current)
 Both forms are the same rule. The `max(x, current + x)` version is the one usually written, because it reads as the decision it encodes.
 
 ## Tracing it
-
 `[-2, 1, -3, 4, -1, 2, 1, -5, 4]`:
 
 |x|current|best|Decision|
@@ -110,25 +102,21 @@ The answer is 6. Note that `current` drops to 1 at the &minus;5 and never recove
 That split is the most common bug: returning `current` gives the best subarray <em>ending at the last element</em>, not the best total.
 
 ## The one decision
-
 At element <em>i</em> there are exactly two candidates for the best subarray ending there: the previous best-ending-here extended by <code>values[i]</code>, or <code>values[i]</code> alone. Take the larger. Then the global answer is the largest of those per-element bests.
 
 That is dynamic programming with the table collapsed to a single variable, because each step only needs the one before it. Saying that out loud is worth more than the code.
 
 ## The edge case that catches people
-
 Initialise <code>best</code> and <code>current</code> to <code>values[0]</code>, not to <code>0</code>. Starting at zero means an all-negative array returns <code>0</code>. A sum from the empty subarray. This is usually not allowed.
 
 Ask whether the empty subarray counts. If it does, zero is the right floor; if not, the first element is. Getting this wrong is the most common failure on this question, and asking about it is a positive signal.
 
 ## Returning the indices
-
 The usual follow-up. Track where the current run started, and when you beat the best, record that start and the current index. Two extra variables and no change to the cost. But you must update <code>start</code> at the moment you restart, not when you improve.
 
 The other follow-up is divide and conquer: split, solve both halves, and handle the crossing case apart. O(n&nbsp;log&nbsp;n), worse than Kadane, and worth knowing because it is the classic example of the crossing-subproblem pattern.
 
 ## The all-negative case
-
 The trap that catches most first attempts. With `[-3, -1, -2]`, what is the answer?
 
 <strong>If the subarray must be non-empty:</strong> &minus;1, the least bad single element. The code above handles this correctly, because it starts `best` to `nums[0]` rather than to 0.
@@ -140,7 +128,6 @@ Setting up `best = 0` when the subarray must be non-empty is wrong. And it only 
 <strong>Ask which convention applies.</strong> It is a legitimate clarifying question and shows that you spotted the ambiguity.
 
 ## Returning the subarray, not just the sum
-
 Often the follow-up. Track where the current run started:
 
 ```python-run
@@ -161,7 +148,6 @@ print(max_subarray_indices([-2,1,-3,4,-1,2,1,-5,4]))
 The addition is one variable and one branch. The `start` moves when a new run begins, and `best_start` is captured only when a new best is found. Keeping those separate is the part that needs care.
 
 ## The variants
-
 |Problem|Change|
 |---|---|
 |Maximum product subarray|Track both max and min &mdash; a negative times a negative flips|
@@ -176,7 +162,6 @@ The addition is one variable and one branch. The `start` moves when a new run be
 <strong>Circular</strong> is elegant: either the best subarray does not wrap, in which case plain Kadane finds it. Or it does wrap, in which case its complement is a non-wrapping <em>minimum</em> subarray. Compute both and take the larger, with a special case when every element is negative.
 
 ## Why it is a dynamic programming problem
-
 Kadane's algorithm is dynamic programming with the table collapsed to a single variable.
 
 The DP formulation: let `dp[i]` be the maximum sum of a subarray <em>ending at index i</em>. Then
@@ -195,29 +180,6 @@ Framing Kadane as DP is also the better answer in an interview, because it shows
 
 For the underlying ideas, see <a href="../dsa/dynamic_programming.html">dynamic programming</a>, <a href="../dsa/big_o_notation.html">time complexity</a> and <a href="../dsa/divide_and_conquer.html">divide and conquer</a>.
 
-## Questions people ask
-
-<strong>What if all numbers are negative?</strong> Return the largest single element, unless an empty subarray is allowed. Ask which convention applies.
-
-<strong>Why track `best` apart from `current`?</strong> `current` is the best subarray ending at the current position; the total answer may have ended earlier.
-
-<strong>Is this greedy or dynamic programming?</strong> DP with an O(1) space optimisation. It is greedy-looking because the state is one variable.
-
-<strong>How do I return the indices?</strong> Track where the current run started, and capture the bounds when a new best is found.
-
-<strong>Does it work with zeros?</strong> Yes &mdash; a zero neither helps nor hurts, and extending across it is handled by the same comparison.
-
-<strong>What about the maximum product version?</strong> Track the running maximum <em>and</em> minimum, because multiplying by a negative swaps them.
-
-## Recap in one screen
-
-- At each element, either extend the previous subarray or start fresh. Extend only if the running sum is positive.
-- O(n) time, O(1) space, and track `best` apart from `current`.
-- Initialise `best` to the first element, not to 0, or all-negative input returns the wrong answer.
-- It is dynamic programming with the table collapsed to one variable. This is the better way to describe it.
-- The standard escalations are maximum product, circular arrays and returning the subarray itself.
-
 ## Sources and next steps
-
 - Source: [LeetCode 53, Maximum Subarray](https://leetcode.com/problems/maximum-subarray/)
 - Continue with [house robber](house-robber.html), which builds on this idea.

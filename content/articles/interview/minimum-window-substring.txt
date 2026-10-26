@@ -1,30 +1,11 @@
 title: Minimum window substring
 intro: Find the smallest substring of s that contains every character of t, including duplicates.
 
-## The problem, and the sliding-window solution
+## The core idea
 
-Find the shortest substring of `s` containing all characters of `t`, including copies. This is the hardest of the standard sliding-window problems. And the one that tests whether you can expand and contract a window using two pointers while maintaining a frequency count that tells you when the window is valid. If you can solve this one, the rest of the sliding-window family follows the same template.
-
-The brute-force approach checks O(n&sup2;) substrings. The sliding window visits each character at most twice &mdash; once when the right pointer includes it. Once when the left pointer excludes it &mdash; for O(n + m) total.
-
-|s|t|Answer|
-|---|---|---|
-|`"ADOBECODEBANC"`|`"ABC"`|`"BANC"`|
-|`"a"`|`"a"`|`"a"`|
-|`"a"`|`"aa"`|`""` &mdash; not enough copies|
-|`"ab"`|`"b"`|`"b"`|
-
-Three details to pin down before writing anything:
-
-<strong>Copies count.</strong> If `t = "AABC"`, the window needs two As. This is why a set is insufficient and a frequency count is required.
-<strong>Order does not matter.</strong> The characters may appear in any arrangement.
-<strong>The substring is contiguous</strong>, and characters not in `t` are allowed inside the window.
-
-The brute force checks every substring: O(n²) substrings, each validated in O(m), so O(n²m). The answer is a sliding window in O(n + m).
-
+Find the shortest substring containing every required character, including repeated requirements. A sliding window expands until it is valid, then contracts while it stays valid; frequency counts track what is still missing.
 
 ## Run it
-
 The window with each valid state printed, its operation count against a brute force over every substring. And the <code>&gt;=</code> variant of the counter update getting a copy case wrong.
 
 ```python-run
@@ -119,8 +100,8 @@ def min_window_ge(s, t):
 
 print("with >= test  :", repr(min_window_ge("ADOBECODEBANC", "ABC")))
 ```
-## The shape of the solution
 
+## The shape of the solution
 Expand the window's right edge until it is <em>valid</em>. Contains all of it needed. Then contract the left edge as far as possible while it stays valid, recording the best window seen. Repeat.
 
 The mechanism that makes this efficient is a counter of <strong>how many required characters are still missing</strong>. So validity is an O(1) check rather than a check of two dictionaries.
@@ -168,25 +149,21 @@ Two lines carry the design.
 After recording a candidate, the left character is released and `missing` incremented &mdash; which invalidates the window on purpose. So the outer loop resumes expanding to find the next candidate.
 
 ## The grow-then-shrink shape
-
 Two phases alternating. Extend <code>hi</code> until the window satisfies the requirement; then advance <code>lo</code> as far as possible while it still does, recording the best window each time. When it stops being valid, go back to growing.
 
 Every index is entered once by <code>hi</code> and left once by <code>lo</code>. So the total work is O(n) despite the nested loop. That is the same amortised argument as longest-substring-without-repeats and longest-in a row-sequence. A nested loop is not by itself quadratic.
 
 ## The counter that makes it cheap
-
 The naive validity test compares the window's counts against the requirement's. This is O(k) on every single step. Instead keep <code>missing</code>: the number of distinct required characters whose quota is not yet met.
 
 Increment or decrement it only when a character's count crosses <em>exactly</em> its requirement &mdash; <code>have[c] == need[c]</code> on the way in, <code>have[c] &lt; need[c]</code> on the way out. Using <code>&gt;=</code> there is the classic bug, because surplus copies then decrement the counter repeatedly.
 
 ## Copies, and the empty cases
-
 If <code>t</code> is <code>"AABC"</code> the window needs two <code>A</code>s. Counting rather than set membership handles that for free, and a set-based solution silently accepts one.
 
 Handle <code>t</code> longer than <code>s</code>, either being empty, and no valid window existing. The last returns the empty string, which needs a sentinel that cannot be confused with a real window of length zero.
 
 ## Tracing `"ADOBECODEBANC"` with `"ABC"`
-
 |right|Character|Window when valid|Length|Best so far|
 |---|---|---|---|---|
 |5|C|`ADOBEC`|6|`"ADOBEC"`|
@@ -200,7 +177,6 @@ Later, when the second `A` arrives at index 10, the window is valid again and th
 Recording `(length, left, right)` as a tuple lets a single check handle both "is this shorter" and "remember where it was". This is tidier than three separate variables.
 
 ## The template this belongs to
-
 The same expand-then-contract skeleton solves a large family. What varies is the validity condition and what is recorded.
 
 |Problem|Valid when|Optimise|
@@ -218,7 +194,6 @@ The same expand-then-contract skeleton solves a large family. What varies is the
 The precondition for the whole family is that validity be <strong>monotonic</strong> in the window. Extending a valid window keeps it valid, or extending an invalid one can only help. When that fails, as with negative numbers and a sum target, prefix sums replace the window.
 
 ## Edge cases
-
 |Case|Result|
 |---|---|
 |`t` longer than `s`|`""` &mdash; check upfront|
@@ -231,47 +206,6 @@ The precondition for the whole family is that validity be <strong>monotonic</str
 
 The "not enough copies" row is the one that catches set-based solutions: `s = "a"`, `t = "aa"` must return `""`. And a set-based check reports success.
 
-## What it is testing
-
-<strong>Do you handle copy requirements?</strong> A `Counter`, not a set.
-
-<strong>Do you find the O(1) validity check?</strong> A single `missing` counter, rather than comparing dictionaries on every step.
-
-<strong>Do you guard the `missing` decrement?</strong> Only characters still needed count as progress.
-
-<strong>Do you allow negative counts?</strong> They encode surplus, which is what the shrink loop keys on.
-
-<strong>Do you shrink at the right time?</strong> Minimise-length shrinks while the window stays valid.
-
-<strong>Can you place it in the template?</strong> Recognising the family, and naming the shrink-while-valid versus shrink-while-invalid distinction, is what makes the pattern reusable.
-
-
-
-For the underlying ideas, see <a href="../dsa/sliding_window.html">sliding window</a>, <a href="../dsa/hash_tables.html">hash tables</a> and <a href="../dsa/two_pointers.html">two pointers</a>.
-
-## Questions people ask
-
-<strong>What is the time complexity of minimum window substring?</strong> O(n + m), where n is the length of the text and m the length of the pattern. Each character enters the window once and leaves it at most once.
-
-<strong>Why track a single `missing` count instead of checking the whole counter?</strong> Comparing two counters on every step costs O(alphabet size). One integer that drops when a needed character arrives makes the validity check O(1).
-
-<strong>Why can counts go negative in the counter?</strong> A negative count means the window holds surplus copies of that character. It tells you a character can be dropped from the left without breaking validity.
-
-<strong>What should I return when no window exists?</strong> Return an empty string. Confirm that convention with the interviewer, and also handle an empty pattern or a pattern longer than the text up front.
-
-<strong>What if the pattern has repeated characters?</strong> The counter stores required multiplicities, so `"AABC"` needs two A's in the window. This is why a plain set of needed characters is not enough.
-
-<strong>When should I reach for this pattern?</strong> Use it for contiguous-substring questions that ask for the shortest or longest range meeting a condition. Shortest problems shrink while the window is valid; longest problems shrink while it is invalid.
-
-## Recap in one screen
-
-- Expand the right edge until the window is valid. Then contract the left edge while it stays valid, recording the shortest.
-- Use a `Counter` for requirements and a single `missing` total so validity is O(1).
-- Decrement `missing` only for characters that are still needed; let counts go negative to mark surplus.
-- After recording a candidate, release the left character to resume expanding.
-- O(n + m) time; minimise-length problems shrink while valid, maximise-length problems shrink while invalid.
-
 ## Sources and next steps
-
 - Source: [LeetCode 76, Minimum Window Substring](https://leetcode.com/problems/minimum-window-substring/)
 - Continue with [longest substring without repeating characters](longest-substring-without-repeating-characters.html), which builds on this idea.

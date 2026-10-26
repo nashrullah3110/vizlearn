@@ -1,24 +1,11 @@
 title: Longest consecutive sequence
 intro: Find the length of the longest run of consecutive integers in an unsorted array, in O(n).
 
-## The problem
+## The core idea
 
-Given an unsorted array of integers, find the length of the longest run of consecutive numbers. The numbers need not be adjacent in the array &mdash; only consecutive in value.
-
-|Input|Longest run|Length|
-|---|---|---|
-|`[100, 4, 200, 1, 3, 2]`|`1, 2, 3, 4`|4|
-|`[0, 3, 7, 2, 5, 8, 4, 6, 0, 1]`|`0..8`|9|
-|`[]`|&mdash;|0|
-|`[5]`|`5`|1|
-|`[1, 1, 1]`|`1`|1 &mdash; duplicates do not extend|
-|`[-3, -2, -1, 5]`|`-3, -2, -1`|3|
-
-The obvious solution is to sort and scan, which is O(n log n). The question is almost always asked with the constraint <strong>"do it in O(n)"</strong>, and that constraint is the whole exercise. The key insight is that a hash set gives O(1) lookups. Put every number into the set. Then iterate: for each number, check whether `num - 1` is in the set. If it is not, this number is the start of a sequence &mdash; count forward (`num + 1`, `num + 2`, ...) as long as each successor is in the set. Track the longest run. Each number is visited at most twice (once in the outer loop, once as a successor in some chain), so the total work is O(n). The edge cases are: an empty array (return 0), a single element (return 1), duplicates (the set removes them, which is correct since duplicates do not extend a sequence), and all elements the same (sequence length 1). A common follow-up is "find the longest consecutive sequence in a stream" &mdash; a [union-find](../dsa/graph_representations.html) structure lets you merge adjacent sequences as new elements arrive, with near-constant time per operation.
-
+The longest consecutive sequence contains adjacent integer values, regardless of their positions in the input. A set lets the algorithm start only at values with no predecessor and walk each run once, for expected O(n) time.
 
 ## Run it
-
 The O(n) version with its inner-loop steps counted against the version missing the start check, on an input built to make the difference obvious.
 
 ```python-run
@@ -78,8 +65,8 @@ def by_sorting(values):
 
 print("by sorting    :", by_sorting([100,4,200,1,3,2]))
 ```
-## The sorting solution, for reference
 
+## The sorting solution, for reference
 ```python-run
 def longest_consecutive_sorted(nums):
     if not nums:
@@ -99,7 +86,6 @@ print(longest_consecutive_sorted([100,4,200,1,3,2]))
 O(n log n), correct, and worth stating first because it establishes the baseline. The `set()` matters: without it, `[1, 1, 2]` counts the repeated 1 as extending the run.
 
 ## The O(n) solution: start only at run starts
-
 Put everything in a set for O(1) membership tests. Then for each number, <strong>only begin counting if it is the start of a run</strong> &mdash; that is, if `num - 1` is not in the set.
 
 ```python-run
@@ -124,7 +110,6 @@ This looks quadratic &mdash; a `while` loop inside a `for` loop &mdash; and it i
 Remove the guard and it genuinely becomes O(n²) &mdash; `[1, 2, 3, ..., n]` would expand from every position. That single `if` is the difference between the intended solution and a slow one, and explaining it is what the interviewer is listening for.
 
 ## Tracing `[100, 4, 200, 1, 3, 2]`
-
 |num|`num-1` present?|Action|Run found|
 |---|---|---|---|
 |1|No (0 absent)|Expand: 2, 3, 4 present|<strong>4</strong>|
@@ -139,23 +124,19 @@ Six outer iterations, and the inner loop ran a total of six times. The answer is
 Iterating over `seen` rather than `nums` is a small extra win &mdash; duplicates are already collapsed, so `[1] * 1000` does one iteration instead of a thousand. Either is O(n); the set is tidier.
 
 ## Why not just sort
-
 Sorting makes it trivial &mdash; one pass counting adjacent runs &mdash; and costs O(n&nbsp;log&nbsp;n). The question asks for O(n) specifically to rule that out, so give the sorting answer, name its cost, and then improve it.
 
 ## The check that makes it linear
-
 Without the start-of-run test, each value walks its whole run and the work is quadratic on a long sequence. With it, a value only walks forward when <code>value - 1</code> is absent &mdash; and each run has exactly one such value.
 
 So across the entire input the inner loop takes as many steps as there are elements, not as many as elements times run length. Every element is touched at most twice: once in the outer loop, once by the walk of its own run.
 
 ## Saying the complexity convincingly
-
 This is the question where candidates write the right code and then call it O(n&sup2;) because there is a loop inside a loop. The argument to make out loud is amortised: the inner loop's <em>total</em> work across all iterations is bounded by n, because runs do not overlap.
 
 Same shape as the sliding window, where both pointers only move forward. A nested loop is not automatically quadratic; what matters is how many times the inner body can run in total.
 
 ## The union-find alternative
-
 Consecutive numbers can be treated as edges in a graph and merged with a disjoint-set structure, taking the size of the largest component.
 
 ```python-run
@@ -199,7 +180,6 @@ Correct, and <strong>the wrong answer for this problem</strong> &mdash; much mor
 The <strong>dictionary of run lengths</strong> variant is worth a mention: as each number arrives, look up the run lengths ending at `num-1` and starting at `num+1`, merge them, and update the boundary entries. It handles a <em>stream</em> of numbers, where the set approach needs all the input up front. That is the answer to "what if the numbers arrive one at a time?"
 
 ## Edge cases
-
 |Case|Result|
 |---|---|
 |Empty array|0 &mdash; `max()` over nothing raises, so guard it|
@@ -215,7 +195,6 @@ That last row is the reason a hash set is used rather than a boolean array: `[1,
 The empty-array case is the one that actually breaks code, because `best = 0` initialised before the loop handles it, while a `max(...)` generator expression over an empty input raises `ValueError`.
 
 ## The related problems
-
 <strong>Longest increasing subsequence.</strong> Superficially similar and much harder &mdash; O(n log n) with patience sorting, and no hash-set shortcut, because the values need not be consecutive.
 
 <strong>Missing ranges / summary ranges.</strong> Compress a sorted array into range strings, which is the same run-detection logic.
@@ -226,45 +205,6 @@ The empty-array case is the one that actually breaks code, because `best = 0` in
 
 <strong>Longest harmonious subsequence.</strong> Values differing by at most 1, solved with a `Counter`.
 
-## What it is testing
-
-<strong>Do you find the O(n) approach?</strong> The sorting solution is the baseline, and the question is asked to see whether you get past it.
-
-<strong>Can you explain why the nested loop is linear?</strong> This is the real question. Each number is visited by exactly one expansion because non-starts are skipped.
-
-<strong>Do you handle duplicates?</strong> A set handles them for free; a naive scan double-counts.
-
-<strong>Do you guard the empty input?</strong> One line, and it is where the solution crashes otherwise.
-
-<strong>Do you recognise the amortisation argument?</strong> Recognising that total work, not per-iteration work, determines complexity is a transferable skill &mdash; the same reasoning justifies the two-pointer and monotonic-stack patterns.
-
-
-
-For the underlying ideas, see <a href="../python/sets_and_set_operations.html">sets</a>, <a href="../dsa/hash_tables.html">hash tables</a> and <a href="../dsa/graph_representations.html">graph representations</a>.
-
-## Questions people ask
-
-<strong>How do you solve it in O(n)?</strong> Put all numbers in a set. For each number whose predecessor <code>n - 1</code> is not in the set, count upward while the next value is present and track the longest run.
-
-<strong>Why is that O(n) and not O(n^2)?</strong> The inner loop only starts at the beginning of a run, so each number is visited by the counting loop at most once. The total across all runs is n.
-
-<strong>Why not simply sort the array?</strong> Sorting is O(n log n), which is correct but misses the O(n) requirement the problem states. The set lets you skip the sort.
-
-<strong>How are duplicates handled?</strong> A set removes them, so they cannot inflate the length. With sorting you must skip equal neighbours instead.
-
-<strong>Can union-find solve it?</strong> Yes. Union each number with its neighbour and track component sizes; the largest component is the answer. It works but is heavier than the set method.
-
-<strong>What is the space complexity?</strong> O(n) for the set. The sort-based solution can use O(1) extra space if sorting in place.
-
-## Recap in one screen
-
-- Put the numbers in a set for O(1) membership tests.
-- Expand a run only from numbers with no predecessor in the set &mdash; that guard is what makes it O(n).
-- Total inner-loop work is n, because each number belongs to exactly one run expansion.
-- Sorting gives an easy O(n log n) baseline; state it, then improve on it.
-- Guard the empty input, and use a set so duplicates cannot inflate a run.
-
 ## Sources and next steps
-
 - Source: [LeetCode 128, Longest Consecutive Sequence](https://leetcode.com/problems/longest-consecutive-sequence/)
 - Continue with [sets versus lists](sets-versus-lists-and-deduplication.html), which builds on this idea.

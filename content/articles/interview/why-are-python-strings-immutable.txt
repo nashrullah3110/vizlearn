@@ -1,35 +1,11 @@
 title: Why are Python strings immutable?
 intro: Why are Python strings immutable, and what does that buy you?
 
-## The fact, the four reasons, and the cost
+## The core idea
 
-A Python string cannot be modified. Every operation that appears to change one produces a new object. That means `+=` in a loop is O(n&sup2;) in the worst case, and building a string from pieces should go through a list and `"".join()`.
-
-```python-run
-s = "hello"
-
-try:
-    s[0] = "H"
-except TypeError as e:
-    print("item assign:", type(e).__name__ + ":", e)
-
-print("upper()    :", s.upper(), "- a NEW string;", s, "is unchanged")
-s += " world"      # rebinds s; the old string is untouched
-print("after +=   :", s)
-```
-Four design reasons, and each has practical consequences.
-
-<strong>1. Hashability.</strong> A dictionary key's slot depends on its hash. If a string could change, its hash would change, and any dictionary entry keyed on it would become unreachable. Immutability is what makes strings usable as keys. And since attribute names, module names and keyword arguments are all dictionary keys, this is foundational rather than incidental.
-
-<strong>2. Safe sharing.</strong> Passing a string to a function cannot mutate the caller's copy. So no defensive copying is needed anywhere. Two names can point at the same string with no risk.
-
-<strong>3. Interning and caching.</strong> The same short strings can share one object, saving memory. The interpreter also caches a string's hash after first computing it. This is only valid because the value cannot change.
-
-<strong>4. Thread safety.</strong> An immutable object needs no lock. Any number of threads can read a string concurrently with no coordination.
-
+Python strings cannot be changed in place; operations that appear to modify text create a new string. Immutability makes strings safe to share and hash, while repeated concatenation can create avoidable copies.
 
 ## Run it
-
 Object identities before and after a "change", then the cost of ignoring what that implies. Measured at three sizes so the shape of the curve is visible rather than asserted.
 
 ```python-run
@@ -87,8 +63,8 @@ for n in (20_000, 40_000, 80_000):
 
 print("Double n: join doubles, += quadruples. That is O(n) against O(n^2).")
 ```
-## The performance consequence
 
+## The performance consequence
 The one real cost is building strings incrementally:
 
 ```python-run
@@ -115,7 +91,6 @@ Two related points:
 <strong>`io.StringIO`</strong> is the other when the pieces are produced incrementally and cannot be collected in a list first. It behaves like a writable buffer.
 
 ## What to use instead when mutation is needed
-
 |Need|Use|
 |---|---|
 |Build a string from pieces|A list, then `"".join()`|
@@ -135,13 +110,11 @@ print(bytes(b))                    # b'Hello' - back to immutable
 Note the pairing: `str` is immutable and `bytes` is immutable, while `bytearray` is the mutable byte sequence. There is no mutable `str` in Python, and a list of one-character strings is the usual stand-in.
 
 ## What immutability actually means
-
 There is no operation in Python that changes a string in place. <code>s.upper()</code>, <code>s.replace()</code>, <code>s.strip()</code> and <code>s + t</code> all <em>return</em> a new string and leave the original exactly as it was. Assigning to an index &mdash; <code>s[0] = 'A'</code> &mdash; is not slow, it is a <code>TypeError</code>.
 
 This is enforced, not advisory. There is no private method and no escape hatch, which is what lets the interpreter make assumptions it could not otherwise make.
 
 ## The three things it buys
-
 <p><strong>Hashability.</strong> A dictionary stores a key in a slot chosen from its hash. If the key could change after insertion, its hash would no longer match its slot and the entry would become unreachable. Immutable types can be keys; mutable ones cannot, which is why <code>{[1,2]: 'x'}</code> raises and <code>{(1,2): 'x'}</code> does not.</p>
 
 <p><strong>Free sharing.</strong> Passing a string to a function, storing it in two places, closing over it. None of these need a defensive copy, because no one can modify it behind your back. In a language with mutable strings, library code often copies on the way in just in case.</p>
@@ -149,17 +122,14 @@ This is enforced, not advisory. There is no private method and no escape hatch, 
 <p><strong>Interning.</strong> CPython reuses one object for short string literals that look like identifiers. So equality can often be settled by an identity check. That is an optimisation immutability makes legal.</p>
 
 ## What it costs, and the one place it bites
-
 Every edit allocates. Usually that is irrelevant &mdash; one <code>replace</code> on one line costs nothing you can measure. It matters in exactly one shape: building a string a piece at a time in a loop.
 
 Each <code>+=</code> copies everything accumulated so far, so n appends copy 1 + 2 + 3 + ... + n characters, which is O(n&sup2;). The fix is <code>"".join(parts)</code>: one pass to total the lengths, one allocation, one copy. The editor below measures both.
 
 ## The follow-up you should expect
-
 "If strings are immutable, why does <code>s += 'x'</code> sometimes look fast?" CPython has a special case that resizes a string in place when the target is a plain local variable and nothing else refers to it. It is real, it is invisible, and it stops firing the moment you store into an attribute or a list. Do not build on it.
 
 ## Interning and the `is` trap
-
 Because strings are immutable, the interpreter may share one object for equal strings. That makes `is` behave unpredictably for strings:
 
 ```python-run
@@ -181,7 +151,6 @@ The rule that follows: <strong>use `==` for string comparison, always.</strong> 
 `sys.intern()` forces interning by name, which is sometimes worth it when the same strings are compared millions of times. Identity comparison is faster than character comparison. That is a genuine optimisation in parsers and interpreters, and rare in application code.
 
 ## Immutability elsewhere in Python
-
 |Type|Mutable|Hashable|
 |---|---|---|
 |`str`|No|Yes|
@@ -205,8 +174,8 @@ try:
 except TypeError as e:
     print("hash((1,[2])):", type(e).__name__ + ":", e)
 ```
-## How other languages compare
 
+## How other languages compare
 <strong>Java</strong> strings are immutable, for the same reasons, with `StringBuilder` as the mutable builder. The direct analogue of using a list and joining.
 
 <strong>C++</strong> `std::string` is mutable, so in-place change and reversal are possible &mdash; which is why "reverse a string in place" is a C++ question that does not translate to Python.
@@ -221,29 +190,6 @@ The convergence is informative: most modern languages chose immutable strings, b
 
 For the underlying ideas, see <a href="../python/strings_and_slicing.html">strings</a>, <a href="../python/mutability_and_aliasing.html">mutability</a> and <a href="../dsa/hash_tables.html">hash tables</a>.
 
-## Questions people ask
-
-<strong>Does `s += x` create a new string?</strong> Yes, in general. CPython sometimes resizes in place when there is exactly one reference. And that is an implementation detail to ignore.
-
-<strong>Why can strings be dictionary keys but lists cannot?</strong> Keys must have a stable hash, which requires immutability.
-
-<strong>How do I modify a string then?</strong> Build a new one. Slicing and joining, or a list of characters joined at the end.
-
-<strong>Is `bytearray` the mutable string?</strong> It is the mutable <em>bytes</em> type. There is no mutable `str`.
-
-<strong>Why is `a is b` sometimes True for equal strings?</strong> Interning shares the same literals. Never depend on it; use `==`.
-
-<strong>Does immutability cost memory?</strong> Sometimes more allocations, and sometimes less through sharing and interning. The predictability is usually worth more than either.
-
-## Recap in one screen
-
-- Strings cannot be modified; every "change" produces a new object.
-- Immutability is what makes them hashable, safely shareable, internable and thread-safe.
-- The cost is that `+=` in a loop is O(n&sup2;). Use a list and `"".join()`.
-- `bytearray` is the mutable byte sequence; there is no mutable `str`.
-- Interning makes `is` unreliable for strings; compare with `==`.
-
 ## Sources and next steps
-
 - Source: [Python documentation, text sequence type str](https://docs.python.org/3/library/stdtypes.html#text-sequence-type-str)
 - Continue with [str versus bytes](str-versus-bytes-in-python.html), which builds on this idea.

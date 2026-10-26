@@ -1,12 +1,11 @@
 title: Longest increasing subsequence, twice
 intro: Find the length of the longest strictly increasing subsequence. Can you do better than O(n squared)?
 
-## The question, and what it is testing
+## The core idea
 
-The quadratic version is the honest first answer: <code>best[i]</code> is the longest run ending at <code>i</code>, found by looking back at every earlier element. The O(n log n) version keeps a <strong>tails</strong> array where <code>tails[k]</code> is the smallest tail of any increasing run of length <code>k+1</code>, and binary searches it. Its length is the answer &mdash; its contents are not the subsequence. The quadratic approach is textbook dynamic programming: the recurrence is <code>best[i] = 1 + max(best[j] for j &lt; i if a[j] &lt; a[i])</code>, and the two nested loops make the O(n&sup2;) cost obvious. The O(n log n) approach replaces the inner scan with a binary search on a maintained invariant &mdash; the tails array is always sorted, so <code>bisect_left</code> finds the insertion point in O(log n). Recovering the actual subsequence (not just its length) requires backtracking through predecessor pointers, which both versions can maintain at no extra asymptotic cost.
+A longest increasing subsequence preserves order but may skip elements. The O(n log n) tails method tracks the smallest ending value for each subsequence length; its tails array is not itself the final subsequence.
 
 ## Run it
-
 Both versions, agreeing on the length.
 
 ```python-run
@@ -172,27 +171,18 @@ print("  non-decreasing      (bisect_right):", lis_non_decreasing(flat))
 ```
 
 ## The quadratic version first
-
 <p><code>best[i]</code> = the length of the longest increasing subsequence <em>ending at index i</em>. To compute it, look at every <code>j &lt; i</code> with <code>a[j] &lt; a[i]</code> and take the best of those, plus one. The answer is the maximum over all <code>best[i]</code>.</p><p>It is O(n&sup2;), it is four lines, and it is the right thing to write first. The "ending at i" framing is the part worth saying aloud: without it people try to define <code>best[i]</code> as "the answer for the first i elements", which does not admit a recurrence, because you cannot tell whether the run can be extended.</p>
 
 ## What the tails array actually holds
-
 <p>This is the part that is usually recited without being understood. <code>tails[k]</code> is the <strong>smallest value that can end an increasing subsequence of length k+1</strong>, among everything seen so far.</p><p>Two facts follow. It is sorted, because a longer run must end higher than the best ending of a shorter one &mdash; which is what makes the binary search legal. And overwriting an entry never breaks anything: replacing a tail with a smaller value keeps the same achievable length while making future extensions easier.</p><p>So each element does one of two things. If it exceeds every tail, it extends the longest run and the array grows. Otherwise it replaces the first tail that is not smaller than it &mdash; <code>bisect_left</code> &mdash; and the length is unchanged.</p>
 
 ## The trap: tails is not the answer
-
 <p>Run it on <code>[2, 6, 8, 3, 4, 5, 1]</code> and the final tails array is <code>[1, 3, 4, 5]</code>. The length, 4, is correct. The contents are not a subsequence of the input at all &mdash; the 1 is the <em>last</em> element, so it cannot precede the 3. The real answer is <code>[2, 3, 4, 5]</code>.</p><p>What makes this trap dangerous is that tails often <em>is</em> a valid subsequence by coincidence: on <code>[10, 9, 2, 5, 3, 7, 101, 18]</code> it comes out as <code>[2, 3, 7, 18]</code>, which is genuinely increasing and genuinely a subsequence. Checking one example proves nothing here. If the actual subsequence is wanted, keep a predecessor index for each element as it is placed and walk the chain backwards &mdash; the editor below does that, and checks both against the input rather than asserting.</p>
 
 ## Strict, non-strict, and the follow-ups
-
 <p><code>bisect_left</code> gives <em>strictly</em> increasing: an equal value replaces rather than extends. <code>bisect_right</code> gives non-decreasing, where equal values extend the run. One function call, two different problems &mdash; and the problem statement often does not say which it wants.</p><p>The name to know is <strong>patience sorting</strong>, after the card game: each tail is the top card of a pile, and you place each new card on the leftmost pile whose top is not smaller. The number of piles is the answer. It is also the basis of the <code>difflib</code> patience diff, which is a good thing to be able to mention.</p>
 
-## What to say out loud
-
-<p>The O(n squared) version: best[i] is the length of the longest increasing run ending at i, computed by scanning everything before i. For O(n log n) I keep an array where position k holds the smallest possible tail of a run of length k+1 - it stays sorted, so each element is placed with a binary search: extend the array if it beats every tail, otherwise overwrite the first tail that is not smaller. The length of that array is the answer. If I need the actual subsequence I keep predecessor pointers, because the tails array is not it.</p>
-
 ## Edge cases to raise
-
 <p>Volunteering these is most of what separates a correct answer from a good one.</p>
 
 <p><strong>Empty input.</strong> Length 0, and the quadratic version's <code>max(best)</code> raises on an empty list.</p>
@@ -201,49 +191,6 @@ print("  non-decreasing      (bisect_right):", lis_non_decreasing(flat))
 
 <p><strong>Strictly decreasing input.</strong> The answer is 1 and the tails array is length 1, overwritten every step - the case worth tracing if the replacement logic looks suspicious.</p>
 
-## The follow-ups interviewers ask
-
-<p><strong>"Return the subsequence, not the length."</strong> Keep a predecessor index per element and walk it backwards. It has to be said explicitly because the tails array is not the answer - the editor checks both against the input.</p>
-
-<p><strong>"Longest non-decreasing instead."</strong> <code>bisect_right</code> rather than <code>bisect_left</code>. One call, and on <code>[1,3,3,3,5]</code> the answer changes from 3 to 5.</p>
-
-<p><strong>"What is patience sorting?"</strong> This algorithm, named after the card game: each tail is the top card of a pile and each new card goes on the leftmost pile whose top is not smaller. The number of piles is the answer, and it is also the basis of patience diff.</p>
-
-## Common wrong answers
-
-<p><strong>"The tails array is the subsequence."</strong> The single most common error. On <code>[2,6,8,3,4,5,1]</code> tails ends as <code>[1,3,4,5]</code>, and the 1 is the last element of the input - so it is not a subsequence at all.</p>
-
-<p><strong>"Sort the array and find the longest common subsequence."</strong> O(n<sup>2</sup>) at best and it is a much harder algorithm for the same answer. It is a real technique and the wrong tool here.</p>
-
-<p><strong>"best[i] is the answer for the first i elements."</strong> That does not admit a recurrence, because you cannot tell whether the run can be extended. It has to be 'ending at i'.</p>
-
-
-
-For the underlying ideas, see <a href="../dsa/dynamic_programming.html">dynamic programming</a>, <a href="../dsa/binary_search.html">binary search</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
-
-## Questions people ask
-
-<strong>What is the simple dynamic programming solution?</strong> Let <code>dp[i]</code> be the length of the longest increasing subsequence ending at i. Set it to 1 plus the maximum <code>dp[j]</code> over earlier j with <code>nums[j] &lt; nums[i]</code>. This is O(n^2) time and O(n) space.
-
-<strong>How does the O(n log n) method work?</strong> Keep a <code>tails</code> array where <code>tails[k]</code> is the smallest possible tail of an increasing subsequence of length k + 1. For each number, binary search for its position and overwrite it, or append if it is larger than all.
-
-<strong>Does the tails array contain the actual subsequence?</strong> No. It holds the best tails for each length, not a valid subsequence, so only its length equals the answer. To recover the sequence, store predecessor indices as well.
-
-<strong>Should I use <code>bisect_left</code> or <code>bisect_right</code>?</strong> Use <code>bisect_left</code> for a strictly increasing subsequence, so equal values replace the existing tail. Use <code>bisect_right</code> for non-decreasing.
-
-<strong>What is the difference between a subsequence and a substring?</strong> A subsequence keeps order but may skip elements; a substring must be contiguous. Mixing them up leads to the wrong problem.
-
-<strong>What are the edge cases?</strong> An empty array returns 0, a single element returns 1, a fully decreasing array returns 1, and an all-equal array returns 1 for the strict version.
-
-## Recap in one screen
-
-- tails stays sorted, which is what licenses the binary search.
-- A replacement never changes the length - it lowers a tail so it is easier to extend.
-- The final tails contents are not a valid subsequence.
-- Worth trying: Print tails after every element of [2, 6, 8, 3, 4, 5, 1] and watch the final 1 overwrite the 2. That single step is where the array stops being a subsequence of the input.
-- Worth trying: Swap bisect_left for bisect_right and re-run on [1, 3, 3, 3, 5]. One call, and the answer changes from 3 to 5.
-
 ## Sources and next steps
-
 - Source: [LeetCode 300, Longest Increasing Subsequence](https://leetcode.com/problems/longest-increasing-subsequence/)
 - Continue with [edit distance and dynamic programming](edit-distance.html), which builds on this idea.

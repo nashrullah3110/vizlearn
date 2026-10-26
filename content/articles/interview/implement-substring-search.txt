@@ -1,25 +1,11 @@
 title: Implement substring search (strStr)
 intro: Find the first occurrence of a pattern in a text, without using the built-in.
 
-## The problem
+## The core idea
 
-Find the first index where a pattern occurs in a text, or &minus;1 if it does not.
-
-|Text|Pattern|Answer|
-|---|---|---|
-|`"hello world"`|`"world"`|6|
-|`"aaaaa"`|`"bba"`|&minus;1|
-|`"abc"`|`""`|<strong>0</strong> &mdash; the empty pattern matches at 0|
-|`"abc"`|`"abcd"`|&minus;1 &mdash; pattern longer than text|
-|`"mississippi"`|`"issip"`|4|
-
-In Python this is `text.find(pattern)`. The exercise is implementing it, and the interesting part is why the obvious method is slow and what fixes it.
-
-The empty-pattern convention is worth confirming out loud: by convention it matches at index 0, and both `str.find` and the standard algorithms agree. The naive approach tries every starting position in the text and compares character by character &mdash; O(n·m) in the worst case, where n is the text length and m is the pattern length. That worst case is real: searching for `"aaaaab"` in `"aaaaaaaaaaaa"` checks almost every character at every position before failing at the last one. KMP (Knuth-Morris-Pratt) precomputes a failure function that tells the search how far to skip when a mismatch occurs, bringing the worst case to O(n + m). Rabin-Karp uses a rolling hash to compare windows in O(1) amortised time, which is fast in practice but O(n·m) in the worst case due to hash collisions. Python's built-in `str.find` uses a mix of Boyer-Moore and Horspool heuristics that is fast on real text. The exercise tests whether you can write the naive version correctly (the off-by-one in the loop bound is `len(text) - len(pattern) + 1`) and then explain why it is slow and what the alternatives are.
-
+Substring search finds the first position where a pattern occurs in a text. The naive scan can revisit text characters; KMP uses a prefix table to retain matched information and avoid backing up the text index.
 
 ## Run it
-
 Both searches with their comparisons counted, on ordinary text and then on the repetitive input designed to make naive matching look bad. The gap is the argument for the table.
 
 ```python-run
@@ -79,8 +65,8 @@ def kmp_search(text, pattern):
 
 print("kmp  :", kmp_search("abxabcabdabcabd", "abcabd"))
 ```
-## The naive approach, and its failure case
 
+## The naive approach, and its failure case
 ```python-run
 def naive_search(text, pattern):
     n, m = len(text), len(pattern)
@@ -106,7 +92,6 @@ The worst case is not artificial-looking but it is specific: text `"aaaaaaaaab"`
 For most real text the naive method is fine, because mismatches happen on the first character. Repetitive data &mdash; DNA, binary formats, log files &mdash; is where it degrades, and that is what motivates the better algorithms.
 
 ## KMP: never re-examine the text
-
 Knuth-Morris-Pratt is O(n + m), and the idea is that <strong>a partial match already tells you something about the text</strong>. After matching `"aab"` and failing, there is no need to restart two positions later. The characters just read are known.
 
 The machinery is the <strong>failure function</strong>: for each prefix of the pattern, the length of the longest proper prefix that is also a suffix.
@@ -150,25 +135,21 @@ print(kmp_search("abxabcabcaby", "abcaby"))
 The key property: `i` only ever increases. The text is read once.
 
 ## What naive search wastes
-
 Align the pattern at position 0, compare until a mismatch, then restart at position 1. The waste is that the comparisons already made are thrown away: on <code>"aaaaaab"</code> against <code>"aaab"</code>, almost every alignment re-reads the same characters.
 
 Worst case O(n&middot;m). Average case on natural text is close to O(n), which is why naive search is a perfectly reasonable answer to give first &mdash; then improve it.
 
 ## The prefix table
-
 <p><code>lps[i]</code> is the length of the longest proper prefix of <code>pattern[:i+1]</code> that is also a suffix of it. That overlap is exactly the information needed: after a mismatch, the characters already matched end in something that also begins the pattern. So the pattern can slide to that alignment without re-reading anything.</p>
 
 The table is built in O(m) using itself &mdash; on a mismatch while building, it falls back to <code>lps[length-1]</code> rather than restarting. That line looks wrong and is the reason the build is linear.
 
 ## The property to state
-
 <p><code>i</code> never decreases. Every character of the text is examined a bounded number of times, so the search is O(n) after an O(m) preprocessing pass.</p>
 
 Say what you would actually ship: <code>text.find(pattern)</code>, which in CPython is a tuned hybrid of Boyer-Moore and Horspool. The point of implementing KMP is the reasoning, and interviewers know that.
 
 ## Rabin-Karp: compare hashes, not characters
-
 Hash the pattern once, then hash each window of the text and compare numbers. The trick is the <strong>rolling hash</strong> &mdash; the next window's hash is computed from the previous one in O(1) by removing the leading character and adding the trailing one.
 
 ```python-run
@@ -202,7 +183,6 @@ The <strong>verification step</strong> is not optional. Equal hashes do not prov
 Rabin-Karp's real advantage is <strong>multiple pattern search</strong>: hash all the patterns into a set, and each window is one hash and one set lookup. That is what plagiarism detectors and `rsync` use.
 
 ## Choosing between them
-
 |Algorithm|Time|Space|Best for|
 |---|---|---|---|
 |Naive|O(nm)|O(1)|Short patterns, non-repetitive text|
@@ -216,52 +196,12 @@ Rabin-Karp's real advantage is <strong>multiple pattern search</strong>: hash al
 <strong>Aho-Corasick</strong> generalises KMP to a set of patterns with one automaton, which is how intrusion-detection systems and virus scanners match thousands of signatures in one pass.
 
 ## What to say in an interview
-
 Start with the naive solution and its complexity &mdash; it is correct and takes thirty seconds. Then name the worst case concretely (`"aaaaab"` against `"aab"`), which shows you know <em>why</em> a better algorithm exists rather than that one does.
 
 Then offer KMP, explain the failure function in one sentence, and write it if asked. If the follow-up is "what if there are many patterns?", the answer is Rabin-Karp or Aho-Corasick. If it is "what does the standard library do?", the answer is a Boyer-Moore variant.
 
 Being able to say <strong>"in production I would call `str.find`, which is a tuned C implementation"</strong> is the right closing note. The exercise is about understanding, not about replacing the library.
 
-## What it is testing
-
-<strong>Do you handle the empty pattern?</strong> It returns 0, and it is one line at the top.
-
-<strong>Do you know the naive worst case?</strong> Naming a concrete repetitive input is the substance.
-
-<strong>Do you verify after a hash match?</strong> Rabin-Karp without verification is wrong.
-
-<strong>Do you understand the failure function?</strong> "The longest proper prefix that is also a suffix". And why that lets the text pointer never move backwards.
-
-<strong>Do you know what real implementations use?</strong> Boyer-Moore variants, chosen for skipping rather than for asymptotic tidiness.
-
-
-
-For the underlying ideas, see <a href="../dsa/kmp_string_matching.html">KMP string matching</a>, <a href="../python/strings_and_slicing.html">strings and slicing</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
-
-## Questions people ask
-
-<strong>What is the complexity of the naive approach?</strong> O(n * m) in the worst case, for text length n and pattern length m. It restarts comparison at the next text position after every mismatch, re-reading characters it has already seen.
-
-<strong>How does KMP avoid re-reading the text?</strong> It precomputes a prefix table, the length of the longest proper prefix of the pattern that is also a suffix at each position. On a mismatch it jumps the pattern pointer using that table and never moves the text pointer backwards.
-
-<strong>What is the complexity of KMP?</strong> O(n + m) time and O(m) space for the table.
-
-<strong>How does Rabin-Karp work?</strong> It compares a rolling hash of each text window with the hash of the pattern, and checks characters only when hashes match. Average time is O(n + m), but the worst case is O(n * m) if many windows collide.
-
-<strong>What should an empty pattern return?</strong> By convention 0, matching Python's <code>str.find</code> and C's <code>strstr</code>. State the convention before coding.
-
-<strong>Which should I write in an interview?</strong> Start with the naive version, say why it can be quadratic, then offer KMP. In practice Python's built-in <code>find</code> is the right tool, so mention it.
-
-## Recap in one screen
-
-- Naive search is O(nm), fine for ordinary text, and quadratic on repetitive input like `"aaaaab"` against `"aab"`.
-- KMP is O(n+m) using a failure function so the text pointer never rewinds.
-- Rabin-Karp rolls a hash over each window in O(1) and <em>must</em> verify matches, since hashes collide.
-- Boyer-Moore scans right to left and can skip m characters at a time, making it sublinear &mdash; which is why libraries use it.
-- The empty pattern matches at index 0 by convention.
-
 ## Sources and next steps
-
 - Source: [LeetCode 28, Find the Index of the First Occurrence in a String](https://leetcode.com/problems/find-the-index-of-the-first-occurrence-in-a-string/)
 - Continue with [find versus index on strings](find-versus-index-on-strings.html), which builds on this idea.

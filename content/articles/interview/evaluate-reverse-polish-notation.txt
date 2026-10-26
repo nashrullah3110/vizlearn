@@ -1,12 +1,11 @@
 title: Evaluate reverse Polish notation
 intro: Evaluate an expression in postfix notation, for example ['4','13','5','/','+'].
 
-## The question, and what it is testing
+## The core idea
 
-Push numbers; on an operator, <strong>pop two and push the result</strong>. Two details decide whether it is correct: the <em>first</em> value popped is the right-hand operand. This only matters for <code>-</code> and <code>/</code>. And the division truncates toward zero, which is <code>int(a / b)</code> and not <code>a // b</code>. The difference matters for negative numbers: <code>-3 // 2</code> in Python is <code>-2</code> (floor division), while <code>int(-3 / 2)</code> is <code>-1</code> (truncation toward zero), and LeetCode expects the second. RPN exists because it needs no parentheses and no precedence rules. Every operator applies to exactly the two values below it. So the stack processes any expression in a single left-to-right pass. The postfix form of <code>((2 + 1) * 3)</code> is <code>2 1 + 3 *</code>. This is what compilers produce after parsing an infix expression and before making machine code. The stack-based evaluation is O(n) time and O(n) space. The common follow-up is converting infix to postfix (the shunting-yard algorithm). This uses a second stack for operators and parentheses.
+Reverse Polish notation places each operator after its operands, so parentheses and precedence rules are unnecessary. A stack stores values until an operator consumes the most recent operands and pushes the result.
 
 ## Run it
-
 The evaluator, on two standard expressions.
 
 ```python-run
@@ -103,27 +102,18 @@ for bad in (["1", "+"], ["1", "2", "3", "+"]):
 ```
 
 ## Why postfix needs no parentheses
-
 <p>In infix, <code>4 + 13 / 5</code> is ambiguous without precedence rules, and <code>(4 + 13) / 5</code> needs brackets to say the other thing. Postfix encodes the order in the token sequence itself, so there is nothing left to disambiguate. And that is why it evaluates with a stack and no parser.</p><p>The rule is mechanical. A number has no dependencies, so it waits on the stack. An operator's operands are always the most recent unconsumed values. This is exactly what "top of the stack" means.</p>
 
 ## The two lines that are wrong in most first attempts
-
 <p><strong>Pop order.</strong> <code>b = pop(). A = pop()</code> and then <code>a - b</code>. Getting it backwards gives the right answer for <code>+</code> and <code>*</code> and the negated or reciprocal answer for <code>-</code> and <code>/</code> &mdash; which is why the bug survives the first test case anybody tries.</p><p><strong>Division.</strong> Python's <code>//</code> floors. So <code>-7 // 2</code> is <code>-4</code>. Postfix, like C and like every version of this problem, truncates toward zero and wants <code>-3</code>. <code>int(a / b)</code> gives that; <code>math.trunc(a / b)</code> says it more by name. For positive operands the two agree, so this is another bug that only appears on the test case with a negative number in it.</p>
 
 ## What the stack depth tells you
-
 <p>The depth is a validity check you get for free. Every number adds one; every binary operator removes one net. So a well-formed expression of <em>n</em> numbers and <em>n&minus;1</em> operators ends at depth 1.</p><p>Two failure modes follow. And an interviewer may ask for both. Popping from an empty stack means an operator with too few operands &mdash; malformed. Finishing with more than one value means numbers that nothing consumed, which is also malformed. Checking both is three lines and is the difference between a solution and a reliable one.</p>
 
 ## The follow-up: converting from infix
-
 <p>"How would you get postfix in the first place?" The shunting-yard algorithm. And it is the same structure twice: one stack for operators, one output list. Numbers go straight to the output; an operator pops every operator of higher or equal precedence before pushing itself; brackets push and pop. Worth being able to name even if you are not asked to write it. It is the reason postfix exists as an intermediate form.</p>
 
-## What to say out loud
-
-<p>A stack. Numbers get pushed; an operator pops two operands, applies itself and pushes the result. The order matters - the first pop is the right operand - and for division I use int(a / b) rather than // because Python floors and postfix expects truncation toward zero. At the end the stack holds exactly one value.</p>
-
 ## Edge cases to raise
-
 <p>Volunteering these is most of what separates a correct answer from a good one.</p>
 
 <p><strong>Division by zero.</strong> <code>int(a / b)</code> raises <code>ZeroDivisionError</code>. Decide whether that propagates or becomes a domain error of your own, and say so rather than discovering it.</p>
@@ -132,49 +122,6 @@ for bad in (["1", "+"], ["1", "2", "3", "+"]):
 
 <p><strong>A single number is a valid expression.</strong> <code>["42"]</code> should return 42. And a loop that requires at least one operator will not.</p>
 
-## The follow-ups interviewers ask
-
-<p><strong>"How would you produce the postfix in the first place?"</strong> The shunting-yard algorithm: one stack for operators, one output list. Numbers go straight out; an operator pops every operator of higher or equal precedence before pushing itself; a closing bracket pops until the opener. Worth naming even if you are not asked to write it.</p>
-
-<p><strong>"What about unary minus?"</strong> It breaks the pop-two rule, so it needs either a distinct token (<code>~</code> or <code>neg</code>) or arity tracked per operator. Raising this unprompted is a good sign - it is the first thing that stops the evaluator being four lines.</p>
-
-<p><strong>"Evaluate prefix notation instead."</strong> Same stack, scanned right to left - and the pop order reverses. So the first pop becomes the <em>left</em> operand. It is a two-character change and it catches people who memorised the code rather than the reason.</p>
-
-## Common wrong answers
-
-<p><strong>"<code>a = pop(). B = pop()</code> then <code>a - b</code>."</strong> The swap. It gives the right answer for <code>+</code> and <code>*</code>, so the first test case passes and subtraction is negated.</p>
-
-<p><strong>"Use <code>a // b</code> for integer division."</strong> Python floors, postfix truncates. They agree on positive operands and differ by one on negatives, so this ships.</p>
-
-<p><strong>"Use <code>eval()</code>."</strong> It does not evaluate postfix at all, and offering it signals you have not read the question. Mentioning that you would never <code>eval</code> untrusted input is fine; offering it as the solution is not.</p>
-
-
-
-For the underlying ideas, see <a href="../dsa/stacks.html">stacks</a>, <a href="../python/try_and_except.html">error handling</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
-
-## Questions people ask
-
-<strong>How do you evaluate RPN?</strong> Scan the tokens left to right. Push numbers; on an operator pop two operands, apply it, and push the result. The single value left at the end is the answer.
-
-<strong>Why does the order of the popped operands matter?</strong> The first value popped is the right operand and the second is the left. For subtraction and division, <code>a - b</code> and <code>b - a</code> differ, so swapping them gives wrong answers.
-
-<strong>How should division be handled?</strong> Problems like this usually specify truncation toward zero. Python's <code>//</code> floors, so use <code>int(a / b)</code> to match, especially for negative results.
-
-<strong>What is the time and space complexity?</strong> O(n) time with one pass over n tokens, and O(n) space for the stack in the worst case.
-
-<strong>Why does postfix need no parentheses?</strong> The position of each operator already fixes which operands it applies to. The order of evaluation is encoded in the order of the tokens.
-
-<strong>How would you convert infix to postfix?</strong> Use the shunting-yard algorithm: an operator stack plus precedence rules, outputting operands immediately and popping higher-precedence operators first.
-
-## Recap in one screen
-
-- Numbers build up; an operator is the only thing that shrinks the stack.
-- 13 / 5 becomes 2, not 2.6 - integer division, truncated.
-- Exactly one value remains, and that is the result.
-- Worth trying: Add % and **. The modulo has the same sign disagreement as division, and exponentiation is the first operator here that is not commutative or associative.
-- Worth trying: Feed it ["2", "0", "/"]. Decide whether the right answer is an exception or a sentinel, and say which before you write it.
-
 ## Sources and next steps
-
 - Source: [LeetCode 150, Evaluate Reverse Polish Notation](https://leetcode.com/problems/evaluate-reverse-polish-notation/)
 - Continue with [valid parentheses](valid-parentheses.html), which builds on this idea.

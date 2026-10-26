@@ -1,25 +1,11 @@
 title: What is a Python list underneath?
 intro: What is a Python list actually implemented as, and why does that make append O(1) but insert(0, x) O(n)?
 
-## A dynamic array of pointers
+## The core idea
 
-In CPython, a list is a contiguous array of pointers to objects, plus a length and an allocated capacity. Other Python implementations may use different internals.
-
-<p class="mono-font">[ptr, ptr, ptr, ptr, &mdash;, &mdash;, &mdash;]&nbsp;&nbsp;length 4, capacity 7</p>
-
-Two facts follow, and between them they explain every speed trait a list has.
-
-<strong>It is contiguous,</strong> so `lst[i]` is a single offset calculation &mdash; O(1) &mdash; and iteration reads sequential memory, which tends to make good use of CPU caches.
-
-<strong>It holds pointers, not values.</strong> A list can contain objects of different types because every slot stores a pointer of the same size, regardless of the object it refers to. On a typical 64-bit CPython build, each pointer occupies 8 bytes, in addition to the object itself.
-
-It is emphatically <strong>not</strong> a linked list, despite the name. There are no per-element next pointers, and indexed access is constant time.
-
-The interactive example shows list over-allocation and compares `append` with `insert(0, x)`. For fast operations at both ends, use `collections.deque`.
-
+A CPython list is a resizable array of object references. Spare capacity makes appends O(1) amortised, while inserting or removing near the front shifts later references and costs O(n).
 
 ## Run it
-
 The over-allocation made visible with <code>sys.getsizeof</code>, then the three operations timed against each other so the O(1) and the O(n) are numbers rather than claims.
 
 ```python-run
@@ -77,8 +63,8 @@ for name, data in (("10 items", small), ("10,000,000 items", big)):
     print(f"  100,000 index reads on {name:>18}: {time.perf_counter() - start:.4f}s")
 print("Indexing is address arithmetic. The length never enters into it.")
 ```
-## Why append is O(1) amortised
 
+## Why append is O(1) amortised
 The list holds spare capacity beyond its length. `append` writes into that space and increments the length. A couple of operations.
 
 When capacity runs out, CPython allocates a larger block, copies every pointer across, and frees the old one. The growth is roughly `new = old + old/8 + constant`. So about 12.5% over-allocation rather than doubling.
@@ -99,7 +85,6 @@ That resize is O(n). Spread across the many appends the new capacity accommodate
 The two O(n) rows at the front are the practical trap: `pop(0)` in a loop is O(n²) and reads as ordinary code. `collections.deque` gives O(1) at both ends.
 
 ## Memory, and NumPy's edge
-
 A list of a million small integers holds a million 8-byte pointers. And each integer is a separate heap object with a header &mdash; 28 bytes each in CPython.
 
 ```python-run
@@ -123,25 +108,21 @@ A NumPy array of the same data stores raw 64-bit values contiguously: <strong>8M
 The last row matters: NumPy arrays are for fixed-size numeric data, and building one by appending defeats the purpose.
 
 ## An array of pointers, not of objects
-
 The block holds <em>references</em>, all the same size, which is why one list can hold an int, a string and another list at once. It is also why <code>sys.getsizeof</code> on a list of a million integers is far smaller than the integers themselves. The list only stores the pointers.
 
 Because the references are contiguous and equally sized, element <em>i</em> lives at a computable address. That is the whole reason indexing is O(1) and a <a href="../dsa/linked_lists.html">linked list</a> is not.
 
 ## Why append is amortised O(1)
-
 CPython allocates more room than the list currently needs. Most appends write into a spare slot: one store, no allocation. When the block fills, a larger one is allocated and all of it is copied &mdash; O(n). But only on that one append.
 
 Because the growth is geometric, the copies are rare enough that the cost spread over n appends is constant each. That is what "amortised" means, and it is worth saying the word. Any single append can be the expensive one. This matters if you care about latency rather than throughput.
 
 ## Why the front is expensive
-
 <p><code>insert(0, x)</code> and <code>pop(0)</code> both have to move every other element one slot. So both are O(n). Doing either in a loop is O(n&sup2;). And that is the single most common accidental quadratic in Python &mdash; usually written as a queue.</p>
 
 <p><code>collections.deque</code> is the fix: a doubly linked list of blocks, O(1) at both ends. It gives up O(1) random access in exchange, which is almost always the right trade when you only touch the ends.</p>
 
 ## The aliasing results
-
 Because a list holds references, copying has two levels. And this is where the bugs are.
 
 ```python-run
@@ -172,7 +153,6 @@ board = [[0] * 3 for _ in range(3)]     # correct
 `[x] * n` repeats the reference n times. Harmless for immutable values, a bug for mutable ones. Understanding that a list holds pointers is exactly what makes this predictable rather than mysterious.
 
 ## Choosing another container
-
 |Need|Use|Why|
 |---|---|---|
 |Add/remove at both ends|`deque`|O(1) at the front|
@@ -189,29 +169,6 @@ board = [[0] * 3 for _ in range(3)]     # correct
 
 For the underlying ideas, see <a href="../dsa/lists_in_python.html">lists</a>, <a href="../dsa/linked_lists.html">linked lists</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
 
-## Questions people ask
-
-<strong>Is a Python list a linked list?</strong> No &mdash; a contiguous dynamic array of pointers, with O(1) indexing.
-
-<strong>Why is `insert(0, x)` slow?</strong> Every existing pointer shifts one position. Use `deque.appendleft`.
-
-<strong>By how much does it grow?</strong> Roughly 12.5% over-allocation, not doubling. A compromise between memory and copy frequency.
-
-<strong>Why can a list hold mixed types?</strong> Because it stores pointers. And every pointer is the same size whatever it points to.
-
-<strong>Does `del lst[i]` free memory?</strong> It removes the reference and shifts the remainder. The object is freed when nothing references it.
-
-<strong>When should I use NumPy?</strong> Homogeneous numeric data, especially with arithmetic over the whole array. Roughly five times less memory and far faster.
-
-## Recap in one screen
-
-- A contiguous array of pointers with spare capacity, plus a stored length.
-- Contiguity gives O(1) indexing and cache-friendly iteration; pointers allow mixed types at a memory cost.
-- Append is O(1) amortised because of over-allocation; operations at the front are O(n) because all of it shifts.
-- Holding references is why `b = a` shares, `copy()` is shallow, and `[[0]*3]*3` repeats one row.
-- For homogeneous numeric data, NumPy or `array.array` stores raw values and uses a fraction of the memory.
-
 ## Sources and next steps
-
 - Source: [CPython source, list implementation](https://github.com/python/cpython/blob/main/Objects/listobject.c)
 - Continue with [list versus tuple versus deque](list-versus-tuple-versus-deque.html), which builds on this idea.

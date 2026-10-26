@@ -1,12 +1,11 @@
 title: Binary search on the answer, not the array
 intro: Given package weights and D days, what is the smallest ship capacity that delivers them all in time?
 
-## The question, and what it is testing
+## The core idea
 
-There is no array to search here. The trick is that <em>feasibility is monotonic</em>: if a capacity works, every larger one works too. So the answers form a sorted sequence of no-no-no-yes-yes, and binary search finds the boundary &mdash; with an O(n) feasibility check in place of an array lookup. The search space is the range of possible capacities: the lower bound is the heaviest single package (anything less cannot even carry one item), and the upper bound is the sum of all packages (one day is always enough). Each probe runs a greedy simulation &mdash; load packages onto a day until the next one would exceed the capacity, then start a new day &mdash; and returns whether the total days used is within the limit. The total cost is O(n log S) where S is the search range. This pattern &mdash; binary search on a monotonic predicate rather than on stored data &mdash; appears in dozens of problems: minimising the maximum page length in a book partitioning, finding the smallest radius that covers k points, and splitting arrays into subarrays with a bounded sum.
+Binary search can find the smallest feasible answer when a yes/no test changes only once as the candidate grows. It applies to capacities, speeds, and limits when you can define that monotone test and a valid search range.
 
 ## Run it
-
 The probe table: five probes over a range of forty-six candidates.
 
 ```python-run
@@ -151,27 +150,18 @@ print("same structure: a monotonic predicate, checked in O(n), searched in log")
 ```
 
 ## Recognising it
-
 <p>The tell is a question of the form "what is the smallest <em>X</em> such that something is possible" &mdash; smallest capacity, minimum speed, fewest days, largest minimum distance. There is no sorted array in the input, which is why the shape gets missed.</p><p>What is sorted is the <strong>answer space</strong>. If you can write a function <code>feasible(x)</code> that is <code>False</code> for every <code>x</code> below the answer and <code>True</code> for every <code>x</code> at or above it, then the sequence <code>feasible(lo) ... feasible(hi)</code> is sorted &mdash; and finding where it flips is exactly binary search.</p>
 
 ## The three things to establish before writing the loop
-
 <p><strong>The predicate.</strong> Here, "can capacity <code>c</code> deliver everything in <code>D</code> days?" Greedily load until the next package would overflow, then start a new day. One pass, O(n), and greedy is optimal for it because leaving room spare can never reduce the day count.</p><p><strong>Monotonicity.</strong> A bigger ship cannot need more days. State it &mdash; this is the step that makes the search valid, and an interviewer will ask why you are allowed to binary search something with no array in it.</p><p><strong>The bounds.</strong> <code>lo = max(weights)</code>, because a package must fit in one trip. <code>hi = sum(weights)</code>, because that always finishes in one day. Getting the low bound wrong &mdash; starting at 1, or at 0 &mdash; produces a search over capacities that can never work, and the loop returns an infeasible answer rather than looping forever, which is worse.</p>
 
 ## Cost, and the shape of it
-
 <p>O(n log(sum &minus; max)): a logarithmic number of probes, each costing a linear pass. Note that the log is over the <em>magnitude</em> of the answer range rather than the size of the input, which is unusual and worth saying &mdash; it means the complexity depends on the numbers, not just on how many there are.</p><p>The editor below prints the probe table. Ten packages give a range of 46 candidate capacities and the search settles it in five probes.</p>
 
 ## The same shape, four other questions
-
 <p><strong>Koko eating bananas</strong> &mdash; smallest eating speed to finish in H hours. Identical, with <code>ceil(pile / speed)</code> as the per-pile cost.</p><p><strong>Split an array into k subarrays</strong> minimising the largest sum. The predicate is "can we do it with all parts at most <code>m</code>", and it is the same greedy pass.</p><p><strong>Aggressive cows / maximum minimum distance</strong> &mdash; place k items as far apart as possible. The monotonicity flips direction: large distances are infeasible, so you search for the last <code>True</code> instead of the first.</p><p><strong>The square root of an integer</strong>, or any inverse of a monotonic function. Once the pattern is visible, "is there a monotonic predicate here?" becomes a routine question to ask of any minimisation problem.</p>
 
-## What to say out loud
-
-<p>I binary search the answer rather than an array. The predicate is 'can this capacity finish in D days', which I can check in one pass, and it is monotonic - if a capacity works, anything bigger works. So the feasible capacities are a suffix, and I search for the first one. Bounds are max weight to total weight, so it is O(n log sum).</p>
-
 ## Edge cases to raise
-
 <p>Volunteering these is most of what separates a correct answer from a good one.</p>
 
 <p><strong>Verify the monotonicity.</strong> If the predicate flips more than once, binary search returns a boundary that means nothing. Printing it either side of the answer is cheap insurance.</p>
@@ -180,49 +170,6 @@ print("same structure: a monotonic predicate, checked in O(n), searched in log")
 
 <p><strong>The log is over the magnitude of the answer range</strong>, not the input length - so the complexity depends on the size of the numbers. Worth stating, because it is unusual.</p>
 
-## The follow-ups interviewers ask
-
-<p><strong>"Koko eating bananas."</strong> Identical: smallest speed such that the total hours fit, with <code>ceil(pile / speed)</code> per pile. If you can see that these are the same question, you have the pattern.</p>
-
-<p><strong>"Split an array into k parts minimising the largest sum."</strong> The predicate is 'can it be done with every part at most m', checked greedily in one pass. Same search, same monotonicity.</p>
-
-<p><strong>"Maximise the minimum distance when placing k items."</strong> The monotonicity reverses - large distances are infeasible - so you search for the last feasible value instead of the first. Recognising that the direction flips is the test.</p>
-
-## Common wrong answers
-
-<p><strong>"There is nothing sorted, so binary search does not apply."</strong> The answer space is sorted, even when the input is not. That reframing is the entire question.</p>
-
-<p><strong>"Start the range at 1."</strong> Sometimes harmless and sometimes not. The lower bound must be feasible-or-below by construction; for capacity that is <code>max(weights)</code>, because a single package has to fit.</p>
-
-<p><strong>"Check feasibility by trying all arrangements."</strong> The greedy pass is O(n) and optimal here. Searching arrangements makes each probe exponential and throws the whole benefit away.</p>
-
-
-
-For the underlying ideas, see <a href="../dsa/binary_search.html">binary search</a>, <a href="../dsa/big_o_notation.html">time complexity</a> and <a href="../dsa/greedy_algorithms.html">greedy algorithms</a>.
-
-## Questions people ask
-
-<strong>What does binary search on the answer mean?</strong> Instead of searching an array, you search the range of possible answers and test each candidate with a yes/no check. It works when the check is monotonic: once a value is feasible, every larger (or smaller) value is too.
-
-<strong>What is the time complexity?</strong> O(log(range) * cost of the check). For a typical feasibility check that scans n items, that is O(n log(range)).
-
-<strong>How do I choose the lower and upper bounds?</strong> The lower bound is the smallest value that could possibly work and the upper bound is a value that definitely works, such as the sum of all items. Getting them wrong either misses the answer or wastes iterations.
-
-<strong>How do I find the minimum feasible value versus the maximum?</strong> For a minimum, when the check passes set <code>hi = mid</code> and otherwise <code>lo = mid + 1</code>. For a maximum, mirror it and round <code>mid</code> up so the loop cannot stall.
-
-<strong>How do I know when this pattern applies?</strong> Look for phrases like minimise the maximum, maximise the minimum, or smallest value such that. If you can write a greedy check for one candidate, you can binary search over candidates.
-
-<strong>What is the most common mistake?</strong> Using a check that is not monotonic, which makes the search discard the wrong half. Test the check on a few values by hand before trusting the loop.
-
-## Recap in one screen
-
-- The thing being searched is a range of answers, not the input.
-- Each probe costs a full O(n) pass - the feasibility check.
-- The predicate flips exactly once, which is what makes it searchable.
-- Worth trying: Set lo = 1 instead of max(weights) and look at the answer. It is still correct here - work out why, and then find an input where it would not be.
-- Worth trying: Change the question to "the largest minimum gap when placing k items". The monotonicity reverses, so you search for the last feasible value instead of the first.
-
 ## Sources and next steps
-
 - Source: [LeetCode 875, Koko Eating Bananas](https://leetcode.com/problems/koko-eating-bananas/)
 - Continue with [binary search with correct boundaries](binary-search-without-an-off-by-one.html), which builds on this idea.

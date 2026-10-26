@@ -1,41 +1,11 @@
 title: Memoisation: caching with a dictionary
 intro: How would you speed up a recursive function that recomputes the same values? What does functools.lru_cache do?
 
-## The technique
+## The core idea
 
-Cache a task's yields keyed on its inputs. On a repeat call, give the stored value instead of recomputing.
-
-The canonical case is Fibonacci:
-
-```python-run
-def fib(n):
-    return n if n < 2 else fib(n-1) + fib(n-2)
-
-print([fib(n) for n in range(10)])
-```
-`fib(40)` makes about 331 million calls, since `fib(35)` is recomputed millions of times. It is O(2ⁿ).
-
-```python-run
-from functools import lru_cache
-
-@lru_cache(maxsize=None)
-def fib(n):
-    return n if n < 2 else fib(n-1) + fib(n-2)
-
-print(fib(30), fib.cache_info())
-```
-O(n), and `fib(40)` returns instantly. One decorator.
-
-|n|Naive calls|Memoised calls|
-|---|---|---|
-|10|177|11|
-|20|21,891|21|
-|40|331,160,281|41|
-
-The pattern extends far beyond Fibonacci. Any pure task (same inputs always give the same output) with overlapping subproblems gains: [edit distance](edit-distance.html), [coin change](coin-change.html), [climbing stairs](climbing-stairs.html). And most dynamic programming problems. The manual approach uses a dictionary keyed on the task's inputs. `functools.lru_cache` automates it with a decorator and adds a bounded cache with LRU eviction. `@cache` (Python 3.9+) is the unbounded variant. The tradeoff is memory: each distinct input tuple stores a yield. So a task called with millions of distinct inputs builds a million-entry dictionary. For iterative DP (bottom-up), a table or two variables replace the dictionary fully, with O(1) or O(n) space without recursion depth limits. Python's default recursion limit is 1000, so memoised recursion on large inputs needs `sys.setrecursionlimit` or an iterative rewrite.
+Memoisation caches results of function calls so repeated subproblems are computed once. It helps when inputs repeat and each result depends only on its arguments; a cache cannot fix an incorrect recurrence or excessive state space.
 
 ## Run it
-
 The same recurrence three ways with call counts, then <code>cache_info()</code> showing the hit rate. Then the two conditions broken on purpose. An impure task and an unhashable input.
 
 ```python-run
@@ -121,8 +91,8 @@ def total(numbers):
 
 print("total      :", total((1,2,3)))
 ```
-## The manual version, and why to know it
 
+## The manual version, and why to know it
 ```python-run
 def fib_manual(n, memo=None):
     if memo is None:
@@ -140,7 +110,6 @@ Note `memo=None` rather than `memo={}`. A mutable default input is created <stro
 The manual version is worth knowing since it is what you write when the cache needs to be inspected, bounded by a custom rule, or shared by name between calls.
 
 ## When memoisation applies
-
 Three conditions, and all three are needed:
 
 <strong>The task is pure</strong> &mdash; same inputs always give the same yield, with no side effects. Memoising a task that reads a store or the clock returns stale answers.
@@ -160,25 +129,21 @@ That third point is the one that separates memoisation from a general speed-up. 
 |Grid paths|Yes|Yes|
 
 ## Why it works at all
-
 Naive recursion on overlapping subproblems recomputes the same vals an rapid count of times. Memoisation does not make each call faster. It makes the repeated ones disappear. So the work drops to the count of <em>distinct</em> subproblems.
 
 This is dynamic programming from the top down. The bottom-up table computes the same vals in a loop with no call stack. Same cost, and see <a href="../dsa/dynamic_programming.html">dynamic programming</a> for both ways side by side.
 
 ## The two conditions
-
 <p><strong>The task must be pure.</strong> Same inputs, same answer, no side effects. Caching a task that reads a file or the clock returns a stale answer for good. And the bug looks like the data being wrong rather than the cache being wrong.</p>
 
 <p><strong>The inputs must be hashable.</strong> They turn dictionary keys, so a list input raises. That is why cached tasks take tuples where you might expect lists. The constraint comes from the cache, not the algorithm.</p>
 
 ## What lru_cache adds
-
 <p><code>@lru_cache(maxsize=None)</code> is an unbounded dictionary and is what you want for a recursion. A finite <code>maxsize</code> evicts least-recently-used entries, which matters when the key space is large and unbounded. An in-memory cache with no eviction is a memory leak with good manners.</p>
 
 It too gives you <code>cache_info()</code> for hits and misses, and <code>cache_clear()</code>. <code>functools.cache</code> is the unbounded alias added in 3.9. Mention that a manual dict is fine and the decorator is what you would really ship.
 
 ## `lru_cache` in practice
-
 ```python-run
 from functools import lru_cache, cache
 
@@ -204,7 +169,6 @@ Four constraints worth knowing:
 <strong>Ways keep `self` in the key,</strong> so instances are held alive by the cache. A real source of leaks. `cachetools` or an explicit per-instance dictionary avoids it.
 
 ## Memoisation against tabulation
-
 Two ways to write the same dynamic programming solution.
 
 |&nbsp;|Memoisation (top-down)|Tabulation (bottom-up)|
@@ -220,7 +184,6 @@ Memoisation's edge is that just the subproblems really needed are computed &mdas
 Write memoisation first, since the recurrence is the part you have to think about. Turn to tabulation if you hit Python's recursion limit or need the O(1) space version.
 
 ## Where it is used beyond interviews
-
 - <strong>Web response caching.</strong> Keyed on the request, with a TTL.
 - <strong>Store query caching.</strong> Same query, same yield, until the data changes.
 - <strong>Costly pure steps</strong> &mdash; parsing, compiling regular terms (`re.compile` is it cached), rendering templates.
@@ -233,29 +196,6 @@ And the counterpart: <strong>invalidation is the hard part</strong>. A cache wit
 
 For the underlying ideas, see <a href="../dsa/dynamic_programming.html">dynamic programming</a>, <a href="../dsa/recursion_and_call_stack.html">recursion</a> and <a href="../python/dictionaries.html">dictionaries</a>.
 
-## Questions people ask
-
-<strong>Why `memo=None` instead of `memo={}`?</strong> A mutable default is created once at definition and shared across calls.
-
-<strong>Is `lru_cache` thread-safe?</strong> Yes, its bookkeeping is &mdash; and the wrapped task may still be called twice concurrently for the same key.
-
-<strong>What if inputs are unhashable?</strong> Turn to tuples or frozensets, or hash a canonical serialisation.
-
-<strong>How large should `maxsize` be?</strong> Large enough for the working set, small enough to bound memory. Use `cache_info()` to check the hit rate.
-
-<strong>Does it help each recursive task?</strong> Just when subproblems repeat. Merge sort gains nothing.
-
-<strong>What is `cached_property`?</strong> A decorator computing a property once per instance and storing the yield on the instance.
-
-## Recap in one screen
-
-- Store yields keyed on inputs. Give the stored value on a repeat call.
-- `@lru_cache` or `@cache` turns rapid recursion into linear in one line.
-- Needs a pure task, hashable inputs, and truly repeating subproblems.
-- Never use a mutable default input as the cache. It is shared across all calls.
-- Memoisation is top-down dynamic programming. Tabulation is the iterative form without a recursion limit.
-
 ## Sources and next steps
-
 - Source: [Python documentation, functools.cache](https://docs.python.org/3/library/functools.html#functools.cache)
 - Continue with [climbing stairs](climbing-stairs.html), which builds on this idea.

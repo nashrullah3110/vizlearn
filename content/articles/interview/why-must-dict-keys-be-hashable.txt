@@ -1,30 +1,11 @@
 title: Why must dictionary keys be hashable?
 intro: Why can a tuple be a dictionary key but a list cannot?
 
-## The requirement
+## The core idea
 
-A dictionary key must be <strong>hashable</strong>, which means two things: it has a `__hash__` method returning a stable integer, and it can be compared for equality.
-
-```python-run
-d = {}
-d["text"] = 1           # str - hashable
-d[(1, 2)] = 2           # tuple - hashable
-d[frozenset({1})] = 3   # frozenset - hashable
-print("stored:", d)
-
-try:
-    d[[1, 2]] = 4
-except TypeError as e:
-    print("list  :", type(e).__name__ + ":", e)
-```
-The rule follows directly from how a dictionary works. The hash determines which slot an entry occupies. If a key's hash changed after insertion, the entry would sit in a slot the new hash does not point to &mdash; unreachable, and effectively lost.
-
-So the requirement is not arbitrary strictness; it is what keeps the structure coherent.
-
-In practice, the built-in immutable types &mdash; `str`, `int`, `float`, `bool`, `tuple` (if all its elements are hashable), `frozenset`, `bytes`, and `None` &mdash; are all hashable and safe to use as keys. Mutable containers like `list`, `dict`, and `set` are not, because their contents can change and their hash would have to change with them, breaking the slot lookup. The distinction is not about types being "allowed"; it is about the contract: a key's hash must stay the same for as long as it is in the table. Python enforces this by giving mutable containers no `__hash__` at all.
+Dictionary keys must have a stable hash and equality relationship while stored. Mutable lists can change their contents and hash, making their bucket location unreliable; immutable tuples are usable when all their elements are hashable.
 
 ## Run it
-
 What is and is not hashable, then a class that breaks the contract on purpose &mdash; mutating a key after insertion and losing the entry, exactly as the visualisation describes.
 
 ```python-run
@@ -92,8 +73,8 @@ try:
 except Exception as e:
     print("and it cannot be mutated:", type(e).__name__, "-", e)
 ```
-## Demonstrating the failure
 
+## Demonstrating the failure
 Python prevents this for built-in types, and a custom class can be made to break it:
 
 ```python-run
@@ -121,7 +102,6 @@ The entry exists, the key object is the same object, and it cannot be found. The
 That is the concrete answer to "why?" &mdash; and being able to construct the failure demonstrates real understanding rather than recall.
 
 ## The hash-equality contract
-
 Two rules govern the relationship, and violating the first is the more serious error.
 
 <strong>If two objects are equal, their hashes must be equal.</strong> Otherwise two keys that compare equal land in different slots, both exist in the dictionary, and `d[k]` returns whichever was found first.
@@ -148,25 +128,21 @@ Hash exactly the fields that `__eq__` compares. Hashing more fields breaks the f
 <strong>Defining `__eq__` without `__hash__` makes a class unhashable in Python 3.</strong> That is deliberate: the default `__hash__` is identity-based, which would contradict a value-based `__eq__`. Python removes it rather than let you violate the contract silently.
 
 ## The invariant being protected
-
 Equal objects must have equal hashes, and an object's hash must not change while it is in use as a key. Both follow from how the table works: the hash is the address, so a moving hash is a moving address.
 
 Python enforces this by making mutable built-ins unhashable. <code>list</code>, <code>dict</code> and <code>set</code> all set <code>__hash__ = None</code>, which is why the error is <code>unhashable type</code> rather than something about dictionaries.
 
 ## It goes all the way down
-
 A tuple is hashable only if everything in it is. <code>(1, 2)</code> is a fine key; <code>(1, [2])</code> is not, because the tuple's hash is derived from its contents and one of them can change.
 
 <p><code>frozenset</code> is the immutable set, and it is hashable for the same reason. <code>set</code> is not, which is why you cannot have a set of sets without it.</p>
 
 ## Custom objects
-
 By default a custom object hashes by identity, so two equal-looking instances are different keys. Define <code>__eq__</code> and Python sets <code>__hash__</code> to <code>None</code> &mdash; because you have redefined equality and the default hash no longer agrees with it.
 
 To make it usable as a key, define <code>__hash__</code> too, over the same fields <code>__eq__</code> uses, and do not mutate those fields afterwards. <code>@dataclass(frozen=True)</code> does all of this correctly for you.
 
 ## What is hashable, and what is not
-
 |Type|Hashable|Note|
 |---|---|---|
 |`int`, `float`, `str`, `bytes`|Yes|Immutable|
@@ -194,7 +170,6 @@ A tuple's hash is derived from its contents, so a tuple containing something mut
 The dataclass row is the practical shortcut: `@dataclass(frozen=True)` generates `__eq__` and `__hash__` consistently and makes the instance immutable, which is exactly what a value object used as a key should be.
 
 ## The workarounds when a key is mutable
-
 <strong>Convert to a tuple.</strong> `tuple(my_list)` is the usual answer, and it snapshots the values at that moment &mdash; later changes to the list do not affect the key, which is what you want.
 
 <strong>Use a `frozenset`</strong> when order should not matter: `frozenset(["a", "b"])` equals `frozenset(["b", "a"])`.
@@ -208,7 +183,6 @@ The dataclass row is the practical shortcut: `@dataclass(frozen=True)` generates
 The general principle worth stating: <strong>if you need a mutable object as a key, what you actually need is an immutable snapshot of the parts that identify it.</strong>
 
 ## Why this appears in interviews
-
 The question is a proxy for whether you understand hash tables rather than just use them. It tests four things:
 
 <strong>Do you know the mechanism?</strong> Hash determines slot, so a changing hash orphans the entry.
@@ -225,29 +199,6 @@ It also connects to the practical questions asked alongside it &mdash; why `in` 
 
 For the underlying ideas, see <a href="../dsa/hash_tables.html">hash tables</a>, <a href="../python/dictionaries.html">dictionaries</a> and <a href="../python/mutability_and_aliasing.html">mutability</a>.
 
-## Questions people ask
-
-<strong>Why is a tuple hashable but a list not?</strong> Tuples are immutable, so their hash is stable. Lists are not.
-
-<strong>Can I hash a nested structure?</strong> Only if every part is hashable. A tuple containing a list is not.
-
-<strong>What if I define `__hash__` without `__eq__`?</strong> Legal &mdash; equality falls back to identity, so two equal-valued objects are different keys. Usually not what you want.
-
-<strong>Are custom objects hashable by default?</strong> Yes, by identity &mdash; two instances with the same field values are different keys.
-
-<strong>How do I make a class usable as a key?</strong> `@dataclass(frozen=True)`, or define `__eq__` and `__hash__` over the same fields.
-
-<strong>Does a bad `__hash__` break correctness or just speed?</strong> An <em>inconsistent</em> hash breaks correctness. A merely poor one that collides often only costs speed.
-
-## Recap in one screen
-
-- The hash determines the slot, so a key whose hash could change would orphan its entry.
-- Hashable means a stable `__hash__` plus equality comparison &mdash; which in practice means immutable.
-- Equal objects must have equal hashes; equal hashes need not mean equal objects.
-- Defining `__eq__` without `__hash__` makes a class unhashable, deliberately.
-- Convert mutable keys to tuples or frozensets &mdash; an immutable snapshot of what identifies the object.
-
 ## Sources and next steps
-
 - Source: [Python glossary, hashable objects](https://docs.python.org/3/glossary.html#term-hashable)
 - Continue with [how a Python dict works](how-does-a-python-dict-work.html), which builds on this idea.

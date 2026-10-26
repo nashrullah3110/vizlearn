@@ -1,25 +1,11 @@
 title: Why does [[0]*3]*3 break?
 intro: What does [[0] * 3] * 3 create, and why does writing to one row change all of them?
 
-## The bug
+## The core idea
 
-```python-run
-grid = [[0] * 3] * 3
-grid[0][0] = 1
-
-print(grid)        # [[1, 0, 0], [1, 0, 0], [1, 0, 0]]
-```
-One assignment changed all three rows. The reason is that `* 3` on a list <strong>copies references, not objects</strong>. So `grid` holds three pointers to the <em>same</em> inner list.
-
-```python-run
-grid = [[0] * 3] * 3
-print(grid[0] is grid[1])        # True -- the same object
-print(id(grid[0]) == id(grid[1]))  # True
-```
-The inner `[0] * 3` is fine, because integers are immutable &mdash; there is nothing to share dangerously. The outer `* 3` is the problem, because a list is mutable and now has three names. The fix is a list comprehension: `[[0] * 3 for _ in range(3)]` creates a **new** inner list on each iteration. So each row has its own identity. The same aliasing trap appears in default arguments &mdash; `def f(items=[])` shares one list across every call that omits the argument &mdash; and in any place where `*` is used to repeat a container of mutable objects. The general rule: `*` on a sequence copies references, never objects, so it is safe only when the elements are immutable (ints, strings, tuples of immutables).
+List multiplication repeats references to the same inner object; it does not clone that object. For independent nested rows, create each row separately with a comprehension.
 
 ## Run it
-
 The broken grid and the correct one side by side with their row identities printed, then the three levels of copying, then the mutable-default-argument bug that has the same cause.
 
 ```python-run
@@ -63,8 +49,8 @@ def fixed(item, accumulated=None):
 
 print("own rows   :", fixed("x", [[0]*3 for _ in range(3)]))
 ```
-## The fix
 
+## The fix
 ```python-run
 grid = [[0] * 3 for _ in range(3)]      # a fresh list per row
 grid[0][0] = 1
@@ -84,7 +70,6 @@ The comprehension <em>evaluates</em> `[0] * 3` on every iteration, so each row i
 The last row is why the bug is subtle: sharing immutable objects is harmless and invisible. `[0] * 1000` shares one integer object a thousand times and nothing can go wrong, because integers cannot be modified in place. The trouble begins only when the repeated element is mutable.
 
 ## The same mistake, other costumes
-
 <strong>Mutable default arguments</strong> &mdash; the most consequential version, because the sharing spans calls:
 
 ```python-run
@@ -144,25 +129,21 @@ print(original)                         # [[1, 2, 99], [3, 4]]  -- inner lists s
 All four are the same rule: <strong>Python assigns and copies references. A copy of a container duplicates the pointers, not the objects behind them.</strong>
 
 ## What multiplication actually does
-
 <p><code>[x] * 3</code> builds a list holding the same reference three times. For immutable contents that is invisible &mdash; <code>[0] * 3</code> is fine, because you can never mutate a <code>0</code>. For a mutable inner object it is a trap, because all three names lead to one object.</p>
 
 The tell is that the bug only appears on <em>write</em>. Building and printing the grid looks perfect; the first assignment to a cell is when it falls apart.
 
 ## The same idea, three ways
-
 This is one instance of a general rule: assignment and shallow copies duplicate references, never the objects behind them.
 
 <p><code>b = a</code> &mdash; another name for the same list. <code>b = a[:]</code> or <code>list(a)</code> or <code>copy.copy(a)</code> &mdash; a new outer list holding the same inner references. So nested contents are still shared. <code>copy.deepcopy(a)</code> &mdash; new objects all the way down, at the cost of walking the whole structure.</p>
 
 ## How to spot it in review
-
 Any <code>* n</code> where the repeated element is a list, a dict, a set or a custom object is suspicious. The same rule explains the mutable default argument bug: <code>def f(acc=[])</code> creates the list once, when the function is <em>defined</em>, and every call that omits the argument shares it.
 
 The fix in both cases is the same &mdash; build the mutable thing at the moment it is needed rather than once, up front.
 
 ## Copy semantics, precisely
-
 |Operation|Copies|Nested objects|
 |---|---|---|
 |`b = a`|Nothing &mdash; a second name|Shared|
@@ -193,7 +174,6 @@ c = a[2:4].copy()                      # explicit copy when needed
 The lesson generalises: whenever a library offers cheap slicing, ask whether you received a view or a copy.
 
 ## How to detect it
-
 <strong>`is` and `id`</strong> answer the question directly:
 
 ```python-run
@@ -212,31 +192,6 @@ print("rows share one list:", grid[0] is grid[1])
 
 For the underlying ideas, see <a href="../python/mutability_and_aliasing.html">mutability and aliasing</a>, <a href="../python/shallow_and_deep_copy.html">shallow and deep copy</a> and <a href="../python/list_comprehensions.html">list comprehensions</a>.
 
-## Questions people ask
-
-<strong>Why does `[0] * 3` work fine?</strong> Integers are immutable, so sharing them is unobservable.
-
-<strong>Is `*` ever right for nested lists?</strong> Only if you never mutate the inner lists. And then a tuple of tuples states the intent better.
-
-<strong>Why does the comprehension fix it?</strong> The expression is re-evaluated per iteration, creating a new object each time.
-
-<strong>Does this affect tuples?</strong> `((0,) * 3,) * 3` is safe, because nothing can be mutated. A tuple containing a list has the same problem.
-
-<strong>When do I need `deepcopy`?</strong> When nesting is arbitrarily deep or unknown. For a known two-level structure, a comprehension is faster.
-
-<strong>Is `list(a)` a deep copy?</strong> No. Shallow &mdash; inner objects stay shared.
-
-<strong>Why is a mutable default evaluated once?</strong> Default arguments are evaluated at function definition, and stored on the function object.
-
-## Recap in one screen
-
-- `[[0] * 3] * 3` creates three references to one inner list, so mutating one row changes all of them.
-- Use `[[0] * 3 for _ in range(3)]` &mdash; the comprehension builds a fresh object per row.
-- The same rule causes mutable default arguments, shared class attributes, and `dict.fromkeys` with a list.
-- Slicing and `list()` are shallow copies; `deepcopy` is the recursive one, and it is slow.
-- Test for aliasing with `grid[0] is grid[1]`, and let a linter catch mutable defaults for you.
-
 ## Sources and next steps
-
 - Source: [Python FAQ, multidimensional list construction](https://docs.python.org/3/faq/programming.html#how-do-i-create-a-multidimensional-list)
 - Continue with [shallow versus deep copy](shallow-versus-deep-copy.html), which builds on this idea.

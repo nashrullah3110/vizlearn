@@ -1,12 +1,11 @@
 title: Merge k sorted sequences
 intro: Merge k sorted lists into one sorted output. What does it cost?
 
-## The question, and what it is testing
+## The core idea
 
-Keep a heap holding <strong>one candidate per list</strong>. Pop the smallest, emit it, and push that list's successor &mdash; so the heap never exceeds k and each of the N values costs one log k operation. <code>heapq.merge</code> is this, lazily. Its real win is memory, not speed: for materialising everything, <code>sorted()</code> is usually faster. The heap approach is O(N log k) total, where N is the combined length and k is the number of lists. `sorted(itertools.chain(*lists))` is O(N log N) and often wins in practice because Python's Timsort exploits the pre-sorted runs inside each list, turning them into a merge internally. The heap version's advantage is that it is **lazy** &mdash; it yields one element at a time without materialising the full output, which matters when N is too large to fit in memory or when you only need the first few elements.
+To merge k sorted sequences, keep one current candidate from each sequence in a min-heap. Repeatedly emit the smallest and replace it with that sequence’s next value, for O(N log k) time.
 
 ## Run it
-
 The merge itself, hand-rolled and against the standard library.
 
 ```python-run
@@ -82,27 +81,18 @@ print("the input streams or does not fit, and for sorted() when it does.")
 ```
 
 ## Why the heap is size k and not N
-
 <p>The next value in the merged output must be the smallest unconsumed value, and because each input is already sorted, each list's smallest unconsumed value is its head. So only k values are ever candidates &mdash; one per list &mdash; and the heap needs to hold exactly those.</p><p>That is the whole complexity argument. N values come out, each costing one pop and at most one push on a heap of size k, giving O(N log k). Concatenating and sorting is O(N log N), and log k is smaller than log N whenever k is smaller than N &mdash; which is the usual case, with many long lists.</p>
 
 ## The tag, and what happens without it
-
 <p>The heap entries are tuples: <code>(value, list_index, position)</code>. The list index is not decoration &mdash; it is how you know which list to pull the successor from. Storing bare values loses that, and the merge cannot continue.</p><p>The index also settles ties deterministically, which matters when values are equal: the tuple comparison falls through to the list index and the merge becomes stable. And if the values are objects that are not comparable, the tuple will try to compare them and raise &mdash; which is why the index goes <em>second</em>, not third, in implementations that need to avoid that.</p>
 
 ## What the standard library gives you, and the honest measurement
-
 <p><code>heapq.merge(*lists)</code> is this algorithm, and it returns a <strong>generator</strong>: it never materialises the result, so memory is O(k) rather than O(N), and the first value is available immediately.</p><p>The editor below measures both claims and the second one is worth seeing. Asking for just the smallest value takes 0.3 ms lazily against 140 ms if you sort first &mdash; a few hundred times less work for the same answer. But materialising <em>everything</em> is the other way round: <code>sorted(concatenation)</code> beats <code>list(heapq.merge(...))</code>, often by two or three times, because Timsort is C and detects the sorted runs while <code>heapq.merge</code> is a Python-level generator paying per-item overhead.</p><p>So the honest answer has two halves: O(N log k) is the right algorithmic answer, and in CPython you reach for <code>heapq.merge</code> when the input streams or does not fit, and for <code>sorted()</code> when it does.</p>
 
 ## Where this actually gets used
-
 <p>External sorting: split a file too large for memory into sorted chunks, then k-way merge the chunks back. That is what <code>sort(1)</code> does, and it is why the merge has to be lazy &mdash; the whole point is that the result does not fit either.</p><p>The same structure merges sorted posting lists in a search index, combines time-ordered log files, and is the merge step of an LSM-tree compaction. Any time several sorted streams have to become one, this is the shape, and the heap is the part that makes it O(N log k) rather than O(Nk).</p>
 
-## What to say out loud
-
-<p>A min-heap with one entry per list, each tagged with which list it came from. Pop the smallest, emit it, push the next value from that same list. The heap stays at size k, so it is O(N log k) for N total values. heapq.merge does exactly this and is lazy, which is the version I would use for streams. If everything fits in memory and I just want a sorted list, concatenating and calling sorted is usually faster in CPython, because Timsort exploits the existing runs in C.</p>
-
 ## Edge cases to raise
-
 <p>Volunteering these is most of what separates a correct answer from a good one.</p>
 
 <p><strong>Empty lists in the input.</strong> The initial heap must skip them or the first index lookup raises. It is the easiest line to omit.</p>
@@ -111,49 +101,6 @@ print("the input streams or does not fit, and for sorted() when it does.")
 
 <p><strong>Lists of very different lengths.</strong> Correctness is unaffected, and one list dominating means the heap is mostly the same entry - still O(N log k), and worth saying if asked about the worst case.</p>
 
-## The follow-ups interviewers ask
-
-<p><strong>"What if there are millions of lists?"</strong> Then the heap is the bottleneck rather than the data. The answer is to merge in rounds &mdash; pair them up and merge repeatedly, which is O(N log k) with a much smaller constant, or shard the merge across machines.</p>
-
-<p><strong>"Merge two sorted lists without a heap."</strong> Two indices and a comparison. For k = 2 the heap is pure overhead, and a good interviewer will ask you to notice that.</p>
-
-<p><strong>"How does external sorting use this?"</strong> Split the input into chunks that fit in memory, sort each and write it out, then k-way merge the files back. That is what <code>sort(1)</code> does, and it is why the merge must be lazy - the output does not fit either.</p>
-
-## Common wrong answers
-
-<p><strong>"Concatenate and sort - it is the same complexity."</strong> It is O(N log N) against O(N log k), and it needs the whole thing in memory. That said, the editor shows it winning the clock in CPython, so the honest answer names both facts rather than one.</p>
-
-<p><strong>"Push all the values into one heap."</strong> O(N) memory instead of O(k), which defeats the purpose. The heap should hold candidates, not data.</p>
-
-<p><strong>"heapq.merge sorts the inputs for you."</strong> It does not. It assumes each input is already sorted, and produces silently wrong output if one is not.</p>
-
-
-
-For the underlying ideas, see <a href="../dsa/heaps_and_priority_queues.html">heaps</a>, <a href="../dsa/merge_sort.html">merge sort</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
-
-## Questions people ask
-
-<strong>How do you merge k sorted lists efficiently?</strong> Put the first element of each list into a min-heap. Repeatedly pop the smallest, add it to the output, and push the next element from that same list.
-
-<strong>What is the time complexity?</strong> O(N log k), where N is the total number of elements, because each element goes through the heap once and the heap holds at most k items.
-
-<strong>Why is the heap size k and not N?</strong> It holds only the current front element of each list. Elements enter as their predecessor leaves.
-
-<strong>Why add a tag or index to the heap entries?</strong> On ties, Python would compare the next field and may fail on objects that cannot be compared. A list index or counter makes tuples comparable and keeps the merge stable.
-
-<strong>What is the alternative to a heap?</strong> Divide and conquer: merge lists in pairs, repeating until one remains. It is also O(N log k) and avoids a heap, but uses more intermediate lists.
-
-<strong>Does the standard library help?</strong> Yes, <code>heapq.merge</code> does exactly this lazily. Mention it, but write the heap version so you can discuss the cost.
-
-## Recap in one screen
-
-- The heap holds one entry per list - at most k, never N.
-- Each popped value is replaced by its own list's successor, which is what keeps the merge correct.
-- A list that runs out simply stops being represented.
-- Worth trying: Set K to 2 and compare again. With two lists the heap buys almost nothing and sorted() wins more clearly - log k of 2 is 1.
-- Worth trying: Merge lists of unequal length, including an empty one. The if lst guard in the initial heap is what stops an IndexError, and it is easy to forget.
-
 ## Sources and next steps
-
 - Source: [LeetCode 23, Merge k Sorted Lists](https://leetcode.com/problems/merge-k-sorted-lists/)
 - Continue with [running median of a stream](running-median-of-a-stream.html), which builds on this idea.

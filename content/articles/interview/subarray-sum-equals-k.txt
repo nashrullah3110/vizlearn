@@ -1,25 +1,11 @@
 title: Subarray sum equals k
 intro: Count the contiguous subarrays that sum to k.
 
-## The problem
+## The core idea
 
-Count the number of contiguous subarrays whose elements sum to exactly k.
-
-|Input|k|Count|The subarrays|
-|---|---|---|---|
-|`[1, 1, 1]`|2|2|`[1,1]` at 0-1 and at 1-2|
-|`[1, 2, 3]`|3|2|`[1,2]` and `[3]`|
-|`[1, -1, 0]`|0|3|`[1,-1]`, `[0]`, `[1,-1,0]`|
-
-The brute force checks every pair of indices &mdash; O(n²). The O(n) solution uses a prefix-sum dictionary: the sum of `a[i..j]` equals `prefix[j+1] - prefix[i]`, so finding subarrays that sum to k is equivalent to finding pairs of prefix sums that differ by k. Walk the array, maintaining a running prefix sum and a dictionary counting how many times each prefix sum has appeared. At each position, `count += seen[prefix - k]`, then increment `seen[prefix]`. The key insight is that you do not need to store the prefix array &mdash; a running total and a counter dictionary are enough. The negative-number test case is the one that separates correct from almost-correct solutions: a sliding window cannot shrink when the sum is too large if the array contains negatives, which is why the prefix-sum approach is necessary rather than a two-pointer technique. The edge cases are: k equals zero with positive-only arrays (no subarrays), the entire array summing to k (one subarray), and all elements zero with k zero (every subarray counts).
-
-<strong>Negative numbers are allowed</strong>, and that single fact rules out the sliding window. This is the crux of the problem.
-
-The brute force sums every subarray: O(n²) with running sums, O(n³) if the sum is recomputed each time. The intended solution is O(n).
-
+Count contiguous subarrays whose sum is k. If the current prefix sum is p, any earlier prefix p−k marks a subarray ending here; a frequency map counts those starts in one pass.
 
 ## Run it
-
 The prefix-sum count against brute force with both operation counts, the missing-seed bug failing on a one-element array, and the sliding window breaking on a negative number.
 
 ```python-run
@@ -109,8 +95,8 @@ def sliding_window(values, k):
 
 print("sliding window:", sliding_window([3,4,7,2,-3,1,4,2], 7), "<- wrong with negatives")
 ```
-## Why the sliding window fails
 
+## Why the sliding window fails
 A sliding window works when growing it increases the sum and shrinking it decreases the sum &mdash; that monotonicity is what makes "too big, shrink from the left" a valid decision.
 
 With negatives, the sum is not monotonic. On `[1, -1, 1]` with k = 1, a window whose sum is already 1 might still be extendable to another valid window, and a window whose sum is too large might become correct by <em>growing</em>. There is no correct rule for when to move the left pointer.
@@ -125,7 +111,6 @@ With negatives, the sum is not monotonic. On `[1, -1, 1]` with k = 1, a window w
 Recognising which of those four you have been asked is most of the work.
 
 ## Prefix sums and the key identity
-
 Let `prefix[i]` be the sum of the first i elements. Then the sum of the subarray from index i to j&minus;1 is `prefix[j] - prefix[i]`.
 
 So a subarray ending at j sums to k exactly when:
@@ -158,25 +143,21 @@ O(n) time and O(n) space.
 The order also matters: <strong>count before inserting</strong>. Inserting `running` first would let a subarray of length zero match when k = 0.
 
 ## From a difference to a lookup
-
 Let <code>P(i)</code> be the sum of everything up to index i. The subarray from j+1 to i sums to <code>P(i) &minus; P(j)</code>, so it equals k exactly when <code>P(j) = P(i) &minus; k</code>.
 
 That converts "search backwards for a matching start" into "have I seen this value before?", which a dictionary answers in O(1). It is the same move as Two Sum &mdash; compute the thing you need rather than hunting for it.
 
 ## Why {0: 1} and not an empty map
-
 The empty prefix has sum 0, and it must be in the map before the loop starts. Otherwise a subarray beginning at index 0 &mdash; where <code>running</code> itself already equals k &mdash; has no earlier prefix to match against and is never counted.
 
 Seeding with <code>{0: 1}</code> is the single most commonly missed line in this problem, and it fails on the simplest possible input: <code>[k]</code>.
 
 ## Why not a sliding window
-
 A sliding window needs the sum to grow when the window grows, so shrinking from the left is a sound response to overshooting. With negative numbers that monotonicity is gone: extending the window can make the sum smaller, so there is nothing to slide on.
 
 If the question guarantees all-positive values, say so and use the window &mdash; O(1) space instead of O(n). Noticing that the constraint changes the right answer is worth as much as the code.
 
 ## Tracing it
-
 `[3, 4, 7, 2, -3, 1, 4, 2]` with k = 7:
 
 |num|running|`running - k`|Found|counts after|
@@ -194,7 +175,6 @@ If the question guarantees all-positive values, say so and use the window &mdash
 Total: 4. The `14:2` entry is the reason a <em>count</em> is stored rather than a set &mdash; the same prefix sum recurring means several valid starting points, and a set would count only one of them.
 
 ## The variants
-
 <strong>Return a subarray rather than a count.</strong> Store the <em>index</em> of each prefix sum instead of its frequency, and return on the first match.
 
 <strong>Longest subarray with sum k.</strong> Store the <em>earliest</em> index for each prefix sum &mdash; `if s not in first: first[s] = i` &mdash; so the span found is maximal.
@@ -208,7 +188,6 @@ Total: 4. The `14:2` entry is the reason a <em>count</em> is stored rather than 
 <strong>2D version: submatrix sum equals target.</strong> Fix a pair of rows, compress the columns between them into a 1D array, and run this algorithm. O(n&sup2;m).
 
 ## Edge cases
-
 |Case|Note|
 |---|---|
 |k = 0|Works; `counts[0] = 1` and the count-before-insert order matter most here|
@@ -221,47 +200,6 @@ Total: 4. The `14:2` entry is the reason a <em>count</em> is stored rather than 
 
 `[0, 0, 0]` with k = 0 giving 6 is a good self-check: the dictionary reaches `{0: 4}` and contributes 1 + 2 + 3.
 
-## What it is testing
-
-<strong>Do you notice the negatives?</strong> Reaching for a sliding window is the expected wrong turn, and identifying why it fails is the insight being probed.
-
-<strong>Do you know the prefix-sum identity?</strong> `sum(i..j) = prefix[j] - prefix[i]` is the most reusable formula in array problems.
-
-<strong>Do you initialise `counts[0] = 1`?</strong> The single most common bug, and it silently produces answers that are correct except at the start of the array.
-
-<strong>Do you count before inserting?</strong> Reversing them breaks the k = 0 case.
-
-<strong>Do you store counts rather than a set?</strong> Repeated prefix sums each contribute a subarray.
-
-<strong>Can you adapt it?</strong> Longest-subarray and divisible-by-k variants follow from changing what the dictionary stores.
-
-
-
-For the underlying ideas, see <a href="../dsa/hash_tables.html">hash tables</a>, <a href="../python/dictionaries.html">dictionaries</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
-
-## Questions people ask
-
-<strong>Why doesn't a sliding window work here?</strong> Negative numbers make the window sum non-monotonic, so extending or shrinking the window no longer moves the sum in a predictable direction.
-
-<strong>How do prefix sums solve it?</strong> A subarray ending at index i sums to k when some earlier prefix equals `running - k`. A dictionary of prefix counts finds that in O(1).
-
-<strong>Why seed the dictionary with `{0: 1}`?</strong> It stands for the empty prefix. Without it, subarrays that start at index 0 are never counted.
-
-<strong>Why store frequencies instead of a set of prefix sums?</strong> The same prefix sum can occur several times, and each occurrence gives a separate subarray. A set would undercount.
-
-<strong>Why look up the complement before inserting the current prefix?</strong> Inserting first could match the current prefix with itself when k is 0. That counts an empty subarray.
-
-<strong>What are the complexities?</strong> O(n) time and O(n) space for the dictionary. The brute-force alternative is O(n squared).
-
-## Recap in one screen
-
-- Negative values rule out a sliding window, because the sum is no longer monotonic in the window size.
-- Use prefix sums: a subarray ending here sums to k when an earlier prefix equals `running - k`.
-- A dictionary of prefix-sum frequencies answers that in O(1), giving O(n) overall.
-- Seed it with `{0: 1}` for the empty prefix, or subarrays starting at index 0 are missed.
-- Count first, then insert &mdash; and store frequencies, not a set.
-
 ## Sources and next steps
-
 - Source: [LeetCode 560, Subarray Sum Equals K](https://leetcode.com/problems/subarray-sum-equals-k/)
 - Continue with [maximum subarray sum](maximum-subarray-kadane.html), which builds on this idea.

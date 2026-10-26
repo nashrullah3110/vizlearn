@@ -1,17 +1,11 @@
 title: Group anagrams together
 intro: Given a list of words, group the anagrams together.
 
-## The problem
+## The core idea
 
-Group a list of words so that anagrams end up together.
-
-<p class="mono-font">["eat", "tea", "tan", "ate", "nat", "bat"]</p>
-<p class="mono-font">&rarr; [["eat", "tea", "ate"], ["tan", "nat"], ["bat"]]</p>
-
-The naive approach compares every pair of words for anagram-ness &mdash; O(n²m) and unnecessary. The insight is to compute a <strong>canonical form</strong> for each word: something identical for all anagrams and different for everything else. Then a single dictionary pass groups them. Two canonical forms work: sorting the letters (`"eat"` and `"tea"` both become `"aet"`) or counting them into a tuple of 26 counts. Sorting is O(m log m) per word, counting is O(m), and both make the dictionary lookup O(1). The total is O(n·m log m) or O(n·m) depending on the key. In practice the words are short enough that the difference is invisible, and sorted letters are easier to debug. The dictionary maps each canonical form to a list of original words, so the output is `dict.values()`. The edge cases worth raising are: single-character words (each is its own group unless duplicated), the empty string (valid anagram of itself), and words of different lengths (never anagrams, and sorting handles that automatically because the keys differ in length).
+Anagrams contain the same characters with the same multiplicities. Give each word a canonical key—such as sorted letters or a fixed-size frequency tuple—and group words that share that key.
 
 ## Run it
-
 Both keys, plus the pairwise version with its comparisons counted, so the difference between six lookups and fifteen comparisons is a number on the screen rather than a claim.
 
 ```python-run
@@ -67,8 +61,8 @@ def group_pairwise(words):
 
 print("pairwise     :", group_pairwise(words))
 ```
-## The two canonical forms
 
+## The two canonical forms
 <strong>Sorted characters:</strong>
 
 ```python-run
@@ -112,7 +106,6 @@ O(n &times; m) &mdash; no sorting. The key is a 26-element tuple rather than a s
 Which is better depends on m. For short words the sort is negligible and the sorted key is clearer; for long words or a large corpus the count key wins. For non-ASCII input the count array must become a dictionary or a `Counter`, at which point the sorted key is simpler again.
 
 ## Why a tuple, not a list
-
 `groups[counts]` with `counts` as a list raises `TypeError: unhashable type: 'list'`.
 
 Dictionary keys must be hashable, which requires immutability &mdash; if a key could change after insertion, its hash would change and the entry would become unreachable. A tuple is immutable and hashable; a list is not.
@@ -122,13 +115,11 @@ That is a small detail and it is one interviewers specifically watch for, becaus
 The same applies to using a `Counter` as a key: `Counter` is a dict subclass and therefore unhashable. `tuple(sorted(counter.items()))` is the usual conversion.
 
 ## The instinct, and why it is wrong
-
 The obvious approach compares every word with every other word to see whether they are anagrams. That is n(n&minus;1)/2 comparisons, each costing O(m&nbsp;log&nbsp;m) or O(m), so the whole thing is O(n&sup2;&middot;m).
 
 The realisation that fixes it: being anagrams is an <em>equivalence relation</em>, so instead of testing pairs you can give every word a label that all its anagrams share, and group by label. Dictionaries group by label in O(1) each.
 
 ## Choosing the key
-
 <p><strong>Sorted letters.</strong> <code>"".join(sorted(word))</code>. Simple, obviously correct, O(m&nbsp;log&nbsp;m) per word. This is the answer to give.</p>
 
 <p><strong>A count tuple.</strong> A 26-element tuple of letter counts, built in O(m). Faster for long words, and the improvement to mention when asked. It must be a <code>tuple</code>, not a list &mdash; keys have to be hashable.</p>
@@ -136,11 +127,9 @@ The realisation that fixes it: being anagrams is an <em>equivalence relation</em
 Total cost is O(n&middot;m&nbsp;log&nbsp;m) with sorting, or O(n&middot;m) with counts. Either way the n&sup2; is gone.
 
 ## The pattern behind it
-
 "Canonicalise, then group" solves a whole family of questions: find duplicate files by hashing contents, group points by slope, detect isomorphic strings by normalising the pattern. Whenever a question asks you to find things that are equivalent under some transformation, look for the canonical form before you look for a clever comparison.
 
 ## Walking through the example
-
 `["eat", "tea", "tan", "ate", "nat", "bat"]` with the sorted key:
 
 |Word|Key|Groups after|
@@ -155,7 +144,6 @@ Total cost is O(n&middot;m&nbsp;log&nbsp;m) with sorting, or O(n&middot;m) with 
 One pass, and the grouping falls out of the dictionary. Note that the output order depends on insertion order, which Python dictionaries preserve &mdash; so the groups come out in the order their first member appeared. If the expected output has a specific order, that must be stated.
 
 ## Edge cases
-
 |Case|Handling|
 |---|---|
 |Empty input|Returns `[]`|
@@ -170,7 +158,6 @@ One pass, and the grouping falls out of the dictionary. Note that the output ord
 The mixed-case row is worth raising: `"Eat"` and `"tea"` are anagrams under a case-insensitive reading and not under a strict one. Ask.
 
 ## The follow-ups
-
 <strong>"What if the words are very long?"</strong> The count key avoids the sort, giving O(m) per word instead of O(m log m).
 
 <strong>"What about a huge corpus that does not fit in memory?"</strong> Compute the key per word and partition by hash across machines or files &mdash; all anagrams share a key, so they land in the same partition. This is a MapReduce shape: the key is the map output, and the grouping is the shuffle.
@@ -181,47 +168,6 @@ The mixed-case row is worth raising: `"Eat"` and `"tea"` are anagrams under a ca
 
 <strong>"What if we want groups sorted by size?"</strong> Sort the result by `len`, which is a one-line addition and a reasonable clarification to offer.
 
-## What it is testing
-
-<strong>Do you find a canonical form</strong> instead of comparing pairs? That is the whole idea, and it is the transferable one.
-
-<strong>Do you know dictionary keys must be hashable,</strong> and why?
-
-<strong>Do you use `defaultdict`</strong> rather than checking whether each key exists?
-
-<strong>Do you state the complexity in terms of both n and m?</strong> Saying "O(n log n)" here is imprecise &mdash; the sort is per word, over its length.
-
-<strong>Do you notice the count-key optimisation</strong> when prompted about long words?
-
-The canonical-form idea appears far beyond this problem: deduplication by content hash, caching by a normalised request, database indexing by a computed column. Any time "these two things are equivalent" needs to be fast, computing a canonical key and using a dictionary is the answer.
-
-
-
-For the underlying ideas, see <a href="../dsa/hash_tables.html">hash tables</a>, <a href="../python/dictionaries.html">dictionaries</a> and <a href="../python/sorted_with_key.html">sorted</a>.
-
-## Questions people ask
-
-<strong>How do you group anagrams?</strong> Compute a canonical key for each word and store words in a dictionary keyed by it. Words with the same key are anagrams of one another.
-
-<strong>What are the two common keys?</strong> The sorted string of the word, which costs O(k log k) per word, or a tuple of 26 letter counts, which costs O(k). Both map every anagram to the same value.
-
-<strong>Why a tuple and not a list as the key?</strong> Dictionary keys must be hashable and lists are mutable, so they raise a TypeError. A tuple (or a sorted string) is hashable.
-
-<strong>What is the time complexity?</strong> O(n * k log k) with sorting, or O(n * k) with letter counts, for n words of length at most k. Space is O(n * k) to store the groups.
-
-<strong>Why is comparing every pair of words a bad idea?</strong> It takes O(n^2) comparisons. A canonical key reduces the problem to a single pass with hash lookups.
-
-<strong>What edge cases should I mention?</strong> An empty input list, empty strings (which group together), single-word groups, and uppercase versus lowercase letters if the problem does not fix the alphabet.
-
-## Recap in one screen
-
-- Compute a canonical form per word and group with a dictionary &mdash; one pass, no pairwise comparison.
-- Sorted characters is the clear key at O(m log m); a 26-element count tuple is O(m) and fixed size.
-- Keys must be hashable, so use a tuple rather than a list or a `Counter`.
-- `defaultdict(list)` removes the key-existence check.
-- The canonical-key pattern generalises to deduplication, caching and indexing.
-
 ## Sources and next steps
-
 - Source: [LeetCode 49, Group Anagrams](https://leetcode.com/problems/group-anagrams/)
 - Continue with [counting with dictionaries](counting-with-dictionaries.html), which builds on this idea.

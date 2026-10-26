@@ -1,58 +1,11 @@
 title: Count things with a dictionary
 intro: Count the frequency of each item in a sequence. Now find the k most common.
 
-## Four ways, and which to use
+## The core idea
 
-Counting occurrences is the most common dictionary task, and Python offers four spellings.
-
-```python-run
-from collections import Counter, defaultdict
-from itertools import groupby
-
-words = "the quick brown fox the lazy dog the fox".split()
-items = ["a", "b", "b", "c", "c", "c"]
-s, t, k = "listen", "silent", 1
-
-class User:                      # a small stand-in for a record
-    def __init__(self, country): self.country = country
-    def __repr__(self): return "User(%s)" % self.country
-users = [User("in"), User("uk"), User("in"), User("de")]
-
-from collections import Counter, defaultdict
-
-# 1. Counter - the right answer
-counts = Counter(words)
-
-# 2. defaultdict
-counts = defaultdict(int)
-for w in words:
-    counts[w] += 1
-
-# 3. dict.get
-counts = {}
-for w in words:
-    counts[w] = counts.get(w, 0) + 1
-
-# 4. explicit check - avoid
-counts = {}
-for w in words:
-    if w not in counts:
-        counts[w] = 0
-    counts[w] += 1
-
-print("counts:", dict(counts))
-```
-All four are O(n). `Counter` is idiomatic, C-optimised for iterables, and comes with `most_common`. Use it unless there is a reason not to.
-
-`defaultdict(int)` is right when counting is part of a bigger loop. `dict.get` is right when you want a plain `dict` in the output. `Counter` and `defaultdict` are dict subclasses and mostly swap in for each other, but they are not the same.
-
-The manual `if key in d` loop is the worst choice for pure counting but the one interviewers expect first. It shows you know a dictionary is a hash map, and that lookup, insert, and update are each O(1) on average.
-
-Counting with dicts is the entry point to several classic problems: the **anagram check** (two `Counter`s are equal iff the strings are anagrams), **top-k frequent** (heap over `Counter.most_common`), and **grouping by attribute** (`defaultdict(list)`).
-
+A dictionary stores a count for each distinct value, turning repeated scans into one pass of lookups and updates. The same pattern supports frequencies, grouping, and top-k problems; choose Counter or a plain dict based on the operation.
 
 ## Run it
-
 The four idioms producing the same counts, the <code>defaultdict</code> read trap caught in the act, and top-k timed three ways on a large input.
 
 ```python-run
@@ -123,8 +76,8 @@ print()
 print("At m = 50,000 the gap is small. At a billion distinct keys it is the")
 print("difference between a job that finishes and one that does not.")
 ```
-## What Counter adds
 
+## What Counter adds
 ```python-run
 from collections import Counter
 
@@ -147,7 +100,6 @@ The `c["z"]` behaviour is the difference from `defaultdict`: `Counter` returns 0
 The `a - b` behaviour is the trap: subtraction discards non-positive counts. Use `c.subtract(other)` to keep negatives.
 
 ## The everyday patterns
-
 <strong>Most frequent element:</strong>
 
 ```python-run
@@ -246,19 +198,16 @@ print("by country:", Counter(u.country for u in users))
 That last one is worth noting: `Counter` accepts any iterable, so a generator expression counts values after mapping each item to its computed key without materialising an intermediate list.
 
 ## The four idioms
-
 <p><code>counts[x] = counts.get(x, 0) + 1</code> needs no import and makes the default explicit. <code>counts.setdefault(x, 0)</code> is the same idea and reads worse for counting. <code>defaultdict(int)</code> lets you write <code>counts[x] += 1</code> directly. <code>Counter(seq)</code> does the whole loop in C.</p>
 
 They are all O(n). Reach for <code>Counter</code> in real code and be able to write the <code>get</code> version when an interviewer asks you not to import anything.
 
 ## One trap in defaultdict
-
 Reading a missing key from a <code>defaultdict</code> <em>creates</em> it. <code>if counts[x] &gt; 5</code> silently inserts <code>x</code> with value 0. So a loop that only reads can grow the dictionary without anyone noticing.
 
 Use <code>.get()</code> or <code>in</code> when you are only asking. <code>Counter</code> does not have this problem: reading a missing key returns 0 without inserting.
 
 ## Top-k without sorting
-
 Sorting all the counts is O(m&nbsp;log&nbsp;m) in the number of distinct items. Keeping a heap of size k is O(m&nbsp;log&nbsp;k), which is what <code>heapq.nlargest</code> and <code>Counter.most_common(k)</code> do.
 
 For "top 10 of a billion" that is the difference between a practical job and an impossible one. And it is the answer the question is actually fishing for. Bucket sort by count is O(m) when the counts are bounded. Worth mentioning as the linear option.
@@ -274,7 +223,6 @@ beat `sorted(counts.items())[:k]`, which pays the full sort for a slice you thro
 most of away.
 
 ## Grouping, the sibling problem
-
 Counting collapses items to a number; grouping keeps them.
 
 ```python-run
@@ -345,7 +293,6 @@ for country, group in groupby(sorted(users, key=lambda u: u.country), key=lambda
 `defaultdict` needs no sorting and is usually the better choice.
 
 ## Counting in a sliding window
-
 The incremental form, which appears in several interview problems:
 
 ```python-run
@@ -381,7 +328,6 @@ print("anagram starts:", find_anagrams("cbaebabacd", "abc"))
 The `del` is important. A `Counter` holding `{'a': 0}` does not compare equal to one without the key. So leaving zero entries breaks the comparison. That is the single most common bug in window-counting solutions.
 
 ## Edge cases and gotchas
-
 |Case|Behaviour|
 |---|---|
 |`Counter([])`|Empty counter; `most_common()` returns `[]`|
@@ -398,29 +344,6 @@ The ties row is worth knowing: `most_common` sorts by count, and elements with e
 
 For the underlying ideas, see <a href="../python/dictionaries.html">dictionaries</a>, <a href="../python/dictionary_methods.html">dictionary methods</a> and <a href="../dsa/hash_tables.html">hash tables</a>.
 
-## Questions people ask
-
-<strong>Counter or defaultdict?</strong> `Counter` for pure counting; `defaultdict(int)` when counting is part of a larger loop; `defaultdict(list)` for grouping.
-
-<strong>Is Counter faster?</strong> For counting a whole iterable, yes. The loop is in C. For incremental `+= 1` in Python, they are comparable.
-
-<strong>Why does `c["missing"]` return 0?</strong> `Counter` defines `__missing__` to return 0 without inserting. This makes counting code cleaner.
-
-<strong>Why did my Counter comparison fail?</strong> Zero-valued keys. Delete them when a count reaches zero.
-
-<strong>How do I count by a field?</strong> `Counter(x.field for x in items)`.
-
-<strong>Is a Counter a dict?</strong> A subclass, so all dict operations work. And it is not hashable. So it cannot itself be a dictionary key.
-
-## Recap in one screen
-
-- `Counter(iterable)` is the idiomatic count; `defaultdict(list)` is the idiomatic grouping.
-- `Counter` returns 0 for missing keys without inserting; `defaultdict` inserts.
-- Delete zero-valued keys before comparing Counters, or equality fails.
-- `Counter` subtraction drops non-positive counts &mdash; `subtract` keeps them.
-- `itertools.groupby` needs the input sorted by the same key; `defaultdict` does not.
-
 ## Sources and next steps
-
 - Source: [Python documentation, collections.Counter](https://docs.python.org/3/library/collections.html#collections.Counter)
 - Continue with [how a Python dict works](how-does-a-python-dict-work.html), which builds on this idea.

@@ -1,21 +1,11 @@
 title: Implement a hash map from scratch
 intro: Implement a hash map with put, get and remove, without using a dict.
 
-## The requirement
+## The core idea
 
-Implement `put`, `get` and `remove` with O(1) average time, without using the language's built-in dictionary.
-
-The design has three parts, and stating them upfront is the expected opening:
-
-<strong>An array of buckets</strong> &mdash; the storage.
-<strong>A hash function</strong> mapping keys to bucket indices.
-<strong>A collision strategy</strong> for when two keys land in the same bucket.
-
-The simplest approach uses chaining: each bucket holds a linked list (or Python list) of key-value pairs. `put` hashes the key, walks the bucket's list to check for an existing entry, and either updates it or appends a new pair. `get` walks the same list and returns the value or &minus;1. `remove` walks and deletes the matching pair. Average-case O(1) holds as long as the load factor (entries / buckets) stays low. With too few buckets, the chains grow long and speed degrades toward O(n). The other is open addressing: on collision, probe the next slot (linear probing). Or the next slot at a quadratic offset, until an empty one is found. Open addressing has better cache behaviour but is harder to implement correctly, especially for deletion (which requires tombstone markers). The hash function for integer keys is often just `key % num_buckets`. Using a prime number of buckets reduces clustering. Interviewers care about three things: choosing the collision strategy and explaining the tradeoff, knowing the load-factor threshold for resizing (usually 0.7), and handling deletion correctly.
-
+A hash map stores key–value pairs by mapping each key’s hash to a bucket. A complete design must handle collisions, resize as it fills, and preserve the equality and hashing contract for keys.
 
 ## Run it
-
 A working hash map with chaining, its bucket distribution printed before and after a resize. And the tombstone problem demonstrated on a small open-fixing version.
 
 ```python-run
@@ -134,8 +124,8 @@ a, b = Fixed("a", 7), Fixed("b", 7)   # same hash, different keys
 d = {a: 1, b: 2}
 print("colliding keys:", d, "- equality separates them, not the hash")
 ```
-## Chaining: the straightforward answer
 
+## Chaining: the straightforward answer
 Each bucket holds a list of key-value pairs. On collision, append.
 
 ```python-run
@@ -266,7 +256,6 @@ Two details are load-bearing:
 <strong>Resizing rehashes every entry,</strong> because the bucket index depends on the capacity. Copying buckets across without rehashing puts keys in the wrong places. And they become unreachable.
 
 ## Why the load factor matters
-
 The <strong>load factor</strong> is entries divided by buckets. As it rises, buckets hold longer chains and lookups degrade from O(1) towards O(n).
 
 |Load factor|Average chain length|Behaviour|
@@ -281,25 +270,21 @@ Resizing at 0.75 is the common choice (Java's `HashMap` uses exactly this; CPyth
 Choosing a <strong>power-of-two capacity</strong> allows `hash & (cap - 1)` instead of a modulo, which is faster. It also means only the low bits of the hash are used. So a hash function that varies mainly in its high bits clusters badly. Java's `HashMap` mixes high bits down before masking to reduce this problem.
 
 ## Chaining versus open addressing
-
 <p><strong>Separate chaining</strong> puts colliding entries in a list per bucket. Simple, deletion is trivial, and it tolerates a high load factor. This is what to implement under time pressure.</p>
 
 <p><strong>Open addressing</strong> stores entries in the table array and probes for another slot after a collision. It can improve cache locality and avoid per-entry pointers, but deletion needs tombstones so a lookup does not stop too early.</p>
 
 ## Why deletion is hard in open addressing
-
 Removing an entry leaves a hole, and a probe sequence that ran <em>through</em> that slot to reach a later entry now stops at the hole and reports the later entry missing.
 
 The fix is a <strong>tombstone</strong>: mark the slot deleted rather than empty. So probes continue past it but inserts may reuse it. Tombstones build up and in time force a rehash even without growth. Being able to say that is usually what the question is really checking.
 
 ## The load factor and the resize
-
 Lookup is O(1) only while buckets stay short. Once entries divided by buckets passes roughly 0.75, chains lengthen and every step drifts towards O(n).
 
 So the table doubles and <em>every key is rehashed</em>, because the index is <code>hash(key) % size</code> and the size just changed. That single resize is O(n), and amortised over the insertions that caused it each insert is still O(1). But any single insert can be the expensive one.
 
 ## Open addressing, the other
-
 Instead of a list per bucket, store entries right in the array and probe for another slot on collision.
 
 |&nbsp;|Chaining|Open addressing|
@@ -317,7 +302,6 @@ Tombstones build up and degrade speed until a resize clears them. This is why op
 CPython dictionaries use open addressing with a probing sequence. Java's `HashMap` uses chained bins and, in modern implementations, can treeify a sufficiently long bin. These are implementation choices, not guarantees of the hash-table abstract data type.
 
 ## The hash function
-
 For an interview, `hash(key) % capacity` is acceptable. If asked to write one:
 
 ```python-run
@@ -343,7 +327,6 @@ It does <em>not</em> need to be cryptographic &mdash; that is a different requir
 Worth mentioning: Python randomises string hashes per process to prevent deliberate-collision denial-of-service attacks. This is why `hash("abc")` differs between runs.
 
 ## Follow-up questions
-
 <strong>"What if keys are integers 0 to 1,000,000?"</strong> Use direct fixing. An array indexed by the key. No hashing, no collisions, O(1) sure. Only viable when the key space is small and dense.
 
 <strong>"How would you make it thread-safe?"</strong> A single lock serialises all of it; striped locking. One lock per group of buckets. Allows concurrency. Java's `ConcurrentHashMap` does this.
@@ -354,47 +337,6 @@ Worth mentioning: Python randomises string hashes per process to prevent deliber
 
 <strong>"What about memory?"</strong> Chaining costs a pointer per entry plus list overhead; open addressing reserves empty slots. Both trade memory for speed.
 
-## What it is testing
-
-<strong>Do you name the three components?</strong> Buckets, hash function, collision strategy.
-
-<strong>Do you handle collisions by name?</strong> A design without a collision answer is incomplete.
-
-<strong>Do you resize?</strong> Without it, speed degrades to O(n) as the table fills.
-
-<strong>Do you rehash on resize?</strong> Copying buckets without recomputing indices is the classic bug.
-
-<strong>Do you check for an existing key in `put`?</strong> If not updates create copies.
-
-<strong>Do you know the real implementations?</strong> CPython open-fixes, Java chains and treeifies. Knowing that grounds the answer in reality.
-
-
-
-For the underlying ideas, see <a href="../dsa/hash_tables.html">hash tables</a>, <a href="../dsa/linked_lists.html">linked lists</a> and <a href="../python/dictionaries.html">Python dictionaries</a>.
-
-## Questions people ask
-
-<strong>How does a hash map find a key quickly?</strong> It hashes the key to an integer, takes it modulo the bucket count to pick a bucket, then looks inside that bucket. With few keys per bucket, lookup is O(1) on average.
-
-<strong>What is the difference between chaining and open addressing?</strong> Chaining stores colliding keys in a list inside the bucket. Open addressing stores everything in the table itself and probes other slots on a collision.
-
-<strong>What is the load factor and why does it matter?</strong> It is the number of entries divided by the bucket count. As it rises, collisions rise and operations slow toward O(n), so the table resizes (commonly doubling) around 0.7 to 0.75.
-
-<strong>Why is deletion tricky in open addressing?</strong> Removing an entry can break the probe chain for keys placed after it. The usual fix is a tombstone marker that lookups skip over and inserts may reuse.
-
-<strong>What is the worst-case complexity?</strong> O(n) per operation when every key lands in one bucket. A good hash function and resizing make that very unlikely in practice.
-
-<strong>Why must the hash function be consistent with equality?</strong> If two keys compare equal they must hash to the same value, or the map will look in the wrong bucket and miss the entry. This is why mutable keys such as lists are not hashable.
-
-## Recap in one screen
-
-- Three components: an array of buckets, a hash function, and a collision strategy.
-- Chaining stores entries per bucket; open addressing probes for another slot and needs tombstones for deletion.
-- Resize when the load factor exceeds about 0.75, and <strong>rehash every entry</strong> because indices depend on the capacity.
-- `put` must update an existing key rather than appending a copy.
-- O(1) average, O(n) worst case; Java bounds the worst case by treeifying long chains.
-
 ## Sources and next steps
-
 - Source: [LeetCode 706, Design HashMap](https://leetcode.com/problems/design-hashmap/)
 - Continue with [how a Python dict works](how-does-a-python-dict-work.html), which builds on this idea.

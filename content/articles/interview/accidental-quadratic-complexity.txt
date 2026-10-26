@@ -1,24 +1,11 @@
 title: What is the complexity of this code?
 intro: Here is a loop. What is its complexity? (The four traps interviewers actually use.)
 
-## The pattern
+## The core idea
 
-Quadratic code rarely looks quadratic. There is no visible nested loop &mdash; instead, an O(n) operation hides inside an O(n) loop, and the cost multiplies.
-
-The reason it survives review and testing is scale. A thousand items finish in milliseconds; a hundred thousand takes minutes. The bug ships because the test data was small. Profiling catches it; reading the code does not.
-
-|n|O(n) work|O(n&sup2;) work|
-|---|---|---|
-|1,000|1 thousand|1 million &mdash; still instant|
-|10,000|10 thousand|100 million &mdash; noticeable|
-|100,000|100 thousand|10 billion &mdash; minutes|
-|1,000,000|1 million|10<sup>12</sup> &mdash; hours|
-
-The skill being tested is <strong>knowing which innocent-looking operations are O(n)</strong>, so you can spot them inside a loop.
-
+Accidental quadratic time usually comes from repeating a linear operation inside a loop: scanning a list for each item, rebuilding a slice, or recomputing the same result. Count how often each operation runs, then multiply its cost by that count.
 
 ## Run it
-
 All four traps and all four fixes, each timed at two input sizes so you can watch the broken version quadruple while the fixed one doubles.
 
 ```python-run
@@ -127,8 +114,8 @@ def sort_once(values):
 
 print("sort once      :", sort_once(list(range(200, 0, -1)))[:5])
 ```
-## The five that account for most of it
 
+## The five that account for most of it
 <strong>1. Membership testing against a list.</strong>
 
 ```python-run
@@ -260,7 +247,6 @@ print("walked", len(s), "characters without re-slicing")
 |`sorted()` inside a loop|O(n log n)|Sort once outside|
 
 ## The four shapes
-
 <p><strong>1. <code>x in a_list</code> inside a loop.</strong> The membership test is O(n). Fix: build a <code>set</code> once, before the loop.</p>
 
 <p><strong>2. <code>result += piece</code> in a loop.</strong> Strings are immutable, so each step copies everything so far. Fix: collect into a list and <code>"".join</code> at the end.</p>
@@ -270,19 +256,16 @@ print("walked", len(s), "characters without re-slicing")
 <p><strong>4. <code>sorted()</code> inside a loop.</strong> Usually the data has not changed and the sort belongs outside it. Fix: sort once, or keep a heap if it really does change.</p>
 
 ## Why they survive code review
-
 None of them looks wrong. Each line is idiomatic Python that would be fine on its own, and on a hundred elements every version is instant. The bug ships, and then someone doubles the input and everything takes four times as long.
 
 The habit worth building is to read the cost of a line rather than its appearance, and to notice when a linear operation has ended up inside a loop. "What is this line's complexity, and how many times does it run?" catches all four.
 
 ## How to answer in the room
-
 Name the shape, give the complexity, and give the fix in one sentence: <em>"the membership test is a linear scan, so it's O(n&sup2;) &mdash; build a set before the loop and it's O(n)"</em>. Do not hedge; these have definite answers.
 
 If asked to prove it, double the input and show the time going up fourfold. That is what the program below does for all four.
 
 ## The ones that hide better
-
 <strong>Dictionary key ordering.</strong> Nothing wrong here, and it is easy to write the list version by habit:
 
 ```python-run
@@ -350,7 +333,6 @@ df = pd.DataFrame(rows)
 <strong>Re-reading a file inside a loop</strong>, and re-compiling a regular expression per iteration. `re.compile` outside the loop, or rely on the module's internal cache.
 
 ## How to find it
-
 <strong>Test with big input.</strong> The fastest diagnostic there is: run with 1,000 and then 10,000 items. Linear code takes 10&times; longer; quadratic code takes 100&times;. That ratio identifies the class of the bug before any profiling.
 
 <strong>Profile.</strong>
@@ -383,45 +365,6 @@ Look for a line whose call count scales with n² rather than n &mdash; `ncalls` 
 
 <strong>Know your data structures.</strong> Most of these fixes are the same fix &mdash; swap a list for a set or dict when the question is "is this present", and swap a list for a deque when the question is "what is at the front".
 
-## What it is testing
-
-<strong>Can you spot O(n) operations that look constant?</strong> `in`, `count`, `index`, `pop(0)`, slicing, and string `+=`.
-
-<strong>Do you reach for the right structure?</strong> Set for membership, dict for lookup, deque for both-ends access, `Counter` for frequencies.
-
-<strong>Do you know why `+=` on strings is quadratic?</strong> Immutability &mdash; each concatenation allocates and copies.
-
-<strong>Can you diagnose it empirically?</strong> The 10&times;-input test distinguishes linear from quadratic in seconds.
-
-<strong>Do you avoid premature optimisation?</strong> Quadratic behaviour on a ten-element list is not worth fixing. Knowing when it matters is part of the answer.
-
-
-
-For the underlying ideas, see <a href="../dsa/big_o_notation.html">Big-O notation</a>, <a href="../python/list_comprehensions.html">list comprehensions</a> and <a href="../python/sets_and_set_operations.html">sets</a>.
-
-## Questions people ask
-
-<strong>What is accidental quadratic complexity?</strong> It is an O(n^2) cost hidden inside code that looks like a single loop, usually because an operation inside the loop (a list <code>in</code> check, <code>list.pop(0)</code>, string concatenation, <code>insert(0, x)</code>) is itself O(n).
-
-<strong>Why does <code>x in some_list</code> inside a loop cause trouble?</strong> Each membership test scans the list, so n tests cost O(n^2) in total. Converting the list to a set once makes each test O(1) on average and the whole loop O(n).
-
-<strong>Why is repeated string concatenation slow?</strong> Strings are immutable, so each <code>+=</code> may copy the whole string built so far. Appending pieces to a list and calling <code>''.join</code> once keeps the total work linear.
-
-<strong>How do I spot this in an interview?</strong> Take every line inside a loop and ask what it costs on its own. If any line is O(n), multiply it by the loop count and say the product out loud.
-
-<strong>Does O(n^2) always need fixing?</strong> No. For small, bounded n it is often fine and the clearer code wins. It matters when n can grow into the tens of thousands, where the gap turns seconds into minutes.
-
-<strong>How do I confirm a suspected quadratic in real code?</strong> Time the function at n and at 2n. If the time roughly quadruples, the cost is quadratic; a profiler will then point at the line responsible.
-
-## Recap in one screen
-
-- Quadratic code usually has no nested loop &mdash; it has an O(n) operation inside an O(n) loop.
-- The frequent offenders: `in` on a list, `+=` on strings, `pop(0)`, `count`, repeated `max`, and slicing.
-- The fixes are almost always a data-structure swap: set, dict, deque, or `Counter`.
-- Test with 1,000 then 10,000 items: 10&times; slower is linear, 100&times; is quadratic.
-- The same shape appears as N+1 database queries, where the cost is round trips rather than CPU.
-
 ## Sources and next steps
-
 - Source: [Princeton Algorithms, mathematical models and order of growth](https://algs4.cs.princeton.edu/14analysis/)
 - Continue with [why membership testing is slow on a list](why-is-in-slow-on-a-list.html), which builds on this idea.

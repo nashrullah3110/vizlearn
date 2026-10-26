@@ -200,6 +200,7 @@ def page(q, track_key, directory, group_label=""):
         </div>
 %(visual)s
     </main>
+<!-- VIZLEARN:LEDE:AFTER -->
 %(article)s
 %(code)s
 """ % {

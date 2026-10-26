@@ -1,21 +1,11 @@
 title: Remove duplicates from a sorted array in place
 intro: Remove duplicates from a sorted array in place and return the new length.
 
-## The problem
+## The core idea
 
-Given a <strong>sorted</strong> array, remove duplicates in place and return the new length. The elements beyond that length do not matter.
-
-<p class="mono-font">[1, 1, 2, 2, 3]&nbsp;&rarr;&nbsp;length 3, array starts [1, 2, 3, ...]</p>
-
-Two constraints define it. <strong>In place</strong> means O(1) extra space &mdash; no new array. <strong>Sorted</strong> means duplicates are adjacent, which is what makes a single pass possible.
-
-The sortedness is doing the work: on unsorted input, adjacency tells you nothing and a set (O(n) space) or a sort (O(n log n)) is needed. Always confirm the input is sorted before writing anything.
-
-The solution is a two-pointer approach. A slow pointer marks where the next unique value goes; a fast pointer scans forward looking for new values. Because the array is sorted, a new value is simply one that differs from the value at the slow pointer.
-
+In a sorted array, equal values are adjacent. A read pointer scans once while a write pointer stores each new value at the front, leaving the unique prefix in place and using O(1) extra space.
 
 ## Run it
-
 The two-pointer version with the array printed after each write, the same pattern applied to two sibling problems, and the off-by-one comparison that looks right and is not.
 
 ```python-run
@@ -93,8 +83,8 @@ v=[1,1,1,2,2,3]
 n=at_most_two(v)
 print("at most two :", n, v[:n])
 ```
-## Two pointers, read and write
 
+## Two pointers, read and write
 ```python-run
 def remove_duplicates(nums):
     if not nums:
@@ -117,7 +107,6 @@ The invariant is what makes it correct: <strong>everything before `write` is the
 The comparison is against `nums[write - 1]` &mdash; the last value <em>kept</em> &mdash; not against `nums[read - 1]`, the previous value read. On sorted input those coincide, and using the kept value generalises correctly to the variants below.
 
 ## Tracing it
-
 `[1, 1, 2, 2, 3]`:
 
 |read|nums[read]|nums[write&minus;1]|Action|Array|write|
@@ -132,25 +121,21 @@ Returns 3, and `nums[:3]` is `[1, 2, 3]`. The tail `[2, 3]` is leftover and expl
 That leftover is worth pointing out, because the natural expectation is that the array is fully cleaned. The contract is only about the first `write` elements.
 
 ## Why sorted matters
-
 Duplicates in a sorted array are adjacent, so "have I seen this before?" collapses to "is it the same as the last one I kept?" &mdash; one comparison, no set, no memory.
 
 On unsorted input this does not work and you need a set, which costs O(n) space, or a sort first, which costs O(n&nbsp;log&nbsp;n) time. Say which assumption you are relying on.
 
 ## The read/write pattern
-
 <p><code>read</code> visits every element exactly once. <code>write</code> lags behind, marking where the next kept element goes. Because <code>write</code> never overtakes <code>read</code>, the copy can never clobber something not yet examined &mdash; which is what makes in-place safe.</p>
 
 Compare against <code>values[write - 1]</code>, the last element actually kept, not <code>values[read - 1]</code>. On a long run of duplicates those differ, and the second is wrong.
 
 ## Why it returns a length
-
 Nothing is reallocated, so the array keeps its original size and everything past <code>write</code> is leftover data. The caller uses <code>values[:n]</code>. This is the C-style convention the question comes from, and returning a new list instead would defeat the O(1) space requirement the question exists to test.
 
 The same pattern solves "move zeroes to the end", "remove all instances of a value", and "allow at most two duplicates" &mdash; only the keep condition changes.
 
 ## The variants
-
 <strong>Allow up to k duplicates.</strong> The generalisation, and it is elegant &mdash; compare against the element k positions back:
 
 ```python-run
@@ -190,7 +175,6 @@ Same shape, different condition. Recognising that these are one pattern with a v
 <strong>Unsorted input.</strong> Requires a set for O(n) time and O(n) space, or sorting first for O(1) space at O(n log n). State the trade rather than pretending in-place O(n) is available.
 
 ## Edge cases
-
 |Case|Result|
 |---|---|
 |`[]`|0|
@@ -205,7 +189,6 @@ The last row is the important one. The algorithm relies on duplicates being adja
 If sortedness is not guaranteed, say so and ask &mdash; do not assume.
 
 ## Why the write-pointer pattern generalises
-
 This is one instance of a broader technique: <strong>a read pointer scanning and a write pointer compacting</strong>, used whenever an array must be filtered in place.
 
 |Problem|Write condition|
@@ -221,45 +204,6 @@ All of them are O(n) time and O(1) space, and all of them are the same loop with
 
 The corresponding out-of-place version is a list comprehension &mdash; `[x for x in nums if x != val]` &mdash; which is clearer and uses O(n) space. Choose in-place only when the constraint requires it.
 
-## What it is testing
-
-<strong>Do you use two pointers rather than deleting from the list?</strong> `nums.remove(x)` or `del nums[i]` inside a loop is O(n) per operation and shifts the elements you are iterating over &mdash; a double mistake.
-
-<strong>Do you state the invariant?</strong> "Everything before `write` is the answer so far" is what makes the solution verifiable.
-
-<strong>Do you compare against the last kept element,</strong> not the previous read one?
-
-<strong>Do you notice that sortedness is required?</strong> And ask if it is not stated.
-
-<strong>Do you know the tail is allowed to be garbage?</strong> The contract is the returned length, not the whole array.
-
-
-
-For the underlying ideas, see <a href="../dsa/two_pointers.html">two pointers</a>, <a href="../dsa/big_o_notation.html">time complexity</a> and <a href="../dsa/lists_in_python.html">lists</a>.
-
-## Questions people ask
-
-<strong>Why does this need the array to be sorted?</strong> Sorting puts equal values next to each other, so one pass comparing neighbours finds every duplicate. An unsorted array needs a set, which costs O(n) extra space.
-
-<strong>What are the time and space complexities?</strong> O(n) time with a single pass and O(1) extra space. Only the read and write indices are stored.
-
-<strong>Why compare with `nums[write - 1]` and not the previous read element?</strong> The write pointer's last position is the last value you kept. Comparing against it stays correct even after earlier values were overwritten.
-
-<strong>What is in the array beyond the returned length?</strong> Anything; the contract says those cells are undefined. Callers must only look at the first k elements.
-
-<strong>How do I adapt this to allow each value at most twice?</strong> Compare against `nums[write - 2]` instead of `nums[write - 1]`. The same read and write pattern covers keep-at-most-k.
-
-<strong>What if the input is empty?</strong> Return 0 before touching the array. Starting `write` at 1 without that check indexes past the end.
-
-## Recap in one screen
-
-- Sorted input means duplicates are adjacent, which allows one pass with O(1) space.
-- A read pointer scans; a write pointer marks where the next kept element goes.
-- Compare against the last <em>kept</em> element, `nums[write - 1]`, not the previous read one.
-- Elements past the returned length are undefined &mdash; that is part of the contract.
-- The read/write compaction pattern covers remove-value, move-zeros and keep-at-most-k with a different condition.
-
 ## Sources and next steps
-
 - Source: [LeetCode 26, Remove Duplicates from Sorted Array](https://leetcode.com/problems/remove-duplicates-from-sorted-array/)
 - Continue with [rotate an array](rotate-an-array.html), which builds on this idea.

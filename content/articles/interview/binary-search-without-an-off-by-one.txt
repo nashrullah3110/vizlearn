@@ -1,12 +1,11 @@
 title: Write binary search without an off-by-one
 intro: Write binary search. What makes it terminate, and where do the off-by-one errors come from?
 
-## The question, and what it is testing
+## The core idea
 
-Keep a <strong>half-open range</strong> <code>[lo, hi)</code> and the loop writes itself: <code>while lo &lt; hi</code>, <code>lo = mid + 1</code> or <code>hi = mid</code>. Both branches strictly shrink the range, which is what guarantees termination &mdash; and <code>hi = mid</code> with an <em>inclusive</em> <code>hi</code> is the version that hangs. The half-open convention makes the invariants clear: `lo` is the first candidate still in play, `hi` is the first one already ruled out, and the range is empty when they meet. The mid calculation should use `lo + (hi - lo) // 2` rather than `(lo + hi) // 2` to avoid integer overflow in languages where it matters (not Python, but C/C++/Java). The convention also makes `bisect_left` and `bisect_right` from Python's `bisect` module easy to derive: `bisect_left` finds the leftmost position where a value could be inserted while keeping sorted order, and `bisect_right` finds the rightmost. Both are binary search with a different branch condition.
+Binary search keeps a range of candidates and removes half after each comparison. A half-open interval [lo, hi) makes the invariant and termination explicit; the same convention supports insertion-point searches and duplicate boundaries.
 
 ## Run it
-
 The half-open version, and the inclusive one that stops making progress.
 
 ```python-run
@@ -101,27 +100,18 @@ print("  it returns the insertion point, which is more useful than a boolean")
 ```
 
 ## The invariant does the work
-
 <p>Binary search is three lines and most people can write a version that usually works. What separates that from a correct one is being able to say what is true at the top of every iteration: <em>if the target is present, it is in <code>[lo, hi)</code></em>.</p><p>Everything follows. The loop condition is <code>lo &lt; hi</code>, because an empty range means the answer is not there. When <code>a[mid] &lt; target</code>, <code>mid</code> cannot be the answer, so <code>lo = mid + 1</code> excludes it. Otherwise <code>mid</code> might be the answer, so <code>hi = mid</code> keeps it in a half-open range. Neither branch can leave the range the same size, which is termination.</p>
 
 ## The two combinations that hang
-
 <p>Pair an <strong>inclusive</strong> <code>hi = len(a) - 1</code> with <code>hi = mid</code> and you have a loop that can stop making progress: when <code>hi = lo + 1</code>, <code>mid</code> equals <code>lo</code>, and setting <code>hi = mid</code> changes nothing. The editor below runs that version under a step cap so you can see it exhaust its budget rather than hanging the page.</p><p>The mirror error is <code>lo = mid</code> instead of <code>lo = mid + 1</code>, which hangs for the same reason from the other side. The rule that avoids both: the branch that keeps <code>mid</code> as a candidate must be the one that moves the <em>exclusive</em> end.</p>
 
 ## The overflow line, and why Python does not need it
-
 <p>You will see <code>mid = lo + (hi - lo) // 2</code> in every C and Java implementation, and the reason is real: <code>lo + hi</code> can exceed the integer width on a large array, a bug that sat in the JDK for nine years.</p><p>Python integers are arbitrary precision, so <code>(lo + hi) // 2</code> is safe here &mdash; and the editor prints both forms agreeing at 2<sup>62</sup> to show it. Knowing <em>why</em> the idiom exists is worth more than using it: it is a good answer to "is there anything else to say about this line?"</p>
 
 ## What to use instead
-
 <p>In real Python, <code>bisect</code>. <code>bisect_left(a, x)</code> is exactly this loop, written in C, and it returns the insertion point &mdash; which is strictly more useful than a boolean, because it answers "where would it go" as well as "is it there". The <a href="first-and-last-position.html">next question</a> is entirely about that.</p><p>Write the loop when asked to, and say that you would reach for <code>bisect</code> in production. Both halves of that answer are being listened for.</p>
 
-## What to say out loud
-
-<p>I use a half-open range: lo inclusive, hi exclusive, loop while lo is less than hi. If a[mid] is less than the target, lo becomes mid + 1, otherwise hi becomes mid. Both branches shrink the range strictly, so it terminates, and at the end lo is the insertion point - one comparison tells me whether the value is actually there.</p>
-
 ## Edge cases to raise
-
 <p>Volunteering these is most of what separates a correct answer from a good one.</p>
 
 <p><strong>The empty array.</strong> <code>hi = 0</code>, the loop body never runs, and <code>lo</code> is 0 - which is the correct insertion point. A version starting at <code>len(a) - 1</code> gets <code>hi = -1</code> and needs a guard.</p>
@@ -130,49 +120,6 @@ print("  it returns the insertion point, which is more useful than a boolean")
 
 <p><strong>Duplicates.</strong> The plain loop returns an arbitrary one. If that matters, you want a boundary search, not this.</p>
 
-## The follow-ups interviewers ask
-
-<p><strong>"Write it recursively."</strong> Same invariant, and it costs stack depth for no benefit - log n frames rather than two variables. Worth writing if asked, and worth noting that the iterative form is what every library ships.</p>
-
-<p><strong>"What if the array is rotated?"</strong> One extra comparison per step to decide which half is sorted, then the same invariant. It is the standard escalation from this question.</p>
-
-<p><strong>"How would you test it?"</strong> Every array length from 0 to about 5, and for each one every target including one below the minimum, one above the maximum, and the gaps. That is a few dozen cases and it catches every off-by-one - which is a better answer than any single clever test.</p>
-
-## Common wrong answers
-
-<p><strong>"while lo <= hi with hi = mid."</strong> This is the combination that hangs. If <code>hi</code> is inclusive, the branch that keeps <code>mid</code> must be <code>hi = mid - 1</code>.</p>
-
-<p><strong>"Return mid when a[mid] == x."</strong> Correct for presence, and it makes the loop unable to answer 'first' or 'last' - which is the <a href="first-and-last-position.html">next question</a>.</p>
-
-<p><strong>"Use lo + (hi - lo) // 2 because Python can overflow."</strong> Python integers cannot overflow. The idiom is right and the reason given is wrong, and interviewers notice the difference.</p>
-
-
-
-For the underlying ideas, see <a href="../dsa/binary_search.html">binary search</a>, <a href="../dsa/big_o_notation.html">time complexity</a> and <a href="../dsa/linear_search.html">linear search</a>.
-
-## Questions people ask
-
-<strong>What is the loop invariant in binary search?</strong> The target, if it exists, always lies inside the current search window. Every update to <code>lo</code> and <code>hi</code> must keep that true, and the loop ends when the window is empty.
-
-<strong>Should I use <code>lo &lt; hi</code> or <code>lo &lt;= hi</code>?</strong> Either works if the pair is consistent with how you update the bounds. With an inclusive <code>hi = n - 1</code> use <code>lo &lt;= hi</code> and <code>hi = mid - 1</code>; with an exclusive <code>hi = n</code> use <code>lo &lt; hi</code> and <code>hi = mid</code>.
-
-<strong>Why can the loop hang forever?</strong> If you set <code>lo = mid</code> or <code>hi = mid</code> in a way that does not shrink the window, the same <code>mid</code> repeats. The two combinations that hang are mismatched bounds and an update that leaves the window unchanged.
-
-<strong>Do I need <code>mid = lo + (hi - lo) // 2</code>?</strong> In Python no, because integers do not overflow. In Java or C++ <code>(lo + hi) / 2</code> can overflow, so the safe form is the habit worth keeping.
-
-<strong>What is the time and space complexity?</strong> O(log n) time and O(1) space for the iterative version. A recursive version uses O(log n) stack space.
-
-<strong>What should I use instead of writing it by hand?</strong> In Python, <code>bisect_left</code> and <code>bisect_right</code> from the standard library. Mention them in an interview, then write the loop to show you understand it.
-
-## Recap in one screen
-
-- The range is [lo, hi): hi is never a candidate.
-- lo = mid + 1 rules mid out; hi = mid keeps it.
-- The loop ends with lo at the insertion point, found or not.
-- Worth trying: Change hi = mid to hi = mid - 1 in search and look for the value that is now missed. The bug is silent, which is why the invariant matters more than the shape.
-- Worth trying: Return lo instead of -1 on a miss. That is bisect_left, and it is the version most real problems want.
-
 ## Sources and next steps
-
 - Source: [LeetCode 704, Binary Search](https://leetcode.com/problems/binary-search/)
 - Continue with [first and last position of a target](first-and-last-position.html), which builds on this idea.

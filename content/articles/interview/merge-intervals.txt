@@ -1,18 +1,11 @@
 title: Merge overlapping intervals
 intro: Given a list of intervals, merge the ones that overlap.
 
-## The problem
+## The core idea
 
-Given a list of intervals, merge any that overlap.
-
-<p class="mono-font">[[1,3], [2,6], [8,10], [15,18]]&nbsp;&rarr;&nbsp;[[1,6], [8,10], [15,18]]</p>
-
-`[1,3]` and `[2,6]` overlap, so they become `[1,6]`. The others do not touch anything.
-
-The key realisation, and the first thing to say: <strong>sort by start time first</strong>. Once sorted, any interval can only overlap the one at once before it in the output. This turns the problem into a single pass. Walk the sorted list: if the current interval's start is less than or equal to the previous result's end, extend the previous result's end to the maximum of the two ends; if not, append a new interval to the result. The sort is O(n log n) and the pass is O(n). So the total is O(n log n). The edge cases worth testing are: a single interval (already merged), all intervals the same, intervals that touch at a point (`[1,2]` and `[2,3]` should merge into `[1,3]`), and already-sorted input. The common follow-up is "insert interval" &mdash; merge a new interval into an already-sorted, non-overlapping list in O(n) &mdash; which is the same merge logic applied to a specific insertion point.
+Merge intervals that overlap by sorting them by start, then comparing each interval with the last merged one. Sorting establishes an order in which a single pass is enough to detect every overlap.
 
 ## Run it
-
 The sweep with each decision printed, the contained-interval case that breaks the naive extend. And both answers to the touching question.
 
 ```python-run
@@ -74,8 +67,8 @@ def max_overlap(intervals):
 
 print("max overlap :", max_overlap([(1,4),(2,5),(7,9)]))
 ```
-## The solution
 
+## The solution
 ```python-run
 def merge(intervals):
     if not intervals:
@@ -101,7 +94,6 @@ Two details carry the correctness:
 <strong>`max(last_end, end)`</strong> is needed because the new interval may be fully contained in the previous one. Assigning `end` directly would shrink `[1,10]` to `[1,3]` when merging `[2,3]` into it. A bug that only appears on nested intervals.
 
 ## Why sorting is what makes it work
-
 Without sorting, an interval can overlap any other, so every pair must be checked and merges cascade &mdash; O(n²) at best, with awkward bookkeeping.
 
 Sorted by start, the invariant is: <strong>the output list's last interval is the only one the next input interval can extend</strong>. All of it earlier in the output ends before the current interval begins, because starts are non-decreasing and the output's earlier entries were finalised.
@@ -111,23 +103,19 @@ That invariant is the argument for correctness, and stating it is worth more in 
 Note what sorting by <em>end</em> instead would give: that is the activity-selection greedy criterion for choosing the maximum number of non-overlapping intervals, a different problem with a different rule. Which field you sort by encodes which question you are answering.
 
 ## Why sorting collapses the problem
-
 Unsorted, any interval can overlap any other, so you are looking at pairs &mdash; O(n&sup2;). Sorted by start, an interval's only possible overlap is with the merged block at once behind it because all of it earlier starts earlier and has already been absorbed.
 
 That reduces the whole thing to one comparison per interval. The sort costs O(n&nbsp;log&nbsp;n) and dominates.
 
 ## The line people get wrong
-
 When extending, take <code>max(last_end, this_end)</code>, not <code>this_end</code>. A fully contained interval &mdash; <code>[1, 10]</code> then <code>[2, 3]</code> &mdash; would if not shrink the merged block to 3 and silently lose all of it from 3 to 10.
 
 The other decision is whether touching counts as overlapping. <code>[1, 3]</code> and <code>[3, 5]</code> merge under <code>lo &lt;= last_end</code> and stay separate under <code>&lt;</code>. Both are defensible; ask which the question wants.
 
 ## What it extends to
-
 Meeting rooms, calendar conflicts, genome ranges, IP blocks &mdash; all the same sweep. The variants change only the merge rule: count how many rooms are needed at once (a sweep line with +1 and &minus;1 events), insert one interval into an already-merged list, or find the gaps rather than the blocks.
 
 ## Edge cases
-
 |Case|Input|Result|
 |---|---|---|
 |Empty|`[]`|`[]`|
@@ -142,7 +130,6 @@ Meeting rooms, calendar conflicts, genome ranges, IP blocks &mdash; all the same
 The nested case is the one that breaks naive implementations, and it is worth constructing on purpose when testing: `[[1,10],[2,3],[4,5]]` must give `[[1,10]]`.
 
 ## The interval-problem family
-
 Once the sort-then-sweep shape is recognised, a whole family follows:
 
 <strong>Insert an interval</strong> into a sorted list. Three phases: intervals ending before the new one, intervals overlapping it (merge them all), and intervals starting after. O(n) without re-sorting.
@@ -158,7 +145,6 @@ Once the sort-then-sweep shape is recognised, a whole family follows:
 <strong>Employee free time.</strong> Merge all busy intervals, then take the gaps.
 
 ## The sweep line technique
-
 For the "how many are active at once" questions, the general tool is a <strong>sweep line</strong>: convert each interval into two events and process them in time order.
 
 ```python-run
@@ -180,45 +166,6 @@ The sort order at ties matters: `(t, -1)` sorts before `(t, 1)` because &minus;1
 
 Sweep line extends well: it handles maximum overlap, total covered length. And the same questions in two dimensions (rectangle area, skyline problems).
 
-## What it is testing
-
-<strong>Do you sort first?</strong> The whole problem hinges on it, and volunteering it at once is the expected opening.
-
-<strong>Do you handle the nested case?</strong> `max(last_end, end)` rather than assignment.
-
-<strong>Do you ask about touching intervals?</strong> A real ambiguity in the specification.
-
-<strong>Do you state the cost correctly?</strong> O(n log n) from the sort, not O(n).
-
-<strong>Do you recognise the family?</strong> Meeting rooms, insert interval and activity selection are all follow-ups, and knowing which field to sort by distinguishes them.
-
-
-
-For the underlying ideas, see <a href="../python/sorted_with_key.html">sorting with a key</a>, <a href="../python/tuples_and_unpacking.html">tuples</a> and <a href="../dsa/big_o_notation.html">time complexity</a>.
-
-## Questions people ask
-
-<strong>How do you merge overlapping intervals?</strong> Sort by start, then walk through them. If the next start is at most the current end, extend the end with <code>max</code>; otherwise push the current interval and start a new one.
-
-<strong>Why does sorting make this work?</strong> After sorting by start, an interval can only overlap the one currently being built or none, never one further back. That reduces the problem to a single pass.
-
-<strong>What is the time and space complexity?</strong> O(n log n) time, dominated by the sort, and O(n) space for the output. The merge pass itself is O(n).
-
-<strong>What is the common mistake in the merge step?</strong> Assigning the new end directly instead of taking <code>max(end, new_end)</code>. An interval fully contained in another would otherwise shrink the merged one.
-
-<strong>Do touching intervals like [1,2] and [2,3] merge?</strong> Usually yes, so the check is <code>start &lt;= end</code>. Ask the interviewer, because some versions treat touching as separate.
-
-<strong>What related problems use the same pattern?</strong> Insert interval, meeting rooms, minimum number of meeting rooms and non-overlapping intervals. The last two use a sort plus a heap or a greedy sweep.
-
-## Recap in one screen
-
-- Sort by start; then each interval can only extend the last one in the output.
-- Merge when `start <= last_end`, and take `max` of the ends to handle nested intervals.
-- O(n log n) from the sort, O(n) output.
-- Ask whether touching intervals count as overlapping &mdash; it changes the comparison.
-- Sort by <em>end</em> instead for activity selection, and use a sweep line for concurrency questions.
-
 ## Sources and next steps
-
 - Source: [LeetCode 56, Merge Intervals](https://leetcode.com/problems/merge-intervals/)
 - Continue with [minimum window substring](minimum-window-substring.html), which builds on this idea.

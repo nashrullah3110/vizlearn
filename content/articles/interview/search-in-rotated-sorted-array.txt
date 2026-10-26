@@ -1,25 +1,11 @@
 title: Search in a rotated sorted array
 intro: A sorted array has been rotated at an unknown pivot. Find a target in O(log n).
 
-## The problem
+## The core idea
 
-A sorted array has been rotated at an unknown pivot. Find a target in O(log n).
-
-`[0, 1, 2, 4, 5, 6, 7]` rotated at index 3 becomes `[4, 5, 6, 7, 0, 1, 2]`.
-
-|Array|Target|Answer|
-|---|---|---|
-|`[4, 5, 6, 7, 0, 1, 2]`|0|4|
-|`[4, 5, 6, 7, 0, 1, 2]`|3|&minus;1|
-|`[1]`|1|0|
-|`[3, 1]`|1|1|
-|`[1, 2, 3]` (no rotation)|3|2|
-
-O(log n) rules out a linear scan, so binary search must work despite the array not being globally sorted. The trick is that <strong>at least one half of any subarray is still sorted</strong>. At each step, compare the middle element to the left end to determine which half is sorted. If the target falls within the sorted half's range, narrow to that half; otherwise, narrow to the other. Each iteration halves the search space, so the total is O(log n). The tricky edge cases are: duplicates (the worst case degrades to O(n) because you cannot distinguish which half is sorted), a single element, and no rotation at all (the algorithm must still work on a plain sorted array). A common follow-up asks you to find the minimum element in the rotated array, which is the same binary search with a different comparison &mdash; the minimum is the one element smaller than its predecessor.
-
+A rotated sorted array has at least one sorted half in every binary-search range when values are distinct. Identify that half, then keep it only if the target lies within its bounds.
 
 ## Run it
-
 The search with each decision printed, checked against a linear scan at every rotation of the same array, plus the duplicates variant and its O(n) case.
 
 ```python-run
@@ -84,8 +70,8 @@ def search_with_duplicates(values, target):
 
 print("with duplicates  :", search_with_duplicates([2,5,6,0,0,1,2], 0))
 ```
-## The key property
 
+## The key property
 Split at the midpoint. The rotation point lies in one half or the other, so the <em>other</em> half is properly sorted. Comparing `nums[mid]` with `nums[left]` reveals which:
 
 <strong>`nums[left] <= nums[mid]`</strong> &rarr; the left half is sorted.
@@ -124,25 +110,21 @@ O(log n) time, O(1) space.
 The <strong>inclusive-exclusive asymmetry</strong> in the bounds tests is deliberate too: `nums[left] <= target < nums[mid]` excludes `mid` because that value has already been compared and rejected. Making both ends inclusive re-tests a known-failed position, and while it does not break correctness, it does obscure the reasoning.
 
 ## Why binary search survives rotation
-
 A rotation splits the array into two sorted runs. Wherever <code>mid</code> lands, it is inside one of them &mdash; so at least one of <code>[lo, mid]</code> and <code>[mid, hi]</code> is entirely in order. That is the invariant the whole solution rests on, and it holds for any rotation amount including zero.
 
 <p><code>values[lo] &lt;= values[mid]</code> identifies which. Use <code>&lt;=</code>, not <code>&lt;</code>: when <code>lo == mid</code> the left half is a single element and is trivially sorted.</p>
 
 ## The decision that follows
-
 Having found a sorted half, you can test membership by range rather than by searching. If the target lies between that half's endpoints, it can only be there. If it does not, it can only be in the other half. Either way one half is discarded per step.
 
 The bounds matter: <code>values[lo] &lt;= target &lt; values[mid]</code> on the left, and <code>values[mid] &lt; target &lt;= values[hi]</code> on the right. <code>mid</code> has already been compared, so it is excluded on both sides.
 
 ## The duplicates variant
-
 With duplicates allowed, <code>values[lo] == values[mid] == values[hi]</code> tells you nothing about which half is sorted, and the only safe move is to shrink the window by one. That makes the worst case O(n) &mdash; and it is a genuine lower bound, not a lazy implementation.
 
 Saying "O(log n), but O(n) worst case if duplicates are allowed" is the complete answer, and the follow-up interviewers reach for when the first part goes smoothly.
 
 ## Tracing it
-
 `[4, 5, 6, 7, 0, 1, 2]`, target 0:
 
 |left|right|mid|`nums[mid]`|Sorted half|In range?|Action|
@@ -154,7 +136,6 @@ Saying "O(log n), but O(n) worst case if duplicates are allowed" is the complete
 Three iterations for seven elements &mdash; log₂ 7 &approx; 2.8, as expected.
 
 ## The duplicates problem
-
 With duplicates allowed, the guarantee breaks. Consider `[1, 1, 1, 0, 1, 1, 1]`: here `nums[left] == nums[mid] == nums[right] == 1`, and there is <strong>no way to tell which half contains the rotation</strong>. The comparison carries no information.
 
 The standard mitigation is to skip the ambiguous boundary:
@@ -188,7 +169,6 @@ Average O(log n), <strong>worst case O(n)</strong> &mdash; and the worst case is
 Note that this variant is usually posed as "does the target exist" rather than "at what index", because with duplicates the index is not unique.
 
 ## The two-pass alternative
-
 Some find this easier to reason about: first find the rotation point, then do an ordinary binary search on the correct segment.
 
 ```python-run
@@ -214,7 +194,6 @@ Two O(log n) passes, so still O(log n). The pivot search is itself a well-known 
 |With duplicates|O(n) worst|O(1)|Unavoidable|
 
 ## The related problems
-
 <strong>Find the minimum in a rotated sorted array.</strong> The pivot search above, on its own.
 
 <strong>How many times was it rotated?</strong> The index of the minimum.
@@ -227,45 +206,6 @@ Two O(log n) passes, so still O(log n). The pivot search is itself a well-known 
 
 The common thread: <strong>binary search needs a monotonic predicate, not a sorted array.</strong> Once that is the framing, rotated arrays, peaks and answer-space searches all become the same tool.
 
-## What it is testing
-
-<strong>Do you spot that one half is always sorted?</strong> This is the insight the problem exists to test.
-
-<strong>Do you get the `<=` right?</strong> With `left == mid` in a two-element subarray, a strict comparison misroutes the search.
-
-<strong>Do you handle no rotation?</strong> A fully sorted array is a valid input and must still work.
-
-<strong>Do you ask about duplicates?</strong> A good question to raise unprompted, and the honest answer is that they force O(n) in the worst case.
-
-<strong>Are your bounds consistent?</strong> `while left <= right` with `mid ± 1` updates, or an off-by-one causes an infinite loop.
-
-
-
-For the underlying ideas, see <a href="../dsa/binary_search.html">binary search</a>, <a href="../dsa/big_o_notation.html">time complexity</a> and <a href="../dsa/linear_search.html">linear search</a>.
-
-## Questions people ask
-
-<strong>What is the time complexity, and why?</strong> O(log n). Every step discards half the range, because at least one half of any subarray is still sorted.
-
-<strong>How do I tell which half is sorted?</strong> Compare `nums[left]` with `nums[mid]`. If the left value is less than or equal to the middle, the left half is sorted; otherwise the right half is.
-
-<strong>Why must the comparison use `<=` rather than `<`?</strong> When only two elements remain, `left` equals `mid`. A strict comparison would misclassify that one-element left half as unsorted.
-
-<strong>What changes if the array contains duplicates?</strong> When `nums[left]`, `nums[mid]` and `nums[right]` are equal you cannot tell which half is sorted. You shrink the range by one step, so the worst case becomes O(n).
-
-<strong>Do I need to find the rotation point first?</strong> No. A single modified binary search finds the target directly. Finding the pivot first is a valid two-step alternative, but it is longer.
-
-<strong>What does this problem teach beyond rotated arrays?</strong> Binary search needs a decision that eliminates half the range, not literally a sorted array. Spotting that predicate is the reusable skill.
-
-## Recap in one screen
-
-- At least one half of any subarray is sorted; `nums[left] <= nums[mid]` identifies which.
-- Test whether the target lies inside the sorted half's range, and search that half if so.
-- The `<=` matters because `left == mid` when only two elements remain.
-- Duplicates destroy the guarantee and force O(n) worst case &mdash; skip equal boundaries and say so.
-- Binary search needs a monotonic predicate, not literally a sorted array.
-
 ## Sources and next steps
-
 - Source: [LeetCode 33, Search in Rotated Sorted Array](https://leetcode.com/problems/search-in-rotated-sorted-array/)
 - Continue with [binary search on the answer](binary-search-on-the-answer.html), which builds on this idea.
