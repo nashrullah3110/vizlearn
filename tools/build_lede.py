@@ -43,6 +43,8 @@ TOP_DEMO_END = "<!-- VIZLEARN:TOP-DEMO:END -->"
 TOP_DEMO_CONTENT_BEGIN = "<!-- VIZLEARN:TOP-DEMO:CONTENT:BEGIN -->"
 TOP_DEMO_CONTENT_END = "<!-- VIZLEARN:TOP-DEMO:CONTENT:END -->"
 TOP_DEMO_SLOT = "<!-- VIZLEARN:TOP-DEMO:SLOT -->"
+LIBRARY_VIZ_BEGIN = "<!-- VIZLEARN:LIBRARY-VIZ:BEGIN -->"
+LIBRARY_VIZ_END = "<!-- VIZLEARN:LIBRARY-VIZ:END -->"
 # Optional per-page placement anchor. Pages that teach best through direct
 # manipulation can put the Overview below their complete visualiser instead
 # of using the default title-area placement.
@@ -177,7 +179,13 @@ def restore_top_demo(src):
     return src
 
 
-def lift_top_demo(src):
+def restore_library_viz(src):
+    block = re.compile(re.escape(LIBRARY_VIZ_BEGIN) + r".*?" + re.escape(LIBRARY_VIZ_END), re.S)
+    src = block.sub("", src)
+    return re.sub(r"\s*<script defer src=\"\.\./assets/vizlearn-library-viz\.js\"></script>", "", src)
+
+
+def lift_top_demo(src, track):
     """Move the first section containing a runnable editor above the lede."""
     body = article_body(src)
     if not body:
@@ -190,7 +198,11 @@ def lift_top_demo(src):
     section = src[start:end]
     src = src[:start] + TOP_DEMO_SLOT + src[end:]
     demo = (
-        TOP_DEMO_BEGIN
+        LIBRARY_VIZ_BEGIN
+        + f'<section class="px-4 md:px-8 pb-5 max-w-[1600px] mx-auto w-full" data-vz-library-viz="{track}"></section>'
+        + LIBRARY_VIZ_END
+        + "\n"
+        + TOP_DEMO_BEGIN
         + '<section class="px-4 md:px-8 pb-5 max-w-[1600px] mx-auto w-full vz-top-demo">'
         + '<div class="card-container"><div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">'
         + '<div class="vz-top-demo-label">Interactive example</div>'
@@ -200,10 +212,14 @@ def lift_top_demo(src):
     )
     viz = re.search(r"<div\b[^>]*\bdata-vz-viz\b[^>]*>", src)
     if viz:
-        return src[:viz.start()].rstrip() + "\n" + demo + "\n" + src[viz.start():]
-    main_end = src.find("</main>")
-    if main_end >= 0:
-        return src[:main_end] + demo + "\n" + src[main_end:]
+        src = src[:viz.start()].rstrip() + "\n" + demo + "\n" + src[viz.start():]
+    else:
+        main_end = src.find("</main>")
+        if main_end >= 0:
+            src = src[:main_end] + demo + "\n" + src[main_end:]
+    scripts_end = src.find("<!-- VIZLEARN:SCRIPTS:END -->")
+    if scripts_end >= 0:
+        src = src[:scripts_end] + '    <script defer src="../assets/vizlearn-library-viz.js"></script>\n' + src[scripts_end:]
     return src
 
 
@@ -231,18 +247,14 @@ def concise_overview(moved):
     return moved[:match.start()] + short + moved[match.end():]
 
 
-def render(moved, headings, concise=False):
+def render(moved, headings, concise=False, summary=None):
     """The above-the-fold block: the opening section, then a contents list."""
     toc = ""
     if len(headings) >= 3:
         items = "".join(
             '<li><a href="#%s">%s</a></li>' % (i, html.escape(t)) for i, t in headings
         )
-        toc = (
-            '<nav class="vz-lede-toc" aria-labelledby="vz-lede-toc-h">'
-            '<h2 id="vz-lede-toc-h">In this guide</h2>'
-            "<ol>%s</ol></nav>" % items
-        )
+        toc = ('<details class="vz-lede-toc"><summary>In this guide</summary><ol>%s</ol></details>' % items)
     return (
         BEGIN
         + '<section class="vz-lede" aria-labelledby="vz-lede-h">'
@@ -251,7 +263,10 @@ def render(moved, headings, concise=False):
         # side by side on a wide screen instead of stacking.
         + '<div class="vz-lede-body">'
         + SRC_BEGIN + '<template data-vz-lede-source>' + moved + '</template>' + SRC_END
-        + '<div class="vz-lede-summary">' + (concise_overview(moved) if concise else moved) + "</div></div>"
+        + '<div class="vz-lede-summary">'
+        + ("<p>" + html.escape(summary) + "</p>" if concise and summary else
+           concise_overview(moved) if concise else moved)
+        + "</div></div>"
         + toc
         + "</section>"
         + END
@@ -261,7 +276,8 @@ def render(moved, headings, concise=False):
 def process(rel):
     path = os.path.join(ROOT, rel)
     original = open(path, encoding="utf-8").read()
-    src = restore_top_demo(restore(original))
+    track = rel.split("/", 1)[0]
+    src = restore_library_viz(restore_top_demo(restore(original)))
 
     def bail(reason):
         """Give up on this page, but do not leave a stale block behind.
@@ -318,7 +334,6 @@ def process(rel):
     # Learning pages lead with one concise paragraph after the visualiser.
     # Keep examples and detailed explanations in the article body so Overview
     # stays an orientation rather than replacing the lesson.
-    track = rel.split("/", 1)[0]
     concise_track = track in ("dsa", "machine_learning", "database", "interview", "async_python", "concurrency", "pydantic", "fastapi", "numpy", "pandas", "matplotlib", "sklearn")
     if concise_track:
         section_start, section_end, _title = blocks[0]
@@ -379,7 +394,10 @@ def process(rel):
         tail = src[section_start:]
         src = src[:section_start] + tail.replace(heading.group(0), "", 1)
     top_demo_tracks = {"pydantic", "numpy", "fastapi", "pandas", "matplotlib", "sklearn"}
-    block = render(first, rest, track in top_demo_tracks)
+    page_lead = LEAD.search(src)
+    lead_paragraphs = P.findall(page_lead.group(0)) if page_lead else []
+    overview_summary = text_of(lead_paragraphs[-1]) if lead_paragraphs else None
+    block = render(first, rest, track in top_demo_tracks, overview_summary)
 
     after = src.find(AFTER_MARKER)
     if after >= 0:
@@ -407,7 +425,7 @@ def process(rel):
     # built. Its original location is a slot, so all lesson prose and code
     # remain available and rebuilds stay idempotent.
     if track in top_demo_tracks:
-        src = lift_top_demo(src)
+        src = lift_top_demo(src, track)
     open(path, "w", encoding="utf-8").write(src)
     return "ok"
 
