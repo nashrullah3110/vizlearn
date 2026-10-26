@@ -3,7 +3,9 @@ intro: The GIL makes one bytecode atomic. An increment is not one bytecode, and 
 
 ## The core idea
 
-The previous page ended on a fact worth repeating, because everything here follows from it: a thread switch can only happen between bytecodes, so a single bytecode is atomic with respect to other threads.
+The previous page ended on a fact worth repeating. Everything here follows
+from it: a thread can switch only between bytecodes. A single bytecode is
+atomic with respect to other threads.
 
 ## One statement, several bytecodes
 
@@ -31,11 +33,10 @@ counter += 1 compiles to:
     RETURN_CONST None
 ```
 
-Read the middle three. <code>LOAD_GLOBAL</code> reads the current value,
-<code>BINARY_OP</code> adds one to it, and <code>STORE_GLOBAL</code> writes the
-result back. A **read**, a **modify**, and a **write** &mdash; three separate
-steps, with two gaps between them, and a thread switch is allowed to land in
-either gap.
+Read the middle three. <code>LOAD_GLOBAL</code> reads the current value.
+<code>BINARY_OP</code> adds one, and <code>STORE_GLOBAL</code> writes the result
+back. These are a **read**, a **modify**, and a **write**. They are separate
+steps, with two gaps where a thread switch may occur.
 
 That is the whole mechanism. There is nothing subtle left; the rest of this
 page is about what happens when the switch lands there.
@@ -104,21 +105,18 @@ switch after T1 reads
     => counter = 1 after two increments
 ```
 
-In the second order both threads read zero. Each then computes 1 in its own
-register, entirely correctly, and each writes 1. Two increments happened and
-the counter advanced once: the second write did not build on the first, it
-**replaced** it. Nothing was corrupted and no operation was interrupted
-half-way &mdash; every individual step did exactly what it should.
+In the second order, both threads read zero. Each computes 1 in its own
+register, then writes 1. Two increments happened, but the counter advanced
+once. The second write did not build on the first; it **replaced** it. Nothing
+was corrupted or interrupted halfway. Each step did exactly what it should.
 
-That is what makes this class of bug hard. There is no broken line to find.
-The defect is in the *interleaving*, which is not written down anywhere in the
-program.
+That is what makes this bug hard to find. There is no broken line. The defect
+is in the *interleaving*, which is not written down in the program.
 
 ## At scale, and why testing misses it
 
-With two increments the damage is at most one. With two threads each doing a
-hundred thousand increments, the damage is however many times the switch
-happened to land in a gap:
+With two increments, the damage is at most one. With two threads each doing
+100,000 increments, the damage depends on how often a switch lands in a gap:
 
 ```python
 import threading
@@ -143,21 +141,21 @@ expected: 200000
 actual:   137216
 ```
 
-Sixty thousand increments gone, and the number is different on every run. Two
-properties of that output are the reason races survive code review.
+Sixty thousand increments are gone, and the number changes on every run. Two
+properties of that output explain why races survive code review.
 
-It is **non-deterministic**: the same program gives 200000, 137216 or 199998
-depending on when the operating system happened to switch. A test that asserts
-the total can pass a hundred times and fail on the hundred and first.
+It is **non-deterministic**. The same program can give 200000, 137216, or
+199998, depending on when the operating system switches. A test that checks the
+total can pass a hundred times, then fail on the next run.
 
-And it is **load-dependent**: with the loop set to 1,000 rather than 100,000,
-most runs come out exactly right, because the whole loop often completes
-inside one 5 ms slice. Small tests hide it and production finds it.
+It is also **load-dependent**. With the loop set to 1,000 instead of 100,000,
+most runs come out right. The whole loop often finishes inside one 5 ms slice.
+Small tests hide the bug; production finds it.
 
 ## The same bug wearing different clothes
 
-A lost update is the famous version. The more common one in real code is
-**check-then-act**, which does not look like an increment at all:
+A lost update is the well-known version. **Check-then-act** is more common in
+real code, and it does not look like an increment at all:
 
 ```python-run
 # "If the key is missing, create it" is a read and a write with a gap.
@@ -214,28 +212,27 @@ switch after both checks
     => store = {'k': ['T2']}
 ```
 
-Both threads looked, both correctly saw the key was missing, and both created
-it. T2's fresh list replaced the one T1 had already appended to, so T1's item
-is gone &mdash; and note that nothing was *overwritten* in the increment sense.
-The value that disappeared was written into a container that was then thrown
-away.
+Both threads checked and saw that the key was missing. Each then created a
+list. T2's fresh list replaced the one T1 had already appended to, so T1's item
+is gone. Nothing was *overwritten* in the increment sense. The value that
+disappeared was written into a container that was then thrown away.
 
-This shape hides everywhere: a lazily-built cache, a "create the directory if
-it does not exist", a counter dictionary, an "insert if not present" against a
-database. The giveaway is a gap between deciding and doing, and the decision
-going stale inside it.
+This shape appears in many places: a lazy cache, a "create the directory if it
+does not exist" check, or a counter dictionary. It also appears in database
+"insert if not present" operations. Look for a gap between deciding and doing.
+The decision can go stale during that gap.
 
-Two of these have a one-line fix that removes the gap rather than locking it.
-<code>dict.setdefault(k, [])</code> does the check and the create in one C
-call, and <code>collections.defaultdict(list)</code> does it at lookup time.
-Both are safe for exactly the reason <code>append</code> is: the whole thing is
-one trip into C with no Python running in the middle.
+Two common cases have a one-line fix that removes the gap. Use
+<code>dict.setdefault(k, [])</code> to check and create in one C call. Use
+<code>collections.defaultdict(list)</code> to create the value at lookup time.
+Both are safe for the same reason as <code>append</code>: one call runs in C
+without running Python in the middle.
 
 ## Which operations are already safe
 
-Not every line needs protecting, and the rule is mechanical: an operation
-implemented as a single bytecode &mdash; or as one call into C that does not
-run Python in the middle &mdash; cannot be interleaved.
+Not every line needs protection. The rule is mechanical: an operation
+implemented as one bytecode, or as a C call that does not run Python, cannot be
+interleaved.
 
 ```python-run
 import dis
@@ -256,12 +253,12 @@ index_incr   9 ops: ['LOAD_FAST', 'LOAD_CONST', 'COPY', 'COPY', 'BINARY_SUBSCR',
 swap         3 ops: ['LOAD_FAST', 'LOAD_FAST', 'BUILD_TUPLE']
 ```
 
-<code>list.append</code> ends in a single <code>CALL</code> into C that appends
-and returns without running any Python, so the append itself cannot be split
-&mdash; which is why appending to a list from several threads does not lose
-items. <code>d["n"] += 1</code> is nine operations with a
-<code>BINARY_SUBSCR</code> read and a <code>STORE_SUBSCR</code> write at
-opposite ends, and it is exactly as unsafe as the global version.
+<code>list.append</code> ends in one <code>CALL</code> into C. It appends and
+returns without running Python, so the append itself cannot be split. That is
+why threads can append to one list without losing items. In contrast,
+<code>d["n"] += 1</code> takes nine operations. A <code>BINARY_SUBSCR</code>
+reads the value, and <code>STORE_SUBSCR</code> writes it back. They sit at
+opposite ends, so this is as unsafe as the global version.
 
 The practical list that follows:
 

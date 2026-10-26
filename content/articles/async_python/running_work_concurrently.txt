@@ -3,14 +3,15 @@ intro: Fan out many awaits at once, collect the results, and decide what should 
 
 ## The core idea
 
-The reason to reach for async is almost always the same: you have many independent waits — requests, queries, file reads — and doing them one after another wastes the time each one spends idle.
+Reach for async when you have many independent waits, such as requests, queries,
+or file reads. Running them one after another wastes the time each spends idle.
 
 ## The shape of the win
 
 <code>asyncio.gather</code> is the direct tool. Hand it several coroutines and it
 schedules them all as [tasks](coroutines_tasks_and_await.html), waits for every
-one, and returns their results in the order you passed them &mdash; not the order
-they finished.
+one, and returns their results in the order you passed them. That can differ
+from the order in which they finished.
 
 These editors run inside a browser event loop that is already going. So the examples finish with <code>await main()</code>. In a standalone <code>.py</code> script &mdash; run with <code>python file.py</code> &mdash; you write <code>asyncio.run(main())</code> instead. This starts a loop, runs the coroutine, and closes it. The two are the same program with different entry points.
 
@@ -39,11 +40,11 @@ results: ['A:0.3', 'B:0.2', 'C:0.1']
 elapsed 0.30s
 ```
 
-Three waits of 0.3, 0.2 and 0.1&nbsp;seconds finish in 0.30, not 0.60 &mdash; the
-total is the longest one, because all three timers ran at once. And the results
-came back in call order (A, B, C) even though C finished first: <code>gather</code>
-lines the results up with the arguments, so you can index them without tracking
-which finished when.
+Three waits of 0.3, 0.2 and 0.1&nbsp;seconds finish in 0.30, not 0.60. The
+total is the longest wait because all three timers ran at once. The results came
+back in call order (A, B, C), even though C finished first. <code>gather</code>
+lines each result up with its argument, so you can index them without tracking
+which one finished when.
 
 ## What happens when one fails
 
@@ -79,12 +80,11 @@ gather re-raised the first exception: failed
 return_exceptions=True: [4, ValueError('failed'), 9]
 ```
 
-The default hands you the first exception and hides the successful results.
-Passing <code>return_exceptions=True</code> changes the contract: nothing is
-raised, and the exception is placed in the results list where that coroutine's
-value would have been. That is the right choice when you want every result you
-can get and intend to inspect the failures yourself &mdash; and the wrong one if
-a failure should abort the whole batch, because it quietly turns errors into data
+The default gives you the first exception and hides successful results.
+Passing <code>return_exceptions=True</code> changes the contract. Nothing is
+raised; each exception appears in the results list where that coroutine's value
+would go. Use this when you want all available results and will inspect failures.
+Avoid it when one failure should stop the batch. It turns errors into data that
 you might forget to check.
 
 ## TaskGroup: the modern default
@@ -117,13 +117,12 @@ done 3
 results: [1, 2, 3]
 ```
 
-The <code>async with</code> block does not exit until every task created inside
-it has finished, so the work is scoped: when control passes the closing line,
-all of it is done. This is **structured concurrency** &mdash; tasks live and die
-within a visible block rather than floating free &mdash; and it gives one
-guarantee <code>gather</code> does not: if any task raises, the group
-**cancels all the others** and then raises, so a failure never leaves siblings
-running in the background.
+The <code>async with</code> block waits for every task created inside it. When
+control passes the closing line, all the work is done. This is **structured
+concurrency**: tasks live and end inside a visible block instead of floating
+free. It also gives a guarantee <code>gather</code> does not. If any task raises,
+the group **cancels all the others** and then raises. A failure cannot leave
+sibling tasks running in the background.
 
 ## Failures come back as a group
 
@@ -153,10 +152,9 @@ TaskGroup raised ExceptionGroup: ['x']
 ```
 
 When <code>bad</code> raises, the group cancels <code>ok</code> before it can
-finish &mdash; note that "ok ran" never prints &mdash; and surfaces the failure
-inside an <code>ExceptionGroup</code>. The <code>except*</code> form is how you
-handle it, and it is built for the real case the group creates: more than one
-task failing together.
+finish. Notice that "ok ran" never prints. The group puts the failure inside an
+<code>ExceptionGroup</code>. Use <code>except*</code> to handle it. This form
+also covers the case where several tasks fail together.
 
 ## Which to reach for
 
@@ -167,9 +165,8 @@ task failing together.
 | A failure to cancel the rest, cleanly scoped | <code>TaskGroup</code> |
 | Results as they finish, not in order | <code>as_completed</code> |
 
-For new code on Python 3.11 or later, TaskGroup is the sensible default, and
-<code>gather</code> is for the cases where you in detail want the siblings to
-survive a failure.
+For new code on Python 3.11 or later, <code>TaskGroup</code> is a sensible
+default. Use <code>gather</code> when sibling tasks should survive a failure.
 
 ## Results as they finish
 
@@ -204,19 +201,17 @@ arriving back in the order they actually completed &mdash; B, C, A. The loop
 yields an awaitable each time one finishes, so the first result is available
 after 0.1&nbsp;s rather than after 0.3.
 
-That matters whenever partial results are useful: streaming rows to a client as
-each query returns, updating a progress bar, or stopping early once you have
-enough. The cost is that you lose the correspondence with your input list, so if
-you need to know *which* job a result came from, return it as part of the value
-&mdash; as the <code>name</code> above does &mdash; rather than relying on
-position.
+That matters when partial results are useful. You might stream rows to a client
+as each query returns, update a progress bar, or stop once you have enough. But
+you lose the link to the input list. If you need to know *which* job produced a
+result, return its name as part of the value instead of relying on position.
 
 ## First answer wins, cancel the rest
 
 <code>gather</code> waits for everything and <code>as_completed</code> hands you
-everything in turn. <code>asyncio.wait</code> is the third shape: it returns as
-soon as a condition is met and gives you two sets, <code>done</code> and
-<code>pending</code>, leaving what to do with the stragglers up to you.
+everything in turn. <code>asyncio.wait</code> is the third shape. It returns
+when a condition is met and gives you two sets: <code>done</code> and
+<code>pending</code>. You decide what to do with the tasks still running.
 
 ```python-run
 import asyncio
@@ -299,19 +294,19 @@ most in flight at once: 3
 elapsed 0.17s for 9 waits of 0.05s, 3 at a time
 ```
 
-Nine coroutines were scheduled at once and never more than three ran at a time
-&mdash; the <code>live</code> list is the evidence, and its peak is exactly the
-semaphore's count. The elapsed time follows: three rounds of 0.05&nbsp;s, plus
-scheduling overhead, rather than the 0.05&nbsp;s an unbounded gather would have
-taken or the 0.45&nbsp;s a sequential loop would.
+Nine coroutines were scheduled at once, but no more than three ran at a time.
+The <code>live</code> list shows this; its peak matches the semaphore's count.
+The elapsed time also fits: three rounds of 0.05&nbsp;s plus scheduling
+overhead. An unbounded gather would take about 0.05&nbsp;s, while a sequential
+loop would take about 0.45&nbsp;s.
 
 The pattern to remember is that the semaphore goes *inside* the coroutine,
 around the part being limited, not around the <code>gather</code>. All nine
 tasks still exist and all nine are still scheduled; the bound is on how many are
 past the <code>async with</code> at once. If the work arrives as an open-ended
 stream rather than a known list, a bounded
-[queue with a fixed number of workers](queues_and_backpressure.html) is the
-better shape &mdash; same idea, different plumbing.
+[queue with a fixed number of workers](queues_and_backpressure.html) is better.
+It uses the same idea with different plumbing.
 
 ## Where it goes wrong
 

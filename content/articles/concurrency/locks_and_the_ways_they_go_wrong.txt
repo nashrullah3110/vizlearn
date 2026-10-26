@@ -44,10 +44,9 @@ contention instead of hanging on it. And releasing an unheld lock is an error
 rather than a no-op, which is worth knowing because it is how a
 <code>try/finally</code> written slightly wrong announces itself.
 
-Note what the second line proves: this single thread just failed to acquire a
-lock it already holds. That is not a quirk of the sandbox &mdash; a
-<code>Lock</code> has no concept of an owner, so "already held" is all it
-knows, even when the holder is you.
+The second line shows that a thread can fail to acquire a lock it already holds.
+This is not a sandbox quirk. A <code>Lock</code> does not track its owner. It
+only knows that it is held, even when the current thread holds it.
 
 The editors here run in a browser interpreter with no OS threads, so the
 protocol above is real and the two-thread examples are shown with the output
@@ -70,16 +69,14 @@ counter += 1          # if this raises, the lock is never released
 lock.release()
 ```
 
-The second form is a deadlock waiting for an exception. Anything that raises
-between the two calls leaves the lock held forever, and every other thread
-that wants it blocks permanently &mdash; a hang with no traceback and no
-obvious cause, because the thread that broke the invariant has long since
-moved on. <code>with</code> releases on the way out however the block exits,
-including on an exception and on a <code>return</code>.
+The second form can deadlock if an exception occurs. Anything that raises
+between the calls leaves the lock held. Every other thread that wants it then
+blocks. The program hangs without a traceback, and the thread that broke the
+invariant may have moved on. <code>with</code> releases the lock when the block
+exits, including on an exception or a <code>return</code>.
 
-If you genuinely need the two-call form &mdash; acquiring in one function and
-releasing in another, which is usually a design worth revisiting &mdash; then
-the release belongs in a <code>finally</code>.
+If you need to acquire in one function and release in another, revisit that
+design. When it is necessary, put the release in a <code>finally</code> block.
 
 ## Lock or RLock
 
@@ -128,11 +125,11 @@ class Counter:
             self.bump()       # ...and bump() wants it too. Hangs.
 ```
 
-<code>RLock</code> fixes that instance and is also a warning sign: if your
+<code>RLock</code> fixes that instance, but it can also be a warning sign. If
 public methods call each other while holding a lock, the lock is doing two
-jobs. The alternative is a private unlocked <code>_bump</code> that both
-public methods call inside their own <code>with</code>, which keeps the lock
-shallow and the ownership obvious.
+jobs. A private unlocked <code>_bump</code> method is another option. Both
+public methods can call it inside their own <code>with</code> block. This keeps
+the locked section shallow and makes ownership clear.
 
 ## How long to hold it
 

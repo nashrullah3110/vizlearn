@@ -7,13 +7,14 @@ Asynchronous Python runs on a single thread. There is no parallelism here and no
 
 ## The whole machine, in one sentence
 
-That "steps aside" is the entire trick, and it happens at exactly one kind of
-place: an <code>await</code>. Between two awaits a coroutine has the thread to
-itself and nothing can interrupt it. At an await it hands control back to the
-loop, which is then free to run something else while the first coroutine is
-waiting for whatever it awaited.
+That "steps aside" is the entire trick. It happens at one kind of place: an
+<code>await</code>. Between awaits, a coroutine has the thread to itself. Nothing
+can interrupt it. At an await, it hands control back to the loop. The loop can
+run something else while the first coroutine waits for a result.
 
-This page steps through the loop one coroutine switch at a time, shows what [blocking calls](the_blocking_call_that_freezes_the_loop.html) do to the queue, and builds up to the producer-consumer pattern that most real async programs use.
+This page follows the loop one coroutine switch at a time. It shows what
+[blocking calls](the_blocking_call_that_freezes_the_loop.html) do to the queue,
+then builds up to the producer-consumer pattern used by many async programs.
 
 ## Watch two coroutines take turns
 
@@ -49,35 +50,33 @@ B step 2
 ```
 
 A runs until its first await and stops. The loop then runs B until *its* first
-await. Then A again, because its sleep(0) has resolved and it is back on the
-ready queue. The two advance in lockstep, one step each per turn, and the point
-where a turn ends is always an await. Delete the <code>await asyncio.sleep(0)</code>
-and A runs all three steps before B starts at all, because without an await it
-never gives the loop a chance to switch.
+await. A runs again when its <code>sleep(0)</code> resolves and returns to the
+ready queue. They advance in lockstep, one step per turn. Each turn ends at an
+await. Delete <code>await asyncio.sleep(0)</code> and A runs all three steps
+before B starts. Without an await, A never gives the loop a chance to switch.
 
 ## Where the concurrency actually comes from
 
 Nothing above ran in parallel. A and B took turns on one thread, and the total
 work was the same as doing them one after another. So what is the loop for?
 
-The answer is that real awaits are not instant. When a coroutine does
-<code>await</code> on a network read, a timer, or a database reply, it is saying
-"I have nothing to do until this arrives &mdash; run someone else." The loop
-does exactly that. While A waits 200&nbsp;ms for a server, B is not blocked; it
-is running, or waiting on its own reply. A thousand coroutines can all be waiting
-at once on one thread, which is the thing threads are too expensive to do at that
-scale.
+The answer is that real awaits take time. A coroutine might await a network
+read, timer, or database reply. It is telling the loop, "I have nothing to do
+until this arrives; run someone else." The loop does exactly that. While A waits
+200&nbsp;ms for a server, B can run or wait for its own reply. A thousand
+coroutines can wait at once on one thread. Threads are often too expensive for
+that many waiting tasks.
 
-The loop is therefore an **overlap machine for waiting**, not a way to do two
-computations at once. That distinction decides everything about when async helps
-&mdash; it is covered in [running work concurrently](running_work_concurrently.html),
-and its most common failure, a coroutine that does not step aside, is the whole
+The loop is an **overlap machine for waiting**, not a way to do two computations
+at once. That distinction tells you when async helps. See
+[running work concurrently](running_work_concurrently.html) for when to use it.
+Its most common failure is a coroutine that does not step aside. That is the
 subject of [the blocking call that freezes the loop](the_blocking_call_that_freezes_the_loop.html).
 
 ## The three states a coroutine is in
 
-At any moment the loop sees each coroutine in one of three states, and following
-them is enough to predict any async program's behaviour:
+At any moment, each coroutine is in one of three states. Tracking those states
+is enough to predict an async program's behaviour:
 
 | State | Meaning |
 |---|---|
@@ -85,10 +84,10 @@ them is enough to predict any async program's behaviour:
 | Ready | it is waiting in the queue for its turn |
 | Waiting | it is suspended at an await, until that await resolves |
 
-Exactly one coroutine is ever *running*. When it hits an await it becomes
-*waiting*, and the loop promotes the next *ready* one to running. When an await
-resolves &mdash; a timer fires, a reply arrives &mdash; its coroutine moves from
-*waiting* back to *ready*, and will run again when its turn comes.
+Exactly one coroutine is ever *running*. When it hits an await, it becomes
+*waiting*. The loop promotes the next *ready* coroutine to running. When an
+await resolves &mdash; a timer fires or a reply arrives &mdash; its coroutine
+moves from *waiting* back to *ready*. It will run again when its turn comes.
 
 ## Why "cooperative" is the word that matters
 

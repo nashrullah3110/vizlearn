@@ -29,16 +29,16 @@ running it needs the loop, not a call
 ```
 
 Calling <code>greet()</code> returned an object, not <code>"hi"</code>. This
-trips up everyone once: an <code>async def</code> looks like a function and is
-really a factory for coroutine objects, and the object does nothing until
-something drives it. The thing that drives it is the
+trips people up at first. An <code>async def</code> looks like a function, but
+it creates a coroutine object. That object does nothing until something drives
+it. The thing that drives it is the
 [event loop](event_loop_stepped_through.html), reached with
 <code>asyncio.run</code> at the top of a program, or with <code>await</code> from
 inside another coroutine.
 
-(The <code>c.close()</code> is only there to avoid a "coroutine was never awaited"
-warning &mdash; a coroutine you create and then abandon is itself a bug, covered
-at the end.)
+The <code>c.close()</code> call prevents a "coroutine was never awaited" warning.
+Creating a coroutine and then abandoning it is a bug; the final section covers
+that case.
 
 ## await runs it, and waits for it
 
@@ -54,10 +54,10 @@ from <code>await</code> alone.
 
 ## Tasks are what run concurrently
 
-To make two coroutines make progress also, you wrap each in a
-**task**. <code>asyncio.create_task</code> schedules a coroutine on the loop
-at once and returns a handle; the coroutine starts running at the next await,
-whether or not you have awaited the handle yet.
+To make two coroutines progress at the same time, wrap each in a
+**task**. <code>asyncio.create_task</code> schedules the coroutine on the loop
+and returns a handle. The task starts at the next await, even if you have not
+awaited its handle yet.
 
 ```python-run
 import asyncio, time
@@ -92,23 +92,22 @@ proposition of async, and it is visible in this one four-hundredth-versus-two-
 hundredth difference.
 
 The reason is scheduling order. <code>await fetch(...)</code> creates the
-coroutine and at once blocks on it, so the second one is not created until
-the first returns. <code>create_task</code> puts both on the loop *before* either
-is awaited, so by the time you <code>await a</code>, task <code>b</code> is
-already running and its timer is already ticking.
+coroutine and waits for it. The second call does not happen until the first
+returns. <code>create_task</code> puts both on the loop *before* either one is
+awaited. By the time you <code>await a</code>, task <code>b</code> is already
+running and its timer is ticking.
 
 ## The rule that follows
 
-<code>await</code> when you need the result before you can continue; wrap in a
-task when you want the work happening while you do something else. Two awaits in
-a row are two things done in sequence. Two tasks are two things done at once. The
-mistake that quietly costs all the performance is a loop of
-<code>await do_one(x)</code> over a list &mdash; correct, and exactly as slow as
-a plain synchronous loop, because each await finishes before the next begins.
+Use <code>await</code> when you need a result before continuing. Wrap work in a
+task when you want it to run while you do something else. Two awaits in a row
+run in sequence. Two tasks can overlap. A loop of <code>await do_one(x)</code>
+over a list is correct, but it is no faster than a plain synchronous loop.
+Each call finishes before the next one begins.
 
-Managing tasks by hand, as above, is also easy to get wrong: a task you forget to
-await can be discarded before it finishes, and an exception inside a task you
-never await can vanish silently. Both are why
+Managing tasks by hand is easy to get wrong. You might forget to await a task
+and drop it before it finishes. An exception in a task you never await can also
+go unnoticed. These risks are why
 [running work concurrently](running_work_concurrently.html) reaches for
 <code>gather</code> and <code>TaskGroup</code> instead of loose
 <code>create_task</code> calls.
@@ -119,8 +118,8 @@ You can only <code>await</code> an **awaitable**: a coroutine, a task, or a
 future. Awaiting a plain value is a <code>TypeError</code>, and &mdash; more
 commonly &mdash; forgetting to await something that *is* awaitable is a silent
 bug. <code>result = fetch(2)</code> without an await binds the coroutine object,
-not its result; the arithmetic you do on it next fails in a way whose cause is
-three lines up.
+not its result. Arithmetic on that object fails a few lines later, far from the
+missing <code>await</code> that caused the problem.
 
 ## Driving a coroutine by hand
 
@@ -145,24 +144,21 @@ type: coroutine
 returned: hi
 ```
 
-<code>send(None)</code> starts the coroutine and runs it until it either
-suspends or finishes. This one never awaits, so it finishes at once, and a
-finished coroutine signals its result by raising
-<code>StopIteration</code> with the return value attached &mdash; which is the
-same protocol a generator uses, because that is what coroutines were built on.
+<code>send(None)</code> starts the coroutine and runs it until it suspends or
+finishes. This one never awaits, so it finishes at once. A finished coroutine
+signals its result by raising <code>StopIteration</code> with the return value
+attached. Generators use the same protocol; coroutines were built on that model.
 
 Now the whole mechanism is visible. The loop holds a coroutine and calls
-<code>send</code>. If the coroutine suspends at an await, control comes back to
-the loop, which goes and does something else and calls <code>send</code> again
-once whatever was awaited is ready. When <code>StopIteration</code> finally
-arrives, the loop takes <code>.value</code> as the result and hands it to
-whoever was awaiting. "The loop drives it" is not a metaphor for something more
-complicated; it is this three-line pattern in a queue.
+<code>send</code>. If the coroutine suspends at an await, control returns to the
+loop. The loop does other work, then calls <code>send</code> again when the
+awaited value is ready. When <code>StopIteration</code> arrives, the loop takes
+<code>.value</code> as the result and gives it to the code that was waiting.
+"The loop drives it" means this small pattern repeated for each task.
 
-You never write this in real code &mdash; <code>await</code> is the readable
-form of it. It is worth seeing once because it makes the rest of asyncio stop
-being magical: a task is an object that owns a coroutine and knows how to keep
-calling <code>send</code> on it.
+You do not write this in normal code; <code>await</code> is the readable form.
+Seeing it once makes the rest of asyncio less mysterious. A task owns a
+coroutine and knows when to call <code>send</code> on it again.
 
 ## Cancelling a task
 
@@ -205,22 +201,21 @@ main: task.cancelled() is True
 wait_for gave up and raised TimeoutError
 ```
 
-Three things in that output are worth naming. <code>t.cancel()</code> does not
-stop the task on the spot &mdash; it *requests* cancellation, and the error is
-delivered the next time the loop gets to that task. Awaiting a cancelled task
-re-raises <code>CancelledError</code> in the awaiter, which is why the
-<code>try</code> around <code>await t</code> is there rather than optional. And
-<code>asyncio.wait_for</code> is cancellation with a deadline attached: it
-cancels the inner coroutine on timeout and raises
-<code>TimeoutError</code>, so a timeout is not a separate mechanism but the same
-one on a timer. On 3.11 and later <code>asyncio.timeout()</code> is the context-
-manager form and reads better around several statements.
+Three details in that output matter. <code>t.cancel()</code> does not stop the
+task at once. It *requests* cancellation, and the loop delivers the error when
+it next runs that task. Awaiting the cancelled task raises
+<code>CancelledError</code> in the caller. That is why the <code>try</code>
+around <code>await t</code> is needed. <code>asyncio.wait_for</code> adds a
+deadline to the same cancellation process. On timeout, it cancels the inner
+coroutine and raises <code>TimeoutError</code>. Python 3.11 and later also offer
+<code>asyncio.timeout()</code>, a context manager that reads well around several
+statements.
 
 The <code>raise</code> in the <code>except</code> block is the part to copy.
-Catching <code>CancelledError</code> to run cleanup is correct and normal;
-catching it and *not* re-raising tells the loop the task declined to be
-cancelled, so the thing that asked &mdash; a TaskGroup, a <code>wait_for</code>,
-a shutdown handler &mdash; hangs waiting for a task that is still running.
+Catching <code>CancelledError</code> to run cleanup is normal. But re-raise it
+after cleanup. If you swallow it, the loop sees the task as still running. A
+TaskGroup, <code>wait_for</code>, or shutdown handler that requested cancellation
+can then wait forever.
 
 ## Where it goes wrong
 

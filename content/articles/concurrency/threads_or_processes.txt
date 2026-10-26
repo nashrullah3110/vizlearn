@@ -1,15 +1,15 @@
 title: Threads or Processes: What Is and Is Not Shared
-intro: Threads share everything and cannot run Python at once. Processes run Python at once and share nothing - so the real question is what your data costs to send.
+intro: Threads share memory; processes isolate it. Choose by weighing Python execution, worker startup, and the cost of moving data.
 
 ## The core idea
 
-Threads in a process share one address space. Every global, every module, every open object is the same object seen from all of them, which is why they are cheap to start and why they need locks.
+Threads in one process share an address space. They can access the same globals and objects. That makes thread startup cheap, but shared writes need coordination such as locks.
 
 ## Two models, one difference
 
-Processes have separate address spaces. Each has its own interpreter, its own
-GIL, its own copy of every module, and no access whatsoever to the others'
-objects. They do run Python at once, on as many cores as you have.
+Processes have separate address spaces. Each has its own interpreter and
+objects. A process cannot directly read another process's objects. Multiple
+processes can run Python code at the same time on separate cores.
 
 | | Threads | Processes |
 |---|---|---|
@@ -21,10 +21,9 @@ objects. They do run Python at once, on as many cores as you have.
 | Crash containment | takes the process down | isolated |
 | What you need | locks | a serialisation story |
 
-The last two rows of that table are where projects actually get stuck. "Use
-processes for CPU-bound work" is correct and it is the easy half. The hard half
-is that nothing crosses the boundary unless it can be **pickled**, and the
-pickle is a copy that is paid for twice.
+The last two rows are where projects often get stuck. Processes can help with
+CPU-bound work, but data must cross a boundary. Arguments and results usually
+need to be **pickled**. That means serializing, copying, and rebuilding them.
 
 These editors run in a browser interpreter with no OS threads and no
 <code>_multiprocessing</code> module, so the pool examples are shown with their
@@ -79,25 +78,22 @@ and what cannot cross at all:
   an open file   TypeError: cannot pickle 'TextIOWrapper' instances
 ```
 
-Read the bottom three first. A lock, a generator and an open file cannot be
-pickled, and the reason is the same in each case: they refer to something that
-only means anything inside the process that made it. A lock is a handle on
-operating-system state; a generator is a paused stack frame; a file object
-wraps a descriptor belonging to one process. There is no honest way to copy any
-of them, so <code>pickle</code> refuses rather than producing something broken.
+The bottom three examples cannot be pickled. Each refers to live state owned by
+the current process. A lock represents synchronization state. A generator
+contains a paused execution frame. A file object wraps a process-owned file
+descriptor. Copying these values would not recreate the same resource, so
+<code>pickle</code> raises an error.
 
-That refusal is what turns "just use a process pool" into a redesign. A worker
-function that closes over a database connection, a file handle, a logger with
-an open socket, or a lambda will fail at submit time rather than doing anything
-useful. The usual answer is to send the *description* and build the object
-inside the worker &mdash; pass a path, not a file; pass a DSN, not a connection
-&mdash; which is why process-pool worker functions tend to take plain data and
-construct everything they need.
+This limitation can require a small redesign. A worker that depends on a
+database connection, file handle, open socket, or local function may fail when
+submitted. Send a description instead, then create the resource inside the
+worker. For example, pass a path rather than an open file, or a connection
+string rather than a live database connection.
 
-Then read the timings. Five million bytes for a million integers, tens of
-milliseconds to serialise and more to rebuild, and both happen on every call.
-If the work a worker does is smaller than the cost of sending it its arguments,
-a pool makes the program slower, and this is much easier to hit than it sounds.
+The timings show another cost: a million integers serialize to about five
+million bytes in this run. Serialization and rebuilding take time on every
+call. If a task does less work than it takes to send its arguments, a pool can
+make the program slower.
 
 ## What a pool actually does
 
@@ -136,14 +132,13 @@ what made this a good case: the arguments are one integer each, the results are
 one integer each, and each call does a substantial amount of work. The boundary
 cost is nothing and the parallelism is real.
 
-The <code>if __name__ == "__main__"</code> guard is not decoration. On Windows
-and macOS a new process **spawns** &mdash; it starts a fresh interpreter and
-imports your module to find the worker function &mdash; so without the guard,
-the module-level code runs again in every child, which starts more children,
-recursively. On Linux the default was <code>fork</code>, which copies the
-parent instead and does not need the guard; that changed in 3.14, where
-<code>forkserver</code> became the default because <code>fork</code> in a
-process with threads is genuinely unsafe. Write the guard.
+Keep the <code>if __name__ == "__main__"</code> guard. With the
+<code>spawn</code> method, a child starts a fresh interpreter and imports your
+module to find the worker function. Without the guard, top-level code can run
+again in each child and start more processes. The default start method varies
+by platform and Python version, so write code that works with spawn. Python's
+documentation describes the current defaults and their platform differences:
+[multiprocessing start methods](https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods).
 
 ## The three start methods
 
@@ -154,15 +149,14 @@ behind most "it works on my machine" reports:
 |---|---|---|
 | <code>fork</code> | a copy of the parent, lazily | fast; unsafe with threads or locks held |
 | <code>spawn</code> | a fresh interpreter, then your module imported | slow, needs picklable everything, safest |
-| <code>forkserver</code> | a fork of a small clean server process | the 3.14 default on Linux |
+| <code>forkserver</code> | a fork of a small server process | available on supported Unix systems |
 
-<code>fork</code> is why some code appears to share objects with its children:
-they inherit a copy, so a global that was populated before the fork is visible
-&mdash; and then diverges the moment either side writes to it. Code written
-against that behaviour breaks on <code>spawn</code>, where the child starts
-from a clean import and sees nothing the parent computed at runtime. Setting
-<code>multiprocessing.set_start_method("spawn")</code> in development is the
-cheapest way to find out whether you depend on it.
+With <code>fork</code>, a child begins with a copy of the parent's memory. A
+global populated before the fork is visible at first, but changes in either
+process do not update the other's copy. With <code>spawn</code>, the child
+imports the module afresh and does not see values computed at runtime by the
+parent. Testing with <code>multiprocessing.set_start_method("spawn")</code>
+can reveal accidental reliance on inherited state.
 
 ## Measure the payload, do not assume it
 

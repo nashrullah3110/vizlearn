@@ -3,7 +3,9 @@ intro: One API over threads and processes, and a Future is a small state machine
 
 ## The core idea
 
-concurrent.futures exists so that the decision from the previous page is a one-word change. Both executors have the same methods, so switching between them is switching a class name:
+<code>concurrent.futures</code> makes the choice from the previous page a
+one-word change. Both executors use the same methods. Switching between them
+means changing the class name:
 
 ## One interface, two backends
 
@@ -17,12 +19,12 @@ with ProcessPoolExecutor(max_workers=4) as pool:     # computing-bound work
     results = list(pool.map(crunch, chunks))
 ```
 
-That symmetry is the library's whole selling point, and it is honest as far as
-it goes. What it does not change is the pickle boundary: the thread version
-will accept any callable and any argument, and the process version will only
-accept what can cross. So the one-word change works in one direction more
-often than the other, and a design that started with threads and closes over a
-database connection will not become a process pool by editing a class name.
+That symmetry is the library's main selling point. But it does not change the
+pickle boundary. A thread pool accepts any callable and argument. A process
+pool accepts only values that can be pickled and sent to another process. The
+one-word change therefore works in one direction more often than the other. A
+thread design that closes over a database connection will not become a process
+pool just by changing the class name.
 
 Two things are worth using instead of the older <code>threading.Thread</code>
 plumbing even when you only want threads. The pool is bounded, so you cannot
@@ -72,9 +74,9 @@ cancel while pending: True -> CANCELLED
 ```
 
 That is the entire contract. A future is <code>PENDING</code> until a worker
-picks it up, <code>RUNNING</code> while the worker has it,
-<code>FINISHED</code> once a result or an exception is set, and
-<code>CANCELLED</code> if it was cancelled before starting.
+picks it up. It is <code>RUNNING</code> while the worker has it, and
+<code>FINISHED</code> once a result or exception is set. It is
+<code>CANCELLED</code> if cancelled before it starts.
 
 The line that answers the most common question is the third one:
 <code>cancel()</code> returns <code>False</code> once the work is running.
@@ -125,10 +127,10 @@ add_done_callback fired: [('callback saw', 'done')]
 Which means the way you consume the results decides whether you ever find out
 about a failure, and that is the trap in the next section.
 
-<code>add_done_callback</code> runs as soon as the future settles &mdash;
-at once if it has already settled by the time you attach it, which is what
-the output above shows. It runs on whichever thread set the result, so it should
-be short and must not raise.
+<code>add_done_callback</code> runs as soon as the future settles. If it has
+already settled when you attach the callback, it runs at once; the output above
+shows this. The callback runs on whichever thread set the result, so keep it
+short and do not raise from it.
 
 ## The mistake that swallows errors
 
@@ -187,14 +189,14 @@ a cheerful line and carried on &mdash; because nothing ever called
 <code>submit</code> is how a pool loses errors, and it is extremely common in
 code that only cares about side effects.
 
-<code>map</code> is convenient and lazily ordered: it yields in argument order,
-so reaching the failure stops the iteration and you never see the results
-after it. Good for "all or nothing", wrong when you want the other four.
+<code>map</code> is convenient and lazily ordered. It yields results in argument
+order. When it reaches a failure, iteration stops and you never see later
+results. Use it for "all or nothing", not when you want the other four.
 
-<code>as_completed</code> is the form to default to. Results arrive as they
-finish, the dictionary keeps the mapping back to the input, and checking
-<code>exception()</code> on each one means no failure can be missed. It is more
-lines and it is the only one of the three that reports everything.
+<code>as_completed</code> is a good default. Results arrive as they finish, and
+the dictionary maps each future back to its input. Check <code>exception()</code>
+on each future so no failure is missed. It takes more lines, but it is the only
+one of the three that reports everything.
 
 ## Waiting on some, not all
 
@@ -268,25 +270,22 @@ ThreadPoolExecutor() max_workers: 5 = min(32, cpu_count + 4)
   on a 64-core machine: threads default to 32, processes default to 64
 ```
 
-The process default is <code>cpu_count()</code>, which is right, because
-computing in parallel is limited by cores. The thread default is
-<code>min(32, cpu_count + 4)</code>, which is a compromise rather than an
-answer: threads are for waiting, and how many waits you can usefully have in
-flight has nothing to do with your core count. The <code>+ 4</code> is there so
-a single-core machine still overlaps some I/O, and the cap of 32 is there so
-nobody accidentally opens hundreds of connections.
+The process default is <code>cpu_count()</code>. That fits parallel computing,
+which is limited by cores. The thread default is
+<code>min(32, cpu_count + 4)</code>. This is a compromise, not a universal
+answer. Threads are for waiting, so useful concurrency does not track core
+count. The <code>+ 4</code> lets a single-core machine overlap some I/O. The cap
+of 32 helps prevent accidental bursts of hundreds of connections.
 
-So for I/O work, set it on purpose. The number you want is roughly the
-concurrency the *other end* is happy with &mdash; a rate limit, a connection
-pool size, a politeness budget for someone else's API. And it is
-often higher than 32 and sometimes much lower.
+For I/O work, set the number on purpose. Base it on what the *other end* can
+handle. Consider its rate limit, connection pool size, and your request budget
+for an API. The right number may be above 32 or much lower.
 
 ## Giving each worker its own setup
 
-The pickle boundary from [the previous page](threads_or_processes.html) has a
-direct answer in this API, and it is easy to miss:
-<code>initializer</code> runs once per worker, in the worker, before it takes
-any job.
+This API has a direct answer to the pickle boundary from
+[the previous page](threads_or_processes.html). It is easy to miss:
+<code>initializer</code> runs once in each worker before that worker takes a job.
 
 ```python
 from concurrent.futures import ProcessPoolExecutor
@@ -306,18 +305,17 @@ with ProcessPoolExecutor(max_workers=4,
     results = list(pool.map(handle, row_ids))
 ```
 
-This is the standard shape for "the worker needs something unpicklable". The
-DSN is a string and crosses happily; the connection is built on the far side
-and lives for the life of the worker, so four workers make four connections
-rather than one per task. The same pattern covers a loaded model, a compiled
-regex cache, or an open file handle.
+This is the standard pattern when a worker needs something unpicklable. The DSN
+is a string, so it can cross to the worker. The worker builds its own connection
+and keeps it for its lifetime. Four workers then make four connections, not one
+per task. The same pattern works for a loaded model, compiled regex cache, or
+open file handle.
 
-Two cautions. A module-level global is truly the right tool here, because
-each process has its own and there is nothing to race against &mdash; that is
-the one place in this whole track where a mutable global is not a smell. And an
-exception inside <code>initializer</code> is reported as a
-<code>BrokenProcessPool</code> on the *first submit*, which is a confusing
-place to meet it, so keep the initializer small and let it fail loudly.
+Two cautions. A module-level global is the right tool here. Each process has
+its own copy, so there is no shared value to race over. This is one place where
+a mutable global is not a smell. An exception inside <code>initializer</code>
+appears as <code>BrokenProcessPool</code> on the *first submit*. That can be
+confusing, so keep the initializer small and let it fail loudly.
 
 ## What it does not give you
 
@@ -329,12 +327,11 @@ it is the single most common false expectation. There is no safe way to
 interrupt a running Python function, so a "cancel" button built on
 <code>Future.cancel</code> works only for the queue behind the workers.
 
-**No progress reporting.** A future is binary: pending or settled. If you need
-"37% done", the worker has to publish it &mdash; through a
+**No progress reporting.** A future is either pending or settled. If you need
+"37% done", the worker has to publish progress. It can use a
 [queue](queues_between_threads.html), a shared counter under a
-[lock](locks_and_the_ways_they_go_wrong.html), or a callback &mdash; and
-<code>as_completed</code> counting finished items is usually the cheapest
-approximation.
+[lock](locks_and_the_ways_they_go_wrong.html), or a callback. Counting finished
+items with <code>as_completed</code> is often the cheapest approximation.
 
 **No backpressure.** <code>submit</code> never blocks. A producer faster than
 the pool queues work without limit, and the queue is unbounded. So a loop that

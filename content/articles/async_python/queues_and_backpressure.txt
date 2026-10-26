@@ -3,16 +3,20 @@ intro: The pattern most real async programs are built from, and the one number t
 
 ## The core idea
 
-Once a program does more than a single fan-out, it tends to settle into the same structure: something produces work, something else consumes it, and the two run at different speeds.
+Most async programs use the same structure after their first fan-out. One part
+produces work, another consumes it, and they often run at different speeds.
 
 ## The shape of almost every async program
 
 An <code>asyncio.Queue</code> is the piece that connects the two. Producers
 <code>put</code> items in, consumers <code>get</code> them out, and because both
-operations are awaitable, the queue is also the place where one side can wait for
-the other without either blocking the [loop](event_loop_stepped_through.html).
+operations are awaitable. The queue lets one side wait for the other without
+blocking the [loop](event_loop_stepped_through.html).
 
-The one number that separates a controlled program from one that slowly runs out of memory is <code>maxsize</code>. This page shows what happens with and without it, how <code>join()</code> and <code>task_done()</code> signal completion, and how to scale up to multiple consumers without the shutdown race that most first attempts contain.
+The <code>maxsize</code> setting separates a controlled queue from one that can
+grow until memory runs out. This page compares bounded and unbounded queues. It
+also shows how <code>join()</code> and <code>task_done()</code> signal completion,
+and how to shut down several consumers without a race.
 
 ## Producer and consumer, running together
 
@@ -56,11 +60,11 @@ produced 4  (queue holds 2)
 ```
 
 Read the queue-size column. It climbs to 2 and then stops. The producer put items
-0 and 1 at once, and when it tried to put item 2 the queue was full, so
-<code>await q.put(2)</code> **suspended the producer** until the consumer took one
-out. From then on the producer only advances when the consumer makes room, which
-is why "produced 2" appears interleaved with "consumed" lines rather than all the
-production happening first.
+0 and 1 at once. When it tried to put item 2, the queue was full, so
+<code>await q.put(2)</code> **suspended the producer** until the consumer took
+one out. After that, the producer only advances when the consumer makes room.
+That is why "produced 2" appears between the "consumed" lines. The producer
+does not finish all its work first.
 
 That pacing is the whole point, and it came from one argument.
 
@@ -74,10 +78,10 @@ producer never runs more than two items ahead.
 Remove the bound &mdash; <code>asyncio.Queue()</code> with no maxsize &mdash; and
 the behaviour changes completely. The producer dumps all five items in instantly,
 the queue holds all of them, and only then does the consumer start draining. With
-five items that is harmless. With a producer reading a million-line file into an
+five items that is harmless. If a producer reads a million-line file into an
 unbounded queue faster than the consumer can process it, the queue grows without
-limit and the program runs out of memory. The failure looks like a leak
-and is really a missing bound.
+limit. The program can run out of memory. It looks like a leak, but the cause is
+a missing bound.
 
 So the size of the queue is not a tuning detail; it is the contract between the
 two sides. Bounded means "the producer may run at most this far ahead", and that
@@ -90,12 +94,12 @@ more: start several consumer coroutines on the same queue and each takes the nex
 available item. The queue hands each item to exactly one consumer, so work is
 shared without any coordination between them.
 
-The clean way to know when everything is finished is <code>task_done</code> and
-<code>join</code>. Each consumer calls <code>q.task_done()</code> after handling
-an item; the producer, after putting everything, calls <code>await q.join()</code>,
-which returns only once every item has been marked done. That removes the
-awkward sentinel bookkeeping and gives a single, reliable "all work drained"
-signal &mdash; the standard way to shut a worker pool down cleanly.
+Use <code>task_done</code> and <code>join</code> to know when work is finished.
+Each consumer calls <code>q.task_done()</code> after handling an item. After
+putting everything, the producer calls <code>await q.join()</code>. That call
+waits until every item is marked done. This avoids sentinel bookkeeping and
+gives one reliable "all work drained" signal. It is a standard way to shut down
+a worker pool cleanly.
 
 ## Why a queue and not just gather
 

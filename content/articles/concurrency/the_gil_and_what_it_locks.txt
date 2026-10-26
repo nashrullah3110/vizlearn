@@ -7,17 +7,16 @@ A CPython process has a global interpreter lock, and the rule around it is short
 
 ## One lock, and what holds it
 
-Two results follow, and almost all of it else about Python threading is
-downstream of them.
+Two results follow. Most advice about Python threads comes from these points.
 
-A program that spends its time **waiting** gets faster with threads, because a
-thread that is blocked on a socket, a file or a timer is not running bytecode
-and has handed the GIL back. Ten threads can wait at once.
+A program that spends its time **waiting** can get faster with threads. A thread
+blocked on a socket, file, or timer is not running bytecode. It has handed the
+GIL back. Ten threads can wait at once.
 
-A program that spends its time **computing** does not get faster with threads,
-because computing *is* running bytecode, and only one thread may. Two threads
-doing arithmetic take turns, and the total time is what one thread would have
-taken plus the cost of the switching.
+A program that spends its time **computing** does not get faster with regular
+threads. Computing *is* running bytecode, and only one thread may do that at a
+time. Two threads doing arithmetic take turns. Their total time is about one
+thread's time plus the cost of switching.
 
 These editors run in a browser interpreter that has no OS threads at all, so
 <code>Thread.start()</code>, <code>ThreadPoolExecutor</code> and
@@ -42,11 +41,10 @@ threads alive right now: 1
 and this one is: MainThread
 ```
 
-So every runnable block on this track shows a method that is real in
-single-threaded Python &mdash; the bytecode an increment compiles to, the lock
-protocol, the pickle boundary, the Future state machine. Anything that needs a
-second thread appears as a plain block with the output it gives on CPython,
-which is flagged where it happens.
+Every runnable block on this track shows a method that works in single-threaded
+Python: the bytecode for an increment, the lock protocol, the pickle boundary,
+or a Future's state machine. A method that needs a second thread appears as a
+plain code block with its CPython output. Each case is labelled on the page.
 
 ## Where the switch happens
 
@@ -86,11 +84,10 @@ the loop itself: ['FOR_ITER', 'JUMP_BACKWARD']
 after setswitchinterval(0.001): 0.001
 ```
 
-Five milliseconds is the default, and it is a **time** interval rather than a
-bytecode count &mdash; that changed in Python 3.2, and older explanations that
-talk about "every 100 ticks" describe the interpreter as it was before then. A
-thread runs for up to 5 ms, then the interpreter asks it to drop the GIL so
-another thread can take it.
+Five milliseconds is the default. It is a **time** interval, not a bytecode
+count. Python changed this in 3.2, so older explanations about "every 100
+ticks" describe the interpreter as it worked before then. A thread runs for up
+to 5 ms. Then the interpreter asks it to drop the GIL so another thread can run.
 
 Lowering the interval makes switching more responsive and adds cost, since
 every switch costs work and cache locality. Raising it does the reverse. It is
@@ -120,11 +117,10 @@ will help:
 | building or walking a dict or list | **held** | no |
 | <code>json.loads</code> | **held** | no |
 
-The pattern is that C code which does not touch Python objects can drop the
-lock for its duration. That is why a numpy-heavy program sometimes does scale
-with threads and an the same loop written in Python never does, and it is
-also why "is this library a thin wrapper over C?" is a practical question
-rather than a pedantic one.
+C code that does not touch Python objects can drop the lock while it runs.
+That is why a NumPy-heavy program may scale with threads while the same loop
+written in Python does not. It also makes "is this library a thin wrapper over
+C?" a practical question, not a pedantic one.
 
 ## Two threads on CPU work
 
@@ -158,19 +154,17 @@ one after the other: 1.18s
 two threads:         1.21s
 ```
 
-Two threads, two cores available, and the work took slightly *longer* than
-doing it sequentially. Nothing is broken: the two threads took turns holding
-the GIL, so the arithmetic was serialised anyway, and the switching added a
-few per cent. Swap <code>ThreadPoolExecutor</code> for
-<code>ProcessPoolExecutor</code> in that snippet and the time roughly halves,
-which is the subject of
+Two cores were available, yet two threads took slightly *longer* than running
+the work in sequence. Nothing is broken. The threads took turns holding the
+GIL, so the arithmetic was still serial. Switching added a few per cent. Swap
+<code>ThreadPoolExecutor</code> for <code>ProcessPoolExecutor</code> and the time
+roughly halves. That is the subject of
 [threads or processes](threads_or_processes.html).
 
-Run the same check with <code>time.sleep(1)</code> as the work and the
-numbers invert fully &mdash; two seconds sequentially, one second with two
-threads &mdash; because sleeping releases the lock. Same threads, same pool,
-opposite result, and the only thing that changed is whether the work needed
-the interpreter.
+Run the same check with <code>time.sleep(1)</code> as the work and the numbers
+invert: two seconds in sequence, one second with two threads. Sleeping releases
+the lock. The threads and pool are the same. Only the need for the interpreter
+has changed.
 
 ## Deciding before you commit
 
@@ -205,10 +199,10 @@ returns 0 under the browser interpreter &mdash; it is not implemented there, so
 the ratio would read 0.00 for both cases and tell you nothing. On CPython it
 is the fastest useful measurement in this whole area.
 
-The number also tells you your ceiling in advance. A ratio of 0.7 means 70% of
-the time is spent holding the GIL, so even infinite threads can only remove
-the other 30%: that is Amdahl's law with the serial fraction handed to you by a
-measurement rather than guessed, and it is drawn for all three models on
+The number also tells you the speed-up ceiling. A ratio of 0.7 means the work
+spends 70% of its time holding the GIL. Even infinitely many threads could
+remove only the other 30%. That is Amdahl's law, with the serial fraction
+measured instead of guessed. It is drawn for all three models on
 [choosing between threads, processes and async](choosing_threads_processes_or_async.html).
 
 ## Why it is there at all
@@ -228,13 +222,17 @@ decades: while your extension holds the GIL, no other thread is mutating
 Python objects below it. A large amount of the scientific stack was
 written against that promise.
 
-What changed recently is worth tracking. Python 3.12 gave each
-**subinterpreter** its own GIL, so separate interpreters in one process can
-run Python at once. And Python 3.13 ships an test
-**free-threaded** build with no GIL at all, which makes reference counting
-atomic and costs single-threaded speed to do it. Neither is the default
-yet, and on any interpreter you are likely to be running today the rule at the
-top of this page still holds.
+Two newer options are worth knowing about. The CPython C API can create
+**subinterpreters** with separate GILs, so they can run Python at the same time
+inside one process. Starting with Python 3.13, CPython also offers optional
+**free-threaded** builds that can run without the GIL. These builds are not the
+default. Some C extensions may turn the GIL back on, so check package support
+before relying on free threading. In a standard GIL-enabled build, the rule at
+the top of this page still holds.
+
+See the [Python free-threading guide](https://docs.python.org/3.14/howto/free-threading-python.html)
+and the [C API guide to subinterpreters](https://docs.python.org/3/c-api/subinterpreters.html)
+for current support and limitations.
 
 ## Where it goes wrong
 
