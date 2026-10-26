@@ -111,7 +111,12 @@ def tags(q, group_label):
 
 def visual(q):
     """The step player, plus the panel that says what to watch for."""
-    data = json.dumps(q["viz"], ensure_ascii=False, separators=(",", ":"))
+    viz_data = dict(q["viz"])
+    # The shared player uses this source metadata to select a representation
+    # that fits the lesson's data structures instead of flattening every
+    # algorithm into the same generic row of boxes.
+    viz_data.setdefault("topic", q.get("group", ""))
+    data = json.dumps(viz_data, ensure_ascii=False, separators=(",", ":"))
     if "</script" in data.lower():
         raise ValueError("%s: frame data contains a closing script tag" % q["slug"])
 
@@ -132,13 +137,14 @@ def visual(q):
                     <script type="application/json" class="vz-iv-data">%(data)s</script>
                     <div class="vz-iv-panel">
                         <div class="vz-iv-stage"></div>
+                        <div class="vz-iv-legend" aria-label="Visualization state key"></div>
                         <div class="vz-iv-reads"></div>
                         <p class="vz-iv-caption" aria-live="polite"></p>
                         <input class="vz-iv-scrub" type="range" min="0" value="0"
                                aria-label="Step position">
                         <div class="vz-iv-controls">
                             <button type="button" class="vz-iv-btn vz-iv-back">Back</button>
-                            <button type="button" class="vz-iv-btn vz-iv-btn-primary vz-iv-step">Step</button>
+                            <button type="button" class="vz-iv-btn vz-iv-btn-primary vz-iv-step">Next step</button>
                             <button type="button" class="vz-iv-btn vz-iv-play"
                                     aria-pressed="false">Auto-run</button>
                             <button type="button" class="vz-iv-btn vz-iv-reset">Reset</button>

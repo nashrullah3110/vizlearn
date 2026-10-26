@@ -34,7 +34,7 @@ def cell(v, k=None, tag=None):
     return out
 
 
-def row(items, label=None, kind="cells", index=True):
+def row(items, label=None, kind="cells", index=True, view=None):
     out = {"items": items}
     if label:
         out["label"] = label
@@ -42,7 +42,40 @@ def row(items, label=None, kind="cells", index=True):
         out["kind"] = kind
     if not index:
         out["index"] = False
+    view = view or _view_for(label, kind)
+    if view:
+        out["view"] = view
     return out
+
+
+def _view_for(label, kind):
+    """Attach a semantic rendering hint to recorded state rows.
+
+    Explicit row metadata lets the browser renderer stay generic and makes a
+    change of rendering independent of page titles. Labels identify the
+    structure already shown by the authored frame; unknown rows use the
+    standard indexed-cell view.
+    """
+    if kind == "pairs":
+        return "pairs"
+    if kind == "text":
+        return "text"
+    name = (label or "").lower()
+    if "bar heights" in name or "histogram" in name:
+        return "bars"
+    if "heap" in name:
+        return "heap"
+    if "stack" in name or name.startswith("inbox") or name.startswith("outbox") or "minimums" in name:
+        return "stack"
+    if "queue" in name or "deque" in name:
+        return "queue"
+    if "bucket" in name or "slot" in name:
+        return "buckets"
+    if any(term in name for term in (
+        "ways to reach", "fewest coins", "tails", "best for the first", "base cases"
+    )) or name.startswith("row "):
+        return "dp"
+    return None
 
 
 def frame(rows, note, read=None):
@@ -61,12 +94,12 @@ def viz(frames, title=None, readouts=None):
     return out
 
 
-def marked(values, marks=None, tags=None, kind="cells", label=None, index=True):
+def marked(values, marks=None, tags=None, kind="cells", label=None, index=True, view=None):
     """A row of `values` with `marks` = {position: state} applied."""
     marks = marks or {}
     tags = tags or {}
     items = [cell(v, marks.get(i), tags.get(i)) for i, v in enumerate(values)]
-    return row(items, label=label, kind=kind, index=index)
+    return row(items, label=label, kind=kind, index=index, view=view)
 
 
 def pairs(items, marks=None, label=None):
