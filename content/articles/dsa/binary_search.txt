@@ -3,13 +3,8 @@ intro: Halve the search space on every comparison. Twenty steps are enough to fi
 
 ## The one assumption that makes it work
 
+
 [Linear search](linear_search.html) checks every element in order and takes O(n) comparisons. Binary search takes O(log n) by cutting the search space in half on every step. On a million elements, that is 20 comparisons instead of a million &mdash; but it only works if the data is sorted.
-
-Binary search requires sorted data, and everything it does follows from that. Look at the middle element. If it equals the target, you are done. If it is <em>smaller</em> than the target, then the target cannot be anywhere in the left half either &mdash; because everything on the left is smaller still. So discard the entire left half in one comparison, and repeat on the right.
-
-Each comparison eliminates half of what remains. That is the whole idea, and it is why the precondition is non-negotiable: on unsorted data, “smaller than the middle” tells you nothing about which side the target is on.
-
-Binary search is also one of the most error-prone algorithms to implement. Off-by-one bugs in the boundary update are so common that entire textbook chapters are devoted to getting `lo`, `hi`, and `mid` right. The standard library in every major language ships a correct binary search &mdash; use it in production unless you are solving a variant that needs a custom loop with different boundary logic. This page breaks down the exact details that go wrong, why `bisect_left` and `bisect_right` matter more than the textbook version, and how to binary search an answer rather than an array.
 
 ## Work one through by hand
 
@@ -57,126 +52,10 @@ The scaling is what makes it important:
 
 Thirty comparisons for a billion items. That is the practical meaning of O(log n).
 
-## Getting it right
-
-Binary search is famously easy to write incorrectly &mdash; a well-known observation is that a large share of published implementations contained bugs for years.
-
-```python
-def binary_search(arr, target):
-    lo, hi = 0, len(arr) - 1
-    while lo <= hi:                      # <= not <, or the last element is missed
-        mid = lo + (hi - lo) // 2        # avoids overflow in fixed-width languages
-        if arr[mid] == target:
-            return mid
-        if arr[mid] < target:
-            lo = mid + 1                 # +1, or it can loop forever
-        else:
-            hi = mid - 1                 # -1, same reason
-    return -1
-```
-
-Four details in those eight lines are the ones that go wrong:
-
-<strong>`lo <= hi`, not `lo < hi`.</strong> With `<`, a single-element range is never examined.
-
-<strong>`mid + 1` and `mid - 1`.</strong> Without the adjustment, a two-element range can fail to shrink and the loop never terminates.
-
-<strong>`lo + (hi - lo) // 2`</strong> rather than `(lo + hi) // 2`. In Python integers are unbounded so it does not matter; in C or Java the sum can overflow, and this was a real bug in widely-used library code.
-
-<strong>The array must be sorted.</strong> On unsorted input it returns a wrong answer silently, which is worse than failing.
-
-In practice, use the standard library: Python's `bisect_left` and `bisect_right` are correct, tested and C-speed.
-
-## The three off-by-one details, demonstrated
-
-The article says binary search is famously easy to write incorrectly and names the details that break it. Here are the broken versions next to the correct one, on inputs chosen so that the difference actually shows -- because the usual mistake is that the buggy version passes every test you happen to try.
-
-```python-run
-arr = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
-
-def correct(a, target):
-    lo, hi, n = 0, len(a) - 1, 0
-    while lo <= hi:
-        mid = lo + (hi - lo) // 2
-        n += 1
-        if a[mid] == target:
-            return mid, n
-        if a[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid - 1
-    return -1, n
-
-def strict_less(a, target):
-    # BUG: `lo < hi` instead of `lo <= hi`
-    lo, hi = 0, len(a) - 1
-    while lo < hi:
-        mid = lo + (hi - lo) // 2
-        if a[mid] == target:
-            return mid
-        if a[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid - 1
-    return -1
-
-print("target  correct  lo<hi")
-for t in arr:
-    i, _ = correct(arr, t)
-    print("%6d  %7d  %5d%s" % (t, i, strict_less(arr, t),
-                               "   <-- MISSED" if strict_less(arr, t) == -1 else ""))
-# four targets are missed -- a test that picks the other six passes cleanly
-# against a function that is wrong. that is how this bug reaches production.
-```
-
-The second classic bug is dropping the +1 / -1 adjustment, which causes an infinite loop on absent values.
-
-```python-run
-arr = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
-
-def correct(a, target):
-    lo, hi, n = 0, len(a) - 1, 0
-    while lo <= hi:
-        mid = lo + (hi - lo) // 2
-        n += 1
-        if a[mid] == target:
-            return mid, n
-        if a[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid - 1
-    return -1, n
-
-def no_adjust(a, target, budget=50):
-    lo, hi, steps = 0, len(a) - 1, 0
-    while lo <= hi and steps < budget:
-        mid = lo + (hi - lo) // 2
-        if a[mid] == target:
-            return "found", steps
-        if a[mid] < target:
-            lo = mid          # should be mid + 1
-        else:
-            hi = mid          # should be mid - 1
-        steps += 1
-    return "gave up", steps
-
-print("no +1/-1, searching for 23:", no_adjust(arr, 23))
-print("no +1/-1, searching for 99:", no_adjust(arr, 99))
-# the bug is invisible when the target is present -- absent values spin forever
-print()
-print("comparisons, correct version:")
-for t in (2, 23, 91, 99):
-    i, n = correct(arr, t)
-    print("  target %2d -> index %2d in %d comparisons" % (t, i, n))
-# ten elements, at most four comparisons, miss costs the same as a hit
-```
-
 ## Experiments to try
 
 1. <strong>Count the halvings.</strong> Set <strong>Array Size</strong> to 25 and press <strong>Next Step</strong> repeatedly, watching the shaded region shrink. It takes about five steps, because 2<sup>5</sup> = 32 is the first power of two above 25.
 2. <strong>Double the array, add one step.</strong> Run a search at <strong>Array Size</strong> 12 and count the steps. Now set it to 24 and count again. One extra step, not twice as many &mdash; that is the logarithm, visible directly.
-3. <strong>Search for something absent.</strong> Set <strong>Search Target</strong> to a value not in the array. The window still collapses in log n steps; a failed binary search costs the same as a successful one, unlike linear search where failure is always the worst case.
-4. <strong>Find the expensive targets.</strong> Press <strong>Reset Array</strong> and try searching for the very first and very last elements. Both take the full log n steps, while the middle element is found immediately &mdash; the exact inverse of linear search’s cost profile.
 
 ## Traps worth knowing
 
@@ -184,61 +63,6 @@ for t in (2, 23, 91, 99):
 - <strong>Off-by-one in the bounds.</strong> The two conventions &mdash; inclusive <span class="mono-font">hi = n &minus; 1</span> with <span class="mono-font">while (lo &lt;= hi)</span>, or exclusive <span class="mono-font">hi = n</span> with <span class="mono-font">while (lo &lt; hi)</span> &mdash; are both correct, and mixing them gives an infinite loop or a missed last element. Pick one and keep it.
 - <strong>Assuming the array is sorted.</strong> Binary search on unsorted data does not error; it silently returns wrong answers, which is far worse. If sortedness is an assumption rather than an invariant, it will eventually be violated.
 - <strong>Wanting the first duplicate.</strong> Plain binary search returns <em>some</em> match, not the leftmost. Finding the first occurrence needs the variant that keeps searching left after a hit instead of returning.
-
-## The short version
-
-Binary search converts a sorted array into an O(log n) lookup by throwing away half the remaining candidates with every comparison. The cost is the precondition: something must keep the data sorted, and if that guarantee ever lapses the algorithm fails silently rather than loudly. Sort once and search many times and it is close to unbeatable; sort in order to search once and you have spent O(n log n) to save O(n).
-
-## The variants that matter more than the basic version
-
-Finding an exact match is the least useful form. The valuable variants find <em>boundaries</em>.
-
-<strong>Leftmost insertion point</strong> (`bisect_left`) &mdash; the first position where the target could be inserted keeping the array sorted. With duplicates, this is the first occurrence.
-
-<strong>Rightmost insertion point</strong> (`bisect_right`) &mdash; one past the last occurrence.
-
-Together they give the range of a duplicated value, and therefore its count, in O(log n):
-
-```python
-from bisect import bisect_left, bisect_right
-
-lo = bisect_left(arr, target)
-hi = bisect_right(arr, target)
-count = hi - lo                    # occurrences of target
-exists = lo < len(arr) and arr[lo] == target
-```
-
-<strong>First element ≥ target</strong> is `bisect_left`; <strong>last element ≤ target</strong> is `bisect_right(arr, target) - 1`. Those two cover most real uses &mdash; finding the price band, the applicable tax bracket, the most recent record before a timestamp.
-
-## Binary search on an answer
-
-The most powerful application is not searching an array at all. If a problem has a <strong>monotonic</strong> predicate &mdash; something that is false up to a threshold and true after it &mdash; you can binary search for the threshold.
-
-<blockquote>"What is the minimum ship capacity needed to deliver all packages within D days?"</blockquote>
-
-Capacity is monotonic: if capacity C works, so does C+1. So binary search over capacity, and for each candidate check feasibility in O(n):
-
-```python
-def min_capacity(weights, days):
-    def feasible(cap):
-        used, load = 1, 0
-        for w in weights:
-            if load + w > cap:
-                used, load = used + 1, 0
-            load += w
-        return used <= days
-
-    lo, hi = max(weights), sum(weights)
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if feasible(mid):
-            hi = mid                 # mid might be the answer, keep it
-        else:
-            lo = mid + 1
-    return lo
-```
-
-Note the different loop shape: `lo < hi` and `hi = mid` rather than `mid - 1`, because we are converging on a boundary rather than looking for a match. That is the template for this whole family of problems, and it is worth memorising separately from the exact-match version.
 
 ## Where it is used
 
@@ -248,32 +72,6 @@ Note the different loop shape: `lo < hi` and `hi = mid` rather than `mid - 1`, b
 - <strong>Numerical root finding</strong> &mdash; bisection on a continuous function.
 - <strong>Rate limiting and capacity planning</strong> &mdash; the answer-search pattern above.
 - <strong>Timestamp lookups</strong> in log and time-series data.
-
-## Questions people ask
-
-<strong>Does the array have to be sorted?</strong> Yes. On unsorted input it returns a wrong answer without any error.
-
-<strong>Is sorting first worth it?</strong> For one search, no &mdash; sorting is O(n log n) and a linear scan is O(n). For many searches on the same data, absolutely.
-
-<strong>What about duplicates?</strong> Plain binary search finds <em>some</em> occurrence. Use `bisect_left` and `bisect_right` for the first, last, or count.
-
-<strong>Why is it so easy to get wrong?</strong> The off-by-one boundaries. Use the standard library, or memorise one template and reuse it.
-
-<strong>Can it work on a linked list?</strong> Not usefully &mdash; reaching the middle requires walking there, which is O(n) per step and destroys the advantage.
-
-<strong>What is interpolation search?</strong> A variant that guesses the position from the value's magnitude, assuming a uniform distribution. O(log log n) when the assumption holds and O(n) when it does not.
-
-## Recap in one screen
-
-- Halve the search space each comparison: 30 steps for a billion sorted items.
-- The array must be sorted, or the result is silently wrong.
-- `lo <= hi`, `mid + 1`, `mid - 1` &mdash; the three off-by-one details that break implementations.
-- The useful variants find boundaries, not exact matches; `bisect_left` and `bisect_right` give first, last and count.
-- Binary searching an <em>answer</em> works whenever feasibility is monotonic, and it is the most powerful form.
-
-## Where to practise this
-
-<p>Three questions that test the invariant rather than the shape:</p><ul><li><a href="../interview/binary-search-without-an-off-by-one.html">Write binary search without an off-by-one</a> &mdash; the half-open range, and the exact combination that loops forever.</li><li><a href="../interview/first-and-last-position.html">First and last position of a target</a> &mdash; why a plain search cannot answer "first", and the one character that separates the two boundaries.</li><li><a href="../interview/binary-search-on-the-answer.html">Binary search on the answer, not the array</a> &mdash; searching a space of answers when there is no sorted input at all.</li><li><a href="../interview/search-in-rotated-sorted-array.html">Search in a rotated sorted array</a> &mdash; one extra comparison per step.</li></ul>
 
 ## Sources and next steps
 

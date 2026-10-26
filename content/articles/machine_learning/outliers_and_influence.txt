@@ -1,251 +1,38 @@
 title: Outliers and Influence
-intro: An outlier has an unusual value; an influential observation changes a fitted model substantially. The distinction matters before deciding whether to investigate or exclude a point.
+intro: An outlier has an unusual value; an influential observation changes a fitted model substantially. Check both ideas before deciding whether to correct or exclude a point.
 
-## Drag it
+## Three related ideas
 
-The chart holds twenty-four points along a clear upward line, plus one
-highlighted point you can move. The dashed line is the least-squares fit without
-it. The solid line is the fit with it.
+A **large residual** means an outcome is far from the model’s prediction; **high leverage** means its predictors are unusual. A point is **influential** if removing it changes the fitted model. These are different properties: an unusual outcome may have little influence, while a high-leverage point can still fit the trend.
 
-Drag the point straight up. The solid line rotates. Drag it to the far right and
-up, and the line follows it much further. The readout reports both slopes and
-the percentage difference between them, and it doesn't take much to change the
-answer by tens of per cent.
+In least-squares regression, residuals are squared. A point twice as far from the fitted line contributes four times as much squared error. This makes a distant observation capable of pulling the line toward itself.
 
-Twenty-four rows are saying one thing. The twenty-fifth overrules them.
+## Explore the fitted line
 
-## Why squaring does this
+In the visualizer, move the point vertically while keeping its x-position near the middle, then move it to the edge of the x-range. A point near the mean x has less leverage on the slope; an extreme x-value can rotate the line more. If that edge point also sits far from the trend, it can combine high leverage and a large residual, making it influential.
 
-Least squares chooses the line cutting the **sum of squared** residuals.
-Squaring is what makes a single point so powerful: a point twice as far from the
-line adds four times the fine, and one ten times as far adds a
-hundred times.
+Cook’s distance combines residual size and leverage to estimate how much a fitted regression would change if an observation were removed. It is a diagnostic, not an automatic deletion rule; no single cutoff decides whether a row is an error or should be excluded.
 
-Least squares is willing to move a long way to reduce one large residual,
-even at the cost of small grows across every other point. That isn't a bug
-in the setup. It's what the goal function asks for.
+## Decide what the observation means
 
-## Hat values: where it sits matters as much as how far off it is
+1. **Data error:** check units, transcription, sensor failures, and sentinel values such as 999. Correct or remove errors and document the choice.
+2. **Different population:** a wholesale order may not belong in a model for ordinary retail purchases. Decide whether it is outside the question or deserves a separate model.
+3. **Valid extreme case:** keep it if the model is meant to cover such cases. Compare results with and without it and report sensitivity when conclusions change.
 
-Drag the point up while keeping it near the middle of the x range, then drag it
-up while keeping it at the far right. The second spot moves the line much
-more.
+Deleting points simply because they make a fit less convenient changes the population being modeled. Investigate first; if the cause is uncertain, show how the conclusion depends on the point.
 
-That difference is the **hat value**. A regression line pivots roughly about the
-mean of x, so a point near that mean is close to the pivot and has little turning
-effect no matter how far off it is vertically. A point at the extreme of x sits
-at the end of a long lever.
+## More robust alternatives
 
-The gap is worth having in three words:
+Huber regression uses squared loss for small residuals and a loss that grows more slowly for large residuals. RANSAC fits candidate models on subsets and selects a consensus set. These methods can reduce sensitivity to some outliers, but they rely on assumptions too and may ignore valid rare cases. Transforming a strongly skewed feature can also help when the scale is the issue.
 
-- **Outlier** &mdash; unusual in y, a large residual.
-- **High hat value** &mdash; unusual in x, far from the pivot.
-- **Influential** &mdash; both, so dropping it changes the model. This is the
-  one that matters, and Cook's distance is the standard way to measure it.
+## Common mistakes
 
-A point with a high hat value that happens to lie on the trend is harmless. A
-moderate outlier in the middle is harmless. The combination isn't.
+- **Deleting every point beyond three standard deviations:** the cutoff assumes a distribution and the point can inflate the standard deviation.
+- **Confusing unusual x with unusual y:** leverage and residuals measure different properties.
+- **Treating robust regression as automatic cleanup:** inspect which observations receive less influence and why.
+- **Ignoring data quality:** an impossible value is a data problem before it is a modeling problem.
 
-## Before you remove anything
+## Sources and next steps
 
-The temptation is to delete the point. Resist it long enough to ask which of
-three things it's.
-
-**An error.** A misplaced decimal, a sensor fault, a unit mix-up, a placeholder
-like 999 or &minus;1 meaning "unknown". Fix it or drop it, and record that you
-did.
-
-**A different group.** The row is correct but doesn't belong to the
-question &mdash; a wholesale order in a table of retail purchases. Exclude it and
-say so, or model the groups apart.
-
-**A real, extreme member of the group.** The row is correct and belongs.
-This one you keep. Dropping genuine extremes because they're inconvenient is
-how a result stops showing the world, and it's much more common than
-deliberate fraud.
-
-If you can't tell which, report the analysis both ways. A conclusion that
-lives the point and a conclusion that depends on it are different findings,
-and the reader is entitled to know which they've.
-
-## Ways to be less fragile
-
-**Solid loss.** Huber loss is squared for small residuals and linear for large
-ones, so a distant point pulls hard but not as n&sup2; hard. RANSAC fits on
-random subsets and keeps the consensus.
-
-**Quantile regression.** Models the median rather than the mean, and the median
-doesn't move when one point is dragged to infinity.
-
-**Winsorising.** Clip values at, say, the 1st and 99th percentiles. Keeps the
-row, caps its sway.
-
-**Use a model that doesn't care.** Trees split on order, not on distance, so
-a value of a million and a value of a thousand are the same split if nothing
-lies between them.
-
-**Transform.** A log transform on a skewed plus column often turns
-"outliers" into plain members of a normal-shaped spread, which is
-often a sign the column was on the wrong scale.
-
-## Why position matters as much as distance
-
-The reason one far-off point wrecks a fit and another leaves it alone is the hat
-value, and squared error is what makes it bite. Least squares cuts the *sum of
-squared* residuals, so a point twice as far off adds four times the fine
-and one ten times as far adds a hundred times. The line will travel a
-long way to reduce a single large residual. But a regression line pivots roughly
-about the mean of x. So How far a point sits along x decides how much turning force
-its vertical error applies:
-
-|the odd point|effect on the slope|
-|---|---|
-|large residual, near the middle of x|small &mdash; close to the pivot|
-|large residual, at the extreme of x|large &mdash; the end of a long lever|
-
-That gives three distinct things worth separating: an **outlier** is unusual in y,
-**a high hat value** is unusual in x, and only their combination &mdash;
-**influential** &mdash; really moves the model. This is what Cook's distance
-measures. A point with a high hat value sitting on the trend is harmless. A mid-range
-outlier is harmless. The far-right outlier is the one that quietly rewrites the
-answer. Which is also why "delete anything beyond three standard deviations" is
-self-defeating: the outlier has already inflated the standard deviation the rule
-depends on.
-
-## Where it goes wrong
-
-**Deleting by rule.** "Beyond three standard deviations" uses the standard
-deviation, which the outlier itself has already inflated.
-
-**Treating placeholders as data.** 999 for unknown age, &minus;1 for missing.
-These aren't outliers. They're missing values wearing a number.
-
-**Dropping points until the model fits.** At that stage the model shows the
-pick, not the effect.
-
-**Checking only y.** Points with high hat values can be plain in y and still
-dominate the fit.
-
-## Questions people ask
-
-<strong>Is every outlier a problem?</strong> No. An outlier is an unusual value, and it matters only if it changes the fit. A point that sits on the trend line is harmless.
-
-<strong>What is the difference between an outlier and an influential point?</strong> An outlier has an unusual response given its inputs, while an influential point changes the fitted model when removed. Points far from the other inputs are the usual cause of influence.
-
-<strong>How do I measure influence?</strong> Cook's distance combines residual size and distance from the other inputs in one number. A common rule of thumb flags values above 4/n for a closer look.
-
-<strong>Should I delete outliers?</strong> Only after checking whether they are errors. If the value is real, removing it hides something true about your data, so consider a different model or transform instead.
-
-<strong>What can I do besides removing them?</strong> Use a loss that is less sensitive to large errors, such as Huber or quantile regression. Or transform the target, or use median-based statistics.
-
-<strong>Why does squared error make outliers worse?</strong> Squaring makes one large residual count far more than many small ones, so the fit bends towards the extreme point.
-
-## An outlier and an influential point are not the same thing
-
-One far-out row can leave a fit untouched while another moves it substantially. The difference is the hat value, and it is computable.
-
-```python-run
-import numpy as np
-from sklearn.linear_model import LinearRegression
-
-rng = np.random.default_rng(0)
-x = np.linspace(0, 10, 60)
-y = 2.0 * x + 5.0 + rng.normal(0, 1.5, 60)
-X = x.reshape(-1, 1)
-
-def fit(Xa, ya, label):
-    m = LinearRegression().fit(Xa, ya)
-    print("  %-34s slope %7.4f  intercept %7.4f" % (label, m.coef_[0], m.intercept_))
-    return m
-
-print("the true relationship is y = 2x + 5.")
-base = fit(X, y, "clean data")
-
-xm, ym = 5.0, 60.0
-Xa = np.vstack([X, [[xm]]]); ya = np.r_[y, ym]
-mid = fit(Xa, ya, "one wild point at x=5 (middle)")
-
-xe, ye = 10.0, 65.0
-Xb = np.vstack([X, [[xe]]]); yb = np.r_[y, ye]
-edge = fit(Xb, yb, "one wild point at x=10 (edge)")
-print()
-print("both sit ~%.0f above the true line." % (ym - (2 * xm + 5)))
-print("  x=5  moved the slope by %.4f" % abs(mid.coef_[0] - base.coef_[0]))
-print("  x=10 moved the slope by %.4f" % abs(edge.coef_[0] - base.coef_[0]))
-print("x=5 is the mean of x, so that point has no lever at all: it pushed")
-print("the whole line up without tilting it. the edge point tilted it.")
-```
-
-The next block computes hat values and Cook's distance to show how influence is measured.
-
-```python-run
-import numpy as np
-from sklearn.linear_model import LinearRegression
-rng = np.random.default_rng(0)
-x = np.linspace(0, 10, 60)
-y = 2.0 * x + 5.0 + rng.normal(0, 1.5, 60)
-X = x.reshape(-1, 1)
-Xa = np.vstack([X, [[5.0]]]); ya = np.r_[y, 60.0]
-Xb = np.vstack([X, [[10.0]]]); yb = np.r_[y, 65.0]
-
-def leverage(Xc):
-    Z = np.column_stack([np.ones(len(Xc)), Xc])
-    H = Z @ np.linalg.solve(Z.T @ Z, Z.T)
-    return np.diag(H)
-
-print("leverage depends only on x, never on y:")
-for label, Xc in (("point at x=5 ", Xa), ("point at x=10", Xb)):
-    h = leverage(Xc)
-    print("  %s  leverage %.4f   (average is %.4f)" % (label, h[-1], h.mean()))
-print("  far from the mean of x = long lever.")
-print()
-
-print("Cook's distance combines both: how far off the line, times leverage.")
-def cooks(Xc, yc):
-    m = LinearRegression().fit(Xc, yc)
-    resid = yc - m.predict(Xc)
-    h = leverage(Xc)
-    mse = (resid ** 2).sum() / (len(yc) - 2)
-    return resid ** 2 * h / (2 * mse * (1 - h) ** 2)
-
-for label, Xc, yc in (("added at x=5 ", Xa, ya), ("added at x=10", Xb, yb)):
-    d = cooks(Xc, yc)
-    print("  %s  Cook's D %.4f  (investigate above %.4f)" % (label, d[-1], 4/len(yc)))
-print()
-print("  outlier      -- unusual y for its x. may cost you nothing.")
-print("  high leverage -- unusual x. dangerous whether or not y is odd.")
-print("  influential  -- actually moved the fit. Cook's D measures this.")
-```
-
-The next block shows how resistant estimators handle the same outlier.
-
-```python-run
-import numpy as np
-from sklearn.linear_model import LinearRegression, HuberRegressor, RANSACRegressor
-rng = np.random.default_rng(0)
-x = np.linspace(0, 10, 60)
-y = 2.0 * x + 5.0 + rng.normal(0, 1.5, 60)
-X = x.reshape(-1, 1)
-Xb = np.vstack([X, [[10.0]]]); yb = np.r_[y, 65.0]
-
-print("robust fits, on the edge-outlier data:")
-edge = LinearRegression().fit(Xb, yb)
-print("  ordinary least squares  slope %7.4f" % edge.coef_[0])
-print("  Huber                   slope %7.4f"
-      % HuberRegressor().fit(Xb, yb).coef_[0])
-print("  RANSAC                  slope %7.4f"
-      % RANSACRegressor(random_state=0).fit(Xb, yb).estimator_.coef_[0])
-print("  true                    slope  2.0000")
-print()
-print("Huber switches from squared to absolute error past a threshold,")
-print("so a far-out point stops getting quadratically more say. RANSAC")
-print("fits on random subsets and keeps the fit most points agree with.")
-print()
-print("deleting the point is a decision about what your data means.")
-print("a sensor glitch, delete it. a genuine extreme customer, deleting")
-print("means the model no longer covers them.")
-```
-
-## Further reading
-
-For implementation details, see the [Robustness and outlier-resistant regression](https://scikit-learn.org/stable/modules/linear_model.html#robustness-regression-outliers-and-modeling-errors). Continue with [ordinary least squares](linear_regression_with_ols.html) to connect this topic to a related part of the workflow.
+- [scikit-learn: Robust regression and outlier detection](https://scikit-learn.org/stable/modules/linear_model.html#robustness-regression-outliers-and-modeling-errors) describes robust estimators.
+- Continue with [ordinary least squares](linear_regression_with_ols.html) and [handling missing values](handling_missing_values.html).

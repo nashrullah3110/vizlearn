@@ -1,275 +1,32 @@
-title: Understanding One-Hot Encoding
-intro: One-hot encoding represents each category with a binary feature. It avoids inventing an order between labels, though the feature matrix can grow wide for high-cardinality data.
+title: One-Hot Encoding
+intro: One-hot encoding turns each category into a binary indicator, so a model can use categories without treating their names as an order. It is simple and useful, but high-cardinality features can create many columns.
 
-## What one-hot encoding represents
+## Represent categories as indicators
 
-One-hot encoding turns a categorical feature into binary indicator columns. For a colour feature with values red, green, and blue, it creates `is_red`, `is_green`, and `is_blue`; a red row becomes `[1, 0, 0]`. Unlike arbitrary integer IDs, this representation does not tell a linear or distance-based model that blue is “twice” red or that green lies between them.
+One-hot encoding represents each category with its own 0/1 feature. It is appropriate for nominal categories—values with no natural order—because the encoded values do not imply that one category is larger or closer than another.
 
-The trade-off is width. A feature with many distinct categories creates many sparse columns. Scikit-learn's `OneHotEncoder` can keep the output sparse and handle categories that were not seen during fitting. For high-cardinality features, consider grouping rare categories, feature hashing, or a carefully validated target encoder. See [label encoding](label_encoding.html) for the contrast.
+## A small example
 
-## How It Works: The Feel
+For a colour feature with values red, green and blue, create three columns: **is_red**, **is_green** and **is_blue**. A green row becomes [0, 1, 0]. This avoids the misleading numeric order created by assigning red=0, green=1 and blue=2.
 
-Imagine you have a feature like "Color" with groups: "Red", "Green", and "Blue". A machine learning model cannot use these text labels directly. One-Hot Coding transforms this single "Color" column into three new columns, one for each group: "Is_Red", "Is_Green", and "Is_Blue".
+The visualiser applies the same representation to words in a text corpus. Each unique token acts like a category: it receives one vocabulary position, and each token’s vector has a 1 at that position. This is a small example of one-hot representation; production text models often use counts, weighted counts or learned embeddings instead.
 
-- For a data point where the color is "Red", the "Is_Red" column will be <code class="mono-font/50 px-1.5 py-0.5 rounded">1</code>, while "Is_Green" and "Is_Blue" will be <code class="mono-font/50 px-1.5 py-0.5 rounded">0</code>.
-- If the color is "Green", the "Is_Green" column gets the <code class="mono-font/50 px-1.5 py-0.5 rounded">1</code>. And the others get <code class="mono-font/50 px-1.5 py-0.5 rounded">0</code>.
+## Explore the vocabulary
 
-This creates a sparse binary vector where just one bit is "hot" (set to 1), clearly and unambiguously showing the first group without implying any ordinal link between the groups.
+1. Click **Encode Corpus** and inspect **Vocabulary** and **Vec Length**. Each token maps to a vector whose length is the number of unique vocabulary entries.
+2. Add a word that is not in the current text and encode again. The vocabulary and vector length grow; repeating an existing word adds another token but does not add a new vocabulary column.
 
-## One column turns a few
+## The trade-offs
 
-One-hot coding replaces a class-based column with one new column per group, each holding 1 if the row has that group and 0 otherwise. Just one column is "hot" in each row. It is where the name comes from.
+One-hot features are easy to interpret and work well for low-cardinality categories. They can be sparse: each row has only a small number of ones in a wide matrix. Sparse storage helps, but a feature with thousands of distinct values can still increase memory and make estimation difficult, especially when many categories appear only a few times.
 
-|City|is_London|is_Manchester|is_Leeds|
-|---|---|---|---|
-|London|1|0|0|
-|Leeds|0|0|1|
-|Manchester|0|1|0|
-|Leeds|0|0|1|
+For a categorical feature with k possible values, a full encoding uses k columns. In a linear model with an intercept, one column is often dropped to avoid exact collinearity; the remaining coefficients are interpreted relative to that reference category. Whether to drop a category depends on the estimator and regularisation—do not apply it blindly to every model.
 
-What this buys you is the absence of a lie. Label coding says London=0, Manchester=1, Leeds=2. And a linear model reads that as an order and a spacing. One-hot says nothing except "this row is London". Each group sits the same distance from each other. It is the honest form of an unordered set.
-
-A linear model can now learn a separate coefficient for each city. In a linear model, `is_London` might get +45 and `is_Leeds` &minus;12, meaning London adds &pound;45k to a price and Leeds subtracts &pound;12k. Those coefficients can also be easier to interpret.
-
-## The dummy var trap
-
-Here is a subtlety that catches people in regression and confuses all else.
-
-If a row must be just one of London, Manchester or Leeds, then the three columns always sum to 1. That means any one of them can be worked out from the other two. They are perfectly collinear. And if the model also has an intercept, there are infinitely many equally good coefficient sets. The grid turns non-invertible and the coefficients turn unstable or arbitrary.
-
-The fix is to drop one group. It turns the <strong>reference level</strong>. With London dropped, `is_Manchester = 0` and `is_Leeds = 0` means London. And each left coefficient reads as "compared to London".
-
-```python
-from sklearn.preprocessing import OneHotEncoder
-
-enc = OneHotEncoder(drop="first",              # avoid the dummy trap
-                    handle_unknown="ignore",   # unseen category -> all zeros
-                    sparse_output=True)        # do not materialise the zeros
-```
-
-Whether you need `drop="first"` depends on the model. Linear and logistic regression with an intercept: yes. Regularised models, trees, forests, boosting and neural networks: no. And dropping a level can really hurt, since smoothing penalises the left groups asymmetrically tied to the hidden reference.
-
-## The cost: width, sparsity and memory
-
-One-hot coding is safe and it is costly. And the expense is a function of cardinality.
-
-A column with 5 groups adds 5 columns. A postcode column with 2,000 distinct values adds 2,000 columns, of which 1,999 are zero in each row. Three consequences follow:
-
-- <strong>Memory.</strong> Stored densely, 1 million rows &times; 2,000 columns of floats is 16 GB. Stored sparsely &mdash; just the spots of the ones. It is a few megabytes. Always keep high-cardinality one-hot output sparse.
-- <strong>Stats.</strong> A group appearing in 20 of 1,000,000 rows gives its column almost nothing to learn from. So the coefficient is mostly noise.
-- <strong>Trees can require more splits.</strong> A binary column can offer a split such as "is it this group or not". So a tree needs many splits to isolate a group of groups that a single native class-based split would handle at once. This is why LightGBM and CatBoost's native group handling often beats one-hot on tree models.
-
-Two real mitigations. Group rare groups into an explicit "other" bucket. Anything under about 1% of rows is often a candidate. And above roughly 50 groups, look at target coding or learned embeddings instead.
-
-## Test in the Live Panel
-
-The interactive visualization on this page lets you see this process in action. Follow these steps to build a strong mental model:
-
-1. <strong>Initial State:</strong> Click the "Encode Corpus" button with the default text. Observe the "Vocabulary" size and the "Vec Length". Notice how each unique word from the input text turns part of the vocabulary.
-2. <strong>Analyze the Vecs:</strong> Look at the encoded vectors. For each word (token), you'll see a vec of 0s and a single 1. The spot of the '1' corresponds to that word's index in the sorted vocabulary. For case, if the vocabulary is <code>['deep', 'fascinating', 'is', 'learning', 'machine']</code>, the word "is" will be shown as <code>[0, 0, 1, 0, 0]</code>.
-3. <strong>Add New Words:</strong> Add a new sentence to the input, like "AI is the future". Click "Encode Corpus" again. What happens to the "Vec Length" and "Vocabulary" count? All existing vecs are now longer to accommodate the new words ('ai', 'the', 'future'). This shows a key challenge with One-Hot Coding: the number of features grows with vocabulary size.
-4. <strong>Add Repetition:</strong> Add a sentence that reuses existing words, such as "deep learning is powerful". Notice that the vocabulary size doesn't increase as much. But the total number of vecs does. This highlights the efficiency of reusing existing vocabulary entries.
-
-## Pseudocode Logic
-
-```
-function oneHotEncode(corpus):
-  // 1. Tokenize and find unique words
-  tokens = tokenize(corpus)
-  vocabulary = sorted(unique(tokens))
-  
-  // 2. Create a mapping from word to index
-  word_to_index = {word: i for i, word in enumerate(vocabulary)}
-  
-  // 3. Generate vectors
-  encoded_vectors = []
-  for token in tokens:
-    vector = create_zero_vector(length=len(vocabulary))
-    index = word_to_index[token]
-    vector[index] = 1
-    encoded_vectors.append(vector)
-    
-  return encoded_vectors
-                        
-```
-
-## Advantages and Disadvantages
-
-<h4 class="font-bold mb-2">Advantages</h4>
-
-- <strong>No Ordinality:</strong> It doesn't create a false order or ranking between groups. It is a common issue with simple label coding.
-- <strong>Interpretability:</strong> The resulting vecs are easy to interpret. Each column clearly corresponds to a set group. <h4 class="font-bold mb-2">Disadvantages</h4>
-
-- <strong>High dimensionality (curse of dimensionality):</strong> If you have many unique groups (a large vocabulary), it creates a huge number of new features. This can slow down model training and sometimes hurt performance.
-- <strong>Sparsity:</strong> The resulting grid is sparse (mostly zeros). It can be computationally inefficient to store and process.
-
-## Beyond One-Hot Coding
-
-While One-Hot Coding is a great starting point, for more complex tasks, especially in Natural Language Handling (NLP), more advanced tricks like <strong>Word Embeddings (e.g., Word2Vec, GloVe, FastText)</strong> are used. These methods represent words as dense, low-dimensional vectors that can capture semantic relationships (e.g., the vecs for "king" and "queen" are closer to each other). In contrast, distinct one-hot vectors are equally distant from one another.
-
-## Choosing between the encodings
-
-|Situation|Reach for|
+| Situation | Common choice |
 |---|---|
-|Under ~10 categories, linear model or network|One-hot|
-|Ordered categories (small/medium/large)|Ordinal, with the order stated|
-|Many categories, tree ensemble|Native categorical support, or label encoding|
-|Many categories, strong relationship to the target|Out-of-fold target encoding|
-|Huge cardinality, collisions acceptable|Feature hashing|
-|Deep learning with many categories|A learned embedding layer|
+| A few unordered categories | One-hot encoding |
+| Categories with a real order | Ordinal encoding, with the order stated |
+| Very many categories | Native categorical handling, feature hashing or carefully validated target encoding |
+| Text with a large vocabulary | Sparse count or TF–IDF features; embeddings for suitable neural models |
 
-The embedding option is worth a moment. Instead of 2,000 sparse columns, learn a dense vec of, say, 16 counts per group, trained along with the rest of the network. Close groups end up with close vecs. It one-hot can never express since each group is equidistant from each other. This is just how class-based features are handled in recommendation systems. And it is why an embedding of 10,000 products is routine while one-hot coding them is not.
-
-## Getting it right in a pipeline
-
-The single most common one-hot bug in production is a column-count mismatch: training data had 40 cities, today's batch has 38. And the model gets a grid of the wrong width.
-
-The fix is to fit the encoder once and reuse the fitted object. Never to call `pd.get_dummies` apart on training and serving data. It is what causes this.
-
-```python
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-
-pre = ColumnTransformer([
-    ("cat", OneHotEncoder(handle_unknown="ignore"), ["city", "product"]),
-    ("num", StandardScaler(), ["price", "age"]),
-])
-
-model = Pipeline([("pre", pre), ("clf", LogisticRegression())])
-model.fit(X_train, y_train)      # the encoder's vocabulary is now fixed
-model.predict(X_new)             # unseen categories become all-zero rows
-```
-
-`handle_unknown="ignore"` is what stops an unfamiliar city from crashing the service: the row simply gets zeros across all the city columns. It the model reads as "none of the known cities". Not ideal, but far better than an exception at request time.
-
-## Why not just count the groups
-
-Label-coding a group invents an order that is not there. This shows the damage, the one-hot fix. And the column explosion that follows.
-
-```python-run
-import numpy as np
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import cross_val_score
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import make_pipeline
-
-rng = np.random.default_rng(0)
-cities = np.array(["london", "paris", "tokyo", "lagos", "lima"])
-# rent depends on the city, in no particular order
-base = {"london": 40, "paris": 32, "tokyo": 45, "lagos": 12, "lima": 15}
-idx = rng.integers(0, 5, 1200)
-city = cities[idx]
-rent = np.array([base[c] for c in city]) + rng.normal(0, 3, 1200)
-X_cat = city.reshape(-1, 1)
-
-ordinal = OrdinalEncoder().fit(X_cat)
-print("ordinal encoding assigns numbers alphabetically:")
-for c, n in zip(ordinal.categories_[0], range(5)):
-    print("   %-8s -> %d   (real average rent %.1f)" % (c, n, rent[city == c].mean()))
-print()
-print("that ordering says lagos < lima < london < paris < tokyo, and that")
-print("the gap from lagos to lima equals the gap from paris to tokyo. neither")
-print("is true. a linear model believes both:")
-Xo = ordinal.transform(X_cat)
-print("  linear regression on ordinal codes : R2 %.4f"
-      % cross_val_score(LinearRegression(), Xo, rent, cv=5).mean())
-```
-
-Building on the same setup, the next block shows the left cases.
-
-```python-run
-import numpy as np
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import cross_val_score
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import make_pipeline
-
-onehot = OneHotEncoder(sparse_output=False).fit(X_cat)
-Xh = onehot.transform(X_cat)
-print("  linear regression on one-hot       : R2 %.4f"
-      % cross_val_score(LinearRegression(), Xh, rent, cv=5).mean())
-print()
-print("one-hot gives each city its own column and its own free coefficient:")
-print("  columns:", list(onehot.get_feature_names_out(["city"])))
-print("  first three rows:")
-for i in range(3):
-    print("    %-8s %s" % (city[i], Xh[i].astype(int)))
-print()
-lin = LinearRegression(fit_intercept=False).fit(Xh, rent)
-for name, c in zip(onehot.get_feature_names_out(["city"]), lin.coef_):
-    print("   %-14s coefficient %8.3f" % (name, c))
-print("  with no intercept, each coefficient IS that city's average rent.")
-print("  no ordering was assumed, so none was imposed.")
-print()
-print("note the fit_intercept=False. keep the intercept and all five columns")
-print("and they sum to 1 in every row, which makes the system singular -- the")
-print("coefficients come back as astronomical numbers that cancel out. that is")
-print("the dummy variable trap, and drop='first' is the usual answer to it.")
-print()
-```
-
-The next block covers the left steps.
-
-```python-run
-import numpy as np
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import cross_val_score
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import make_pipeline
-
-print("trees are less bothered, because a split is a set membership test:")
-print("  random forest on ordinal codes : R2 %.4f"
-      % cross_val_score(RandomForestRegressor(n_estimators=100, random_state=0),
-                        Xo, rent, cv=5).mean())
-print("  random forest on one-hot       : R2 %.4f"
-      % cross_val_score(RandomForestRegressor(n_estimators=100, random_state=0),
-                        Xh, rent, cv=5).mean())
-print("  it can carve out one code with two splits. it just costs depth.")
-print()
-
-print("the cost of one-hot is width. with high-cardinality columns:")
-for n_cat in (5, 50, 500, 5000):
-    print("   %5d categories -> %5d columns" % (n_cat, n_cat))
-print("  at that point you want target encoding, hashing, or an embedding.")
-print()
-print("two practical notes:")
-print("  handle_unknown='ignore' stops an unseen category crashing predict().")
-print("  drop='first' removes one column to avoid perfect collinearity, which")
-print("  matters for linear models and not at all for trees.")
-enc = OneHotEncoder(sparse_output=False, drop="first").fit(X_cat)
-print("  with drop='first': %d columns instead of %d"
-      % (enc.transform(X_cat).shape[1], Xh.shape[1]))
-```
-
-## Questions people ask
-
-<strong>Should I one-hot encode the target?</strong> For multi-class sorting with a neural network and class-based cross-entropy, yes. With scikit-learn sorters and sparse class-based loss, no. Integer labels are what they expect.
-
-<strong>Does one-hot coding need scaling afterwards?</strong> The columns are now 0/1. So scaling changes little. It matters just if you are also scaling other features and want the smoothing cost to fall evenly across them.
-
-<strong>Is `pd.get_dummies` fine?</strong> For exploration, yes. For anything that will see new data later, no. It derives the columns from whatever data you hand it. So training and serving can disagree silently.
-
-<strong>How many groups are too many?</strong> There is no hard line. But past 50 the sparsity starts to hurt and past a few hundred it often dominates. Measure it: check one-hot against target coding by cross-validation rather than guessing.
-
-<strong>What about missing values?</strong> Encode them as their own group. A blank field is often informative. And folding it into the most common group destroys that information.
-
-<strong>Does one-hot coding cause overfitting?</strong> Indirectly. Adding hundreds of columns to a model with limited rows gives it more ways to fit noise. Smoothing and rare-group grouping are the usual answers.
-
-## Recap in one screen
-
-- One column per group, just one 1 per row, no invented ordering.
-- Drop one level for linear models with an intercept. Keep all levels for regularised models and trees.
-- Cardinality is the cost: width, sparsity and thin stats per column.
-- Keep the grid sparse, group rare values. And consider target coding or embeddings above ~50 groups.
-- Fit the encoder once, inside a pipeline. And set `handle_unknown="ignore"` before it reaches production.
-
-## Further reading
-
-For implementation details, see the [Encoding categorical features](https://scikit-learn.org/stable/modules/preprocessing.html#encoding-categorical-features). Continue with [label encoding](label_encoding.html) to connect this topic to a related part of the workflow.
+Unseen categories at prediction time need an explicit policy. Scikit-learn’s [OneHotEncoder documentation](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.OneHotEncoder.html) describes options such as handling unknown values and sparse output. Fit the encoder on training data only, then reuse it for validation and test data; a pipeline helps prevent leakage. See [label encoding](label_encoding.html) for the alternative that maps categories to integers.

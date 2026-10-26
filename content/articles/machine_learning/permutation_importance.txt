@@ -3,134 +3,92 @@ intro: Permutation importance measures how much a model’s score changes when a
 
 ## The idea
 
-If a feature matters, destroying the info in it should hurt the model. So:
 
-1. Score the model on a dataset.
-2. Shuffle one column, breaking its tie with the target while leaving
-   its spread untouched.
-3. Score again.
-4. The drop is that feature's importance.
-5. Repeat for each column.
 
-Shuffling rather than deleting is the key detail. Deleting a column means
-retraining, which gives a different model and answers a different question.
-Shuffling keeps the same fitted model and the same input shape, so the only thing
-that changed is whether that column carries signal.
-
-Because it needs nothing but predictions, it works on any model at all
-&mdash; linear, forest, grad-boosted, neural network. You do not need
-access to the model's internals or any knowledge of how it works. All
-you need is the ability to score it on a dataset and to shuffle one
-column at a time. That makes it one of the first tools worth trying.
+Permutation importance is the drop in a fitted model’s chosen score after one feature is shuffled. It describes reliance for that model, metric and dataset; it does not show that a feature causes the outcome.
 
 ## Reading the chart
 
-Four features are fed to a logistic model: a strong signal, a weak one, pure
-noise, and a **near-duplicate copy of the strong signal**.
+The example compares a strong signal, a weak signal, noise and a duplicate
+copy of the strong signal. The model is a random forest.
 
 `noise` scores about zero, which is correct and reassuring.
 
-Now compare `signal` with `copy of signal`. They carry the same info
-&mdash; either would serve the model about equally well on its own &mdash; and
-`copy of signal` scores roughly half what `signal` does, landing at about the
-level of `weak`, a feature that is truly much less helpful.
+Now compare `signal` with `copy of signal`. They contain the same information,
+so shuffling either one leaves its twin available to the forest. Each can
+therefore receive a much smaller score drop than the signal provides as a
+group.
 
 ## Why: correlated features hide each other
 
-The reason is just the method. The model here is a small random forest,
-and each split considers a random subset of the features. So Some trees split on
-`signal` and others on its copy. Shuffling the copy leaves all the trees that
-used `signal` working correctly. So The measured drop is much smaller than the
-column's actual worth.
+The method shuffles one column at a time. Some trees can use `signal`, while
+others use its copy. Shuffling only the copy leaves the original signal intact,
+so the score may barely change. Low importance here means the model can rely on
+the substitute; it does not mean the information is useless.
 
 The metric is measured **one column at a time**, and with linked features
 that is the wrong unit of analysis. The honest reading isn't "the copy doesn't
 matter" but "either one largely substitutes for the other, and this method can't
 say that".
 
-The size of the effect depends on the model. A linear model given two duplicate
-columns splits its weight between them. So Shuffling one still destroys half the
-part and both score moderately high. A forest can substitute one for the
-other outright, which is why the discount is so visible here &mdash; and why the
-trap is worst on just the tree models where importance charts are most often
-drawn.
+The effect depends on how the fitted model uses the features. With exact
+duplicates, a linear model may divide its coefficients between columns; a tree
+ensemble may use one as a substitute for the other. In either case, a
+single-column shuffle can understate the value of a correlated group.
 
-This is the single most key thing to know about permutation importance,
-because the failure is silent and the chart looks reasonable.
+This is the main limitation to check before interpreting the chart: the result
+can look plausible even when correlated features mask one another.
 
 What to do about it:
 
-**Cluster linked features first** and permute whole groups together. The
-group's importance is then real though its members' aren't.
+**Group related features** and, where appropriate, permute the group together.
+This estimates the value of the group, not the unique contribution of each
+member.
 
 **Check the correlation matrix** before reading any importance chart.
 
-**Use if-based permutation**, which shuffles within strata of the linked
-features rather than globally.
+Conditional permutation methods can preserve dependencies between features,
+but require a suitable conditional model and a clearly defined question.
 
 ## Held-out data, not training data
 
-Permutation importance found on the training set measures what the model
-*used to fit*, including what it stored. A feature the model overfitted to
-will look highly key because shuffling it destroys stored training
-speed.
+Importance measured on the training set can reward memorisation. A feature
+used to fit noise may appear valuable there even though it does not help on new
+data.
 
-On held-out data the same method measures what the feature adds to
-speed that generalises. That is almost always the question, and it's why
-scikit-learn's docs is emphatic about it.
+On held-out data, the method estimates how much that feature helps the chosen
+score generalise. Use data that was not used to fit the model, and choose a
+metric that reflects the task. The [scikit-learn guide](https://scikit-learn.org/stable/modules/permutation_importance.html)
+explains this evaluation procedure.
 
-Checking the two is diagnostic in itself: a feature that is very key on
-training data and unimportant on validation data is one the model overfitted.
+Comparing the two can be diagnostic: a feature that scores highly on training
+data but little on validation data may be associated with overfitting.
 
 ## Against a tree's built-in importance
 
-Random forests and grad-boosted trees expose `feature_importances_`, often
-mean fall in impurity. It's free, since it's built up during training,
-and it has a known bias: it **favours high-cardinality features**. A column with
-many distinct values offers more possible split points, so it's chosen more
-often and builds up more credit. Even a random ID column will score
-above a handy binary flag.
+Random forests and boosted trees expose `feature_importances_`, often based on
+the mean decrease in impurity. It is available from the fitted model without
+an extra scoring pass, but can favour high-cardinality features because they
+offer more candidate split points. A random ID can therefore receive a
+misleadingly high score.
 
-Permutation importance doesn't have that bias, costs a re-scoring pass per
-feature, and applies to models that have no built-in measure at all.
+Permutation importance avoids that particular split-count bias, but costs a
+re-scoring pass per feature and can be used with models that have no built-in
+importance measure.
 
 ## Repeats
 
-Shuffling is random, so a single shuffle is a noisy guess. The repeats control
-above means a few, and the wobble as you change the seed at one repeat
-shrinks visibly as you raise it. Five to ten is common.
-
-## Two copies of one signal, and the discount
-
-The central trap is measurable. Feed a model four features &mdash; a strong signal,
-a weak one, pure noise, and a near-duplicate copy of the strong signal &mdash; and
-read the permutation importances:
-
-|feature|importance|
-|---|---|
-|signal|high|
-|copy of signal|~half of signal, level with `weak`|
-|weak|low|
-|noise|~0|
-
-`noise` scoring zero is correct and reassuring. But `copy of signal` carries the
-same info as `signal` &mdash; either alone would serve the model &mdash; and
-it scores about half, down at the level of a truly weak feature. The cause is
-the method: importance is measured one column at a time. So When the copy is
-shuffled each tree that split on the first still works, and the measured drop is
-small. The honest reading isn't "the copy doesn't matter" but "either substitutes
-for the other, and this method can't say so". And the effect is worst on the
-tree models where these charts are drawn most. A forest can swap one
-linked column for the other outright. The fixes are to cluster linked
-features and permute the group, or to check the correlation matrix before trusting
-any importance bar. Find it on held-out data, too: on training data it rewards
-what the model stored.
+Shuffling is random, so one result is noisy. Increase **Shuffles per feature**
+to estimate the average score drop and its variation across repeats. More
+repeats cost more scoring time; choose enough to see whether the ranking is
+stable for this dataset.
 
 ## Where it goes wrong
 
 **Reading it on linked features.** The central trap.
 
-**finding it on training data.** Measures memorisation.
+**Measuring it on training data.** The model may have memorised patterns that
+do not generalise.
 
 **Treating it as causal.** It says the model used a feature, not that the feature
 causes the outcome.
@@ -139,68 +97,16 @@ causes the outcome.
 different model can rank the same features differently and both be right about
 themselves.
 
-## Questions people ask
+## Experiments to try
 
-<strong>How does permutation importance work?</strong> Shuffle one column in held-out data and measure how much the score drops. A large drop means the model relied on that feature.
+1. Set **Shuffles per feature** to 1, then raise it toward 12. Repeated shuffles average out some random variation, though they take longer.
+2. Change **Shuffle seed**. The bars can move because each run uses different permutations; large swings suggest the estimates are noisy.
 
-<strong>Why use held-out data?</strong> On training data, an overfit model can rely on features that carry only noise. Held-out data shows which features help predictions that generalise.
+## Runnable example
 
-<strong>Why do correlated features get low scores?</strong> When two columns carry the same signal, shuffling one leaves the other to cover for it. Both look unimportant, so group correlated features or drop one.
-
-<strong>How is it different from tree feature importance?</strong> Tree importance counts how much splits reduce impurity and favours high-cardinality features. Permutation importance measures the effect on actual predictions and works with any model.
-
-<strong>How many repeats should I use?</strong> Ten or more shuffles per feature, so you can see the spread. A feature whose drop is within the noise is not clearly useful.
-
-<strong>Can importance be negative?</strong> Yes, slightly. It means shuffling the feature happened to improve the score, which suggests the feature is not helping.
-
-## Break one column and see what it costs
-
-Permutation importance shuffles a column and measures the damage. It works on any fitted model. It disagrees with a tree's built-in importances in ways worth understanding.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.inspection import permutation_importance
-from sklearn.model_selection import train_test_split
-rng = np.random.default_rng(0)
-X, y = make_classification(n_samples=3000, n_features=6, n_informative=3,
-                           n_redundant=0, flip_y=0.08, shuffle=False,
-                           random_state=0)
-X = np.column_stack([X, rng.normal(size=len(X)), X[:, 0]])
-names = ["real_0", "real_1", "real_2", "filler_3", "filler_4", "filler_5",
-         "pure_noise", "copy_of_real_0"]
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
-rf = RandomForestClassifier(n_estimators=250, random_state=0).fit(Xtr, ytr)
-print("baseline test accuracy %.4f" % rf.score(Xte, yte))
-print()
-print("do it by hand on one column -- shuffle it and re-score:")
-col = 0
-scores = []
-for rep in range(10):
-    Xs = Xte.copy()
-    rng.shuffle(Xs[:, col])
-    scores.append(rf.score(Xs, yte))
-print("  shuffling %s ten times: accuracy %.4f +/- %.4f"
-      % (names[col], np.mean(scores), np.std(scores)))
-print("  the drop is %.4f. that is its permutation importance."
-      % (rf.score(Xte, yte) - np.mean(scores)))
-print()
-r = permutation_importance(rf, Xte, yte, n_repeats=10, random_state=0)
-print("%-16s %12s %10s %14s" % ("feature", "permutation", "sd", "tree built-in"))
-order = np.argsort(-r.importances_mean)
-for i in order:
-    print("%-16s %12.4f %10.4f %14.4f"
-          % (names[i], r.importances_mean[i], r.importances_std[i],
-             rf.feature_importances_[i]))
-print()
-print("filler columns and pure_noise carry nothing. the tree's built-in")
-print("importance still scores them above zero because a continuous column")
-print("offers many split points. permutation importance, on held-out rows,")
-print("puts them at zero where they belong.")
-```
-
-The next block shows how correlated features split their importance and how to read the result honestly.
+The example measures importance on held-out data, compares a duplicated signal
+before and after removing its copy, and switches scoring metrics to show that
+importance depends on the question being measured.
 
 ```python-run
 import numpy as np
@@ -221,7 +127,7 @@ r = permutation_importance(rf, Xte, yte, n_repeats=10, random_state=0)
 print("the trap. real_0 and copy_of_real_0 are the same column:")
 for i in (0, 7):
     print("  %-16s permutation %.4f" % (names[i], r.importances_mean[i]))
-print("  each scores about half. shuffling one leaves the other standing.")
+print("  shuffling either leaves its twin available to the forest.")
 print()
 print("drop the copy and refit:")
 keep = [i for i in range(8) if i != 7]
@@ -237,7 +143,7 @@ print()
 print("measure on held-out data and use the metric you care about:")
 r3 = permutation_importance(rf, Xte, yte, n_repeats=10, random_state=0,
                             scoring="roc_auc")
-order = np.argsort(-r.importances_mean)
+order = np.argsort(-r3.importances_mean)
 print("  scored by ROC AUC instead of accuracy:")
 for i in order[:4]:
     print("    %-16s %.4f" % (names[i], r3.importances_mean[i]))

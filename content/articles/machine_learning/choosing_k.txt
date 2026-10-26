@@ -1,239 +1,34 @@
 title: Choosing k: Elbow and Silhouette
-intro: K-means needs the number of clusters before it runs. Inertia and silhouette scores offer evidence for choosing that number, but neither can decide it without context.
+intro: K-means needs the number of clusters before it runs. Inertia and silhouette scores offer evidence for choosing k, but neither can decide without context about the data and the goal.
 
-## Why inertia cannot answer the question
+## Compare compactness and separation
 
-**Inertia** is the sum of squared distances from each point to the centroid of
-its cluster. K-means cuts it right. So it's the obvious quantity to inspect.
+Inertia measures how tightly K-means clusters fit their assigned points; the silhouette compares how close each point is to its own cluster versus the nearest alternative. Together they can reveal useful structure, but a metric alone does not define the right grouping.
 
-It's also useless on its own, and the reason is structural: inertia falls at
-each grow in k, always. With k equal to the number of points, each point is
-its own centroid and inertia is just zero. Watch the left chart as the spread
-control moves &mdash; the curve descends monotonically no matter what the data
-looks like.
+## The elbow: inspect inertia
 
-So "choose the k with the lowest inertia" always answers "as many as possible".
-The metric measures how tightly points sit around their centres, not whether the
-grouping is any good.
+Inertia is the sum of squared distances from each point to its assigned centroid. It cannot select k by its minimum: adding clusters can only reduce inertia, and at k equal to the number of points it reaches zero. The elbow method looks for a bend where the improvement begins to slow.
 
-## The elbow
+The bend can be subjective or absent. A smooth curve does not contain a hidden, objectively correct elbow. Use it as a clue and compare the resulting clusters with the task.
 
-The elbow method looks for the k where the curve stops falling steeply &mdash;
-where extra clusters stop buying much. On well-separated blobs there's a genuine
-bend at the true number. Up to that point each new cluster splits a real
-group, and after it each new cluster splits a group that was already coherent.
+## Silhouette: compare within and between clusters
 
-The problems are hands-on. The bend is judged by eye and different people pick
-different points. Very often, on real data, there simply is no bend &mdash; the
-curve is smooth, and reading an elbow into it's wishful. Raise the spread
-control until the blobs share and the bend disappears in front of you.
+For one point, let a be its average distance to points in its own cluster, and b its average distance to points in the nearest other cluster. Its silhouette is:
 
-There's a formalisation, the **kneedle** method. This Finds the point of
-max curvature. It's better than eyeballing, and it still assumes a knee
-exists.
+<p><strong>s = (b − a) / max(a, b)</strong></p>
 
-## The silhouette
+The value lies between −1 and 1. Near +1 means the point is much closer to its own cluster; near 0 means it is near a boundary; below 0 means it may fit another cluster better. Average the point scores to compare candidate values of k. Silhouette favours compact, well-separated groups and can undervalue non-convex shapes; it is not a universal quality score.
 
-The silhouette measures something different: not tightness, but **gap
-scaled to tightness**.
+## Compare both measures in the visualiser
 
-For each point, let *a* be its mean distance to the other members of its own
-cluster, and *b* its mean distance to the members of the nearest other cluster.
-The silhouette is:
+1. Set **Data** to **Three blobs** and inspect the inertia and mean silhouette plots across k.
+2. Change **Data** to **Two crescents**. K-means still creates centroid-based groups, so the metrics may prefer a split that does not match the curved shapes.
+3. Adjust **Blob spread** and watch whether the evidence for a single k becomes weaker as groups overlap.
 
-```
-s = (b - a) / max(a, b)
-```
+The visualiser shows why metric disagreement can be informative: it may reveal ambiguous structure or a mismatch between the clustering method and the data.
 
-Near **+1** the point is much closer to its own cluster than to any other. Near
-**0** it sits on a boundary. **Minus** means it's closer to a different
-cluster than to its own &mdash; it's probably misassigned.
+## Make the choice for a purpose
 
-Blending over all points gives one number per k, and unlike inertia it doesn't
-improve automatically as k grows. Adding clusters eventually forces points close
-to a neighbouring cluster. This Drives *b* down and the score with it. So the
-silhouette has a real max, and that max is a defensible choice.
+Choose k based on how the clusters will be used. If a team needs a manageable number of segments, a slightly lower silhouette may be acceptable. If the goal is to recover known labels, compare cluster assignments with those labels using an appropriate external measure. If the data has curved groups or different densities, try a method such as [DBSCAN](dbscan_clustering.html) or [hierarchical clustering](hierarchical_clustering.html) rather than forcing K-means to fit it.
 
-The right-hand chart shows this. The peak is at the true number of blobs, and it
-is a peak rather than a slope.
-
-The cost is work: it needs pairwise distances, so O(n&sup2;), against
-inertia's O(n).
-
-## When they disagree
-
-They often do, and the disagreement is helpful rather than a problem to
-resolve.
-
-Inertia asks *are the clusters tight*. The silhouette asks *are they separated*.
-A dataset can have tight clusters that sit right next to each other, and the two
-metrics will point in different directions.
-
-Switch the data to **Two crescents** and watch both. The silhouette doesn't
-recover the two crescents either. Because it's still built on distances
-to cluster members, and k-means hasn't made the crescents in the first
-place. That is the honest limit of both metrics: they test the clustering
-you gave them, and can't tell you the method was wrong.
-
-## The answer that is usually right
-
-Neither metric knows what the clusters are for.
-
-If you're segmenting customers so a marketing team can write one message per
-segment, k is roughly how many messages they can write. If you're compressing
-colours, k is the palette size you can afford. If clusters feed a downstream
-model, the number that makes that model best is the number.
-
-Both metrics are worth finding, and the use often decides.
-
-## The silhouette of one point
-
-Where inertia only ever falls as k grows. Reaching zero when each point is
-its own cluster &mdash; the silhouette has a real max, because it measures
-gap against tightness rather than tightness alone. For one point, let a be
-its mean distance to its own cluster and b its mean distance to the nearest other
-cluster. `s = (b - a) / max(a, b)`:
-
-|a (own)|b (nearest other)|silhouette|reading|
-|---|---|---|---|
-|1.0|3.0|0.67|comfortably inside its cluster|
-|2.5|3.0|0.17|near the boundary|
-|3.0|1.0|&minus;0.67|closer to another cluster &mdash; misassigned|
-
-Blending s over all points gives one number per k, and unlike inertia it doesn't
-improve automatically: add too many clusters and points are forced close to a
-neighbouring cluster, which drives b down and the score with it, so the curve peaks
-at a defensible k rather than sliding forever toward "more". The cost is O(n&sup2;)
-pairwise distances against inertia's O(n). Both still test only the clustering
-they were handed, though &mdash; on two interleaved crescents that k-means never
-separated, the silhouette can't recover them either. This Is the honest shared
-limit: these scores judge a split, they don't know the method was the
-wrong one.
-
-The honest last word is that neither metric knows what the clusters are *for*. If
-you're segmenting customers so a team can write one message per segment, k is
-roughly how many messages they can write. If you're quantising colours, k is the
-palette you can afford. If the clusters feed a downstream model, the k that makes
-that model best is the answer. The elbow and the silhouette are both worth
-finding &mdash; the elbow reads tightness, the silhouette reads gap, and
-their disagreement is helpful rather than a problem to resolve &mdash; but the
-use often decides, and a formalisation like the kneedle method only
-helps once you've accepted that a knee exists at all.
-
-## Where it goes wrong
-
-**Choosing k by inertia alone.** It will always say "more".
-
-**Seeing an elbow in a smooth curve.** Check whether the bend lives a change
-of scale on the axis.
-
-**Trusting a silhouette on non-spherical clusters.** It's distance-based and
-inherits the same assumption k-means makes.
-
-**Losing to scale.** Both metrics are distances.
-
-## Questions people ask
-
-<strong>Is the elbow method reliable?</strong> Only when the curve has a clear bend, which real data often lacks. When the inertia curve falls smoothly, treat the elbow as a hint and confirm with silhouette scores.
-
-<strong>Can inertia pick k on its own?</strong> No. Inertia always drops as k grows and reaches zero when every point is its own cluster, so its minimum is a useless answer.
-
-<strong>What is a good silhouette score?</strong> Above about 0.5 suggests clear structure, 0.25 to 0.5 means weak structure, and below that the clusters are barely separated. Compare scores across k on the same data rather than against a fixed bar.
-
-<strong>What if the elbow and the silhouette disagree?</strong> Look at the clusters at both values of k and ask which one is useful for the job. Disagreement usually means the structure is ambiguous, so the downstream purpose should break the tie.
-
-<strong>Should k be the number of classes I already know?</strong> If you know the true classes and want to recover them, start there. If the goal is finding structure, let the metrics and the use case decide, since natural groups often differ from labels.
-
-<strong>Does k-means need k even if I only want a rough grouping?</strong> Yes, k is a required input. If you do not want to choose it, try hierarchical clustering or DBSCAN, which do not fix k up front.
-
-## Four ways to pick k, on data where you know the answer
-
-The same four pick scores run twice: once on clean, well-separated blobs where they all agree. Once on shared ones where they don't. The disagreement is the handy part.
-
-```python-run
-import numpy as np
-from sklearn.cluster import KMeans
-from sklearn.datasets import make_blobs
-from sklearn.metrics import (silhouette_score, calinski_harabasz_score,
-                             davies_bouldin_score)
-from sklearn.mixture import GaussianMixture
-TRUE_K = 5
-KS = range(2, 11)
-def survey(X, label):
-    rows = []
-    for k in KS:
-        km = KMeans(n_clusters=k, n_init=10, random_state=0).fit(X)
-        gm = GaussianMixture(n_components=k, random_state=0).fit(X)
-        rows.append((k, km.inertia_, silhouette_score(X, km.labels_),
-                     calinski_harabasz_score(X, km.labels_),
-                     davies_bouldin_score(X, km.labels_), gm.bic(X)))
-    print(label)
-    print("%4s %12s %11s %12s %11s %12s"
-          % ("k", "inertia", "silhouette", "calinski", "davies", "GMM BIC"))
-    for r in rows:
-        print("%4d %12.1f %11.4f %12.1f %11.4f %12.1f" % r)
-    picks = {
-        "silhouette": max(rows, key=lambda r: r[2])[0],
-        "calinski":   max(rows, key=lambda r: r[3])[0],
-        "davies":     min(rows, key=lambda r: r[4])[0],
-        "GMM BIC":    min(rows, key=lambda r: r[5])[0],
-    }
-    print("  picks: " + ",  ".join("%s k=%d" % (n, v) for n, v in picks.items()))
-    print("  the truth is k=%d. agreed: %d of 4."
-          % (TRUE_K, sum(v == TRUE_K for v in picks.values())))
-    print()
-clean, _ = make_blobs(n_samples=900, centers=TRUE_K, cluster_std=0.55,
-                      random_state=0)
-survey(clean, "WELL SEPARATED blobs (cluster_std 0.55)")
-messy, _ = make_blobs(n_samples=900, centers=TRUE_K, cluster_std=1.6,
-                      random_state=0)
-survey(messy, "OVERLAPPING blobs (cluster_std 1.6), same 5 centres")
-print("when the structure is obvious the scores agree and you did not need")
-print("them. when it is not, they disagree -- and that disagreement is")
-print("information: there is no single k that is clearly right.")
-```
-
-The next block shows why inertia alone cannot pick k and what happens on pure noise.
-
-```python-run
-import numpy as np
-from sklearn.cluster import KMeans
-from sklearn.datasets import make_blobs
-from sklearn.metrics import silhouette_score
-TRUE_K = 5
-KS = range(2, 11)
-clean, _ = make_blobs(n_samples=900, centers=TRUE_K, cluster_std=0.55,
-                      random_state=0)
-rows = []
-for k in KS:
-    km = KMeans(n_clusters=k, n_init=10, random_state=0).fit(clean)
-    rows.append((k, km.inertia_, silhouette_score(clean, km.labels_)))
-print("why inertia is not on the picks list -- it falls no matter what:")
-print("%6s %14s %14s" % ("k", "inertia", "drop"))
-for i, r in enumerate(rows):
-    d = "%14.1f" % (rows[i - 1][1] - r[1]) if i else "%14s" % "-"
-    print("%6d %14.1f %s" % (r[0], r[1], d))
-print("  at k = n every point is its own cluster and inertia is exactly 0.")
-print("  the elbow method asks where the DROPS stop being dramatic, by eye.")
-print()
-print("the check nobody runs -- on data with no clusters at all:")
-Xr = np.random.default_rng(0).uniform(size=(900, 2))
-scores = {k: silhouette_score(Xr, KMeans(n_clusters=k, n_init=10,
-                                         random_state=0).fit(Xr).labels_)
-          for k in KS}
-bk = max(scores, key=scores.get)
-best_clean = max(r[2] for r in rows)
-print("  900 uniform random points: best silhouette is k=%d at %.4f"
-      % (bk, scores[bk]))
-print("  the clean blobs scored %.4f. every method returns an answer" % best_clean)
-print("  whether or not there is anything there. the SIZE of the score")
-print("  is what tells you it was worth asking.")
-print()
-print("so: run several, check they agree, check the winner is meaningfully")
-print("better than what noise scores -- and if you have a downstream task,")
-print("score k on that instead. it is the only measure that certainly matters.")
-```
-
-## Further reading
-
-For implementation details, see the [Clustering methods and evaluation](https://scikit-learn.org/stable/modules/clustering.html). Continue with [K-means](k_means.html) to connect this topic to a related part of the workflow.
+Run K-means with multiple initialisations and compare stable solutions. The [scikit-learn clustering guide](https://scikit-learn.org/stable/modules/clustering.html#silhouette-coefficient) documents silhouette scoring and its assumptions. Continue with [K-means](k_means.html) for the clustering procedure itself.

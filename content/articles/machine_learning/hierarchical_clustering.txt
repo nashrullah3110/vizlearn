@@ -1,227 +1,34 @@
 title: Hierarchical Clustering and Dendrograms
-intro: Hierarchical clustering repeatedly merges nearby groups to build a tree of clusterings. The linkage rule defines what “nearby” means and can change the result.
+intro: Agglomerative clustering repeatedly merges the closest groups to build a hierarchy. A dendrogram records those merges, so you can choose a cluster cut after seeing the structure.
 
-## The algorithm
+## How agglomerative clustering builds a tree
 
-Agglomerative clustering is almost trivially simple:
+Begin with each point as its own cluster. At each step, merge the two clusters considered closest by the chosen **linkage** rule. Continue until all points form one cluster. A dendrogram draws each merge at its distance; branches join higher when the merge required a larger distance.
 
-1. each point starts as its own cluster.
-2. Find the two closest clusters and merge them.
-3. Repeat until one cluster remains.
+Unlike k-means, the method does not require a cluster count before building the hierarchy. Afterward, a horizontal cut through the dendrogram determines the number of groups. A large vertical gap can suggest a useful cut, but it is evidence to inspect, not proof of a natural number of clusters.
 
-Recording the distance at each merge gives a **dendrogram** &mdash; the chart
-above plots just that: merge number against the distance at which it
-happened.
+## Linkage defines “closest”
 
-## The point: k comes last
+- **Single:** minimum distance between any pair across the two clusters. It can connect elongated groups, but a chain of nearby points may join otherwise distinct groups.
+- **Complete:** maximum distance between cross-cluster pairs. It tends to form compact groups, but one distant point can delay a merge.
+- **Average:** mean cross-cluster distance. It is a compromise between the two definitions.
+- **Ward:** merges the pair that produces the smallest increase in within-cluster squared error. It favors compact groups and is available only with compatible Euclidean distances.
 
-K-means and DBSCAN both need a choice before they run &mdash; how many
-clusters, or how dense. Hierarchical clustering needs neither. It builds one
-tree, and a flat cut through it makes a clustering.
+Try each available choice in **Linkage**. Then move **Cut height** and watch the flat cluster count change while the merge tree stays the same. The visualizer offers Single, Complete, and Average; Ward is described here for comparison.
 
-Drag the cut height and watch the count change. A cut low down leaves many small
-clusters, a cut high up leaves few, and the tree itself never changed. That is
-truly handy when you don't know what structure to expect, because you can
-look at the merge distances before committing.
+## Worked example: read a cut
 
-Large jumps in the curve are helpful: a merge that costs much more than the
-one before it joined two things that weren't really close. Cutting just below a
-big jump is the dendrogram equal of the [elbow](choosing_k.html).
+Suppose two tight groups are far apart. Merges within each group occur at small heights; the final merge between groups occurs much higher. A cut between those heights returns two clusters. If instead the dendrogram has no clear gap, the data may not support a compelling cluster count, or the chosen distance and linkage may not match the structure.
 
-## Linkage changes everything
+The left-to-right order of leaves is arranged for drawing and does not rank similarity. Read branch joins and heights, not which leaves happen to appear next to each other.
 
-The method needs a distance between two *clusters*, not two points, and there
-is no single right answer. Switch the control and the shape of the curve changes
-a lot.
+## Limits and practical choices
 
-**Single linkage** &mdash; distance between the nearest pair. Merges cheaply
-when any two members are close. So it can follow elongated shapes. Its
-failure mode is **chaining**: two well-separated blobs joined by a thin bridge of
-points merge into one, because the bridge gives a short hop at each step.
+Agglomerative merges are greedy and irreversible: an early merge remains in every higher level of the tree. Distance-based results are sensitive to feature scale, so scale features when units differ. Many implementations require pairwise-distance storage that grows quadratically with the number of observations, limiting the method on large datasets.
 
-**Complete linkage** &mdash; distance between the furthest pair. A merge is only
-cheap if *each* member of one cluster is close to each member of the other, so
-clusters come out compact and roughly equal in diameter. It breaks up elongated
-structures that truly belong together, and is sensitive to outliers, since
-one distant member sets the whole distance.
+Choose linkage and distance based on the shape and meaning of the data, and validate any selected clusters against domain knowledge or a downstream task. Hierarchical clustering can show structure at several resolutions; it does not prove that the data contains discrete natural groups.
 
-**Mean linkage** &mdash; the mean over all cross-pairs. Between the two, and
-the usual default.
+## Sources and next steps
 
-**Ward linkage**, not offered here, merges the pair that grows within-cluster
-variance least. It behaves much like k-means and is the most common choice for
-roughly spherical clusters.
-
-| Linkage | Produces | Fails at |
-|---|---|---|
-| Single | elongated, chain-following | bridges between clusters |
-| Complete | compact, similar sized | genuinely elongated clusters |
-| Average | a compromise | nothing dramatic |
-| Ward | spherical, balanced | non-convex shapes |
-
-## Reading a real dendrogram
-
-A conventional dendrogram draws each merge as a bracket at its height, with the
-leaves at the bottom. Two things are worth knowing about reading one.
-
-**Height is real. Flat spot isn't.** The left-to-right order is
-chosen to keep the drawing untangled and carries no info. Two adjacent
-leaves aren't always similar.
-
-**The tree is greedy and permanent.** Once two clusters merge they never
-separate, so an early mistake. Two points joined because of noise &mdash;
-persists through the hierarchy. Hierarchical clustering doesn't revisit choices.
-
-## Cost
-
-The naive method is O(n&sup3;), and careful setups reach O(n&sup2;
-log n) with O(n&sup2;) memory for the distance mat. That memory is often the
-binding constraint: 100,000 points is a mat of ten billion distances.
-
-This is why hierarchical clustering is a small-to-medium-data method. Above a few
-tens of thousands of points, k-means or a sampled variant is the hands-on
-choice.
-
-## Linkage, on two little clusters
-
-"There's no single right answer" for the distance between two clusters is easiest
-to see on numbers. Cluster A = {0, 1}, cluster B = {5, 9}. The four cross-pair
-distances are 5, 9, 4, 8, and each linkage reads a different one:
-
-|linkage|cluster distance|from|
-|---|---|---|
-|single (nearest pair)|4|1 to 5|
-|complete (furthest pair)|9|0 to 9|
-|average (mean of all four)|6.5|(5+9+4+8)/4|
-
-Single linkage merges as soon as *any* two members are close. This Lets it follow
-an elongated shape but also lets a thin bridge of points chain two separate blobs
-into one. Complete linkage merges only when *each* member is close, giving compact
-clusters but breaking truly stretched ones and taking its distance from a
-single furthest outlier. Mean sits between them and is the usual default. The
-same three points would cut the tree at three different heights. This Is why the
-dendrogram's shape &mdash; and any k read off it &mdash; changes with
-the linkage rule, before the data has changed at all. And the whole thing carries
-an O(n&sup2;) distance mat: 100,000 points is ten billion distances, which is
-the memory wall that keeps this a small-to-medium-data method.
-
-Two more properties are worth carrying. The tree is *greedy and permanent*: once
-two clusters merge they never separate. So A mistake made early &mdash; two points
-joined because of noise &mdash; rides all the way up the dendrogram, because the
-method never revisits a choice. And the left-to-right order of the leaves
-carries no info. It's chosen only to keep the drawing untangled, so two
-adjacent leaves aren't always similar. Height in the diagram is real
-&mdash; it's the distance at which a merge happened, and a large vertical jump
-means two things that weren't really close were forced together &mdash; but
-flat spot is decoration.
-
-Ward linkage, not among the three above, merges the pair that grows
-within-cluster variance least. It behaves much like k-means and is the usual choice
-for roughly spherical clusters. This Rounds out the rule of thumb &mdash; single
-for elongated shapes, complete for compact ones, mean as a safe middle, Ward
-when the clusters are blobs.
-
-## Where it goes wrong
-
-**Not scaling the features.** As with each distance-based method.
-
-**Using single linkage on data with any bridge between clusters.** Chaining will
-merge them.
-
-**Reading meaning into leaf order.** It's a drawing rule.
-
-**Trying it on a large dataset.** The distance mat won't fit.
-
-## Questions people ask
-
-<strong>What is a dendrogram?</strong> A tree showing the order in which clusters merge and the distance at each merge. Cut it at a height to get a flat set of clusters.
-
-<strong>Which linkage should I use?</strong> Ward is a good default for compact, similar-sized clusters. Single linkage finds chains but is sensitive to noise, and average and complete sit in between.
-
-<strong>How do I choose where to cut the dendrogram?</strong> Look for a long vertical gap with no merges, and cut within it. That gap shows the clusters are well separated at that level.
-
-<strong>Does hierarchical clustering scale to large datasets?</strong> Poorly. It needs the pairwise distance matrix, so memory grows with the square of the number of points. Beyond tens of thousands of rows, use k-means or a sampled subset.
-
-<strong>Do I need to scale features?</strong> Yes, because distances drive every merge. A large-scale feature will dominate otherwise.
-
-<strong>Can I undo a merge?</strong> No. Agglomerative merges are final, so an early bad merge stays in the tree.
-
-## Cluster without choosing k first
-
-Agglomerative clustering merges the two closest groups over and over. You get each k at once. The linkage rule decides what "closest" means. It can change the clustering substantially.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_blobs
-from sklearn.metrics import adjusted_rand_score, silhouette_score
-from scipy.cluster.hierarchy import linkage, fcluster
-
-X, y = make_blobs(n_samples=300, centers=4, cluster_std=1.0, random_state=0)
-
-Z = linkage(X, method="ward")
-print("the merge log -- 299 merges, each joining two groups into one.")
-print("%8s %8s %8s %12s %10s" % ("step", "group A", "group B", "distance", "size"))
-for i in list(range(3)) + list(range(len(Z) - 5, len(Z))):
-    a, b, d, n = Z[i]
-    print("%8d %8d %8d %12.4f %10d" % (i, a, b, d, n))
-print("  first merges: single points at almost no distance.")
-print("  last merges: whole clusters across large gaps.")
-print()
-
-print("the last few merge distances, and the jump before each:")
-for i in range(len(Z) - 6, len(Z) - 1):
-    print("  cut here -> %d clusters   next merge costs %8.3f (%.2fx the last)"
-          % (len(X) - i - 1, Z[i, 2], Z[i, 2] / Z[i - 1, 2]))
-print("  cut here -> 1 cluster    the root, %8.3f" % Z[-1, 2])
-print()
-print("  'find the biggest jump' always answers 2. the useful reading is")
-print("  where the RATIO stops being dramatic -- a judgement call,")
-print("  which is why the silhouette column below is worth having.")
-print()
-
-print("one tree, every k, no refitting:")
-print("%6s %14s %14s" % ("k", "agreement", "silhouette"))
-for k in (2, 3, 4, 5, 6):
-    labels = fcluster(Z, k, criterion="maxclust")
-    print("%6d %14.4f %14.4f"
-          % (k, adjusted_rand_score(y, labels), silhouette_score(X, labels)))
-print("  k-means has to be rerun from scratch for each k. this is one fit.")
-```
-
-The next block compares the four linkage methods and shows where single linkage wins.
-
-```python-run
-import numpy as np
-from sklearn.cluster import AgglomerativeClustering
-from sklearn.datasets import make_blobs, make_moons
-from sklearn.metrics import adjusted_rand_score
-
-X, y = make_blobs(n_samples=300, centers=4, cluster_std=1.0, random_state=0)
-
-print("linkage is the whole personality of the algorithm:")
-for method in ("ward", "complete", "average", "single"):
-    m = AgglomerativeClustering(n_clusters=4, linkage=method).fit(X)
-    print("  %-10s agreement %.4f, cluster sizes %s"
-          % (method, adjusted_rand_score(y, m.labels_),
-             sorted(np.bincount(m.labels_), reverse=True)))
-print()
-print("  ward     -- minimise total variance. compact, even sizes.")
-print("  complete -- furthest members. compact, sensitive to outliers.")
-print("  average  -- mean pairwise distance. a middle ground.")
-print("  single   -- closest members. chains through thin bridges.")
-print()
-
-Xm, ym = make_moons(n_samples=300, noise=0.06, random_state=0)
-print("that chaining is a weakness and a feature. on two crescents:")
-for method in ("ward", "single"):
-    m = AgglomerativeClustering(n_clusters=2, linkage=method).fit(Xm)
-    print("  %-10s agreement %.4f" % (method, adjusted_rand_score(ym, m.labels_)))
-print("  single linkage follows the shape. ward cuts straight across it.")
-print()
-print("the cost is O(n^2) in memory -- a full distance matrix. at")
-print("100,000 rows that is 40GB, which is why k-means still exists.")
-```
-
-## Further reading
-
-For implementation details, see the [Clustering and linkage methods](https://scikit-learn.org/stable/modules/clustering.html). Continue with [DBSCAN](dbscan_clustering.html) to connect this topic to a related part of the workflow.
+- [scikit-learn: Hierarchical clustering](https://scikit-learn.org/stable/modules/clustering.html#hierarchical-clustering) documents agglomerative clustering and linkage choices.
+- Continue with [k-means](k_means.html), [DBSCAN](dbscan_clustering.html), and [choosing k](choosing_k.html).

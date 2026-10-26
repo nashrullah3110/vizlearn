@@ -1,315 +1,51 @@
 title: Greedy Algorithms
-intro: Fast, simple, and wrong just often enough to be dangerous.
+intro: A greedy algorithm commits to the best-looking next choice and does not revise it. That can be efficient, but it is correct only when the problem’s structure supports a proof that each choice preserves an optimal solution.
 
-## Before the details
+## What makes a greedy choice safe
 
-A <strong>greedy algorithm</strong> builds a solution one step at a time, always taking any looks best <em>at that moment</em>, and never revisiting a decision. No backtracking, no lookahead.
+Greedy algorithms build a solution one local choice at a time. They are often fast and simple, but a plausible local choice can block a better complete answer. The key task is proving the rule works for the specific problem.
 
-That ease is the appeal. A greedy algorithm is fast to write, fast to run, and easy to reason about. It never explores options, so it avoids the rapid blowup of exhaustive search. The danger is that it can commit to a locally attractive choice that blocks the globally best solution.
+## When a greedy rule is valid
 
-Making change is the classic case. Given coins of 25, 10, 5 and 1 cent, the greedy plan. Always take the largest coin that fits. Gives the fewest coins for any amount. That works for US currency because the denominations were designed to make it work. Change the denominations to 25, 10 and 6, and 12 cents gets two 6-cent coins, not a 10 and two 1s. The greedy answer is wrong because a locally smaller coin leads to a globally better solution.
+Two useful proof ideas are the **greedy-choice property**—some optimal solution begins with the locally best choice—and **optimal substructure**—after that choice, the remaining task is a smaller instance of the same problem. A proof may use an exchange argument: replace the first choice in an optimal solution with the greedy choice and show the solution is no worse.
 
-The question with any greedy approach is whether the greedy choice is safe. For some problems it is provably best: activity choice, Huffman coding, Kruskal's and Prim's minimum spanning tree algorithms, and Dijkstra's shortest path. For others it gives a good estimate but not the optimum. The travelling salesman problem, set cover, and bin packing.
-
-When greedy fails, dynamic programming is often the next tool. DP explores all subproblems and recalls their answers. This trades time and memory for correctness. The link between the two is worth understanding. A greedy algorithm is a DP where only one subproblem needs to be thought of at each step. This is exactly what the greedy choice property guarantees.
-
-## When greedy is provably correct
-
-Two properties are needed:
-
-<strong>Greedy choice property.</strong> A locally best choice is part of some globally best solution.
-
-<strong>Best substructure.</strong> After making that choice, the left problem is a smaller instance of the same problem.
-
-Where both hold, greedy is best <em>and</em> faster than dynamic programming. Where the first fails, greedy gives an answer that may be arbitrarily bad.
-
-|Problem|Greedy optimal?|
-|---|---|
-|Activity selection (earliest finish time)|Yes|
-|Huffman coding|Yes|
-|Minimum spanning tree (Kruskal, Prim)|Yes|
-|Dijkstra's shortest path|Yes, with non-negative weights|
-|Fractional knapsack|Yes|
-|0/1 knapsack|<strong>No</strong> &mdash; needs DP|
-|Coin change, arbitrary coins|<strong>No</strong> &mdash; needs DP|
-|Travelling salesman|<strong>No</strong> &mdash; and greedy is a common heuristic|
-
-The knapsack pair is the clearest illustration. If items can be split, taking the best value-per-weight ratio first is best. If they cannot, that ratio can mislead &mdash; and the problem becomes NP-hard, needing dynamic programming for an exact answer.
-
-## Activity Choice: Greedy Wins
-
-Given activities with start and finish times, pick the most that do not overlap. The greedy rule is: <strong>always take the one that finishes earliest</strong> among those still compatible.
-
-Why is that safe? Finishing earliest leaves the maximum doable time for all of it after it. Any best schedule can have its first activity swapped for the earliest-finishing one without reducing the count &mdash; that is the exchange argument. And it makes greedy provably best here.
-
-Note that sorting by <em>duration</em> or <em>start time</em> both fail. The specific greedy rule matters enormously.
-
-## Coin Change: Greedy Fails
-
-With coins {1, 5, 10, 25} greedy works &mdash; always take the largest coin that fits. That is why it feels natural at a till.
-
-Now switch to <strong>greedy FAILS</strong>, using coins {1, 3, 4} and amount 6. Greedy takes 4, then 1, then 1 &mdash; <strong>three coins</strong>. The optimum is 3 + 3 &mdash; <strong>two coins</strong>. Taking the biggest coin first stranded the algorithm in a worse position.
-
-Nothing about the greedy code is buggy. The <em>problem</em> simply lacks the greedy choice property for that coin set. And only dynamic programming is sure correct.
-
-## Famous Greedy Algorithms That Do Work
-
-- <strong>Dijkstra</strong> &mdash; always expand the nearest unvisited node. Correct only when edge weights are non-negative.
-- <strong>Kruskal and Prim</strong> &mdash; always take the cheapest safe edge. Provably build minimum spanning trees.
-- <strong>Huffman coding</strong> &mdash; always merge the two least frequent symbols. Gives best prefix codes.
-- <strong>Fractional knapsack</strong> &mdash; take the best value-per-weight first. Works because items can be split; the 0/1 version cannot, and needs DP.
-
-## Take the best option now, and never reconsider
-
-A greedy algorithm makes the locally best choice at each step and never revisits it. No backtracking, no thinking of combinations &mdash; just the best-looking move, repeatedly.
-
-That is sharply cheaper than exploring options, and it is only <em>correct</em> for problems with a particular structure.
-
-<strong>Coin change with UK coins.</strong> Make 87p from 50, 20, 10, 5, 2, 1. Take 50 (37 left), 20 (17), 10 (7), 5 (2), 2 (0). Five coins, and provably best.
-
-<strong>Coin change with an awkward set.</strong> Make 30 from coins 25, 20, 1: greedy takes 25. Then five 1s &mdash; six coins. The optimum is two 20s and... no. It is 20 + 1&times;10, also worse. With coins 25, 20, 10 and target 40. Greedy takes 25 then 10 then five 1s if available; the optimum is two 20s. Greedy fails.
-
-The difference is a property of the coin system, not of the algorithm. Greedy coin change is best for canonical systems (including UK and euro coins) and not broadly &mdash;. This is exactly the shape of the whole topic.
-
-## Activity choice: the canonical proof
-
-Given intervals, select the largest number that do not overlap.
-
-The correct greedy rule is <strong>earliest finish time</strong>, not earliest start or shortest duration:
-
-```python
-def max_activities(intervals):
-    intervals.sort(key=lambda x: x[1])        # by end time
-    chosen, last_end = [], float("-inf")
-    for start, end in intervals:
-        if start >= last_end:
-            chosen.append((start, end))
-            last_end = end
-    return chosen
-```
-
-Why earliest finish works: choosing the activity that finishes soonest leaves the maximum left time for all of it else. Any best solution's first activity can be swapped for this one without reducing the count &mdash; which is an exchange argument. And it is the standard way greedy correctness is proved.
-
-Why the options fail: earliest <em>start</em> can pick one very long activity that blocks many; shortest <em>duration</em> can pick one that straddles the boundary between two others.
-
-That distinction &mdash; the right greedy rule versus a plausible wrong one &mdash; is where most greedy mistakes live. The algorithm is trivial; the choice of what to be greedy about is the problem.
-
-## Where greedy is provably right, and where it is confidently wrong
-
-Greedy algorithms are the ones that take the best-looking option now and never reconsider. Sometimes that is best and provably so; sometimes it is merely fast. The difference is a property of the problem, and running both on the same two problems makes it concrete.
-
-```python-run
-# PROBLEM 1: activity selection. Pick the most non-overlapping meetings
-# from a set. Greedy by EARLIEST FINISH TIME is provably optimal here.
-# "x" is the trap for earliest-start: it begins first and runs all day.
-MEETINGS = [("a", 1, 5), ("b", 4, 6), ("c", 5, 10), ("d", 9, 11),
-            ("e", 10, 15), ("f", 14, 16), ("g", 15, 20), ("x", 0, 20)]
-
-
-def greedy_by(meetings, key, label):
-    chosen, last_end = [], -1
-    for m in sorted(meetings, key=key):
-        if m[1] >= last_end:
-            chosen.append(m[0])
-            last_end = m[2]
-    return label, chosen
-
-
-import itertools
-
-
-def brute_force(meetings):
-    best = []
-    for r in range(len(meetings), 0, -1):
-        for combo in itertools.combinations(sorted(meetings, key=lambda m: m[1]), r):
-            ok = all(combo[i][2] <= combo[i + 1][1] for i in range(len(combo) - 1))
-            if ok:
-                return [m[0] for m in combo]
-    return best
-
-print("done")
-```
-
-Building on the same setup, the next block shows the left cases.
-
-```python-run
-
-strategies = [
-    (lambda m: m[2], "earliest finish"),
-    (lambda m: m[1], "earliest start"),
-    (lambda m: m[2] - m[1], "shortest duration"),
-]
-print("%-20s %-30s %s" % ("strategy", "chosen", "count"))
-for key, label in strategies:
-    _, chosen = greedy_by(MEETINGS, key, label)
-    print("%-20s %-30s %d" % (label, " ".join(chosen), len(chosen)))
-best = brute_force(MEETINGS)
-print("%-20s %-30s %d" % ("optimal (brute force)", " ".join(best), len(best)))
-
-# Earliest-finish matches the brute-force optimum. The other two rules,
-# which are every bit as intuitive, do not -- and they fail for different
-# reasons. Earliest-start takes "x" because it begins at 0, and "x" runs
-# until 20, so one choice consumes the entire day. Shortest-duration takes
-# the short meetings, but the short ones here are precisely the ones that
-# straddle two longer meetings, so each pick blocks two to gain one.
-#
-# "Be greedy" is not a strategy until you say greedy BY WHAT, and only one
-# choice of what has a proof behind it.
-#
-# The proof sketch: taking the activity that finishes first leaves the
-# largest possible remaining interval, so any solution can be rewritten to
-# start with it without getting worse. That is an exchange argument, and
-# a greedy algorithm is correct exactly when one exists.
-#
-# PROBLEM 2: the knapsack, where no such argument exists.
-
-ITEMS = [("gold", 10, 60), ("silver", 20, 100), ("bronze", 30, 120)]
-CAPACITY = 50
-
-```
-
-The following block covers the left steps.
-
-```python-run
-
-def greedy_knapsack(items, cap):
-    take, total, left = [], 0, cap
-    for name, w, v in sorted(items, key=lambda i: i[2] / i[1], reverse=True):
-        if w <= left:
-            take.append(name); total += v; left -= w
-    return take, total
-
-
-def best_knapsack(items, cap):
-    best = ([], 0)
-    for r in range(len(items) + 1):
-        for combo in itertools.combinations(items, r):
-            w = sum(i[1] for i in combo)
-            v = sum(i[2] for i in combo)
-            if w <= cap and v > best[1]:
-                best = ([i[0] for i in combo], v)
-    return best
-
-
-print()
-print("0/1 knapsack, capacity %d" % CAPACITY)
-g = greedy_knapsack(ITEMS, CAPACITY)
-b = best_knapsack(ITEMS, CAPACITY)
-print("  greedy by value/weight: %-24s = %d" % (str(g[0]), g[1]))
-print("  optimal:                %-24s = %d" % (str(b[0]), b[1]))
-
-# Greedy took gold and silver -- the two best value-per-weight ratios --
-# filled 30 of the 50 units, and then could not fit the 30-unit bronze.
-# The optimal answer SKIPS the item with the best ratio entirely, and no
-# greedy rule can do that, because greedy never reconsiders a choice.
-#
-# Now allow fractions of an item. Nothing else changes:
-```
-
-The next block goes on with the left demonstrations.
-
-```python-run
-
-def fractional(items, cap):
-    total, left = 0.0, cap
-    for name, w, v in sorted(items, key=lambda i: i[2] / i[1], reverse=True):
-        take = min(w, left)
-        total += v * take / w
-        left -= take
-        if left == 0:
-            break
-    return total
-
-
-print()
-print("fractional knapsack, same items and capacity: %.0f"
-      % fractional(ITEMS, CAPACITY))
-
-# Higher than either 0/1 answer, and the SAME greedy rule that failed
-# above is now provably optimal -- because with fractions there is always
-# an exchange that swaps a worse ratio for a better one, and that exchange
-# argument is precisely what was missing in the 0/1 version.
-#
-# So the lesson is not "greedy is unreliable". It is that greedy is
-# correct exactly when the problem admits an exchange argument, and that
-# whether it does can turn on a detail as small as whether you are allowed
-# to cut an item in half.
-```
-
-## Try it yourself
-
-1. <strong>Run activity choice.</strong> Watch it pick the earliest finisher and reject all of it that overlaps. And confirm the result matches the true optimum.
-2. <strong>Run coin change with friendly coins.</strong> Greedy and best agree. This is why the approach feels obviously right.
-3. <strong>Now run the failing case.</strong> Greedy returns 3 coins; the optimum is 2. Same algorithm, different coin set.
-4. <strong>Slide the amount</strong> in the failing case. Some amounts greedy gets right by luck; others it does not. There is no warning &mdash; that is what makes it dangerous.
-5. <strong>Compare the two verdicts.</strong> A greedy algorithm gives you no signal when it is wrong; you must prove correctness in advance.
-
-## In one line
-
-Greedy algorithms are fast and elegant when the greedy choice property holds — and silently wrong when it does not. Always ask whether a locally best move can ever block a globally better one. If it can, reach for dynamic programming instead.
-
-## Greedy against dynamic programming
-
-|&nbsp;|Greedy|Dynamic programming|
+| Problem | Greedy rule | Result |
 |---|---|---|
-|Choices|One, committed|All, compared|
-|Revisits decisions|No|Effectively yes|
-|Typical complexity|O(n log n), often sorting-dominated|O(n&times;states)|
-|Correctness|Only with the greedy choice property|General|
-|Memory|O(1) beyond the input|O(states)|
+| Activity selection | Choose the compatible activity that finishes earliest | Optimal maximum-size schedule |
+| Fractional knapsack | Take the greatest value per unit weight | Optimal when items can be split |
+| Minimum spanning tree | Add a cheapest safe edge | Kruskal’s and Prim’s algorithms are optimal |
+| Shortest paths | Finalise the nearest unsettled vertex | Dijkstra is correct only with non-negative edges |
+| 0/1 knapsack | Take the greatest value-to-weight ratio | Can fail because items cannot be split |
 
-The practical procedure when facing a new optimisation problem: <strong>try to find a greedy rule and a counterexample</strong>. If a counterexample exists, use dynamic programming. If a few tries to break it fail, look for an exchange argument to prove it.
+These are problem-specific proofs. “Always take the largest” or “always choose the cheapest” is not a general correctness argument.
 
-Do not assume greedy works because it gives plausible answers on small cases. That is how incorrect solutions ship &mdash; greedy failures are often subtle and appear only on specific inputs.
+## A worked success: choosing activities
 
-## Greedy as an estimate
+Suppose activities have start and finish times, and only one can run at once. Sort by finish time; repeatedly select the first activity that starts after the last selected one finishes. This leaves as much time as possible for whatever follows.
 
-When exact solutions are intractable, greedy is often the best practical option and sometimes comes with a guarantee.
+Why is that safe? Consider an optimal schedule whose first activity finishes later than the earliest-finishing compatible activity. Replacing it with the earlier finisher cannot reduce the number of later activities that fit. Repeating the exchange establishes an optimal schedule that follows the greedy rule. The sorting costs O(n log n); the scan costs O(n).
 
-<strong>Set cover.</strong> Repeatedly take the set covering the most uncovered elements. NP-hard exactly, and greedy is within a factor of ln(n) of best. And no polynomial algorithm does much better.
+Choosing the earliest start or shortest duration does not give the same guarantee. One long early-starting activity can block several short non-overlapping activities, and a short activity can straddle two that could otherwise both be chosen.
 
-<strong>Travelling salesman.</strong> Nearest neighbour is a fast heuristic, but its worst-case approximation ratio grows logarithmically with the number of cities on metric instances; it has no fixed percentage guarantee. Christofides’ algorithm guarantees a tour no longer than 1.5 times optimal when distances satisfy the metric conditions. The nearest-neighbour bound is analysed by <a href="https://doi.org/10.1137/0206041" rel="noopener">Rosenkrantz, Stearns and Lewis</a>; see also <a href="https://www.cs.cornell.edu/courses/cs681/2007fa/Handouts/christofides.pdf" rel="noopener">Cornell’s proof of the Christofides 3/2 bound</a>.
+## A counterexample: coin change
 
-<strong>Job scheduling.</strong> Longest-handling-time-first is within 4/3 of best for cutting makespan on the same machines.
+Greedy coin change repeatedly takes the largest coin no bigger than the remaining amount. With coins {1, 3, 4} and amount 6, it chooses 4, then 1, then 1: three coins. The optimum is 3 + 3: two coins. The local choice is legal but not globally best.
 
-<strong>Huffman coding.</strong> Repeatedly merge the two least frequent symbols. And here greedy is exactly best. This is why it is used in every compression format.
+The result depends on the denomination system. Some systems have a proof that greedy is optimal; arbitrary systems do not. Dynamic programming can solve the minimum-coin version for a bounded integer amount by comparing choices across subamounts; see [dynamic programming](dynamic_programming.html).
 
-So greedy takes two roles: exactly best for a specific set of problems. And a strong fast estimate for many that are intractable. Knowing which situation you are in is the point.
+## Try the visualiser
 
-## Where greedy algorithms are used
+1. Choose **Problem** “Activity selection (greedy works)” and step through the schedule. Check that each accepted activity starts after the previous one finishes.
+2. Choose **Problem** “Coin change — greedy FAILS” and set **amount** to 6. With coins {1, 3, 4}, compare the greedy choices with the two-coin optimum.
 
-- <strong>Huffman coding</strong> in ZIP, JPEG, MP3 and HTTP compression.
-- <strong>Dijkstra's algorithm</strong> in every routing protocol and navigation system.
-- <strong>Minimum spanning trees</strong> for network design and clustering.
-- <strong>Interval scheduling</strong> in room booking, CPU scheduling and advertising slot allocation.
-- <strong>Cache eviction.</strong> LRU is greedy &mdash; evict the least recently used, without predicting the future.
-- <strong>Decision tree construction.</strong> Choosing the best split at each node is greedy. And it is why trees are not globally best.
+The experiment makes a useful distinction visible: the same simple pattern can be optimal on one problem and fail on another.
 
-The decision-tree case is a good closing case: finding the globally best tree is intractable. So every implementation is greedy, and everyone accepts a locally-best tree because it works well enough.
+## Where greedy appears
 
-## Questions people ask
-
-<strong>How do I know greedy will work?</strong> Prove the greedy choice property with an exchange argument, or find a counterexample. There is no shortcut.
-
-<strong>Is greedy always faster than DP?</strong> Often, because it explores one path rather than a state space &mdash; often ruled by an initial sort.
-
-<strong>What if greedy is wrong but close?</strong> That is an estimate algorithm. And it is often the right engineering answer for NP-hard problems.
-
-<strong>Is Dijkstra greedy?</strong> Yes &mdash; it commits to the closest unvisited node. This is exactly why negative weights break it.
-
-<strong>Can greedy be combined with DP?</strong> Yes &mdash; some DP solutions use a greedy rule to prune states. And some greedy algorithms use DP for subproblems.
-
-<strong>Why does the greedy rule matter so much?</strong> Because the algorithm is the rule. Earliest-finish works for activity choice and earliest-start does not.
-
-## Recap in one screen
-
-- Make the locally best choice and never reconsider. Cheap, and only correct with the greedy choice property.
-- Best for activity choice, Huffman coding, MST, Dijkstra and fractional knapsack.
-- Wrong for 0/1 knapsack, arbitrary coin systems and travelling salesman. Use DP or accept an estimate.
-- The hard part is choosing <em>what</em> to be greedy about; earliest finish time works where earliest start does not.
-- Prove correctness with an exchange argument, or find a counterexample. Do not infer it from small cases.
+Huffman coding repeatedly merges the two least-frequent symbols to build an optimal prefix code. Kruskal and Prim use safe-edge choices to build a minimum spanning tree. Dijkstra selects the nearest unsettled vertex, provided every edge weight is non-negative. Fractional knapsack works because taking part of an item is allowed. For each algorithm, its correctness depends on its own invariant or exchange proof.
 
 ## Sources and next steps
 
-- Approximation analysis: [Rosenkrantz, Stearns and Lewis on TSP heuristics](https://doi.org/10.1137/0206041) and [Cornell’s proof of the Christofides 3/2 bound](https://www.cs.cornell.edu/courses/cs681/2007fa/Handouts/christofides.pdf).
-- Continue with [dynamic programming](dynamic_programming.html), which builds on this idea.
+- Princeton’s [Algorithms course materials](https://www.cs.princeton.edu/courses/archive/spring18/cos423/lectures.php) include greedy algorithms and interval scheduling.
+
+For shortest paths, continue with [Dijkstra’s algorithm](dijkstras.html) and [Bellman–Ford](bellman_ford.html). For a local-choice proof, compare the activity-selection argument above with [dynamic programming](dynamic_programming.html), which keeps alternatives when a local choice is not safe.

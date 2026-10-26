@@ -3,15 +3,10 @@ intro: Constant-time lookup by turning a key into an address &mdash; and what ha
 
 ## Quick Context
 
+
 A <strong>hash table</strong> stores key&ndash;value pairs in an array. A <strong>hash function</strong> converts each key into an array index, so finding a key requires no searching at all. You compute where it must be and go straight there.
 
-That is the core trade-off: a hash table uses more memory than a sorted array or a tree. But it makes lookup, insertion and deletion O(1) on average. The "on average" matters. In the worst case, every key hashes to the same index, every operation degenerates to a linear scan. And the table is no faster than a list. Good hash functions and sensible load factors keep this from happening in practice.
-
-Python's `dict` and `set` are both hash tables. Every time you write `if key in my_dict` or `my_set.add(value)`, you are using a hash table. The constant-time behaviour is why dictionary lookup feels instant even on millions of keys, and why checking membership in a set is faster than scanning a list.
-
-The load factor is the ratio of stored items to available buckets. When it gets too high, collisions multiply and performance drops. Most implementations resize the table &mdash; allocate a larger array and rehash every key &mdash; when the load factor crosses a threshold. Python resizes at about two-thirds full. The resize is O(n) but happens rarely enough that the amortised cost per insertion stays O(1).
-
-Two strategies handle collisions. Chaining stores a linked list (or another container) at each bucket, so multiple keys at the same index coexist. Open addressing looks for the next empty slot in the array itself, following a probe sequence. Python uses open addressing. Both give O(1) amortised performance under reasonable load, and both degrade to O(n) if the table is too full or the hash function is too weak.
+That is the core trade-off: a hash table uses more memory than a sorted array or a tree.
 
 ## What Makes a Good Hash Function
 
@@ -44,31 +39,6 @@ The practical consequence: if you know roughly how many entries you will store, 
 
 The worst case remains O(n) per operation, when every key collides. That requires either a terrible hash function or adversarially chosen keys &mdash; which was a real denial-of-service vector until languages began randomising their hash seeds per process. That is why Python's string hashes differ between runs unless `PYTHONHASHSEED` is fixed.
 
-## Why This Matters to You
-
-Python's <span class="mono-font">dict</span>, JavaScript's <span class="mono-font">Map</span> and object, Java's <span class="mono-font">HashMap</span>, Go's <span class="mono-font">map</span> &mdash; all hash tables. When someone says "just use a dictionary for O(1) lookup", this is the machinery they are invoking. It is also why dictionary keys must be <em>hashable</em> and immutable: mutating a key after insertion changes its hash. And the entry becomes permanently unreachable.
-
-## Turning a key into an address
-
-A hash table stores key-value pairs and finds any of them in roughly constant time, whatever the size.
-
-The mechanism: a <strong>hash function</strong> converts the key into an integer, that integer is reduced modulo the table size to give an index. And the pair is stored there.
-
-<p class="mono-font">"apple" &rarr; hash() &rarr; 1839274 &rarr; % 16 &rarr; slot 10</p>
-
-Lookup does the same computation and goes straight to slot 10. No scanning, no comparison against other keys &mdash; one calculation and one memory access.
-
-That is the whole idea, and it is why dictionaries are the workhorse of practical programming:
-
-|Operation|Hash table|Sorted array|Linked list|
-|---|---|---|---|
-|Lookup|O(1)|O(log n)|O(n)|
-|Insert|O(1)|O(n)|O(1)|
-|Delete|O(1)|O(n)|O(n) to find|
-|Ordered traversal|Insertion order|Sorted|Insertion order|
-
-The trade is that nothing is sorted. If you need range queries or ordered iteration by key, a tree structure is the right choice.
-
 ## Collisions, and the two ways to handle them
 
 Two different keys can hash to the same slot. With 16 slots and 10 keys, collisions are not unlikely &mdash; they are near-certain, by the same reasoning as the birthday problem.
@@ -86,121 +56,10 @@ Two different keys can hash to the same slot. With 16 slots and 10 keys, collisi
 
 Python's `dict` uses open addressing with a randomised probe sequence. Java's `HashMap` uses chaining, switching a long chain to a tree above a threshold to bound the worst case.
 
-## Load factor, collisions, and the moment O(1) stops being true
-
-A hash table is O(1) on average and O(n) in the worst case, and the distance between those two is decided by the load factor and the quality of the hash. Both are measurable, so rather than take the averages on trust, build a table and watch the chains grow.
-
-```python-run
-class Table:
-    def __init__(self, buckets, hashfn):
-        self.b = [[] for _ in range(buckets)]
-        self.hashfn = hashfn; self.n = 0
-    def put(self, key):
-        i = self.hashfn(key) % len(self.b)
-        if key not in self.b[i]:
-            self.b[i].append(key); self.n += 1
-    def probes(self, key):
-        i = self.hashfn(key) % len(self.b)
-        for pos, k in enumerate(self.b[i]):
-            if k == key: return pos + 1
-        return len(self.b[i])
-    def stats(self):
-        lens = [len(c) for c in self.b]
-        return (self.n / len(self.b), max(lens),
-                sum(lens) / max(1, sum(1 for x in lens if x)))
-
-keys = ["key%d" % i for i in range(200)]
-print("200 keys, good hash, varying table size")
-print("%9s %6s %12s %10s %12s" % ("buckets", "load", "longest", "avg", "probes"))
-for buckets in (16, 64, 256, 512):
-    t = Table(buckets, lambda k: hash(k))
-    for k in keys: t.put(k)
-    load, longest, avg = t.stats()
-    print("%9d %6.2f %12d %10.2f %12d" % (buckets, load, longest, avg, t.probes(keys[-1])))
-# 4x the buckets -> roughly 1/4 the chain. that is why implementations
-# resize: keep the load near 1 and lookup stays constant-time.
-```
-
-Now break the hash function instead of the load factor, and see lookups degenerate to O(n).
-
-```python-run
-class Table:
-    def __init__(self, buckets, hashfn):
-        self.b = [[] for _ in range(buckets)]
-        self.hashfn = hashfn
-    def put(self, key):
-        i = self.hashfn(key) % len(self.b)
-        if key not in self.b[i]: self.b[i].append(key)
-    def probes(self, key):
-        i = self.hashfn(key) % len(self.b)
-        for pos, k in enumerate(self.b[i]):
-            if k == key: return pos + 1
-        return len(self.b[i])
-
-keys = ["key%d" % i for i in range(200)]
-print("200 keys, 256 buckets, three hash functions")
-print("%-18s %12s %12s %12s" % ("hash", "used", "longest", "probes"))
-for name, fn in [("len(key)", lambda k: len(k)),
-                 ("first char", lambda k: ord(k[0])),
-                 ("Python hash", lambda k: hash(k))]:
-    t = Table(256, fn)
-    for k in keys: t.put(k)
-    used = sum(1 for c in t.b if c)
-    print("%-18s %12d %12d %12d" % (
-        name, used, max(len(c) for c in t.b), t.probes(keys[-1])))
-# first-char hash: all 200 keys start with "k", one bucket, 200 probes.
-# nothing about the table is wrong; the hash is. Python randomises
-# string hashing per process to prevent hash-flooding attacks.
-print("\nhash('a') this run:", hash("a"))
-```
-
 ## Experiments to try
 
 1. <strong>Insert a few keys</strong> and watch each one compute its own index &mdash; no searching involved at any point.
 2. <strong>Press Force collision.</strong> Two keys land in the same bucket; the strategy selector decides what happens next.
-3. <strong>Switch to open addressing</strong> with a collision present. The second key moves to the next free slot rather than sharing.
-4. <strong>Reduce the bucket count to 4</strong> and keep inserting. The load factor rises, collisions multiply, and lookups start needing several probes.
-5. <strong>Look up a key after several collisions.</strong> The probe count is exactly how far O(1) has drifted toward O(n).
-
-## What to remember
-
-Hashing replaces searching with computing an address. Collisions are unavoidable and must be resolved by chaining or probing; the load factor governs how often they happen. Keep it low and lookups stay effectively constant &mdash; let it climb and a hash table quietly becomes a linked list.
-
-## What makes a valid key
-
-A key must be <strong>hashable</strong>, which means two things: it has a hash value that never changes. And it can be compared for equality.
-
-That is why mutable types cannot be keys:
-
-```python
-d = {}
-d[(1, 2)] = "ok"          # tuple - immutable, hashable
-d[[1, 2]] = "error"       # TypeError: unhashable type: 'list'
-```
-
-If a list could be a key, mutating it after insertion would change its hash, and the entry would become unreachable. Stored in a slot the new hash does not point to.
-
-The contract between hashing and equality has two rules, and breaking the first causes genuinely confusing bugs:
-
-<strong>Equal objects must have equal hashes.</strong> Otherwise two objects that compare equal land in different slots and both exist in the table.
-
-<strong>Unequal objects may share a hash.</strong> That is just a collision, handled normally.
-
-For a custom class, implement both together:
-
-```python
-class Point:
-    def __init__(self, x, y):
-        self.x, self.y = x, y
-
-    def __eq__(self, other):
-        return isinstance(other, Point) and (self.x, self.y) == (other.x, other.y)
-
-    def __hash__(self):
-        return hash((self.x, self.y))     # hash the same fields as __eq__
-```
-
-Defining `__eq__` without `__hash__` makes the class unhashable in Python 3 &mdash; a deliberate safeguard against exactly this inconsistency.
 
 ## Where hash tables show up
 
@@ -226,28 +85,6 @@ for order in orders:
 ```
 
 Building a dictionary to replace a repeated scan is the most common and most effective optimisation available in ordinary code.
-
-## Questions people ask
-
-<strong>Why is lookup O(1) if collisions exist?</strong> Because with a good hash function and a bounded load factor, the expected chain length is a small constant. The worst case is O(n) and is not encountered in practice.
-
-<strong>Are Python dictionaries ordered?</strong> They preserve insertion order, guaranteed since 3.7. That is not the same as sorted.
-
-<strong>Why can a list not be a dictionary key?</strong> Mutating it would change its hash and orphan the entry. Use a tuple.
-
-<strong>How much memory does a dictionary use?</strong> More than a list of the same values. It stores hashes and keeps spare slots. Lookup speed is what you are buying.
-
-<strong>What is hash randomisation?</strong> Per-process randomisation of string hashes, added to prevent denial-of-service attacks that on purpose collide keys.
-
-<strong>When should I not use a hash table?</strong> When you need sorted order, range queries, or a nearest-key lookup. Use a tree.
-
-## Recap in one screen
-
-- A hash function maps a key to a slot, so lookup is one computation and one access.
-- Collisions are inevitable and are handled by chaining or open addressing.
-- Load factor drives resizing, which is O(n) sometimes and O(1) amortised.
-- Keys must be immutable, and `__eq__` and `__hash__` must agree.
-- Replacing a repeated scan with a pre-built dictionary is the standard way to turn quadratic code linear.
 
 ## Sources and next steps
 

@@ -1,279 +1,39 @@
 title: t-SNE and UMAP beside PCA
-intro: t-SNE and UMAP create low-dimensional layouts that emphasize neighbourhood structure. Their plots help explore data, but distances between separated groups can be misleading.
+intro: PCA, t-SNE, and UMAP project high-dimensional data into a plot for different purposes. PCA captures directions of variance; t-SNE and UMAP focus more on preserving local neighbourhoods.
 
-## A note on what this page runs
+## Three different projections
 
-High-dimensional data is hard to think about. You cannot plot 50
-columns on a flat screen. PCA does it by choosing the two directions
-with the most spread, but that projection can hide clusters that sit
-in the other 48 dimensions. t-SNE and UMAP take a different approach:
-they try to keep nearby points nearby, and let everything else land
-wherever it lands. The result often shows clusters that PCA misses.
-The price is that cluster spacing in the plot becomes arbitrary. You
-can read neighbourhoods, not distances.
+**PCA** is a linear projection onto directions with high variance. A two-dimensional PCA plot shows how much of the original variation those two components retain, but it can hide structure in omitted dimensions. PCA does not preserve every pairwise distance when reducing dimensions.
 
-The layout on this page is a **simplified neighbour-preserving
-optimisation** &mdash; attract each point toward its nearest neighbours in
-the original space, repel all else. It is not t-SNE: there is no
-perplexity, no Student-t kernel, no KL divergence being minimised.
-What it copies faithfully is the action that matters: local structure
-is preserved, and the distances between groups stop meaning anything.
-The [PCA module](pca.html) covers the linear method properly. The controls on this page let you watch both approaches side by side.
+**t-SNE** constructs a layout that tries to keep nearby points together. **UMAP** builds a neighbourhood graph and optimizes a low-dimensional representation of it. Both are nonlinear and can produce useful views of local structure. Neither plot is a faithful map of all high-dimensional distances.
 
-## Two different jobs
+## Compare the layouts
 
-**PCA** finds the directions along which the data varies most and projects onto
-them. It's linear, deterministic, invertible, and fast &mdash; and because it's
-a map, distances live it in a predictable way. Points far apart in the
-first space are far apart in the plot, up to the variance the discarded
-dims held.
+The visualization starts from groups with known spacing and compares how each method lays them out. Switch between PCA and the neighbourhood methods, then change the local-neighbourhood setting. The groups may remain visibly separated even as their displayed gaps change. This shows why cluster separation in the picture is useful for exploration but not proof that the groups are globally far apart in the original data.
 
-**t-SNE and UMAP** solve a different problem. They ask which points are near
-each other in the first space, and then *make* a two-dimensional
-setup in which those same points are near each other. There's no
-map and no formula mapping one space to the other &mdash; the coords
-are the output of an optimisation.
+## What the plot can and cannot tell you
 
-## What the readout is checking
+- **Nearby points:** a t-SNE or UMAP plot is designed to emphasize local neighbourhoods, but validate the neighbourhoods in the original feature space.
+- **Gaps between groups:** do not interpret these as meaningful global distances; the layout objective may not constrain them.
+- **Cluster size and density:** plot area can be distorted. It does not directly report the original cluster size or density.
+- **Axes:** the orientation and absolute coordinates have no direct meaning; rotating or reflecting a layout does not change its interpretation.
+- **Stability:** results can depend on initialization, random seed, and settings. Compare multiple runs and parameter choices before treating a pattern as robust.
 
-The data behind this page has three clusters arranged on a line, with the third
-just twice as far from the first as the second is. A ratio of 2.00, by
-build.
+## Choosing a method
 
-Switch between the methods and watch the measured ratio.
+Use PCA for a fast, interpretable linear baseline and when a fitted transform for new data is useful. Use t-SNE to inspect local neighbourhoods, especially in smaller datasets; adding new points generally requires fitting the embedding again. UMAP can often transform new points after fitting and can scale to larger datasets, but the result still depends on its metric and neighbourhood settings. Neither method should be selected solely because its plot looks more separated.
 
-**PCA** copies it closely. It's a linear map, so the global
-setup is preserved.
+These are primarily exploratory tools. Before using projected coordinates in a predictive model, validate the full projection-and-model pipeline on held-out data and check whether the representation generalizes to new observations.
 
-**The neighbour-preserving layout** doesn't, and the number wanders as you
-change the attraction strength. The three groups are cleanly separated &mdash;
-visibly better than PCA &mdash; and the distances between them are an artefact of
-the optimisation.
+## Common mistakes
 
-That is the whole lesson, and it's the thing most often got wrong when reading
-these plots.
+- **Claiming clusters are proven by the plot:** separation may be an artifact of the embedding objective.
+- **Reading exact distances or density from t-SNE:** those global quantities are not preserved.
+- **Showing one run as definitive:** repeat with different seeds and reasonable settings.
+- **Calling PCA invertible after reducing dimensions:** omitted components cannot be recovered exactly.
 
-## What you may not read from a t-SNE plot
+## Sources and next steps
 
-**Distance between clusters.** Two clusters at opposite ends may be more similar
-than two that are adjacent. The layout only tried to keep neighbours together.
-
-**Cluster size.** t-SNE expands dense regions and contracts sparse ones, so the
-area a cluster occupies says nothing about how many points it has or how spread
-out they were.
-
-**Density within a cluster.** Same reason.
-
-**anything from one run.** t-SNE is stochastic and its result depends on the
-random seed and on perplexity. Run it three times and you get three pictures.
-Structure that lives all three is real. Structure that doesn't, isn't.
-
-## Perplexity and n_neighbors
-
-Both methods have a parameter controlling how much zone to consider
-&mdash; **perplexity** in t-SNE, **n_neighbors** in UMAP. Low values emphasise
-very local structure and can shatter a genuine cluster into fragments. High
-values emphasise broader structure and can merge distinct clusters.
-
-There's no correct value, and the standard advice is to look at a few. A
-finding that only appears at one setting is a finding about the parameter.
-
-## t-SNE against UMAP
-
-**Speed.** UMAP is a lot faster and scales to larger datasets.
-
-**Global structure.** UMAP claims to preserve more of it, and often does,
-though the caution above still applies &mdash; less meaningless isn't
-real.
-
-**New points.** UMAP can transform data it didn't see during fitting. t-SNE
-can't: adding a point means re-running all. This matters if the embedding
-is part of a pipeline rather than a picture.
-
-**Reproducibility.** Both are stochastic. Both take a seed.
-
-## What they are for
-
-Looking. These are visualisation tools, and they're very good at answering "does
-my data separate at all", "are my labels steady", "is there a group I didn't
-expect".
-
-They're a poor choice as a prep step for a model. The output
-coords have no meaning outside the plot, the mapping isn't stable, and for
-t-SNE it can't be applied to new data at all. If you want dimensionality
-reduction inside a pipeline, PCA is the safe default.
-
-## The distance you are not allowed to read
-
-The one number that makes the caution concrete: place three clusters on a line so
-the third is just twice as far from the first as the second is &mdash; a true
-ratio of 2.00 &mdash; and measure it back off each layout:
-
-|method|recovered distance ratio|
-|---|---|
-|PCA|~2.00|
-|neighbour-preserving (t-SNE-like)|arbitrary, and it wanders with the settings|
-
-PCA is a linear map. So Global setup lives it and the 2.00 comes
-back. t-SNE and UMAP never project. They *make* a layout that keeps
-each point near its first neighbours and nothing else &mdash; so between-cluster
-distance is an output of the optimisation, not a property of the data, and it
-changes with the seed and the perplexity. That is why three things on such a plot
-are unreadable: the distance between clusters, the size of a cluster (dense regions
-are expanded and sparse ones contracted), and within-cluster density. What the plot
-*is* good for is the local question. Does the data separate at all, are the
-labels steady, is there an unexpected group. And the discipline that
-keeps it honest is to run it two or three times: structure that lives each seed
-is real, structure that moves is an artefact.
-
-On choosing between the two neighbour-preserving methods: UMAP is a lot
-faster, scales to larger data, and can transform points it didn't see during
-fitting, which t-SNE can't &mdash; adding a point to a t-SNE means re-running
-all, so it can never sit inside a pipeline that scores new data. UMAP also
-claims to preserve more global structure and often does, though the caution
-stands: less meaningless isn't real. Both are stochastic and both take a
-seed. And both are the wrong choice as a prep step for a model, because
-the coords mean nothing outside the plot and the mapping isn't stable. When
-you want dimensionality reduction inside a pipeline, PCA is the safe default.
-
-## Where it goes wrong
-
-**Measuring distance between clusters.** The single most common error.
-
-**Reading cluster sizes.** Artefacts of the optimisation.
-
-**Running once and believing it.** Vary the seed and the perplexity.
-
-**Feeding t-SNE coords into a classifier.** No stable mapping. No way to
-transform new data.
-
-## Questions people ask
-
-<strong>Can I trust the distances between clusters in t-SNE?</strong> No. t-SNE preserves local neighbourhoods, not global distances, so the gaps and sizes between clusters can be arbitrary.
-
-<strong>What is perplexity?</strong> Roughly the number of neighbours each point considers. Values from 5 to 50 are typical, and you should try several because the picture changes.
-
-<strong>t-SNE or UMAP?</strong> UMAP is faster and tends to keep more of the global structure. Both are for visualisation, and both are sensitive to their settings.
-
-<strong>Can I use t-SNE output as features for a model?</strong> It is not recommended. The embedding cannot transform new points consistently and depends on the run. UMAP can transform new data and is better suited.
-
-<strong>Why does my plot change every run?</strong> Both start from random initialisation. Set a random seed, and check that the structure you care about appears across seeds.
-
-<strong>Should I reduce dimensions with PCA first?</strong> Often yes, down to about 30 to 50 components. It cuts noise and speeds up the embedding.
-
-## A map you can look at, and must not measure
-
-t-SNE turns high-dimensional data into a picture. The picture is handy and a few things about it aren't true. The interactive comparison makes this concrete.
-
-```python-run
-import numpy as np
-from sklearn.manifold import TSNE
-from sklearn.datasets import make_blobs
-from sklearn.metrics import pairwise_distances
-rng = np.random.default_rng(0)
-X, y = make_blobs(n_samples=600, n_features=30, centers=4, cluster_std=2.0,
-                  random_state=0)
-X[y == 3] += 40.0
-print("600 points in 30 dimensions, 4 groups, one pushed far away.")
-cent = np.array([X[y == c].mean(axis=0) for c in range(4)])
-D = pairwise_distances(cent)
-print("true distances between group centres:")
-for i in range(4):
-    print("   group %d: %s" % (i, np.round(D[i], 1)))
-
-emb = TSNE(n_components=2, perplexity=30, random_state=0, init="pca").fit_transform(X)
-cent2 = np.array([emb[y == c].mean(axis=0) for c in range(4)])
-D2 = pairwise_distances(cent2)
-print("the same distances in the t-SNE picture:")
-for i in range(4):
-    print("   group %d: %s" % (i, np.round(D2[i], 1)))
-
-off = ~np.eye(4, dtype=bool)
-print("ratio of largest to smallest between-group distance:")
-print("   in 30-D  : %.2f" % (D[off].max() / D[off].min()))
-print("   in t-SNE : %.2f" % (D2[off].max() / D2[off].min()))
-near = D[:3, :3][~np.eye(3, dtype=bool)].mean()
-far = D[3, :3].mean()
-near2 = D2[:3, :3][~np.eye(3, dtype=bool)].mean()
-far2 = D2[3, :3].mean()
-print("  in 30-D, group 3 sits %.1fx further. in the picture, %.1fx."
-      % (far / near, far2 / near2))
-print()
-print("cluster SIZES are not preserved either:")
-for c in range(4):
-    print("   group %d: spread %6.2f in 30-D, %6.2f in the picture"
-          % (c, X[y == c].std(), emb[y == c].std()))
-print("  t-SNE inflates sparse clusters and compresses dense ones.")
-```
-
-The next block measures what t-SNE does preserve and how perplexity changes the result.
-
-```python-run
-import numpy as np
-from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA
-from sklearn.datasets import make_blobs
-from sklearn.metrics import pairwise_distances
-rng = np.random.default_rng(0)
-X, y = make_blobs(n_samples=600, n_features=30, centers=4, cluster_std=2.0,
-                  random_state=0)
-X[y == 3] += 40.0
-
-def knn_overlap(A, B, k=15):
-    da = pairwise_distances(A); db = pairwise_distances(B)
-    np.fill_diagonal(da, np.inf); np.fill_diagonal(db, np.inf)
-    na = np.argsort(da, axis=1)[:, :k]
-    nb = np.argsort(db, axis=1)[:, :k]
-    return np.mean([len(set(a) & set(b)) / k for a, b in zip(na, nb)])
-
-emb = TSNE(n_components=2, perplexity=30, random_state=0, init="pca").fit_transform(X)
-pca2 = PCA(n_components=2).fit_transform(X)
-print("what IS preserved -- who your neighbours are:")
-print("   fraction of each point's 15 nearest neighbours that survive:")
-print("     t-SNE %.4f" % knn_overlap(X, emb))
-print("     PCA   %.4f" % knn_overlap(X, pca2))
-print("  t-SNE keeps local neighbourhoods far better, throws away global.")
-print()
-
-print("perplexity changes the picture, not just its appearance:")
-for perp in (5, 30, 100):
-    e = TSNE(n_components=2, perplexity=perp, random_state=0,
-             init="pca").fit_transform(X)
-    print("   perplexity %3d: neighbour overlap %.4f" % (perp, knn_overlap(X, e)))
-print("  roughly 'how many neighbours count'. run two or three values")
-print("  before believing any structure you see.")
-```
-
-The next block runs t-SNE on pure noise to show it always produces apparent structure.
-
-```python-run
-import numpy as np
-from sklearn.manifold import TSNE
-from sklearn.metrics import pairwise_distances
-rng = np.random.default_rng(0)
-
-def knn_overlap(A, B, k=15):
-    da = pairwise_distances(A); db = pairwise_distances(B)
-    np.fill_diagonal(da, np.inf); np.fill_diagonal(db, np.inf)
-    na = np.argsort(da, axis=1)[:, :k]
-    nb = np.argsort(db, axis=1)[:, :k]
-    return np.mean([len(set(a) & set(b)) / k for a, b in zip(na, nb)])
-
-print("t-SNE on pure noise:")
-Xn = rng.normal(size=(600, 30))
-en = TSNE(n_components=2, perplexity=30, random_state=0, init="pca").fit_transform(Xn)
-print("   neighbour overlap with the real 30-D noise: %.4f" % knn_overlap(Xn, en))
-print("   it still produces a picture with apparent blobs in it.")
-print("   a shape in a t-SNE plot is a hypothesis, not a finding.")
-print()
-print("use it to look, never to measure. do not read distances between")
-print("clusters or their sizes. cluster in the original space and")
-print("colour the picture by it.")
-print()
-print("UMAP is the usual alternative: much faster, preserves more global")
-print("layout, same caveats. it ships as the separate umap-learn package.")
-```
-
-## Further reading
-
-For implementation details, see the [Manifold learning](https://scikit-learn.org/stable/modules/manifold.html). Continue with [principal component analysis](pca.html) to connect this topic to a related part of the workflow.
+- [scikit-learn: Manifold learning](https://scikit-learn.org/stable/modules/manifold.html) documents t-SNE and related methods.
+- [UMAP documentation](https://umap-learn.readthedocs.io/en/latest/) explains its neighbourhood graph and transform workflow.
+- Continue with [principal component analysis](pca.html) and [choosing k](choosing_k.html).

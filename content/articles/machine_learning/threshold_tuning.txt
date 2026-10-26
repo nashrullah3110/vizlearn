@@ -1,216 +1,48 @@
 title: Threshold Tuning
-intro: A classification threshold converts scores or probabilities into labels. Tune it on validation data to match the costs or operating constraints of the task.
+intro: A classification threshold turns model scores into positive or negative decisions. Choose it on validation data to meet a cost, precision, recall, or workload target.
 
-## Where 0.5 comes from
+## What the threshold changes
 
-It comes from the library. `predict()` calls `predict_proba()` and cuts at 0.5,
-because a default has to be a thing and 0.5 is least arbitrary
-choice available.
+Many classifiers output a score, and a threshold turns it into a positive or negative decision. Lowering the threshold usually catches more positives while creating more false alarms; the score ranking stays fixed, so ROC AUC does not change.
 
-It's best under two assumptions that are rarely true together: the classes
-are weighed, and the two kinds of mistake cost the same. Change either and 0.5
-stops being an appropriate threshold.
+The familiar 0.5 is a default decision rule, not a universal optimum. It is justified by calibrated probabilities and equal costs for false positives and false negatives. If the scores are not calibrated, the numerical threshold should not be interpreted as a probability.
 
-## Put a price on each mistake
+## Let error costs guide the cutoff
 
-The two sliders set what a false minus and a false plus cost. The curve
-is the **total cost** across each threshold, found over 1,500 cases with 20%
-positives. The grey line marks 0.5. The orange line marks the cheapest
-threshold.
+For a case with calibrated positive probability <code>p</code>, predicting positive has expected cost <code>(1 - p) C_FP</code>; predicting negative has expected cost <code>p C_FN</code>. Choose positive when the first is smaller:
 
-Start with a miss costing 20 and a false alarm costing 1 &mdash; a screening
-problem, where investigating a healthy person is cheap and letting a sick one
-through isn't. The min sits well below 0.5. The model should flag
-generously, because the flags are cheap and the misses aren't.
-
-Now reverse them: a miss at 1 and a false alarm at 50 &mdash; an automated
-account suspension, where a wrong suspension is costly and a missed offender
-is dealt with later. The min moves above 0.5.
-
-Set them equal and, with these class proportions, the min lands near 0.5 but
-not just on it, because the balance is 20/80 rather than 50/50.
-
-## The arithmetic
-
-The expected cost of predicting plus on a case with predicted chance
-*p* is `(1 - p) x cost_FP`. Predicting minus costs `p x cost_FN`. Flagging is
-worth it when
-
-```
-(1 - p) * cost_FP  <  p * cost_FN
+```text
+(1 - p) C_FP < p C_FN
 ```
 
-which rearranges to
+Solving gives <code>p &gt; C_FP / (C_FP + C_FN)</code>. If a missed positive costs 20 and a false alarm costs 1, the cost-based threshold is about 0.048. If a false alarm costs 50 and a miss costs 1, it is about 0.980. These are starting points for calibrated probabilities; operational limits and model uncertainty still matter.
 
-```
-p  >  cost_FP / (cost_FP + cost_FN)
-```
+## Explore the cost curve
 
-With equal costs that is 0.5. This Is where the default comes from. With a miss
-ten times as costly as a false alarm it's 1/11, about 0.09 &mdash; and a
-default of 0.5 is then five times too strict.
+The chart compares total error cost across thresholds for its fixed example dataset. Change **Cost of a miss (false negative)** and **Cost of a false alarm (false positive)**. When missing a positive becomes more expensive, the minimum-cost point moves toward a lower threshold. When false alarms become expensive, it moves higher. This curve illustrates the trade-off; it is not a guarantee that the same threshold will be best on your data.
 
-That formula is worth carrying around. It gives a defensible starting threshold
-from two numbers a domain expert can often supply, without any tuning at all.
+## When costs are hard to estimate
 
-## When you cannot price the errors
+Choose a measurable operating requirement instead:
 
-Often no one can put a number on a miss. Three usable fallbacks:
+- **Recall target:** find a threshold that catches at least the required share of positives, then inspect the resulting false alarms.
+- **Precision target:** require a minimum fraction of alerts to be correct, then measure how many positives are missed.
+- **Review capacity:** take the highest-scoring cases up to the team’s available capacity.
+- **F-score:** use F1 when precision and recall matter similarly, or F-beta when one matters more. Select the score on validation data.
 
-**Raise F1**, or F-beta if one error matters more. This is the least
-opinionated option and it's what most people do.
+None of these choices is value-free. State the constraint and show the resulting confusion matrix so readers can see the practical workload and error counts.
 
-**Fix an operating constraint.** "The team can investigate 200 cases a day" sets
-the threshold right: take the top 200 scores. "Precision must be at least
-80%" does the same from the other side. These are often more honest than a
-metric, because they show what will really happen.
+## Worked example
 
-**Choose from the curve.** Plot precision and recall against threshold and pick
-the point where the trade-off turns. It's a judgement, but an informed one.
+Suppose a screening model ranks 1,000 patients, 100 of whom have a condition. At threshold 0.5 it flags 40 patients and catches 30 cases: precision is <code>30/40 = 75%</code> and recall is <code>30/100 = 30%</code>. Lowering the threshold might flag 120 and catch 75: recall rises to 75%, while precision becomes <code>75/120 = 62.5%</code>. Whether that is better depends on follow-up capacity and the relative harm of a missed case and an unnecessary review.
 
-## Two things that must be right
+## Keep threshold selection honest
 
-**Tune on validation data.** Choosing the threshold on the test set and then
-reporting test speed is the same category of error as tuning
-settings there &mdash; the reported number includes the choice you made
-to raise it.
+Tune the threshold using validation data or out-of-fold predictions, then evaluate the chosen rule once on the test set. Picking a threshold on the test set and reporting its score makes the test result optimistic. If the class prevalence or error costs change in production, review the operating point again.
 
-**Don't confuse this with calibration.** Threshold tuning takes the scores as
-given and picks a cut. Calibration changes the scores so that a score of 0.8
-really means 80% of such cases are plus.
+Cost-derived thresholds require probabilities that represent real frequencies; check calibration or calibrate on separate validation data. Threshold tuning cannot repair poor ranking, missing features, or a model that does not generalize.
 
-They're free. A badly calibrated model can rank just right, and if the
-ranking is right, a tuned threshold works fine. But if the threshold is being
-derived from the cost formula above, the *p* in it must mean an actual
-chance &mdash; and then calibration matters. Platt scaling and isotonic
-regression are the usual tools.
+## Sources and next steps
 
-## The threshold the costs imply
-
-The best cut isn't a matter of taste. It drops out of the two error costs.
-Flagging a case with predicted chance p is worth it when
-`(1 - p) &middot; cost_FP < p &middot; cost_FN`. This Rearranges to a threshold of
-`cost_FP / (cost_FP + cost_FN)`:
-
-|a miss costs|a false alarm costs|optimal threshold|
-|---|---|---|
-|20|1 (screening)|0.048|
-|1|1 (symmetric)|0.500|
-|1|50 (auto-suspension)|0.980|
-
-The familiar 0.5 is just the middle row. The special case where the two
-mistakes cost the same. Move to a screening problem. Here Missing a sick patient
-is twenty times worse than a needless second look, and an appropriate threshold falls to
-0.048: flag almost anything. Flags are cheap and misses aren't, and the
-default of 0.5 is then more than ten times too strict. Reverse the costs and it
-climbs to 0.98. The formula needs only two numbers a domain expert can often
-supply, and it gives a defensible threshold with no tuning at all &mdash; but the
-p in it must be an actual chance. This Is why a cost-derived threshold is
-just the case where [calibration](probability_calibration.html) stops being
-optional.
-
-When no one can price the errors, three fallbacks are honest. Raise F1 (or
-F-beta if one error matters more). This Is the least opinionated option. Fix an
-operating constraint &mdash; "the team can investigate 200 cases a day" sets the
-threshold right as the top 200 scores, and often shows reality better than
-any metric. Or read the precision-recall trade-off off the curve and pick the knee.
-Whichever you use, tune it on validation data, never the test set: choosing the
-threshold to raise a number and then reporting that number folds the choice into
-the result, just as tuning settings on the test set does.
-
-## Where it goes wrong
-
-**Reporting metrics at 0.5 and stopping.** The most common test mistake
-after using fit.
-
-**Tuning on the test set.** Optimistic by just the amount you gained.
-
-**Retuning per fold and blending.** The thresholds aren't close across
-folds. Tune once on a held-out validation set.
-
-**Losing it drifts.** The best threshold depends on the class balance,
-and that moves in production. It needs rechecking, not setting once.
-
-## Questions people ask
-
-<strong>Why is 0.5 not always the right threshold?</strong> It assumes both kinds of error cost the same and the classes are balanced. Neither is usually true.
-
-<strong>How do I pick a threshold?</strong> Assign a cost to false positives and false negatives and choose the threshold that minimises expected cost. If you cannot price them, set a recall or precision target.
-
-<strong>On which data should I tune the threshold?</strong> On validation data or cross-validated predictions, not the test set. Then report the final result on test data once.
-
-<strong>Does threshold tuning change the model?</strong> No. It changes only how scores become labels, so ranking metrics like AUC stay the same.
-
-<strong>Do I need calibrated probabilities?</strong> For thresholds derived from costs, yes. A cost-based threshold assumes the probabilities are real, so calibrate first.
-
-<strong>What happens when class balance shifts in production?</strong> The best threshold moves. Monitor the positive rate and re-tune when the distribution changes.
-
-## 0.5 is a default, not a decision
-
-The threshold is the one setting you can change after training, in production, in a config file. Here is what it costs and what it buys.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, roc_auc_score, precision_recall_curve, f1_score
-X, y = make_classification(n_samples=8000, n_features=15, n_informative=6,
-                           weights=[0.93, 0.07], flip_y=0.06, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.35, random_state=0, stratify=y)
-prob = LogisticRegression(max_iter=3000).fit(Xtr, ytr).predict_proba(Xte)[:, 1]
-pos = (yte == 1).sum()
-print("%d test rows, %d positive (%.1f%%). AUC %.4f -- model is fine."
-      % (len(yte), pos, 100*pos/len(yte), roc_auc_score(yte, prob)))
-print("the threshold is what is broken.")
-print()
-print("%10s %8s %8s %10s %9s %9s" % ("threshold", "TP", "FP", "FN", "prec", "recall"))
-for t in (0.50, 0.30, 0.20, 0.10, 0.07, 0.03):
-    tn, fp, fn, tp = confusion_matrix(yte, (prob >= t).astype(int)).ravel()
-    print("%10.2f %8d %8d %10d %9.4f %9.4f"
-          % (t, tp, fp, fn, tp/max(tp+fp,1), tp/max(tp+fn,1)))
-print()
-print("at 0.50 the model catches %d of %d positives." %
-      (confusion_matrix(yte, (prob >= 0.5).astype(int)).ravel()[3], pos))
-print("0.50 is not cautious -- it is wrong when only %.1f%% of rows are positive."
-      % (100*pos/len(yte)))
-prec, rec, thr = precision_recall_curve(yte, prob)
-f1 = 2*prec*rec / np.clip(prec+rec, 1e-12, None)
-best = thr[np.nanargmax(f1[:-1])]
-print("best-F1 threshold: %.4f  (F1 %.4f vs %.4f at 0.50)"
-      % (best, f1_score(yte, (prob>=best).astype(int)),
-         f1_score(yte, (prob>=0.5).astype(int))))
-```
-
-F1 is one way to pick a threshold, but a cost matrix is more honest. The next block shows how the same probabilities produce three different optimal thresholds depending on the price of each mistake.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-X, y = make_classification(n_samples=8000, n_features=15, n_informative=6,
-                           weights=[0.93, 0.07], flip_y=0.06, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.35, random_state=0, stratify=y)
-prob = LogisticRegression(max_iter=3000).fit(Xtr, ytr).predict_proba(Xte)[:, 1]
-print("put money on the two mistakes and the answer changes:")
-for fp_cost, fn_cost, label in ((1, 1, "equal cost"),
-                                (1, 20, "miss costs 20x false alarm"),
-                                (20, 1, "false alarm costs 20x miss")):
-    costs = [(t, fp_cost*((prob>=t)&(yte==0)).sum()
-                +fn_cost*((prob<t)&(yte==1)).sum())
-             for t in np.linspace(0.01, 0.95, 300)]
-    t_best, c_best = min(costs, key=lambda kv: kv[1])
-    c_def = next(c for t, c in costs if abs(t-0.5) < 0.006)
-    print("  %-30s best %.3f, cost %6d (at 0.50: %6d)"
-          % (label, t_best, c_best, c_def))
-print()
-print("same model, three different right answers.")
-print("the threshold is where business constraints enter the system.")
-print("pick it on a validation split, not the test set. re-check it")
-print("when the base rate moves -- that is what invalidates it.")
-```
-
-## Further reading
-
-For implementation details, see the [Tuning the classification threshold](https://scikit-learn.org/stable/modules/classification_threshold.html). Continue with [precision, recall, and F1](precision_recall_and_f1.html) to connect this topic to a related part of the workflow.
+- [scikit-learn: Tuning the decision threshold](https://scikit-learn.org/stable/modules/classification_threshold.html) describes validation-based threshold selection.
+- Continue with [probability calibration](probability_calibration.html) and [precision, recall, and F1](precision_recall_and_f1.html).

@@ -1,221 +1,39 @@
 title: The Accuracy Paradox
-intro: Class imbalance makes accuracy hard to interpret because a model can predict the majority class and still score highly. Inspect class-specific metrics and error costs.
+intro: When one class is rare, a model can score highly by predicting the majority class while missing nearly every positive. Accuracy must be read alongside class-specific errors.
 
-## Why 99% score can mean a useless model
+## Why accuracy can hide failure
 
-In many real-world scenarios, the data we care about is rare. Think of credit card fraud, rare disease detection. Or critical system failures. In these datasets, the "normal" class vastly outnumbers the "anomaly" class. This is called <strong>Label Imbalance</strong>. And it creates a dangerous trap for machine learning models: <strong>The Score Paradox</strong>. A model that predicts the majority class for each input reaches high score on imbalanced data while catching zero minority-class cases. The fix is not one thing but a combination: use metrics that expose the failure (precision, recall, F1, AUC rather than score), adjust the decision [threshold](../sklearn/probabilities_and_thresholds.html) to catch more positives, apply class weights so the loss penalises minority-class mistakes more heavily. Or resample the training data (oversample the minority with SMOTE, undersample the majority, or both). The choice depends on the cost of the two kinds of mistake: in fraud detection, missing a fraud (false negative) is far worse than flagging a legitimate transaction (false positive). So you push the threshold low and accept more false alarms. In spam filtering, the costs are closer to equal. This page trains a model on imbalanced data, shows the score paradox in action. And shows how threshold adjustment and class weighting recover the minority class.
+Imagine 100,000 transactions, 500 of which are fraudulent. A model that predicts “legitimate” every time gets 99.5% accuracy and catches no fraud. The score is correct as a fraction of all predictions, but it says little about the rare class the system is meant to find.
 
-## What is the Score Paradox?
+This is the **accuracy paradox**: high accuracy can coexist with poor performance on the minority class. It does not mean accuracy is always useless; it means the class distribution and decision costs matter when interpreting it.
 
-The accuracy paradox occurs when a model has high accuracy but fails to identify the rare class. This happens when the model predicts the majority class every time. In a dataset with 99% normal transactions and 1% fraudulent ones, a model that always predicts "normal" has 99% accuracy. It sounds great. But it has failed at its main task: detecting fraud.
+## Read beyond the overall score
 
-This visualization shows the paradox by checking two models:
+- **Recall** = TP / (TP + FN): the share of actual positives detected. It matters when missed cases are costly.
+- **Precision** = TP / (TP + FP): the share of positive predictions that are correct. It matters when false alarms are costly.
+- **F1** combines precision and recall using their harmonic mean, but ignores true negatives.
+- **Balanced accuracy** averages recall for each class, so the majority class does not dominate the average.
 
-<h4 class="font-bold" style="color: var(--text-main);">1. The "Naive" model</h4>
+No metric is universally best. A fraud team with limited review capacity may prioritize precision; a safety screen may accept more false alarms to improve recall. Report the confusion matrix, class prevalence, selected threshold, and the metric tied to the decision.
 
-This is a deliberately dumb model. Its just rule is: <strong>always predict Class 0 (the majority class)</strong>. It never predicts an anomaly. As you'll see, its score is deceptively high. <h4 class="font-bold" style="color: var(--text-main);">2. The Standard Trained model</h4>
+## Explore prevalence and overlap
 
-This is a standard Logistic Regression model. It tries to learn a decision edge to split the two classes based on the data. Watch how its behavior and metrics change as the dataset turns more imbalanced.
+Adjust **Class 0 (Normal) %** and **Data Overlap** in the visualizer. As normal examples become more common, a model can achieve high overall accuracy without finding many anomalies. Increasing overlap makes the classes harder to separate even if their proportions stay fixed. These controls vary two different properties: prevalence and separability.
 
-## How badly the counts can mislead
+## A threshold changes the trade-off
 
-Take a fraud dataset: 100,000 transactions, 500 of them fraudulent. That is 0.5% positive.
+Suppose the 500 positive cases receive model scores. At one threshold, the system might raise 610 alerts and catch 280 positives: 330 alerts are false and 220 positives are missed. Lowering the threshold to raise 2,400 alerts and catch 420 positives increases recall from 56% to 84%, but precision falls from about 46% to 18%. The model’s ranking did not change; the operating point did.
 
-Now write the laziest possible model &mdash; `give "not fraud"` &mdash; and test it:
+These counts are illustrative. Estimate them on validation data and choose the threshold using error costs or real review capacity. Keep the final test set out of those choices.
 
-- Score: 99.5%
-- Fraud caught: 0 out of 500
-- Money saved: nothing
+## Common mistakes
 
-This is the score paradox in its purest form. The accuracy is high, but the model is useless for detecting fraud, since accuracy is dominated by the class you did not care about. Worse, a real model trained with a standard loss will drift towards this behaviour on its own: predicting the majority class is genuinely the fastest way to reduce average error. So that is where the solver goes.
+- **Treating 99% accuracy as proof of usefulness:** compare against a majority-class baseline.
+- **Reporting recall without false alarms:** a system can catch more positives by flagging nearly everyone.
+- **Assuming resampling is the first fix:** inspect metrics and threshold behavior before changing training data.
+- **Using only ROC AUC:** it summarizes ranking over thresholds, not the precision or workload at the chosen threshold.
 
-The confusion matrix tells the true story instantly:
+## Sources and next steps
 
-|&nbsp;|Predicted fraud|Predicted legitimate|
-|---|---|---|
-|<strong>Actually fraud</strong>|0|500|
-|<strong>Actually legitimate</strong>|0|99,500|
-
-An empty column is the signature of a model that has learned to abstain. If you never look past score, you will never see it.
-
-## Why models collapse onto the majority class
-
-Two mechanisms do the damage. And they are worth separating since they suggest other fixes.
-
-<strong>The loss function is an average.</strong> Cross-entropy sums equally over rows. So 99,500 easy negatives add far more total loss than 500 hard positives. Reducing the loss on the many is simply the better deal for the solver.
-
-<strong>There is not enough of the minority to learn from.</strong> Still a perfectly balanced loss cannot conjure a pattern out of 500 cases spread across a complicated feature space. This is a data problem, not a weighting problem. And no amount of reweighting fixes it.
-
-Distinguishing the two is diagnostic. If the model does well on the training minority and poorly on the test minority, you have too few cases. If it does badly on both, the loss is drowning the signal and reweighting should help.
-
-## Fixes, in the order worth trying
-
-1. <strong>Change the metric first.</strong> Before touching the data, stop reading score. Use precision, recall, F1, and PR-AUC. Half the time this alone changes which model you would have shipped.
-2. <strong>Move the threshold.</strong> A model that outputs chances is not committed to 0.5. Sweep the threshold and pick the point that meets your recall requirement. This costs nothing and is often the whole fix.
-3. <strong>Weight the classes.</strong> `class_weight="balanced"` multiplies each class's loss contribution by the inverse of its frequency. So 500 fraud cases count as much as 99,500 legitimate ones. Supported by most scikit-learn estimators and by the boosting libraries via `scale_pos_weight`.
-4. <strong>Resample.</strong> Undersample the majority (fast, discards data) or oversample the minority (keeps data, risks memorising duplicates). SMOTE creates synthetic minority points by interpolating between real ones. It works well on smooth numeric features and poorly on categorical or high-dimensional data.
-5. <strong>Collect more of the rare class.</strong> Unglamorous and by far the most effective when it is possible.
-6. <strong>Reframe as anomaly detection.</strong> Below roughly 0.1% positives, treating the problem as "learn what normal looks like and flag departures" often beats sorting outright.
-
-Two warnings that cost people weeks. <strong>Resample just the training set</strong>. A balanced test set measures a world that does not exist. And apply SMOTE <em>inside</em> the cross-validation fold, never before splitting. Or synthetic points derived from test rows leak straight into training.
-
-## What 99% score is really worth
-
-On a 1% positive rate, a model that predicts "no" each time scores 99%. This measures what that model is worth. And what the useful metrics say instead.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.dummy import DummyClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import (accuracy_score, balanced_accuracy_score, f1_score,
-                             roc_auc_score, average_precision_score,
-                             matthews_corrcoef)
-
-X, y = make_classification(n_samples=20000, n_features=15, n_informative=6,
-                           weights=[0.99], flip_y=0.01, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0,
-                                      stratify=y)
-print("%d training rows, %d of them positive (%.2f%%)"
-      % (len(ytr), ytr.sum(), 100 * ytr.mean()))
-print()
-
-models = {
-    "always predicts 0": DummyClassifier(strategy="constant", constant=0),
-    "logistic regression": LogisticRegression(max_iter=3000),
-}
-print("%-22s %9s %9s %8s %8s %8s %8s"
-      % ("", "accuracy", "balanced", "F1", "MCC", "ROC AUC", "PR AUC"))
-for name, m in models.items():
-    m.fit(Xtr, ytr)
-    pred = m.predict(Xte)
-    try:
-        prob = m.predict_proba(Xte)[:, 1]
-    except Exception:
-        prob = pred.astype(float)
-    print("%-22s %9.4f %9.4f %8.4f %8.4f %8.4f %8.4f"
-          % (name, accuracy_score(yte, pred), balanced_accuracy_score(yte, pred),
-             f1_score(yte, pred, zero_division=0), matthews_corrcoef(yte, pred),
-             roc_auc_score(yte, prob), average_precision_score(yte, prob)))
-print()
-print("the do-nothing model scores %.4f on accuracy and 0.0000 on every metric"
-      % accuracy_score(yte, np.zeros_like(yte)))
-print("that asks whether it found anything. that is the whole problem, in one row.")
-```
-
-Still the real model misses most positives at the default threshold. And PR AUC degrades much faster than ROC AUC as imbalance deepens.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import (accuracy_score, confusion_matrix,
-                             roc_auc_score, average_precision_score)
-
-X, y = make_classification(n_samples=20000, n_features=15, n_informative=6,
-                           weights=[0.99], flip_y=0.01, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0,
-                                      stratify=y)
-model = LogisticRegression(max_iter=3000).fit(Xtr, ytr)
-
-tn, fp, fn, tp = confusion_matrix(yte, model.predict(Xte)).ravel()
-print("even the real model, at the default threshold:")
-print("  caught %d of the %d positives, missed %d" % (tp, tp + fn, fn))
-print()
-
-pr_auc = average_precision_score(yte, model.predict_proba(Xte)[:, 1])
-print("baseline: a random scorer gets PR AUC ~%.4f (the base rate)" % yte.mean())
-print("logistic model's PR AUC: %.4f (%.0fx the base rate)"
-      % (pr_auc, pr_auc / yte.mean()))
-print()
-
-print("how the metrics behave as the imbalance deepens:")
-print("%12s %12s %12s %12s" % ("positive %", "acc of 'no'", "ROC AUC", "PR AUC"))
-for w in (0.50, 0.90, 0.99, 0.999):
-    Xi, yi = make_classification(n_samples=20000, n_features=15, n_informative=6,
-                                 weights=[w], flip_y=0.01, random_state=0)
-    a, b, c, d = train_test_split(Xi, yi, test_size=0.3, random_state=0, stratify=yi)
-    p = LogisticRegression(max_iter=3000).fit(a, c).predict_proba(b)[:, 1]
-    print("%12.2f %12.4f %12.4f %12.4f"
-          % (100 * d.mean(), 1 - d.mean(), roc_auc_score(d, p),
-             average_precision_score(d, p)))
-print()
-print("PR AUC falls off a cliff while ROC AUC is still reporting good news.")
-print("so: report balanced accuracy or PR AUC, always quote the base rate,")
-print("and check the confusion matrix before believing anything.")
-```
-
-## Guided tour
-
-Use the interactive panel to build a strong intuition for this problem.
-
-1. <strong>Start with a Balanced Dataset (50%):</strong> With the "Class 0 %" slider at 50%, click "Generate & Train". Both classes are equal. The Standard model learns a reasonable edge. And its score is a good reflection of its performance. The Naive model's score is just 50%, correctly showing it's a poor model.
-2. <strong>Add Moderate Imbalance (85%):</strong> Move the slider to 85%. The Naive model's score instantly jumps to 85%! It's now looking better than the Standard model. Yet it hasn't caught a single anomaly (its Recall is 0%). Notice how the Standard model's decision edge starts to shift, turning more biased toward the majority class. It's getting harder for it to correctly find anomalies.
-3. <strong>Create Severe Imbalance (99%):</strong> Push the slider to 99%. The Score Paradox is now in full effect. The Naive model boasts 99% score, making it look nearly perfect. The Standard model, overwhelmed by the majority class, gives up trying to find anomalies. Its edge is pushed far away. And it also classifies all as Class 0. Its score is also 99%, but its Recall is 0%. Both models are now useless for finding the rare events we care about.
-
-## Beyond Score: Why Recall and Precision Matter
-
-The paradox teaches us a critical lesson: <strong>score is not the right metric for imbalanced datasets</strong>. We need to look at metrics that tell us how well the model does on the minority class.
-
-- <strong>Recall (Response):</strong> Of all the <em>actual</em> positive cases (anomalies), how many did the model correctly find? A Recall of 0%, like in our 99% imbalance test, means the model is unable to identify to the minority class. This is often the most key metric in fraud or disease detection.
-- <strong>Precision:</strong> Of all the cases the model <em>predicted</em> as positive, how many were <em>really</em> positive? High precision means the model is trustworthy when it raises an alarm.
-
-When dealing with imbalanced data, always test your model with a <strong>Confusion Matrix</strong>. And pay close attention to Precision, Recall. And the F1-Score, especially for the rare class you are trying to find.
-
-## Costs make the decision, not ratios
-
-The right operating point is a business question with a numerical answer. Put pounds on each cell of the confusion matrix and it stops being a judgement call.
-
-Suppose a missed fraud costs &pound;200 on average. And a false alarm costs &pound;5 in review time and customer annoyance. Then:
-
-- Catching 400 of 500 frauds and raising 3,000 false alarms costs 100&times;200 + 3,000&times;5 = &pound;35,000.
-- Catching 300 and raising 500 false alarms costs 200&times;200 + 500&times;5 = &pound;42,500.
-
-The first model is better despite raising six times as many false alarms, since the asymmetry in costs is 40 to 1. Compute this curve across thresholds and the optimum is a decision grounded in the relative costs.
-
-This framing also settles the perennial "which metric?" debate. When you can put costs on the errors, expected cost <em>is</em> the metric. And precision, recall and F1 are just proxies for it.
-
-## Questions people ask
-
-<strong>How imbalanced is too imbalanced?</strong> There is no threshold. But rough bands help: up to 1:10 often needs nothing but sensible metrics. 1:100 needs weighting or resampling. Beyond 1:1000, consider anomaly detection.
-
-<strong>Does SMOTE really work?</strong> Sometimes. It helps most with moderate imbalance and continuous features. And it can hurt with high-dimensional or categorical data. There interpolating between two points gives something that is not a plausible record.
-
-<strong>Should I balance the validation set?</strong> Never. Test on the real spread or your estimates are fiction.
-
-<strong>Is class weighting the same as oversampling?</strong> In math close. Both increase the minority's influence on the loss. But weighting does not duplicate rows. So it is cheaper and does not encourage memorising set cases.
-
-<strong>My PR-AUC is 0.3. Is that bad?</strong> Check it with the base rate. On a dataset with 0.5% positives, random guessing gives a PR-AUC of 0.005. So 0.3 is sixty times better than chance. PR-AUC must always be read against the prevalence.
-
-<strong>Can I just collect more data?</strong> If the extra data holds more of the rare class, yes. It is the best fix on hand. More majority-class rows make the imbalance worse.
-
-## Recap in one screen
-
-- With rare positives, score measures the majority class and nothing else.
-- models drift towards predicting the majority since that genuinely cuts average loss.
-- Fix the metric first, then the threshold, then the class weights, then the sampling.
-- Resample and synthesise just inside the training fold. Keep test on the real spread.
-- When you can price the two mistakes, expected cost beats each other metric.
-
-## A worked threshold sweep
-
-Counts make the threshold argument concrete. Take a fraud model scored on 100,000 transactions holding 500 frauds. And read what happens as the threshold falls:
-
-|Threshold|Alerts raised|Frauds caught|Precision|Recall|
-|---|---|---|---|---|
-|0.90|120|95|0.79|0.19|
-|0.50|610|280|0.46|0.56|
-|0.20|2,400|420|0.18|0.84|
-|0.05|11,000|480|0.04|0.96|
-
-Nothing about the model changed across those four rows. Just the bar moved.
-
-Which row is best depends fully on what happens after the alert. If a human reviews each alert and can handle 500 a day, row two is the just feasible option. If the alert triggers an automatic extra verification step that costs pennies and annoys the customer slightly, row three catches 140 more frauds for a cost most businesses would accept. If a missed fraud costs &pound;200 and a review costs &pound;5, row three's expected cost is 80&times;200 + 2,400&times;5 = &pound;28,000 against row two's 220&times;200 + 610&times;5 = &pound;47,050. And the eager model wins clearly.
-
-Give this table before you give a model comparison. It is often more decision-relevant than any single metric. And it costs one line of code from a chance column.
-
-## Further reading
-
-For implementation details, see the [Classification metrics and baselines](https://scikit-learn.org/stable/modules/model_evaluation.html). Continue with [training with class imbalance](training_on_label_imbalanced_dataset.html) to connect this topic to a related part of the workflow.
+- [scikit-learn: Classification metrics](https://scikit-learn.org/stable/modules/model_evaluation.html#classification-metrics) documents class-sensitive measures.
+- Continue with [the confusion matrix](confusion_matrix.html), [threshold tuning](threshold_tuning.html), and [training on imbalanced data](training_on_label_imbalanced_dataset.html).

@@ -1,231 +1,40 @@
 title: Handling Missing Values
-intro: Missing values can reflect different processes, so the reason for missingness matters before choosing to drop rows, impute values, or add missingness indicators.
+intro: Missing data can signal different things: a recording failure, an irrelevant field, or a choice that carries information. Identify the cause before deciding whether to drop, impute, or flag it.
 
-## Why, before what
+## Start with why the value is absent
 
-each tutorial answers "what do I do about NaN". The question that decides the
-answer is **why the value is absent**, and there are three cases with three
-different consequences.
+Missingness can be **MCAR** (unrelated to observed or missing values), **MAR** (explained by observed variables), or **MNAR** (depends on the missing value or another unobserved factor). These describe assumptions about how data went missing, not facts confirmed by the incomplete table alone.
 
-**Missing completely at random.** The lack has nothing to do with anything.
-A form field lost to a transmission error. This is the harmless case, and it's
-rare.
+The cause matters. If high earners skip an income question, filling every gap with the median hides a potentially useful pattern. If a sensor failed randomly for a few readings, deleting those rows may be harmless. Ask how the data was collected and whether missingness will occur the same way at prediction time.
 
-**Missing at random.** The lack depends on other columns you've. Younger
-respondents skip the income question more often, and you've their age. This is
-recoverable, because the info needed to model the lack is present.
+## Compare the strategies
 
-**Missing not at random.** The lack depends on the missing value itself.
-High earners decline to state their income. This is the hard case, and it's
-also the common one.
+Use **Strategy** in the visualizer to compare **Drop the rows**, **Fill with the mean**, **Fill with the median**, and **Median + missing indicator**. The plot uses a deliberately skewed example: dropping the large values changes the remaining sample, while a constant fill creates a pile-up and pulls the distribution toward the fill value.
 
-The data in the visualisation is on purpose the third kind: the largest values
-are the ones that failed. Look at the two histograms. The grey spread is
-what existed. The orange one is what each strategy leaves you with.
+|Method|Useful when|Main limitation|
+|---|---|---|
+|Drop rows|Few rows are missing and complete cases are representative|Can waste data or bias results if absence is systematic|
+|Mean imputation|A numeric feature is roughly symmetric and a simple baseline is needed|Sensitive to outliers; understates variation|
+|Median imputation|A numeric feature is skewed or has outliers|Creates repeated values and can weaken relationships|
+|Imputation plus indicator|The fact that a value is missing may predict the outcome|Adds a feature; does not recover the missing value|
+|Model-based imputation|Relationships among features are useful and complexity is justified|More assumptions, tuning, and leakage risk|
 
-## Drop the rows
+For example, if a feature has observed values 2, 3, 4, 5, 40 and two missing entries, mean imputation inserts 10.8 twice and shifts the feature upward; median imputation inserts 4 twice. Neither estimates the two unknown values exactly. An indicator adds a separate 1 for originally missing rows, letting a model learn whether absence itself is informative.
 
-Select **Drop**. The right tail is gone, and the mean in the readout has fallen
-well below the true mean.
+## Fit preprocessing without leakage
 
-Nothing about dropping is wrong in principle. It's unbiased when the values are
-missing fully at random, and with a handful of affected rows out of many it
-is a reasonable choice.
+Split the data first. Fit an imputer on training data, then apply that fitted transformation to validation and test data. In cross-validation, fit it anew inside each training fold. A scikit-learn `Pipeline` keeps that order. Fitting the fill value on the full dataset lets held-out rows influence training.
 
-Here it's a disaster, because the rows removed aren't a random sample &mdash;
-they're the large ones. each statistic found afterwards shows a
-group that excludes them.
+Some tree implementations can route missing values directly. That can be a good option when supported by the model and the missingness pattern is represented in training; compare it against an imputation baseline on held-out data.
 
-The other cost is math. Dropping any row with any missing value across ten
-columns each 5% missing drops about 40% of the data, though 95% of each
-single column is present.
+## Common mistakes
 
-## Fill with the mean or median
+- **Filling with zero automatically:** zero may be a valid measurement.
+- **Dropping every incomplete row across many columns:** small per-column gaps can remove a large share of records.
+- **Assuming an indicator always helps:** validate it; missingness may be noise or may change after deployment.
+- **Using a complex imputer without a reason:** begin with a simple pipeline and measure whether added complexity improves the task.
 
-Select **Mean**, then **Median**. Both put a spike at a single value in the
-middle of the spread, and both leave the mean below the truth.
+## Sources and next steps
 
-They differ in strength. The mean is dragged by extreme values. The median is
-not. For a skewed column. Income, house prices, time-to-event &mdash; the
-median is the better default, and for a roughly even column the two are
-close enough that it rarely matters.
-
-What neither can do is invent info. Imputation makes the dataset
-rectangular so the model will accept it. It doesn't restore what was lost, and
-it adds two distortions worth knowing:
-
-- **Variance shrinks.** A pile of the same values has none.
-- **Links weaken.** The imputed rows carry no tie to any other
-  column, so they dilute each tie the column really had.
-
-## Keep the fact that it was missing
-
-Select **Median + indicator**. The imputation is the same. What changes is that
-a second column is added, holding 1 where the value was missing and 0 or else.
-
-This is often the best simple answer, because in the third case &mdash;
-missing not at random &mdash; **the lack is itself helpful**. If high
-earners decline to answer, then "declined to answer" predicts high earnings, and
-plain imputation throws that signal away while an indicator preserves it.
-
-It costs one column and no assumptions. It's hard to do worse than the
-options with it.
-
-| Strategy | Keeps rows | Keeps distribution | Keeps the signal in absence |
-|---|---|---|---|
-| Drop | no | only if MCAR | no |
-| Mean | yes | no, spike at centre | no |
-| Median | yes | no, spike at centre | no |
-| Median + indicator | yes | no | **yes** |
-| Model-based (kNN, MICE) | yes | better | only with an indicator |
-
-## More sophisticated options
-
-**k-NN imputation** fills a value from similar rows. **MICE** models each column
-from the others, iteratively. Both preserve ties better than a constant
-and both cost far more work, and both must be fitted on training data
-only &mdash; they're models, so imputing before the split is
-[leakage](data_leakage.html).
-
-Also worth knowing: some models handle missing values natively. LightGBM and
-XGBoost learn a default direction at each split for rows whose value is absent,
-which is often better than anything you'd impute by hand.
-
-## Why "why" changes the answer
-
-The strategy matters far less than the reason the value is absent, and the same
-30%-missing column shows it. When the missing values are the *largest* ones
-(missing not at random &mdash; high earners decline to state income), each method
-that skips the lack inherits the bias:
-
-|values 1-100, top 30 missing|resulting mean|
-|---|---|
-|true mean|50.5|
-|after dropping the missing rows|35.5|
-|after mean/median imputation|~35.5 (a spike at the low centre)|
-
-Dropping or filling both land near 35.5, understating the truth by fifteen, because
-the rows removed or flattened are just the high ones. No math on the
-values that remain can recover values that were never seen. The one strategy that
-helps adds a *missingness indicator*: a second column marking which rows were
-absent. In the not-at-random case the lack is itself the signal &mdash; "declined
-to answer" predicts high income. So keeping that flag lets the model use what
-plain imputation throws away. It costs one column and no assumptions. And dropping
-carries a second, math cost: with ten columns each 5% missing,
-`1 - 0.95^10 = 40%` of rows have *some* gap. Row-dropping discards 40% of the
-data though 95% of each column is present.
-
-## Where it goes wrong
-
-**Imputing before the split.** The column mean is found from the test rows
-too.
-
-**Filling with zero without thinking.** Zero is a real value in most columns. A
-temperature of zero isn't a missing temperature.
-
-**Dropping rows across many columns at once.** A little missingness all over
-drops a lot of data.
-
-**Never checking why.** Ten minutes finding out what caused the gap is worth
-more than any choice of strategy.
-
-## Questions people ask
-
-<strong>Should I just drop rows with missing values?</strong> Only when few rows are affected and the values are missing at random. Otherwise you lose data and can bias the sample.
-
-<strong>Mean or median imputation?</strong> Median is safer with skewed data or outliers. Mean is fine for symmetric distributions.
-
-<strong>Why add a missing-value indicator?</strong> The fact that a value is absent often carries signal, such as an unreported income. A binary flag lets the model use that.
-
-<strong>Do I impute before or after splitting?</strong> After. Learn the fill values from the training set only, ideally inside a pipeline, to avoid leakage.
-
-<strong>When should I use model-based imputation?</strong> When many features are missing and related to each other. KNN or iterative imputation can recover the relationships, at higher cost and with more risk of leakage.
-
-<strong>Which models handle missing values natively?</strong> Gradient-boosted trees like HistGradientBoosting, XGBoost and LightGBM do. Most linear models, SVMs and neural networks need imputation first.
-
-## Dropping, filling, and the flag that saves you
-
-Whether a gap can be safely filled depends on why it is missing. Two datasets can have the same missing-value rate but need different treatments because the missingness mechanisms differ.
-
-```python-run
-import numpy as np
-from sklearn.linear_model import Ridge
-from sklearn.impute import SimpleImputer, KNNImputer
-from sklearn.ensemble import HistGradientBoostingRegressor
-from sklearn.model_selection import cross_val_score
-from sklearn.pipeline import make_pipeline
-
-rng = np.random.default_rng(0)
-n = 700
-X = rng.normal(size=(n, 6))
-y = 5 * X[:, 0] + 2 * X[:, 1] - X[:, 2] + rng.normal(0, 2.0, n)
-print("feature 0 is the dominant predictor. with no gaps at all: R2 %.4f"
-      % cross_val_score(Ridge(), X, y, cv=5).mean())
-print()
-print("CASE 1 -- missing completely at random (a sensor dropped packets).")
-Xa = X.copy()
-Xa[rng.random(Xa.shape) < 0.30] = np.nan
-keep = ~np.isnan(Xa).any(axis=1)
-print("  30%% of cells gone, which costs %d of the %d rows entirely."
-      % (n - keep.sum(), n))
-print("  drop incomplete rows : R2 %7.4f  (on %d rows)"
-      % (cross_val_score(Ridge(), Xa[keep], y[keep], cv=5).mean(), keep.sum()))
-for name, imp in (("fill with mean  ", SimpleImputer(strategy="mean")),
-                  ("fill with median", SimpleImputer(strategy="median")),
-                  ("k-NN imputer    ", KNNImputer(n_neighbors=5))):
-    print("  %s : R2 %7.4f"
-          % (name, cross_val_score(make_pipeline(imp, Ridge()), Xa, y, cv=5).mean()))
-print("  HistGradientBoosting : R2 %7.4f   <- takes NaN directly"
-      % cross_val_score(HistGradientBoostingRegressor(random_state=0),
-                        Xa, y, cv=5).mean())
-print()
-print("  dropping rows is not WRONG here -- the surviving rows are a fair")
-print("  sample. it is just wasteful, and it gets worse as columns multiply:")
-for cols in (6, 12, 25, 50):
-    print("     %2d columns at 30%% missing -> %.1f%% of rows survive intact"
-          % (cols, 100 * 0.7 ** cols))
-```
-
-The next block shows what happens when the data is missing for a reason, and why a missing-value indicator flag is the only thing that recovers the lost signal.
-
-```python-run
-import numpy as np
-from sklearn.linear_model import Ridge
-from sklearn.impute import SimpleImputer
-from sklearn.model_selection import cross_val_score
-from sklearn.pipeline import make_pipeline
-
-rng = np.random.default_rng(0)
-n = 700
-X = rng.normal(size=(n, 6))
-y = 5 * X[:, 0] + 2 * X[:, 1] - X[:, 2] + rng.normal(0, 2.0, n)
-print("CASE 2 -- missing for a reason (high earners skip the income question).")
-Xb = X.copy()
-hide = X[:, 0] > np.percentile(X[:, 0], 65)
-Xb[hide, 0] = np.nan
-print("  feature 0 is missing on exactly the %d rows where it is high." % hide.sum())
-print("  mean of the values that survived: %7.4f" % np.nanmean(Xb[:, 0]))
-print("  mean of the values that vanished: %7.4f" % X[hide, 0].mean())
-print("  imputation fills the first number into rows that deserve the second.")
-print()
-print("  drop incomplete rows  : R2 %7.4f  (on %d rows, all low earners)"
-      % (cross_val_score(Ridge(), X[~hide], y[~hide], cv=5).mean(), (~hide).sum()))
-print("  mean imputation       : R2 %7.4f"
-      % cross_val_score(make_pipeline(SimpleImputer(), Ridge()), Xb, y, cv=5).mean())
-flag = np.column_stack([Xb, np.isnan(Xb[:, 0]).astype(float)])
-print("  plus a was-missing flag: R2 %7.4f"
-      % cross_val_score(make_pipeline(SimpleImputer(), Ridge()), flag, y, cv=5).mean())
-print()
-print("  the flag is the only thing that lets the model say 'this row is one")
-print("  of the hidden ones'. the gap itself carried information, and filling")
-print("  it in without a flag throws that information away.")
-print("  SimpleImputer(add_indicator=True) adds those columns for you.")
-print()
-print("so the order of operations is: ask why it is missing, then choose. and")
-print("whatever you choose, put it inside the pipeline -- an imputer fitted on")
-print("the full dataset has already read the test rows.")
-```
-
-## Further reading
-
-For implementation details, see the [Imputation of missing values](https://scikit-learn.org/stable/modules/impute.html). Continue with [data leakage](data_leakage.html) to connect this topic to a related part of the workflow.
+- [scikit-learn: Imputation of missing values](https://scikit-learn.org/stable/modules/impute.html) covers simple and multivariate imputers.
+- Continue with [data leakage](data_leakage.html) and [train, validation, and test sets](train_test_split.html).

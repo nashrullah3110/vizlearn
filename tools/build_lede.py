@@ -45,6 +45,7 @@ AFTER_MARKER = "<!-- VIZLEARN:LEDE:AFTER -->"
 
 LEAD = re.compile(r"<!-- VIZLEARN:BYLINE:END -->\s*<p\b[^>]*>.*?</p>", re.S)
 H3 = re.compile(r"<h3\b([^>]*)>(.*?)</h3>", re.S)
+P = re.compile(r"<p\b[^>]*>.*?</p>", re.S | re.I)
 TAGS = re.compile(r"<[^>]+>")
 
 # Headings that label the visualisation's own furniture rather than prose. A
@@ -239,8 +240,39 @@ def process(rel):
         idm = re.search(r'\bid="([^"]+)"', m.group(1)) if m else None
         ids.append((idm.group(1) if idm else slug_, title))
 
+    slot_start = slot_end = None
+    # ML and DSA pages lead with one concise paragraph after the visualiser.
+    # Moving the whole first section made the Overview absorb examples, control
+    # instructions, and long explanations. Keep the remaining paragraphs and
+    # section heading in the article body so the overview stays an orientation,
+    # not a replacement for the lesson.
+    track = rel.split("/", 1)[0]
+    concise_track = track in ("dsa", "machine_learning")
+    if concise_track:
+        section_start, section_end, _title = blocks[0]
+        heading = H3.search(src, section_start, section_end)
+        paragraph = P.search(src, heading.end() if heading else section_start,
+                             section_end)
+        if not paragraph:
+            return bail("no-opening-paragraph")
+        first_start, first_end = paragraph.span()
+        remainder = (src[section_start:paragraph.start()]
+                     + src[paragraph.end():section_end])
+        remainder = H3.sub("", remainder)
+        has_section_detail = bool(
+            text_of(remainder).split()
+            or re.search(r"<(?:pre|table|ul|ol|svg|canvas)\b", remainder, re.I)
+        )
+        if has_section_detail:
+            rest = [i for i in ids if i]
+        else:
+            # A one-paragraph opening has no body left under its heading once
+            # that paragraph becomes the Overview. Remove the empty section
+            # from the article and omit its heading from the contents list.
+            slot_start, slot_end = section_start, section_end
+            rest = [i for i in ids[1:] if i]
     # Prefer a substantial opening paragraph; otherwise lift the first section.
-    if preamble and len(text_of(src[preamble[0]:preamble[1]]).split()) >= 45:
+    elif preamble and len(text_of(src[preamble[0]:preamble[1]]).split()) >= 45:
         first_start, first_end = preamble
         rest = [i for i in ids if i]
     else:
@@ -260,16 +292,31 @@ def process(rel):
 
     first = src[first_start:first_end]
     # A list-led section is still an introduction; only length disqualifies it.
-    if len(text_of(first).split()) < 45:
+    min_words = 30 if concise_track else 45
+    if len(text_of(first).split()) < min_words:
         return bail("not-prose")
 
-    src = src[:first_start] + SLOT + src[first_end:]
+    slot_start = first_start if slot_start is None else slot_start
+    slot_end = first_end if slot_end is None else slot_end
+    src = src[:slot_start] + SLOT + src[slot_end:]
     block = render(first, rest)
 
     after = src.find(AFTER_MARKER)
     if after >= 0:
         at = after + len(AFTER_MARKER)
-        src = src[:at] + "\n" + block + src[at:]
+        # A few hand-authored ML pages put the article shell before this
+        # marker in source order, even though both follow the visualizer.
+        # Place Overview between the visualizer and the lesson body in those
+        # cases too, rather than leaving the short orientation after the full
+        # article.
+        article = src.find("<!-- auto-article-vizlearn -->")
+        if article < 0:
+            article = src.find("<!-- VIZLEARN:ARTICLE:BEGIN")
+        if article >= 0 and after > article:
+            at = article
+            src = src[:at] + block + "\n" + src[at:]
+        else:
+            src = src[:at] + "\n" + block + src[at:]
     else:
         lead = LEAD.search(src)
         if not lead:

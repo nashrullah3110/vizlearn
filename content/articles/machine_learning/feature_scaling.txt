@@ -1,244 +1,35 @@
 title: Feature Scaling
-intro: Feature scaling puts numeric variables on comparable ranges. It matters for distance-based and regularized models, while most decision trees are largely unaffected.
+intro: Scaling puts numeric features on comparable ranges. It matters for distance-based and regularised models, while most tree splits are unaffected by monotonic rescaling.
 
-## The problem is the units
+## Why units change a model
 
-The data here has two columns: age, spanning roughly 25 to 55, and income,
-spanning roughly 20,000 to 70,000. They show a person about equally well.
+Suppose a dataset describes people using age (about 25–55 years) and income (about £20,000–£70,000). In a raw Euclidean distance, income differences can outweigh age differences simply because the numbers are larger. A distance-based model may then behave as if income were the only feature.
 
-Set the scaler to None and look at the readout. The income range is around a
-thousand times the age range. Now consider what k-NN does &mdash; it finds the
-nearest points by Euclidean distance:
+## What common scalers do
 
-```
-distance^2 = (age1 - age2)^2 + (income1 - income2)^2
-```
+- **Standard scaling** subtracts a feature's training mean and divides by its standard deviation. The transformed feature has mean 0 and standard deviation 1 on that training data.
+- **Min–max scaling** maps the training minimum and maximum to chosen endpoints, commonly 0 and 1. It is useful when a bounded range is required, but a new extreme value can compress most observations into a narrow interval.
+- **Robust scaling** uses the median and interquartile range. It is less sensitive to extreme values than mean-and-standard-deviation scaling, though it does not make outliers harmless.
 
-A ten-year age difference adds 100 to that sum. A ten-pound income
-difference adds 100 as well. A five-thousand-pound difference adds
-twenty-five million.
+For example, if age has mean 40 and standard deviation 10, age 30 becomes `−1`. If income has mean £45,000 and standard deviation £15,000, £30,000 also becomes `−1`. The two values now represent the same distance from their respective training means.
 
-The age term isn't merely less key. It's by number irrelevant: any
-plausible age difference is lost in the rounding of the income term. The model
-is in effect one-dimensional, and no one asked for that.
+## Which models benefit
 
-## What the scalers do
+Scaling usually matters for methods that compare distances or use coefficient magnitudes, including KNN, K-means, PCA, RBF-kernel SVMs, and regularised linear models. Neural-network optimisation can also be easier when inputs have comparable ranges.
 
-Switch to **StandardScaler**. Each column has its mean subtracted and is cut
-by its standard deviation, so both end up centred on 0 with a spread of about 1.
-The scatter turns roughly circular, both columns contribute comparably, and
-the model output in the readout changes.
+Decision trees and tree ensembles usually do not need feature scaling: a split such as `income ≤ 45000` can be expressed as an equivalent threshold after a monotonic rescaling. Scaling may still be useful for a shared preprocessing pipeline, but it generally does not change those tree splits.
 
-```
-z = (x - mean) / std
-```
+## Fit preprocessing on training data only
 
-Switch to **MinMaxScaler**. Each column is mapped onto [0, 1] using its min
-and max:
+Learn the scaler's statistics from the training split, then use that fitted scaler to transform validation and test rows. If you calculate the mean, standard deviation, minimum, or maximum from the whole dataset first, information from the held-out rows has entered training. That is [data leakage](data_leakage.html). A [pipeline](ml_pipelines.html) keeps the scaler inside each training fold during cross-validation.
 
-```
-x' = (x - min) / (max - min)
-```
+## Common mistakes
 
-Both fix the units problem. They differ in how they handle extremes, and that is
-the basis for choosing.
-
-| | StandardScaler | MinMaxScaler |
-|---|---|---|
-| Output range | unbounded, roughly &minus;3 to 3 | exactly [0, 1] |
-| Uses | mean, standard deviation | minimum, maximum |
-| One extreme value | shifts the mean a little | compresses everything else |
-| Good for | most things, especially with outliers | bounded inputs, image pixels, neural networks |
-
-MinMax's weakness is worth stating plainly. Both statistics it uses are the most
-outlier-sensitive numbers available. One salary of ten million maps to 1.0 and
-crushes each real salary into the bottom half of a per cent of the range.
-
-## Which models care
-
-**Sensitive**, because they measure distance or magnitude:
-
-- k-NN and k-means &mdash; distance is the entire method
-- SVM with an RBF or polynomial kernel. The kernel is a distance
-- PCA &mdash; it finds directions of max variance, and unscaled variance is
-  dominated by whichever column has the biggest units
-- Neural networks &mdash; not for correctness. But Grads on wildly different
-  scales make optimisation slow and unstable
-- Ridge and Lasso &mdash; the fine is on coeff size, and coeff
-  size depends on the units of its column
-
-**Not sensitive:**
-
-- choice trees, random forests, grad boosting
-
-That last group surprises people, and the reason is worth having. A tree split
-asks `is income > 45000`. Rescale the column and the question turns
-`is income' > 0.53`. This splits the rows into the same two groups.
-Any monotonic change leaves each possible split unchanged, so the tree
-is the same. Scaling before a random forest isn't wrong. It's simply a
-no-op.
-
-## The rule that matters more than the choice
-
-Fit the scaler on the **training data only**, then apply it to the test data
-without refitting.
-
-The mean and standard deviation are learned parameters. finding them from the
-whole dataset lets info about the test set reach the model before it's
-tested, and the reported score stops being an guess of anything. That is
-[data leakage](data_leakage.html), it's the most common serious mistake in
-applied machine learning, and it's why scalers belong inside a
-[pipeline](ml_pipelines.html) rather than being applied by hand.
-
-## Standardising, and why trees do not care
-
-The fix is one formula applied per column, `z = (x - mean) / std`, and working it
-shows why scaling changes some models substantially but leaves tree splits essentially unchanged. Age spanning
-25-55 and income spanning 20,000-70,000, standardised:
-
-|raw|z-score|
-|---|---|
-|age 30 (mean 40, sd 10)|&minus;1.0|
-|age 55|+1.5|
-|income 25,000 (mean 45k, sd 15k)|&minus;1.3|
-|income 70,000|+1.7|
-
-Both columns now live on the same &minus;3-to-3 scale. A year of age and a
-standard deviation of income contribute comparably to a Euclidean distance &mdash; where
-before, the income term's raw spread of 50,000 against age's 30 made age
-by number invisible to k-NN, k-means, SVM-RBF and PCA. A choice tree, by
-contrast, is unaffected: its split asks `is income > 45000`, which after
-scaling turns `is income' > 0.53`, and that splits the rows into just the
-same two groups. Any monotonic rescaling leaves each possible split unchanged, so
-scaling before a random forest is a genuine no-op. Not wrong, just wasted
-effort &mdash; while for the distance-based models it's the difference between a
-usable model and a one-dimensional one.
-
-The choice between the two common scalers comes down to outliers. StandardScaler
-uses the mean and standard deviation. So One extreme value shifts the centre only a
-little. MinMaxScaler uses the min and max, the two most outlier-sensitive
-numbers there are, so a single salary of ten million maps to 1.0 and crushes each
-real salary into the bottom fraction of a per cent of the range. StandardScaler is
-the safer default for most data, MinMax suits truly bounded inputs like image
-pixels. One thing neither should touch is a one-hot column: it's already 0 and 1,
-and standardising it turns two real values into two any ones for no
-gain.
-
-And if you scale the target and the features, note to invert the
-transform on the guesses, or the error metric comes back in scaled units and
-means nothing &mdash; a small bookkeeping step that is easy to forget and quietly
-corrupts each reported number.
-
-## Where it goes wrong
-
-**Fitting the scaler on all.** The number you report goes up and the
-model doesn't get better.
-
-**Scaling the target variable and losing to invert it.** guesses come
-back in scaled units and the error metric is meaningless.
-
-**MinMax on data with outliers.** The real data ends up in a sliver of the
-range.
-
-**Scaling one-hot columns.** They're already 0 and 1. StandardScaler turns them
-into two any values and makes the model harder to read for no gain.
-
-## Questions people ask
-
-<strong>Which models need feature scaling?</strong> Distance-based and gradient-based models such as k-NN, SVMs, k-means, PCA, neural networks and regularised linear models. Tree-based models do not care.
-
-<strong>Standardisation or min-max?</strong> Standardisation is the safer default, particularly with outliers. Min-max suits bounded inputs, like pixel values, and models that expect a fixed range.
-
-<strong>Should I scale the target too?</strong> Usually not for classification. For regression it can help some models, but you must invert the predictions before computing errors.
-
-<strong>When do I fit the scaler?</strong> On the training data only, then apply it to validation and test data. Fitting on everything leaks test statistics into training.
-
-<strong>Do I scale one-hot columns?</strong> No. They are already 0 or 1, and scaling them makes coefficients harder to read with no gain.
-
-<strong>What if my data has big outliers?</strong> Min-max will squeeze most values into a sliver of the range. Use the median-and-IQR scaler, or clip or transform the feature first.
-
-## Which models care, and which do not
-
-One dataset, one column rescaled by 10,000, five models. Two collapse, two don't move at all. The fifth is the notable case.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.model_selection import cross_val_score
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-
-X, y = make_classification(n_samples=1500, n_features=8, n_informative=4,
-                           random_state=0)
-X_big = X.copy()
-X_big[:, 0] *= 10_000
-print("column 0 now has sd %.0f; the rest are near 1.0" % X_big[:, 0].std())
-print()
-print("%-24s %12s %12s %10s" % ("model", "raw", "scaled", "change"))
-for name, mk in (("k-nearest neighbours", lambda: KNeighborsClassifier()),
-                 ("SVM (rbf)",            lambda: SVC()),
-                 ("logistic regression",  lambda: LogisticRegression(max_iter=5000)),
-                 ("decision tree",        lambda: DecisionTreeClassifier(random_state=0)),
-                 ("random forest",        lambda: RandomForestClassifier(n_estimators=100,
-                                                                         random_state=0))):
-    raw = cross_val_score(mk(), X_big, y, cv=5).mean()
-    scaled = cross_val_score(make_pipeline(StandardScaler(), mk()),
-                             X_big, y, cv=5).mean()
-    print("%-24s %12.4f %12.4f %+10.4f" % (name, raw, scaled, scaled - raw))
-print()
-print("distance-based models collapse. KNN and the rbf SVM both compute")
-print("||a - b||, and one column that is 10,000x larger IS the distance --")
-print("the other seven columns stop counting.")
-print()
-print("trees split one column at a time and never compare across columns,")
-print("so a change of unit is invisible to them. that is exact, not approximate.")
-```
-
-The next block shows how scaling changes the coefficients of logistic regression, and how the three common scalers handle a column with one outlier.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
-
-X, y = make_classification(n_samples=1500, n_features=8, n_informative=4,
-                           random_state=0)
-X_big = X.copy()
-X_big[:, 0] *= 10_000
-raw_c = LogisticRegression(max_iter=5000).fit(X_big, y).coef_[0]
-sc_c = LogisticRegression(max_iter=5000).fit(StandardScaler().fit_transform(X_big), y).coef_[0]
-print("logistic regression barely lost accuracy, but look at the coefficients:")
-print("  unscaled:", np.round(raw_c[:4], 6), "...")
-print("  scaled:  ", np.round(sc_c[:4], 6), "...")
-print("the first coefficient is %.0fx smaller just to undo the unit."
-      % (abs(sc_c[0]) / abs(raw_c[0])))
-print("the L2 penalty charges by coefficient size, so it is now charging")
-print("that column almost nothing and the rest full price.")
-print()
-col = np.concatenate([np.random.default_rng(0).normal(50, 5, 200),
-                      [400.0]]).reshape(-1, 1)
-print("the three scalers, on a column with one outlier:")
-for name, sc in (("StandardScaler", StandardScaler()),
-                 ("MinMaxScaler",   MinMaxScaler()),
-                 ("RobustScaler",   RobustScaler())):
-    out = sc.fit_transform(col).ravel()
-    print("  %-15s normal rows in [%7.3f, %7.3f], outlier at %8.3f"
-          % (name, out[:200].min(), out[:200].max(), out[-1]))
-print()
-print("MinMaxScaler squeezes every real row into 6%% of its range because one")
-print("point defines the other end. RobustScaler uses the median and IQR,")
-print("so a single extreme value does not distort the rest.")
-print()
-print("and always fit the scaler inside a pipeline -- fitting it on all the data")
-print("before splitting leaks the test set's mean and sd into training.")
-```
+- **Assuming standard scaling removes outlier influence.** Mean and standard deviation can both be pulled by extreme values; consider robust scaling when that is appropriate.
+- **Fitting a new scaler on validation or test data.** Reuse the scaler fitted on training data so evaluation matches deployment.
+- **Scaling without a reason.** Tree-based models generally do not need it. Binary indicator columns are often kept as 0/1 so their meaning remains clear.
+- **Forgetting to invert target transformations.** If the target was scaled, convert predictions back to the original units before interpreting errors or reporting results.
 
 ## Further reading
 
-For implementation details, see the [Preprocessing and feature scaling](https://scikit-learn.org/stable/modules/preprocessing.html). Continue with [machine-learning pipelines](ml_pipelines.html) to connect this topic to a related part of the workflow.
+The [scikit-learn preprocessing guide](https://scikit-learn.org/stable/modules/preprocessing.html) describes these transformations and their API. Continue with [K-nearest neighbors](knn.html), where feature scale directly affects which examples are considered nearest.

@@ -1,257 +1,51 @@
-title: Stacks (LIFO)
-intro: One end, three operations, and a surprising amount of the computing world built on top.
+title: Stacks
+intro: A stack is a collection that adds and removes items at one end. Last in, first out (LIFO) order is useful whenever the newest unfinished item must be handled first.
 
-## Quick Context
+## Push, pop, and peek
 
-A <strong>stack</strong> is a collection where you may only touch one end &mdash; the <em>top</em>. The last thing you put in is the first thing you take out, which is why it is called <strong>LIFO</strong>: Last In, First Out. Think of a stack of plates.
+A stack stores items so the most recently added is the first removed: last in, first out (LIFO). This order fits nested or unfinished work because only the top item is directly available.
 
-The three operations are push (add to the top), pop (remove from the top) and peek (read the top without removing). All three are O(1) because they never touch the rest of the structure. You cannot reach the middle without popping everything above it, which is O(n). That restriction is the feature &mdash; it keeps the interface simple and the implementation fast.
+- **Push** adds an item to the top.
+- **Pop** removes and returns the top item.
+- **Peek** reads the top without removing it.
 
-In Python a stack is a plain list: `append()` is push, `pop()` is pop, `[-1]` is peek. There is no need for a separate Stack class. The list's underlying dynamic array gives amortised O(1) for both append and pop from the end.
+These operations are <code>O(1)</code> on a typical stack implementation; Python list append and pop at the end are amortized constant time. Searching for a buried item takes <code>O(n)</code>, because items above it must be removed or scanned by another method.
 
-The most important stack you interact with is the call stack. Every function call pushes a frame (local variables, arguments, return address); every return pops it. Recursion is a sequence of pushes, and deep recursion exhausts the call stack &mdash; Python's default limit is 1,000 frames, after which `RecursionError` is raised. Converting a recursive algorithm to an explicit stack (a list that you push and pop in a loop) avoids the limit and is often faster.
+Choose **Mode** in the visualizer. In stack mode, try **Push**, **Pop**, and **Peek**; in bracket mode, compare a **valid** sequence with a **mismatched** one. The top is the only item directly accessible.
 
-Stacks appear in three classic algorithmic patterns. Bracket matching pushes every opener and pops on each closer. Expression evaluation (postfix/infix) pushes operands and applies operators by popping. Depth-first search pushes the start node and repeatedly pops, processes and pushes neighbours. In all three, the LIFO order is what makes the algorithm correct.
+## Worked example: balanced brackets
 
-## Three Operations, All O(1)
-
-- <span class="mono-font kw">push(x)</span> &mdash; put x on top.
-- <span class="mono-font kw">pop()</span> &mdash; remove and return the top item.
-- <span class="mono-font kw">peek()</span> &mdash; read the top without removing it.
-
-All three are <strong>O(1)</strong> because they never touch the rest of the structure. That guarantee is the reason stacks are used in performance-critical places like the call stack.
-
-Note what you <em>cannot</em> do: reach the middle. Searching a stack is O(n) and requires popping everything above what you want. The restriction is the feature &mdash; it makes the structure simple and fast.
-
-In Python you implement a stack with a plain list: `append()` is push, `pop()` is pop, and `[-1]` is peek. All three are O(1) amortised. There is no need for a separate Stack class — the list already does the job, and wrapping it in a class adds indirection without adding safety.
-
-The most important stack you will never write is the call stack. Every function call pushes a frame holding local variables, arguments and a return address. Every return pops it. A recursive function that descends too deep exhausts the call stack and raises `RecursionError` — Python's default limit is 1,000 frames. Converting a deep recursion to an explicit stack (push and pop in a loop) avoids that limit and often runs faster because it skips the overhead of function-call frames.
-
-Stacks appear in three classic algorithmic patterns. Bracket matching: push every opening bracket, pop on each closing bracket, check that they match. Expression evaluation: push operands, pop when an operator arrives, push the result. Depth-first search: push a starting node, pop and process, push its neighbours. In all three, the LIFO order is what makes the algorithm correct — it ensures the most recently opened context is the one you deal with next.
-
-## The call stack is a stack
-
-The most important stack in any program is the one you do not write. Every function call pushes a frame holding local variables, arguments and the return address; every return pops it.
-
-That is why:
-
-- <strong>Recursion depth costs memory</strong> &mdash; each level is a frame.
-- <strong>Infinite recursion raises `RecursionError`</strong> &mdash; the stack has a limit.
-- <strong>A traceback reads bottom-up</strong> &mdash; it is a printout of the stack, most recent call last.
-
-Understanding that makes recursion, DFS and backtracking all one idea rather than three. Recursion is a stack you get for free; an explicit stack is recursion you manage yourself.
-
-## Bracket Matching: The Classic Application
-
-Switch to bracket mode and step through. The rule is beautifully simple:
-
-- See an opening bracket &rarr; <strong>push</strong> it.
-- See a closing bracket &rarr; <strong>pop</strong> and check it matches. If it does not, the expression is invalid.
-- At the end, the stack must be <strong>empty</strong> &mdash; anything left over is an unclosed bracket.
-
-A stack is exactly right here because brackets nest: the most recently opened one must always close first. Every code editor that highlights a missing brace runs this algorithm.
-
-## Last in, first out
-
-A stack allows two operations: add to the top, and remove from the top. Nothing else &mdash; no indexing, no removing from the middle.
-
-That restriction is the point. A stack models any situation where the most recent thing must be dealt with first, and there are more of those than one expects.
-
-|Operation|Meaning|Cost|
-|---|---|---|
-|push|Add to the top|O(1)|
-|pop|Remove and return the top|O(1)|
-|peek / top|Look without removing|O(1)|
-|is_empty|Nothing left|O(1)|
-
-In Python a plain list is a stack: `append` to push, `pop` to pop.
+When scanning `([{}])`, push each opening bracket. On a closing bracket, pop and check that it matches the most recent opener. The order matters: the last bracket opened must close first. The sequence is valid only if no mismatch occurs and the stack is empty at the end.
 
 ```python
-stack = []
-stack.append(1)
-stack.append(2)
-stack.pop()            # 2 - the most recent
-stack[-1]              # 1 - peek without removing
-```
-
-Both are O(1) amortised, because they operate on the end of the array. The mistake to avoid is `pop(0)` &mdash; removing from the front shifts every element, making it O(n). That is what `collections.deque` is for.
-
-## Matching and undoing
-
-The two archetypal stack problems.
-
-<strong>Balanced brackets.</strong> Push each opening bracket; on a closing bracket, pop and check it matches:
-
-```python
-def balanced(s):
-    pairs = {")": "(", "]": "[", "}": "{"}
+def balanced(text):
+    matching = {")": "(", "]": "[", "}": "{"}
     stack = []
-    for ch in s:
-        if ch in "([{":
-            stack.append(ch)
-        elif ch in pairs:
-            if not stack or stack.pop() != pairs[ch]:
+    for char in text:
+        if char in "([{":
+            stack.append(char)
+        elif char in matching:
+            if not stack or stack.pop() != matching[char]:
                 return False
-    return not stack          # anything left open means unbalanced
+    return not stack
 ```
 
-The final `return not stack` is the part people forget: "(((" has no mismatch and is still unbalanced.
-
-<strong>Undo.</strong> Push each action as it happens; undo pops the most recent. Redo needs a second stack &mdash; popping from undo pushes onto redo, and any new action clears redo. That pair of stacks is exactly how every text editor's undo works.
-
-Both problems share a shape: the most recent unresolved item is the one that must be resolved next, and that is precisely what LIFO provides.
-
-## Bracket matching, and the errors a stack can name
-
-A stack turns a problem that looks like it needs lookahead into one pass with one pointer. Bracket matching is the standard demonstration, but the version worth writing is the one that reports WHICH bracket went wrong and where -- because that is what a parser or a linter actually has to do.
-
-```python-run
-PAIRS = {")": "(", "]": "[", "}": "{"}
-OPEN = set(PAIRS.values())
-
-def check(s):
-    stack = []
-    for i, c in enumerate(s):
-        if c in OPEN:
-            stack.append((c, i))
-        elif c in PAIRS:
-            if not stack:
-                return "unexpected %s at %d" % (c, i)
-            got, at = stack.pop()
-            if got != PAIRS[c]:
-                return "%s at %d closed by %s at %d" % (got, at, c, i)
-    if stack:
-        c, at = stack[-1]
-        return "%s at %d never closed" % (c, at)
-    return "balanced"
-
-tests = ["(a[b]{c})", "([)]", "(()", "())", "", "no brackets here", "{[()]}"]
-for t in tests:
-    print("%-20r %s" % (t, check(t)))
-# note "([)]": counts are equal, so a counter says balanced. only the
-# ORDER is wrong, and order is exactly what a stack remembers.
-print("\ncounting says '([)]' is fine:", "([)]".count("(") == "([)]".count(")"))
-```
-
-The same shape solves anything with nesting. A postfix evaluator is the same loop with numbers instead of brackets.
-
-```python-run
-def rpn(expr):
-    stack = []
-    for tok in expr.split():
-        if tok in "+-*/":
-            b, a = stack.pop(), stack.pop()
-            stack.append({"+": a+b, "-": a-b, "*": a*b, "/": a//b}[tok])
-        else:
-            stack.append(int(tok))
-    return stack.pop()
-
-for e in ("3 4 +", "3 4 + 2 *", "5 1 2 + 4 * + 3 -"):
-    print("%-20s = %d" % (e, rpn(e)))
-# "5 1 2 + 4 * + 3 -" is (5 + ((1+2)*4)) - 3 = 14, no parentheses needed.
-# compilers convert to postfix before generating code, and the machine
-# they generate it for is itself a stack.
-```
-
-## Things to try
-
-1. <strong>Push A, B, C then pop.</strong> C comes back first &mdash; LIFO in one action.
-2. <strong>Try to reach the bottom item.</strong> You cannot, without popping everything above it. That is the trade-off for O(1) access to the top.
-3. <strong>Pop from an empty stack.</strong> The lab reports <em>stack underflow</em> &mdash; a real error class you will meet.
-4. <strong>Switch to bracket matching with the valid expression</strong> and step through. Watch the stack grow on openers and shrink on closers, finishing empty.
-5. <strong>Now run the mismatched one.</strong> The algorithm stops the moment a closer disagrees with the top of the stack &mdash; it does not need to read the rest.
-
-## What to remember
-
-A stack restricts you to one end, and that restriction buys O(1) push, pop and peek. It models anything where the most recent item must be handled first: nested brackets, function calls, undo history, and depth-first traversal.
-
-## Expression evaluation and parsing
-
-Stacks are how arithmetic is actually evaluated by machines.
-
-<strong>Postfix (reverse Polish) evaluation</strong> needs one stack and no precedence rules at all:
-
-```python
-def eval_postfix(tokens):
-    stack = []
-    for t in tokens:
-        if t in "+-*/":
-            b, a = stack.pop(), stack.pop()      # note the order
-            stack.append({"+": a+b, "-": a-b, "*": a*b, "/": a/b}[t])
-        else:
-            stack.append(float(t))
-    return stack.pop()
-
-eval_postfix("3 4 + 2 *".split())     # (3+4)*2 = 14
-```
-
-The `b, a = pop(), pop()` order matters for subtraction and division &mdash; the second pop is the left operand.
-
-<strong>Infix to postfix</strong> is the shunting-yard algorithm: operands go straight to the output, operators onto a stack, and an incoming operator pops any of higher or equal precedence first. Parentheses push and pop directly.
-
-That is how calculators, spreadsheet formula engines and compilers turn `2 + 3 * 4` into something evaluable, and it is the reason precedence and associativity can be handled without recursion.
-
-The same structure underlies <strong>recursive-descent parsing</strong> &mdash; where the call stack does the work &mdash; and the shift-reduce parsers used by tools like yacc.
-
-## The monotonic stack
-
-A stack whose contents are kept in sorted order, which solves a specific family of problems in O(n) that look like they need O(n²).
-
-<strong>Next greater element:</strong> for each item, find the first larger item to its right.
-
-```python
-def next_greater(arr):
-    out = [-1] * len(arr)
-    stack = []                            # holds indices, values decreasing
-    for i, x in enumerate(arr):
-        while stack and arr[stack[-1]] < x:
-            out[stack.pop()] = x          # x is the answer for everything smaller
-        stack.append(i)
-    return out
-```
-
-Each index is pushed and popped at most once, so the whole scan is O(n) despite the inner loop.
-
-The insight generalises: whenever the answer for an earlier element becomes known the moment a later element arrives, a monotonic stack finds all the answers in one pass. It solves the largest rectangle in a histogram, trapping rainwater, stock spans and daily temperatures &mdash; all classic O(n²)-looking problems.
+The final check catches leftover open brackets such as `(((`, which have no mismatch but are still incomplete.
 
 ## Where stacks appear
 
-- <strong>The call stack</strong> in every program.
-- <strong>Undo and redo</strong> in editors.
-- <strong>Browser history</strong> &mdash; back is a pop.
-- <strong>Depth-first search</strong> &mdash; explicit or via recursion.
-- <strong>Backtracking</strong> &mdash; the state to restore is on the stack.
-- <strong>Expression evaluation and parsing.</strong>
-- <strong>Bracket and tag matching</strong> in editors and validators.
-- <strong>Virtual machines.</strong> The JVM and CPython are stack machines &mdash; bytecode operates on an operand stack.
+Function calls use a call stack to remember arguments, local variables, and where to resume. Recursive algorithms rely on it; extremely deep recursion can exceed a language’s stack limit. An explicit stack is also used by depth-first search, expression evaluation, and undo systems, where the latest unresolved task or action is handled first.
 
-## Questions people ask
+In Python, `append` and `pop` at the end of a list are a simple stack. Do not use `pop(0)` for a stack: removing from the front shifts the remaining list. Use a `deque` when efficient operations at both ends are required.
 
-<strong>Should I use a list or `deque` as a stack?</strong> A list is fine and slightly faster for stack use, because `append` and `pop` at the end are O(1). `deque` matters when you need efficient operations at both ends.
+## Common mistakes
 
-<strong>What is stack overflow?</strong> Exceeding the call stack's size, usually through unbounded recursion. Python raises `RecursionError`; lower-level languages crash.
-
-<strong>Why is `pop(0)` slow?</strong> It removes from the front, shifting every remaining element &mdash; O(n). Use `deque.popleft()`.
-
-<strong>How is a stack different from a queue?</strong> LIFO against FIFO. A stack gives depth-first behaviour, a queue breadth-first.
-
-<strong>Can a stack be implemented with a linked list?</strong> Yes &mdash; push and pop at the head, both O(1). An array is usually faster because of cache behaviour.
-
-<strong>What is a monotonic stack for?</strong> Problems where an element's answer is determined by the next larger or smaller element, solved in one O(n) pass.
-
-## Recap in one screen
-
-- Push and pop at one end only; that restriction is what makes it useful.
-- A Python list is a stack: `append` and `pop`, both O(1) amortised. Never `pop(0)`.
-- The call stack is a stack, which is why recursion has a depth limit and tracebacks read as they do.
-- Matching brackets, undo/redo, DFS and expression evaluation are all the same LIFO shape.
-- A monotonic stack turns several classic O(n&sup2;) problems into single O(n) passes.
-
-## Where to practise this
-
-<p>The stack questions interviewers actually ask, each with a runnable editor and a stepped walkthrough:</p><ul><li><a href="../interview/design-a-min-stack.html">Design a stack that reports its minimum in O(1)</a> &mdash; a parallel stack of minimums, and the <code>&lt;=</code> that duplicates depend on.</li><li><a href="../interview/evaluate-reverse-polish-notation.html">Evaluate reverse Polish notation</a> &mdash; why the first value popped is the right-hand operand.</li><li><a href="../interview/daily-temperatures.html">Daily temperatures, and the monotonic stack</a> &mdash; a nested loop that is still O(n).</li><li><a href="../interview/valid-parentheses.html">Valid parentheses</a> &mdash; the classic, and the empty-stack check at the end.</li></ul>
+- **Popping an empty stack:** check before removal when the input may be malformed.
+- **Checking only for mismatches:** verify the stack is empty at the end.
+- **Using a stack for FIFO order:** a queue is the right structure when the oldest item should leave first.
+- **Reaching into the middle:** that breaks the simple LIFO interface and costs linear time.
 
 ## Sources and next steps
 
-- Source: [Python documentation, using lists as stacks](https://docs.python.org/3/tutorial/datastructures.html#using-lists-as-stacks)
-- Continue with [queues](queues.html), which builds on this idea.
+- [Python documentation: Using lists as stacks](https://docs.python.org/3/tutorial/datastructures.html#using-lists-as-stacks) shows the built-in list operations.
+- Continue with [queues](queues.html), [depth-first search](depth_first_search.html), and [recursion](recursion_and_call_stack.html).

@@ -1,236 +1,34 @@
-title: Understanding Model & Data Drift
-intro: Drift describes changes in input data, outcome rates, or the relationship between inputs and outcomes. Monitoring helps detect when a deployed model needs review.
+title: Model and Data Drift
+intro: Drift is a change in inputs, outcomes, or the relationship between them after deployment. Monitoring helps find changes that may affect model performance, but a distribution shift alone does not prove the model has degraded.
 
-## What drift looks like and why it matters
+## Three kinds of change
 
-A machine learning model is a snapshot of the world at the moment it was trained. The world does not stay still. Customer preferences shift, economic conditions change. And new patterns appear that the training data never held. <strong>model drift</strong> is the degradation of a model's predictive power over time since the environment it was deployed into has moved away from the environment it was trained on.
+Drift is a change in the data a deployed model receives, the outcomes it predicts, or the relationship between them. Monitoring can reveal changes that deserve investigation, but a shift alone does not prove model performance has fallen.
 
-The visualisation above shows a model trained at Month 0. As you advance the time slider, the relationship between the model's predictions and the live data diverges. And the error climbs. Two distinct mechanisms cause this &mdash; concept drift. There the underlying rules change. And data drift (covariate shift). There the inputs move to a region the model has never seen. A third pattern, sudden shock, is an extreme case where a single event invalidates the model overnight.
+- **Covariate shift:** the input distribution (P(X)) changes while the relationship between inputs and outcomes is assumed stable. For example, a customer base may become younger.
+- **Label or prior shift:** the outcome prevalence (P(Y)) changes, such as a higher rate of fraud. This can alter calibration and the best decision threshold.
+- **Concept drift:** the conditional relationship <code>P(Y | X)</code> changes. The same inputs now lead to different outcomes, perhaps because customer behavior or policy changed.
 
-This page covers how to detect each type with statistical tests and monitoring dashboards, when to retrain versus when to rebuild. And the feedback loops that make drift worse if you ignore it. The code blocks below simulate all three drift patterns on synthetic data so you can watch the error curves right.
+In practice, these changes can occur together. A model’s measured performance may also fall because of data-quality, software, or serving changes. Drift is a signal to investigate, not a diagnosis or automatic command to retrain.
 
-## Types of Drift
+## See the relationship move
 
-<h4 class="font-bold" style="color: var(--text-main);">1. Concept Drift</h4>
+Select **Concept Drift** in the visualizer and use **Simulate Time**. The underlying relationship changes over time while the deployed model stays fixed, so its error grows. Use **Retrain model** to compare how fitting to newer data changes the result. The demonstration is deliberately simple: in a real system, retraining helps only if recent labels are available, representative, and reliable.
 
-This occurs when the basic relationship between the input vars and the target var changes. The "rules of the game" have changed. In the visualization, the <span style="color: var(--true-color);">green dashed line</span> (the true underlying pattern) will slowly change its shape over time, while the data points continue to follow it. The deployed model (<span style="color: var(--model-color);">red line</span>). It learned the first pattern, turns increasingly wrong. <h4 class="font-bold" style="color: var(--text-main);">2. Data Drift (Covariate Shift)</h4>
+## Monitor predictions and outcomes
 
-This occurs when the distribution of the input data changes, still if the underlying concept stays the same. The model starts seeing data it has never encountered before. In the visualization, the <span style="color: var(--true-color);">green dashed line</span> will remain static. But the <span style="color: var(--data-color);">blue data points</span> will drift horizontally into a new region. The model, which was just trained on data from the initial region, has no idea how to make exact predictions for these new inputs. A third type, <strong>Sudden Shock</strong>, is an extreme form of drift where a major event instantly changes the data or concept, like the effect of a global pandemic on shopping behavior.
+Log the model version, prediction time, inputs allowed by policy, prediction, and eventual outcome. Compare input and score distributions with a reference period to spot changes early; these checks need no labels, but cannot tell whether accuracy changed. When labels arrive, monitor the task metric and confusion matrix over time, including important subgroups.
 
-## The world moves and the model does not
+Define investigation thresholds from the system’s normal variation and business risk rather than treating one statistic as a universal alarm. Check data collection, feature pipelines, class prevalence, calibration, and performance before retraining. Record the training window and evaluation results so a new model can be compared with the deployed one and rolled back if needed.
 
-A trained model is a photograph. It records the relationships that held in the data it saw, on the day it saw it. And then it stops updating &mdash; forever, unless you retrain it.
+## Common mistakes
 
-All else keeps moving. A demand forecast built before a competitor opened nearby. A fraud model built before fraudsters read about it. A recommendation model built before a new product category existed. None of these models break loudly. They degrade, quietly, while continuing to give confident predictions.
+- **Calling every input shift a failure:** covariates can move while performance remains adequate.
+- **Waiting only for labels:** outcome labels may be delayed, so input monitoring can provide an early warning.
+- **Retraining automatically on a drift alert:** noisy or unrepresentative recent data can make a model worse.
+- **Checking only aggregate performance:** subgroup changes can disappear in an overall average.
 
-This is why "the model is finished" is never true of a deployed system. A model in production is a part with a maintenance schedule. And drift monitoring is that schedule.
+## Sources and next steps
 
-## The three kinds, and how they differ
-
-The word "drift" covers three genuinely other problems, and the fixes differ.
-
-<strong>Data drift (covariate shift)</strong> &mdash; the inputs change, the relationship does not. Your customer base shifts younger. The way age relates to purchase behaviour stays the same. The model is now making predictions in a region it saw less of in training. So accuracy often drops even though nothing about the underlying rule changed.
-
-<strong>Concept drift</strong> &mdash; the relationship it changes. The inputs might look identical, but what they imply is other. "Working from home" meant something other about a customer in 2019 than in 2021. This is the serious one: no amount of reweighting the old data fixes it, since the old data is now wrong.
-
-<strong>Label drift (prior shift)</strong> &mdash; the mix of outcomes changes. Fraud rises from 0.5% to 2% of transactions. The model's calibration is now off still if its ranking is still good. And a fixed threshold is now in the wrong place.
-
-|Type|What changed|Typical fix|
-|---|---|---|
-|Data drift|P(X)|Retrain on recent data; reweight|
-|Concept drift|P(y given X)|Retrain, and shorten the training window|
-|Label drift|P(y)|Recalibrate, adjust the threshold|
-
-Concept drift also comes in speeds. <em>Sudden</em>: a regulation changes overnight. <em>Gradual</em>: preferences shift over a year. <em>Recurring</em>: seasonality, which is not really drift at all if your features include the season.
-
-## Detecting it before your users do
-
-The awkward reality is that ground-truth labels often arrive late &mdash; you learn whether a loan defaulted a year after you approved it. So monitoring splits into two layers.
-
-<strong>Input monitoring</strong> works at once, since it needs no labels:
-
-- <strong>Population Stability Index (PSI)</strong> &mdash; bucket a feature, check the training and recent distributions. Under 0.1 is stable, 0.1&ndash;0.25 is worth watching, above 0.25 is a material shift. The industry standard in credit risk.
-- <strong>Kolmogorov&ndash;Smirnov test</strong> for continuous features, chi-squared for categorical ones.
-- <strong>A domain classifier.</strong> Train a model to distinguish training rows from recent rows. If it can, they differ &mdash; and its feature importances tell you just which columns moved.
-- <strong>Prediction distribution.</strong> If a model that used to predict "approve" 70% of the time now says 45%, something changed, whether or not you can yet say what.
-
-<strong>Outcome monitoring</strong> is the real test, and it lags:
-
-- Track accuracy, precision, recall or error over rolling windows, not as a single all-time count.
-- Segment it. An total accuracy that holds steady can hide a set region or product line falling apart.
-- Watch calibration, not just ranking &mdash; drift often shows up as confident predictions that are no longer well-calibrated.
-
-Set thresholds and alerts on these before launch, not after the first incident. And log each prediction with its inputs and a timestamp. Or you will have nothing to check against later.
-
-## Three ways a model goes stale, told apart
-
-The inputs change, the relationship changes, or the class balance changes. Each one has another signature. And just one of them is visible without labels.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, roc_auc_score
-from scipy.stats import ks_2samp
-
-rng = np.random.default_rng(0)
-X, y = make_classification(n_samples=6000, n_features=6, n_informative=4,
-                           n_redundant=0, flip_y=0.08, shuffle=False,
-                           random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.4, random_state=0)
-model = LogisticRegression(max_iter=3000).fit(Xtr, ytr)
-print("day one: accuracy %.4f, AUC %.4f"
-      % (accuracy_score(yte, model.predict(Xte)), roc_auc_score(yte, model.predict_proba(Xte)[:, 1])))
-print()
-
-def check(name, Xn, yn):
-    acc = accuracy_score(yn, model.predict(Xn))
-    auc = roc_auc_score(yn, model.predict_proba(Xn)[:, 1])
-    # what you can see WITHOUT labels
-    ks = max(ks_2samp(Xtr[:, c], Xn[:, c]).statistic for c in range(Xn.shape[1]))
-    rate = model.predict(Xn).mean()
-    print("%-26s acc %.4f  AUC %.4f | max feature KS %.4f  predicted-positive %.4f"
-          % (name, acc, auc, ks, rate))
-
-check("no drift (held-out)", Xte, yte)
-
-# 1. covariate shift: the inputs move, the rule does not
-Xc = Xte.copy(); Xc[:, 0] += 2.5
-check("1. covariate shift", Xc, yte)
-
-# 2. concept drift: the inputs look the same, the rule flips
-flip = rng.random(len(yte)) < 0.35
-yc = np.where(flip, 1 - yte, yte)
-check("2. concept drift", Xte, yc)
-```
-
-Building on the same setup, the next block shows the left cases.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, roc_auc_score
-from scipy.stats import ks_2samp
-
-# 3. prior shift: the class balance moves
-keep = np.where((yte == 0) | (rng.random(len(yte)) < 0.2))[0]
-check("3. prior/label shift", Xte[keep], yte[keep])
-print()
-
-print("read the last two columns -- they are the ones you have in production,")
-print("because labels arrive late or never:")
-print("  covariate shift shows up as a large feature KS statistic.")
-print("  prior shift shows up as a change in the predicted-positive rate.")
-print("  concept drift shows up in NEITHER. the inputs are identical and the")
-print("  prediction rate barely moves. only the labels reveal it.")
-print()
-
-print("that is the uncomfortable part, so here is the KS detail:")
-Xc = Xte.copy(); Xc[:, 0] += 2.5
-print("%10s %14s %14s" % ("feature", "KS vs train", "verdict"))
-for c in range(6):
-```
-
-The next block covers the left steps.
-
-```python-run
-    stat = ks_2samp(Xtr[:, c], Xc[:, c]).statistic
-    print("%10d %14.4f %14s" % (c, stat, "DRIFTED" if stat > 0.1 else "ok"))
-print("  one column moved and the test names it. this is cheap to run daily.")
-print()
-
-print("but detecting input drift is not the same as detecting damage:")
-weakest = int(np.argmin(np.abs(model.coef_[0])))
-Xh = Xte.copy(); Xh[:, weakest] += 6.0
-print("  shift feature %d by 6.0 -- the column with the smallest coefficient:"
-      % weakest)
-print("    max KS %.4f -- alarming"
-      % max(ks_2samp(Xtr[:, c], Xh[:, c]).statistic for c in range(6)))
-print("    accuracy %.4f -- against %.4f before, so in effect untouched"
-      % (accuracy_score(yte, model.predict(Xh)),
-         accuracy_score(yte, model.predict(Xte))))
-print("    coefficients: %s" % np.round(model.coef_[0], 3))
-print("  a drift alarm on an unimportant column is noise. weight your")
-print("  monitoring by feature importance, or you will train your team to")
-print("  ignore the alerts.")
-print()
-print("what to actually watch, in order of how early it warns you:")
-print("  prediction distribution -- free, immediate, catches prior shift")
-print("  input distributions     -- free, immediate, catches covariate shift")
-print("  performance on labels   -- delayed, and the only thing that catches")
-print("                             concept drift. get labels on a sample")
-print("                             deliberately, even if it costs money.")
-```
-
-## Experiments to try
-
-Use the interactive panel to see how drift destroys a model's performance and how retraining can fix it.
-
-1. <strong>Observe Concept Drift:</strong> Select "Concept Drift" and click "Simulate Time". Watch as the green dashed line (the truth) slowly separates from the red line (the deployed model). The live data points follow the green line. As a result, the "Deployed model Error" (MSE) steadily raises. And the system status changes from "Healthy" to "Warning" and finally to "Critical".
-2. <strong>Fix the Drift with Retraining:</strong> Let the simulation run until "Month 12". The error will be high. Now, click the "Retrain model" button. The red line instantly snaps to the new green line. And the error drops back to near zero. You have updated the model to match the new reality.
-3. <strong>Witness Data Drift:</strong> Select "Data Drift" from the dropdown. This will reset the simulation to Month 0 and retrain the model. Now, click "Simulate Time". Notice that the green line doesn't move. But the blue data points slide to the right. The model's predictions turn wildly inaccurate since it is extrapolating into an unknown region. The error skyrockets.
-4. <strong>Experience a Sudden Shock:</strong> Choose "Sudden Shock" and simulate time. All is stable until Month 12, when the true pattern instantly inverts. The model's error, which was near zero, explodes overnight. This shows why continuous monitoring is key.
-
-## The Weight of MLOps
-
-Drift is not a sign of a bad model. It is an inevitability for any model deployed in a dynamic environment. The solution is not to build a "perfect" model but to have a reliable <strong>MLOps (Machine Learning Steps)</strong> plan. This involves:
-
-- <strong>Monitoring:</strong> Continuously track the model's performance and the statistical properties of live data.
-- <strong>Detection:</strong> Set up alerts to trigger when performance drops below a certain threshold or when data drift is detected.
-- <strong>Retraining:</strong> Have an automated or semi-automated pipeline to retrain the model on new, relevant data to adapt to the changes.
-
-## Responding: retrain, reweight, or redesign
-
-Detection is just useful if there is a response attached. And there are three, in raising order of effort.
-
-<strong>Scheduled retraining.</strong> The simplest policy: refit on a rolling window each week or month. Cheap to automate, and it handles gradual drift well. The main decision is the window length &mdash; too long and it dilutes recent reality, too short and the model turns noisy and unstable.
-
-<strong>Triggered retraining.</strong> Retrain when a monitor crosses a threshold rather than on a calendar. More fast, and it responds to sudden drift far faster. It needs the monitoring to be trustworthy, since a false alarm costs a full retraining cycle.
-
-<strong>Redesign.</strong> Sometimes the features them have stopped being meaningful &mdash; a channel was discontinued, a product was renamed, a data source changed its schema. No retraining fixes that; the pipeline needs work.
-
-Two practices make all three safer. Keep a <strong>champion&ndash;challenger</strong> setup, where the newly trained model runs alongside the live one on real traffic before replacing it &mdash; a retrained model is not automatically a better model. And keep a small, stable <strong>golden test set</strong> that never changes. So you can distinguish "the model got worse" from "the new test data got harder".
-
-## What monitoring looks like in practice
-
-A workable min for any deployed model:
-
-1. <strong>Log all.</strong> Inputs, prediction, model version, timestamp. And the label whenever it eventually arrives.
-2. <strong>Compute drift statistics on a schedule.</strong> PSI per feature, daily or weekly, against the training distribution.
-3. <strong>Track prediction distributions</strong> as a leading indicator, since they need no labels.
-4. <strong>Track outcome metrics</strong> on rolling windows as labels arrive, broken down by segment.
-5. <strong>Alert with a runbook.</strong> "PSI above 0.25 on any top-10 feature" should route to a person with instructions, not to a dashboard nobody opens.
-6. <strong>Keep model versions and their training data reproducible</strong>. So a rollback is possible when a retrain makes things worse.
-
-Open-source tools such as Evidently, NannyML and river cover most of this. And each major cloud ML platform has a monitoring product. The tooling matters much less than having decided, before launch, what "too much drift" means for this model.
-
-## Questions people ask
-
-<strong>How often should I retrain?</strong> As often as the underlying process changes. Fraud and pricing models often need weekly or daily attention. A model predicting physical properties may run for years. Measure the decay rate rather than guessing: retrain on old data, test on progressively newer windows. And see how fast performance falls.
-
-<strong>Can a model drift if the data does not?</strong> The model itself has not changed. But the world's relationship to it can &mdash; and a stable input distribution with falling accuracy is the signature of concept drift.
-
-<strong>Is drift the same as an outlier?</strong> No. An outlier is one unusual row. Drift is a sustained change in the distribution. Both matter, and both need split detection.
-
-<strong>Should I always retrain on the newest data just?</strong> Not always. Recency helps with concept drift and hurts when it discards rare but still-valid patterns. Weighted training &mdash; recent rows count more, old rows still count &mdash; is often a better compromise.
-
-<strong>What if I never get labels?</strong> Then input drift monitoring and prediction monitoring are all you have, plus any proxy outcome you can obtain: click-throughs, manual review outcomes, complaint rates.
-
-<strong>Does drift affect deep learning models more?</strong> Not inherently. But they are often deployed on inputs that shift more &mdash; user-made text, camera pics, sensor streams &mdash; and they are more costly to retrain. So the monitoring matters more.
-
-## Recap in one screen
-
-- models are snapshots. The world keeps moving, so performance decays by default.
-- Data drift changes the inputs, concept drift changes the rule, label drift changes the base rate.
-- Monitor inputs and prediction distributions at once, outcomes as labels arrive.
-- PSI, KS tests and a train-versus-recent domain classifier are the standard detectors.
-- Attach a response &mdash; scheduled or triggered retraining &mdash; and validate the retrained model before it replaces the live one.
-
-## Further reading
-
-For implementation details, see the [A survey on concept-drift adaptation](https://doi.org/10.1145/2523813). Continue with [class imbalance](training_on_label_imbalanced_dataset.html) to connect this topic to a related part of the workflow.
+- Gama et al., [A Survey on Concept Drift Adaptation](https://doi.org/10.1145/2523813), reviews drift types and adaptation approaches.
+- Continue with [probability calibration](probability_calibration.html), [threshold tuning](threshold_tuning.html), and [training on imbalanced data](training_on_label_imbalanced_dataset.html).

@@ -3,17 +3,9 @@ intro: Split the array in half, sort each half, then merge the two sorted halves
 
 ## Divide, conquer, combine
 
-Merge sort is the textbook divide-and-conquer algorithm and it has exactly three steps. <strong>Divide:</strong> split the array at the midpoint. <strong>Conquer:</strong> sort each half by calling merge sort on it. <strong>Combine:</strong> merge the two sorted halves into one sorted array.
 
-The recursion bottoms out at arrays of length one, which are sorted by definition. All the real work happens in the merge, on the way back up.
 
-The merge step takes two sorted halves and produces one sorted whole by walking two pointers, one in each half. At each step, compare the elements the two pointers point to and copy the smaller one into the output. When one half is exhausted, copy the remainder of the other. This runs in O(n) time and requires O(n) extra space for the output array, which is the fundamental trade-off of merge sort: guaranteed speed for guaranteed memory.
-
-Time complexity is O(n log n) in every case — worst, average and best. The recursion depth is log n (each level halves the array), and each level does O(n) total work across all the merges. No comparison-based sort can do better in the worst case, which makes merge sort optimal in that sense.
-
-Merge sort is stable: equal elements keep their original relative order, because the merge step takes from the left half when both sides are equal. This matters when sorting records by one key while preserving the order from a previous sort by another key. Quick sort is not stable, which is one reason Python's built-in sort (Timsort, a hybrid of merge sort and insertion sort) chose merge sort as its foundation.
-
-The O(n) extra space is the main drawback. Quick sort sorts in place (O(log n) stack space), which makes it faster in practice on arrays despite its O(n&sup2;) worst case. Merge sort is preferred when stability matters, when the worst case must be guaranteed, or when the data is in a linked list, where the merge step needs no extra allocation.
+Merge sort divides an array into halves, sorts each half recursively, then merges the sorted halves. Its running time is O(n log n) in every case; the usual array implementation needs O(n) extra space for merging.
 
 ## The merge is the whole algorithm
 
@@ -62,33 +54,6 @@ Sorting [38, 27, 43, 3]:
 
 The recursion has `log n` levels, and each level does O(n) work merging &mdash; hence O(n log n), for every input, with no bad cases.
 
-## Merging is the whole algorithm
-
-Given two sorted lists, produce one sorted list by repeatedly taking the smaller of the two front elements:
-
-```python
-def merge(left, right):
-    out, i, j = [], 0, 0
-    while i < len(left) and j < len(right):
-        if left[i] <= right[j]:          # <= is what makes it stable
-            out.append(left[i]); i += 1
-        else:
-            out.append(right[j]); j += 1
-    out.extend(left[i:])                 # whatever remains is already sorted
-    out.extend(right[j:])
-    return out
-
-def merge_sort(arr):
-    if len(arr) <= 1:
-        return arr
-    mid = len(arr) // 2
-    return merge(merge_sort(arr[:mid]), merge_sort(arr[mid:]))
-```
-
-The `<=` on line 4 is not arbitrary. With `<=`, when two elements are equal the one from the <em>left</em> half is taken first &mdash; and since the left half came earlier in the original array, equal elements keep their relative order. That is <strong>stability</strong>, and changing `<=` to `<` silently destroys it.
-
-Stability matters more than it sounds. Sorting a table by surname and then by department gives a list ordered by department, and alphabetical within each department &mdash; only if the second sort is stable.
-
 ## The cost: O(n) extra space
 
 Merging cannot be done in place without a substantial loss of simplicity or speed. The straightforward implementation allocates a new array at each merge, using O(n) additional memory.
@@ -106,92 +71,10 @@ That is merge sort's main disadvantage against quick sort, and it is what decide
 
 The linked-list row is worth noting: merging two linked lists requires only pointer rearrangement, so merge sort on a linked list uses O(1) extra space and is the natural choice there.
 
-## The guarantee, and what it costs
-
-Merge sort's selling point is not that it is fast on average -- quick sort usually beats it -- but that its worst case equals its best case. Here is that guarantee measured against quick sort's on the input designed to break it, along with the price merge sort pays in memory.
-
-```python-run
-def merge_sort(a, stats):
-    if len(a) <= 1: return a
-    mid = len(a) // 2
-    left = merge_sort(a[:mid], stats)
-    right = merge_sort(a[mid:], stats)
-    stats["allocated"] += len(a)
-    out, i, j = [], 0, 0
-    while i < len(left) and j < len(right):
-        stats["comps"] += 1
-        if left[i] <= right[j]:
-            out.append(left[i]); i += 1
-        else:
-            out.append(right[j]); j += 1
-    out.extend(left[i:]); out.extend(right[j:])
-    return out
-
-def quick_sort(a, stats, depth=0):
-    stats["depth"] = max(stats["depth"], depth)
-    if len(a) <= 1: return a
-    pivot = a[-1]
-    lo, eq, hi = [], [], []
-    for x in a:
-        stats["comps"] += 1
-        (lo if x < pivot else hi if x > pivot else eq).append(x)
-    return quick_sort(lo, stats, depth+1) + eq + quick_sort(hi, stats, depth+1)
-
-import random; random.seed(11)
-n = 64
-inputs = {"random": random.sample(range(n), n),
-          "sorted": list(range(n)), "reversed": list(range(n))[::-1]}
-print("n = %d" % n)
-print("%-10s %12s %12s" % ("input", "merge comps", "quick comps"))
-for name, data in inputs.items():
-    ms = {"comps": 0, "allocated": 0}; qs = {"comps": 0, "depth": 0}
-    merge_sort(data, ms); quick_sort(data, qs)
-    print("%-10s %12d %12d" % (name, ms["comps"], qs["comps"]))
-# merge sort stays near n log2 n regardless of input shape;
-# quick sort with a naive pivot hits O(n^2) on sorted data
-```
-
-Now see the cost merge sort pays for that guarantee: O(n) extra allocation per level, and what it buys in return -- stability.
-
-```python-run
-import math
-
-def merge_sort(a, stats):
-    if len(a) <= 1: return a
-    mid = len(a) // 2
-    left = merge_sort(a[:mid], stats)
-    right = merge_sort(a[mid:], stats)
-    stats["allocated"] += len(a)
-    out, i, j = [], 0, 0
-    while i < len(left) and j < len(right):
-        stats["comps"] += 1
-        if left[i] <= right[j]:
-            out.append(left[i]); i += 1
-        else:
-            out.append(right[j]); j += 1
-    out.extend(left[i:]); out.extend(right[j:])
-    return out
-
-n = 64
-for name, data in [("random", list(range(n))), ("sorted", list(range(n)))]:
-    ms = {"comps": 0, "allocated": 0}
-    merge_sort(data, ms)
-    print("%-8s allocated %d slots for %d elements (n log2 n = %.0f)" % (
-        name, ms["allocated"], n, n * math.log2(n)))
-
-# stability: equal keys keep their input order
-pairs = [(x, i) for i, x in enumerate([3, 1, 3, 1, 2])]
-print("\ninput:", pairs)
-print("merge sorted:", merge_sort(pairs, {"comps": 0, "allocated": 0}))
-# the two 3s keep indices 0,2 -- that is the <= in the merge comparison
-```
-
 ## Experiments to try
 
 1. <strong>Watch the recursion bottom out.</strong> Set <strong>Array Size</strong> to 16 and press <strong>Next Step</strong> repeatedly. The array splits until every block holds one element, and only then does anything get compared. All the sorting happens on the way back up.
 2. <strong>Count the levels.</strong> At <strong>Array Size</strong> 16 there are 4 levels of merging; at 32 there are 5. Doubling the array adds one level, and each level costs a full pass &mdash; that is n log n, split into its two factors.
-3. <strong>Give it sorted input.</strong> Press <strong>Randomize Array</strong> until the array is close to ascending and press <strong>Auto-Run</strong>. The step count barely moves. Unlike quick sort, merge sort has no input that hurts it.
-4. <strong>Spot the extra array.</strong> Watch a merge closely: elements are written to a separate buffer and then copied back. That buffer is the O(n) auxiliary memory, and it is not an implementation detail you can optimise away.
 
 ## The memory cost, and why it is unavoidable
 
@@ -200,63 +83,6 @@ Merging in place is the hard part. To write the smaller element into position 0 
 So standard merge sort allocates an auxiliary array of size n, giving <strong>O(n) space</strong>. In-place merge sort algorithms exist, but they trade the clean linear merge for substantially worse constants and considerably more complexity. In practice, if memory is the constraint you use quick sort or heap sort instead.
 
 The exception is linked lists, where merging needs only pointer reassignment and no buffer. Merge sort on a linked list is O(1) extra space, which is why it is the standard list-sorting algorithm.
-
-## Where this goes wrong
-
-- <strong>Allocating a new buffer per recursive call.</strong> This turns O(n) space into O(n log n) and hammers the allocator. Allocate one buffer up front and pass it down.
-- <strong>Breaking stability with &lt; instead of &le;.</strong> When the two fronts are equal the merge must take from the <em>left</em> run. Using a strict comparison that prefers the right run reverses equal elements and silently destroys stability.
-- <strong>Forgetting the leftover tail.</strong> When one run empties, the remainder of the other must be copied across. Dropping that step truncates the output.
-- <strong>Recursing all the way to size 1.</strong> The call overhead dominates on tiny subarrays. Real implementations switch to insertion sort below roughly 16 elements, which typically buys 10&ndash;20%.
-
-## Key takeaway
-
-Merge sort splits positionally, sorts recursively, and does its real work in a linear merge, giving a guaranteed &Theta;(n log n) on every input with no pathological case. It is stable, it parallelises cleanly, and it is the natural sort for linked lists and for data too large to fit in memory. The price is O(n) auxiliary space for arrays &mdash; which is precisely the trade quick sort makes in the opposite direction.
-
-## Where the guarantee earns its keep
-
-<strong>External sorting.</strong> Data too large for memory is sorted by reading chunks, sorting each in memory, writing them back, and then merging the sorted runs in a streaming pass. Merge sort is the only classic algorithm whose access pattern is sequential enough for this, and it is how databases sort large results and how `sort` handles huge files.
-
-<strong>Stability requirements.</strong> Multi-key sorting done as successive stable sorts, which is how spreadsheet and dataframe sorting works.
-
-<strong>Linked lists.</strong> No random access needed, O(1) extra space.
-
-<strong>Predictable latency.</strong> A guaranteed O(n log n) matters where a worst case would breach a service-level agreement, and quick sort's rare quadratic case is unacceptable.
-
-<strong>Parallel sorting.</strong> The two halves are independent, so they can be sorted concurrently. Merge sort parallelises naturally in a way quick sort's in-place partitioning does not.
-
-## Timsort: what Python actually uses
-
-Python's `sorted` and `list.sort` use <strong>Timsort</strong>, a merge sort adapted for real-world data. Two ideas make it faster than textbook merge sort:
-
-<strong>It finds existing runs.</strong> Real data is often partially sorted, and Timsort detects ascending or descending runs and merges them rather than splitting down to single elements. On already-sorted input it is O(n).
-
-<strong>It uses insertion sort for small runs.</strong> Below a threshold (32&ndash;64 elements), insertion sort's low constant factor beats recursion.
-
-It is stable, which Python guarantees as part of the language, and its worst case remains O(n log n). Java uses it for object arrays for the same reasons.
-
-The practical lesson: <strong>use the library sort</strong>. Timsort is better than anything you will write, and it handles the cases that matter.
-
-## Questions people ask
-
-<strong>Why is merge sort O(n log n) always?</strong> Because the split is always exactly in half, independent of the data. Quick sort's split depends on the pivot, which is why its worst case differs.
-
-<strong>Can merge sort be done in place?</strong> In-place variants exist and are considerably more complex and slower in practice. The O(n) space version is what is used.
-
-<strong>Is merge sort stable?</strong> Yes, provided the merge takes from the left half on ties. That single comparison decides it.
-
-<strong>Why does Python use Timsort rather than quick sort?</strong> Stability is a language guarantee, real data is often partially sorted, and the worst case is bounded.
-
-<strong>Which is faster in practice?</strong> Quick sort, usually, on arrays in memory &mdash; better cache behaviour and no allocation. Timsort wins on partially-sorted data.
-
-<strong>How does external merge sort work?</strong> Sort chunks that fit in memory, write them out, then merge the sorted runs with a k-way merge using a heap.
-
-## Recap in one screen
-
-- Split in half, sort each half recursively, merge the sorted halves &mdash; O(n log n) for every input.
-- All the work is in the merge, which takes the smaller front element repeatedly.
-- Taking from the left half on ties is what makes it stable; `<` instead of `<=` destroys that.
-- It needs O(n) extra space, which is its main cost against quick sort.
-- Ideal for linked lists, external sorting and parallel sorting; Timsort is the production refinement.
 
 ## Sources and next steps
 

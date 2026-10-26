@@ -1,237 +1,30 @@
 title: Isolation Forest
-intro: Isolation Forest identifies anomalies by how quickly random tree splits isolate each observation. It is useful when labels are scarce, but its scores need context.
+intro: Isolation Forest ranks unusual observations by how few random tree splits are needed to separate them. It is useful when labels are scarce, but the score and threshold need to be interpreted for the dataset and task.
 
-## Inverting the usual approach
+## How isolation reveals anomalies
 
-Most outlier spotting builds a model of normal &mdash; fit a spread,
-guess a density, learn a boundary. And flags what falls outside.
-That is hard work, and in high dims density estimation is very hard work.
+Many anomaly detectors model what normal data looks like and flag points that do not fit. Isolation Forest reverses the question: how quickly can random partitions isolate a point? Unusual points often have shorter paths than points in dense regions.
 
-Alone Forest asks a different question: **how much effort does it take to
-separate this point from all else?**
+## From path length to anomaly score
 
-Pick a random feature, pick a random split value between its min and max,
-and divide the data. Repeat on each half until each point sits alone.
+Each tree repeatedly chooses a feature and a split value. The number of splits needed to isolate a point is its path length. Isolation Forest averages path lengths across trees and normalises for the sample size; shorter paths produce higher anomaly scores under the convention shown here.
 
-A point far from the rest gets cut off almost right away &mdash; a single random
-split has a good chance of landing between it and the crowd. A point in the
-middle of a dense cluster lives many splits. Each cut has to be
-placed among tightly packed neighbours.
+An isolated point may be separated by one or two splits because many random cuts fall in the empty space around it. A point inside a dense group usually needs more cuts. This score ranks points; it is not a probability that a point is truly anomalous.
 
-**Path length is the outlier measure**, and no model of normality was ever built.
+## Explore the forest
 
-## The score
+1. Set **Trees** to 5, then raise it toward 60. Change **Forest seed** to compare runs. With more trees, the flagged set should become less sensitive to a single random forest.
+2. Adjust **Score threshold** and inspect how many points are flagged. The cutoff changes the decision; it does not change the underlying observations or prove that a point is an anomaly.
+3. Change **Points sampled per tree** to see how the subsample affects paths and the result.
 
-The raw quantity is the mean path length across the forest. It's normed
-against the expected path length in a random binary tree of the same size,
-because deeper trees on its own have longer paths:
+The visualiser uses a two-dimensional example. In an application, inspect flagged cases and validate the threshold with domain knowledge or labelled examples when available.
 
-```
-score = 2 ^ ( -avg_path / c(n) )
-```
+## Strengths and limitations
 
-The direction catches people out. A **short** path means easy to isolate, which
-means **anomalous**, which means a **high** score. Around 0.5 is plain;
-above about 0.6 on this page is worth a look.
+Isolation Forest does not require labelled anomalies or a distance metric, and it can be efficient on large datasets. Its random axis-aligned splits can be less effective when anomalies are only locally unusual, when irrelevant features dominate the splits, or when the meaningful structure is strongly rotated or dependent across features.
 
-Drag the threshold and watch the count. The readout gives the range of scores
-present, so you can see where the group really sits rather than guessing.
+The threshold is a separate decision from the ranking. Some implementations expose a contamination setting to choose a cutoff based on an assumed fraction of outliers; that assumption should reflect the use case, not be treated as a measured anomaly rate. Compare with [Local Outlier Factor](https://scikit-learn.org/stable/modules/outlier_detection.html#local-outlier-factor) when local density differences matter, or [DBSCAN](dbscan_clustering.html) when density-based clusters are the goal.
 
-## Subsampling, and why it helps
+## Sources and next steps
 
-Each tree is built from a small random subsample. 256 points by default in
-most libraries &mdash; and this isn't only for speed.
-
-With the full dataset, a cluster of outliers can be dense enough to look normal
-locally: its members shield each other and need a few splits to separate. Take
-a small sample and those outliers are often alone in it, so they're isolated
-right away. Subsampling reduces *swamping* (normal points looking anomalous
-because the data is crowded) and *masking* (outliers hiding one another).
-
-The trees control shows the other half of the picture. At five trees the flagged
-set jitters as you change the seed. At sixty it's stable. Path length from one
-random tree is nearly meaningless, and the mean over many isn't.
-
-**Each tree is built from a sample and then used to score each point.** Building
-and scoring on the same subsample is a mistake worth naming: a point missing from
-a tree adds nothing that round, its mean path comes out short, and it
-looks like an outlier. All ends up flagged.
-
-## What it is good at
-
-**Speed.** Linear in the number of points, and the trees are shallow. It's one
-of the few outlier finders that is truly cheap on large data.
-
-**High dims.** No distance metric, so it avoids the concentration problem
-that undoes k-nearest-neighbour approaches.
-
-**No labels.** fully unsupervised.
-
-**No distributional assumption.** Unlike a Gaussian-based finder, it doesn't
-care what shape normal is.
-
-## What it is bad at
-
-**Local outliers.** It finds points that are globally easy to separate. A point
-sitting in a *low-density gap between two dense clusters* may be entirely typical
-globally and clearly anomalous locally. **Local Outlier Factor** checks each
-point's density to its neighbours' and catches these.
-
-**Axis-aligned splits.** Cuts are at right angles to the axes, which makes
-artefacts along main-lines in linked data. **Extended Alone Forest** uses
-random hyperplanes instead.
-
-**Irrelevant features.** Random feature pick wastes splits on columns that
-carry nothing.
-
-**The contamination parameter.** Libraries ask what fraction of the data is
-anomalous to place a threshold, and if you knew that you'd be much
-further along. Prefer to look at the score spread and choose a cut, which
-is what the slider here makes you do.
-
-## The path-length score, worked
-
-The score turns an mean path length into a number between 0 and 1, and working
-it shows why the direction is what it's. With a 256-point subsample the expected
-path in a random tree is `c(256) &asymp; 10.24`, and `score = 2^(-avg_path / c(n))`:
-
-|average path to isolate the point|score|reading|
-|---|---|---|
-|3 (cut off early)|0.82|anomalous|
-|8 (survived many cuts)|0.58|nearer normal|
-
-A point far from the crowd is separated by one or two random splits &mdash; a
-single cut has a good chance of landing in the empty space around it &mdash; so its
-path is short, its score high. It's flagged. A point buried in a dense cluster
-needs many splits to peel away from its neighbours. Its path is long and its
-score low. Short path, high score, anomalous: the tie that catches people
-because it runs opposite to the intuition that a bigger number is safer. The
-256-point subsample isn't only for speed. A small sample often holds a
-would-be outlier alone, so it isolates right away. Here in the full data a tight
-clump of outliers can shield each other and live a few cuts (masking). And
-the mean is over many trees for a reason: one tree's path length is nearly
-meaningless, and the flagged set only settles across dozens.
-
-What Alone Forest is good and bad at both follow from that random-split
-mechanism. It's fast &mdash; linear in the points, with shallow trees &mdash; and
-indifferent to dimensionality, since it uses no distance metric and so escapes the
-concentration that undoes k-nearest-neighbour finders, and it assumes nothing
-about the shape of "normal". But it finds only *globally* easy-to-separate points:
-a point sitting in a low-density gap between two dense clusters can be just right
-plain globally and clearly anomalous locally. This Is what Local Outlier Factor
-catches by checking each point's density to its neighbours'. And its
-`contamination` parameter, which asks what fraction of the data is anomalous, is a
-guess presented as a setting. Better to read the score spread and cut
-it yourself.
-
-## Where it goes wrong
-
-**Reading the score in the wrong direction.** High means anomalous.
-
-**Too few trees.** The estimate is noisy. Check by changing the seed.
-
-**Trusting `contamination`.** It's a guess presented as a parameter.
-
-**Expecting it to find local outliers.** Use LOF for those.
-
-## Questions people ask
-
-<strong>How does Isolation Forest find anomalies?</strong> It builds random trees that split features at random values. Anomalies are few and different, so they are isolated in fewer splits, which gives them a short average path length.
-
-<strong>What does the contamination parameter do?</strong> It sets the fraction of points you expect to be anomalies and so sets the decision threshold. If you do not know it, use the raw scores and choose a cutoff yourself.
-
-<strong>Do I need to scale features?</strong> No. Splits are made on single features, so scale does not matter.
-
-<strong>Why subsample?</strong> Smaller subsamples (256 by default) reduce masking and swamping, where normal points hide anomalies or look like them. It also makes training fast.
-
-<strong>What does Isolation Forest miss?</strong> Anomalies that are only unusual in combinations of features at very high dimension, and local anomalies hidden inside dense regions. Irrelevant features also dilute the score.
-
-<strong>How do I read the score?</strong> Scores near 1 are likely anomalies and scores well under 0.5 are normal. In scikit-learn, score_samples returns the negated version, where lower is more anomalous.
-
-## Finding outliers by how easy they are to separate
-
-Alone Forest splits at random and counts how few cuts it takes to isolate a point. Outliers fall out early. That path length is the entire score.
-
-```python-run
-import numpy as np
-from sklearn.ensemble import IsolationForest
-rng = np.random.default_rng(0)
-normal = rng.normal(0, 1, (960, 2))
-weird = rng.uniform(-6, 6, (40, 2))
-X = np.vstack([normal, weird])
-truth = np.r_[np.ones(960), -np.ones(40)]
-print("960 normal points and %d scattered ones. no labels." % len(weird))
-
-iso = IsolationForest(contamination=0.04, random_state=0).fit(X)
-pred = iso.predict(X)
-print("caught %d of the %d planted anomalies"
-      % (((pred == -1) & (truth == -1)).sum(), (truth == -1).sum()))
-print("false alarms on normal points: %d" % ((pred == -1) & (truth == 1)).sum())
-print()
-
-print("the score IS the average path length, rescaled. shorter = weirder:")
-s = iso.score_samples(X)
-order = np.argsort(s)
-print("  five most anomalous points:")
-for i in order[:5]:
-    print("    %s  score %.4f  %s"
-          % (np.round(X[i], 3), s[i], "planted" if truth[i] < 0 else "normal"))
-print("  five most normal points:")
-for i in order[-5:]:
-    print("    %s  score %.4f  %s"
-          % (np.round(X[i], 3), s[i], "planted" if truth[i] < 0 else "normal"))
-print()
-
-print("distance from the centre, against the score:")
-dist = np.linalg.norm(X, axis=1)
-for lo, hi in ((0, 1), (1, 2), (2, 3), (3, 8)):
-    m = (dist >= lo) & (dist < hi)
-    if m.any():
-        print("  %d-%d sd from centre: %4d points, mean score %.4f, flagged %d"
-              % (lo, hi, m.sum(), s[m].mean(), (pred[m] == -1).sum()))
-print("  no distance was computed. random splits isolate far-out points")
-print("  in fewer cuts, and that is all the algorithm knows.")
-```
-
-The next block shows how the contamination parameter works and compares Isolation Forest against the other unsupervised detectors.
-
-```python-run
-import numpy as np
-from sklearn.ensemble import IsolationForest
-from sklearn.svm import OneClassSVM
-from sklearn.neighbors import LocalOutlierFactor
-from sklearn.covariance import EllipticEnvelope
-rng = np.random.default_rng(0)
-normal = rng.normal(0, 1, (960, 2))
-weird = rng.uniform(-6, 6, (40, 2))
-X = np.vstack([normal, weird])
-truth = np.r_[np.ones(960), -np.ones(40)]
-
-print("contamination is not a threshold on weirdness -- it is a quota:")
-for c in (0.01, 0.04, 0.10, 0.25):
-    p = IsolationForest(contamination=c, random_state=0).fit_predict(X)
-    print("  contamination=%.2f -> flagged %3d (%.1f%% of %d), caught %2d real"
-          % (c, (p == -1).sum(), 100 * (p == -1).mean(), len(X),
-             ((p == -1) & (truth == -1)).sum()))
-print("  it always flags that fraction, whether or not anything is wrong.")
-print()
-
-print("against the other unsupervised detectors, same data:")
-for name, m in (("Isolation Forest", IsolationForest(contamination=0.04, random_state=0)),
-                ("One-Class SVM", OneClassSVM(nu=0.04, gamma="scale")),
-                ("Elliptic Envelope", EllipticEnvelope(contamination=0.04, random_state=0)),
-                ("Local Outlier Factor", LocalOutlierFactor(contamination=0.04))):
-    p = m.fit_predict(X)
-    print("  %-22s caught %2d of %d, %3d false alarms"
-          % (name, ((p == -1) & (truth == -1)).sum(), (truth == -1).sum(),
-             ((p == -1) & (truth == 1)).sum()))
-print()
-print("Isolation Forest is the usual first choice: linear in the number")
-print("of rows, needs no distance metric, survives high dimensions.")
-print("Elliptic Envelope assumes one gaussian blob -- fast when that is")
-print("true, useless when it is not.")
-```
-
-## Further reading
-
-For implementation details, see the [Novelty and outlier detection](https://scikit-learn.org/stable/modules/outlier_detection.html). Continue with [DBSCAN](dbscan_clustering.html) to connect this topic to a related part of the workflow.
+The method was introduced by Liu, Ting and Zhou in [“Isolation Forest”](https://doi.org/10.1109/ICDM.2008.17). See scikit-learn’s [outlier-detection guide](https://scikit-learn.org/stable/modules/outlier_detection.html) for implementation details and score conventions.

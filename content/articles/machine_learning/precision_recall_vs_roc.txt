@@ -1,227 +1,41 @@
-title: Precision-Recall against ROC
-intro: ROC and precision-recall curves compare classifier behavior across thresholds. Precision-recall views are especially informative when positive cases are rare.
+title: Precision–Recall and ROC Curves
+intro: ROC and precision–recall curves show how a classifier’s error trade-offs change with its threshold. Precision–recall is especially useful when the positive class is rare and false alarms matter.
 
-## Start balanced
+## What each curve measures
 
-Leave the slider at 0.5. Half the rows are plus, and the two curves broadly
-agree: ROC bows toward the top left, PR bows toward the top right, and both say
-the model is decent.
+Both curves evaluate a classifier across decision thresholds. ROC focuses on rates within each actual class; precision–recall focuses on the correctness and coverage of positive predictions. Class prevalence affects their baselines differently.
 
-Now drag the slider down toward 0.02. This Is a realistic rate for fraud,
-disease screening or ad clicks. Watch the two charts diverge.
+## What the curves measure
 
-**ROC barely moves.** The AUC in the readout stays high.
+A classifier often produces a score, such as a probability. Choosing a threshold turns those scores into positive or negative predictions. Each threshold gives a confusion matrix and a point on each curve.
 
-**PR merges.** The precision that was achievable at any handy recall falls
-away, and the best F1 falls with it.
+<p><strong>True positive rate (recall) = TP / (TP + FN)</strong></p>
+<p><strong>False positive rate = FP / (FP + TN)</strong></p>
+<p><strong>Precision = TP / (TP + FP)</strong></p>
 
-The scores didn't change. The model didn't change. Only the proportion of
-positives changed, and the two curves disagree about whether that matters.
+The ROC curve plots true positive rate against false positive rate. The precision–recall curve plots precision against recall. ROC AUC summarises ranking across thresholds; average precision summarises precision as recall increases. Neither metric chooses a deployment threshold or checks whether predicted probabilities are calibrated.
 
-## Why ROC does not notice
+## A rare-class example
 
-ROC plots true positive rate against false positive rate:
+Suppose a test set contains 100 positive cases and 9,900 negatives. At one threshold, a model catches 90 positives (recall 0.90) and incorrectly flags 5% of negatives. That is 495 false positives, so precision is:
 
-```
-TPR = TP / (TP + FN)     denominator: all actual positives
-FPR = FP / (FP + TN)     denominator: all actual negatives
-```
+<p><strong>90 / (90 + 495) ≈ 0.154</strong></p>
 
-Each rate uses one class as its denominator. TPR asks what fraction of positives
-were caught. FPR asks what fraction of negatives were wrongly flagged. Adding a
-million more negatives leaves TPR untouched and changes FPR only through its own
-denominator, which grows in proportion.
+The ROC point is (FPR 0.05, TPR 0.90). If the same rates held in a balanced set with 100 negatives, there would be 5 false positives and precision would be 90 / 95 ≈ 0.947. The true-positive and false-positive rates are unchanged, but the number of false alarms and the precision differ because prevalence changed.
 
-That class-freedom is often given as a virtue, and for some purposes it
-is. It also means ROC can't see the thing that makes rare-plus problems
-hard.
+## Change prevalence in the visualiser
 
-## Why PR does notice
+1. Set **Fraction of rows that are positive** near 0.50, then note the ROC and precision–recall curves.
+2. Lower it toward 0.01. The ROC baseline remains 0.5 for random ranking, while the no-skill precision–recall baseline follows the positive-class prevalence. With rare positives, small false-positive rates can still produce many false alarms.
 
-Precision is different:
+The exact curve shape depends on the scores; the key distinction is how the axes and baselines respond to class balance.
 
-```
-precision = TP / (TP + FP)     denominator: everything you flagged
-```
+## Which one should you use?
 
-The denominator mixes both classes. When negatives outnumber positives a hundred
-to one, even a small false plus *rate* makes a large *number* of false
-positives, and those go straight into precision's denominator.
-
-Concretely: 10,000 rows, 100 plus. A model at 90% recall and 5% FPR catches
-90 real positives and flags 495 negatives. FPR of 5% sounds great and ROC
-records it as such. Precision is 90 / 585 = **15%**. Five out of six flagged
-cases are wrong, and each one costs somebody an investigation.
-
-## Reading the baselines
-
-Each chart has a dashed no-skill line, and they differ.
-
-For **ROC** it's the main-line, always. A random classifier gets AUC 0.5
-even so of balance.
-
-For **PR** it's a flat line at the **positive rate**. At 50% positives,
-random scores 0.5 precision. At 2%, random scores 0.02. Drag the slider and
-watch it drop.
-
-This is what makes PR honest and slightly harder to read: there's no fixed
-scale. A PR AUC of 0.4 is poor on weighed data and outstanding at a 2% base
-rate. The number must always be checked against the baseline, never quoted
-alone.
-
-## Which to use
-
-| Situation | Curve | Reason |
+| Question | Useful view | What to keep in mind |
 |---|---|---|
-| Roughly balanced | either | they broadly agree |
-| Rare positives | **PR** | ROC hides the false-positive volume |
-| You care about ranking overall | ROC | it is what AUC measures |
-| Someone acts on each flag | **PR** | precision is that person's experience |
-| Comparing across datasets | ROC, carefully | PR baselines differ by base rate |
+| How well does the model rank positives above negatives overall? | ROC AUC | It is prevalence-insensitive when the class-conditional score distributions stay fixed, but it does not show the volume of alerts by itself. |
+| How many flagged cases are correct, and how many positives are found? | Precision–recall | Its baseline changes with prevalence, so compare scores against that baseline and use the intended deployment prevalence. |
+| What threshold should run in production? | Neither curve alone | Choose on validation data using the costs or capacity limits of false alarms and misses. |
 
-The hands-on rule: if a human or a process has to act on each plus
-guess, precision is the thing they run into, and the PR curve is the one
-to look at.
-
-## Add a million negatives, and watch only one curve move
-
-The divergence is math. Hold the model's rates fixed &mdash; 90% recall, 5%
-false-positive rate &mdash; and change only the class balance in 10,000 rows:
-
-|positives|TP|FP|precision|TPR / FPR|
-|---|---|---|---|---|
-|5,000 (balanced)|4,500|250|0.95|0.90 / 0.05|
-|100 (1%)|90|495|**0.15**|0.90 / 0.05|
-
-The ROC coords are the same in both rows. TPR cuts by actual
-positives and FPR by actual negatives. Each lives inside one class, so the
-balance can't touch them. Precision cuts by all flagged, which mixes
-the classes, so when negatives outnumber positives a 5% false-positive rate turns
-into 495 false alarms drowning 90 real ones and precision falls to 0.15. Same
-model, same scores, and ROC records it as great while five of each six
-flagged cases are wrong. That is why ROC AUC alone on rare-plus data is the
-standard way to make an undeployable model look ready, and why the PR curve
-&mdash; whose no-skill baseline is the positive rate itself, 0.01 here, not a
-fixed 0.5 &mdash; is the honest one to quote.
-
-The hands-on rule follows from who acts on the output. If a human or a process
-has to deal with each plus guess. An analyst investigating each
-flag, a queue of cases to review. Then precision is the run into that
-person really has, and the PR curve is the one to read. ROC still has its place:
-it's the right tool when you care about ranking quality total, and it's more
-close across datasets because its baseline is a fixed 0.5 rather than a
-base-rate that shifts. Neither curve, though, tells you which threshold to deploy;
-that is a separate choice driven by [costs](threshold_tuning.html).
-
-One more skew is worth stating: because the PR baseline is the positive rate,
-a PR AUC has no fixed scale. A PR AUC of 0.4 is poor on weighed data and
-outstanding at a 2% base rate. So The number means nothing quoted alone &mdash; it
-has to be read against the baseline for that dataset. This Is just why it
-can't be checked across datasets with different weighs the way ROC can.
-
-A last check point: the two curves also treat the negatives differently. ROC
-rewards a model for correct ranking the vast pool of easy negatives, which is
-where its optimism on rare-plus data comes from. PR skips true negatives
-they appear in neither precision nor recall &mdash; so it reports
-only on the positives you care about and the false alarms among them.
-
-## Where it goes wrong
-
-**Reporting ROC AUC alone on imbalanced data.** It's the standard way to make a
-model that will drown a team in false positives look ready to ship.
-
-**Checking PR AUC across datasets with different base rates.** The baselines are
-different, so the numbers aren't close.
-
-**Losing that both curves span all thresholds.** Neither tells you which
-threshold to deploy &mdash; that is a separate choice, made with
-[costs](threshold_tuning.html).
-
-## Questions people ask
-
-<strong>When should I use a precision-recall curve instead of ROC?</strong> When the positive class is rare. ROC can look excellent even when most flagged items are false alarms.
-
-<strong>Why does ROC AUC stay high on imbalanced data?</strong> The false positive rate divides by the huge number of negatives, so many false positives still give a small rate.
-
-<strong>What is the baseline for each curve?</strong> ROC AUC for a random model is 0.5 regardless of balance. For PR it equals the positive rate, so it changes with the data.
-
-<strong>Can I compare PR AUC across datasets?</strong> Only with care, since the baseline differs. Compare against each dataset's positive rate.
-
-<strong>What is average precision?</strong> A summary of the PR curve, the weighted mean of precision at each threshold. It is the usual way to get a single PR number.
-
-<strong>Do the curves change if I change the threshold?</strong> No. Each curve covers all thresholds. The threshold picks a single point on it.
-
-## The same model, two curves, two different stories
-
-ROC and precision-recall are found from the same guesses. On weighed data they agree. On imbalanced data one of them is misleading. It's always the same one.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score, average_precision_score
-
-def build(weight, seed=0):
-    X, y = make_classification(n_samples=20000, n_features=18, n_informative=10,
-                               weights=[weight], flip_y=0.005, class_sep=2.5,
-                               random_state=seed)
-    a, b, c, d = train_test_split(X, y, test_size=0.4, random_state=0, stratify=y)
-    return d, LogisticRegression(max_iter=3000).fit(a, c).predict_proba(b)[:, 1]
-
-print("%14s %10s %12s %12s" % ("positive rate", "ROC AUC", "PR AUC", "PR baseline"))
-for w in (0.50, 0.80, 0.95, 0.985):
-    yte, p = build(w)
-    print("%13.2f%% %10.4f %12.4f %12.4f"
-          % (100 * yte.mean(), roc_auc_score(yte, p),
-             average_precision_score(yte, p), yte.mean()))
-print()
-print("ROC AUC drifts. PR AUC falls through the floor -- and its baseline")
-print("falls with it, because a random scorer's PR AUC IS the positive rate.")
-print("ROC AUC's baseline is 0.5 no matter what, which is exactly the problem:")
-print("a number that does not move cannot warn you.")
-```
-
-The next block picks one threshold on the most imbalanced data and shows what the false positive rate and precision actually measure.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_curve, roc_auc_score, confusion_matrix
-
-X, y = make_classification(n_samples=20000, n_features=18, n_informative=10,
-                           weights=[0.985], flip_y=0.005, class_sep=2.5,
-                           random_state=0)
-a, b, c, d = train_test_split(X, y, test_size=0.4, random_state=0, stratify=y)
-yte, p = d, LogisticRegression(max_iter=3000).fit(a, c).predict_proba(b)[:, 1]
-
-fpr, tpr, rthr = roc_curve(yte, p)
-i = int(np.argmin(np.abs(tpr - 0.80)))
-t = rthr[i]
-tn, fp, fn, tp = confusion_matrix(yte, (p >= t).astype(int)).ravel()
-print("on %.1f%% positive data, threshold catching 80%% of positives:" % (100*yte.mean()))
-print("  false positive rate  %.4f   <- the ROC curve's x-axis" % (fp / (fp + tn)))
-print("  precision            %.4f   <- the PR curve's y-axis" % (tp / (tp + fp)))
-print()
-print("both describe the SAME %d false positives." % fp)
-print("  FPR divides by the %d negatives       -> %.4f" % (fp + tn, fp / (fp + tn)))
-print("  precision divides by %d rows flagged   -> %.4f wrong" % (tp + fp, fp / (tp + fp)))
-print()
-print("AUC %.4f and FPR %.1f%% both read like a working model."
-      % (roc_auc_score(yte, p), 100 * fp / (fp + tn)))
-print("but a human sees %d items, %d real. %.0f%% of the day is wasted."
-      % (tp + fp, tp, 100 * fp / (tp + fp)))
-print()
-print("the rule:")
-print("  balanced classes, both errors matter    -> ROC is fine")
-print("  rare positives, you care about alerts   -> precision-recall")
-print("  comparing across different base rates   -> ROC, PR baseline moves")
-print()
-print("always print the base rate beside either. an AUC without it is half a sentence.")
-```
-
-## Further reading
-
-For implementation details, see the [Precision-recall and ROC metrics](https://scikit-learn.org/stable/modules/model_evaluation.html). Continue with [threshold tuning](threshold_tuning.html) to connect this topic to a related part of the workflow.
+Precision–recall is often more revealing for rare-positive tasks such as fraud review or defect detection. ROC remains useful for ranking and for seeing the false-positive rate directly. Read both in the context of the task, and use [threshold tuning](threshold_tuning.html) to choose an operating point. The [scikit-learn evaluation guide](https://scikit-learn.org/stable/modules/model_evaluation.html#precision-recall-f-measure-metrics) documents these metrics; Davis and Goadrich discuss the relationship between ROC and precision–recall spaces in their [ICML paper](https://doi.org/10.1145/1143844.1143874).

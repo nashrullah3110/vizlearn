@@ -1,254 +1,44 @@
-title: Training on Imbalanced Dataset: A Practical Guide
-intro: When one class is rare, training objectives may favor the majority class. Reweighting, resampling, and threshold changes address different parts of that problem.
+title: Training on an Imbalanced Dataset
+intro: When one class is rare, average training loss and accuracy can hide poor detection of that class. The right response depends on the metric, error costs, and how the model will be used.
 
-## Why imbalance breaks training
+## What imbalance changes
 
-Standard training minimizes average loss over the dataset. When one class holds 99% of the rows, that average is dominated by it: predicting the majority class for every row can achieve low average loss. So the optimization may provide too little incentive to learn the minority class.
+When positives are rare, a classifier can achieve high accuracy by mostly predicting the majority class while missing the cases that matter. With 1% positives, always predicting negative gives 99% accuracy and zero recall, so evaluate class-specific errors as well as the overall score.
 
-The model is optimizing the objective it was given. If the goal is to find rare cases, minimizing overall error may not put enough weight on that goal. Other objectives may be more appropriate when classes are unequal.
+Imbalance alone does not prove a model is wrong. First measure performance in a way that reflects the task: inspect the confusion matrix, precision, recall, F1, and a precision-recall curve. Compare results with the prevalence baseline and decide what false positives and false negatives cost.
 
-This page compares resampling, reweighting, and threshold adjustment &mdash; and the metrics that really tell you whether they helped. Accuracy alone is misleading on imbalanced data. Read precision, recall, F1, and area under the [precision-recall curve](precision_recall_and_f1.html) instead. The code blocks below train on a 99:1 dataset with and without each fix so you can check the confusion matrices side by side. And the visualisation above lets you adjust the class ratio interactively and watch the metrics respond in real time.
+## Three different interventions
 
-## Three ways to address imbalance
+- **Change the decision threshold:** keeps the fitted model fixed and trades precision for recall. Tune on validation data and inspect the resulting workload.
+- **Change loss weights:** class weights make errors on a rare class count more during fitting. This can shift the learned boundary but does not create new examples.
+- **Change the training sample:** oversampling adds or synthesizes minority examples; undersampling removes majority examples. This changes the data seen during fitting and can increase overfitting or discard useful variation.
 
-There are three different interventions, and they solve different problems:
+Try threshold adjustment and sensible evaluation first. If the model still fails the task, compare weights or resampling using the same validation procedure.
 
-- **Change the metric.** Use precision, recall, F1, or average precision to see whether the rare class is being detected. Accuracy alone can hide a model that predicts only the majority class.
-- **Change the training loss.** Class weights increase the penalty for mistakes on the rare class. Focal loss reduces the contribution of examples the model already handles confidently.
-- **Change the training data.** Oversampling duplicates or synthesizes minority-class examples; undersampling removes some majority-class examples. These choices change the training distribution and can increase overfitting or discard information.
+## Read the visualizer
 
-A fourth option changes the decision rule rather than training: lower or otherwise tune the classification threshold on validation data. This can improve recall at the cost of more false positives. Check the resulting confusion matrix and choose based on the cost of each error.
+Set **Class 0 Ratio** to 50, then press **Retrain Both Nets**. Increase it to 95 and retrain again. The two classes become less evenly represented, and the learned decision region can shift. The demonstration isolates class balance in a small synthetic problem; real performance also depends on feature overlap, sample size, model choice, and random variation.
 
-## Start by changing nothing about the data
+The visualizer shows why accuracy can remain high while minority-class recall falls. It does not show that changing the ratio alone is always the right fix. Compare class-specific errors and choose a strategy against a defined validation objective.
 
-The instinct on seeing an imbalanced dataset is to resample it at once. Resampling is not always the best first response. Two checks are cheaper and should come first; one may be enough.
+## Compare weighting and resampling
 
-<strong>Change what you measure.</strong> If you evaluate only with accuracy, a training change may not address the actual failure. Switch to precision, recall, F1 and PR-AUC. And look at the confusion matrix. Sometimes the model is adequate for the task and only the metric was misleading.
+|Method|What changes|Trade-off|
+|---|---|---|
+|Class weighting|Contribution of each class to training loss|Can improve minority recall; may increase false positives or harm probability calibration|
+|Undersampling|Some majority examples are removed|Cheaper training; discarded examples may contain useful subgroups|
+|Random oversampling|Minority rows are repeated|Simple; exact duplicates can encourage memorization|
+|SMOTE|Synthetic minority rows are interpolated between neighbours|Can help numeric features; may create unrealistic points in sparse, categorical, or high-dimensional data|
 
-<strong>Change the threshold.</strong> A model that outputs scores can rank examples. If it ranks fraud above legitimate deals well, the decision threshold may simply be too high for a class that makes up 0.5% of the data. Sweep the threshold, pick the point that meets your recall target. This may be enough to meet the chosen target without retraining.
+With 99,500 negative and 500 positive examples, balanced class weights assign a positive example about 199 times the negative example’s weight. This changes the loss contribution; it does not make the observed sample representative of every deployment setting. Check probability calibration before using weighted-model scores as probabilities.
 
-Only after trying those two should you change the training procedure. And when you do, weighting is the gentler intervention: it changes how much each row counts, without inventing or deleting rows.
+## Prevent a misleading evaluation
 
-## Weighting versus resampling
+Split before resampling. Apply oversampling or undersampling only inside each training fold; otherwise near-duplicates or synthetic relatives can cross into validation or test data. Use a pipeline or an imbalanced-learn pipeline to keep sampling within the fold. Preserve the real class distribution in validation and test sets unless the deployment distribution is intentionally different.
 
-<strong>Class weights</strong> multiply each class's contribution to the loss by a factor, often the inverse of its rate. With 99,500 negatives and 500 positives, each positive counts 199 times as much. And the totals balance. No data is created or destroyed.
+ROC AUC measures ranking across thresholds and can be useful, but it does not tell how many alerts will be correct at the operating threshold. Precision-recall results expose that trade-off more directly when positives are scarce. Report the positive prevalence and a confusion matrix at the chosen threshold.
 
-```python
-# scikit-learn: one argument
-model = RandomForestClassifier(class_weight="balanced")
-model = LogisticRegression(class_weight="balanced")
+## Sources and next steps
 
-# boosting libraries: the ratio directly
-xgb = XGBClassifier(scale_pos_weight=len(y[y==0]) / len(y[y==1]))
-```
-
-<strong>Down-sampling</strong> throws away bulk rows until the ratio improves. Fast, and it makes training much cheaper on very large datasets. But you are discarding real information. Fair when you have millions of bulk rows and can afford to lose some.
-
-<strong>Up-sampling</strong> duplicates minority-class rows. Keeps all the data. But exact duplicates push memorisation. The model can fit those set rows rather than the pattern.
-
-<strong>SMOTE</strong> creates new synthetic minority-class points along the lines between existing minority-class neighbours, instead of duplicating. It works best with continuous, well-scaled features and a moderate imbalance. It struggles with class-based features (the interpolated value is not a real group), with high dimensions (the interpolation is between points that were not really neighbours). And with noisy minority-class points (it amplifies them).
-
-|Approach|Data changed|Cost|Main risk|
-|---|---|---|---|
-|Threshold shift|None|None|None &mdash; try it first|
-|Class weights|None|None|Can over-correct; still tune|
-|Undersampling|Majority removed|Cheap, faster training|Information thrown away|
-|Oversampling|Minority duplicated|Slower training|Memorising duplicates|
-|SMOTE|Synthetic rows added|Slower training|Unrealistic synthetic points|
-
-## The ordering rule that keeps results honest
-
-Resampling belongs <em>inside</em> the cross-validation fold, applied just to the training portion. And never to validation or test data.
-
-Get this wrong and the failure is spectacular but invisible: SMOTE applied before splitting creates synthetic points from rows that later land in the test set. The model then sees close relatives of test rows in training, scores 0.97. And collapses in production.
-
-The safe pattern is an imbalanced-learn pipeline. It applies the sampler just in `fit`:
-
-```python
-from imblearn.pipeline import Pipeline
-from imblearn.over_sampling import SMOTE
-from sklearn.model_selection import cross_val_score, StratifiedKFold
-
-pipe = Pipeline([
-    ("smote", SMOTE(random_state=0)),        # training folds only
-    ("clf", RandomForestClassifier(n_jobs=-1)),
-])
-
-cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
-scores = cross_val_score(pipe, X, y, cv=cv, scoring="average_precision")
-```
-
-`StratifiedKFold` matters here too: without it a fold can end up with almost no positives. And its score turns meaningless noise that drags the average around.
-
-## Four fixes, measured against each other
-
-Class weights, up-sampling, down-sampling and threshold tuning, all applied to the same imbalanced problem so you can see what each one really costs.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import (confusion_matrix, average_precision_score,
-                             precision_score, recall_score, f1_score)
-
-X, y = make_classification(n_samples=12000, n_features=15, n_informative=6,
-                           weights=[0.97], flip_y=0.02, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0,
-                                      stratify=y)
-print("train: %d rows, %d positive (%.2f%%)" % (len(ytr), ytr.sum(), 100 * ytr.mean()))
-print("test : %d rows, %d positive" % (len(yte), yte.sum()))
-print()
-
-def score(name, pred, prob=None):
-    tn, fp, fn, tp = confusion_matrix(yte, pred).ravel()
-    print("%-28s TP %4d  FP %5d  FN %4d | prec %.4f  rec %.4f  F1 %.4f"
-          % (name, tp, fp, fn, precision_score(yte, pred, zero_division=0),
-             recall_score(yte, pred, zero_division=0),
-             f1_score(yte, pred, zero_division=0)))
-
-base = LogisticRegression(max_iter=3000).fit(Xtr, ytr)
-score("1. nothing (baseline)", base.predict(Xte))
-
-w = LogisticRegression(max_iter=3000, class_weight="balanced").fit(Xtr, ytr)
-score("2. class_weight='balanced'", w.predict(Xte))
-print("   that reweights each class by n / (2 * count), so one positive row")
-print("   counts as much as %.1f negative ones. no data was copied or deleted."
-      % ((ytr == 0).sum() / (ytr == 1).sum()))
-```
-
-Now check up-sampling the small, down-sampling the bulk. And threshold tuning on the same split.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import (confusion_matrix, precision_score,
-                             recall_score, f1_score, average_precision_score)
-
-X, y = make_classification(n_samples=12000, n_features=15, n_informative=6,
-                           weights=[0.97], flip_y=0.02, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0,
-                                      stratify=y)
-def score(name, pred):
-    tn, fp, fn, tp = confusion_matrix(yte, pred).ravel()
-    print("%-28s TP %4d  FP %5d  FN %4d | prec %.4f  rec %.4f  F1 %.4f"
-          % (name, tp, fp, fn, precision_score(yte, pred, zero_division=0),
-             recall_score(yte, pred, zero_division=0),
-             f1_score(yte, pred, zero_division=0)))
-
-base = LogisticRegression(max_iter=3000).fit(Xtr, ytr)
-rng = np.random.default_rng(0)
-pos = np.where(ytr == 1)[0]
-extra = rng.choice(pos, (ytr == 0).sum() - len(pos), replace=True)
-idx = np.concatenate([np.arange(len(ytr)), extra])
-over = LogisticRegression(max_iter=3000).fit(Xtr[idx], ytr[idx])
-score("3. oversample the minority", over.predict(Xte))
-print("   %d rows became %d -- every added row is a duplicate." % (len(ytr), len(idx)))
-print()
-
-neg = rng.choice(np.where(ytr == 0)[0], len(pos), replace=False)
-idx2 = np.concatenate([neg, pos])
-under = LogisticRegression(max_iter=3000).fit(Xtr[idx2], ytr[idx2])
-score("4. undersample the majority", under.predict(Xte))
-print("   balanced by throwing away %d rows -- %.1f%% of the data."
-      % (len(ytr) - len(idx2), 100 * (1 - len(idx2) / len(ytr))))
-print()
-
-prob = base.predict_proba(Xte)[:, 1]
-for t in (0.20, 0.10, 0.05):
-    score("5. baseline, threshold %.2f" % t, (prob >= t).astype(int))
-print("   the same untouched model. no retraining, no resampling.")
-```
-
-Finally, check the ranking quality across all four ways with PR AUC.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import average_precision_score
-
-X, y = make_classification(n_samples=12000, n_features=15, n_informative=6,
-                           weights=[0.97], flip_y=0.02, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0,
-                                      stratify=y)
-base = LogisticRegression(max_iter=3000).fit(Xtr, ytr)
-w = LogisticRegression(max_iter=3000, class_weight="balanced").fit(Xtr, ytr)
-rng = np.random.default_rng(0)
-pos = np.where(ytr == 1)[0]
-extra = rng.choice(pos, (ytr == 0).sum() - len(pos), replace=True)
-idx = np.concatenate([np.arange(len(ytr)), extra])
-over = LogisticRegression(max_iter=3000).fit(Xtr[idx], ytr[idx])
-neg = rng.choice(np.where(ytr == 0)[0], len(pos), replace=False)
-idx2 = np.concatenate([neg, pos])
-under = LogisticRegression(max_iter=3000).fit(Xtr[idx2], ytr[idx2])
-
-print("PR AUC -- what the ranking itself is worth:")
-for name, m in (("baseline", base), ("class weights", w),
-                ("oversampled", over), ("undersampled", under)):
-    p = m.predict_proba(Xte)[:, 1]
-    print("  %-16s PR AUC %.4f" % (name, average_precision_score(yte, p)))
-print()
-print("the PR AUCs are close. none of these fixes taught the model anything")
-print("new -- they moved where it draws the line. threshold tuning does the")
-print("same thing for free, and it is reversible. start there.")
-```
-
-## Tests to try
-
-1. <strong>Start balanced.</strong> Set <strong>Class 0 Ratio</strong> to 50 and press <strong>Retrain Both Nets</strong>. Both classes are learned and the edge sits sensibly between them.
-2. <strong>Make it severe.</strong> Raise <strong>Class 0 Ratio</strong> to 95 and retrain. The edge shifts toward the minority class and swallows it. Accuracy stays high while the minority class is barely detected.
-3. <strong>Apply a fix.</strong> With the ratio still at 95, choose a plan from <strong>Fix Plan</strong> and retrain. The edge moves back and recall improves, at some cost in precision.
-4. <strong>Push to the extreme.</strong> Set <strong>Class 0 Ratio</strong> to 99 and check with and without a fix. At this level the unmitigated model is close to a constant predictor.
-
-## What often goes wrong
-
-- <strong>Resampling before splitting.</strong> The most damaging mistake here. Oversample first and duplicated (or SMOTE-interpolated) rows appear in both train and test. So the test set holds near-copies of training rows and the score is meaningless. Resample <em>inside</em> the training fold just.
-- <strong>Still reporting score.</strong> If you fixed the training and kept the metric, you cannot see whether it worked. Use precision, recall, F1, or PR-AUC.
-- <strong>With ROC-AUC on severe imbalance.</strong> It is found over the whole threshold range and stays optimistic since true negatives are plentiful. Precision-recall AUC is the more honest curve when positives are rare.
-- <strong>SMOTE on high-dim or class-based data.</strong> Interpolating between neighbours assumes a meaningful metric space. On one-hot features it synthesises rows that could not exist.
-- <strong>Treating imbalance as always a problem.</strong> If the class ratio in training matches the real world and the metric reflects the actual costs, no correction may be needed.
-
-## The short version
-
-Imbalance is a mismatch between the average loss you are cutting and the rare-class detection you really want. Fix it by reweighting the loss (often first), resampling the training data (inside the fold, never before the split). Or simply moving the decision threshold. Then change the metric too. Score cannot show you whether anything worked.
-
-## When the class is very rare indeed
-
-Below roughly one positive in a thousand, sorting starts to be the wrong framing altogether. And two options turn worth considering.
-
-<strong>Anomaly detection</strong> learns what normal looks like from the bulk class alone and flags departures from it. Isolation Forest, One-Class SVM and autoencoder reconstruction error are the usual tools. This works when the positives are heterogeneous. Many other kinds of unusual. Rather than one coherent pattern.
-
-<strong>A two-stage pipeline.</strong> A fast, high-recall model can reduce a large candidate set; a more expensive second-stage model can then rank the remaining cases. This is how large-scale fraud and moderation systems are really built. And it sidesteps the problem of asking one model to be both sensitive and precise.
-
-Whichever route you take, the test discipline is the same: a test set with the real prevalence, PR-AUC rather than ROC-AUC. And metrics reported at the operating point you will really deploy.
-
-## Questions people ask
-
-<strong>Does `class_weight="balanced"` always help?</strong> No. It sometimes over-corrects, giving a model that flags far too much. Treat the weight as a hyperparameter and tune it rather than assuming the balanced setting is best.
-
-<strong>Should I resample before or after splitting?</strong> After, always. And just the training part.
-
-<strong>Is SMOTE better than plain up-sampling?</strong> Often, on continuous numeric features. On class-based or very high-dim data it often is not. And plain up-sampling with strong smoothing can do better. Test both.
-
-<strong>What about making synthetic data with a model?</strong> Generative models can produce synthetic minority-class examples in some settings. It is far more effort than SMOTE and carries the same basic risk: the model learns the generator's idea of the class, not the world's.
-
-<strong>Do neural networks need special handling?</strong> Yes. And focal loss is the standard answer. It down-weights easy, well-classified cases so training focuses on the hard ones. It was designed for object detection. There background boxes outnumber objects by a thousand to one.
-
-<strong>How do I know if it worked?</strong> Check confusion matrices before and after at the same threshold, on the real spread. If recall rose and precision did not collapse, it worked. If both moved and you just looked at F1, you have not learned much.
-
-## Recap in one screen
-
-- Fix the metric, then the threshold, before you touch the data.
-- Class weights change influence without changing rows. Resampling changes rows and carries more risk.
-- SMOTE synthesises rather than duplicates. And suits continuous features with moderate imbalance.
-- Resample just inside training folds, stratify your splits, test on the real spread.
-- Below about 1 in 1,000, consider anomaly detection or a two-stage pipeline instead.
-
-## Further reading
-
-For implementation details, see the [Class-weight computation](https://scikit-learn.org/stable/modules/generated/sklearn.utils.class_weight.compute_class_weight.html). Continue with [why imbalance misleads accuracy](label_imbalance_problem.html) to connect this topic to a related part of the workflow.
+- Chawla et al., [SMOTE: Synthetic Minority Over-sampling Technique](https://doi.org/10.1613/jair.953), describes synthetic minority sampling.
+- Continue with [the label imbalance problem](label_imbalance_problem.html), [threshold tuning](threshold_tuning.html), and [precision, recall, and F1](precision_recall_and_f1.html).

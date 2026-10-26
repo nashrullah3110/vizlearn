@@ -3,17 +3,10 @@ intro: Remember what you already worked out. That is genuinely the whole idea.
 
 ## What this is
 
-<strong>Dynamic programming</strong> solves a problem by breaking it into subproblems. This solves each <em>once</em>, and storing the answers. It applies when the same subproblems keep reappearing &mdash; which is exactly when plain recursion wastes enormous effort.
 
-The Fibonacci sequence is the smallest case. `fib(5)` calls `fib(4)` and `fib(3)`. `fib(4)` calls `fib(3)` and `fib(2)`. `fib(3)` is computed twice, and the copying grows fast: `fib(30)` makes over a million calls without memoisation and 30 with it. That gap &mdash; rapid to linear &mdash; is the payoff of dynamic programming.
 
-Two approaches implement the idea. Top-down (memoisation) writes the natural recursion and adds a cache. If the answer is already stored, return it; if not compute, store and return. Bottom-up (tabulation) fills a table from the smallest subproblem upward, removing recursion fully. Both give the same answers; they differ in which subproblems are computed (top-down computes only what is needed, bottom-up computes all of them) and in stack usage (top-down uses the call stack, bottom-up does not).
 
-Classic DP problems include the knapsack problem (boost value under a weight limit), longest common subsequence (how similar are two strings), edit distance (minimum steps to transform one string into another), and shortest paths in a graph (Bellman-Ford and Floyd-Warshall). Each has the same structure: overlapping subproblems and best substructure.
-
-The hardest part of dynamic programming is setting the state. The state is the set of variables that uniquely find a subproblem. For the knapsack, it is (item index, left capacity). For edit distance, it is (position in string 1, position in string 2). Choosing the wrong state either misses subproblem overlap or makes the table too large to be practical.
-
-Space optimisation often follows the table structure. If each row of the table depends only on the previous row, you need only two rows instead of the full table. That reduces space from O(n&sup2;) to O(n), which matters when n is large.
+Dynamic programming solves overlapping subproblems once and stores their answers for reuse. It applies when a problem has a manageable set of states and an optimal solution can be built from smaller states; a recurrence defines how those states relate.
 
 ## The Two Conditions
 
@@ -33,235 +26,10 @@ The table in this lab is the tabulation view. Each cell depends only on cells al
 
 <p>Every DP problem reduces to a recurrence. A formula for one cell in terms of earlier cells. The panel shows the one in use. For edit distance:</p><span class="cm"># delete</span><span class="cm"># insert</span><span class="cm"># replace</span> Once you have the recurrence and the base cases, the code writes itself. Finding the recurrence is the hard part. The implementation is mechanical.
 
-## The Payoff Is Enormous
-
-Naive Fibonacci is O(2&#8319;). With DP it is O(n). At n = 40 that is roughly a billion steps versus forty. Compare the "cells filled" and "naive calls" figures as you raise n. The gap is not a constant factor, it is a different universe.
-
-## The Classic Problems
-
-- <strong>0/1 Knapsack</strong> &mdash; boost value within a weight limit. Each cell asks: with this capacity and these items available, what is the best I can do?
-- <strong>Edit distance</strong> &mdash; minimum insertions, deletions and substitutions to turn one string into another. Powers spell-checkers and diff tools.
-- <strong>Coin change</strong> &mdash; fewest coins making a target. A greedy approach fails on awkward denominations; DP always succeeds.
-
-## Recalling instead of recomputing
-
-Dynamic programming applies when a problem has two properties:
-
-<strong>Overlapping subproblems.</strong> The same smaller problem is solved many times.
-
-<strong>Best substructure.</strong> The best solution is built from the best solutions to its subproblems.
-
-Naive recursive Fibonacci shows the first spectacularly:
-
-```python
-def fib(n):
-    return n if n < 2 else fib(n-1) + fib(n-2)
-```
-
-Computing `fib(40)` makes about 331 million calls, because `fib(35)` is recomputed millions of times. It is O(2ⁿ).
-
-Store each result the first time it is computed and the tree collapses:
-
-```python
-from functools import lru_cache
-
-@lru_cache(maxsize=None)
-def fib(n):
-    return n if n < 2 else fib(n-1) + fib(n-2)
-```
-
-O(n) time, and `fib(40)` returns instantly. One decorator, three orders of size.
-
-|n|Naive calls|Memoised calls|
-|---|---|---|
-|10|177|11|
-|20|21,891|21|
-|40|331,160,281|41|
-
-## Top-down and bottom-up
-
-Two ways to write the same solution, and they differ in style rather than cost.
-
-<strong>Memoisation (top-down)</strong> is recursion plus a cache. Write the recurrence naturally and add `@lru_cache`. Only the subproblems really needed are computed, which matters when the state space is large and sparsely visited.
-
-<strong>Tabulation (bottom-up)</strong> fills a table from the base cases upwards, iteratively. No recursion, so no stack limit, and often a smaller constant factor.
-
-```python
-def fib_table(n):
-    a, b = 0, 1
-    for _ in range(n):
-        a, b = b, a + b
-    return a                    # O(n) time, O(1) space
-```
-
-That last version illustrates the further optimisation available to many DP solutions. If each state depends only on the previous one or two, the whole table is unneeded and two variables suffice. Space drops from O(n) to O(1).
-
-|&nbsp;|Memoisation|Tabulation|
-|---|---|---|
-|Style|Recursive|Iterative|
-|Computes|Only needed states|All states|
-|Stack risk|Yes|No|
-|Space optimisation|Harder|Often easy|
-|Easier to write|Usually|Usually not|
-
-Write it top-down first, because the recurrence is what you really have to think about. Convert to bottom-up if recursion depth or constant factors matter.
-
-## Spotting a DP problem
-
-The signals are recognisable once you have seen a few:
-
-<strong>"Find the maximum/minimum/number of ways"</strong> over a set of choices.
-
-<strong>Each step has a small number of options,</strong> and the choices interact.
-
-<strong>Brute force is rapid</strong> because the same situations recur.
-
-<strong>The answer for n depends on answers for smaller inputs.</strong>
-
-The method is always the same four steps: define the <strong>state</strong> (what distinguishes one subproblem from another), write the <strong>recurrence</strong> (how a state's answer follows from smaller states), find the <strong>base cases</strong>, and decide the <strong>order</strong> of work.
-
-Setting the state is the hard part. All of it else is mechanical once the state is right.
-
-## The two conditions, and what happens when one is missing
-
-Dynamic programming needs overlapping subproblems and best substructure. Those are not decoration -- each one is doing a specific job. And the cleanest way to understand them is to watch what breaks when a problem has one but not the other.
-
-```python-run
-# CONDITION 1: overlapping subproblems. Without them, memoising is pure
-# overhead -- the cache is written and never read.
-calls = {"n": 0}
-hits = {"n": 0}
-
-
-def fib(n, memo=None):
-    calls["n"] += 1
-    if memo is not None and n in memo:
-        hits["n"] += 1
-        return memo[n]
-    if n < 2:
-        return n
-    v = fib(n - 1, memo) + fib(n - 2, memo)
-    if memo is not None:
-        memo[n] = v
-    return v
-
-
-calls["n"] = hits["n"] = 0
-fib(22)
-plain = calls["n"]
-calls["n"] = hits["n"] = 0
-fib(22, {})
-print("fib(22): %d calls plain, %d with a memo (%d cache hits)"
-      % (plain, calls["n"], hits["n"]))
-
-# Now merge sort, which also splits into two subproblems at every level.
-
-msplits = {"n": 0}
-seen = {}
-
-```
-
-Building on the same setup, the next block shows the left cases.
-
-```python-run
-
-def msort(a):
-    key = tuple(a)
-    msplits["n"] += 1
-    seen[key] = seen.get(key, 0) + 1
-    if len(a) <= 1:
-        return a
-    mid = len(a) // 2
-    left, right = msort(a[:mid]), msort(a[mid:])
-    out = []
-    while left and right:
-        out.append(left.pop(0) if left[0] <= right[0] else right.pop(0))
-    return out + left + right
-
-
-import random
-msort(random.Random(1).sample(range(200), 200))
-repeats = sum(1 for v in seen.values() if v > 1)
-print("merge sort on 200 items: %d subproblems, %d of them repeated"
-      % (msplits["n"], repeats))
-
-# Zero repeats. Merge sort has optimal substructure but NO overlap: each
-# subproblem is a different slice, so a cache would never hit. That is
-# why merge sort is divide-and-conquer and not dynamic programming --
-# the distinction is exactly this measurement.
-
-# CONDITION 2: optimal substructure. The best solution must be buildable
-# from best solutions to subproblems. Coin change has it:
-
-def coins_dp(target, coins):
-    best = [0] + [float("inf")] * target
-    for t in range(1, target + 1):
-        for c in coins:
-            if c <= t and best[t - c] + 1 < best[t]:
-                best[t] = best[t - c] + 1
-    return best[target]
-
-```
-
-The following block covers the left steps.
-
-```python-run
-
-def coins_greedy(target, coins):
-    n, left = 0, target
-    for c in sorted(coins, reverse=True):
-        while left >= c:
-            left -= c
-            n += 1
-    return n if left == 0 else None
-
-
-print()
-print("%-16s %10s %10s" % ("coin system", "greedy", "DP"))
-for name, coins, target in (("1, 5, 10, 25", [1, 5, 10, 25], 30),
-                            ("1, 3, 4", [1, 3, 4], 6),
-                            ("1, 7, 10", [1, 7, 10], 14)):
-    print("%-16s %10s %10d" % (
-        name + " -> %d" % target, coins_greedy(target, coins),
-        coins_dp(target, coins)))
-
-# The greedy answers are wrong on the second and third systems: 6 is 3+3
-# (two coins) and greedy takes 4+1+1 (three); 14 is 7+7 (two) and greedy
-# takes 10+1+1+1+1 (five). Greedy assumes the biggest coin is always part
-# of the best answer, which is a claim about the coin system, not about
-# the problem. DP makes no such assumption -- it tries every coin at
-# every total, which is why it costs more and why it is always right.
-```
-
 ## Things to try
 
 1. <strong>Run Fibonacci and step through.</strong> Each cell reads exactly two earlier cells. Highlighted in amber. And is computed once and only once.
 2. <strong>Compare cells filled against naive calls.</strong> At n = 16 it is 17 versus nearly 2,000.
-3. <strong>Switch to edit distance</strong> with kitten/sitting. The answer is 3, and the table shows every middle alignment cost.
-4. <strong>Try knapsack.</strong> Each cell chooses between taking the item and skipping it. The amber cells show both options being compared.
-5. <strong>Look at the bottom-right cell.</strong> In every one of these problems it holds the final answer, built fully from the cells before it.
-
-## Worth recalling
-
-Dynamic programming is recursion plus memory. Spot repeated subproblems, define a recurrence, fill a table in dependency order, and rapid work collapses to polynomial. The trouble is never the code &mdash; it is finding the recurrence.
-
-## The classic problems, by state shape
-
-|Problem|State|Recurrence sketch|
-|---|---|---|
-|Fibonacci|`i`|`f(i) = f(i-1) + f(i-2)`|
-|Climbing stairs|`i`|Same as Fibonacci|
-|Coin change|`amount`|`min over coins of 1 + f(amount - coin)`|
-|0/1 knapsack|`(item, capacity)`|Take it or leave it, whichever is better|
-|Longest common subsequence|`(i, j)`|Match: `1 + f(i-1, j-1)`, else max of skipping either|
-|Edit distance|`(i, j)`|Insert, delete or substitute, whichever is cheapest|
-|Longest increasing subsequence|`i`|`1 + max over previous smaller elements`|
-
-Two observations from that table.
-
-<strong>The state dimension decides the cost.</strong> A one-dimensional state over n values is O(n) states; a two-dimensional state over two strings is O(nm). Times by the work per state to get the total.
-
-<strong>Two-dimensional string problems are one family.</strong> Longest common subsequence, edit distance and sequence alignment share a shape. Compare the current characters, and either match them or skip one. Learning one gives you the others.
 
 ## Where it is used in practice
 
@@ -277,38 +45,12 @@ That list is worth noticing because DP has a reputation as an interview topic. I
 
 ## Common mistakes
 
-- <strong>A state that does not capture all of it relevant.</strong> If two situations with the same state have different answers, the state is wrong. This is the root cause of most incorrect DP solutions.
+- <strong>A state that omits relevant information.</strong> If two situations represented by the same state can lead to different answers, the state is incomplete. This is a common cause of incorrect DP solutions.
 - <strong>Missing or wrong base cases.</strong> Off-by-one at the boundary propagates everywhere.
 - <strong>Mutable default arguments as caches.</strong> `def f(n, memo={})` shares one cache across all calls. This sometimes helps and sometimes leaks between unrelated inputs.
 - <strong>Recursion depth.</strong> Top-down on n = 100,000 exceeds Python's stack limit. Convert to iteration.
 - <strong>Unhashable arguments with `lru_cache`.</strong> Lists cannot be cached; convert to tuples.
 - <strong>Filling the table in the wrong order,</strong> so a state is computed before its dependencies.
-
-## Questions people ask
-
-<strong>How do I know a problem is DP?</strong> Rapid brute force, overlapping subproblems. And an answer built from smaller answers. "Count the ways" or "find the optimum over choices" are strong hints.
-
-<strong>Memoisation or tabulation?</strong> Write memoisation first &mdash; it is easier to get right. Convert if you hit stack limits or need the space optimisation.
-
-<strong>What is the difference from divide and conquer?</strong> Divide and conquer splits into <em>free</em> subproblems (merge sort). DP applies when they overlap, so caching pays.
-
-<strong>What is the difference from greedy?</strong> Greedy commits to a locally best choice and never reconsiders. DP thinks of all choices and keeps the best. Greedy is faster and only correct for some problems.
-
-<strong>Can I always reduce the space?</strong> Only when each state depends on a bounded window of earlier states. A full two-dimensional dependency needs the table.
-
-<strong>Is `lru_cache` enough?</strong> For most top-down solutions, yes &mdash; it is C-speed and handles eviction. Use an explicit dict when you need to inspect or control the cache.
-
-## Recap in one screen
-
-- DP applies when subproblems overlap and the optimum is built from sub-optima.
-- Memoisation is recursion plus a cache; tabulation fills a table iteratively from the base cases.
-- Setting the state correctly is the whole problem; the recurrence follows from it.
-- Cost is the number of states times the work per state.
-- It powers `diff`, spell checking, sequence alignment, Viterbi decoding and scheduling &mdash; not only interviews.
-
-## Where to practise this
-
-<p>Four problems that between them cover the whole method. Overlapping subproblems, a case where greedy is plainly wrong, a reformulation that beats the obvious recurrence. And the rolling variables that remove the table:</p><ul><li><a href="../interview/climbing-stairs.html">Climbing stairs</a>. The smallest complete DP, with the call counts that justify memoising.</li><li><a href="../interview/coin-change.html">Coin change</a>. And the counterexample where taking the biggest coin first loses.</li><li><a href="../interview/longest-increasing-subsequence.html">Longest increasing subsequence</a>. O(n&sup2;). Then O(n log n) with a binary search.</li><li><a href="../interview/house-robber.html">House robber</a>. The take-or-skip choice in two variables.</li><li><a href="../interview/edit-distance.html">Edit distance</a>. The two-dimensional version.</li></ul>
 
 ## Sources and next steps
 

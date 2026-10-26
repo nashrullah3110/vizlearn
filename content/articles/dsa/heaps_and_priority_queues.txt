@@ -3,17 +3,10 @@ intro: Weaker ordering than a BST, and that is exactly the point.
 
 ## The problem it solves
 
+
 A <strong>heap</strong> is a complete binary tree obeying one rule: every parent is smaller than both its children (a <em>min-heap</em>) or larger than both (a <em>max-heap</em>). It says nothing about siblings &mdash; the tree is only partially ordered.
 
-That partial ordering is what makes a heap useful. It guarantees the smallest (or largest) element is always at the root, and it can be maintained in O(log n) per insertion or removal. A fully sorted structure like a balanced BST offers more &mdash; sorted traversal, range queries, arbitrary lookups &mdash; but maintaining full order costs more effort per operation and more complexity in the implementation.
-
-Python's `heapq` module implements a min-heap on top of a plain list. `heapq.heappush(h, x)` inserts, `heapq.heappop(h)` removes and returns the smallest, and `h[0]` peeks at the smallest without removing it. There is no max-heap in the standard library; the convention is to negate the values or wrap them in a tuple with a negated priority.
-
-The priority queue is the abstract concept; the heap is the concrete implementation. A priority queue says "give me the highest-priority item." A heap says "I can do that in O(log n)." Other implementations exist &mdash; an unsorted list gives O(1) insert and O(n) extract, a sorted list gives O(n) insert and O(1) extract &mdash; but the heap balances both at O(log n), which is why it is the standard choice.
-
-Heaps appear inside other algorithms. Dijkstra's shortest-path algorithm uses a min-heap to pick the next closest vertex. Heap sort builds a max-heap and repeatedly extracts the maximum. The merge step of external sorting uses a min-heap to merge k sorted runs. Huffman coding builds its prefix tree by repeatedly merging the two lowest-frequency nodes, which is a heap operation.
-
-Building a heap from n elements takes O(n), not O(n log n). The algorithm starts from the last internal node and sifts down, and the cost of sifting is proportional to the height, which decreases as you move toward the leaves. That O(n) build is what makes heap sort competitive and what makes `heapq.heapify` fast.
+That partial ordering is what makes a heap useful. It guarantees the smallest (or largest) element is always at the root, and it can be maintained in O(log n) per insertion or removal.
 
 ## Why Partial Ordering Is Better Here
 
@@ -34,227 +27,10 @@ Watch the tree and the array update together as you insert. They are the same st
 
 The swap counter shows this: even with 15 elements, no operation needs more than about 4 swaps.
 
-## Priority Queues Everywhere
-
-A <strong>priority queue</strong> serves the highest-priority item rather than the oldest, and a heap is how it is almost always implemented. That makes heaps quietly important:
-
-- <strong>Dijkstra and A*</strong> repeatedly need "the unvisited node with the smallest distance" &mdash; exactly a min-heap extract. Both of your existing pathfinding apps depend on this.
-- <strong>Heap sort</strong> builds a heap and extracts repeatedly: O(n log n) with O(1) extra space.
-- <strong>Top-k problems</strong> &mdash; keep a size-k heap and you find the largest k items in O(n log k) without sorting everything.
-- <strong>Schedulers and event simulations</strong> &mdash; always process the next-earliest event.
-
-## A tree that keeps its smallest element on top
-
-A binary heap is a complete binary tree with one rule &mdash; the <strong>heap property</strong>:
-
-<strong>Min-heap:</strong> every parent is less than or equal to its children.
-<strong>Max-heap:</strong> every parent is greater than or equal to its children.
-
-Note what the rule does <em>not</em> say: siblings are unordered, and the tree is not sorted. The only guarantee is that the smallest (or largest) element is at the root, which is exactly what a priority queue needs.
-
-That weaker guarantee is what makes a heap fast. Maintaining full sorted order on every insertion would cost O(n); maintaining only the parent-child relation costs O(log n).
-
-|Operation|Heap|Sorted array|Unsorted array|
-|---|---|---|---|
-|Find minimum|O(1)|O(1)|O(n)|
-|Insert|O(log n)|O(n)|O(1)|
-|Remove minimum|O(log n)|O(n) or O(1) at the end|O(n)|
-|Build from n items|O(n)|O(n log n)|O(1)|
-
-The last row is worth noting: building a heap from an existing list is O(n), not O(n log n) &mdash; `heapq.heapify` does it in place by sifting down from the middle.
-
-## Stored as an array, not as nodes
-
-A heap needs no pointers. Because the tree is complete, the structure is implicit in the array indices:
-
-<p class="mono-font">parent of i = (i &minus; 1) // 2&nbsp;&nbsp;&nbsp;children of i = 2i + 1 and 2i + 2</p>
-
-So [1, 3, 6, 5, 9, 8] represents a tree whose root is 1, with children 3 and 6, and so on. No allocation per node, and excellent cache behaviour because the whole structure is contiguous.
-
-The two operations that maintain the property:
-
-<strong>Sift up (after insertion).</strong> Add the element at the end, then swap it with its parent while it is smaller. At most `log n` swaps.
-
-<strong>Sift down (after removing the root).</strong> Move the last element to the root, then swap it with its smaller child while it is larger. At most `log n` swaps.
-
-Both walk one path from root to leaf, which is why both are O(log n).
-
-## Using it in Python
-
-```python
-import heapq
-
-h = []
-heapq.heappush(h, 5)
-heapq.heappush(h, 1)
-heapq.heappush(h, 3)
-heapq.heappop(h)                     # 1 - always the smallest
-
-nums = [5, 1, 8, 3, 9]
-heapq.heapify(nums)                  # O(n), in place
-heapq.nlargest(3, nums)              # [9, 8, 5]
-heapq.nsmallest(3, nums)             # [1, 3, 5]
-```
-
-Two practical points about Python specifically.
-
-<strong>It is a min-heap only.</strong> For a max-heap, negate the values on the way in and out &mdash; `heappush(h, -x)` and `-heappop(h)`. There is no max-heap variant.
-
-<strong>Priorities go in tuples.</strong> `heappush(h, (priority, item))` sorts by priority. If two priorities tie, Python compares the second element, so items must be comparable &mdash; or push a counter as a tiebreaker:
-
-```python
-import itertools
-counter = itertools.count()
-heapq.heappush(h, (priority, next(counter), task))   # never compares task
-```
-
-That counter pattern is worth memorising; the alternative is an occasional `TypeError` in production when two priorities happen to match.
-
-## Partial order is the point, not a compromise
-
-A heap is often introduced as a tree that is only sort-of sorted, which sounds like a weaker version of something better. It is the opposite: the ordering it does NOT maintain is exactly the work it does not have to do, and that shows up the moment you compare it with keeping a list sorted.
-
-```python-run
-import heapq
-import random
-import time
-
-# A heap only guarantees parent <= child. Siblings are unordered, and
-# the array is emphatically not sorted:
-h = []
-for x in [5, 3, 8, 1, 9, 2, 7]:
-    heapq.heappush(h, x)
-print("heap array:", h)
-print("sorted:    ", sorted(h))
-print("smallest is at index 0:", h[0] == min(h))
-
-# Every level down is a valid heap too, which is the invariant:
-def check(a):
-    return all(a[p] <= a[c]
-               for c in range(1, len(a))
-               for p in [(c - 1) // 2])
-
-
-print("parent <= child everywhere:", check(h))
-
-# The array IS the tree. Node i has children 2i+1 and 2i+2 -- no pointers,
-# no nodes, no allocation:
-print()
-for i in range(len(h) // 2):
-    kids = [h[j] for j in (2 * i + 1, 2 * i + 2) if j < len(h)]
-    print("  h[%d] = %d  ->  children %s" % (i, h[i], kids))
-
-# Now the comparison that matters. A sorted list also gives you the
-# minimum in O(1) -- it is just list[0]. The difference is what INSERT
-# costs, and that is where the partial order pays.
-
-def timed(f, n):
-    t0 = time.time(); f(n); return (time.time() - t0) * 1000
-
-```
-
-Building on the same setup, the next block shows the remaining cases.
-
-```python-run
-import heapq
-import random
-import time
-
-def with_heap(n):
-    q, rng = [], random.Random(1)
-    for _ in range(n):
-        heapq.heappush(q, rng.random())
-    while q:
-        heapq.heappop(q)
-
-
-def with_sorted_list(n):
-    import bisect
-    q, rng = [], random.Random(1)
-    for _ in range(n):
-        bisect.insort(q, rng.random())    # O(log n) to find, O(n) to shift
-    while q:
-        q.pop(0)
-
-
-print()
-print("%8s %14s %18s" % ("n", "heap (ms)", "sorted list (ms)"))
-for n in (2000, 4000, 8000):
-    print("%8d %14.1f %18.1f" % (n, timed(with_heap, n),
-                                 timed(with_sorted_list, n)))
-
-# The sorted list has to keep a total order it was never asked for. The
-# heap maintains only the parent-child relation, which is one path from
-# the insertion point to the root -- log n comparisons and no shifting.
-#
-# The classic use is scheduling: always take the most urgent job, and
-# keep adding jobs while you work.
-```
-
-The following block covers the remaining operations.
-
-```python-run
-import heapq
-import random
-import time
-
-jobs = [(3, "write report"), (1, "server on fire"), (2, "review PR"),
-        (5, "reorganise inbox"), (1, "customer down")]
-pq = []
-for pri, name in jobs:
-    heapq.heappush(pq, (pri, name))
-print()
-print("handling in priority order:")
-while pq:
-    pri, name = heapq.heappop(pq)
-    print("  [p%d] %s" % (pri, name))
-    if name == "server on fire":
-        heapq.heappush(pq, (1, "write incident postmortem"))
-        print("        (a new p1 job arrived mid-queue)")
-
-# The new p1 job jumped ahead of everything with a lower priority, and
-# nothing had to be re-sorted to make that happen. A sorted list would
-# have shifted every element after the insertion point; the heap moved
-# one item up one short path.
-```
-
 ## Try it yourself
 
 1. <strong>Insert a value smaller than the root.</strong> Watch it bubble all the way to the top &mdash; one swap per level, never more.
 2. <strong>Insert a large value.</strong> It stays near the bottom with no swaps at all &mdash; the average insert is far cheaper than the worst case.
-3. <strong>Extract the root repeatedly.</strong> The last element jumps to the top and sinks back down. Values come out in sorted order &mdash; that is heap sort.
-4. <strong>Compare the array with the tree</strong> as you go. Index 0 is the root; index i's children are at 2i+1 and 2i+2, always.
-5. <strong>Switch to a max-heap.</strong> The same machinery runs with the comparison flipped &mdash; that is the only difference between the two.
-
-## Where that leaves you
-
-A heap keeps only the extreme value ordered, and that weaker guarantee is what makes it fast: O(1) peek, O(log n) insert and extract, in a pointer-free array. Whenever an algorithm repeatedly asks for the smallest or largest remaining item, a heap is the answer.
-
-## What heaps are used for
-
-<strong>Dijkstra's algorithm and A*.</strong> The priority queue of nodes by tentative distance is a heap, and it is what gives those algorithms their log factor rather than a linear scan.
-
-<strong>Top-k problems.</strong> To find the k largest of n items, keep a min-heap of size k: push each item, and pop when the heap exceeds k. O(n log k) time and O(k) space, against O(n log n) for sorting everything. When k is small and n is huge, this is the difference between feasible and not.
-
-```python
-def top_k(items, k):
-    h = []
-    for x in items:
-        heapq.heappush(h, x)
-        if len(h) > k:
-            heapq.heappop(h)          # discard the smallest
-    return sorted(h, reverse=True)
-```
-
-<strong>Heap sort.</strong> Heapify, then repeatedly extract the minimum. O(n log n) guaranteed, in place, and not stable.
-
-<strong>Merging sorted sequences.</strong> `heapq.merge` performs a k-way merge lazily, which is how external sorting combines sorted runs.
-
-<strong>Task schedulers and event simulation.</strong> Process the earliest-deadline or earliest-timestamp item next.
-
-<strong>Median maintenance.</strong> Two heaps &mdash; a max-heap of the lower half and a min-heap of the upper half &mdash; give the running median of a stream in O(log n) per element.
-
-<strong>Huffman coding.</strong> Repeatedly combine the two least frequent symbols, which is a priority queue by construction.
 
 ## The limitation: no efficient search or update
 
@@ -271,28 +47,6 @@ If you need both priority access and lookup, the usual answer is a heap plus a d
 |Lookup by key|Hash table|
 |Range queries|Balanced tree|
 |Priority plus lookup|Heap plus an index dictionary|
-
-## Questions people ask
-
-<strong>Is a heap sorted?</strong> No. Only the root is guaranteed to be the extreme value; siblings are unordered.
-
-<strong>How do I get a max-heap in Python?</strong> Negate the values, or store `(-priority, item)` tuples.
-
-<strong>Why is building a heap O(n) rather than O(n log n)?</strong> Sifting down from the middle backwards does less work at the deep levels, and the sum works out to O(n).
-
-<strong>What is the difference from `queue.PriorityQueue`?</strong> It wraps `heapq` with locking for thread safety, which costs performance. Use `heapq` in single-threaded code.
-
-<strong>Can a heap have duplicates?</strong> Yes, without any problem.
-
-<strong>Is heap sort used in practice?</strong> Rarely on its own &mdash; quick sort is faster in the average case. It appears as introsort's fallback, providing the worst-case guarantee.
-
-## Recap in one screen
-
-- A heap keeps the extreme element at the root; parents are ordered against children and siblings are not.
-- It is stored as a plain array, with children at `2i+1` and `2i+2` &mdash; no pointers, good cache behaviour.
-- Push and pop are O(log n); finding the minimum is O(1); building from a list is O(n).
-- Python's `heapq` is a min-heap only, and tuple priorities need a tiebreaker to avoid comparing payloads.
-- Ideal for priority queues, top-k with O(k) memory, k-way merges, schedulers and running medians.
 
 ## A worked heap trace
 
@@ -313,10 +67,6 @@ Final heap: [9, 4, 5, 1, 3, 2]. The root is the maximum, every parent exceeds it
 Extracting repeatedly then gives the sorted order: swap the root with the last element, shrink, sift down. That is heap sort.
 
 Two things this trace demonstrates. The build genuinely does little work &mdash; three sift operations for six elements, most of them trivial. And the array's final layout looks unsorted, which is the point: a heap is not a sorted structure, only a partially ordered one.
-
-## Where to practise this
-
-<p>The three questions that come up once a heap is on the table:</p><ul><li><a href="../interview/top-k-frequent-elements.html">Top k frequent elements</a> &mdash; a heap of size k, and how little of the input ever enters it.</li><li><a href="../interview/merge-k-sorted-sequences.html">Merge k sorted sequences</a> &mdash; one candidate per list, and what <code>heapq.merge</code> does and does not buy.</li><li><a href="../interview/running-median-of-a-stream.html">Find the median of a data stream</a> &mdash; two heaps, with the roots as the middle values.</li><li><a href="../interview/kth-largest-element.html">Kth largest element</a> &mdash; the same idea at its smallest.</li></ul>
 
 ## Sources and next steps
 

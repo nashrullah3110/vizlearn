@@ -1,229 +1,37 @@
 title: Gaussian Mixture Models
-intro: A Gaussian mixture model represents data as a weighted combination of Gaussian components and assigns each point probabilities of belonging to them.
+intro: A Gaussian mixture model represents data as a weighted combination of Gaussian components. It gives each point a probability of membership, which is useful when cluster boundaries are uncertain or groups have different shapes.
 
-## Hard labels throw information away
+## Model data as a mixture
 
-K-means gives each point just one cluster. For a point sitting squarely
-inside a group that is fine. For a point in the share between two groups it's
-a fabrication: the method had almost no reason to prefer one over the other,
-and the output records none of that doubt.
+K-means assigns each point to one cluster. A Gaussian mixture model (GMM) instead estimates how likely each component is to have generated each point. This soft assignment preserves uncertainty, but assumes the data can be represented by a mixture of Gaussian distributions.
 
-A Gaussian mixture keeps the doubt. It models the data as having come from
-a few Gaussian spreads mixed together, and reports, for each point, the
-chance that it came from each one.
+## The mixture model
 
-Raise the share control above and watch the readout. As the two groups merge,
-the number of points assigned with less than 90% trust climbs &mdash; and
-each one of those is a point k-means would have labelled without hesitation.
+A GMM with K components has a mean μₖ, covariance Σₖ and mixture weight πₖ for each component. The weights are non-negative and sum to one. Its density is:
 
-## The model
+<p><strong>p(x) = Σₖ πₖ 𝒩(x | μₖ, Σₖ)</strong></p>
 
-Three parameters per component: a mean, a width, and a **mixing weight** saying
-what fraction of the data that component accounts for. The density is their
-weighted sum, and the two curves in the chart are the fitted components.
+The covariance controls each component’s shape and orientation. A full covariance can describe an ellipse; a spherical covariance restricts the component to a circle or sphere. The point’s **responsibility** rₖ is the posterior probability that component k generated it.
 
-Fitting is a chicken-and-egg problem. Knowing which points belong to which
-component would make guessing the parameters easy, and knowing the parameters
-would make assigning points easy. Neither is known.
+## How EM fits the model
 
-## Expectation-Maximisation
+Expectation–Maximisation alternates two steps. In the **E-step**, compute each point’s responsibility under the current component parameters. In the **M-step**, update the means, covariances and weights using those responsibilities. Repeat until the log-likelihood stops improving meaningfully.
 
-EM resolves it by alternating, starting from a guess:
+For two one-dimensional components, N(0, 1) with weight 0.6 and N(3, 1) with weight 0.4, the responsibility for component one is about 0.97 at x = 0.5 and 0.60 at x = 1.5. The midpoint remains uncertain rather than being forced into a hard cluster. The visualiser shows the same pattern as you change **Overlap of the two groups** and step through **EM iterations**.
 
-**E step.** With the current parameters, find each point's
-**job** &mdash; the chance that each component made it.
+EM does not promise the global best fit. It can converge to a local optimum that depends on its initial parameters, so fit from multiple starts and compare the resulting likelihood or information criterion.
 
-**M step.** With those jobs, re-guess each component's mean, width
-and weight, weighting each point by how much it belongs.
+## Where GMMs differ from K-means
 
-Repeat. Each iteration provably doesn't fall the likelihood, so the process
-settles.
+A GMM can represent components with different sizes and elliptical shapes, and it returns soft memberships. K-means uses hard assignments and prefers roughly spherical groups of similar scale. A GMM is useful when probabilistic membership or an elliptical model matches the data; K-means is simpler when compact, roughly spherical clusters are adequate.
 
-Drag the iterations control from 1 upward and watch the curves settle. The early
-steps move a great deal. The last twenty barely move at all, which is what
-settling looks like.
+Fit several component counts and compare criteria such as BIC or AIC, along with held-out fit and whether the resulting groups make sense for the task. These criteria balance fit against model complexity; they do not guarantee that the selected groups are meaningful.
 
-The ensure is only about *local* optima. EM settles to a local max that
-depends on the starting point. This Is why setups run it a few times
-from different initialisations and keep the best. Scikit-learn's `n_init` exists
-for this.
+## Limits and common mistakes
 
-## Why it beats k-means, when it does
+- **Wrong shape assumption.** Gaussian components may fit ellipses, but not arbitrary structures such as crescents without using many components.
+- **Local optima.** Use several initialisations and check stability across runs.
+- **Too many components.** A complex mixture can fit noise as well as structure. Compare criteria and validate the use of the clusters.
+- **Near-singular covariance.** A component can collapse around a few points. Covariance regularisation can help, but does not remove the need to inspect the fit.
 
-**Elliptical clusters.** With a full covariance mat per component, a GMM fits
-stretched and tilted clusters. K-means silently assumes spheres, so an
-elongated cluster gets cut in half.
-
-**Different sizes.** Mixing weights let one component account for 80% of the data
-and another for 20%. K-means has no such notion and tends toward equal-sized
-clusters.
-
-**Soft set.** handy in itself when the output feeds a downstream system
-that can use a chance.
-
-**A likelihood.** Being a proper probabilistic model, a GMM can score how well it
-shows the data, which makes **BIC** and **AIC** available for choosing the
-number of components &mdash; a principled option to
-[the elbow](choosing_k.html).
-
-K-means is just the limiting case: spherical components of equal weight, with
-jobs forced to 0 or 1.
-
-## The E-step, worked
-
-The soft set the whole method turns on is one math. Two components,
-N(0,1) with weight 0.6 and N(3,1) with weight 0.4, and a point to assign: its
-job to each is the weighted density there, normed so the two sum
-to 1.
-
-|point|r(component 1)|r(component 2)|
-|---|---|---|
-|x = 0.5|0.968|0.032|
-|x = 1.5|0.600|0.400|
-
-At x = 0.5 the point sits deep in the first component and is assigned to it with
-97% trust &mdash; but k-means would have recorded the same hard label with no
-hint of the 3% doubt. At x = 1.5, halfway between the means, the jobs
-fall back to the mixing weights themselves: the data gives almost no reason to
-prefer either component, and the GMM says so where k-means would still pick one.
-That preserved doubt is the whole point, and it's why the number of low-trust
-sets climbs as the components share. The M-step then re-guesses each
-mean, width and weight using each point weighted by its job, and
-alternating the two provably never falls the likelihood &mdash; which is also
-why a GMM can report one, through BIC, and choose its own number of components
-where k-means can't.
-
-What a GMM buys over k-means, when the data suits it, is three things at once:
-elliptical clusters, because a full covariance per component fits stretched and
-tilted shapes k-means cuts in half. Unequal sizes, because the mixing weights let
-one component own 80% of the data. And the soft set itself, handy when
-a downstream system can act on a chance. K-means is just the limiting
-case &mdash; spherical components of equal weight with jobs forced to
-0 or 1 &mdash; which is why it fabricates the trust a GMM keeps. The costs are
-the assumption of Gaussian components (crescents defeat it) and settling only to
-a local optimum, which is why libraries run a few initialisations and keep the
-best.
-
-The other failure to watch is a singularity: a component can collapse onto a
-single point, driving its width toward zero and the likelihood toward infinity.
-A small constant added to each covariance. On by default in most libraries
-&mdash; blocks it, and it's the same smoothing instinct that stops too many
-components fitting the noise. This Is what BIC’s penalty for parameter count guards
-against when choosing how many components to keep.
-
-## Where it goes wrong
-
-**given Gaussian.** If the clusters are crescents, a mixture of Gaussians is
-the wrong model, and it will fit two Gaussians to them anyway.
-
-**Singularities.** A component can collapse onto a single point, driving its
-width to zero and the likelihood to infinity. Smoothing &mdash; a small
-constant added to the covariance. Blocks it, and is on by default in
-most libraries.
-
-**One run from one start.** Local optima are real. Use a few initialisations.
-
-**Too many components.** With enough Gaussians you can fit anything, including
-the noise. BIC punishes parameter count for this reason.
-
-## Questions people ask
-
-<strong>How is a GMM different from k-means?</strong> A GMM gives each point a probability of belonging to every cluster, and each cluster has its own shape through a covariance matrix. K-means gives hard labels and assumes round clusters.
-
-<strong>How do I choose the number of components?</strong> Fit models for a range of component counts and pick the lowest BIC or AIC. BIC penalises complexity more heavily, so it tends to give simpler models.
-
-<strong>Which covariance type should I use?</strong> Full covariance fits any ellipse but needs more data. Diagonal, spherical or tied reduce parameters, which helps when you have few points or many features.
-
-<strong>Why does my GMM give different results each run?</strong> EM starts from random initial values and only finds a local optimum. Set n_init higher and fix random_state.
-
-<strong>Can a GMM be used for anomaly detection?</strong> Yes. Points with a very low density under the fitted mixture are unusual, so you can threshold score_samples.
-
-<strong>What is the E-step and M-step?</strong> The E-step computes how responsible each component is for each point. The M-step updates means, covariances and weights using those responsibilities, and the two repeat until the likelihood stops improving.
-
-## Soft clusters, and shapes k-means cannot fit
-
-A GMM gives each point a chance of belonging to each cluster. Fits ellipses rather than spheres. Both differences show up on the same data.
-
-```python-run
-import numpy as np
-from sklearn.mixture import GaussianMixture
-from sklearn.cluster import KMeans
-from sklearn.datasets import make_blobs
-from sklearn.metrics import adjusted_rand_score
-
-X, y = make_blobs(n_samples=600, centers=3, cluster_std=0.8,
-                  center_box=(-14.0, 14.0), random_state=0)
-X = X @ np.array([[1.0, 0.0], [1.2, 0.35]])
-
-gm = GaussianMixture(n_components=3, random_state=0).fit(X)
-km = KMeans(n_clusters=3, n_init=10, random_state=0).fit(X)
-print("three well-separated blobs, sheared into long tilted ellipses:")
-print("  k-means agreement %.4f" % adjusted_rand_score(y, km.labels_))
-print("  GMM     agreement %.4f" % adjusted_rand_score(y, gm.predict(X)))
-print("  k-means can only draw spheres, so it cuts across the grain")
-print("  of the ellipses and splits them in the wrong places.")
-print()
-
-print("what a GMM stores per cluster -- weight, centre, covariance:")
-for c in range(3):
-    print("  cluster %d  weight %.4f  centre %s" % (c, gm.weights_[c],
-                                                    np.round(gm.means_[c], 3)))
-    print("             covariance %s" % np.round(gm.covariances_[c], 3).tolist())
-print()
-
-p = gm.predict_proba(X)
-conf = p.max(axis=1)
-print("every point gets a probability per cluster, not just a label:")
-order = np.argsort(conf)
-print("  least certain (border points):")
-for i in order[:4]:
-    print("    %s  ->  %s" % (np.round(X[i], 2), np.round(p[i], 4)))
-print("  most certain (deep inside a component):")
-for i in order[-3:]:
-    print("    %s  ->  %s" % (np.round(X[i], 2), np.round(p[i], 4)))
-print("  %d of %d points are less than 90%% sure." % ((conf < 0.9).sum(), len(X)))
-```
-
-The next block compares covariance types and uses BIC to pick the number of components.
-
-```python-run
-import numpy as np
-from sklearn.mixture import GaussianMixture
-from sklearn.datasets import make_blobs
-from sklearn.metrics import adjusted_rand_score
-
-X, y = make_blobs(n_samples=600, centers=3, cluster_std=0.8,
-                  center_box=(-14.0, 14.0), random_state=0)
-X = X @ np.array([[1.0, 0.0], [1.2, 0.35]])
-
-print("covariance_type trades flexibility for parameters:")
-for ct in ("spherical", "diag", "tied", "full"):
-    m = GaussianMixture(n_components=3, covariance_type=ct, random_state=0).fit(X)
-    print("  %-10s agreement %.4f   BIC %9.1f   parameters %d"
-          % (ct, adjusted_rand_score(y, m.predict(X)), m.bic(X),
-             m._n_parameters()))
-print("  'spherical' is soft k-means. 'full' fits any ellipse.")
-print("  'tied' wins on BIC here because all three ellipses share one")
-print("  shape, so it gets full covariance flexibility with fewer parameters than a spherical model.")
-print()
-
-print("BIC picks the number of components, which k-means cannot do:")
-print("%6s %12s %12s" % ("k", "BIC", "AIC"))
-for k in range(1, 7):
-    m = GaussianMixture(n_components=k, random_state=0).fit(X)
-    print("%6d %12.1f %12.1f" % (k, m.bic(X), m.aic(X)))
-best = min(range(1, 7), key=lambda k: GaussianMixture(n_components=k,
-                                                      random_state=0).fit(X).bic(X))
-print("  lowest BIC at k=%d, and the data really has 3 components." % best)
-print("  BIC is not infallible -- on overlapping components it under-counts.")
-print("  it works because a GMM is a probability model: BIC compares how")
-print("  well each k explains the data against how many parameters it spent.")
-print()
-print("the catch: with enough components a GMM puts one tiny component")
-print("on a handful of points and drives variance toward zero, sending")
-print("the likelihood to infinity. reg_covar exists to stop that.")
-```
-
-## Further reading
-
-For implementation details, see the [Gaussian mixture models](https://scikit-learn.org/stable/modules/mixture.html). Continue with [K-means](k_means.html) to connect this topic to a related part of the workflow.
+For implementation details and covariance options, see scikit-learn’s [Gaussian mixture documentation](https://scikit-learn.org/stable/modules/mixture.html). Compare with [K-means](k_means.html) and [hierarchical clustering](hierarchical_clustering.html) when choosing a clustering method.

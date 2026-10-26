@@ -1,186 +1,49 @@
-title: Inside K-Nearest Neighbors (KNN)
-intro: K-nearest neighbours predicts from the labels or values of nearby training examples. Its simplicity makes distance choice, feature scale, and the value of k especially important.
+title: K-Nearest Neighbors (KNN)
+intro: KNN predicts from nearby examples. Its results depend on how distance is measured, how features are scaled, and how many neighbors vote.
 
-## How KNN classifies by neighbourhood vote
+## What KNN predicts
 
-KNN stores the entire training set and does no work at training time &mdash; all math happens at guess time. It is why it is called a **lazy learner**. To classify a new point, it finds the k nearest training points (by Euclidean distance, Manhattan distance, or another metric), counts which class appears most among them. And Assigns that class. The choice of k controls the bias-variance tradeoff: k = 1 memorises the training set and produces a jagged decision boundary sensitive to noise. Large k smooths the boundary but can blur class boundaries. **Feature scaling** matters because distance metrics are dominated by whichever feature has the largest range &mdash; a feature measured in thousands swamps one measured in fractions. So Standardising or scaling first is not optional. The compute cost at guess time is O(n &middot; d) per query (n training points, d features), which makes KNN impractical for large datasets without spatial indexing (KD-trees, ball trees). This page lets you place a query point, shows its k neighbours highlighted. And Shows how the decision boundary changes as you adjust k and the distance metric.
+K-nearest neighbors (KNN) classifies a new example by finding the `k` closest labelled training examples and taking their majority class. For regression, it averages the neighbors' target values. The method stores the training data instead of fitting a compact formula, so most of its work happens when a prediction is requested.
 
-## How KNN Works: A Simple Democracy
+## Find neighbors, then combine their labels
 
-Imagine you have a new student (the target point) and you want to predict which class they belong to. KNN doesn't learn a "model" in the traditional sense. Instead, it follows a simple, lazy procedure at guess time.
+For each training point, KNN computes a distance from the query, selects the `k` smallest distances, and combines their targets. With `k = 3`, suppose the nearest labels are A, B, A: the predicted class is A. The visualizer shows those neighbors and the vote as you move the query point.
 
-<h4 class="font-bold" style="color: var(--text-main);">1. Find the Neighbors</h4>
+Distance is part of the model. Euclidean distance is common for continuous features; Manhattan distance sums absolute differences. For either, a feature with a much larger numeric range can dominate the result unless the features are scaled.
 
-First, the algorithm calculates the distance (usually Euclidean distance) from the new target point to every single point in the training data. It then identifies the 'K' points that are closest to the target—these are its "nearest neighbors." In the visualization, a circle is drawn around the target to show the neighborhood. And Lines connect to the K neighbors within it. <h4 class="font-bold" style="color: var(--text-main);">2. Hold a Vote</h4>
+## Choose `k` using held-out data
 
-Next, the algorithm looks at the classes of these K neighbors and holds a vote. Each neighbor gets one vote for its class. The class with the most votes wins. And that becomes the guess for the new target point. The "Neighbor Votes" panel on the right shows this process in real-time.
+Small `k` makes predictions sensitive to individual points. At `k = 1`, a training point predicts itself, so a perfect training score says little about performance on new data. Larger `k` smooths the boundary, but an excessively large value can wash out a small local class. Compare candidate values with cross-validation, then report performance on a separate test set. An odd `k` can avoid a tie in a two-class, unweighted vote; it does not prevent ties in every multiclass setting.
 
-## Nothing is learned until you ask
+## Scale features before measuring distance
 
-KNN is unusual in being a model with no training step worth the name. `fit()` stores the data. That is it. All the work happens when a guess is requested:
+If age ranges from 18 to 80 while income ranges from 20,000 to 200,000, raw Euclidean distance is likely to be driven mostly by income. Standardise or otherwise scale numeric features so their units do not silently decide which neighbors count. Fit the scaler on the training split only, then apply that fitted transformation to validation and test data; fitting it on all rows leaks information. See [feature scaling](feature_scaling.html) and [machine-learning pipelines](ml_pipelines.html).
 
-1. Measure the distance from the new point to every stored point.
-2. Take the k nearest.
-3. For sorting, take the majority vote of their labels. For regression, take their average.
+Scaling does not solve every distance problem. Irrelevant features can obscure nearby points, and in high dimensions distances often become less useful for distinguishing neighbors. Feature selection or dimensionality reduction may help, but validate the full workflow rather than assuming it will.
 
-This is called <strong>lazy learning</strong>. And It has consequences you feel immediately. Training is instant. Guess is slow, because every guess scans the entire dataset. Memory use is the size of your data, forever, because the data <em>is</em> the model. And there is no equation to inspect afterwards. You cannot show anyone "the model", only the neighbours it consulted.
+## A small scikit-learn example
 
-It also means KNN adapts instantly to new data. Add a row and it is available to the next guess with no retraining. For a small, slowly-changing dataset that is a genuine advantage.
-
-## What k actually controls
-
-k is the only important setting. And It slides the model along the bias-variance line.
-
-- <strong>k = 1</strong> &mdash; every point takes the label of its single nearest neighbour. Training score is 100% by construction, because each point is its own nearest neighbour. The decision boundary is a jagged outline that wraps around every individual point, including every mislabelled one. Maximum variance.
-- <strong>k = 5 to 20</strong> &mdash; the usual working range. Boundaries smooth out and single odd points stop mattering.
-- <strong>k = n</strong> &mdash; every guess is the majority class of the whole dataset. The model has become a constant. Maximum bias.
-
-Two practical rules. Use an odd k for two-class problems so a vote cannot tie. And choose k by cross-validation rather than by folklore. The square root of n is a common starting suggestion, not an answer.
-
-<strong>Distance weighting</strong> is the refinement worth knowing: instead of every neighbour getting one vote, weight each vote by 1/distance so closer neighbours count for more. It softens the choice of k much, because a distant neighbour scraping into the top k barely affects the outcome.
-
-## Scaling is not optional here
-
-KNN is distance, and distance is unitless arithmetic on whatever numbers you hand it. Consider predicting from age (18&ndash;80) and salary (20,000&ndash;200,000).
-
-Two people: A is 25 with a salary of 30,000. B is 60 with a salary of 30,500. The age difference is 35, the salary difference is 500. Squared, that is 1,225 against 250,000. The distance calculation is 99.5% salary. Age has well been deleted from the model.
-
-Standardise both columns &mdash; subtract the mean, divide by the standard deviation. And the two features get comparable say. This is the number one cause of KNN "not working". And It is a one-line fix.
-
-The same logic applies to the <strong>curse of dimensionality</strong>. It affects KNN harder than most models. In high dimensions, distances between all pairs of points converge towards each other: the nearest neighbour is barely nearer than the furthest. With 100 mostly-irrelevant features, "nearest" becomes meaningless and KNN degrades to guessing. Feature selection or PCA before KNN is often the difference between a working model and a coin flip.
-
-## The model that does nothing until you ask
-
-k-NN has no training step worth the name -- it stores the data and does all its work at guess time. That single fact explains every one of its trade-offs.
+This example scales both features, fits a three-neighbor classifier, and predicts a query. The labels of its three closest rows are A, A, and B, so the vote returns A.
 
 ```python-run
-import numpy as np
-import time
-from sklearn.datasets import make_classification
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import train_test_split
-X, y = make_classification(n_samples=4000, n_features=10, n_informative=5,
-                           flip_y=0.10, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
-knn = KNeighborsClassifier(5)
-t0 = time.time(); knn.fit(Xtr, ytr); fit_s = time.time() - t0
-t0 = time.time(); knn.predict(Xte);  pred_s = time.time() - t0
-print("fit took %.4f s, predicting %d rows took %.4f s" % (fit_s, len(Xte), pred_s))
-print("'fitting' is just storing the array.")
-print()
-print("one prediction, by hand:")
-row = Xte[0]
-d = np.linalg.norm(Xtr - row, axis=1)
-near = np.argsort(d)[:5]
-print("  the five nearest training rows:")
-for i in near:
-    print("    distance %.4f, label %d" % (d[i], ytr[i]))
-print("  majority vote -> %d" % np.bincount(ytr[near]).argmax())
-print("  sklearn says  -> %d" % knn.predict([row])[0])
-print()
-print("k is a smoothing knob:")
-print("%6s %10s %10s" % ("k", "train", "test"))
-for k in (1, 3, 5, 15, 50, 200):
-    m = KNeighborsClassifier(k).fit(Xtr, ytr)
-    print("%6d %10.4f %10.4f" % (k, m.score(Xtr, ytr), m.score(Xte, yte)))
-print("  k=1 scores 1.0000 on training data -- the nearest neighbour of a")
-print("  training point is itself. it means nothing.")
-```
-
-The next block shows why scaling matters and how extra dimensions hurt k-NN more than most algorithms.
-
-```python-run
-from sklearn.datasets import make_classification
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-X, y = make_classification(n_samples=4000, n_features=10, n_informative=5,
-                           flip_y=0.10, random_state=0)
-print("scaling is not optional here, it is the algorithm:")
-Xs = X.copy(); Xs[:, 0] *= 500
-print("  one column x500, raw   : %.4f"
-      % cross_val_score(KNeighborsClassifier(5), Xs, y, cv=5).mean())
-print("  same data, scaled      : %.4f"
-      % cross_val_score(make_pipeline(StandardScaler(), KNeighborsClassifier(5)),
-                        Xs, y, cv=5).mean())
-print()
-print("and it degrades as dimensions grow, because distances stop separating:")
-for dim in (2, 5, 20, 100, 400):
-    Xd, yd = make_classification(n_samples=1200, n_features=dim,
-                                 n_informative=2, n_redundant=0,
-                                 flip_y=0.05, random_state=0)
-    s = cross_val_score(make_pipeline(StandardScaler(), KNeighborsClassifier(5)),
-                        Xd, yd, cv=5).mean()
-    print("  %3d features (still only 2 informative): %.4f" % (dim, s))
-print()
-print("the informative signal never changed. the noise dimensions drowned it,")
-print("because every extra dimension adds to the distance whether it means")
-print("anything or not. that is the curse of dimensionality.")
+
+X = [[0, 0], [1, 0], [0, 1], [1, 1]]
+y = ["A", "A", "B", "B"]
+model = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=3))
+model.fit(X, y)
+print(model.predict([[0.8, 0.1]])[0])
 ```
 
-## Guided tour
+## Try it in the visualizer
 
-The most important parameter in KNN is 'K'. Let's see how it affects the outcome.
+1. Set **Neighbors (K)** to **1** and move the query point. Notice how easily its class changes near individual training points.
+2. Set **Neighbors (K)** to **20** and move it again. The boundary is smoother; a small local group can now be outvoted by the wider neighborhood.
 
-1. <strong>The Effect of a Small K (K=1):</strong> Set the "Neighbors (K)" slider to <strong>1</strong>. Now, drag the target point around the canvas. Notice that the guess is extremely volatile. It changes to the class of the single closest point. This creates a very complex and jagged decision boundary. It is a classic sign of <strong>high variance</strong> and overfitting. The model is too sensitive to individual data points, including noise.
-2. <strong>The Effect of a Large K (K=20):</strong> Now, set the "Neighbors (K)" slider to its maximum value, <strong>20</strong>. Drag the target point again. You'll see that the guess is much more stable and changes less frequently. The decision boundary becomes much smoother. However, if K is too large, the model might become too generalized and ignore local patterns, leading to <strong>high bias</strong> and underfitting. For example, a small cluster of one class might be "outvoted" by the more dominant class in the wider neighborhood.
-3. <strong>Finding a "Good" K:</strong> Set K to a moderate value, like <strong>5</strong> or <strong>7</strong>. Drag the target point to a boundary region between two classes. With K=5, if three neighbors are Class A and two are Class B, the target will be classified as A. Now, slowly increase K. You might find a point where the guess flips because the expanding neighborhood now includes more points from Class B. This shows the trade-off: a good K balances the influence of local patterns with overall stability.
-4. <strong>The "curse of dimensionality":</strong> While this 2D visualization is simple, imagine if we had 100 features (dimensions). In high-dimensional space, the concept of "distance" becomes less meaningful. All points tend to be far away from each other, making it difficult to find truly "close" neighbors. This is a major challenge for KNN in practice.
-
-## Where that leaves you
-
-- <strong>Lazy Learning:</strong> KNN is a "lazy" algorithm because it doesn't do any work during the training phase. It simply stores the entire training dataset. All the math happens at guess time.
-- <strong>Non-Parametric:</strong> It makes no assumptions about the underlying data spread. This allows it to learn complex, non-linear decision boundaries.
-- <strong>In compute Expensive at Guess:</strong> Because it has to compare the new point to every single training point, making guesses can be slow for large datasets.
-- <strong>Importance of Feature Scaling:</strong> Since KNN relies on distance, features with larger scales can dominate the distance calculation. It's important to scale your data (e.g., using scaling or standardization) before applying KNN.
-
-## Making it fast enough to use
-
-A brute-force guess compares against every stored point: with 1 million rows and 50 features, that is 50 million multiply-adds per guess. Fine for a notebook, fatal for an API with a 50ms budget.
-
-The standard remedies:
-
-- <strong>KD-trees</strong> partition space along feature axes so whole regions can be skipped. Excellent up to roughly 20 dimensions, then they stop helping.
-- <strong>Ball trees</strong> partition into nested hyperspheres and cope somewhat better with more dimensions.
-- <strong>Rough nearest neighbours</strong> (HNSW, IVF, product quantisation) give up the guarantee of finding the exact nearest neighbours in exchange for enormous speed-ups. Every vector database is built on these. And For search and recommendation the rough guess is invisible.
-- <strong>Reduce first.</strong> PCA down to 20&ndash;50 components makes both the distance math and the tree structures dramatically more effective.
-
-Scikit-learn's `algorithm="auto"` picks between brute force, KD-tree and ball tree for you based on the data's shape. It is usually the right call.
-
-## Where KNN is genuinely the right tool
-
-- <strong>Recommendation systems.</strong> "Users like you also bought" is literally a nearest-neighbour query over user vectors.
-- <strong>Missing value imputation.</strong> `KNNImputer` fills a gap with the average of the most similar complete rows. It Respects links between columns in a way that filling with the column mean does not.
-- <strong>Anomaly detection.</strong> A point whose k-th nearest neighbour is unusually far away is, by definition, somewhere the data is thin.
-- <strong>Small tabular problems with irregular boundaries.</strong> When you have a few thousand rows, a handful of well-scaled features and a genuinely non-linear boundary, KNN is quick to get working and hard to beat by much.
-- <strong>A baseline.</strong> It takes three lines and gives you a number your fancier model has to beat.
-
-Where it is the wrong tool: very large datasets with tight latency budgets, high-dimensional raw data, heavily imbalanced classes (the majority class simply outvotes the minority in every neighbourhood). And Any situation where you must explain the decision as a rule rather than as "these five similar cases".
-
-## Questions people ask
-
-<strong>How do I choose k?</strong> Cross-validate over a range and plot the score. You will usually see a rise, a plateau. And A slow decline. Pick from the plateau rather than the single best point. It is often noise.
-
-<strong>Which distance should I use?</strong> Euclidean for continuous, well-scaled features. Manhattan when features are sparse or high-dimensional. Cosine when direction matters more than magnitude, as with text. Hamming for binary or class-based data.
-
-<strong>Does KNN work with class-based features?</strong> Only after encoding. And Even then the distances one-hot encoding produces are crude. Consider Gower distance for mixed data. Or A model that handles groups natively.
-
-<strong>Why is my score perfect on training data and poor on test data?</strong> You are almost certainly using k = 1. Every training point is its own neighbour. So Training score is a meaningless 100%. Increase k.
-
-<strong>How does it handle imbalanced classes?</strong> Badly, by default. Distance weighting helps a little. Resampling or a class-weighted vote helps more.
-
-<strong>Is KNN affected by irrelevant features?</strong> Severely. Every useless column adds noise to every distance. Feature selection matters more for KNN than for tree-based models. It Can simply ignore a column.
-
-## Recap in one screen
-
-- KNN stores the data and answers each query by consulting the k closest stored points.
-- No training cost, high guess cost. And The dataset is the model.
-- Small k means jagged, unstable boundaries. Large k means smooth, eventually constant ones.
-- Scale your features. Or The widest-ranging column becomes the only column.
-- It degrades badly in high dimensions &mdash; reduce first.
-- Ideal as a baseline, an imputer. And The engine behind "similar items".
+KNN is useful for small, well-scaled datasets where local similarity is meaningful and a simple baseline is valuable. It can be slow at prediction time because it compares a query with stored examples, and it needs memory for those examples. High-dimensional, large, imbalanced, or latency-sensitive problems may need a different model or a dedicated nearest-neighbor index.
 
 ## Further reading
 
-For implementation details, see the [Nearest-neighbor methods](https://scikit-learn.org/stable/modules/neighbors.html). Continue with [feature scaling](feature_scaling.html) to connect this topic to a related part of the workflow.
+The [scikit-learn nearest-neighbor guide](https://scikit-learn.org/stable/modules/neighbors.html) documents distance choices and implementation options. Continue with [classification metrics](confusion_matrix.html) to see how to evaluate the predictions.

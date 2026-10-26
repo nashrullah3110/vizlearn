@@ -86,19 +86,22 @@ def card_inner(src):
     return start + m.end(), close_start
 
 
-def render(title, entry):
+def render(title, entry, include_header=True):
     # A page that came with its own card title keeps it; "<module>: A
     # Practical Guide" is only the fallback for the ones that never had one.
     title = entry.get("title") or title
-    parts = [
-        BEGIN,
+    parts = [BEGIN]
+    if include_header:
+        parts.extend([
         '            <div class="card-header">',
         '                <h2 class="font-bold text-xl md:text-2xl" style="color: var(--text-main)">%s</h2>' % title,
         '                <p class="mt-2 text-sm" style="color: var(--text-muted)">%s</p>'
         % entry["intro"],
         "            </div>",
+        ])
+    parts.extend([
         '            <div class="vz-article p-5 md:p-7 space-y-7 text-sm md:text-base leading-7" style="color: var(--text-main)">',
-    ]
+    ])
     for heading, body in entry["sections"]:
         parts.append("                <div>")
         parts.append("                    <h3>%s</h3>" % heading)
@@ -157,7 +160,11 @@ def main():
 
         src = open(path, encoding="utf-8").read()
         title = "%s: A Practical Guide" % titles.get(rel, rel)
-        block = render(title, entry)
+        # These tracks already show their title and short orientation above
+        # the visualiser, then place an Overview below it. Repeating an article
+        # title and deck immediately before the body adds no new teaching.
+        include_header = not rel.startswith(("dsa/", "machine_learning/"))
+        block = render(title, entry, include_header=include_header)
 
         if BLOCK.search(src):
             src = BLOCK.sub(lambda _: block, src)

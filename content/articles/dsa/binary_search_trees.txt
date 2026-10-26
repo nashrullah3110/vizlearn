@@ -3,15 +3,8 @@ intro: Binary search made into a structure &mdash; and what happens when it lose
 
 ## What a binary search tree gives you
 
-[Binary search](binary_search.html) is fast &mdash; O(log n) &mdash; but it requires a sorted array. Arrays are expensive to keep sorted: inserting a value into the middle means shifting everything after it one position to the right. A binary search tree solves that problem by storing the values in a tree instead of a flat array, so insertions and deletions only change a few pointers rather than shifting half the data.
 
-A <strong>binary search tree</strong> keeps its values in sorted order by position. At every node: the entire left subtree is smaller, the entire right subtree is larger. Searching then works exactly like binary search &mdash; compare, discard half, repeat.
-
-The catch is balance. When values arrive in sorted order, the tree degrades into a linked list and every operation drops from O(log n) to O(n). Self-balancing variants like AVL trees and red-black trees prevent this by rotating nodes after each insertion. The standard `TreeMap` in Java and `std::map` in C++ are both red-black trees underneath, and Python's `sortedcontainers.SortedList` provides similar guarantees.
-
-This page covers the BST property, how search, insertion, and deletion work, and why balance is the difference between a fast tree and a slow list.
-
-The visualisation above lets you insert, search, and delete values and watch the tree reshape itself. Pay attention to what happens when you insert values in sorted order: the tree stretches into a chain, and every operation slows down to O(n). Then try inserting the same values in a random order and compare the depth. That depth is the whole story &mdash; a balanced tree of a million nodes is only 20 levels deep.
+A binary search tree stores ordered values in nodes: smaller keys go left and larger keys go right. Search, insert, and delete follow one path, taking <code>O(h)</code> time for tree height <code>h</code>. A balanced tree has logarithmic height; an unbalanced one can become a linear chain.
 
 ## Search, Insert, Delete
 
@@ -43,58 +36,6 @@ Height goes from O(log n) to O(n), and every operation degrades with it. This is
 
 A hash table is faster for pure lookup &mdash; O(1) versus O(log n). But a BST keeps its data <strong>ordered</strong>, which a hash table cannot. Use a tree when you need sorted iteration, range queries ("all values between 20 and 50"), or nearest-neighbour lookups. Use a hash table when you only ever ask "is this exact key present?".
 
-## Ordered structure, not just storage
-
-A binary search tree keeps one invariant at every node:
-
-<strong>Everything in the left subtree is smaller; everything in the right subtree is larger.</strong>
-
-That single rule makes search work like binary search: compare, then discard half the tree.
-
-```
-        8
-      /   \
-     3     10
-    / \      \
-   1   6      14
-      / \    /
-     4   7  13
-```
-
-Searching for 6: 6 &lt; 8 so go left; 6 &gt; 3 so go right; found. Three comparisons for seven nodes.
-
-|Operation|Balanced|Degenerate|
-|---|---|---|
-|Search|O(log n)|O(n)|
-|Insert|O(log n)|O(n)|
-|Delete|O(log n)|O(n)|
-|In-order traversal|O(n)|O(n)|
-|Minimum / maximum|O(log n)|O(n)|
-
-The difference between those columns is the whole subject, and it is what balanced trees exist to guarantee.
-
-## Why an in-order traversal is sorted
-
-Visit the left subtree, then the node, then the right subtree, and values come out in ascending order &mdash; because everything left is smaller and everything right is larger, recursively.
-
-```python
-def inorder(node, out):
-    if node:
-        inorder(node.left, out)
-        out.append(node.value)
-        inorder(node.right, out)
-```
-
-That is the property hash tables cannot offer, and it is why BSTs are used where ordering matters:
-
-- <strong>Range queries</strong> &mdash; all values between 10 and 50, found by traversing a subtree.
-- <strong>Nearest neighbour</strong> &mdash; the closest value to a target.
-- <strong>Sorted iteration</strong> without sorting.
-- <strong>Successor and predecessor</strong> of a given value.
-- <strong>Minimum and maximum</strong> &mdash; walk left or right to the end.
-
-A hash table does none of those. That is the trade: O(1) unordered lookup, or O(log n) with order.
-
 ## The degenerate case
 
 Insert 1, 2, 3, 4, 5 into an empty BST in that order and every node becomes the right child of the last. The tree is a linked list, and every operation is O(n).
@@ -118,184 +59,10 @@ Three responses:
 
 Red-black trees are what most standard libraries use for ordered maps &mdash; C++'s `std::map`, Java's `TreeMap` &mdash; because they balance insertion and lookup cost well.
 
-## The fatal weakness, measured
-
-A BST gives O(log n) search when it is balanced and O(n) when it is not, and nothing in the plain insert algorithm prevents the second. The gap between those two is the whole reason self-balancing trees exist, and it opens up on the most ordinary input there is.
-
-```python-run
-class BST:
-    def __init__(self): self.root = None
-    def insert(self, v):
-        if not self.root: self.root = [v, None, None]; return
-        n = self.root
-        while True:
-            side = 1 if v < n[0] else 2
-            if n[side] is None: n[side] = [v, None, None]; return
-            n = n[side]
-    def find(self, v):
-        n, s = self.root, 0
-        while n:
-            s += 1
-            if v == n[0]: return s
-            n = n[1] if v < n[0] else n[2]
-        return s
-    def height(self):
-        best, stk = 0, [(self.root, 1)]
-        while stk:
-            n, d = stk.pop()
-            if not n: continue
-            best = max(best, d)
-            stk.append((n[1], d+1)); stk.append((n[2], d+1))
-        return best
-
-import math, random
-N = 1000
-orders = {"random": random.Random(6).sample(range(N), N),
-          "sorted": list(range(N)),
-          "reversed": list(range(N))[::-1]}
-print("%-10s %7s %9s %12s" % ("order", "height", "log2(n)", "find last"))
-for name, seq in orders.items():
-    t = BST()
-    for v in seq: t.insert(v)
-    print("%-10s %7d %9.1f %12d" % (name, t.height(), math.log2(N), t.find(seq[-1])))
-# sorted input turns the tree into a linked list -- height is n, not log n
-```
-
-The tree is still correct even when degenerate: in-order traversal still gives sorted output. Only the performance collapsed.
-
-```python-run
-class BST:
-    def __init__(self):
-        self.root = None
-    def insert(self, v):
-        if self.root is None:
-            self.root = [v, None, None]; return
-        node = self.root
-        while True:
-            if v < node[0]:
-                if node[1] is None:
-                    node[1] = [v, None, None]; return
-                node = node[1]
-            else:
-                if node[2] is None:
-                    node[2] = [v, None, None]; return
-                node = node[2]
-    def inorder(self):
-        out, stack, node = [], [], self.root
-        while stack or node:
-            while node:
-                stack.append(node); node = node[1]
-            node = stack.pop(); out.append(node[0]); node = node[2]
-        return out
-
-import math
-t = BST()
-for v in [5, 3, 8, 1, 4]: t.insert(v)
-print("in-order of balanced BST:", t.inorder())
-
-deg = BST()
-for v in range(6): deg.insert(v)
-print("in-order of degenerate:  ", deg.inorder())
-
-print()
-print("%8s %10s %14s %10s" % ("n", "balanced", "degenerate", "ratio"))
-for n in (1000, 10000, 100000, 1000000):
-    bal, degn = math.log2(n), n / 2
-    print("%8d %10.1f %14.0f %10.0fx" % (n, bal, degn, degn / bal))
-# at a million nodes: 20 steps vs 500,000 -- the argument for AVL/red-black trees
-```
-
 ## Guided tour
 
 1. <strong>Insert a few values</strong> and watch each one walk down the tree, going left or right at every comparison.
 2. <strong>Search for something.</strong> The highlighted path shows roughly half the remaining tree being discarded at each step.
-3. <strong>Press In-order traversal.</strong> The values come out perfectly sorted &mdash; that is the BST rule paying off.
-4. <strong>Press Sorted input.</strong> The tree collapses into a straight line and the height jumps to n &mdash; every search is now linear.
-5. <strong>Delete a node with two children</strong> and note which value replaces it: the in-order successor, the only choice that keeps the ordering intact.
-
-## In one line
-
-A BST turns the binary-search idea into a living structure with O(log n) search, insert and delete &mdash; but only while it stays bushy. Sorted input degenerates it to a linked list, which is precisely why self-balancing variants exist and why they, not plain BSTs, are what production libraries ship.
-
-## Deletion, the awkward operation
-
-Insertion and search are straightforward. Deletion has three cases, and the third is where implementations go wrong.
-
-<strong>A leaf.</strong> Remove it.
-
-<strong>One child.</strong> Replace the node with its child.
-
-<strong>Two children.</strong> Replace the node's value with its <strong>in-order successor</strong> &mdash; the smallest value in its right subtree &mdash; then delete that successor, which by construction has at most one child.
-
-```python
-def delete(node, value):
-    if not node:
-        return None
-    if value < node.value:
-        node.left = delete(node.left, value)
-    elif value > node.value:
-        node.right = delete(node.right, value)
-    else:
-        if not node.left:
-            return node.right
-        if not node.right:
-            return node.left
-        succ = node.right                      # find the in-order successor
-        while succ.left:
-            succ = succ.left
-        node.value = succ.value
-        node.right = delete(node.right, succ.value)
-    return node
-```
-
-The predecessor (largest in the left subtree) works equally well. Either choice preserves the ordering invariant, which is what matters.
-
-Note that repeated deletions can unbalance a tree even if insertions were balanced &mdash; another argument for a self-balancing implementation.
-
-## Where trees beat hash tables
-
-|Need|Structure|
-|---|---|
-|Lookup by exact key|Hash table &mdash; O(1)|
-|Range queries|Tree|
-|Sorted iteration|Tree|
-|Nearest key|Tree|
-|Minimum or maximum|Tree, or a heap|
-|Predictable worst case|Balanced tree &mdash; O(log n) guaranteed|
-
-The last row is worth noting: a hash table's O(1) is an average, with an O(n) worst case; a balanced tree's O(log n) is a guarantee. For latency-sensitive systems that certainty sometimes wins.
-
-In Python specifically, there is no built-in balanced tree. The practical alternatives are `dict` for unordered lookup, `bisect` on a sorted list for range queries when insertions are rare, and the third-party `sortedcontainers` package, which provides sorted list, dict and set types with excellent constant factors.
-
-## B-trees, and why databases use them
-
-A B-tree node holds many keys &mdash; hundreds &mdash; rather than one, so the tree is very shallow: a few levels for millions of records.
-
-The reason is disk. Reading from disk or SSD happens in pages of several kilobytes, and the cost is dominated by the number of page reads rather than the comparisons within a page. A binary tree with a million nodes is 20 levels deep, meaning up to 20 page reads. A B-tree with 200 keys per node is 3 levels deep &mdash; 3 reads.
-
-That is why <strong>every relational database index is a B-tree</strong> (usually a B+ tree, with all values in the leaves and the leaves linked for range scans). It is the same ordering invariant, restructured around the hardware.
-
-## Questions people ask
-
-<strong>Why not always use a hash table?</strong> Because it has no order. Range queries, sorted iteration and nearest-key lookups all need a tree.
-
-<strong>What makes a tree balanced?</strong> Height O(log n). AVL and red-black trees enforce it with rotations on insertion and deletion.
-
-<strong>What happens with sorted insertions?</strong> An unbalanced tree degrades to a linked list &mdash; O(n) operations. This is common in practice, not a corner case.
-
-<strong>How do I do a range query?</strong> Traverse in order, pruning subtrees entirely outside the range.
-
-<strong>Does Python have a balanced tree?</strong> Not in the standard library. Use `bisect` on a sorted list, or `sortedcontainers`.
-
-<strong>What is the difference between a BST and a heap?</strong> A BST orders left-node-right for sorted access; a heap only orders parent against children, giving O(1) access to the extreme value and no ordering otherwise.
-
-## Recap in one screen
-
-- Left subtree smaller, right subtree larger &mdash; that invariant gives O(log n) search on a balanced tree.
-- An in-order traversal yields sorted values, which is what hash tables cannot do.
-- Sorted insertions produce a degenerate O(n) tree, so self-balancing (AVL, red-black) is what production uses.
-- Deletion with two children replaces the node with its in-order successor.
-- B-trees widen the nodes to match disk pages, which is why every database index is one.
 
 ## Sources and next steps
 

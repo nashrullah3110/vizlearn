@@ -1,236 +1,33 @@
-title: Grid Search against Random Search
-intro: Grid search tests a fixed set of parameter combinations; random search samples the search space. When only a few parameters matter, random search can explore them more efficiently.
+title: Grid Search and Random Search
+intro: Grid search tests every combination from fixed parameter lists; random search samples combinations from chosen distributions. With a limited evaluation budget, random search can explore more useful values when only a few parameters strongly affect performance.
 
-## The setup
+## What the search budget buys
 
-The background shading is the true score surface, and it's on purpose
-lopsided. The flat axis is a setting that matters a great deal
-&mdash; a learning rate, a smoothing strength. And the vertical axis
-is one that barely does. The optimum is a narrow vertical band.
+Both methods compare model configurations using validation scores. Grid search is systematic over a small, discrete set; random search spends each trial on a new sample from the parameter ranges. The choice depends on the search space and the cost of each fit.
 
-This lopsidedness is the normal case, not a contrived one. In most models one or
-two settings dominate and the rest are close to noise, and you often do
-not know in advance which is which.
+## Why the search space matters
 
-Grid search picks values in a regular lattice. Every point in a column
-shares the same value of the important axis. Most of the budget is spent
-varying a parameter that barely matters.
+Suppose there are two parameters, but only one has a large effect on validation score. A grid with ten values for each parameter uses 100 trials to test each value of the important parameter only ten times. A random search with the same 100-trial budget can sample many more distinct values along both ranges. If the second parameter barely matters, more of those trials cover useful settings of the first.
 
-Random search spends the same budget differently. Each trial picks each
-parameter independently, so every trial tests a new value of the axis
-you care about. The coverage where it counts is far finer, at no extra
-cost.
+This is not a guarantee that one random run will win. Results depend on the ranges, sampling distributions, noise in the validation score and random seed. Bergstra and Bengio’s [random-search study](https://jmlr.org/papers/v13/bergstra12a.html) explains why random search can be more efficient when only a subset of hyperparameters matters.
 
-## Count the distinct values
+## Compare a matched budget
 
-Set the method to **Grid** with 16 trials. Sixteen points appear in a 4&times;4
-lattice. Read the line under the chart: 16 trials, **4** distinct values of the
-parameter that matters.
+1. Choose **Search** as Grid and set **Trials** to a fixed budget. Note which regions receive evaluations and the best score found.
+2. Choose Random with the same **Trials** budget. Change **Random seed** and observe how the sampled points and best score vary.
 
-each point in a column shares an x. The other three trials in that column tell
-you nothing new about the axis you care about. They only vary the axis
-you don't.
+The visualiser shows a two-parameter score surface. A real model-selection run should use the same data splits and scoring metric for both methods so the comparison is fair.
 
-Now switch to **Random**, same 16 trials. Sixteen points scattered, and
-**16** distinct values of the parameter that matters. Same cost, four times the
-detail where detail counts.
+## Choosing a method
 
-Push the budget to 64. Grid gives 8 distinct values from 64 trials. Random gives
-64. The gap widens as the budget grows, and it widens much faster as dims
-are added &mdash; a grid over five parameters at four values each is 1,024
-trials and still only four values of each.
-
-## The argument in one line
-
-A grid of *n* points per axis over *d* axes costs *n^d* trials and buys *n*
-distinct values of each parameter. Random search of the same *n^d* trials buys
-*n^d* distinct values of each parameter.
-
-If only one axis matters, grid search has wasted all but *n* of its trials on
-that axis. This is Bergstra and Bengio's 2012 result, and it changed default
-practice.
-
-## Watch the luck
-
-Move the **seed** slider with random selected. The best point found moves, and
-the best score wobbles. Random search is random. A single run can be unlucky.
-
-That is a real cost and a smaller one than it looks. Because the surface is
-broad along the unimportant axis, most draws land a place reasonable, and the
-distribution of outcomes is much better than grid's ensured coarseness. But
-it does mean a single random run isn't a strong claim, and checks should
-allow for the variation.
-
-## When grid search is still right
-
-**Few parameters, truly discrete.** Three kernels, four values of *k*: a
-grid is exhaustive and the exhaustiveness is worth having.
-
-**Reproducibility matters more than speed.** A grid is deterministic and
-easy to show in a paper.
-
-**You're refining.** Random search to find the region, a small grid to comb it.
-This combination is better than either alone.
-
-## What replaced both
-
-**Bayesian optimisation** builds a model of the score surface from the trials so
-far and proposes the point most likely to improve. Optuna and Hyperopt do this,
-and on costly goals &mdash; where one trial takes an hour &mdash; it's
-clearly better than either method here.
-
-**Successive halving** and **Hyperband** attack the cost differently: start many
-configurations cheaply, kill the worst, give the survivors more budget. When a
-trial's early speed predicts its final speed, this is sharply
-more fast.
-
-For anything cheap, random search remains an great default. It has no
-settings of its own, it is easy to parallelize, and it's very hard to
-use wrongly.
-
-## Why random search reaches the good region
-
-Random search's edge over a grid is that it doesn't spend trials
-re-measuring the axis that doesn't matter, and its chance of landing in the good
-region follows a simple curve. If the top 5% of the space is what you want, `n`
-free random draws miss it only if *all* of them do:
-
-|random trials|P(at least one lands in the top 5%)|
+| Use | When it fits |
 |---|---|
-|10|0.40|
-|20|0.64|
-|60|0.95|
+| Grid search | A few parameters have small, meaningful discrete sets, or an exhaustive check is important. |
+| Random search | Ranges are broad, some parameters matter more than others, or each fit is expensive. |
+| A staged search | Random search identifies a promising region, then a smaller grid compares nearby values. |
 
-Sixty trials find the good region 95% of the time, with no assumption about which
-setting matters. A grid of the same 60 trials over two axes gives about 8
-distinct values of each, so if only one axis matters it has spent all but 8 of its
-trials varying the one that doesn't. And over five axes at four values
-each, a grid is 1,024 trials and still only four values per parameter. That is
-Bergstra and Bengio's result, and it's why random beat grid as the default. The
-one place it needs care is the sampling scale: a learning rate must be drawn
-log-uniformly, because a uniform draw between 0.0001 and 0.1 puts 90% of its
-samples above 0.01 and starves the small values that often matter most.
+Choose distributions that match the parameter. For a learning rate spanning several orders of magnitude, sample on a logarithmic scale; a uniform sample over raw values will concentrate most trials near the upper end. Keep the validation strategy fixed, and reserve the test set until the final evaluation. If fits are costly, successive halving can stop weak configurations early; Bayesian optimisation is another option when each evaluation is expensive.
 
-What replaced both methods for costly goals is Bayesian optimisation
-&mdash; Optuna, Hyperopt &mdash; which builds a model of the score surface from the
-trials so far and proposes the point most likely to improve, clearly better when a
-single trial takes an hour. Successive halving and Hyperband attack the cost from
-another angle, starting many configurations cheaply and killing the worst, which
-wins when early speed predicts final speed. For anything cheap, random
-search remains an great default: it has no settings of its own, it
-is easy to parallelize, and the one way to misuse it. A linear scale on a
-parameter that should be logarithmic. Is the same trap noted above.
+## Sources and next steps
 
-## Where it goes wrong
-
-**Sampling scale.** A learning rate should be sampled log-uniformly. Uniform
-between 0.0001 and 0.1 puts 90% of the draws above 0.01.
-
-**Tuning on the test set.** Same error as all over else. Tune on validation.
-
-**Searching a range that excludes the answer.** No search finds what is outside
-its bounds. Check whether the best value sits at the edge of the range. If it
-does, widen it and search again.
-
-**Not searching prep.** Put the whole [pipeline](ml_pipelines.html) in
-the search, so imputation and scaling choices are tuned alongside the model.
-
-## Questions people ask
-
-<strong>Is random search always better than grid search?</strong> Not always, but it usually finds a good setting with fewer fits when only a few hyperparameters matter. Grid search is fine for one or two small, discrete parameters.
-
-<strong>How many random samples do I need?</strong> Around 60 random trials gives a good chance of landing in the top 5 percent of the space. More helps with diminishing returns.
-
-<strong>Should I sample on a log scale?</strong> Yes for parameters like learning rate, C and alpha that span orders of magnitude. Use a log-uniform distribution so each scale gets equal attention.
-
-<strong>Why does grid search waste fits?</strong> It repeats the same few values of each parameter across every combination. If one parameter does not matter, you run many near-duplicate experiments.
-
-<strong>What comes after random search?</strong> Bayesian optimisation and successive halving, which use earlier results to choose where to look next. They are worth it when each fit is expensive.
-
-<strong>Can I tune on the test set?</strong> No. Use cross-validation on the training data for the search, and touch the test set once at the end.
-
-## Why random search finds more with fewer fits
-
-Grid search spends its budget evenly across each parameter, including the ones that don't matter. Random search doesn't. On the same budget it often wins.
-
-```python-run
-import numpy as np
-import time
-from sklearn.datasets import make_classification
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import (GridSearchCV, RandomizedSearchCV,
-                                     StratifiedKFold, cross_val_score)
-from scipy.stats import randint
-X, y = make_classification(n_samples=700, n_features=12, n_informative=5,
-                           flip_y=0.10, random_state=0)
-cv = StratifiedKFold(3, shuffle=True, random_state=0)
-print("baseline, all defaults: cv %.4f"
-      % cross_val_score(RandomForestClassifier(random_state=0), X, y, cv=cv).mean())
-
-grid = {"n_estimators": [40, 120], "max_depth": [3, 6, 12, None],
-        "max_features": [2, 4, 8]}
-total = 2 * 4 * 3
-print("grid search over %d combinations x 3 folds = %d fits" % (total, total * 3))
-t0 = time.time()
-gs = GridSearchCV(RandomForestClassifier(random_state=0), grid, cv=cv).fit(X, y)
-print("  best %.4f in %.1fs with %s" % (gs.best_score_, time.time()-t0, gs.best_params_))
-
-dist = {"n_estimators": randint(40, 120), "max_depth": randint(2, 20),
-        "max_features": randint(1, 12)}
-t0 = time.time()
-rs = RandomizedSearchCV(RandomForestClassifier(random_state=0), dist,
-                        n_iter=total, cv=cv, random_state=0).fit(X, y)
-print("random search, the SAME %d fits" % total)
-print("  best %.4f in %.1fs with %s" % (rs.best_score_, time.time()-t0, rs.best_params_))
-print()
-print("how many DISTINCT values does each parameter get tried at?")
-print("  grid   : n_estimators 2, max_depth 4, max_features 3")
-print("  random : n_estimators %d, max_depth %d, max_features %d"
-      % tuple(len(set(r[k] for r in rs.cv_results_["parameters"]))
-              for k in ("n_estimators", "max_depth", "max_features")))
-print("  random gets 24 distinct values of every parameter, so it never")
-print("  wastes budget on a parameter that turns out not to matter.")
-```
-
-The next block shows why log-uniform distributions matter and demonstrates SVM tuning.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.svm import SVC
-from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from scipy.stats import loguniform
-X, y = make_classification(n_samples=700, n_features=12, n_informative=5,
-                           flip_y=0.10, random_state=0)
-cv = StratifiedKFold(3, shuffle=True, random_state=0)
-
-print("grids explode. adding one parameter with 4 values multiplies:")
-for extra in range(5):
-    print("  %d parameters at 4 values each -> %5d combinations"
-          % (extra + 1, 4 ** (extra + 1)))
-print()
-print("scales matter -- C and gamma live on a log scale:")
-print("  linear range 0.1 to 100 in 5 steps:", np.round(np.linspace(0.1, 100, 5), 3))
-print("  log range,   same endpoints      :", np.round(np.logspace(-1, 2, 5), 3))
-print("  the linear one puts 4 of 5 samples above 25, which is almost")
-print("  never where the interesting values are.")
-print()
-svm_rs = RandomizedSearchCV(make_pipeline(StandardScaler(), SVC()),
-                            {"svc__C": loguniform(1e-2, 1e3),
-                             "svc__gamma": loguniform(1e-4, 1e0)},
-                            n_iter=15, cv=cv, random_state=0).fit(X, y)
-print("SVM tuned over log-uniform ranges, 15 draws: cv %.4f" % svm_rs.best_score_)
-print("  C %.4f, gamma %.5f"
-      % (svm_rs.best_params_["svc__C"], svm_rs.best_params_["svc__gamma"]))
-print()
-print("rule of thumb: grid when you have 2 parameters and know the ranges,")
-print("random when you have more than 2 or are still exploring. always")
-print("check if the best value landed on the edge -- if it did, the range")
-print("was wrong, not the model.")
-```
-
-## Further reading
-
-For implementation details, see the [Hyperparameter search strategies](https://scikit-learn.org/stable/modules/grid_search.html). Continue with [cross-validation](cross_validation.html) to connect this topic to a related part of the workflow.
+See Bergstra and Bengio, [“Random Search for Hyper-Parameter Optimization”](https://jmlr.org/papers/v13/bergstra12a.html), and scikit-learn’s [parameter-search guide](https://scikit-learn.org/stable/modules/grid_search.html). Continue with [cross-validation](cross_validation.html) to choose a reliable validation strategy.

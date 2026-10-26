@@ -1,235 +1,35 @@
-title: Random Forest and Bagging: A Practical Guide
-intro: A random forest averages many decision trees trained with sampling and feature randomness. This often stabilizes predictions, while reducing the transparency of a single tree.
+title: Random Forests and Bagging
+intro: A random forest averages many decision trees, each trained with row sampling and random feature subsets. This usually reduces the instability of a single tree, at the cost of a less transparent model.
 
-## Quick Context
+## How a forest combines trees
 
-A <a href="decision_tree.html" style="color: var(--accent-primary)">decision tree</a> grown to full depth will classify each training point correctly. It does this by carving the space into ever less rectangles until each one is pure &mdash; with rectangles that exist just to accommodate a single mislabelled point. The result has near-perfect training accuracy and a edge that looks like a staircase drawn in an earthquake.
+Random forests combine many decision trees so that individual quirks have less influence on the final prediction. The method works best when the trees are reasonably accurate but make different errors.
 
-The tree is not wrong on average; it is unstable. Change a handful of training points and you get a noticeably different tree. That is high variance. And variance is the one error you can cancel by averaging.
+## From one tree to a forest
 
-A random forest does just that. It grows many trees, each on another bootstrap sample of the data. And averages their predictions. Each individual tree overfits its own sample. But the mistakes are in other places. So the average is smoother and more exact than any single tree. The forest adds one extra ingredient beyond plain averaging: at each split, just a random subset of features is considered. This decorrelates the trees &mdash; without it, each tree would split on the same dominant feature first, and the "other" trees would be nearly identical.
+A deep decision tree can fit its training data closely, including accidental patterns. **Bagging** (bootstrap aggregating) trains each tree on a bootstrap sample: a same-size sample drawn with replacement. A bootstrap sample contains about 63% of the distinct training rows on average; the remaining rows are out of bag for that tree.
 
-The result is a model that inherits the flexibility of deep trees without most of their instability. It handles missing values, mixed types and nonlinear relationships out of the box. It rarely needs much tuning: the default settings in scikit-learn often give a strong baseline with no grid search at all. The main cost is interpretability &mdash; a single tree can be drawn and read, while a forest of five hundred cannot &mdash; and training time. It scales linearly with the number of trees. Feature importances partly recover the interpretability. And the trees are independent so they parallelise trivially.
+For classification, the forest usually combines tree votes; for regression, it averages predictions. Averaging reduces variability when the trees do not all make the same mistakes. If every tree were identical, combining them would add little.
 
-## Bagging: the general idea
+A random forest adds feature randomness: at each split, a tree considers only a random subset of candidate features. This can stop one strong feature from dominating every tree and helps decorrelate their errors. Row sampling and feature sampling create diversity; aggregation uses that diversity to stabilise predictions.
 
-Bagging is short for <strong>bootstrap aggregating</strong>, and it is just those two steps:
+## Out-of-bag evaluation
 
-1. <strong>Bootstrap.</strong> Draw a random sample of the training data, with replacement, the same size as the first. Roughly 63% of the rows appear at least once. The rest are left out.
-2. <strong>Aggregate.</strong> Train one model per sample, then mix them &mdash; majority vote for classification, mean for regression.
+Each training row is left out of roughly 36.8% of bootstrap samples. For that row, the trees that did not train on it can produce an out-of-bag prediction. Aggregating these predictions gives an out-of-bag score without reserving a separate validation split.
 
-Each tree sees a slightly other world, so each makes slightly other mistakes. Where they agree, the signal was real. Where they disagree, one of them was chasing noise. And the vote overrules it.
+Out-of-bag evaluation is a useful estimate, not a replacement for a final held-out test set. Its default score for a classifier is accuracy, which can be misleading for imbalanced labels. Pick a metric that matches the task, and use a separate test set for the final evaluation.
 
-## What makes a forest more than bagging
+## Watch the ensemble grow
 
-Bagged trees have a weakness: if one feature is strongly predictive, nearly each tree splits on it first. And the trees end up highly correlated. Averaging correlated models buys much less than averaging independent ones.
+1. Set **number of Trees** to 1 and click **Regrow Forest** a few times. The fitted boundary and test score can vary with the sampled data.
+2. Increase **number of Trees** to 40 and regrow. The ensemble averages more trees, so its predictions and score spread should become more stable. More trees cost more time; they do not repair a poor feature set or biased training data.
 
-Random Forest adds a second source of randomness. At <em>each split</em>, the tree may just consider a random subset of the features &mdash; often the square root of the total for classification. A tree that is denied the dominant feature is forced to find another, still-useful split. And the forest turns genuinely diverse rather than forty copies of the same idea.
+The visualiser uses a small two-dimensional classification example. Real forests can have many features and trees, and their performance still needs validation on data representative of deployment.
 
-That is the whole gap between bagged trees and a random forest: one extra random choice, made at each node.
+## When to use one
 
-## Two sources of randomness, one purpose
+Random forests are a strong general-purpose baseline for tabular data. They can model nonlinear boundaries and feature interactions without scaling numeric columns. They are less suitable when a compact, directly interpretable model is required, or when extrapolation beyond the training range matters. A single tree is easier to inspect; boosted trees may perform better on some structured datasets but need their own tuning and validation.
 
-A single decision tree grown to full depth is an unstable model: change a few rows and the tree changes shape fully. A random forest turns that instability into an advantage by growing hundreds of trees and averaging their votes &mdash; but just if the trees make <em>other</em> mistakes. Two identical trees average to one tree.
+## Sources and next steps
 
-So the forest injects randomness twice.
-
-<strong>Bagging (bootstrap aggregating).</strong> Each tree is trained on a random sample of the rows, drawn with replacement and the same size as the first dataset. Since of the replacement, each sample holds about 63% of the unique rows, some of them a few times. And leaves about 37% out.
-
-<strong>Random feature subsets.</strong> At each split, the tree may just consider a random subset of the features &mdash; often the square root of the total for classification. This is the step that separates a random forest from plain bagging. And it matters more than it sounds. Without it, if one feature is highly predictive, each tree splits on it first and the trees end up nearly identical. Forcing most trees to look elsewhere gives genuinely diverse trees.
-
-The errors of diverse trees are partly independent. And independent errors cancel when averaged. That is the whole mechanism.
-
-## Out-of-bag scoring: free validation
-
-The 37% of rows left out of each tree's bootstrap sample have a use. For any given row, roughly a third of the trees never saw it. So those trees can predict it as if it were test data.
-
-Aggregate that across all rows and you get an <strong>out-of-bag score</strong> &mdash; an honest estimate of generalisation performance, computed in training, with no split validation set and no extra fitting.
-
-```python
-from sklearn.ensemble import RandomForestClassifier
-
-forest = RandomForestClassifier(
-    n_estimators=500,        # more trees never hurts accuracy, only time
-    max_features="sqrt",     # the diversity knob
-    min_samples_leaf=1,      # raise it on noisy data
-    oob_score=True,          # free validation estimate
-    n_jobs=-1,               # trees are independent: use every core
-    random_state=0,
-)
-forest.fit(X_train, y_train)
-print(forest.oob_score_)
-```
-
-It is not a full replacement for cross-validation &mdash; it is set to bagged models and can be a noisy estimate, since each prediction uses just a third of the forest &mdash; but for a quick, honest count in development it is hard to beat.
-
-## Why more trees never overfits
-
-This surprises people who have internalised "more complexity means overfitting". So it is worth stating precisely.
-
-Adding trees to a random forest does not increase the risk of overfitting. Each tree is trained independently on its own bootstrap sample. And averaging more independent estimates reduces variance and then flattens out. Going from 100 to 1,000 trees costs ten times the compute and changes accuracy by a fraction of a percent. But it does not make the model worse.
-
-What <em>can</em> overfit is each individual tree. It is why `min_samples_leaf` and `max_depth` still matter on noisy data. And boosting behaves in the opposite way: there, more trees absolutely can overfit, since each new tree is fitted to the last ones' errors.
-
-The real implication: pick `n_estimators` from your compute budget, not from a validation curve. 100 for iteration, 500 or more for a final model.
-
-## Where the improvement really comes from
-
-A forest beats one tree by averaging away variance, not bias. This measures both halves so you can see which one it fixed.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, BaggingClassifier
-from sklearn.model_selection import train_test_split, cross_val_score
-
-X, y = make_classification(n_samples=2500, n_features=20, n_informative=6,
-                           flip_y=0.12, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
-
-print("one tree, refit on six different bootstrap resamples of the same data:")
-rng = np.random.default_rng(0)
-preds = []
-for i in range(6):
-    idx = rng.integers(0, len(Xtr), len(Xtr))
-    t = DecisionTreeClassifier(random_state=0).fit(Xtr[idx], ytr[idx])
-    preds.append(t.predict(Xte))
-    print("   resample %d: accuracy %.4f" % (i, (preds[-1] == yte).mean()))
-preds = np.array(preds)
-disagree = (preds != preds[0]).any(axis=0).sum()
-print("  the six trees disagree with each other on %d of %d test rows."
-      % (disagree, len(yte)))
-print("  that instability IS the variance a forest removes.")
-print()
-
-for name, model in (
-    ("one tree",                DecisionTreeClassifier(random_state=0)),
-    ("bagging, 200 trees",      BaggingClassifier(DecisionTreeClassifier(),
-                                                  n_estimators=200, random_state=0)),
-    ("random forest, 200",      RandomForestClassifier(n_estimators=200, random_state=0)),
-):
-    s = cross_val_score(model, X, y, cv=5)
-    print("%-24s cv %.4f  (folds sd %.4f)" % (name, s.mean(), s.std()))
-print()
-print("bagging alone gets most of it. the extra step a forest adds is picking")
-print("a random subset of features at each split, which makes the trees less")
-print("similar to each other -- and averaging helps more the less they agree.")
-```
-
-The max_features parameter controls how much diversity the forest has.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_val_score
-
-X, y = make_classification(n_samples=2500, n_features=20, n_informative=6,
-                           flip_y=0.12, random_state=0)
-
-print("max_features is that knob:")
-for mf in (1, 2, 4, 8, 20):
-    s = cross_val_score(RandomForestClassifier(n_estimators=200, max_features=mf,
-                                               random_state=0), X, y, cv=5)
-    print("  max_features=%2d  cv %.4f" % (mf, s.mean()))
-print("  max_features=20 is every feature, which is plain bagging.")
-print()
-print("more trees never hurts, it just stops helping:")
-for k in (5, 25, 100, 400):
-    s = cross_val_score(RandomForestClassifier(n_estimators=k, random_state=0),
-                        X, y, cv=5)
-    print("  %3d trees  cv %.4f" % (k, s.mean()))
-print()
-print("that is the useful property: n_estimators is not a thing you tune for")
-print("overfitting. you raise it until the score flattens, then stop paying.")
-```
-
-## Experiments to try
-
-1. <strong>Start with the problem.</strong> Set the <strong>number of Trees</strong> slider to 1. The edge is a jagged staircase with isolated islands carved around individual mislabelled points. Train accuracy is near perfect and test accuracy is not &mdash; and pressing <strong>Regrow Forest</strong> four or five times swings test accuracy by a few points. Watch Accuracy Spread: that swing is the variance bagging exists to remove.
-2. <strong>Add trees and watch it settle.</strong> Set the <strong>number of Trees</strong> slider to 40. The islands dissolve, test accuracy climbs. And Accuracy Spread collapses to a point or two &mdash; without any single tree having improved.
-3. <strong>Confirm nothing was tuned away.</strong> Check Forest Test Accuracy against Avg Single Tree. The individual trees are no better than before. The gain comes from averaging predictions across the forest.
-4. <strong>Take away one source of diversity.</strong> Untick <strong>Feature Subsampling</strong> and watch Gain from Voting shrink and Trees Disagreeing fall. Each tree may now consider both features at each split. So they reach for the same ones and their mistakes start to coincide. The gain does not vanish fully, since bootstrapping still hands each tree another sample &mdash; that is the gap between bagged trees and a random forest, measured.
-5. <strong>Cripple the trees instead.</strong> Set the <strong>Max Depth</strong> slider to 1. Each tree is now a single split &mdash; a stump &mdash; and no amount of voting fixes it. Bagging reduces variance, not bias.
-6. <strong>Turn up the noise.</strong> Set the <strong>Label Noise</strong> slider to 0.3, then check one tree against forty. The gap between them widens: the more noise there is to memorise, the more averaging is worth.
-
-## Why it does not overfit with more trees
-
-This surprises people: adding trees to a random forest does not cause overfitting. More trees means a more precise estimate of the same average. And the curve flattens rather than turning back up. Past a few hundred trees you are spending compute for no gain. But you are not doing damage.
-
-What <em>does</em> overfit is depth, along with letting tiny leaves. Those control how much each individual tree can memorise. And they are the knobs worth tuning.
-
-## Out-of-bag error, free of charge
-
-Each tree leaves out about 37% of the rows in bootstrapping. Those rows are unseen by that tree. So you can test the tree on them &mdash; and averaging that over the forest gives an honest estimate of generalisation error with no split validation split at all. It is one of the few genuinely free lunches in machine learning. And it is why random forests are so convenient on small datasets.
-
-## Where this goes wrong
-
-- <strong>Trusting the default feature importances.</strong> Impurity-based weight is biased toward high-cardinality and continuous features. It can look key simply since they offer more places to split. Prefer permutation weight.
-- <strong>Expecting extrapolation.</strong> A forest predicts by averaging training labels in a region. Outside the range of the training data it returns the nearest thing it saw and flatlines &mdash; it cannot continue a trend the way a linear model can.
-- <strong>Assuming it beats boosting.</strong> On structured tabular data, <a href="gradient_boosting.html" style="color: var(--accent-primary)">gradient boosting</a> often edges it out. Forests win on robustness: they need almost no tuning and are very hard to break.
-- <strong>Ignoring class imbalance.</strong> Majority voting inherits whatever imbalance is in the data. Use class weights or balanced bootstrapping &mdash; see <a href="training_on_label_imbalanced_dataset.html" style="color: var(--accent-primary)">training on imbalanced data</a>.
-
-## Worth remembering
-
-A random forest trains many deep, deliberately diverse trees and lets them vote. It cancels the variance that makes any single deep tree unreliable. The diversity comes from two places &mdash; a bootstrap sample of the rows and a random subset of the features at each split &mdash; and without that diversity extra trees buy nothing. Adding trees never overfits. So depth and leaf size are the parameters that really need care. It is the sensible default when you want a strong model with almost no tuning. And the out-of-bag rows give you an honest error estimate for free.
-
-## Feature weight, and why to distrust the default
-
-Random forests hand you an weight score per feature. And it is one of the most-used and most-misread outputs in machine learning.
-
-The default &mdash; mean decrease in impurity &mdash; adds up how much each feature reduced impurity across all splits. It is computed for free in training. And it has two well-documented biases: it inflates high-cardinality features (a column with many distinct values gets more opportunities to look useful) and it splits credit arbitrarily between correlated features (two near-duplicate columns each get about half the weight, making both look unimportant).
-
-<strong>Permutation weight</strong> is the more trustworthy measure. Shuffle one column in the validation set, re-score. And see how much performance drops. If it drops a lot, that column mattered. It costs one extra scoring pass per feature and is computed on held-out data. It is just what you want.
-
-```python
-from sklearn.inspection import permutation_importance
-
-r = permutation_importance(forest, X_val, y_val, n_repeats=10, random_state=0)
-for i in r.importances_mean.argsort()[::-1][:10]:
-    print(f"{feature_names[i]:<25} {r.importances_mean[i]:.4f}")
-```
-
-For per-prediction explanations rather than global ones, SHAP values are the standard tool. And they handle correlated features more sensibly than either way above.
-
-## Forest or boosting?
-
-|&nbsp;|Random forest|Gradient boosting|
-|---|---|---|
-|Trees are built|Independently, in parallel|Sequentially, each fixing the last|
-|Tree depth|Deep, fully grown|Shallow, 3&ndash;8 levels|
-|More trees|Safe|Can overfit|
-|Tuning required|Very little|Considerable|
-|Noisy labels|Handles them well|More easily misled|
-|Typical accuracy|Very good|Usually a bit better|
-|Training speed|Fast, parallel|Slower, sequential|
-
-The pragmatic reading: reach for a random forest when you want a strong result with almost no tuning, when your labels are noisy. Or when you need to train quickly across many cores. Reach for boosting when you are chasing the last few points of accuracy and can afford to tune.
-
-## Questions people ask
-
-<strong>How many trees do I need?</strong> Start at 100, use 500 for anything final. Watch the out-of-bag score flatten &mdash; past that point you are just spending time.
-
-<strong>Does it need feature scaling?</strong> No. Trees check against thresholds; units are irrelevant.
-
-<strong>Can it handle missing values?</strong> Scikit-learn's build cannot &mdash; impute first. Some other implementations handle them natively.
-
-<strong>Does it work for regression?</strong> Yes. Each leaf predicts the mean of its rows. And the forest averages the trees. Note that it cannot predict outside the range of the training targets.
-
-<strong>Why is my forest slow to predict?</strong> Five hundred deep trees is a lot of memory traversal. Reduce `n_estimators`, cap `max_depth`. Or raise `min_samples_leaf` &mdash; all three shrink the model with modest accuracy cost.
-
-<strong>Is it interpretable?</strong> Individually no, structurally yes. You lose the readable rule path of a single tree but gain reliable weight rankings and, with SHAP, per-prediction explanations.
-
-## Recap in one screen
-
-- Many deep trees, each on a bootstrap sample, each choosing splits from a random feature subset.
-- Diversity is the point: independent errors cancel when averaged.
-- More trees is safe &mdash; it reduces variance and then plateaus.
-- Out-of-bag scoring gives a free, honest performance estimate.
-- Prefer permutation weight to the built-in impurity weight.
-- Excellent defaults, minimal tuning, and hard to break.
-
-## Further reading
-
-For implementation details, see the [Random forests and ensemble methods](https://scikit-learn.org/stable/modules/ensemble.html). Continue with [decision trees](decision_tree.html) to connect this topic to a related part of the workflow.
+See scikit-learn’s [random forest documentation](https://scikit-learn.org/stable/modules/ensemble.html#forest) for parameters and out-of-bag scoring. Continue with [decision trees](decision_tree.html) to see the base learner, or [cross-validation](cross_validation.html) to compare models across splits.

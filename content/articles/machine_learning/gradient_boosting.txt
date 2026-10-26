@@ -3,237 +3,49 @@ intro: Gradient boosting builds an ensemble sequentially, with each new tree cor
 
 ## Quick Context
 
-A <a href="random_forest.html" style="color: var(--accent-primary)">random forest</a> builds many strong trees independently and averages away their variance. Boosting does close to the opposite: it builds many <em>deliberately weak</em> trees in sequence, each one aimed squarely at the mistakes the previous ones left behind.
 
-Nothing here votes. The trees are added together, and each new tree is a correction rather than an opinion.
 
-The loop is simple: start with a constant prediction (the mean), compute the residuals (how far off), fit a small tree to those residuals, add a fraction (the learning rate) of that tree's predictions to the running total, and repeat. Each tree is shallow — typically 3 to 8 levels — because the goal is a small correction, not a complete model. The ensemble of hundreds of these weak corrections converges to an accurate predictor.
+Gradient boosting builds an ensemble sequentially: each new, usually shallow tree is fitted to reduce the current model’s loss. This can produce strong predictions, but learning rate, tree count, and depth must be tuned together to manage overfitting and training cost.
 
-The learning rate controls how much each tree contributes. A small learning rate (0.01–0.1) means each tree's correction is modest, so more trees are needed but the final model generalises better. A large learning rate means fewer trees but a higher risk of overfitting. The standard practice is to use a small learning rate and let early stopping decide when to stop adding trees — monitor the validation loss and stop when it stops improving.
-
-Gradient boosting dominates tabular data competitions. XGBoost, LightGBM and CatBoost are the three major implementations, and all three add regularisation, efficient tree-building algorithms, and support for categorical features. On structured data with mixed feature types, gradient boosting consistently outperforms neural networks unless the dataset is very large and the features are very high-dimensional.
-
-The name "gradient" comes from the fact that the residuals are the negative gradient of the loss function with respect to the predictions. Fitting a tree to the residuals is equivalent to taking a step in function space in the direction of steepest descent — the same idea as gradient descent, but in the space of functions rather than the space of parameters.
-
-## The loop
+## The sequential fit
 
 1. Start with a constant prediction &mdash; the mean of the target. It is a bad model, but it is a start.
 2. Compute the <strong>residual</strong> for every training point: how far off the current prediction is.
-3. Fit a small tree <em>to those residuals</em>, not to the original labels.
-4. Add a fraction of that tree's predictions to the running total. The fraction is the learning rate.
+3. Fit a small tree to the residuals.
+4. Add a fraction of that tree's predictions to the current model. The fraction is the learning rate.
 5. Repeat.
 
+This residual description is exact for squared-error regression, which the visualizer demonstrates. More generally, gradient boosting fits each new learner to the negative gradient of the chosen loss, so the target depends on the loss function.
+
 The residual panel above is step 2 made visible. Watch it after each tree: the bars shrink, and where they are still tall is exactly where the next tree will spend its capacity.
-
-## Why "gradient"
-
-For squared-error loss, the negative gradient of the loss with respect to the prediction <em>is</em> the residual. So fitting a tree to the residuals is the same as taking a gradient descent step in function space &mdash; each tree is one step downhill, and the learning rate is the step size, exactly as in <a href="../deep_learning/gradient_descent_training.html" style="color: var(--accent-primary)">ordinary gradient descent</a>.
-
-That framing is what makes the method general. Swap in a different loss and the "residual" becomes that loss's negative gradient instead, which is how the same algorithm can handle classification, ranking, and other objectives without changing shape.
-
-## The exam-revision analogy
-
-Boosting is what a sensible student does with a mock exam.
-
-You sit the paper and get 60%. You do not then revise everything again from page one &mdash; you look at what you got wrong and study that. Sit another paper, look at the new mistakes, study those. Each round of revision is small and targeted at whatever is still failing.
-
-Gradient boosting does exactly this with models. The first tree makes a crude prediction. The second tree is not trained on the original target at all &mdash; it is trained on the <em>errors</em> the first tree made. The third is trained on the errors that remain after the first two. Add them all up and you have a prediction that has been corrected hundreds of times.
-
-The trees stay deliberately weak &mdash; often just three to six levels deep. A weak learner cannot overreact to one round's mistakes, and with a small learning rate each correction is only partly applied. Hundreds of small, cautious corrections turn out to beat a handful of confident ones, on almost every tabular dataset anyone has tried.
-
-## Three rounds with numbers
-
-Predict house prices from a single starting guess. Suppose the average price is 300 (thousand), so the model starts by predicting 300 for everybody.
-
-|Row|Actual|Prediction after round 0|Residual to learn|
-|---|---|---|---|
-|A|250|300|&minus;50|
-|B|420|300|+120|
-|C|310|300|+10|
-
-Tree 1 is fitted to the residual column, not the price column. Suppose it learns "small houses &minus;40, large houses +90". With a learning rate of 0.1, only a tenth of that correction is applied:
-
-|Row|Prediction after round 1|New residual|
-|---|---|---|
-|A|300 + 0.1&times;(&minus;40) = 296|&minus;46|
-|B|300 + 0.1&times;(+90) = 309|+111|
-|C|300 + 0.1&times;(&minus;40) = 296|+14|
-
-Barely moved &mdash; and that is the design. Tree 2 now fits the new residual column, tree 3 fits what is left after that, and so on for several hundred rounds. Each tree sees a target that is what the ensemble still gets wrong, so the errors shrink gradually and no single tree gets to dominate.
-
-Two consequences follow directly. Boosting cannot be parallelised across trees, because tree n needs the residuals from tree n&minus;1. And adding trees often continues to reduce training loss, which is why the stopping rule matters more here than in any other common model.
-
-## The four settings that matter
-
-|Setting|What it does|Sensible range|
-|---|---|---|
-|`learning_rate`|How much of each tree's correction to apply|0.01&ndash;0.1|
-|`n_estimators`|How many trees|300&ndash;3000, with early stopping|
-|`max_depth`|How complex each tree may be|3&ndash;8|
-|`subsample`|Fraction of rows each tree sees|0.7&ndash;1.0|
-
-The first two are one knob wearing two labels: halve the learning rate and you need roughly twice the trees for the same fit. The practical recipe is to fix a small learning rate, set a generous number of trees, and let <strong>early stopping</strong> on a validation set decide when to quit.
-
-```python
-from sklearn.ensemble import HistGradientBoostingClassifier
-
-model = HistGradientBoostingClassifier(
-    learning_rate=0.05,
-    max_iter=2000,             # an upper bound, not a target
-    max_depth=6,
-    early_stopping=True,       # stop when validation stops improving
-    n_iter_no_change=50,       # patience
-    validation_fraction=0.1,
-)
-model.fit(X_train, y_train)
-print(model.n_iter_)           # how many rounds it actually used
-```
-
-`subsample` below 1.0 turns this into <em>stochastic</em> gradient boosting: each tree sees a random fraction of the rows, which adds a useful dose of randomness and often improves generalisation as well as speed.
 
 ## Exploration guide
 
 1. <strong>Watch it build.</strong> Press <strong>Reset to Zero Trees</strong>, then click <strong>Add One Tree</strong> a few times. Each stump adds a single step to the prediction and flattens one part of the residual plot. After three or four trees the shape of the underlying curve is already visible.
 2. <strong>Let it run.</strong> Click <strong>Add Trees One by One</strong> and watch the step function converge on the true curve while both error curves fall.
-3. <strong>Turn the rate up.</strong> Set the <strong>Learning Rate</strong> slider to 1. The fit lurches at the data and reaches its best around round 20 rather than round 80 &mdash; then stops improving and drifts slightly worse. With stumps the damage is mild; combine a rate of 1 with a <strong>Tree Depth</strong> of 4 and the model is overfitting from the very first round.
-4. <strong>Turn it down.</strong> Set the <strong>Learning Rate</strong> slider to 0.02. Progress is slow and the model needs far more trees, but the final predictions change more gradually and the test curve stays flat rather than turning up. This is the trade every boosting library is tuned around.
-5. <strong>Make the trees too strong.</strong> Set the <strong>Tree Depth</strong> slider to 5 with 120 trees. Deep trees fit the noise directly and test error rises sharply while train error keeps falling. Boosting wants weak learners.
-6. <strong>Remove the noise.</strong> Set the <strong>Noise</strong> slider to 0. Now more trees never hurt &mdash; there is nothing to memorise. Boosting overfits noise, not complexity as such.
 
 ## Boosting versus bagging
 
-<table> <tr><th></th><th>Random Forest</th><th>Gradient Boosting</th></tr> <tr><td>Trees are built</td><td>independently, in parallel</td><td>in sequence, each on the last one's errors</td></tr> <tr><td>Individual trees are</td><td>deep and strong</td><td>shallow and weak</td></tr> <tr><td>Combined by</td><td>voting or averaging</td><td>addition</td></tr> <tr><td>Attacks</td><td>variance</td><td>bias</td></tr> <tr><td>More trees</td><td>never hurts</td><td>eventually overfits</td></tr> <tr><td>Tuning</td><td>forgiving</td><td>needs care</td></tr> </table>
+<table> <tr><th></th><th>Random Forest</th><th>Gradient Boosting</th></tr> <tr><td>Trees are built</td><td>independently, so training can be parallelized</td><td>in sequence, each depending on the current ensemble</td></tr> <tr><td>Typical trees</td><td>often deeper</td><td>often shallow</td></tr> <tr><td>Combined by</td><td>averaging or voting</td><td>adding each learner’s contribution</td></tr> <tr><td>Main effect</td><td>often reduces variance</td><td>can reduce bias and variance</td></tr> <tr><td>Tuning</td><td>usually forgiving</td><td>learning rate, depth, and tree count interact</td></tr> </table>
 
-That last row is the honest trade. Boosting usually wins on tabular data, and it will happily overfit if you let it. A forest is much harder to get wrong.
+Both can perform well on tabular data. A random forest is a useful baseline; boosting may improve the fit but generally needs careful validation and tuning.
 
 ## The learning rate and tree count are one knob
 
-Halving the learning rate roughly doubles the number of trees you need to reach the same fit. Because of this they should never be tuned independently: the usual recipe is to fix a small learning rate (0.05 or 0.1), then add trees until held-out error stops improving, and stop there. That early stop is the main regulariser in practice, which is why every serious implementation has it built in.
+Reducing the learning rate often requires more trees to reach a similar training fit, but the trade-off is not exact. Tune learning rate and tree count together using validation data or early stopping; choose tree depth and other regularization settings for the task rather than relying on a universal value.
 
 ## Traps worth knowing
 
 - <strong>Judging by training error.</strong> It falls in effect forever. If you are not watching a validation curve you have no signal at all about when to stop.
-- <strong>Deep trees.</strong> Depth 3 to 6 is the normal range. Going deeper turns each correction into a memorisation step and the ensemble overfits within a few dozen rounds.
+- <strong>Deep trees.</strong> Greater depth lets each learner fit more interactions and can overfit. Choose depth using validation data.
 - <strong>Expecting parallel training.</strong> Tree <em>n</em> cannot start until tree <em>n</em>&minus;1 has finished, by construction. Libraries parallelise the work inside a single tree, not across trees, so boosting is slower to train than a forest of the same size.
 - <strong>Ignoring outliers under squared error.</strong> Residuals from a wild point stay large and every subsequent tree keeps chasing them. Huber or absolute-error losses exist for exactly this.
 
-## What to remember
-
-Gradient boosting fits each new small tree to the residuals left by everything built so far, then adds a fraction of it to the running prediction &mdash; which is gradient descent performed in function space, with the learning rate as the step size. Because it attacks bias by sequential correction rather than variance by averaging, its trees must be weak and the number of boosting rounds must be controlled, and unlike a random forest it will overfit if you keep going. Fix a small learning rate, add trees while held-out error improves, and stop the moment it does not.
-
-## XGBoost, LightGBM and CatBoost
-
-The idea is one thing; the implementations are another, and in practice you will use one of three.
-
-- <strong>XGBoost</strong> &mdash; the one that made boosting famous by winning competitions. Adds explicit L1 and L2 regularisation on leaf weights and a well-engineered handling of missing values, where each split learns a default direction for absent values.
-- <strong>LightGBM</strong> &mdash; the fastest on large data. It grows trees leaf-wise (always splitting the leaf that reduces loss most) rather than level by level, and bins continuous features into histograms. Usually the best choice above a few hundred thousand rows, but leaf-wise growth overfits small datasets unless you cap `num_leaves`.
-- <strong>CatBoost</strong> &mdash; the one to reach for with many categorical columns. It encodes them with target statistics computed in a way that avoids leaking the target, and its defaults are unusually good, so it often wins with no tuning at all.
-
-Scikit-learn's own `HistGradientBoostingClassifier` is a LightGBM-style implementation with no extra dependency, and is a perfectly good default for a first pass.
-
 ## When to use it, and when not to
 
-Gradient boosting is the strongest general-purpose model for tabular data &mdash; rows and columns, mixed types, tens to millions of rows. If your data lives in a spreadsheet or a database table, this is the family to try first and probably to ship.
+Gradient boosting is a strong candidate for tabular data, but it is not best for every dataset. Compare it with a simple baseline and other suitable models using a validation design that reflects deployment.
 
-It is the wrong tool for images, audio and raw text, where neural networks capture structure that trees cannot. It is a poor fit when you need a model a regulator can read, since "the sum of 800 trees" is not an explanation without extra tooling like SHAP. It struggles to extrapolate beyond the range of the training data, as all tree models do. And it is more sensitive to noisy labels than a random forest is, precisely because it keeps focusing effort on the examples it gets wrong &mdash; and a mislabelled row is an example it will always get wrong.
-
-## Build a booster out of three stumps
-
-Boosting fits each new model to the errors the previous ones left. Doing that by hand for three rounds shows there is no magic in the loop.
-
-```python-run
-import numpy as np
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-
-rng = np.random.default_rng(0)
-X = rng.uniform(0, 6, 400).reshape(-1, 1)
-y = np.sin(1.4 * X.ravel()) + 0.3 * X.ravel() + rng.normal(0, 0.25, 400)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
-
-print("boosting by hand: start at the mean, then fit the leftovers.")
-lr = 0.5
-pred_tr = np.full(len(ytr), ytr.mean())
-pred_te = np.full(len(yte), ytr.mean())
-print("  round 0 (just the mean): train MSE %.4f  test MSE %.4f"
-      % (mean_squared_error(ytr, pred_tr), mean_squared_error(yte, pred_te)))
-for r in range(1, 4):
-    residual = ytr - pred_tr                    # what we still get wrong
-    stump = DecisionTreeRegressor(max_depth=2).fit(Xtr, residual)
-    pred_tr = pred_tr + lr * stump.predict(Xtr)
-    pred_te = pred_te + lr * stump.predict(Xte)
-    print("  round %d: fit a stump to the residuals -> train %.4f  test %.4f"
-          % (r, mean_squared_error(ytr, pred_tr), mean_squared_error(yte, pred_te)))
-print()
-print("each stump only ever sees what is left over. that is the whole idea.")
-```
-
-Now the same data through scikit-learn's GradientBoostingRegressor, showing how tree count and learning rate trade off.
-
-```python-run
-import numpy as np
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-
-rng = np.random.default_rng(0)
-X = rng.uniform(0, 6, 400).reshape(-1, 1)
-y = np.sin(1.4 * X.ravel()) + 0.3 * X.ravel() + rng.normal(0, 0.25, 400)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
-
-print("scikit-learn's version, over more rounds:")
-print("%10s %12s %12s" % ("estimators", "train MSE", "test MSE"))
-for k in (1, 3, 10, 50, 200, 800):
-    m = GradientBoostingRegressor(n_estimators=k, learning_rate=0.1,
-                                  max_depth=3, random_state=0).fit(Xtr, ytr)
-    print("%10d %12.4f %12.4f"
-          % (k, mean_squared_error(ytr, m.predict(Xtr)),
-             mean_squared_error(yte, m.predict(Xte))))
-print()
-print("watch the two columns separate. unlike a forest, MORE ROUNDS CAN")
-print("OVERFIT -- n_estimators is a real hyperparameter here, not a budget.")
-print()
-
-print("the learning rate, at a fixed 300 rounds:")
-print("%8s %12s %12s" % ("lr", "train MSE", "test MSE"))
-for lr_ in (0.001, 0.01, 0.05, 0.2, 0.5, 1.0):
-    m = GradientBoostingRegressor(n_estimators=300, learning_rate=lr_,
-                                  max_depth=3, random_state=0).fit(Xtr, ytr)
-    print("%8.3f %12.4f %12.4f"
-          % (lr_, mean_squared_error(ytr, m.predict(Xtr)),
-             mean_squared_error(yte, m.predict(Xte))))
-print()
-
-rf = RandomForestRegressor(n_estimators=300, random_state=0).fit(Xtr, ytr)
-gb = GradientBoostingRegressor(n_estimators=300, learning_rate=0.05,
-                               max_depth=3, random_state=0).fit(Xtr, ytr)
-print("forest vs booster on the same data:")
-print("  random forest    test MSE %.4f" % mean_squared_error(yte, rf.predict(Xte)))
-print("  gradient boosting test MSE %.4f" % mean_squared_error(yte, gb.predict(Xte)))
-```
-
-## Questions people ask
-
-<strong>How is this different from a random forest?</strong> A forest builds hundreds of deep trees independently on random samples and averages them, which reduces variance. Boosting builds shallow trees sequentially, each fixing the last one's errors, which reduces bias. Forests are harder to break; boosting reaches higher.
-
-<strong>Does it need feature scaling?</strong> No. Trees split on thresholds, so units are irrelevant.
-
-<strong>How do I stop it overfitting?</strong> Early stopping first, then a lower learning rate, shallower trees, `subsample` below 1, and the L1/L2 penalties the library offers. Watch the validation curve: the point where validation loss turns up while training loss keeps falling is the moment to stop.
-
-<strong>Why is my model worse after adding more trees?</strong> Because past the optimum, additional trees are fitting noise. This is normal and is exactly what early stopping is for.
-
-<strong>Can it do multi-class classification?</strong> Yes &mdash; typically by fitting one set of trees per class and taking a softmax over their outputs, which is why training time scales with the number of classes.
-
-<strong>Is it good with missing values?</strong> Unusually good. XGBoost and LightGBM learn which way to send missing values at each split, so imputing beforehand is often unnecessary and occasionally harmful.
-
-## Recap in one screen
-
-- Each tree is trained on what the ensemble still gets wrong, and only a fraction of its correction is applied.
-- Learning rate and number of trees are one knob: small rate, many trees, early stopping.
-- Keep trees shallow. The strength comes from the sequence, not from any single tree.
-- Best-in-class for tabular data; not for images, text or hard interpretability requirements.
-- More trees is not better past the validation minimum &mdash; it is memorisation.
+It is usually not the first choice for raw images, audio, or text, where specialized representations are important. Tree ensembles are also hard to interpret directly and do not extrapolate smoothly beyond observed feature ranges. Explainability tools can help inspect predictions, but they do not turn feature attribution into causal evidence.
 
 ## Further reading
 

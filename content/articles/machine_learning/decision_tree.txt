@@ -1,223 +1,35 @@
-title: Building a Decision Tree (ID3)
-intro: A decision tree predicts by applying a sequence of feature-based rules. Its paths are easy to inspect, but deep trees can overfit and change sharply with the data.
+title: Decision Trees
+intro: A decision tree predicts by applying feature-based rules from a root to a leaf. The path is easy to inspect, but a deep tree can fit noise and change sharply when the data changes.
 
-## How a tree learns to ask the right questions
+## How the tree makes predictions
 
-A <strong>Decision Tree</strong> is one of the most intuitive and interpretable models in machine learning. It makes predictions by learning a series of simple "if-then-else" rules from the data, forming a tree-like structure. This lab visualizes the <strong>ID3 (Iterative Dichotomiser 3)</strong> algorithm. It builds the tree by asking one simple question at each step: "Which feature gives me the most information to help classify my data?" At each node the algorithm tries each feature, measures how much each split reduces the uncertainty in the labels (information gain). And picks the one that reduces it the most. It then recurses on the resulting subsets until each leaf is pure or a stopping condition is met. The measure of uncertainty is entropy &mdash; a 50/50 split has max entropy (1 bit), a pure group has zero. Information gain is the parent's entropy minus the weighted average of the children's entropies. So a perfect split that puts all positives in one child and all negatives in the other scores the highest. ID3 handles categorical features natively. The closely tied C4.5 and CART algorithms extend the idea to continuous features and to regression. This page lets you step through the algorithm one split at a time, shows the entropy and gain math at each node. And animates the tree growing as each feature is chosen.
+A decision tree predicts by following feature questions from a root to a leaf; a leaf stores a class or numeric prediction. The example on this page uses categorical splits and information gain, while other tree learners can use different criteria.
 
-## The Core Idea: Boosting Information Gain
+## How a split is chosen
 
-The goal of the ID3 algorithm is to build a tree that separates the data into pure groups (i.e., groups holding just a single class) as well as possible. It does this by choosing the best feature to split on at each node. The "best" feature is the one that results in the most major reduction in uncertainty, a concept measured by <strong>Information Gain</strong>.
+The tree looks for a feature question that makes the resulting groups less mixed. For binary classes with positive fraction p, entropy is:
 
-<h4 class="font-bold" style="color: var(--text-main);">Entropy: A Measure of Impurity</h4>
+<p><strong>H(p) = −p log₂(p) − (1 − p) log₂(1 − p)</strong></p>
 
-First, we measure the "impurity" or "randomness" of a set of data with a metric called <strong>Entropy</strong>. A dataset with a perfect mix of all classes (e.g., 50% 'Yes', 50% 'No') has the highest entropy (max uncertainty). A dataset with just one class (e.g., 100% 'Yes') has zero entropy (perfect certainty). <h4 class="font-bold" style="color: var(--text-main);">Information Gain: The Reduction in Entropy</h4>
+Entropy is 0 when a group contains one class only and 1 bit when the classes are evenly mixed. Information gain is the parent’s entropy minus the size-weighted average entropy of its child groups. The tree picks the split with the greatest gain, then repeats the process in each child until a stopping rule applies.
 
-For each feature, the algorithm calculates what the entropy <em>would be</em> after splitting the data based on that feature's values. <strong>Information Gain</strong> is simply the initial entropy minus the weighted average entropy after the split. The feature with the highest information gain is chosen for the split since it does the best job of creating purer, more organized subgroups.
+For example, start with 10 cases: five Yes and five No, so entropy is 1 bit. Suppose a “sunny?” question makes one child with four Yes cases and no No cases (entropy 0), and a second child with one Yes and five No (entropy about 0.65). The weighted child entropy is 0.4 × 0 + 0.6 × 0.65 = 0.39 bits. The split gains about 1 − 0.39 = 0.61 bits.
 
-## The twenty questions analogy
+This page uses information gain and categorical features. Other tree implementations may use Gini impurity or continuous thresholds; check the estimator’s splitting rules before assuming every tree grows the same way.
 
-A decision tree is the game of twenty questions, learned from data instead of played by instinct.
+## Follow the split in the visualiser
 
-Each internal node asks one question about one feature &mdash; "is income above &pound;40,000?", "is the weather sunny?" &mdash; and each answer sends you down a branch. Keep answering until you reach a leaf. And the leaf holds the prediction: a class for classification, an average value for regression.
+1. At the root, compare the displayed information gain for the available features. **Best Split** selects the feature with the largest gain.
+2. After splitting on Outlook, select the **Overcast** child. Its examples all have the same Play label, so it is a pure leaf and needs no further split.
 
-That is why trees are the model you can show to a non-technical colleague without apologising. The path from root to leaf reads as a sentence: "applicants under 25 with less than two years of credit history and an existing loan were rejected 82% of the time." No other family of models hands you that for free.
+The example shows the rule-building process, not an automatic claim that the chosen tree will generalise. A tree can keep splitting until it memorises its training examples.
 
-The just real question in building one is which feature to ask about first. And the answer is: whichever question separates the classes best. A good first question splits a mixed pile into two much purer piles. A bad one leaves both halves as mixed as the first.
+## When trees are useful
 
-## Measuring "purer", with real counts
+Tree paths are readable as a sequence of decisions, and the model can represent nonlinear boundaries and feature interactions without scaling numeric inputs. A small, pruned tree can be a useful explanation or baseline.
 
-Two measures dominate, and both answer the same question: how mixed is this group?
+The main risk is overfitting. Limit depth, require enough samples per leaf, or prune using validation data. A high information-gain feature is useful for this tree’s split; it does not prove that the feature causes the outcome. Deep trees can also be unstable: a small change in training data may produce a different early split and a different tree. Ensembles such as [random forests](random_forest.html) reduce some of that instability at the cost of a less transparent prediction process.
 
-<strong>Gini impurity</strong> is the chance you would label a randomly chosen item wrongly if you guessed labels at the group's own proportions. For a group that is a fraction p positive:
+## Sources and next steps
 
-<p class="mono-font">Gini = 1 &minus; (p&sup2; + (1&minus;p)&sup2;)</p>
-
-<strong>Entropy</strong> measures the same idea in bits of surprise:
-
-<p class="mono-font">Entropy = &minus;p log&#8322;(p) &minus; (1&minus;p) log&#8322;(1&minus;p)</p>
-
-Both are 0 for a pure group and highest for a 50/50 group &mdash; 0.5 for Gini, 1.0 bit for entropy.
-
-Work one split through. Start with 10 items: 5 yes, 5 no. Entropy = 1.0 bit, as mixed as it gets. Now split on "is it sunny?":
-
-- <strong>Sunny</strong>: 4 items, 4 yes, 0 no. Entropy = 0.
-- <strong>Not sunny</strong>: 6 items, 1 yes, 5 no. Entropy = &minus;(1/6)log&#8322;(1/6) &minus; (5/6)log&#8322;(5/6) = 0.65 bits.
-
-The weighted entropy after the split is (4/10)&times;0 + (6/10)&times;0.65 = 0.39 bits. The <strong>information gain</strong> is 1.0 &minus; 0.39 = <strong>0.61 bits</strong>. The algorithm computes just this for each feature and each possible threshold. And keeps the winner. Then it repeats on each child. And keeps going until a stopping rule fires.
-
-In practice Gini and entropy pick the same split the vast majority of the time. Gini is marginally cheaper since it has no logarithm. It is why it is scikit-learn's default. This is not a choice worth agonising over.
-
-## Why an unpruned tree always overfits
-
-Left alone, a tree keeps splitting until each leaf is pure. On training data that means 100% accuracy. And on new data it means trouble, since the last few splits were made to accommodate individual rows &mdash; a leaf holding one customer is a rule about that customer, not about customers.
-
-The controls that stop this are the ones worth knowing by name:
-
-- <strong>max_depth</strong> &mdash; how many questions deep the tree may go. The bluntest and most effective control. Depths of 3 to 8 cover most tabular problems.
-- <strong>min_samples_leaf</strong> &mdash; refuse to create a leaf with fewer than this many rows. Setting it to 20 or 50 kills the one-row rules right.
-- <strong>min_samples_split</strong> &mdash; refuse to split a node that is now small.
-- <strong>max_features</strong> &mdash; consider just a random subset of features at each split. Mostly used inside forests.
-- <strong>ccp_alpha</strong> &mdash; cost-complexity pruning. Grow the tree fully, then remove the branches that do not pay for their complexity. Often the cleanest way of all.
-
-There is a second, subtler instability. Change a handful of training rows and the root split can change. It changes all below it. It gives a visibly different tree that does about the same. This high variance is not a bug you can tune away &mdash; it is the reason random forests and gradient boosting exist. And why a single tree is more often a communication tool than a production model.
-
-## How to Use the Interactive Lab
-
-This lab lets you manually build a decision tree step-by-step to understand the ID3 algorithm's logic.
-
-- <strong>The Data:</strong> The table on the left shows the dataset for the now selected node (initially, the whole dataset). The goal is to predict whether to 'Play' based on 'Outlook', 'Temp', 'Humidity', and 'Wind'.
-- <strong>Splitting Actions:</strong> The buttons under "Splitting Actions" correspond to the on hand features you can use to split the current node. Clicking one will show you the Information Gain for that split.
-- <strong>Building the Tree:</strong> When you click a split button (e.g., "Split on Outlook"), the tree in the "Decision Arena" expands. New child nodes are created, each holding the subset of data corresponding to a value of that feature (e.g., 'Sunny', 'Overcast', 'Rain').
-- <strong>Leaf Nodes:</strong> The process stops at a node when all data points in it belong to the same class. This is a "pure" node and turns a <strong>leaf node</strong> (colored green). It makes the final prediction.
-
-## Read the tree it really built
-
-A depth-3 tree printed as the rules it learned, with the impurity drop at each split. Nothing here is a black box.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.tree import DecisionTreeClassifier, export_text
-from sklearn.model_selection import train_test_split
-
-X, y = make_classification(n_samples=2000, n_features=6, n_informative=3,
-                           n_redundant=0, flip_y=0.06, class_sep=1.3,
-                           random_state=0)
-names = ["f%d" % i for i in range(6)]
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
-
-tree = DecisionTreeClassifier(max_depth=3, random_state=0).fit(Xtr, ytr)
-print(export_text(tree, feature_names=names))
-print("test accuracy %.4f" % tree.score(Xte, yte))
-```
-
-Next we verify how the root split was chosen by computing Gini impurity by hand and checking it to what scikit-learn picked.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.model_selection import train_test_split
-
-X, y = make_classification(n_samples=2000, n_features=6, n_informative=3,
-                           n_redundant=0, flip_y=0.06, class_sep=1.3,
-                           random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
-tree = DecisionTreeClassifier(max_depth=3, random_state=0).fit(Xtr, ytr)
-
-def gini(labels):
-    if len(labels) == 0:
-        return 0.0
-    p = np.bincount(labels, minlength=2) / len(labels)
-    return 1 - (p ** 2).sum()
-
-before = gini(ytr)
-print("how it chose the first split -- gini impurity before and after:")
-print("  impurity of the root: %.4f" % before)
-best = None
-for col in range(6):
-    for t in np.percentile(Xtr[:, col], [20, 40, 50, 60, 80]):
-        left, right = ytr[Xtr[:, col] <= t], ytr[Xtr[:, col] > t]
-        after = (len(left) * gini(left) + len(right) * gini(right)) / len(ytr)
-        if best is None or before - after > best[0]:
-            best = (before - after, col, t)
-print("  best split found by brute force: f%d <= %.4f, impurity drop %.4f"
-      % (best[1], best[2], best[0]))
-print("  scikit-learn chose:              f%d <= %.4f"
-      % (tree.tree_.feature[0], tree.tree_.threshold[0]))
-print("  same feature. the thresholds differ because this loop tried five")
-print("  candidate cut points and scikit-learn tries the midpoint between")
-print("  every adjacent pair of values -- the idea is identical, the search")
-print("  is just finer.")
-```
-
-Raising depth trades test accuracy for memorisation. And feature weight is just each feature's total impurity drop across all splits.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.model_selection import train_test_split
-
-X, y = make_classification(n_samples=2000, n_features=6, n_informative=3,
-                           n_redundant=0, flip_y=0.06, class_sep=1.3,
-                           random_state=0)
-names = ["f%d" % i for i in range(6)]
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
-
-print("depth is the whole trade-off:")
-print("%8s %10s %10s %10s" % ("depth", "leaves", "train", "test"))
-for d in (1, 2, 3, 5, 10, None):
-    t = DecisionTreeClassifier(max_depth=d, random_state=0).fit(Xtr, ytr)
-    print("%8s %10d %10.4f %10.4f"
-          % (d, t.get_n_leaves(), t.score(Xtr, ytr), t.score(Xte, yte)))
-print()
-
-tree = DecisionTreeClassifier(max_depth=3, random_state=0).fit(Xtr, ytr)
-print("feature importances are impurity drops added up, weighted by how many")
-print("rows passed through each split:")
-for n, imp in sorted(zip(names, tree.feature_importances_),
-                     key=lambda kv: -kv[1]):
-    print("   %-4s %.4f %s" % (n, imp, "#" * int(imp * 50)))
-print()
-print("note the zeros -- a feature the tree never split on scores 0, even if")
-print("it is genuinely predictive. it just lost every contest to a better one.")
-```
-
-## Experiments to try
-
-Follow these steps to see the algorithm in action.
-
-1. <strong>Find the Best First Split:</strong> Start with the root node selected. Click each of the four split buttons ('Outlook', 'Temp', etc.). Observe the Information Gain value displayed for each. You'll notice that 'Outlook' gives the highest gain. This is the split the ID3 algorithm would choose automatically. Click the <strong>"Best Split"</strong> button to confirm this.
-2. <strong>Follow a Path to a Leaf Node:</strong> After splitting on 'Outlook', the tree has three new nodes. Click on the 'Overcast' node. Look at the data table on the left. You'll see that all four data points in this subset have a 'Play' value of 'Yes'. This is a pure node! The algorithm stops here and creates a leaf node that predicts 'Yes'.
-3. <strong>Do a Recursive Split:</strong> Now, select the 'Sunny' node. The data subset for this node is still impure (it holds both 'Yes' and 'No' values). You can split it again! Check the Information Gain for the left features ('Temp', 'Humidity', 'Wind'). Find the best feature to split the 'Sunny' node and continue the process until all branches end in pure leaf nodes.
-
-## The short of it
-
-- <strong>Greedy Algorithm:</strong> ID3 is a "greedy" algorithm. At each step, it picks the split that looks best at that moment (the one with the highest Information Gain) without looking ahead to see if another choice might lead to a better total tree.
-- <strong>Interpretability is a Superpower:</strong> The final tree structure is easy for humans to read and understand. You can trace the path for any new data point to see just how the model arrived at its prediction.
-- <strong>Foundation for Advanced models:</strong> While simple, decision trees are the building blocks for more powerful ensemble models like Random Forests and Gradient Boosted Trees (like XGBoost).
-- <strong>Overfitting Risk:</strong> If a decision tree is grown too deep, it can perfectly memorize the training data, with its noise. This leads to overfitting. Techniques like pruning or setting a max depth are used to combat this.
-
-## Where trees are used, and where they are not
-
-Trees handle a few things that trip other models up. They need no feature scaling, since a threshold on income does not care whether income is in pounds or thousands of pounds. They cope with a mix of numeric and categorical features. They find interactions on their own &mdash; "young <em>and</em> in London" is just two levels of the same branch. And missing values can be handled by sending them down a default branch rather than being imputed.
-
-What they are bad at is equally set. A smooth linear relationship needs a staircase of many splits to approximate. So a plain line beats a tree on genuinely linear data. They cannot extrapolate at all: a tree trained on houses up to 200 square metres predicts the same value for a 500-square-metre house, since it has no leaf beyond the range it saw. And a single tree's predictions jump in steps rather than moving smoothly.
-
-|Situation|Single tree|Random forest|Gradient boosting|
-|---|---|---|---|
-|You must explain every decision|Best|Hard|Hard|
-|Highest accuracy on tabular data|Weakest|Good|Usually best|
-|Sensitive to noisy labels|Very|Less|More than a forest|
-|Training cost|Trivial|Moderate, parallel|Higher, sequential|
-|Tuning needed|Little|Little|Considerable|
-
-The honest summary: use one tree when a human has to read the model. And an ensemble of trees when a machine has to act on it.
-
-## Questions people ask
-
-<strong>Do decision trees need scaled features?</strong> No. Splits are comparisons on one feature at a time. So units are irrelevant. This is one of the few places you can genuinely skip the scaler.
-
-<strong>Gini or entropy?</strong> Either. They agree on the split almost always. Gini is faster. Spend the effort on depth and leaf size instead.
-
-<strong>How do trees handle categories?</strong> Depends on the library. Scikit-learn expects counts, so you encode first. LightGBM and CatBoost handle categorical columns natively. It is often better since one-hot encoding a high-cardinality column gives many weak, sparse splits.
-
-<strong>Why does feature weight disagree with my intuition?</strong> The built-in weight counts how much each feature reduced impurity. It is biased towards high-cardinality features &mdash; a column with many distinct values gets more chances to look useful. Permutation weight is a fairer measure.
-
-<strong>Can trees do regression?</strong> Yes. All is identical except that the split criterion turns variance reduction (or mean squared error) and each leaf predicts the average of its rows.
-
-<strong>Why did my tree change dramatically after adding ten rows?</strong> That is high-variance behaviour, not a bug. If stability matters, use a forest. Or prune harder so the tree depends on broad patterns rather than fine ones.
-
-## Recap in one screen
-
-- A tree is a chain of yes/no questions ending in a prediction, learned greedily one split at a time.
-- Each split is chosen to make the resulting groups purer, measured by Gini impurity or entropy.
-- Grown without limits it will memorise the training data. So depth, leaf size and pruning are not optional.
-- No scaling needed, handles mixed data types, finds interactions, cannot extrapolate.
-- One tree to explain, an ensemble of trees to predict.
-
-## Further reading
-
-For implementation details, see the [Decision tree guide](https://scikit-learn.org/stable/modules/tree.html). Continue with [random forests](random_forest.html) to connect this topic to a related part of the workflow.
+For scikit-learn’s tree implementation and its splitting criteria, see the official [decision-tree guide](https://scikit-learn.org/stable/modules/tree.html). Continue with [random forests](random_forest.html) to see how many trees are combined.

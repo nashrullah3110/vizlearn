@@ -1,303 +1,32 @@
 title: Topological Sort
-intro: Putting dependencies in a workable order &mdash; and noticing when that is impossible.
+intro: A topological ordering lists the vertices of a directed acyclic graph so every prerequisite appears before the task that depends on it. If the graph has a cycle, no valid ordering exists.
 
-## The problem it solves
+## Dependencies as a directed graph
 
-A <strong>topological sort</strong> orders the vertices of a directed graph so that each edge points forwards. If A must happen before B, A appears earlier. It answers "in what order can I do these dependent tasks?"
+Represent each task as a vertex and draw an edge from a prerequisite to the task that needs it. For example, if A must precede B and A must precede C, both `A, B, C` and `A, C, B` are valid orders. A topological ordering is often not unique.
 
-The answer is not unique. A graph with edges A&rarr;B and A&rarr;C can be ordered A, B, C or A, C, B. Both are valid because both place A before the vertices that depend on it. The algorithm gives one valid order, not the only one.
+The graph must be a DAG: a directed acyclic graph. If A depends on B while B depends on A, each waits for the other, so no ordering can satisfy both.
 
-Topological sort appears wherever dependencies exist. A build system compiles source files in an order that meets their include and import dependencies. A package manager installs libraries so that each dependency is present before the package that needs it. A spreadsheet recalculates cells so that a cell referencing B2 and C3 is updated after both of those cells. A university course planner arranges prerequisites so that no course is taken before the courses it needs.
+## Kahn’s algorithm
 
-Two algorithms give a topological order. Kahn's algorithm maintains a queue of vertices with no incoming edges, removes them one at a time, and decrements the in-degree of their neighbours. When a neighbour's in-degree reaches zero, it joins the queue. The other approach uses depth-first search: visit each vertex, recurse into its neighbours, and prepend the vertex to the result list on the way back out. Both run in O(V + E) time.
+Kahn’s algorithm tracks each vertex’s in-degree, the number of prerequisites still remaining. Add all zero-in-degree vertices to a queue. Repeatedly remove one, append it to the order, and reduce the in-degree of each dependent vertex. Whenever a count reaches zero, that task is ready to be queued.
 
-The algorithm also detects cycles. If Kahn's algorithm finishes and some vertices were never added to the queue, those vertices are part of a cycle. The DFS approach detects cycles by tracking which vertices are now on the recursion stack. A back edge to an in-progress vertex proves a cycle exists. That dual purpose &mdash; sorting when doable, detecting impossibility when not &mdash; makes topological sort the standard tool for dependency resolution.
+Choose **Dependency graph** in the visualizer and compare **Build pipeline** or **Course prerequisites** with **Circular dependency**. In the cyclic case, some nodes remain after the queue empties. Those nodes belong to or depend on a cycle; the incomplete output signals that no full ordering was found.
 
-## It Needs a DAG
+## Worked example
 
-A valid sorting exists <strong>if and only if</strong> the graph is a <em>directed acyclic graph</em>. Directed edges, no cycles. If A depends on B and B depends on A, no order can meet both.
+Suppose the dependencies are `A → C`, `B → C`, and `C → D`. Initially, A and B have in-degree zero. Output A and B in either order; after both edges to C are removed, C becomes ready. Output C, then D. The order preserves every prerequisite edge.
 
-Select <strong>Circular dependency</strong> and run it: the algorithm stalls with nodes left over. That stall <em>is</em> the cycle detection, which is why the same code powers "circular dependency detected" errors in build tools.
+## Cost and common mistakes
 
-## Kahn's algorithm
+With adjacency lists, the algorithm takes <code>O(V + E)</code> time and <code>O(V + E)</code> space for the graph and queue. Each vertex is added and removed once, and each edge is processed once.
 
-Repeatedly take a vertex with no left incoming edges &mdash; nothing left that must come first &mdash; and remove it.
-
-```python
-from collections import deque
-
-def topo_sort(graph, nodes):
-    indegree = {n: 0 for n in nodes}
-    for u in graph:
-        for v in graph[u]:
-            indegree[v] += 1
-
-    queue = deque([n for n in nodes if indegree[n] == 0])
-    order = []
-    while queue:
-        u = queue.popleft()
-        order.append(u)
-        for v in graph.get(u, []):
-            indegree[v] -= 1               # u is done; one fewer prerequisite
-            if indegree[v] == 0:
-                queue.append(v)
-
-    if len(order) != len(nodes):
-        raise ValueError("cycle detected")  # some nodes never reached indegree 0
-    return order
-```
-
-The final check is the cycle detection, and it is elegant. If a cycle exists, each vertex in it always has at least one unremoved parent. So none ever reaches indegree zero and the output is short. No separate cycle search is needed.
-
-O(V + E) time, and the structure is BFS-shaped &mdash; which is why it is easy to reason about and easy to parallelise.
-
-## The Order Is Not Unique
-
-When the ready queue holds more than one node, any of them may go next. Each choice yields a different but equally valid sorting. Watch the queue readout: when it holds a few nodes, that is genuine freedom.
-
-This is why build systems can parallelise: all of it sitting in the ready queue at the same moment has no dependency on the others and can run at once.
-
-## Where You Meet It Daily
-
-- <strong>Build systems</strong> &mdash; compile dependencies before dependents.
-- <strong>Package managers</strong> &mdash; npm, pip and apt install in dependency order and report cycles.
-- <strong>Spreadsheets</strong> &mdash; recalculate cells in formula-dependency order; circular guides are just a detected cycle.
-- <strong>Course planning</strong> &mdash; the prerequisite case in this lab.
-- <strong>Task schedulers and CI pipelines</strong> &mdash; stage sorting.
-
-## Sorting things that depend on each other
-
-A topological sort gives a linear sorting of a directed graph's vertices such that each edge points forwards. If A must happen before B, A appears earlier.
-
-That is the answer to each dependency question: build order, task scheduling, module loading, course prerequisites.
-
-Given dependencies A&rarr;C, B&rarr;C, C&rarr;D, one valid order is A, B, C, D. So is B, A, C, D. <strong>The sorting is not unique</strong>, and any order respecting all the edges is correct &mdash; which matters,. This is because it means two implementations can disagree and both be right.
-
-The requirement is that the graph is a <strong>directed acyclic graph</strong>. A cycle means a circular dependency, and no valid sorting exists &mdash; A before B before C before A is unsatisfiable. Detecting that is part of the algorithm's job.
-
-## DFS with finishing times
-
-The other uses depth-first search: run DFS, and prepend each vertex to the output when it <em>finishes</em> (after all its descendants).
-
-```python
-def topo_sort_dfs(graph, nodes):
-    WHITE, GREY, BLACK = 0, 1, 2
-    colour = {n: WHITE for n in nodes}
-    order = []
-
-    def visit(u):
-        colour[u] = GREY
-        for v in graph.get(u, []):
-            if colour[v] == GREY:
-                raise ValueError("cycle detected")
-            if colour[v] == WHITE:
-                visit(v)
-        colour[u] = BLACK
-        order.append(u)                     # append on finish
-
-    for n in nodes:
-        if colour[n] == WHITE:
-            visit(n)
-    return order[::-1]                      # reverse the finishing order
-```
-
-The reversal is the key insight: a vertex finishes only after all of it it points to has finished. So reversing the finishing sequence puts prerequisites first.
-
-The three-colour scheme detects cycles properly. Meeting a <strong>grey</strong> vertex means an edge back to the current path &mdash; a cycle. Meeting a <strong>black</strong> one means a finished subtree, which is fine. Using a single visited set conflates the two and reports cycles that do not exist.
-
-|&nbsp;|Kahn's|DFS|
-|---|---|---|
-|Structure|Queue, BFS-like|Recursion, DFS|
-|Cycle detection|Output length is short|Grey vertex encountered|
-|Parallelisable|Yes &mdash; all indegree-0 nodes are independent|No|
-|Recursion depth risk|None|Yes, on deep graphs|
-|Lexicographic order|Use a heap instead of a queue|Awkward|
-
-## The order, the ambiguity, and the cycle it has to reject
-
-A topological sort answers "what order can these be done in". And two things about it surprise people. The answer is often not unique. And the algorithm's real job is often detecting that there is no answer at all. Both are visible on a small dependency graph.
-
-```python-run
-from collections import deque
-
-DEPS = {
-    "boil water":   [],
-    "grind beans":  [],
-    "brew":         ["boil water", "grind beans"],
-    "warm cup":     [],
-    "pour":         ["brew", "warm cup"],
-    "drink":        ["pour"],
-}
-
-
-def kahn(deps, tie_break=sorted):
-    indeg = {n: len(d) for n, d in deps.items()}
-    out_edges = {n: [] for n in deps}
-    for node, ds in deps.items():
-        for d in ds:
-            out_edges[d].append(node)
-    ready = tie_break([n for n, k in indeg.items() if k == 0])
-    order = []
-    while ready:
-        node = ready.pop(0)
-        order.append(node)
-        for nxt in out_edges[node]:
-            indeg[nxt] -= 1
-            if indeg[nxt] == 0:
-                ready.append(nxt)
-        ready = tie_break(ready)
-    return order, len(order) == len(deps)
-
-order, ok = kahn(DEPS)
-print("one valid order:")
-for i, step in enumerate(order, 1):
-    print("  %d. %s" % (i, step))
-
-order2, _ = kahn(DEPS, lambda x: sorted(x, reverse=True))
-print()
-print("another valid order:", " | ".join(order2))
-print("same graph, both correct:", order != order2)
-```
-
-A topological sort returns some valid order, not the only one. The guarantee is that each dependency comes before the task needing it. Check it right.
-
-```python-run
-DEPS = {
-    "boil water": [], "grind beans": [],
-    "brew": ["boil water", "grind beans"], "warm cup": [],
-    "pour": ["brew", "warm cup"], "drink": ["pour"],
-}
-order = ["boil water", "grind beans", "warm cup", "brew", "pour", "drink"]
-pos = {n: i for i, n in enumerate(order)}
-violations = [(d, n) for n, ds in DEPS.items() for d in ds if pos[d] > pos[n]]
-print("dependencies that came after the task needing them:", violations)
-```
-
-Both orderings are valid because neither violates a dependency. Now see what happens when a cycle makes a valid sorting not doable.
-
-```python-run
-from collections import deque
-
-DEPS = {
-    "boil water":   ["drink"],       # you must drink before you boil
-    "grind beans":  [],
-    "brew":         ["boil water", "grind beans"],
-    "warm cup":     [],
-    "pour":         ["brew", "warm cup"],
-    "drink":        ["pour"],
-}
-
-
-def kahn(deps):
-    indeg = {n: len(d) for n, d in deps.items()}
-    out_edges = {n: [] for n in deps}
-    for node, ds in deps.items():
-        for d in ds:
-            out_edges[d].append(node)
-    ready = sorted([n for n, k in indeg.items() if k == 0])
-    order = []
-    while ready:
-        node = ready.pop(0)
-        order.append(node)
-        for nxt in out_edges[node]:
-            indeg[nxt] -= 1
-            if indeg[nxt] == 0:
-                ready.append(nxt)
-        ready = sorted(ready)
-    return order, len(order) == len(deps)
-
-
-order, ok = kahn(DEPS)
-print("with a cycle, Kahn's algorithm produced %d of %d tasks" % (
-    len(order), len(DEPS)))
-print("complete?", ok)
-print("stuck on:", sorted(set(DEPS) - set(order)))
-```
-
-## Things to try
-
-1. <strong>Run the build pipeline.</strong> Only in-degree-0 nodes can start. Those with no prerequisites at all.
-2. <strong>Watch in-degrees fall</strong> as each node is output. A node turns ready the moment its count reaches zero.
-3. <strong>Note when the queue holds two or more nodes.</strong> Those tasks are free and could run in parallel.
-4. <strong>Switch to the circular dependency.</strong> The queue empties with nodes still unprocessed. The algorithm has proved no valid order exists.
-5. <strong>Look at the in-degrees of the stuck nodes.</strong> None reaches zero, because each waits on one more inside the cycle.
-
-## Summing up
-
-Topological sort orders a DAG so dependencies always precede dependents, in O(V+E) via in-degree counting. When it cannot output each node, the leftovers form a cycle — making it both a scheduler and a circular-dependency detector.
-
-## Where it is used
-
-- <strong>Build systems.</strong> `make`, Bazel, Gradle and each dependency-aware build tool topologically sorts targets. A circular dependency is reported as an error, and that error is this algorithm's cycle detection.
-- <strong>Package managers.</strong> Installing dependencies before the things that need them.
-- <strong>Task and job scheduling</strong> in workflow engines &mdash; Airflow DAGs are named after the requirement.
-- <strong>Spreadsheet recalculation.</strong> Cells depend on other cells; a circular guide error is a detected cycle.
-- <strong>Compiler passes</strong> and module initialisation order.
-- <strong>Course prerequisites</strong> and curriculum planning.
-- <strong>Store migrations</strong> applied in dependency order.
-- <strong>Dynamic programming on a DAG,</strong> where the topological order is the correct evaluation order.
-
-That last one is worth expanding: on a DAG, handling vertices in topological order guarantees that a vertex's dependencies are now computed. Longest path in a DAG &mdash; NP-hard in a general graph &mdash; turns linear this way.
-
-## Choosing among valid orders
-
-Because many orderings are valid, uses often want a set one.
-
-<strong>Lexicographically smallest.</strong> Replace Kahn's queue with a min-heap, so the smallest available vertex is always taken next. Useful when output must be deterministic and reproducible.
-
-<strong>Maximum parallelism.</strong> Kahn's algorithm naturally gives <em>levels</em>: all vertices with indegree 0 at the start can run at once. Then their successors, and so on. Grouping by level rather than emitting a flat list gives the schedule with the shortest critical path.
-
-```python
-def topo_levels(graph, nodes):
-    indegree = compute_indegrees(graph, nodes)
-    level = [n for n in nodes if indegree[n] == 0]
-    levels = []
-    while level:
-        levels.append(level)
-        nxt = []
-        for u in level:
-            for v in graph.get(u, []):
-                indegree[v] -= 1
-                if indegree[v] == 0:
-                    nxt.append(v)
-        level = nxt
-    return levels
-```
-
-That levelled form is what a build system uses to decide what can compile in parallel. And it is a small change from the standard algorithm.
-
-## Common mistakes
-
-- <strong>Not detecting cycles.</strong> Without the length check, a cyclic graph silently gives a partial sorting that looks valid.
-- <strong>Using a single visited set in the DFS version,</strong> which cannot distinguish a back edge from a cross edge and reports false cycles.
-- <strong>Forgetting isolated vertices.</strong> A vertex with no edges never appears in an edge list and must be added by name.
-- <strong>Assuming the order is unique</strong> and writing tests that expect one set sequence.
-- <strong>Applying it to an undirected graph,</strong> where the concept does not apply.
-- <strong>Recursion depth</strong> in the DFS version on a long chain.
-
-## Questions people ask
-
-<strong>What if the graph has a cycle?</strong> No topological order exists. Kahn's algorithm gives a short output; the DFS version hits a grey vertex.
-
-<strong>Is the order unique?</strong> Only when the graph is a single chain. If not many valid orders exist.
-
-<strong>Kahn's or DFS?</strong> Kahn's for parallel scheduling, lexicographic control and no recursion limit. DFS when you are now doing a DFS or need finishing times for a thing else.
-
-<strong>How do I get a deterministic order?</strong> Use a heap instead of a queue in Kahn's algorithm.
-
-<strong>Can it handle disconnected graphs?</strong> Yes &mdash; all indegree-0 vertices seed the queue, whichever part they are in.
-
-<strong>How is this tied to DFS cycle detection?</strong> They are the same traversal; topological sort is the finishing order. And a back edge to a grey vertex is the cycle.
-
-## Recap in one screen
-
-- Order the vertices so each edge points forwards. The answer to each dependency question.
-- Needs a DAG; a cycle means no valid order exists. And the algorithm detects it.
-- Kahn's repeatedly removes indegree-0 vertices; a short output means a cycle.
-- DFS prepends each vertex on finishing, and needs three colours to detect cycles correctly.
-- Grouping Kahn's output into levels gives the maximum-parallelism schedule, which is what build systems use.
+- **Reversing edge direction:** choose a convention and keep it consistent; this article uses prerequisite → dependent.
+- **Assuming there is one answer:** independent tasks can appear in multiple valid orders.
+- **Treating a partial result as complete:** fewer output vertices than input vertices means a cycle prevents completion.
+- **Confusing the queue order with priority:** Kahn’s algorithm can use a priority queue to choose among ready tasks when a deterministic or lexicographically smallest order is needed.
 
 ## Sources and next steps
 
-- Source: [Princeton Algorithms, directed graphs and topological order](https://algs4.cs.princeton.edu/42directed/)
-- Continue with [depth-first search](depth_first_search.html), which builds on this idea.
+- [Princeton Algorithms: Directed graphs and topological order](https://algs4.cs.princeton.edu/42digraph/) describes DAGs and topological sorting.
+- Continue with [cycle detection](cycle_detection.html) and [dependency graphs](graph_representations.html).

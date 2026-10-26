@@ -3,13 +3,11 @@ intro: The language for saying how an algorithm behaves when the data gets big.
 
 ## Quick Context
 
-<strong>Big-O</strong> describes the <em>growth rate</em> of an algorithm's cost as input size n increases. It deliberately throws away constants and lower-order terms &mdash; an algorithm that takes <span class="mono-font">3n + 50</span> steps is simply <span class="mono-font">O(n)</span>, because for large n the 3 and the 50 stop mattering.
 
-The six classes you will encounter most often are O(1) constant, O(log n) logarithmic, O(n) linear, O(n log n) linearithmic, O(n&sup2;) quadratic and O(2&#8319;) exponential. Each describes how the number of operations grows as you scale the input. At n = 10 every class looks affordable. At n = 100,000 the quadratic one takes ten billion operations and the exponential one has left the observable universe.
 
-Big-O is an upper bound, not an exact count. Saying an algorithm is O(n&sup2;) means its cost grows no faster than n&sup2; &mdash; it might be faster on some inputs. That is why best-case, average-case and worst-case are separate conversations: quick sort is O(n log n) on average but O(n&sup2;) in the worst case.
+<strong>Big-O</strong> describes an upper bound on how an algorithm's time or memory use grows with input size n. It ignores constant factors and lower-order terms: <span class="mono-font">3n + 50</span> is <span class="mono-font">O(n)</span>. It helps compare growth, but does not predict exact run time on a particular machine.
 
-Constants matter in practice even though Big-O ignores them. Two O(n log n) algorithms can differ by a factor of 10 in wall-clock time because of cache behaviour, branch prediction and constant factors. Big-O tells you which algorithm scales &mdash; it does not tell you which is faster at your current n. For small n, a quadratic algorithm with tiny constants can beat a linearithmic one with large constants. Measurement settles those questions; Big-O settles what happens when n doubles.
+The six classes you will encounter most often are O(1) constant, O(log n) logarithmic, O(n) linear, O(n log n) linearithmic, O(n&sup2;) quadratic and O(2&#8319;) exponential.
 
 ## Why Ignore the Constants?
 
@@ -19,31 +17,12 @@ Slide n and watch the table. At n = 10 every row looks affordable. By n = 1000 t
 
 ## The Six Classes You Will Meet
 
-- <strong style="color:#4ade80">O(1) constant</strong> &mdash; cost never changes. Array index lookup, hash table access, stack push.
+- <strong style="color:#4ade80">O(1) constant</strong> &mdash; cost stays bounded as n grows. Array index lookup and stack push are typical; hash-table lookup is expected O(1), not a worst-case guarantee.
 - <strong style="color:#22d3ee">O(log n) logarithmic</strong> &mdash; each step halves the problem. Binary search, balanced tree operations. Doubling n adds just <em>one</em> step.
 - <strong style="color:#3b82f6">O(n) linear</strong> &mdash; touch every item once. Linear search, summing an array.
-- <strong style="color:#8b5cf6">O(n log n)</strong> &mdash; the practical floor for comparison sorting. Merge sort, quick sort, heap sort.
-- <strong style="color:#f59e0b">O(n&sup2;) quadratic</strong> &mdash; nested loops over the data. Bubble, insertion and selection sort. Fine for 100 items, painful for 100,000.
+- <strong style="color:#8b5cf6">O(n log n)</strong> &mdash; common for efficient comparison sorts. Merge sort and heapsort have this worst-case bound; quicksort is O(n log n) on average but O(n&sup2;) in the worst case.
+- <strong style="color:#f59e0b">O(n&sup2;) quadratic</strong> &mdash; often comes from nested loops over the data. Bubble, insertion and selection sort have quadratic worst cases; simple versions can still suit small or nearly sorted inputs.
 - <strong style="color:#ef4444">O(2&#8319;) exponential</strong> &mdash; every extra element doubles the work. Naive recursive Fibonacci, brute-force subsets. Intractable beyond roughly n = 40.
-
-## Best, average and worst case
-
-Big O usually refers to the worst case, and the other two matter in practice.
-
-|Algorithm|Best|Average|Worst|
-|---|---|---|---|
-|Quick sort|O(n log n)|O(n log n)|O(n&sup2;)|
-|Merge sort|O(n log n)|O(n log n)|O(n log n)|
-|Insertion sort|O(n)|O(n&sup2;)|O(n&sup2;)|
-|Hash table lookup|O(1)|O(1)|O(n)|
-
-Two rows deserve comment.
-
-<strong>Quick sort</strong> is O(n²) in the worst case and is the practical default anyway, because the worst case requires a pathological pivot sequence and randomised pivots make it vanishingly unlikely. Merge sort's guarantee is stronger and its constants are worse.
-
-<strong>Insertion sort</strong> is O(n) on already-sorted input, which is why real sorting implementations use it for small or nearly-sorted subarrays inside a larger algorithm.
-
-The related idea is <strong>amortised</strong> complexity: appending to a Python list is O(1) amortised, because occasional reallocations are spread across many cheap appends. Any individual append may be O(n); the average over a sequence is constant.
 
 ## Compare the growth rates
 
@@ -56,7 +35,7 @@ The related idea is <strong>amortised</strong> complexity: appending to a Python
 |O(n&sup2;)|Quadratic|100|1,000,000|10&#185;&sup2;|
 |O(2&#8319;)|Exponential|1,024|astronomical|impossible|
 
-That table is the whole argument. At n = 1,000,000, an O(n log n) algorithm does 20 million operations &mdash; a fraction of a second. An O(n²) algorithm does 10¹² &mdash; hours. The difference is not an optimisation; it is the difference between working and not.
+The table shows growth, not wall-clock time: actual duration depends on the operation, implementation and hardware. At n = 1,000,000, the listed O(n log n) model is about 20 million units of work, while the quadratic model is 10¹². Their ratio illustrates why input growth can dominate constant-factor tuning.
 
 ## Reading complexity from code
 
@@ -70,7 +49,7 @@ The rules are mechanical once you see them.
 
 <strong>Halving the search space each step is O(log n).</strong> Binary search on a million items takes 20 steps, because 2²⁰ ≈ 1,000,000.
 
-<strong>Dictionary and set lookups are O(1).</strong> This is the single most useful fact for writing fast Python.
+<strong>Dictionary and set lookups are expected O(1).</strong> Hash collisions can make a lookup slower, so this is not a worst-case guarantee.
 
 ```python
 # O(n^2) - for each item, scan the whole list
@@ -81,85 +60,16 @@ for a in items:
 # O(n) - build a set once, then constant-time lookups
 other = set(other_list)
 for a in items:
-    if a in other:           # O(1)
+        if a in other:           # expected O(1)
         ...
 ```
 
 That transformation &mdash; replacing a repeated scan with a pre-built set or dictionary &mdash; is the most common and most effective optimisation in everyday code, and it usually makes the code shorter as well.
 
-## Counting the operations, and watching the ratios
-
-Big-O is a claim about how work grows when the input grows. That claim is testable: count the actual operations at several sizes and look at what happens to the count when n doubles. Each class has its own signature, and you can read it straight off the numbers.
-
-```python-run
-def constant(n):
-    return 1                                # O(1): one look, whatever n is
-
-def linear(n):
-    ops = 0
-    for _ in range(n):
-        ops += 1                            # O(n)
-    return ops
-
-def logarithmic(n):
-    ops, k = 0, n
-    while k > 1:
-        k //= 2
-        ops += 1                            # O(log n)
-    return ops
-
-def linearithmic(n):
-    ops, k = 0, n
-    while k > 1:
-        ops += n                            # n work, log n times
-        k //= 2
-    return ops
-
-def quadratic(n):
-    ops = 0
-    for _ in range(n):
-        for _ in range(n):
-            ops += 1                        # O(n^2)
-    return ops
-
-sizes = [100, 200, 400, 800]
-funcs = [("O(1)", constant), ("O(log n)", logarithmic), ("O(n)", linear),
-         ("O(n log n)", linearithmic), ("O(n^2)", quadratic)]
-print("%-11s %8s %8s %8s %8s   ratio" % tuple(["class"] + [str(s) for s in sizes]))
-for name, f in funcs:
-    counts = [f(s) for s in sizes]
-    ratios = [counts[i+1] / counts[i] for i in range(len(counts)-1)]
-    print("%-11s %8d %8d %8d %8d   %s" % (
-        name, *counts, ", ".join("%.2f" % r for r in ratios)))
-# the ratio IS the class: O(1)=1.00, O(n)=2.00, O(n^2)=4.00
-```
-
-Big-O drops constants because they stop mattering -- but only eventually. Here is where a heavy O(n) loses to a light O(n^2).
-
-```python-run
-def fast_but_heavy(n):
-    return 1000 * n           # O(n) with a big constant
-
-def slow_but_light(n):
-    return n * n // 100       # O(n^2) with a small one
-
-print("%8s %14s %14s  %s" % ("n", "1000n", "n^2/100", "which wins"))
-for n in (10, 100, 1000, 10000, 100000, 1000000):
-    a, b = fast_but_heavy(n), slow_but_light(n)
-    verdict = "tie" if a == b else ("O(n)" if a < b else "O(n^2)")
-    print("%8d %14d %14d  %s" % (n, a, b, verdict))
-# the quadratic is faster below n=100,000 and ties there. Big-O is about the limit,
-# not about your data -- which is why real sorting libraries switch
-# to insertion sort on small arrays.
-```
-
 ## Things to try
 
 1. <strong>Start at n = 10.</strong> Every curve is bunched together &mdash; at small inputs, complexity genuinely does not matter and the constants dominate.
 2. <strong>Slide to n = 60.</strong> The exponential curve leaves the chart almost immediately, then the quadratic. The separation is the entire point of the notation.
-3. <strong>Read the table at n = 1,000,000.</strong> O(log n) needs about 20 operations; O(n&sup2;) needs 10&sup1;&sup2;. That is the difference between instant and never.
-4. <strong>Tick log-scale y.</strong> Each class becomes a straight line with its own slope &mdash; the cleanest way to see that these are genuinely different families, not just different constants.
-5. <strong>Compare O(n) with O(n log n).</strong> The gap is small even at large n, which is why an O(n log n) sort is considered in effect as good as linear in practice.
 
 ## Space complexity
 
@@ -170,45 +80,11 @@ The same notation applies to memory, and it is frequently the binding constraint
 |Sort in place|O(n log n)|O(1) extra|
 |Merge sort|O(n log n)|O(n) extra|
 |Recursion depth d|&mdash;|O(d) stack|
-|Memoised recursion|Faster|O(states) extra|
+|Memoised Fibonacci|O(n) time|O(n) extra|
 
-Recursion's space cost is easy to overlook: each call holds a frame on the stack, so recursion depth n uses O(n) memory and can overflow. Python's default limit is around 1,000 frames, which is why deep recursion needs converting to iteration or an explicit stack.
+Recursion's space cost is easy to overlook: each active call holds a frame, so depth n uses O(n) stack space. Python limits recursion depth; the configured limit varies by environment. Deep input may need an iterative solution or an explicit stack.
 
-Memoisation is the classic time-for-space trade: recursive Fibonacci is O(2ⁿ) time and O(n) space; memoised it is O(n) time and O(n) space. That single change turns an impossible computation into an instant one.
-
-## Where it misleads
-
-Big O is an asymptotic statement, and three caveats matter in real code.
-
-<strong>Constants can dominate at realistic sizes.</strong> An O(n log n) algorithm with a huge constant can lose to an O(n²) one for n = 50. This is why real sorting implementations switch to insertion sort below a threshold.
-
-<strong>Cache behaviour is invisible to the notation.</strong> Sequential array access can be several times faster than pointer-chasing through a linked list with the same complexity, because of memory locality.
-
-<strong>The input's shape matters.</strong> Nearly-sorted data, many duplicates, or adversarial patterns can move an algorithm between its best and worst case.
-
-So the discipline is: use Big O to rule out approaches that cannot possibly scale, and <strong>measure</strong> to choose between approaches that could. It is a filter, not a benchmark.
-
-## Questions people ask
-
-<strong>Why drop constants?</strong> Because they depend on hardware and implementation, while the growth rate is a property of the algorithm. `2n` and `100n` are both O(n).
-
-<strong>What is the difference between O, &Theta; and &Omega;?</strong> O is an upper bound, &Omega; a lower bound, &Theta; both. In practice people say O and mean &Theta;.
-
-<strong>Is O(log n) fast?</strong> Extremely. Twenty steps for a million items, thirty for a billion. Any O(log n) algorithm is effectively instant at realistic sizes.
-
-<strong>Which base for the logarithm?</strong> It does not matter &mdash; changing base multiplies by a constant, which is dropped. Base 2 is conventional because halving is the common operation.
-
-<strong>Is O(n log n) much worse than O(n)?</strong> Only by the log factor &mdash; 20&times; at a million items. Both are practical; O(n²) is where the wall is.
-
-<strong>Does Big O tell me which is faster?</strong> Only asymptotically. For a specific input size, measure.
-
-## Recap in one screen
-
-- Big O describes how work grows with input size, ignoring constants and hardware.
-- Loops over the input are O(n); nested loops multiply; halving is O(log n); dictionary lookups are O(1).
-- Replacing a repeated scan with a set or dictionary is the most common real-world speed-up.
-- Worst case is what Big O usually means; best and amortised cases explain why quick sort and list append are used anyway.
-- Use it to rule out what cannot scale, then measure to choose between what can.
+Memoisation is a time-for-space trade: naive recursive Fibonacci takes O(2ⁿ) time and O(n) stack space, while memoised Fibonacci takes O(n) time and O(n) total extra space. The improvement comes from computing each state once.
 
 ## Sources and next steps
 

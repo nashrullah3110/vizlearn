@@ -112,6 +112,7 @@ def page(t):
                 </div>
             </div>
         </div>
+        <!-- VIZLEARN:LEDE:AFTER -->
     </main>
 """ % {
         "crumb": shell.breadcrumb_bar([("Home", PREFIX + "index.html"),
@@ -157,8 +158,13 @@ def main():
     art_dir = os.path.join(ROOT, "content", "articles", DIR)
     os.makedirs(art_dir, exist_ok=True)
     for t in TOPICS:
-        open(os.path.join(art_dir, "%s.txt" % t["slug"]), "w",
-             encoding="utf-8").write(t["article"].strip() + "\n")
+        article_path = os.path.join(art_dir, "%s.txt" % t["slug"])
+        # The text article is the editable source of truth. Use the copy in
+        # ml_topics.py only to bootstrap a newly added topic; overwriting an
+        # existing article here erased editorial revisions on every build.
+        if not os.path.exists(article_path):
+            open(article_path, "w", encoding="utf-8").write(
+                t["article"].strip() + "\n")
 
     index = os.path.join(ROOT, "index.html")
     src = open(index, encoding="utf-8").read()

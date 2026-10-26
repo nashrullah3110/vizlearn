@@ -1,220 +1,39 @@
-title: How Naive Bayes Works: A Step-by-Step Guide
-intro: Naive Bayes applies Bayes’ rule with a conditional-independence assumption between features. The assumption is often imperfect, yet the method can work well for sparse data.
+title: Naive Bayes
+intro: Naive Bayes uses Bayes’ rule to compare class probabilities, with a simplifying assumption that features are conditionally independent given the class. It is fast and often useful for text, though its probability estimates can be overconfident.
 
-## How Bayes' theorem classifies with one bold assumption
+## Bayes’ rule and conditional independence
 
-The <strong>Naive Bayes Classifier</strong> is a simple yet powerful algorithm for predictive modeling. It is based on <strong>Bayes' Theorem</strong> and is very useful for text classification, like spam filtering. Its core idea is to calculate the probability of a certain outcome (e.g., "Should I play tennis?") based on the evidence provided by a set of features (e.g., the weather outlook, temperature, and wind). The "naive" part is the independence assumption: the model treats each feature as if it adds to the probability independently of each other feature. In practice features are almost never independent &mdash; a sunny outlook correlates with more temperatures &mdash; but the classifier works surprisingly well regardless, since classification just needs to get the ranking of class probabilities right, not the probabilities them. Three variants handle other data types: Gaussian for continuous features, Multinomial for counts (the standard for text). And Bernoulli for binary presence/absence. All three are fast to train (one pass through the data to count frequencies) and fast to predict (a product of looked-up probabilities). It is why Naive Bayes stays the first model to try on a text classification task. This page walks through the math step by step on the classic "play tennis" dataset, shows the posterior for each class. And covers Laplace smoothing for the zero-frequency problem.
+Naive Bayes predicts a class by combining its prior probability with the likelihood of the observed features under that class. The “naive” assumption makes the calculation practical: given the class, the model treats each feature as independent of the others.
 
-## The "Naive" Assumption: A Key Simplification
+## Bayes’ rule and the independence assumption
 
-The "naive" part of the name comes from a key assumption the algorithm makes: <strong>it assumes that all features are independent of each other</strong>. In our case, it assumes that the 'Outlook' has no effect on the 'Temperature' or 'Wind'. While this is often not true in the real world (a sunny outlook often implies hotter temperatures), this simplification makes the math much easier and faster. Despite this "naive" assumption, the classifier works surprisingly well in many real-world scenarios.
+For a class c and observed features x₁, …, xₚ:
 
-## Bayes' theorem without the fear
+<p><strong>P(c | x₁, …, xₚ) ∝ P(c) × P(x₁, …, xₚ | c)</strong></p>
 
-All here rests on one line. And the line is less intimidating written as a sentence.
+Naive Bayes approximates the joint likelihood as a product:
 
-<p class="mono-font">P(class | evidence) &prop; P(evidence | class) &times; P(class)</p>
+<p><strong>P(c | x₁, …, xₚ) ∝ P(c) × ∏ᵢ P(xᵢ | c)</strong></p>
 
-"How likely is this class, given what I have seen?" equals "how typical is this evidence for that class" times "how common is that class in the first place".
+The features need not be independent in general; the assumption is conditional on the class. It is often false—for example, “New” and “York” are related words—but the approximation can still rank classes usefully. The class prior matters: common classes start with more probability before the features are considered.
 
-The second term is the one people forget. And it is the one that stops the classic mistake. A test for a disease that affects 1 in 10,000 people, with a 1% false-positive rate, gives about 100 false positives for each true one &mdash; not since the test is bad but since the prior is tiny. Naive Bayes never forgets the prior. It is one reason it behaves sensibly on rare classes.
+## Work through a prediction
 
-To classify, you compute that product for each class and pick the biggest. The denominator that would turn the product into a proper probability is the same for all classes. So it can be ignored while you are just ranking them.
+In the classic weather example, the observed features are Sunny, Cool and Strong wind. Without smoothing, the training counts give:
 
-## What "naive" is doing
+<p><strong>Score(Yes) = 9/14 × 2/9 × 3/9 × 3/9 = 1/63</strong></p>
+<p><strong>Score(No) = 5/14 × 3/5 × 1/5 × 3/5 = 9/350</strong></p>
 
-The hard part of the true math is P(evidence | class) when the evidence is a few features at once. To know P("free" and "money" and "click" | spam) well, you would need to know how those words co-occur. And with a vocabulary of 20,000 words that is more combinations than there are atoms on hand to count them with.
+These are unnormalised scores: each is the class prior multiplied by the three class-conditional likelihoods. The No score is larger, so the model predicts No. Dividing each score by their sum would produce normalised probabilities. The visualiser uses Laplace smoothing to avoid zero likelihoods, so its displayed values differ from this unsmoothed hand calculation.
 
-The naive assumption cuts through this: <strong>assume each feature is independent of each other, given the class</strong>. Then the joint probability is just the product:
+## What the assumption buys, and what it costs
 
-<p class="mono-font">P(free, money, click | spam) = P(free|spam) &times; P(money|spam) &times; P(click|spam)</p>
+The product turns a large joint-probability problem into separate per-feature counts. This makes training and prediction fast, even with many features and relatively few examples. It can work well for text classification, where word features are dependent but their counts still carry useful class information.
 
-Each of those is a single count divided by another count. The whole model turns a table of frequencies, computable in one pass over the data.
+Naive Bayes variants match different feature types: Multinomial Naive Bayes is common for non-negative counts, Bernoulli Naive Bayes for binary indicators, and Gaussian Naive Bayes for continuous features modelled with class-specific normal distributions. Choosing the wrong variant or preprocessing can make the likelihoods inappropriate.
 
-The assumption is, of course, false. "New" and "York" are wildly dependent. And yet the classifier works, since for <em>ranking</em> classes you do not need the probabilities to be right &mdash; you just need the right class to come out on top. The estimated probabilities are often far too extreme (0.9999 and close), while the decisions they lead to are sound. Trust the argmax, distrust the count. And calibrate if you need the count.
+The independence approximation can produce probabilities that are too extreme, especially when correlated features repeat the same evidence. A strong class prediction is not proof that the probability is calibrated. If probability accuracy matters, evaluate a reliability curve and consider [calibration](probability_calibration.html). For a model that can learn feature interactions directly, compare with [logistic regression](logistic_regression.html).
 
-## A spam math you can follow
+## Sources and next steps
 
-Training data: 100 emails, 30 spam and 70 not. Among the spam, "free" appears in 24. Among the rest, in 7.
-
-Priors: P(spam) = 0.30, P(not spam) = 0.70.
-Likelihoods: P(free | spam) = 24/30 = 0.80, P(free | not spam) = 7/70 = 0.10.
-
-A new email holds "free":
-
-- Spam score: 0.80 &times; 0.30 = <strong>0.24</strong>
-- Not-spam score: 0.10 &times; 0.70 = <strong>0.07</strong>
-
-Spam wins. Normalising, 0.24 / (0.24 + 0.07) = 77% probability of spam.
-
-Now suppose the email also holds "meeting", a word that appeared in zero spam emails in training. P(meeting | spam) = 0. And the whole spam score is multiplied by zero &mdash; one unseen word has vetoed the whole math.
-
-The fix is <strong>Laplace smoothing</strong>: add 1 to each count (and the vocabulary size to each denominator). So no probability is ever just zero. With a vocabulary of 1,000 words, P(meeting | spam) turns 1/(30 + 1000) = 0.00097 instead of 0. Small, but survivable. Each real build does this by default. Scikit-learn calls the parameter `alpha`.
-
-The other build detail: multiplying thousands of small probabilities underflows to zero in floating point. So real implementations add logarithms instead of multiplying probabilities. Same ranking, no underflow.
-
-## The Math Process: A Walkthrough
-
-The interactive panel walks you through the exact steps the algorithm takes to make a prediction. Let's use the default input: <strong>Outlook=Sunny, Temp=Cool, Wind=Strong</strong>.
-
-1. <strong>Step 1: Calculate Prior Probabilities</strong> <p>First, the algorithm looks at the historical data (the "Knowledge Base") to find the total probability of each outcome. This is the "prior" belief before considering any new evidence.</p> <ul class="list-disc list-outside space-y-1 pl-5 mt-2"> <li><code>P(Play=Yes)</code>: Out of 14 total days, 'Play' was 'Yes' on 9 of them. So, P(Yes) = 9/14.</li> <li><code>P(Play=No)</code>: 'Play' was 'No' on 5 of them. So, P(No) = 5/14.</li> </ul>
-2. <strong>Step 2: Calculate Likelihoods for Each Feature</strong> <p>Next, for each class ('Yes' and 'No'), the algorithm calculates the probability of our set input features occurring. This is the "likelihood".</p> <ul class="list-disc list-outside space-y-1 pl-5 mt-2"> <li><strong>Likelihood for 'Yes':</strong> <ul class="list-circle list-outside space-y-1 pl-5 mt-1"> <li><code>P(Outlook=Sunny | Play=Yes)</code>: Among the 9 'Yes' days, 2 were 'Sunny'. (Prob = 2/9)</li> <li><code>P(Temp=Cool | Play=Yes)</code>: Among the 9 'Yes' days, 3 were 'Cool'. (Prob = 3/9)</li> <li><code>P(Wind=Strong | Play=Yes)</code>: Among the 9 'Yes' days, 3 were 'Strong'. (Prob = 3/9)</li> </ul> </li> <li><strong>Likelihood for 'No':</strong> <ul class="list-circle list-outside space-y-1 pl-5 mt-1"> <li><code>P(Outlook=Sunny | Play=No)</code>: Among the 5 'No' days, 3 were 'Sunny'. (Prob = 3/5)</li> <li><code>P(Temp=Cool | Play=No)</code>: Among the 5 'No' days, 1 was 'Cool'. (Prob = 1/5)</li> <li><code>P(Wind=Strong | Play=No)</code>: Among the 5 'No' days, 3 were 'Strong'. (Prob = 3/5)</li> </ul> </li> </ul> <p class="text-xs mt-2 opacity-80"><em>Note: The visualization uses Laplace Smoothing (adding 1 to the numerator and the number of unique feature values to the denominator) to avoid zero-probability issues. So the exact fractions will look slightly other in the "Math Story".</em></p>
-3. <strong>Step 3: Mix and Calculate Scores</strong> <p>Now, we mix all. For each outcome, we multiply its prior probability by all of its likelihoods.</p> <ul class="list-disc list-outside space-y-1 pl-5 mt-2"> <li><code>Score(Yes) = P(Yes) * P(Sunny|Yes) * P(Cool|Yes) * P(Strong|Yes)</code></li> <li><code>Score(No) = P(No) * P(Sunny|No) * P(Cool|No) * P(Strong|No)</code></li> </ul>
-4. <strong>Step 4: Normalize and Predict</strong> <p>The scores are not final probabilities. To get a clean 0-100% result, we normalize them by dividing each score by the sum of both scores. The class with the more final probability is our prediction.</p>
-
-## Which flavour to use
-
-|Variant|Feature type|Typical use|
-|---|---|---|
-|Multinomial|Counts|Word counts or TF-IDF for text classification|
-|Bernoulli|Binary|Word present / absent; short texts|
-|Gaussian|Continuous|Numeric features, assumed normal within each class|
-|Complement|Counts|Text with imbalanced classes; often beats multinomial|
-
-Gaussian Naive Bayes is the one to be careful with: it assumes each feature follows a bell curve within each class. On a heavily skewed feature such as income, that assumption is badly wrong. And a log transform beforehand often helps more than switching models.
-
-## Where it still earns its place
-
-Naive Bayes is old, and it is still deployed, for reasons that have not been undermined by anything newer:
-
-- <strong>Speed.</strong> Training is one pass of counting. On millions of documents it finishes while other models are still loading.
-- <strong>Small data.</strong> With a few hundred labelled cases it often beats models with more parameters to fit, since it has so few of its own.
-- <strong>Streaming.</strong> Counts update incrementally. So the model can learn continuously with no retraining step.
-- <strong>Baselines.</strong> If your transformer cannot beat Naive Bayes on your text classification task, something is wrong with the pipeline, not with the transformer.
-- <strong>High dimensions.</strong> A vocabulary of 100,000 features is not a problem. Each adds one count per class.
-
-It is a poor choice when feature interactions carry the signal &mdash; the naive assumption discards them by construction &mdash; and when you need well-calibrated probabilities rather than a ranking.
-
-## An assumption that is wrong and works anyway
-
-Naive Bayes assumes each feature is independent, which is almost never true. Here is the assumption being violated and the classifier still doing its job.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.naive_bayes import GaussianNB, MultinomialNB
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score, train_test_split
-
-X, y = make_classification(n_samples=2000, n_features=8, n_informative=5,
-                           n_redundant=0, flip_y=0.08, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=0)
-nb = GaussianNB().fit(Xtr, ytr)
-
-print("what the model actually stores -- a mean and a variance per class,")
-print("per feature. that is all of it:")
-print("  class priors      ", np.round(nb.class_prior_, 4))
-print("  means, class 0    ", np.round(nb.theta_[0][:4], 4), "...")
-print("  means, class 1    ", np.round(nb.theta_[1][:4], 4), "...")
-print("  variances, class 0", np.round(nb.var_[0][:4], 4), "...")
-print()
-
-row = Xte[0]
-print("one prediction, rebuilt by hand:")
-logp = []
-for c in (0, 1):
-    ll = -0.5 * np.sum(np.log(2 * np.pi * nb.var_[c])
-                       + (row - nb.theta_[c]) ** 2 / nb.var_[c])
-    logp.append(np.log(nb.class_prior_[c]) + ll)
-    print("  log P(x | class %d) + log prior = %.6f" % (c, logp[-1]))
-logp = np.array(logp)
-post = np.exp(logp - logp.max()); post /= post.sum()
-print("  normalised            : %s" % np.round(post, 6))
-print("  sklearn predict_proba : %s" % np.round(nb.predict_proba([row])[0], 6))
-print()
-print("the 'naive' step is that sum: it multiplies the per-feature")
-print("probabilities together, which is only valid if they are independent.")
-print()
-```
-
-Building on the same setup, the next block shows the left cases.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.naive_bayes import GaussianNB, MultinomialNB
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score, train_test_split
-
-print("so let us break the assumption. find the single most useful column,")
-print("then paste copies of it alongside the originals:")
-best = int(np.argmax([cross_val_score(GaussianNB(), X[:, [c]], y, cv=5).mean()
-                      for c in range(X.shape[1])]))
-print("  column %d is the strongest on its own." % best)
-print()
-print("%14s %12s %12s" % ("copies added", "naive bayes", "logistic reg"))
-for k in (0, 1, 3, 10, 30):
-    Xd = np.column_stack([X] + [X[:, best]] * k) if k else X
-    print("%14d %12.4f %12.4f"
-          % (k, cross_val_score(GaussianNB(), Xd, y, cv=5).mean(),
-             cross_val_score(LogisticRegression(max_iter=3000), Xd, y, cv=5).mean()))
-print()
-print("no new information was added at any step -- every copy is the same")
-print("column. naive bayes multiplies its evidence in once per copy, so that")
-print("one feature drowns out the other seven. logistic regression splits the")
-print("weight across the copies and lands in the same place it started.")
-print()
-```
-
-The next block covers the left steps.
-
-```python-run
-
-print("its probabilities are the part you should not trust:")
-p = nb.predict_proba(Xte)[:, 1]
-print("  predictions above 0.99 : %d of %d" % ((p > 0.99).sum(), len(p)))
-print("  of those, actually 1   : %.4f" % yte[p > 0.99].mean())
-print("  it claimed better than 99%% and was right on %.1f%% of them."
-      % (100 * yte[p > 0.99].mean()))
-print()
-print("  now the same measurement after adding 30 copies of one column:")
-Xd = np.column_stack([X] + [X[:, best]] * 30)
-nb2 = GaussianNB().fit(Xd[:len(Xtr)], y[:len(Xtr)])
-p2 = nb2.predict_proba(Xd[len(Xtr):])[:, 1]
-y2 = y[len(Xtr):]
-print("    predictions above 0.99 : %d of %d" % ((p2 > 0.99).sum(), len(p2)))
-print("    of those, actually 1   : %.4f" % y2[p2 > 0.99].mean())
-print()
-print("  multiplying many small numbers together drives the result toward 0")
-print("  or 1 much faster than the evidence justifies, and correlated")
-print("  features make it worse. use the ranking, not the number.")
-print()
-print("it earns its place when you have many features and few rows: it needs")
-print("only a mean and a variance per feature per class, so it will train on")
-print("data that leaves almost anything else underdetermined. that, and it is")
-print("fast enough to be the baseline you compare everything against.")
-```
-
-## Questions people ask
-
-<strong>Why does it work if the independence assumption is false?</strong> Since classification just needs the correct class to score highest. Correlated features distort the magnitude of the scores in the same way for all classes. It often leaves the ordering intact.
-
-<strong>What does `alpha` do?</strong> It is the smoothing constant. `alpha=1` is Laplace smoothing. Less values trust the observed counts more. `alpha=0` reintroduces the zero-probability veto. Tune it &mdash; on small vocabularies it matters more than people expect.
-
-<strong>Can it handle continuous and categorical features together?</strong> Not in one standard estimator. Either bin the continuous features into categories. Or train split models and mix their log-probabilities.
-
-<strong>Why are the predicted probabilities so extreme?</strong> Multiplying many correlated likelihoods double-counts evidence, pushing outputs towards 0 or 1. Apply isotonic or sigmoid calibration if you need trustworthy probabilities.
-
-<strong>Is it affected by imbalanced classes?</strong> The prior handles imbalance sensibly. But for text namely, Complement Naive Bayes was designed to correct a bias multinomial NB shows on skewed class distributions.
-
-## Recap in one screen
-
-- Score each class by "how common is this class" times "how typical is this evidence for it". And pick the winner.
-- The naive assumption &mdash; features independent given the class &mdash; turns an impossible count into a product of easy ones.
-- Smoothing is mandatory, or a single unseen feature zeroes out a class.
-- Fast, tiny, excellent on text and small datasets. And a benchmark each heavier model should have to beat.
-- Trust its decisions more than its probabilities.
-
-## A last word on why it survives
-
-Naive Bayes is roughly as old as the field, is based on an assumption everyone agrees is false. And is still in production in spam filters, document routers and medical triage tools. That combination is worth grasp, since it teaches something general about modelling.
-
-The lesson is that a model does not have to be right to be useful &mdash; it has to be wrong in a way that does not affect the decision being made. The independence assumption distorts the magnitude of the probabilities. And the decision just depends on their order. So much of the error affects probability magnitudes, even when the predicted class remains the same.
-
-Check that with a model whose errors land right on the decision edge. And the gap in real value is enormous still if their stated assumptions look equally shaky.
-
-The second reason it survives is that its cost profile is unusual. Training is a pass over the data to accumulate feature counts, and prediction combines log-probabilities. This can be inexpensive to deploy on a CPU or in a streaming system, although the independence assumption may limit predictive quality.
-
-## Further reading
-
-For implementation details, see the [Naive Bayes methods](https://scikit-learn.org/stable/modules/naive_bayes.html). Continue with [logistic regression](logistic_regression.html) to connect this topic to a related part of the workflow.
+See scikit-learn’s [Naive Bayes guide](https://scikit-learn.org/stable/modules/naive_bayes.html) for the variants and their assumptions. The weather counts above illustrate how priors and likelihoods combine; your own application should validate both classification performance and probability quality.

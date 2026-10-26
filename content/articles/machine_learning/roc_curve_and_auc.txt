@@ -1,236 +1,37 @@
-title: ROC and AUC: A Practical Guide
-intro: A ROC curve plots true-positive rate against false-positive rate across thresholds. AUC summarizes ranking performance, but does not choose an operating threshold or guarantee calibrated probabilities.
+title: ROC Curve and AUC
+intro: A receiver operating characteristic (ROC) curve plots true-positive rate against false-positive rate across thresholds. AUC summarizes score ranking, but does not choose a threshold or measure probability calibration.
 
-## Quick Context
+## Two rates across thresholds
 
-A classifier does not really output a class. It outputs a score &mdash; a probability, often &mdash; and something else turns that into a label by checking it against a threshold. The <a href="confusion_matrix.html" style="color: var(--accent-primary)">confusion matrix</a> describes one such threshold. Change the threshold and you get another matrix from the very same model.
+A receiver operating characteristic (ROC) curve shows how the true-positive and false-positive rates trade off as a classifier threshold changes. Its area summarizes ranking across thresholds, but it does not select an operating threshold or show alert volume on its own.
 
-The ROC curve is what you get when you stop picking one and plot them all.
+- **True-positive rate (TPR)** = TP / (TP + FN), also called recall.
+- **False-positive rate (FPR)** = FP / (FP + TN), the share of actual negatives incorrectly flagged.
 
-The curve plots true positive rate (recall) on the y-axis against false positive rate on the x-axis, sweeping the threshold from the highest score to the lowest. At a threshold of 1.0 nothing is predicted positive. So both rates are zero — the curve starts at the origin. At a threshold of 0.0 all is predicted positive. So both rates are 1.0 — the curve ends at the top-right corner.
+Plot TPR against FPR as the threshold changes to get the ROC curve. A perfect classifier reaches the top-left corner; random ranking has expected AUC 0.5. ROC AUC measures how often a randomly chosen positive receives a higher score than a randomly chosen negative, with ties conventionally receiving half credit.
 
-A perfect model sends the curve straight up to (0, 1) and then across to (1, 1), hugging the top-left corner. A random model gives a diagonal from (0, 0) to (1, 1). A model worse than random dips below the diagonal. It means it has learned to invert the signal — flipping its predictions would improve it.
+## Follow one operating point
 
-AUC (area under the ROC curve) collapses the curve to a single value between 0 and 1. An AUC of 0.5 is random, 1.0 is perfect. And anything above about 0.7 is often considered useful. AUC has one critical property: it is threshold-independent. It measures how well the model ranks positive cases above negative ones, no matter where you cut. This makes it a useful summary when comparing ranking performance across thresholds. It is almost always the case. A model with a higher AUC is a better ranker. And a better ranker can always be used to choose a threshold that suits the task.
+Set **Threshold** to 0.9, then lower it toward 0.1. The operating point moves along the curve: a lower threshold usually catches more positives but also flags more negatives. The AUC readout stays the same because changing the threshold does not change the score ranking.
 
-## Two rates, one curve
+## Why prevalence still matters
 
-Sweep the threshold from 1 down to 0. At each value compute:
+TPR and FPR use separate class totals, so their values do not directly show how many alerts a system will generate. Suppose 1% of one million cases are positive. At TPR 90% and FPR 10%, the model catches 9,000 positives but also flags 99,000 negatives. Precision is 9,000 / (9,000 + 99,000), or about 8.3%; more than nine in ten alerts are false.
 
-- <strong>True Positive Rate</strong> = TP / (TP + FN) &mdash; of the actual positives, the share you caught. Also called recall or sensitivity.
-- <strong>False Positive Rate</strong> = FP / (FP + TN) &mdash; of the actual negatives, the share you wrongly flagged.
+This is why a precision-recall curve can be especially informative when positives are rare: it shows precision alongside recall, and its baseline reflects prevalence. ROC remains useful for examining ranking and false-positive rate. Use both in the context of the task.
 
-Plot TPR against FPR and you have the ROC curve. The top-left corner is perfection: catch all, flag nothing wrongly. The diagonal is a coin flip.
+## AUC is not a deployment decision
 
-Both rates are computed <em>within</em> a true class &mdash; TPR divides by the positives, FPR by the negatives. That detail is what makes the curve independent of how many of each you happen to have. And it is the source of both its main strength and its main trap.
+Two models can have similar AUC but different behavior in the threshold range that matters. Choose an operating threshold on validation data using error costs, a required recall or precision, or review capacity. Then report the resulting confusion matrix on untouched test data. AUC also says nothing about whether a score of 0.8 corresponds to an 80% event rate; assess calibration separately.
 
-## What AUC really measures
+## Common mistakes
 
-The area under that curve compresses the whole picture into one value between 0 and 1.
+- **Reading AUC as accuracy:** it summarizes ranking across thresholds.
+- **Ignoring alert volume:** a low FPR can still mean many false positives when negatives are numerous.
+- **Assuming 0.5 AUC is the only baseline:** random rankings have expected AUC 0.5; class prevalence is the relevant no-skill baseline for precision-recall.
+- **Choosing a threshold on the test set:** use validation data for that decision.
 
-- <strong>1.0</strong> &mdash; perfect separation.
-- <strong>0.9</strong> &mdash; strong.
-- <strong>0.7</strong> &mdash; useful in many settings.
-- <strong>0.5</strong> &mdash; no better than a coin.
-- <strong>Below 0.5</strong> &mdash; worse than chance. It often means your labels or your sign convention are flipped.
+## Sources and next steps
 
-There is an interpretation of AUC that is worth memorising, since it makes the score concrete: <strong>AUC is the probability that a randomly chosen positive case gets a higher score than a randomly chosen negative one.</strong> An AUC of 0.85 means that if you draw one fraudulent transaction and one legitimate one at random, the model gives the fraudulent one a higher score 85% of the time.
-
-That framing makes clear what AUC is and is not. It is a measure of <em>ranking</em> quality. It says nothing about whether the predicted probabilities are calibrated. And nothing about which threshold you should use. A model can have excellent AUC and be badly calibrated. Or have an AUC of 0.9 and still be useless at each threshold you can really afford to operate at.
-
-## One model, each threshold
-
-A classifier that outputs probabilities is not one classifier &mdash; it is a family of them, one for each threshold you might pick. Threshold at 0.9 and you get a cautious model. Threshold at 0.1 and you get an eager one. Accuracy, precision and recall all describe a single member of that family.
-
-An ROC curve describes the whole family at once. Sweep the threshold from 1 down to 0. And at each stop plot two counts:
-
-- <strong>True positive rate</strong> (recall, sensitivity) = TP / (TP + FN) &mdash; the share of real positives you caught.
-- <strong>False positive rate</strong> = FP / (FP + TN) &mdash; the share of real negatives you wrongly flagged.
-
-At a threshold of 1.0 the model flags nothing: both rates are 0, the bottom-left corner. At 0.0 it flags all: both are 1, the top-right corner. In between, the curve traces the trade-off.
-
-The diagonal line from corner to corner is what random guessing gives. Anything above it is better than chance. The more towards the top-left corner, the better. The top-left corner it &mdash; catching each positive with no false alarms &mdash; is a perfect classifier.
-
-## The imbalance problem, and PR curves
-
-Here is where ROC quietly misleads. And it happens on just the problems people care about most.
-
-Take 10,000 transactions, 100 of them fraud. A model flags 500 transactions to catch 90 frauds.
-
-- True positive rate = 90/100 = 0.90.
-- False positive rate = 410/9,900 = 0.041.
-
-Those counts look superb, and the ROC curve will sit close to the top-left corner. But precision is 90/500 = 0.18 &mdash; four out of five alerts are false. The false positive rate is small just since the denominator, the 9,900 legitimate transactions, is enormous. ROC divides by a big count and flatters the result.
-
-A <strong>precision&ndash;recall curve</strong> does not have this problem, since precision's denominator is the number of alerts, not the number of negatives. On imbalanced problems it tracks what a human reviewing the alerts will really experience.
-
-|&nbsp;|ROC curve|Precision&ndash;recall curve|
-|---|---|---|
-|Axes|TPR against FPR|Precision against recall|
-|Baseline|The diagonal, AUC 0.5|A flat line at the positive rate|
-|Balanced data|Excellent|Fine|
-|Rare positives|Over-optimistic|The right choice|
-|Changes with prevalence|No|Yes|
-
-The rule of thumb: report ROC-AUC when classes are roughly balanced or when both classes matter equally. And PR-AUC when positives are rare and the cost of a false alarm is borne by a human.
-
-## One count that ignores your threshold
-
-AUC is the probability that a random positive scores above a random negative. That is not a metaphor -- here it is, counted right.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score
-
-X, y = make_classification(n_samples=5000, n_features=15, n_informative=5,
-                           weights=[0.8, 0.2], flip_y=0.10, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.35, random_state=0,
-                                      stratify=y)
-
-models = {
-    "logistic regression": LogisticRegression(max_iter=2000),
-    "random forest":       RandomForestClassifier(n_estimators=200, random_state=0),
-}
-probs = {}
-for name, m in models.items():
-    probs[name] = m.fit(Xtr, ytr).predict_proba(Xte)[:, 1]
-    print("%-22s AUC %.4f" % (name, roc_auc_score(yte, probs[name])))
-
-rng = np.random.default_rng(0)
-print("%-22s AUC %.4f  <- coin flip" % ("random scores", roc_auc_score(yte, rng.random(len(yte)))))
-```
-
-The same model also shows what AUC literally measures when you count random draws.
-
-```python-run
-import numpy as np
-from sklearn.datasets import make_classification
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_curve, roc_auc_score
-
-X, y = make_classification(n_samples=5000, n_features=15, n_informative=5,
-                           weights=[0.8, 0.2], flip_y=0.10, random_state=0)
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.35, random_state=0,
-                                      stratify=y)
-p = RandomForestClassifier(n_estimators=200, random_state=0).fit(Xtr, ytr).predict_proba(Xte)[:, 1]
-rng = np.random.default_rng(0)
-pos, neg = p[yte == 1], p[yte == 0]
-pairs = 200_000
-a = pos[rng.integers(0, len(pos), pairs)]
-b = neg[rng.integers(0, len(neg), pairs)]
-print("what AUC literally means -- draw one positive and one negative at random:")
-print("  the positive scored higher in %.4f of %d draws"
-      % (((a > b) + 0.5 * (a == b)).mean(), pairs))
-print("  roc_auc_score says              %.4f" % roc_auc_score(yte, p))
-print()
-fpr, tpr, thr = roc_curve(yte, p)
-print("the curve is just every threshold at once:")
-print("%12s %10s %10s" % ("threshold", "FPR", "TPR"))
-for i in np.linspace(1, len(thr) - 2, 8).astype(int):
-    print("%12.4f %10.4f %10.4f" % (thr[i], fpr[i], tpr[i]))
-print()
-print("AUC is the area under that curve. it never looks at a threshold, which")
-print("is its strength when comparing models and its weakness when you have to")
-print("ship one -- shipping means choosing a point on the curve.")
-```
-
-## Guided tour
-
-1. <strong>Watch the point travel.</strong> Set the <strong>Threshold</strong> slider to 0.9. Very few things are predicted positive: FPR is near zero. But so is recall. And the operating point sits in the bottom-left of the curve. Now set the <strong>Threshold</strong> slider to 0.1 and it swings to the top-right &mdash; you catch nearly each positive, at the cost of flagging most negatives.
-2. <strong>Confirm what AUC ignores.</strong> Move the threshold anywhere you like and watch the AUC readout. It does not move. AUC is a property of the ranking. The threshold just chooses where you sit on the curve.
-3. <strong>Make the model useless.</strong> Set the <strong>Class Separation</strong> slider to 0. The two distributions sit on top of each other, the curve collapses onto the diagonal. And AUC falls to about 0.5. There is no threshold that rescues a model that cannot rank.
-4. <strong>Make it perfect.</strong> Set the <strong>Class Separation</strong> slider to 4. The distributions barely touch, the curve hugs the top-left corner. And AUC ways 1.
-5. <strong>Meet the imbalance trap.</strong> Set the <strong>Positive Rate</strong> slider to 0.02. So just 2% of the data is positive. AUC barely changes &mdash; the ranking is just as good &mdash; but watch precision collapse. Most of what you flag is now a false positive, since there are so many more negatives on hand to be wrongly flagged.
-6. <strong>Let the metric choose.</strong> With that imbalance still set, click <strong>Jump to Best F1</strong> and then <strong>Jump to Best TPR &minus; FPR</strong>. They land in other places, since they are optimising other things. Neither is "correct" without knowing what an error costs you.
-
-## The imbalance trap, spelled out
-
-Suppose 1% of a million people have a disease. And your test catches 90% of them at a 10% false positive rate. That is a respectable ROC point. In absolute counts: 9,000 true positives, and 99,000 false positives. Over 90% of the people you flag are healthy.
-
-The ROC curve does not show this, since FPR divides by the 990,000 negatives and 99,000 of them is just 10%. Precision divides by what you <em>flagged</em>. And that is where the problem appears. On heavily imbalanced problems the precision&ndash;recall curve is the more honest picture. And average precision the more honest summary.
-
-## Choosing a threshold
-
-The curve tells you the options. It cannot tell you which to take. That depends on what each error costs:
-
-- <strong>Youden's J</strong> (maximise TPR &minus; FPR) is a reasonable default when the two errors matter about equally.
-- <strong>Best F1</strong> balances precision and recall. It is often more right when positives are rare.
-- <strong>A fixed budget</strong> &mdash; "we can just follow up 500 cases a week" &mdash; means picking the threshold that gives 500 flags, whatever the rates work out to.
-- <strong>Explicit costs</strong>, when you have them, beat all of the above: minimise the expected cost right.
-
-## Traps worth knowing
-
-- <strong>Reporting AUC on an imbalanced problem and stopping there.</strong> It can look excellent while the model is unusable in practice. Report precision at your operating point too.
-- <strong>Checking AUCs across other datasets.</strong> AUC depends on the trouble of the data as much as the quality of the model. It is a fair comparison between two models on one dataset, not between one model on two.
-- <strong>Treating AUC as accuracy.</strong> They are unrelated quantities. A model can have AUC 0.95 and terrible accuracy at the default threshold of 0.5. It often means the scores need calibrating rather than the model replacing.
-- <strong>Tuning the threshold on the test set.</strong> The threshold is a parameter like any other. Choose it on validation data, or the reported performance is optimistic.
-
-## Summing up
-
-The ROC curve plots true positive rate against false positive rate across each possible threshold. It separates two questions that accuracy tangles together: how well the model ranks. And where you choose to cut. AUC summarises just the first. And equals the probability that a random positive outscores a random negative &mdash; so it is unchanged by the threshold and nearly unchanged by class imbalance. That property can mislead on rare-event problems. There precision collapses while AUC looks fine. Check precision at your actual operating point. And pick that point from what the two kinds of error really cost.
-
-## Turning a curve into an operating point
-
-An ROC curve does not choose a threshold for you. Three ways to make that choice, in raising order of rigour:
-
-<strong>Youden's J statistic</strong> picks the point that maximises TPR &minus; FPR &mdash; the point furthest above the diagonal. It treats both error types as equally costly. It is rarely true but makes a defensible default.
-
-<strong>A fixed constraint.</strong> "We must catch 95% of fraud" fixes the TPR. And you read the threshold off the curve at that height. Or "we can review 200 alerts a day" fixes the alert volume. Steps teams often have one of these constraints now.
-
-<strong>Expected cost.</strong> Give a cost to a false negative and a false positive, compute the expected cost at each threshold. And take the min. This is the just way that gets the answer right when the costs are asymmetric. It they nearly always are.
-
-```python
-from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve, average_precision_score
-
-probs = model.predict_proba(X_test)[:, 1]
-
-fpr, tpr, thresholds = roc_curve(y_test, probs)
-print("ROC-AUC:", roc_auc_score(y_test, probs))
-print("PR-AUC :", average_precision_score(y_test, probs))
-
-best = (tpr - fpr).argmax()          # Youden's J
-print("threshold:", thresholds[best])
-```
-
-Note that `predict()` silently uses 0.5. If you have chosen another operating point, you must apply it yourself &mdash; `(probs >= chosen).astype(int)` &mdash; or the threshold you carefully selected never reaches production.
-
-## Checking models honestly
-
-AUC is popular for model comparison since it does not depend on a threshold. So it checks the underlying ranking ability rather than a particular deployment decision. Three cautions:
-
-<strong>A higher AUC does not guarantee a better model at your operating point.</strong> Two curves can cross: model A is better at low false positive rates, model B better at high ones. If you operate only in the low-FPR region, A is the better model no matter total area. Always inspect the relevant part of the curves, not only total AUC.
-
-<strong>AUC gaps within noise are not gaps.</strong> On a test set of a few thousand rows, 0.842 versus 0.847 is nothing. Bootstrap the test set to get a confidence interval before declaring a winner.
-
-<strong>Calibration is a split question.</strong> If a downstream system multiplies your probability by a monetary value, ranking is not enough &mdash; check a reliability diagram and calibrate if needed. Calibration does not change AUC at all, since it is a monotonic transformation of the scores.
-
-## Questions people ask
-
-<strong>What is a good AUC?</strong> Domain-dependent. Credit scoring lives around 0.7&ndash;0.8 and that is a mature, valuable industry. Some medical imaging tasks reach 0.99. Check against the best existing model, not against 1.0.
-
-<strong>Can AUC be below 0.5?</strong> Yes. And it almost always means an inverted convention &mdash; you passed the wrong column of `predict_proba`. Or the positive label is not what you think.
-
-<strong>Does AUC work for multi-class problems?</strong> By extension: one-vs-rest AUC per class, then macro- or weighted-averaged. Report the per-class counts too, since averaging hides a class the model cannot rank at all.
-
-<strong>Why is my AUC good but my accuracy poor?</strong> Since the ranking is good and the threshold is wrong. This is the most fixable problem in classification &mdash; move the threshold.
-
-<strong>Does class imbalance change AUC?</strong> ROC-AUC is insensitive to prevalence. It is just why it can look good on data where a human would find the alerts useless. PR-AUC does move with prevalence and is the more honest measure there.
-
-<strong>Should I optimise AUC right in training?</strong> Rarely needed. Train with a proper loss such as cross-entropy, then test with AUC. Ranking-set losses exist and are mostly used in learning-to-rank problems.
-
-## Recap in one screen
-
-- An ROC curve shows each threshold at once, plotting recall against the false positive rate.
-- AUC is the probability that a random positive outscores a random negative &mdash; a measure of ranking, not of calibration.
-- 0.5 is chance, above 0.9 is strong, below 0.5 means something is inverted.
-- On rare-positive problems ROC flatters the model. Use precision&ndash;recall curves instead.
-- The curve does not pick a threshold. Pick it from your constraints or your costs, and apply it clearly.
-
-## Further reading
-
-For implementation details, see the [ROC curves and AUC](https://scikit-learn.org/stable/modules/model_evaluation.html). Continue with [precision-recall versus ROC](precision_recall_vs_roc.html) to connect this topic to a related part of the workflow.
+- [scikit-learn: ROC metrics](https://scikit-learn.org/stable/modules/model_evaluation.html#roc-metrics) explains ROC curves and AUC.
+- Continue with [precision-recall versus ROC](precision_recall_vs_roc.html), [threshold tuning](threshold_tuning.html), and [probability calibration](probability_calibration.html).
