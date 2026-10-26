@@ -6,10 +6,11 @@ links - written statically so crawlers that do not run JavaScript still saw
 it, and then redrawn by renderCourses() on load. That made the homepage a
 directory: 748 links and not one paragraph of two sentences.
 
-The default view is now the 18 tracks, each a card with a short paragraph
-(tools/home_copy.py) and one link to the track's own page, where the full
-ordered module list lives. renderCourses() keeps this markup for the default
-view and only draws the full catalogue for a track filter or a search.
+The default view is now the 18 tracks, each a card with a visual from its first
+module, a short paragraph (tools/home_copy.py) and one link to the track's own
+page, where the full ordered module list lives. renderCourses() keeps this
+markup for the default view and only draws the full catalogue for a track
+filter or a search.
 
 Idempotent: re-running replaces the block.
 """
@@ -31,7 +32,7 @@ BLOCK = re.compile(re.escape(BEGIN) + r".*?" + re.escape(END), re.S)
 PLACEHOLDER = re.compile(r"<!-- Courses will be injected here -->")
 
 
-def track_card(key, n):
+def track_card(key, n, representative):
     """A track: its size, its name as the one link, and its paragraph.
 
     The paragraph sits outside the link, so the page's prose is prose rather
@@ -39,14 +40,19 @@ def track_card(key, n):
     the whole card is still one click target.
     """
     t = TOPICS[key]
+    art = (representative or {}).get("svg", "").strip()
+    if art.startswith("<svg") and "xmlns=" not in art:
+        art = art.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"', 1)
     return (
-        '<div class="vzx-panel vzx-start-card">'
+        '<div class="vzx-panel vzx-start-card vzx-track-card">'
+        '<div class="vzx-track-art" aria-hidden="true">%s</div>'
         '<span class="vzx-start-track">%d modules</span>'
         '<h3 class="vzx-start-title"><a href="%s/">%s</a></h3>'
         '<p class="vzx-start-p">%s</p>'
         '<span class="vzx-start-go" aria-hidden="true">Open the track &rarr;</span>'
         "</div>"
-        % (n, html.escape(t["dir"]), html.escape(t["title"]), html.escape(TRACK_BLURBS[key]))
+        % (art, n, html.escape(t["dir"]), html.escape(t["title"]),
+           html.escape(TRACK_BLURBS[key]))
     )
 
 
@@ -65,7 +71,8 @@ def main():
         raise SystemExit("no homepage copy for track(s): %s (tools/home_copy.py)" % missing)
 
     total = sum(len(data[k]["courses"]) for k in ordered)
-    cards = "".join(track_card(k, len(data[k]["courses"])) for k in ordered)
+    cards = "".join(
+        track_card(k, len(data[k]["courses"]), data[k]["courses"][0]) for k in ordered)
     block = (
         BEGIN
         + "\n<!-- The homepage's default view. renderCourses() keeps it for the\n"

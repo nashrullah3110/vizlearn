@@ -130,31 +130,20 @@ TRACK_BLURBS = {
     ),
 }
 
-# The featured modules, in the order shown. Two sentences each: what you do
-# on the page, then what it shows you.
+# The featured modules, in the order shown. One concise interaction hook per
+# card; the illustration carries the visual preview and each linked lesson
+# provides the full explanation.
 FEATURED = [
     ("maths/bayes_theorem.html",
-     "A positive result from a 99% accurate test can still mean you are "
-     "probably fine. Adjust the base rate on a grid of real people and the "
-     "paradox stops being one."),
+     "Set the base rate for a rare condition and see what a positive test really means."),
     ("machine_learning/knn.html",
-     "Drop a point on the plane and let its nearest neighbours vote on its "
-     "class. Change k and the decision boundary goes from jagged to smooth in "
-     "front of you."),
+     "Move a query point; its k nearest labelled neighbours vote on the class."),
     ("deep_learning/backpropagation.html",
-     "Run a small computational graph forward, then backward, one local "
-     "gradient at a time. Every gradient is checked against a finite "
-     "difference, so you can see the chain rule is not hand-waving."),
+     "Run a small network and follow each gradient back through the graph."),
     ("dsa/big_o_notation.html",
-     "Put constant, logarithmic, linear, n log n, quadratic and exponential "
-     "growth on the same axes. Real operation counts sit beside the curves, so "
-     "the notation turns into numbers."),
+     "Compare operation counts as input size grows, from constant to exponential."),
     ("natural_language_processing/attention_mechanism.html",
-     "See why squeezing a whole sentence into one context vector loses "
-     "information. Attention lets the decoder re-weigh every input word at "
-     "each step, shown as a full alignment matrix."),
+     "Change attention weights and see which input words shape the context."),
     ("gen_ai/rag.html",
-     "Ask about a product no model has heard of and watch retrieval score "
-     "every chunk. The winners go into the prompt, and a guess becomes an "
-     "answer with sources."),
+     "Rank document chunks by similarity and inspect what retrieval sends to the model."),
 ]

@@ -56,13 +56,11 @@ def esc(s):
 # --------------------------------------------------------------------------
 
 def featured():
-    """Six strong interactive examples, with concise reasons to open them.
+    """Six illustrated examples plus a small live experiment.
 
-    This was "Start here": the first module of six tracks, title only. The
-    homepage now opens on the track cards below it, so this is the place for
-    a short, written reason to open a particular page. Copy lives in
-    tools/home_copy.py; the paragraph sits outside the link, as on the track
-    cards.
+    The compact KNN experiment gives visitors one immediate interaction. The
+    six lesson cards below it use the catalog's own artwork and concise hooks;
+    copy lives in tools/home_copy.py.
     """
     by = {m["path"]: m for m in modules(with_desc=False)}
     cards = []
@@ -70,18 +68,87 @@ def featured():
         m = by.get(path)
         if not m:
             raise SystemExit("featured module not in the catalog: %s" % path)
+        art = m["svg"].strip()
+        if art.startswith("<svg") and "xmlns=" not in art:
+            art = art.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"', 1)
         cards.append(
-            '<div class="vzx-panel vzx-start-card"><span class="vzx-start-track">%s</span>'
+            '<article class="vzx-panel vzx-start-card vzx-featured-card">'
+            '<div class="vzx-featured-art" aria-hidden="true">%s</div>'
+            '<div class="vzx-featured-copy"><span class="vzx-start-track">%s</span>'
             '<h3 class="vzx-start-title"><a href="%s" data-vz-path="%s">%s</a></h3>'
-            '<p class="vzx-start-p">%s</p></div>'
-            % (esc(m["category"]), esc(path), esc(path), esc(m["title"]), esc(blurb)))
+            '<p class="vzx-start-p">%s</p>'
+            '<span class="vzx-start-go" aria-hidden="true">Open lesson &rarr;</span></div>'
+            '</article>'
+            % (art, esc(m["category"]), esc(path), esc(path), esc(m["title"]), esc(blurb)))
     return ('<section class="vzx-sec" id="featured-lessons" aria-labelledby="vzx-start-h"><div class="vzx-wrap">'
             '<p class="vzx-kicker">Featured</p>'
-            '<h2 class="vzx-h" id="vzx-start-h">Try a concept for yourself</h2>'
-            '<p class="vzx-sub">Choose one of six hands-on lessons. Change an input, see '
-            'what changes, then read the explanation and code.</p>'
-            '<div class="vzx-start vzx-featured-grid">%s</div>%s</div></section>'
-            % ("".join(cards), learning_path_prompt()))
+            '<h2 class="vzx-h" id="vzx-start-h">Try an idea, then choose what to learn next</h2>'
+            '<p class="vzx-sub">Move the query point and change k. The neighbours vote again each time.</p>'
+            '%s<div class="vzx-start vzx-featured-grid">%s</div>%s</div></section>'
+            % (knn_demo(), "".join(cards), learning_path_prompt()))
+
+
+HOME_KNN_POINTS = [
+    (20, 24, "a"), (31, 35, "a"), (18, 50, "a"), (37, 27, "a"), (35, 48, "a"),
+    (62, 26, "b"), (76, 37, "b"), (67, 53, "b"), (84, 62, "b"), (59, 72, "b"),
+]
+
+
+def knn_demo():
+    """A small, self-contained KNN vote preview based on the full KNN lesson."""
+    points = "".join(
+        '<circle class="vz-home-knn-point is-%s" data-point="%d" data-x="%d" '
+        'data-y="%d" data-class="%s" cx="%d" cy="%d" r="7"/>'
+        % (kind, i, x, y, kind, 48 + x * 5.52, 300 - y * 2.68)
+        for i, (x, y, kind) in enumerate(HOME_KNN_POINTS)
+    )
+    grid = "".join(
+        '<line class="vz-home-knn-grid" x1="%d" y1="32" x2="%d" y2="300"/>' % (x, x)
+        for x in range(48, 601, 69)
+    ) + "".join(
+        '<line class="vz-home-knn-grid" x1="48" y1="%d" x2="600" y2="%d"/>' % (y, y)
+        for y in range(32, 301, 54)
+    )
+    return (
+        '<div class="vz-home-knn" id="home-knn" data-vz-home-demo="knn">'
+        '<div class="vz-home-knn-intro">'
+        '<span class="vzx-start-track">Live preview · K-nearest neighbours</span>'
+        '<p>KNN predicts from nearby labelled points. Move the new point left or right; '
+        'the closest neighbours cast the vote.</p>'
+        '<a class="vz-home-knn-link" href="machine_learning/knn.html" '
+        'data-vz-path="machine_learning/knn.html">Open the full KNN lesson &rarr;</a>'
+        '</div>'
+        '<div class="vz-home-knn-playground">'
+        '<svg class="vz-home-knn-svg" viewBox="0 0 640 360" role="img" '
+        'aria-labelledby="home-knn-title home-knn-desc" aria-describedby="home-knn-readout">'
+        '<title id="home-knn-title">K-nearest neighbours classification demo</title>'
+        '<desc id="home-knn-desc">Blue and coral training points. A gold query point moves horizontally. '
+        'Dashed lines connect it to the selected nearest neighbours.</desc>'
+        '<rect class="vz-home-knn-bg" x="32" y="16" width="584" height="312" rx="8"/>'
+        '%s<line class="vz-home-knn-axis" x1="48" y1="300" x2="600" y2="300"/>'
+        '<line class="vz-home-knn-axis" x1="48" y1="32" x2="48" y2="300"/>'
+        '<g data-knn-links aria-hidden="true"></g><g data-knn-points>%s</g>'
+        '<circle class="vz-home-knn-query is-a" data-knn-query cx="324" cy="166" r="11"/>'
+        '<text class="vz-home-knn-axis-label" x="324" y="326" text-anchor="middle">Feature 1</text>'
+        '<text class="vz-home-knn-axis-label" transform="translate(19 166) rotate(-90)" text-anchor="middle">Feature 2</text>'
+        '</svg>'
+        '<div class="vz-home-knn-legend" role="group" aria-label="Plot legend">'
+        '<span><i class="is-a"></i> Class A</span><span><i class="is-b"></i> Class B</span>'
+        '<span><i class="is-query"></i> Query</span></div>'
+        '<div class="vz-home-knn-controls">'
+        '<label class="vz-home-knn-control" for="home-knn-k">'
+        '<span>Neighbours <strong>k = <output id="home-knn-k-value">5</output></strong></span>'
+        '<input id="home-knn-k" type="range" min="1" max="9" step="2" value="5" '
+        'aria-label="Number of neighbours, k"></label>'
+        '<label class="vz-home-knn-control" for="home-knn-x">'
+        '<span>Move query point <strong><output id="home-knn-x-value">50</output></strong></span>'
+        '<input id="home-knn-x" type="range" min="5" max="95" value="50" '
+        'aria-label="Move the query point from the blue class to the coral class"></label>'
+        '</div>'
+        '<p class="vz-home-knn-readout" id="home-knn-readout" role="status" aria-live="polite">'
+        'Class A wins: 3 blue to 2 coral with k = 5. Move the point or change k to see the vote change.</p>'
+        '</div></div>' % (grid, points)
+    )
 
 
 def learning_path_prompt():
@@ -181,6 +248,60 @@ HUB_JS = """<script>
   document.addEventListener('click', function (e) {
     if (e.target.closest && e.target.closest('#themeToggle, .theme-toggle')) guard();
   }, true);
+
+  // A tiny KNN experiment lets first-time visitors try the same idea as the
+  // full lesson without loading a second page or another visualization bundle.
+  var demo = document.querySelector('[data-vz-home-demo="knn"]');
+  if (!demo) return;
+  var plot = demo.querySelector('.vz-home-knn-svg');
+  var kInput = demo.querySelector('#home-knn-k');
+  var xInput = demo.querySelector('#home-knn-x');
+  var kValue = demo.querySelector('#home-knn-k-value');
+  var xValue = demo.querySelector('#home-knn-x-value');
+  var output = demo.querySelector('#home-knn-readout');
+  var pointLayer = demo.querySelector('[data-knn-points]');
+  var linkLayer = demo.querySelector('[data-knn-links]');
+  var query = demo.querySelector('[data-knn-query]');
+  if (!plot || !kInput || !xInput || !output || !pointLayer || !linkLayer || !query) return;
+
+  var training = Array.prototype.map.call(pointLayer.querySelectorAll('[data-point]'), function (el) {
+    return {element:el, index:Number(el.dataset.point), x:Number(el.dataset.x),
+      y:Number(el.dataset.y), c:el.dataset.class};
+  });
+  function px(x) { return 48 + x * 5.52; }
+  function py(y) { return 300 - y * 2.68; }
+  function update() {
+    var k = Number(kInput.value);
+    var x = Number(xInput.value);
+    var q = {x:x, y:50};
+    var nearest = training.map(function (p, i) {
+      var dx = p.x - q.x, dy = p.y - q.y;
+      return {point:p, index:i, distance:dx * dx + dy * dy};
+    }).sort(function (a, b) { return a.distance - b.distance; }).slice(0, k);
+    var selected = new Set(nearest.map(function (n) { return n.index; }));
+    var votes = nearest.reduce(function (v, n) { v[n.point.c] += 1; return v; }, {a:0,b:0});
+    var winner = votes.a > votes.b ? 'a' : 'b';
+    training.forEach(function (p) {
+      p.element.classList.toggle('is-nearest', selected.has(p.index));
+    });
+    linkLayer.innerHTML = nearest.map(function (n) {
+      return '<line class="vz-home-knn-link-line" x1="' + px(q.x).toFixed(1) +
+        '" y1="' + py(q.y).toFixed(1) + '" x2="' + px(n.point.x).toFixed(1) +
+        '" y2="' + py(n.point.y).toFixed(1) + '"/>';
+    }).join('');
+    query.setAttribute('cx', px(q.x).toFixed(1));
+    query.setAttribute('cy', py(q.y).toFixed(1));
+    query.setAttribute('class', 'vz-home-knn-query is-' + winner);
+    kValue.value = k;
+    kValue.textContent = k;
+    xValue.value = x;
+    xValue.textContent = x;
+    output.textContent = 'Class ' + winner.toUpperCase() + ' wins: ' +
+      votes.a + ' blue to ' + votes.b + ' coral with k = ' + k + '. Move the point or change k to see the vote change.';
+  }
+  kInput.addEventListener('input', update);
+  xInput.addEventListener('input', update);
+  update();
 })();
 </script>"""
 
@@ -216,7 +337,7 @@ def main():
     src = src[:at] + bottom + src[at:]
 
     open(INDEX, "w", encoding="utf-8").write(src)
-    print("hub sections    : six featured lessons, track catalog, learning route, study tools")
+    print("hub sections    : KNN demo, six illustrated lessons, track catalog, learning route, study tools")
     print("intro band      : %s" % ("removed" if removed else "already gone"))
     print("numbers         : %d modules, %d tracks (from the catalog)"
           % (n["modules"], n["tracks"]))
