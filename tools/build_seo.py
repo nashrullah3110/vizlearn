@@ -304,7 +304,7 @@ def breadcrumbs(rel, short, mod):
     }
 
 
-def build_block(rel, title, desc, prefix, mod, needs_icons=False):
+def build_block(rel, title, desc, prefix, mod, needs_icons=False, include_stylesheet=True):
     """The generated <head> block for one page."""
     url = page_url(rel)
     img = og_image(rel)
@@ -441,10 +441,11 @@ def build_block(rel, title, desc, prefix, mod, needs_icons=False):
         '    <meta name="twitter:title" content="%s">' % e(short),
         '    <meta name="twitter:description" content="%s">' % e(desc),
         '    <meta name="twitter:image" content="%s">' % img,
+    ] + ([
         "",
         "    <!-- prebuilt stylesheet (replaces the Tailwind CDN compiler) -->",
         '    <link rel="stylesheet" href="%sassets/vizlearn.css">' % prefix,
-    ] + ([
+    ] if include_stylesheet else []) + ([
         "",
         "    <!-- Google AdSense -->",
         ADSENSE_TAG,
@@ -534,15 +535,18 @@ def normalize_home_links(src):
 NOINDEX = indexing.noindex_pages()
 
 
-def main():
+def main(page_paths=None):
     mods = modules()
     by_path = {m["path"]: m for m in mods}
-    files = sorted(glob.glob(os.path.join(ROOT, "*", "*.html")))
-    files = [f for f in files
-             if os.path.basename(os.path.dirname(f)) not in ("tools", "assets", "node_modules")]
-    files.append(os.path.join(ROOT, "index.html"))
-    files += [os.path.join(ROOT, p) for p in STATIC_PAGES
-              if os.path.exists(os.path.join(ROOT, p))]
+    if page_paths is None:
+        files = sorted(glob.glob(os.path.join(ROOT, "*", "*.html")))
+        files = [f for f in files
+                 if os.path.basename(os.path.dirname(f)) not in ("tools", "assets", "node_modules")]
+        files.append(os.path.join(ROOT, "index.html"))
+        files += [os.path.join(ROOT, p) for p in STATIC_PAGES
+                  if os.path.exists(os.path.join(ROOT, p))]
+    else:
+        files = [os.path.join(ROOT, p) for p in page_paths]
 
     added_desc = 0
     rewritten_desc = 0
@@ -611,8 +615,13 @@ def main():
             src = src[:anchor] + tag + src[anchor:]
             added_desc += 1
 
+        has_stylesheet = re.search(
+            r'<link\b[^>]*href=["\'][^"\']*assets/vizlearn\.css(?:[?#][^"\']*)?["\']',
+            src, re.I,
+        )
         block = build_block(rel, title, desc, prefix, by_path.get(rel),
-                            needs_icons="vzIcon(" in src)
+                            needs_icons="vzIcon(" in src,
+                            include_stylesheet=not has_stylesheet)
 
         # Insert just before the page's own <style>, so page rules still win.
         i = src.find("<style>")

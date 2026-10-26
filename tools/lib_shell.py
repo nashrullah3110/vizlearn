@@ -81,6 +81,7 @@ def head_top(title, prefix):
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="%sassets/vizlearn.css">
     <script>
         (function(){
             const apply = (t)=>{
@@ -95,7 +96,7 @@ def head_top(title, prefix):
         /* page-specific rules go here; the shared system is in vizlearn.css */
     </style>
 </head>
-""" % (html.escape(title), GA_ID, GA_ID)
+""" % (html.escape(title), GA_ID, GA_ID, prefix)
 
 
 def header(prefix, back_label="Home"):
