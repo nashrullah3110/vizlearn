@@ -1,160 +1,27 @@
-title: Partitioning by Range and Hash
-intro: Cutting one table into pieces the planner can skip. The choice of where to cut.
+title: Database Partitioning: Split One Table into Partitions
+intro: Partitioning divides a large logical table into smaller pieces managed by one database system, often using a key such as date or region.
 
-## One table, several files
+## One table, several partitions
+With table partitioning, queries and applications can work with one logical table while the database stores rows in separate partitions. A partitioning rule assigns each row—for example, a range of dates per month or a hash bucket based on a tenant key.
 
-Splitting splits a table into physical pieces by a rule on one or more
-columns. uses keep querying the single logical table. The engine decides
-which pieces are involved.
+Partitioning can help with lifecycle operations and queries that filter by the partition key. When a predicate excludes partitions, partition pruning lets the engine skip those pieces. It does not automatically make every query faster, and queries that scan all partitions may gain little.
 
-This is **not** sharding. each split lives in the same DB on the same
-server. [Sharding](sharding_in_databases.html) spreads data across separate
-machines and is a much larger commitment.
+## Choose the key from access patterns
+A useful partition key appears in frequent filters and divides data with predictable boundaries. Range partitioning suits ordered values such as time; hash partitioning can distribute values more evenly when range scans are not the main need. Too many tiny partitions increase planning and operational overhead.
 
-The query above builds three range splits and a view that unions them, which
-is the shape a split table has underneath. Run the variants to see what
-each strategy costs.
+Constraints, unique indexes, foreign keys, and maintenance behavior vary by engine. PostgreSQL, for example, has rules for unique constraints across partitioned tables. Test inserts, query plans, retention, and backups with the actual database and version.
 
-## Range partitioning
+## Partitioning is not sharding
+Partitions are usually managed inside one database system; sharding distributes data across separate servers or nodes and adds routing and cross-shard coordination. Partitioning does not by itself add horizontal capacity. See [sharding](sharding_in_databases.html).
 
-Pick an sorted column &mdash; almost always a timestamp &mdash; and give each
-split a bounded interval.
+## A time-based retention example
+A log table partitioned by month can let a query for one month avoid scanning older data, provided the filter exposes the partition key and the planner prunes other partitions. Retention may also be simpler when an old partition can be detached or dropped instead of deleting millions of individual rows. This depends on engine features, foreign-key relationships, backup policy, and whether the partition is still needed for historical queries. Partition boundaries should cover inserts deliberately; an uncovered date can cause writes to fail or enter a catch-all partition.
 
-```
-orders_2024  :  order_date >= '2024-01-01' AND < '2025-01-01'
-orders_2025  :  order_date >= '2025-01-01' AND < '2026-01-01'
-orders_2026  :  order_date >= '2026-01-01' AND < '2027-01-01'
-```
+## Test pruning with the real predicate
+A query can fail to prune partitions if it wraps the key in a function, casts it unexpectedly, or uses a predicate the planner cannot prove. Compare the plan for a bounded date range with a query that omits the date condition. Confirm that only the intended partitions are scanned and that boundary timestamps land in the correct interval. Partitioning creates operational work too: monitor partition creation, statistics, backups, and retention so the table does not accumulate empty or obsolete pieces.
 
-A query with `WHERE order_date >= '2026-01-01'` can be proved to need only the
-last split, so the engine reads one file instead of three. That proof is
-**split pruning**, and it's where nearly all the gain is.
+## Balance partition size and count
+A monthly partition is not automatically right for every time series. A small table may gain nothing from partitioning, while a very high-volume table may need daily or weekly boundaries to keep maintenance manageable. Too many partitions increase planning and catalog overhead; partitions that are too large can make retention and archival operations cumbersome. Choose a size using row volume, query ranges, maintenance windows, and engine limits. Revisit that choice as data grows rather than treating it as a one-time schema detail.
 
-The second gain is admin and, for time-series data, often the bigger
-one. Deleting a year of orders with `DELETE` writes a row version per deleted
-row, makes huge WAL traffic, and leaves the table bloated. `DROP TABLE
-orders_2024` unlinks a file. Retention policies are the standard reason to
-split.
-
-## Hash partitioning
-
-Hash the key, take the remainder modulo the split count, and store the row
-there. Rows spread evenly even so of what the values look like.
-
-This is the right choice when there's no natural sorting to exploit and the
-goal is to spread contention. Many concurrent writers hitting one hot
-page, say.
-
-The trade-off is that **hash splitting prunes only on equality**. A query for
-one `customer_id` reaches one split. A query for a *range* of customer ids
-reaches all of them, because hashing destroys order. Range splitting is the
-opposite: it prunes ranges beautifully and can leave you with one very hot
-split if recent data is where all the traffic goes.
-
-| | Range | Hash |
-|---|---|---|
-| Prunes equality | yes | yes |
-| Prunes ranges | yes | **no** |
-| Even distribution | no | yes |
-| Drop old data instantly | yes | no |
-| Typical key | timestamp | id |
-
-## Choosing the key
-
-The split key must appear in the `WHERE` clause of the queries you care
-about. This is the whole game, and it's where splitting schemes go wrong.
-
-Split by `order_date` and then run reports by `customer_id`, and each report
-reads each split &mdash; you've added cost and gained nothing. Worse
-than nothing: each split has its own indexes. So A query that scans them all
-does more index work than it would have on a single table.
-
-A second constraint follows: a unique constraint has to include the split
-key, because the engine can't cheaply enforce uniqueness across pieces it's
-trying not to read.
-
-## What pruning is worth, and what caps it
-
-The payoff scales with how much the query skips, and that is just math.
-Take 120 million orders over five years, split by month &mdash; 60
-splits of two million rows each. A report over a single month, filtering on
-the split key, prunes to one split:
-
-|query| rows the engine must touch |fraction of the table|
-|---|---|---|
-|one month|2,000,000|1.7% (1/60)|
-|one quarter|6,000,000|5.0% (3/60)|
-|no partition-key filter|120,000,000|100%|
-
-The single-month query does **60&times; less scanning**. And the number is
-just the split count, because pruning reads one of 60 equal pieces. Finer
-splits prune harder: weekly splits would make that same month prune to a
-quarter of the rows again.
-
-## Sizing
-
-So why not split into thousands of tiny pieces? Because pruning saves scan
-work and the planner spends it back. The planner tests each split when it
-builds the plan, so planning cost grows roughly linearly with the split count
-&mdash; a fixed cost paid on each query whether or not pruning helps it:
-
-|partitions|rough planning overhead|
-|---|---|
-|60|small, negligible next to the scan|
-|500|starting to matter for short queries|
-|5,000|can exceed the query's own runtime|
-
-For a lookup that executes in a couple of milliseconds, planning across thousands
-of splits is the dominant cost, and the splitting has made the query
-slower. That is the ceiling the two forces set between them: too few splits
-and pruning barely helps. Too many and planning overwhelms the saving. a place
-between a few dozen and a few hundred is the usual advice, and monthly splits
-over a couple of years land on its own in that band.
-
-Splits can also be **subpartitioned**. Range by month, then hash by
-customer within each month &mdash; when both access patterns matter.
-
-## Joins get a second, quieter benefit
-
-Pruning is the gain everyone knows. The other one shows up when two tables are
-split on the *same* key. Orders and order-items both by `customer_id`,
-say. A row in bucket `i` of one table can only match rows in bucket `i` of the
-other, so the engine performs a **split-wise join**: 60 small joins of
-aligned buckets, rather than one join over the whole product.
-
-The math is the same shape as pruning. With 60 buckets a side, matched
-splitting means 60 aligned split-joins. Unmatched, any bucket of one table
-could hold a match for any bucket of the other. This Is 60 &times; 60 = 3,600
-split-pairs to consider. And each aligned join is small enough that its hash
-table &mdash; two million rows, not 120 million &mdash; fits in memory instead of
-spilling to disk. This is why data warehouses split fact and dim tables
-on the join key: the join, not just the scan, gets cut into pieces the engine can
-hold.
-
-## Questions people ask
-
-<strong>What is partitioning?</strong> Splitting one large table into smaller pieces, called partitions, that are stored separately but queried as one table.
-
-<strong>What is the difference between range and hash partitioning?</strong> Range splits by value ranges such as dates. Hash spreads rows evenly using a hash of the key.
-
-<strong>What is partition pruning?</strong> The planner skips partitions that cannot contain matching rows. It only works when the query filters on the partition key.
-
-<strong>Is partitioning the same as sharding?</strong> No. Partitioning splits a table inside one database server. Sharding spreads data across several servers.
-
-<strong>How do I choose a partition key?</strong> Pick the column most queries filter on, such as a date for time-series data. A poor choice leaves queries touching every partition.
-
-<strong>Does partitioning always make queries faster?</strong> No. It helps when queries prune partitions or when old data is dropped by detaching a partition. Otherwise it adds overhead.
-
-## Where it goes wrong
-
-**Splitting a small table.** Under a few million rows, a good index is
-simpler and often faster.
-
-**A split key the queries don't filter on.** No pruning, more index
-cost.
-
-**Hash splitting then querying ranges.** each split, each time.
-
-**Losing the default split.** A row that matches no split is an error
-unless a catch-all exists, and a data-loading job that fails at midnight on New
-Year's Day is the classic version of this.
+## Further reading
+- [PostgreSQL table partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html) documents declarative partitioning and pruning.

@@ -1,220 +1,29 @@
-title: UNION, INTERSECT and EXCEPT in SQL: A Practical Guide
-intro: Set operators combine whole result sets vertically, stacking rows rather than widening them. That is the difference from a JOIN, and it is the point people miss most often.
+title: UNION, INTERSECT, and EXCEPT
+intro: Set operators combine the results of compatible SELECT statements vertically, matching columns by position rather than joining rows side by side.
 
-## How set operators mix result sets
+## Three ways to combine result sets
+UNION returns rows that appear in either query and removes duplicates. UNION ALL keeps every row, including duplicates. INTERSECT keeps rows common to both results. EXCEPT keeps rows from the first result that do not appear in the second.
 
-SQL has two ways to mix data from more than one source. A [JOIN](joins_in_sql.html) mixes tables <strong>horizontally</strong>: matching rows are linked and the result has the columns of both. A set operator mixes result sets <strong>vertically</strong>: rows from the second query are stacked under rows from the first. And the column count does not change.
-
-The three set operators are `UNION`, `INTERSECT`, and `EXCEPT`. `UNION` returns each row that appears in either result. `INTERSECT` returns just the rows that appear in both. `EXCEPT` returns the rows from the first result that do not appear in the second. Each of them removes duplicate rows by default. Add `ALL` to keep duplicates.
-
-The question a set operator answers is “which rows appear in these two result sets?”, not “what belongs together?”. If you want columns from two tables, you need a JOIN. If you want the rows from two close queries treated as one collection, you need one of these three operators.
-
-There is one strict rule: both queries must give the same count of columns. And the types must be compatible. If one query returns three columns and the other returns four, the database raises an error before it runs anything. That constraint is easy to miss when one of the queries uses `SELECT *`. And the error message does not always say which column broke it.
-
-## The three operators
-
-Take two result sets, A = {1, 2, 3} and B = {2, 3, 4}:
-
-A UNION B&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr; 1, 2, 3, 4&nbsp;&nbsp;&nbsp;in either, duplicates removed<br>A UNION ALL B&nbsp;&rarr; 1,2,3,2,3,4&nbsp;&nbsp;all, duplicates kept<br>A INTERSECT B &rarr; 2, 3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in both<br>A EXCEPT B&nbsp;&nbsp;&nbsp;&nbsp;&rarr; 1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in A but not B
-
-Two things are worth noting. <strong>EXCEPT is not symmetric</strong> &mdash; <span class="mono-font">B EXCEPT A</span> gives 4, a other answer. And UNION, INTERSECT and EXCEPT all remove duplicates by default. It is a genuine cost: the database must sort or hash the whole result to find them.
-
-Some databases spell EXCEPT as MINUS (Oracle), and the semantics are the same.
-
-## The rules each set operator enforces
-
-- <strong>Same count of columns</strong> in both queries.
-- <strong>Compatible types</strong>, position by position &mdash; the first column of one must be comparable with the first column of the other.
-- <strong>Column names come from the first query.</strong> The second query’s aliases are ignored fully.
-- <strong>ORDER BY applies to the whole result</strong> and may appear just once, at the very end. It cannot be attached to an individual branch.
-
-Note that matching is <em>positional</em>, not by name. If the first query selects (id, name) and the second selects (name, id). And both are text-compatible, the query runs and silently returns nonsense.
-
-## Stacking results, not joining them
-
-Joins put tables side by side, matching rows on a condition. Set operators put results one on top of the other, matching them by column position.
-
-```sql
-SELECT name, email FROM customers
+<pre><code>SELECT email FROM customers
 UNION
-SELECT name, email FROM suppliers;
-```
+SELECT email FROM newsletter_signups;</code></pre>
 
-Three operators cover the whole topic:
+This produces the combined set of email values. Use UNION ALL when duplicates are meaningful or have already been handled; it avoids the duplicate-elimination work required by UNION.
 
-- <strong>`UNION`</strong> &mdash; all from both, duplicates removed.
-- <strong>`INTERSECT`</strong> &mdash; just rows appearing in both.
-- <strong>`EXCEPT`</strong> (called `MINUS` in Oracle) &mdash; rows in the first result that are not in the second.
+## The result columns must line up
+Each query must return the same number of columns in the same order, with compatible types. Column names generally come from the first SELECT. Set operators combine values by position; they do not match columns by name.
 
-Each has an `ALL` variant that keeps duplicates: `UNION ALL`, `INTERSECT ALL`, `EXCEPT ALL`.
+If order matters, apply ORDER BY to the final combined result. Parentheses and precedence rules differ in how complex combinations are parsed, so use parentheses to make intent clear. Support for INTERSECT and EXCEPT varies across older engines.
 
-The rules each set operator enforces:
+## Choose between a set operation and a join
+Use a set operator when each query produces a compatible list of values to stack or compare. Use a join when columns from related rows should appear side by side. See [joins](joins_in_sql.html). If the input query includes NULL, duplicate handling follows the set operation's rules, which may differ from ordinary equality predicates.
 
-1. Both queries must give the <strong>same count of columns</strong>.
-2. Corresponding columns must have <strong>compatible types</strong>.
-3. Column names come from the <strong>first</strong> query. Names in the second are ignored.
-4. `ORDER BY` applies to the mixed result and goes at the very end, once.
+## Duplicate removal changes meaning
+UNION treats duplicate result rows as one row, comparing the complete output row rather than a chosen key. If two source tables contain the same email but different names, both rows remain because the rows are not identical. UNION ALL preserves both regardless. If the desired rule is “one row per email, choosing the newest record,” a set operator alone does not express which record wins; use ranking or an aggregate with an explicit selection rule.
 
-Matching is by <em>position</em>, not by name. `SELECT name, email` unioned with `SELECT email, name` compiles happily and gives nonsense &mdash; a real bug that type compatibility often fails to catch, since both columns are text.
+## Align types and ordering deliberately
+Corresponding columns are paired by position, so a name in column one of the first query is combined with column one of the next query even when that column has a different alias. Give each SELECT the same intended meaning and compatible types at every position. If the output needs a label or stable order, name columns in the first query and sort the final compound result. An ORDER BY inside an individual branch does not define the final combined order and may be disallowed without a limiting clause.
 
-## UNION versus UNION ALL, and why the default is the slow one
-
-`UNION` removes duplicates, and removing duplicates means sorting or hashing the whole mixed result. `UNION ALL` simply concatenates.
-
-On a million rows, the gap is large &mdash; often a few times the runtime, plus the memory for the sort. And most of the time the deduplication is unneeded, since the two queries give inherently distinct rows: this year's orders and last year's orders cannot overlap.
-
-The habit worth forming: <strong>write `UNION ALL` by default. And use `UNION` just when you namely need duplicates removed and cannot rule them out.</strong> That is the reverse of what most people do. And it is the right way round.
-
-```sql
--- combining partitioned tables: overlap is impossible
-SELECT * FROM orders_2025
-UNION ALL
-SELECT * FROM orders_2026;
-```
-
-## What INTERSECT and EXCEPT are really for
-
-Both express set membership questions that would otherwise need subqueries.
-
-```sql
--- customers who are also suppliers
-SELECT email FROM customers
-INTERSECT
-SELECT email FROM suppliers;
-
--- customers who have never ordered
-SELECT id FROM customers
-EXCEPT
-SELECT customer_id FROM orders;
-```
-
-The `EXCEPT` form is the readable option to `NOT IN` &mdash; and unlike `NOT IN`, it handles NULLs correctly, treating them as comparable to each other. That alone is a reason to prefer it.
-
-Two behavioural details worth knowing. Set operators treat two NULLs as duplicates of each other. It is the opposite of `=` semantics and consistent with `GROUP BY`. And `EXCEPT` removes <em>all</em> copies of a matching row, not one per occurrence, unless you use `EXCEPT ALL`.
-
-Precedence: `INTERSECT` binds more tightly than `UNION` and `EXCEPT`. So mixed expressions need parentheses to mean what you intend.
-
-## Exploration guide
-
-1. <strong>Check UNION with UNION ALL.</strong> Switch <strong>Operator</strong> between them and count the rows. The gap is just the duplicates &mdash; and UNION paid to find them.
-2. <strong>Look at INTERSECT.</strong> Just rows present in both sides survive. This is the set equivalent of an inner join on each column at once.
-3. <strong>Reverse EXCEPT.</strong> Note which rows survive, then imagine swapping the two queries. The answer changes fully &mdash; order matters here and nowhere else among the three.
-4. <strong>Watch the duplicate handling.</strong> With duplicates present in the source, see which operators collapse them and which do not.
-
-## UNION ALL is often the one you want
-
-UNION does a deduplication pass over the mixed result. It means a sort or a hash of each row. When you know the two sets cannot overlap &mdash; last month’s orders and this month’s orders. Or partitioned tables split by region &mdash; that work finds nothing and you have paid for it anyway.
-
-UNION ALL simply concatenates and is often a few times faster on large result sets. Use UNION just when duplicates are genuinely possible <em>and</em> you want them removed. Reach for UNION ALL by default and add the deduplication deliberately.
-
-## What trips people up
-
-- <strong>With UNION out of habit.</strong> The unneeded deduplication is one of the more common avoidable costs in reporting queries.
-- <strong>Mismatched column order.</strong> Positional matching means compatible-but-wrong orderings run happily and give garbage.
-- <strong>Expecting EXCEPT to be symmetric.</strong> Swapping the operands gives a other result.
-- <strong>Putting ORDER BY on a branch.</strong> It belongs once, at the end. And applies to the whole mixed set.
-- <strong>Reaching for a set operator when a JOIN is needed.</strong> If you want columns from both tables, no set operator will do it &mdash; they just ever stack rows.
-
-## What to remember
-
-UNION, INTERSECT and EXCEPT mix result sets vertically, needing the same column count and compatible types matched by position rather than name. All three deduplicate by default. It costs a full sort or hash &mdash; so prefer UNION ALL unless you namely need duplicates removed. EXCEPT is the just one where operand order changes the answer. And none of them is a substitute for a JOIN.
-
-## Real uses
-
-- <strong>Mixing partitioned or archived tables</strong> into one result. It is the classic `UNION ALL` case.
-- <strong>Checking two datasets in a migration.</strong> Run `A EXCEPT B` and `B EXCEPT A`. If both give nothing, the datasets are identical. This is the fastest reconciliation check there is.
-- <strong>Adding a total row</strong> to a report by unioning the detail with an aggregate.
-- <strong>Merging results from other sources</strong> that happen to share a shape &mdash; internal customers and external ones, current staff and alumni.
-- <strong>Expressing "in this list but not that one"</strong> without a correlated subquery.
-
-A worked reconciliation:
-
-```sql
--- rows in the old table missing from the new one
-SELECT id, amount FROM legacy_payments
-EXCEPT
-SELECT id, amount FROM payments
-
-UNION ALL
-
--- rows in the new table that were not in the old one
-SELECT id, amount FROM payments
-EXCEPT
-SELECT id, amount FROM legacy_payments;
-```
-
-An empty result means the migration is clean. Anything returned is a discrepancy with its side identifiable by which half produced it.
-
-## Performance notes
-
-- Each deduplicating variant costs a sort or hash. Prefer `ALL` unless you need otherwise.
-- Each branch is executed independently. So index each of them well &mdash; a set operator does not make a slow branch faster.
-- `ORDER BY` at the end sorts the mixed result. And cannot use an index from either branch.
-- With `LIMIT` after a `UNION`, the engine generally has to give both branches fully before it can apply the limit. Pushing the limit into each branch first (each with its own `ORDER BY`) is often much faster.
-- For very large `UNION ALL` sets over the same shape of data, consider whether the tables should be genuine partitions of one table instead &mdash; the planner then handles the combination it.
-
-## Stacking result sets, and the DISTINCT you did not ask for
-
-UNION, INTERSECT and EXCEPT mix whole result sets rather than joining rows. They are simple operators with one costly default and one strict requirement, both of which are visible at once.
-
-```sql-run
--- The requirement first: same number of columns, compatible types.
--- The column NAMES come from the first SELECT and the rest are ignored.
-
-SELECT name AS label, 'customer' AS kind FROM customers
-UNION ALL
-SELECT name,          'product'        FROM products
-ORDER BY kind, label;
-
--- Now the default. UNION removes duplicates; UNION ALL does not.
-
-SELECT 'UNION (distinct)' AS operator, count(*) AS rows_out FROM (
-    SELECT city FROM customers UNION SELECT city FROM customers
-)
-UNION ALL
-SELECT 'UNION ALL', count(*) FROM (
-    SELECT city FROM customers UNION ALL SELECT city FROM customers
-);
-
--- Deduplicating means sorting or hashing every row, so UNION is the
--- expensive one and it is the one people type by habit. If you know the
--- inputs cannot overlap -- which is usually why you are stacking them --
--- UNION ALL is both faster and more honest about your intent.
---
--- INTERSECT and EXCEPT answer set questions directly.
-
-SELECT 'in both'        AS relation, count(*) AS n FROM (
-    SELECT id FROM customers INTERSECT SELECT customer_id FROM orders)
-UNION ALL
-SELECT 'customers with no orders', count(*) FROM (
-    SELECT id FROM customers EXCEPT SELECT customer_id FROM orders)
-UNION ALL
-SELECT 'orders with no customer',  count(*) FROM (
-    SELECT customer_id FROM orders EXCEPT SELECT id FROM customers);
-
--- That middle row is the anti-join written as a set difference. It finds
--- Dara and Eze, and it reads more directly than the LEFT JOIN ... IS NULL
--- form -- though on a large table the planner usually prefers the join.
-```
-
-## Questions people ask
-
-<strong>Do the column names have to match?</strong> No &mdash; just the count and the types. The first query's names are used for the result.
-
-<strong>Can I `ORDER BY` inside one branch?</strong> Not usefully. The mixed result is what gets ordered. The exception is when a branch has its own `LIMIT`. There the inner ordering is meaningful &mdash; wrap that branch in a subquery.
-
-<strong>Is `UNION` the same as a `FULL OUTER JOIN`?</strong> No. `UNION` stacks rows vertically. A join widens rows horizontally by matching them.
-
-<strong>Does `INTERSECT` work with other column counts?</strong> No &mdash; the same rule applies to all set operators.
-
-<strong>Which engines support `INTERSECT` and `EXCEPT`?</strong> PostgreSQL, SQL Server, SQLite and Oracle (as `MINUS`). MySQL added them in 8.0.31. Before that, `INNER JOIN` and `LEFT JOIN ... IS NULL` were the workarounds.
-
-<strong>How do NULLs behave?</strong> Two NULLs count as duplicates for deduplication and as matching rows for `INTERSECT` and `EXCEPT` &mdash; deliberately unlike `=`.
-
-## Recap in one screen
-
-- Set operators stack results vertically; joins mix them horizontally.
-- `UNION` deduplicates, `UNION ALL` does not &mdash; and `ALL` should be your default.
-- `INTERSECT` keeps rows in both. `EXCEPT` keeps rows in the first just. And handles NULLs better than `NOT IN`.
-- Columns match by position, not name. The first query names the result.
-- `A EXCEPT B` plus `B EXCEPT A` is the quickest way to prove two datasets are identical.
+## Further reading
+- [SQLite SELECT](https://www.sqlite.org/lang_select.html) documents compound SELECT and set operators.
+- [PostgreSQL combining queries](https://www.postgresql.org/docs/current/queries-union.html) explains UNION, INTERSECT, and EXCEPT.

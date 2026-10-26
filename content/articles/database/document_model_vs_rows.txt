@@ -1,151 +1,25 @@
-title: The Document Model against Rows
-intro: One order, stored two ways. An honest account of which questions each shape answers well.
+title: Document Models and Relational Rows
+intro: Document databases store related fields together as documents; relational databases represent facts in rows connected through keys.
 
-## The same order, two shapes
+## Two ways to shape related data
+A document might store an order and its line items together. A relational design might put the order in one table and each line item in another, connected by an order key. Both can represent the same information. The practical choice is how the application reads, changes, and validates that information.
 
-Run the query above and then the variants. The the same order is stored as
-normed rows and as a single JSON doc, and both are queried in the same
-session &mdash; because modern SQL engines support both.
+Embedding often makes a common read simple and keeps related data together. But duplicated or rapidly growing nested data can make updates harder. Referencing a separate document or relational row avoids some duplication but requires another lookup or join. MongoDB's guidance similarly frames embedding and references around access patterns and data relationships.
 
-**Relational**: an `orders` row, several `order_items` rows referring back to it,
-a `customers` row. Each fact recorded once, joined when needed.
+## Model around the work
+Ask which data is usually fetched together, which parts change independently, whether children can grow without bound, and what consistency is required across updates. If many workflows need different slices of the same entity, a single large embedded document may be awkward. If a small related object is always read with its parent, embedding may be simpler.
 
-**Document**: one record containing the order, its items nested inside it, and
-the customer details copied in.
+Relational schemas support constraints and flexible joins across tables. Document systems can provide schemas and transactions too, but details and limits depend on the product. “Schema-less” does not mean the application has no data contract.
 
-## What documents make easy
+## A storage change has consequences
+Changing storage shape affects indexes, validation, update semantics, and application code. Measure representative queries and define how existing documents or rows will be migrated. See [relational databases](what_are_relational_databases.html) and [non-relational databases](what_are_non_relational_databases.html).
 
-**One read for one thing.** Fetching an order means pulling one doc.
-No joins, no round trips, and the data is contiguous on disk. For a
-read-this-whole-object access pattern, this is truly faster and the gap
-widens as the object gets more parts.
+## Example: orders and line items
+An order document with a small, bounded list of line items can serve a page that always loads the whole order. If the same product details must stay consistent across thousands of orders, copying them into each document creates many values to update. A reference to a product record avoids that duplication but adds a read and may show current product details rather than the historical price. Historical order lines usually need their purchase-time price stored as part of the order. Model each field according to its meaning over time.
 
-**A shape that matches the code.** The doc deserialises straight into an
-object. No object-relational mapping layer reassembling a graph from five result
-sets.
+## Keep repeated snapshots intentional
+Some values should be copied because they describe a past event rather than the current source record. An order should usually preserve the item name and price charged at purchase time even if the product catalog later changes. That is different from accidentally duplicating a current address everywhere. Label snapshot fields clearly and decide which fields are historical facts versus live references. The same distinction applies in relational schemas and document stores; storage model alone does not solve temporal meaning.
 
-**Schema flexibility.** Adding a field to some docs and not others needs
-no migration. For truly heterogeneous data &mdash; product catalogues where
-a book and a fridge share almost no fields. This is a real edge
-rather than laziness.
-
-## What rows make easy
-
-**Querying from any direction.** "Which customers bought product 902" is
-straightforward relationally and awkward in a doc store, because the data
-is organised around orders, not products. docs optimise one access path and
-make the others harder.
-
-**Updating a shared fact once.** If the customer's address is copied into each
-order doc, changing it means finding and rewriting each one. Relationally
-it's a single `UPDATE`. This is the classic norming arg and it has
-not stopped being true.
-
-**Integrity the DB enforces.** Foreign keys, uniqueness and check
-constraints are declared once and can't be bypassed. In a doc store these
-often become use code. This Means they hold until some other code
-path forgets.
-
-**Ad-hoc analysis.** Aggregating across docs means either a scan or a
-purpose-built index, and the queries are harder to write.
-
-## Denormalisation is the actual trade
-
-Nesting the items inside the order is fine. An order item belongs to
-just one order and is never queried on its own. That isn't duplication,
-just co-location.
-
-Copying the customer's name and address into each order is duplication, and it
-buys read speed at the cost of update cost and the risk of divergence. at times
-that is right: an invoice arguably *should* record the address as it was at the
-time, in which case it isn't duplication at all but a historical fact.
-
-The question is always whether the copies must agree. If they must, storing them
-apart means keeping them in sync forever.
-
-## The distinction has mostly dissolved
-
-PostgreSQL's `jsonb` is indexable, queryable and transactional. MySQL and SQLite
-have JSON functions &mdash; the queries on this page use SQLite's, in the same
-session as plain tables.
-
-So the modern answer is often neither purely one nor the other: relational
-tables for the entities that are queried from a few directions and must stay
-steady, and a JSON column for the parts that are truly variable and only
-ever read alongside their parent.
-
-What a dedicated doc DB still offers is flat scaling and
-operational tooling built around that model from the start. What it gives up is
-joins and multi-doc transactions &mdash; though MongoDB has had the latter
-since 4.0, which narrowed the gap a lot.
-
-## The number behind the update argument
-
-"Rewriting each one" is the whole cost of copying a shared fact, and it's worth
-seeing at scale. Suppose the customer's address is denormalised into each of
-their order docs. Changing it isn't one write:
-
-|orders holding the copy|document store: rewrites|relational: rows changed|
-|---|---|---|
-|100|100|1|
-|10,000|10,000|1|
-|1,000,000|1,000,000|1|
-
-Relationally the address lives in one `customers` row and one `UPDATE` changes it;
-each order simply keeps pointing at it. The doc shape trades that single
-write for one per copy, and while the copies are being rewritten the DB
-briefly disagrees with itself about where the customer lives. That is the exact
-trade: the doc read is faster because the join was done once at write time,
-and each later change to a shared fact pays it back in full.
-
-## The read the document shape wins
-
-The mirror image of the update cost is the read. It's why the trade exists
-at all. Assembling one order. The order, its five line items, the customer
-&mdash; from normed tables means touching three tables, and an ORM that loads
-them naively issues one query for the order and then one per related set:
-
-|shape|reads to assemble one order|
-|---|---|
-|document|**1** (the whole object, contiguous)|
-|relational, one join query|3 tables joined|
-|relational, naive ORM|1 + N round trips (the N+1 problem)|
-
-The doc was written with the join already done. So The read is a single
-contiguous fetch with no reassembly. That is a real edge for a
-read-this-whole-object access pattern, and it grows as the object gains parts. It
-is the same coin as the update cost: the doc pays once at write time to make
-this read cheap, and the relational shape pays a little at read time to keep each
-fact in one place. Which way that trade should fall is a property of the workload, not of the
-DB &mdash; read-mostly and object-shaped leans doc, write-shared and
-queried-many-ways leans relational.
-
-## Questions people ask
-
-<strong>When is a document database a better fit than rows?</strong> When records are read and written whole, vary in shape, and are rarely joined to other records.
-
-<strong>What is denormalisation?</strong> Storing related data together, even if it repeats, so reads need no joins. It speeds reads and complicates updates.
-
-<strong>Can a relational database store JSON?</strong> Yes. PostgreSQL, MySQL and others have JSON column types with indexing, so the line between the models has blurred.
-
-<strong>Why are updates harder in documents?</strong> A repeated value, such as a customer name, must be changed in every document that copies it.
-
-<strong>Do document databases support joins?</strong> Some offer lookup operations, but they are not as flexible or fast as relational joins. Design documents around the queries you run.
-
-<strong>How do I choose between them?</strong> Look at your access pattern. Many cross-entity queries and strict integrity favour rows. Self-contained records read as a unit favour documents.
-
-## Where it goes wrong
-
-**Choosing docs to avoid schema design.** The schema still exists. It has
-moved into the use, where nothing enforces it.
-
-**Unbounded arrays.** A doc that grows without limit &mdash; each event
-appended to one record &mdash; eventually exceeds the size limit and rewrites
-the whole thing on each append.
-
-**Duplicating a fact that must stay steady.** Fine for a historical snapshot,
-a slow disaster for live data.
-
-**Using JSON columns for well-structured data.** If each row has the same
-fields, they're columns. Putting them in JSON gives up type checking and
-constraints for nothing.
+## Further reading
+- [MongoDB data modeling](https://www.mongodb.com/docs/manual/data-modeling/) discusses embedding and referencing based on application access patterns.
+- Codd's [relational model paper](https://doi.org/10.1145/362384.362685) introduced the relational model.

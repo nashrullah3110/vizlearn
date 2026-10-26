@@ -1,217 +1,39 @@
-title: CASE and Views: A Practical Guide
-intro: A branch inside SELECT, and a name for a query.
+title: CASE Expressions and Views in SQL
+intro: CASE derives a value from conditions; a view gives a reusable name to a query.
 
-## What CASE and views give you
+## Two different tools
+A <code>CASE</code> expression selects a result for each row based on conditions. A view stores a query definition under a name so other queries can reuse it. Neither changes the underlying rows by itself. They solve different problems: conditional logic in a result, and reuse of a query shape.
 
-SQL has no `if` statement, but it has `CASE` &mdash; a conditional expression that lives inside a `SELECT` list and produces a different value for each row depending on a condition. You use it whenever a query needs to classify, bucket, or label rows on the fly.
+## Use CASE for conditional values
+A searched <code>CASE</code> checks conditions in order and returns the result for the first true condition. If none match, <code>ELSE</code> supplies the fallback; without it, the result is <code>NULL</code>.
 
-A view is a saved query with a name. Once defined, you can `SELECT` from it exactly like a table, and anyone reading your SQL sees a meaningful name instead of a dense subquery. Views do not store data; the database runs the underlying query each time. They are a tool for readability and reuse, not for performance.
-
-Together, `CASE` and views solve two of the most common complaints about SQL: that logic gets buried inside long expressions, and that the same query gets copied into five places. `CASE` puts the branching logic where it belongs &mdash; in the column list, beside the data it describes. A view wraps a tested query behind a name so you write it once and reference it everywhere.
-
-This page covers how `CASE` evaluates conditions, how views are created and used, and the specific situations where each one saves you from repeating yourself.
-
-## CASE, shape and rules
-
-CASE WHEN cond1 THEN v1 WHEN cond2 THEN v2 ELSE v3 END
-
-Conditions are checked top to bottom and the first match wins — order matters when ranges overlap. Without an ELSE, a row matching nothing gets NULL, silently, which is a common source of "why is this column empty" bugs.
-
-## Views: a name for a query, not a copy of it
-
-A plain view stores no data. Every time you query it, the underlying SELECT runs again against the current table — which is the whole point of the raise experiment below. This is different from a <strong>materialized view</strong>, which does store a snapshot and has to be refreshed explicitly to catch up with changes underneath it.
-
-## CASE: if/else inside a query
-
-`CASE` is SQL's conditional expression. It returns a value, so it can appear anywhere a value can &mdash; in `SELECT`, in `ORDER BY`, inside an aggregate, even in `WHERE`.
-
-```sql
-SELECT name,
-       salary,
+<pre><code>SELECT order_id,
        CASE
-         WHEN salary >= 80000 THEN 'senior'
-         WHEN salary >= 50000 THEN 'mid'
-         ELSE 'junior'
-       END AS band
-FROM   employees;
-```
+         WHEN total &gt;= 100 THEN 'large'
+         WHEN total &gt;= 40 THEN 'medium'
+         ELSE 'small'
+       END AS size_band
+FROM orders;</code></pre>
 
-Two rules that explain most `CASE` behaviour. Conditions are evaluated <strong>in order</strong> and the first match wins &mdash; so overlapping conditions are fine as long as the more specific one comes first. And with no `ELSE`, unmatched rows get NULL, which is a common source of unexpected blanks.
+The order matters: a condition that catches too much can make later branches unreachable. Comparisons with <code>NULL</code> are not true, so add an explicit <code>WHEN total IS NULL</code> branch if missing totals need their own label. A simple <code>CASE expression WHEN value</code> form is useful for equality checks, but cannot express ranges.
 
-There is also a shorter form for equality against one expression:
+Conditional aggregation combines <code>CASE</code> with aggregates, for example <code>SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END)</code>. For a portable alternative, some engines also support <code>FILTER</code>; check the target dialect.
 
-```sql
-CASE status WHEN 'A' THEN 'Active' WHEN 'C' THEN 'Closed' ELSE 'Unknown' END
-```
+## A view is a saved query
+Create a view when a query expresses a stable, reusable concept such as active customers:
 
-## Conditional aggregation: the pattern worth learning
+<pre><code>CREATE VIEW active_customers AS
+SELECT customer_id, name
+FROM customers
+WHERE status = 'active';</code></pre>
 
-Putting `CASE` inside an aggregate turns rows into columns, which is how summary reports are built without a pivot feature.
+Selecting from the view runs its underlying query; a regular view is not automatically a stored copy of the results. Updates through views have engine-specific restrictions. A materialized view stores results and needs a refresh strategy; SQLite does not provide native materialized views.
 
-```sql
-SELECT region,
-       COUNT(*)                                                  AS total,
-       SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END)      AS completed,
-       SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END)     AS cancelled,
-       AVG(CASE WHEN status = 'complete' THEN total_amount END)  AS avg_completed
-FROM   orders
-GROUP  BY region;
-```
+Views can reduce repetition and restrict which columns users see, but they are not a substitute for permissions on the underlying data. Keep the view definition clear, and inspect its query plan when it becomes slow. See [query plans](explain_and_query_plans.html).
 
-Note the last line: with no `ELSE`, non-complete orders become NULL, and `AVG` skips NULLs &mdash; so the average is computed over completed orders only. That interaction between `CASE` and aggregate NULL-skipping is the trick that makes this pattern so compact.
+## Keep branch results compatible
+The result branches of a CASE expression should have compatible types. If one branch returns a number and another returns text, the database may coerce values or reject the expression depending on its type rules. Give the expression a meaningful alias so callers can understand the derived field. A view can also expose a stable set of columns while hiding joins from consumers, but changing its output columns can break dependent queries. Treat view definitions as part of the interface and migrate them deliberately.
 
-PostgreSQL offers a cleaner spelling with `FILTER`:
-
-```sql
-COUNT(*) FILTER (WHERE status = 'complete') AS completed
-```
-
-`CASE` is also how you sort in a business order rather than alphabetically, and how you avoid division by zero (`CASE WHEN n = 0 THEN NULL ELSE x / n END`, though `NULLIF` is neater).
-
-## Views: a name for a query
-
-A view is a stored `SELECT` that behaves like a table:
-
-```sql
-CREATE VIEW active_customers AS
-SELECT c.id, c.name, c.email, COUNT(o.id) AS order_count
-FROM   customers c
-LEFT   JOIN orders o ON o.customer_id = c.id AND o.order_date > CURRENT_DATE - 365
-WHERE  c.status = 'active'
-GROUP  BY c.id, c.name, c.email;
-
-SELECT * FROM active_customers WHERE order_count > 5;
-```
-
-It stores no data. Every query against it re-runs the underlying `SELECT`, with the outer conditions merged in by the planner &mdash; so the filter above is applied efficiently rather than after materialising every active customer.
-
-Views earn their keep in three ways: they hide complexity behind a name, they present a stable interface while the tables underneath change, and they restrict access &mdash; grant a user the view instead of the table and they see only the rows and columns it exposes.
-
-Their limits are worth knowing too. A simple view can be updatable; anything with joins, aggregates or `DISTINCT` generally is not, and needs an `INSTEAD OF` trigger to accept writes. And views stack: a view built on three views built on four views is a maintenance problem and often an unpredictable query plan.
-
-## Branching inside a query, and naming one for reuse
-
-CASE is an expression, not a statement, which is why it can appear anywhere a value can -- including inside an aggregate, where it becomes a conditional count. A view then gives a query a name, and the important thing about it is what it does not do.
-
-```sql-run
--- CASE as a value in the SELECT list.
-
-SELECT name,
-       price,
-       CASE WHEN price >= 100 THEN 'premium'
-            WHEN price >=  40 THEN 'standard'
-            ELSE                   'budget'
-       END AS tier
-FROM products
-ORDER BY price DESC;
-
--- CASE inside an aggregate is the useful trick: it turns one pass over
--- the table into several conditional counts, which is how you pivot.
-
-SELECT count(*)                                             AS all_orders,
-       sum(CASE WHEN status = 'shipped'   THEN 1 ELSE 0 END) AS shipped,
-       sum(CASE WHEN status = 'pending'   THEN 1 ELSE 0 END) AS pending,
-       sum(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
-       count(discount)                                      AS with_discount
-FROM orders;
-
--- Note the last column. count(discount) counts non-NULL values, while
--- count(*) counts rows -- which is the shortest way to count how many
--- rows have a value in a nullable column.
-```
-
-A view wraps a tested query behind a name, giving reuse without storing any data.
-
-```sql-run
-CREATE VIEW order_totals AS
-SELECT o.id           AS order_id,
-       c.name         AS customer,
-       o.status,
-       sum(i.qty * p.price) AS gross
-FROM orders o
-JOIN customers   c ON c.id = o.customer_id
-JOIN order_items i ON i.order_id = o.id
-JOIN products    p ON p.id = i.product_id
-GROUP BY o.id, c.name, o.status;
-
-SELECT * FROM order_totals ORDER BY gross DESC;
-
--- The view is re-run every time you select from it. It costs nothing to
--- create and saves nothing at query time -- it is a name for a query,
--- not a cache of its answer. The thing that caches is a MATERIALIZED
--- view, which SQLite does not have and which every engine that does have
--- one makes you decide when to refresh.
-
-SELECT customer, count(*) AS orders, round(sum(gross), 2) AS lifetime
-FROM order_totals
-GROUP BY customer
-ORDER BY lifetime DESC;
-```
-
-## Guided experiments
-
-1. <strong>Read the bands.</strong> Each row gets a label from CASE based purely on its salary and the two thresholds.
-2. <strong>Move a threshold.</strong> Drag Senior down and someone's label flips from mid to senior immediately — the CASE logic is re-evaluated on every row, every time.
-3. <strong>Create the view.</strong> Press the button. A second panel appears, querying pay_bands — identical to the first table, because it is the same logic under a name.
-4. <strong>Give Grace a raise.</strong> Her underlying salary changes, and pay_bands updates on the very next read — no refresh, no re-creation. The view is not a stored answer, it is the query, run again.
-
-## Where that leaves you
-
-CASE is a per-row branch inside SELECT that returns the first matching value or NULL if nothing matches and there is no ELSE. A view is a saved query, not saved data — it re-runs against live tables on every read, which is what makes it stay correct as the underlying data changes and is exactly the property a materialized view trades away for speed.
-
-## Materialised views
-
-A <strong>materialised view</strong> stores the result rather than re-running it:
-
-```sql
-CREATE MATERIALIZED VIEW monthly_revenue AS
-SELECT DATE_TRUNC('month', order_date) AS month, SUM(total) AS revenue
-FROM   orders GROUP BY 1;
-
-REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_revenue;
-```
-
-Queries against it are as fast as querying a table, because it is one. The trade is staleness: the data is only as current as the last refresh, and the refresh itself costs whatever the underlying query costs.
-
-Use one when an expensive aggregate is read far more often than the data changes &mdash; dashboards, reports, leaderboards. `CONCURRENTLY` lets readers keep using the old copy while the new one builds, at the cost of requiring a unique index on the view.
-
-|&nbsp;|View|Materialised view|
-|---|---|---|
-|Stores data|No|Yes|
-|Always current|Yes|Only as of the last refresh|
-|Query speed|Cost of the underlying query|Cost of reading a table|
-|Can be indexed|No (the underlying tables are)|Yes|
-|Maintenance|None|Refresh schedule|
-
-MySQL has no materialised views; the usual substitute is a summary table maintained by a scheduled job or triggers.
-
-## Common mistakes
-
-- <strong>Forgetting `ELSE`</strong> and getting NULLs where a default was intended.
-- <strong>Ordering conditions wrongly.</strong> `WHEN salary > 50000 THEN 'mid' WHEN salary > 80000 THEN 'senior'` never returns 'senior', because the first condition already caught those rows.
-- <strong>Mixing return types</strong> across branches. Some engines coerce, some raise an error, and the coercion is rarely what you want.
-- <strong>Views over views over views.</strong> Convenient to write, painful to debug, and easy for the planner to handle badly.
-- <strong>Treating a view as a cache.</strong> It is not one &mdash; that is what a materialised view or a summary table is for.
-- <strong>Putting a `CASE` on an indexed column in `WHERE`</strong>, which prevents the index being used.
-
-## Questions people ask
-
-<strong>Can `CASE` be used in `ORDER BY`?</strong> Yes, and it is the standard way to sort by a custom business order.
-
-<strong>Are views slower than the equivalent query?</strong> No &mdash; the planner inlines the definition and optimises the whole thing together.
-
-<strong>Can I update through a view?</strong> Simple single-table views, usually yes. Anything with a join or aggregate needs an `INSTEAD OF` trigger.
-
-<strong>Do views improve security?</strong> Yes, genuinely &mdash; granting access to a view instead of a table is a standard way to expose a subset of columns or rows.
-
-<strong>How often should a materialised view refresh?</strong> As rarely as the freshness requirement allows. Hourly for most dashboards; nightly for reporting. Refresh cost and staleness tolerance are the only two inputs.
-
-<strong>Is `COALESCE` just a shorter `CASE`?</strong> Effectively yes: `COALESCE(a, b)` is `CASE WHEN a IS NOT NULL THEN a ELSE b END`. Use `COALESCE` when that is all you need.
-
-## Recap in one screen
-
-- `CASE` returns a value and can appear anywhere a value can; the first matching condition wins.
-- With no `ELSE`, unmatched rows return NULL &mdash; often useful inside aggregates, often a bug elsewhere.
-- Conditional aggregation (`SUM(CASE WHEN ...)`) turns rows into report columns.
-- A view names a query and stores nothing; it hides complexity and can restrict access.
-- A materialised view stores the result and needs refreshing &mdash; use it when reads far outnumber changes.
+## Further reading
+- [SQLite expressions](https://www.sqlite.org/lang_expr.html) documents <code>CASE</code> evaluation.
+- [SQLite CREATE VIEW](https://www.sqlite.org/lang_createview.html) describes view behavior.

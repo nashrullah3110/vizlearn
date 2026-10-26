@@ -1,149 +1,29 @@
-title: The CAP Theorem
-intro: The most quoted and most misquoted result in spread data, and what it really constrains.
+title: CAP Theorem: Guarantees During a Network Partition
+intro: CAP describes a limit on distributed systems when nodes cannot communicate; it is not a general rule that every database can offer only two features.
 
-## What the three letters mean
+## The question CAP answers
+CAP concerns a distributed service during a network partition: some nodes cannot exchange messages. It asks whether the system can preserve a single-copy view of data and still return a response to every request sent to a non-failing node. The theorem is often compressed into “pick two,” which hides the condition that makes the trade-off relevant: a partition.
 
-**Agreement** here means *linearisability*: each read sees the most recent
-write, as if there were one copy. It isn't the C in ACID, which is about
-constraints being met. Two different ideas, one letter, endless confusion.
+## Define the guarantees precisely
+**Consistency** here means linearizability: each operation appears to take effect atomically at one point between its call and response, respecting real-time order. It is stronger and more specific than the broad database use of “consistency” in ACID.
 
-**Uptime** means each request to a non-failed node gets a non-error
-response. Not "mostly up" &mdash; each request, each working node.
+**Availability** means every request to a non-failing node eventually receives a valid response. Returning a stale value is available under this definition, but may violate linearizability.
 
-**Split handling** means the system keeps operating when the network drops
-or delays messages between nodes.
+**Partition tolerance** means the system continues to operate despite dropped or delayed messages between parts of the cluster. In a real distributed system, a partition cannot simply be wished away.
 
-## The theorem, stated properly
+## What the choice looks like
+Suppose a user updates a balance on one side of a partition while another client reads from the isolated side. A system that refuses to answer that read can preserve one agreed order of operations, sacrificing availability for that request. A system that returns the isolated replica's local value stays responsive, but may return stale data. Once communication returns, replicas can reconcile, though application conflicts may still need resolution.
 
-The common phrasing &mdash; "pick two of three" &mdash; is catchy and wrong
-in a way that matters.
+This is a choice among guarantees during the partition, not a permanent label for a whole product. Different operations or configurations can make different trade-offs.
 
-Splits aren't a design choice. Networks fail: cables are cut, switches
-reboot, a cloud uptime zone turns unreachable. Any system spanning more
-than one machine will be split eventually, so **P isn't optional**.
+## What CAP does not say
+CAP does not mean a database can offer only two of consistency, availability, and partition tolerance in normal operation. It also does not tell you which product to select, how much staleness is acceptable, or how the system behaves when there is no partition. PACELC extends the discussion by asking about latency versus consistency even when the network is healthy.
 
-What the theorem really says is narrower and more handy:
+For practical design, write down what a read may return during a failure, whether writes may be rejected, and how recovery works. Replication settings and read routing determine those behaviors; see [replication and lag](replication_and_lag.html).
 
-> When a split occurs, you must choose between agreement and uptime.
+## Turn the theorem into a product requirement
+For a shopping cart, is it acceptable to show a slightly stale copy during a regional network failure, or should the request wait or fail until the latest update is available? That is a concrete consistency-versus-availability question. Specify the behavior for reads and writes separately, including timeout behavior and what happens after recovery. “Eventual consistency” only says that replicas may converge if updates stop and communication recovers; it does not define a maximum delay or settle concurrent conflicting writes. Document those details for the actual system.
 
-That is it. When the network is healthy, a system can be both steady and
-available, and most are. The theorem constrains action during a exact,
-temporary failure.
-
-## The choice, concretely
-
-Two nodes can no longer talk. A write arrives at one of them.
-
-**CP &mdash; refuse.** Return an error, because confirming a write the other
-side can't see risks two different answers to the same question. Correct, and
-temporarily down to whoever can't reach a quorum.
-
-Choose this when a wrong answer is worse than no answer: account weighs,
-inventory that must not oversell, any of it involving money or safety.
-
-**AP &mdash; accept.** Take the write locally, serve reads from local state, and
-merge when the split heals. Always answering, and during the split
-two clients can see different values.
-
-Choose this when an answer now is worth more than a just right current one: a
-shopping cart, a social feed, a view counter, a DNS record. Amazon's first
-Dynamo paper made this arg for carts by name &mdash; a cart that
-at times resurrects a deleted item is better business than a cart that is
-at times down.
-
-Step the timeline above through both settings and the difference is one choice
-made at one moment.
-
-## Reconciling afterwards
-
-An AP system must resolve conflicting versions once the network returns.
-**Last-write-wins** is simple and silently discards data when clocks disagree.
-**Vector clocks** detect concurrent writes and hand the conflict to the
-use. **CRDTs** are data types designed so concurrent updates merge
-deterministically &mdash; which is why counters, sets and collaborative text
-editors are the AP success stories.
-
-## PACELC, which is the more useful version
-
-CAP only shows splits, and splits are rare. Daniel Abadi's extension
-covers the rest of the time:
-
-> **if P**artition then **A**vailability or **C**onsistency, **E**lse
-> **L**atency or **C**onsistency.
-
-The second half is the one engineers meet daily. With the network healthy, a
-system can still choose to confirm each write with remote replicas &mdash;
-steady and slower &mdash; or confirm locally and replicate afterwards
-&mdash; faster and briefly stale.
-
-That is just the [synchronous versus asynchronous replication
-choice](replication_and_lag.html), and unlike CAP's trade it's live on each
-request.
-
-That "live on each request" is the whole reason the extension earns its keep. A
-split is a rare event. The network between healthy nodes works the vast
-majority of the time &mdash; so CAP's agreement-or-uptime choice is one you
-really pay only during those rare failures. The latency-or-agreement choice,
-by contrast, is paid on *each single request* the system ever serves. PACELC is
-"the more handy version" just because it names the trade you make billions
-of times a day rather than the one you make on the bad afternoon a cable is cut.
-
-## The tunable, made concrete: R + W > N
-
-The last "where it goes wrong" note below says the labels are tunable per query.
-That tuning is one inequality, and it's worth seeing because it's how a single
-system offers both answers.
-
-Keep `N` copies of each row. Let a write wait for `W` of them to confirm, and
-a read collect answers from `R` of them and take the newest. The read is
-ensured to see the latest write when the read set and the write set must
-share &mdash; which is just when **R + W > N**. Below that they can miss each
-other, and a read can come back stale.
-
-On `N = 3`:
-
-|W|R|R + W > N|what you get|
-|---|---|---|---|
-|1|1|no|fastest reads and writes, but reads can be stale|
-|2|2|yes|**quorum**: strong, and survives one node down either way|
-|3|1|yes|strong, instant reads, but a write needs all three up|
-|1|3|yes|strong, instant writes, but a read needs all three up|
-
-Read the `W=1, R=1` row against the `W=2, R=2` row: same three machines, and the
-choice between a possibly-stale answer and a ensured-current one is nothing but
-how many replicas each op waits for. That is the AP/CP dial from earlier,
-turned per request instead of per system.
-
-Quorum &mdash; `W = R = 2` &mdash; is the common default because 2 + 2 = 4 > 3
-shares by one replica *and* still ends with a single node down, where the
-`R = 1` and `R = 3` rows each give up uptime on one side. This is just
-what Cassandra's `ONE` / `QUORUM` / `ALL` levels and DynamoDB's strongly-steady
-reads are selecting.
-
-## Questions people ask
-
-<strong>What do the letters in CAP stand for?</strong> Consistency, Availability and Partition tolerance.
-
-<strong>Can I really only pick two of the three?</strong> Not quite. Partitions happen on real networks, so the choice is what to give up during a partition: consistency or availability.
-
-<strong>What does a CP system do during a partition?</strong> It refuses some requests, or returns errors, to avoid serving inconsistent data.
-
-<strong>What does an AP system do during a partition?</strong> It keeps answering from each side, accepting that replicas may disagree until they can be reconciled later.
-
-<strong>What is PACELC?</strong> It extends CAP: if there is a Partition, choose Availability or Consistency; Else, choose Latency or Consistency. It covers the normal case too.
-
-<strong>What does R + W > N mean?</strong> With N replicas, reading from R and writing to W of them such that R + W exceeds N guarantees every read overlaps the latest write.
-
-## Where it goes wrong
-
-**"We chose AP, so we gave up agreement."** You gave up linearisability during
-splits. Most of the time the system is steady.
-
-**Confusing CAP's C with ACID's C.** Different properties.
-
-**Calling a single-node DB CP.** With one node there's no split and
-the theorem doesn't apply.
-
-**Treating the labels as fixed.** Many systems are tunable per query &mdash;
-Cassandra's agreement levels, DynamoDB's strongly steady reads &mdash; so
-the choice belongs to the op, not the product.
+## Further reading
+- Gilbert and Lynch's [formal treatment of CAP](https://doi.org/10.1145/564585.564601) states the result for asynchronous networks.
+- [The original paper](https://www.cs.princeton.edu/courses/archive/spr22/cos418/papers/cap.pdf) gives the proof and assumptions.

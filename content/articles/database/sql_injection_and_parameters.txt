@@ -1,186 +1,29 @@
-title: SQL Injection and Parameterised Queries
-intro: The oldest widespread vulnerability in web software, why it happens, and the single correct fix.
+title: SQL Injection and Parameterized Queries
+intro: SQL injection happens when untrusted input changes the structure of a query; bound parameters keep values separate from SQL syntax.
 
-## The mechanism
+## How the vulnerability happens
+If an application builds SQL by concatenating user text into a query, special characters can change what the database executes. An attacker may bypass a login check, read data, or alter rows depending on the query and permissions. Escaping strings by hand is error-prone because quoting rules differ across drivers and contexts.
 
-Build a query by pasting user input into a string:
+## Bind values as parameters
+Use the database driver's parameterized-query API. The SQL statement contains placeholders, and the driver sends user values separately as data.
 
-```
-"SELECT * FROM users WHERE name = '" + name + "'"
-```
+<pre><code>SELECT account_id, display_name
+FROM accounts
+WHERE email = ?;</code></pre>
 
-With `name = "Ada"` this makes a sensible query. With
-`name = "' OR '1'='1"` it makes:
+The placeholder syntax varies by driver. Bind the supplied email through that API instead of inserting it into the SQL string. Parameterization also lets the database reuse query plans in some systems, but the security property is the separation of values from SQL code.
 
-```
-SELECT * FROM users WHERE name = '' OR '1'='1'
-```
+Parameters represent values, not SQL identifiers or keywords. If a user can choose a sort column or table, map that choice through a strict allowlist of known identifiers and construct the query from that trusted mapping. Never treat arbitrary input as a column name.
 
-The quote closed the string early, and all after it became **syntax**
-rather than data. The DB isn't confused or exploited &mdash; it's
-right running the query it was given. The bug happened before it arrived.
+## Use least privilege too
+Parameterization prevents a class of injection, but it does not replace authorization, validation, or database permissions. Give the application account only the access it needs, avoid exposing detailed database errors to users, and keep dependencies current. See [DML](dml_in_sql.html) for safe row changes.
 
-Run the variants above to see it: the same lookup, safe and unsafe, with a normal
-value and then a crafted one.
+## Separate trusted structure from user choice
+For a sort option, map a small public choice such as “newest” to a fixed SQL fragment such as created_at DESC. Do not bind the string as though a value placeholder could stand for the column name, and do not concatenate an arbitrary request parameter. Bind the actual page size and filter values separately. Review every query-building path, including search, exports, and administrative endpoints; one safe login query does not protect the rest of the application.
 
-## What can be done through it
+## Test the query boundary
+A useful security test supplies quotes, comment markers, wildcard characters, and Unicode in fields that are meant to be ordinary text. The value should remain data and must not change the query's meaning. Parameterization does not decide whether that value is authorized or valid, so enforce length, format, and ownership rules separately. Review logs and error paths so a rejected input does not disclose schema details. Treat each database driver’s placeholder syntax as part of its API and avoid mixing string formatting with bound values.
 
-A closed quote gives an attacker the whole language.
-
-**Authentication bypass.** `' OR '1'='1` as a password makes the `WHERE` clause
-true for each row.
-
-**Reading other tables.** A `UNION SELECT` appends results from anywhere the
-DB user can read.
-
-**Writing.** If the driver allows multiple statements, a semicolon starts a new
-one.
-
-**Blind extraction.** Even with no output at all, a rule that changes
-whether the page errors, or how long it takes, leaks one bit per request &mdash;
-and one bit per request is enough to read a password hash.
-
-That last one is worth costing out. "one bit per request" sounds slow
-and isn't. Ask a yes/no question the query answers through its action &mdash;
-*is the first character of the admin's hash greater than `m`?* &mdash; and binary
-search finds each character in `ceil(log2(95)) = 7` requests across the printable
-ASCII range. A bcrypt hash is 60 characters. So The whole thing comes out in
-about 60 &times; 7 = **420 requests**, plus a handful to find the length first.
-At a modest 100 requests a second that is **four seconds**, and it's fully
-automated &mdash; the attacker writes none of it by hand. The naive
-character-by-character guess would take 2,850 requests. Binary search is what
-makes a channel that leaks one bit at a time truly fast.
-
-## The fix
-
-Send the query and the values apart:
-
-```
-cursor.execute("SELECT * FROM users WHERE name = ?", (name,))
-```
-
-The `?` is a **placeholder**. The DB receives the query text and the value
-through different channels, parses the statement first, and then binds the value
-into an already-parsed plan.
-
-The value so can't alter the structure of the query, because parsing has
-already finished by the time it arrives. `' OR '1'='1` turns a search for a
-user whose name is truly `' OR '1'='1`, which finds nothing.
-
-This isn't a filter that might miss a thing. It's a structural ensure:
-there's no input for which a bound param turns syntax.
-
-## The same property also makes it faster
-
-The security comes from one fact: the query text is fixed and the values arrive
-apart. That same fact is a speed win, and the two aren't a
-coincidence &mdash; they're the same mechanism seen from two sides.
-
-A DB parses a query string, plans it. Only then runs it. When the text
-is fixed, that parse-and-plan happens once and the plan is cached and reused for
-each later run with different bound values. When the query is built by
-concatenation, each call is a *different* string &mdash; `name = 'user1'`,
-`name = 'user2'` &mdash; so the cache never hits and the planner runs each time.
-
-Measured in the SQLite this page runs, reusing one prepared statement against
-re-parsing a fresh query string each time is about **1.8&times; faster** (7.5 vs
-13.3 microseconds per query), and the gap widens for more complex queries where
-planning is the larger share. So the concatenation habit is slower *and* unsafe,
-and the fix for one is the fix for the other: the fixed query string that denies
-an attacker a foothold is the same fixed string the planner can cache.
-
-## Why escaping is not the fix
-
-Escaping tries to neutralise dangerous characters in the input. It fails for
-reasons that aren't obvious in advance:
-
-**Numeric contexts have no quotes.** `WHERE id = " + id` needs no quote to
-escape, and `1 OR 1=1` needs no special characters at all.
-
-**Character sets.** Multi-byte encodings have once allowed a byte
-sequence that turns a quote after the escaping function has run.
-
-**It's a blacklist.** each blacklist is a claim to have thought of all.
-
-**It's per-engine.** Rules differ between MySQL, PostgreSQL and SQLite, and code
-that moves between them silently stops being correct.
-
-Parameterisation avoids all of this by never putting the value in the query text
-at all.
-
-## Identifiers cannot be parameterised
-
-This is the real limitation. A placeholder can stand for a *value*, not for a
-table or column name:
-
-```
-"ORDER BY " + column      -- cannot be parameterised
-```
-
-The correct approach is an **allowlist**: map the user's input to a known-good
-identifier and reject any of it unrecognised.
-
-```
-allowed = {"name": "name", "date": "created_at"}
-column = allowed.get(user_input)
-if column is None: reject()
-```
-
-Never sanitise an identifier by escaping. Choose it from a fixed set.
-
-There's one more case that sends people back to concatenation, and it should
-not: a variable-length `IN` list. `WHERE id IN (?)` does **not** bind a list to
-the single placeholder &mdash; it binds one value. The correct move is to make
-*one placeholder per element* and bind them positionally:
-
-```
-ids = [4, 7, 12]
-marks = ",".join("?" for _ in ids)      # "?,?,?"
-cursor.execute("... WHERE id IN (%s)" % marks, ids)
-```
-
-The `%` here builds only punctuation. Commas and question marks, never the
-values &mdash; so nothing user-controlled reaches the query text. each id is still
-bound. It looks like string-building, and the thing being built holds no data,
-which is just the line that keeps it safe.
-
-## The other layers
-
-Parameterise all over, and then:
-
-**Least privilege.** The use's DB user shouldn't own the schema or
-be able to `DROP`. It limits the damage of any bug, not just this one.
-
-**Don't show DB errors.** Error text is how blind extraction is made
-fast.
-
-**ORMs help but don't immunise.** Their query builders parameterise by default,
-and each one of them has a raw-SQL escape hatch that doesn't. The escape hatch
-is where the vulnerabilities are.
-
-## Questions people ask
-
-<strong>What is SQL injection?</strong> An attack where user input is treated as SQL code, letting the attacker change what a query does.
-
-<strong>How do parameterised queries prevent it?</strong> The query text and the values are sent separately, so input is always treated as data and never parsed as SQL.
-
-<strong>Is escaping input enough?</strong> No. Escaping is easy to get wrong across encodings and contexts. Parameters are the reliable fix.
-
-<strong>Can I parameterise table or column names?</strong> No. Identifiers cannot be bound as parameters. Check them against an allowed list instead.
-
-<strong>Do ORMs protect me from injection?</strong> Mostly, but raw query helpers and string-built filters can still be injectable. Check that values go through parameters.
-
-<strong>What other defences should I add?</strong> Give the application account the fewest privileges it needs, validate input, and log failed queries. They limit damage if one slips through.
-
-## Where it goes wrong
-
-**"It's an inner tool."** inner input is still input, and inner tools
-get exposed.
-
-**Parameterising most of a query.** One concatenated fragment is enough.
-
-**Trusting a value because it came from a dropdown.** The dropdown is in the
-client. The request isn't.
-
-**Escaping instead of binding.** Even when correct today, it's one encoding
-change from not being.
+## Further reading
+- [OWASP SQL Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html) recommends parameterized queries and allowlisting.
+- [SQLite parameters](https://www.sqlite.org/lang_expr.html#parameters) documents bound-value syntax.

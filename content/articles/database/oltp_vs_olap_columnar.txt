@@ -1,174 +1,25 @@
-title: OLTP, OLAP and Columnar Storage
-intro: Why the DB that runs your use is the wrong one for your dashboards.
+title: OLTP, OLAP, and Columnar Storage
+intro: OLTP and OLAP describe different workloads; row and column layouts describe how data is physically organized.
 
-## Two workloads
+## Two workload shapes
+Online Transaction Processing (OLTP) handles many small operations that read or change a few records, such as placing an order. It usually needs low-latency lookups, concurrent writes, and transactional guarantees.
 
-Most databases serve one of two patterns. Knowing which one you face tells you
-what storage layout will work and what will not.
+Online Analytical Processing (OLAP) answers questions across large datasets, such as monthly revenue by region. It often reads many rows but only a few columns, and can benefit from scans and aggregation. These are workload patterns, not mutually exclusive kinds of product. A system may support both, though one workload can interfere with the other.
 
-**OLTP** &mdash; online transaction processing &mdash; is the production
-database. Many concurrent connections, each doing something small: fetch this
-order, insert this payment, update this status. Queries touch few rows and
-often want every column of those rows. Latency per query matters enormously.
+## Rows and columns
+A row-oriented layout keeps fields from one record together, which suits retrieving or updating a complete record. A columnar layout stores values from the same column together. An analytic query that reads only region and revenue can avoid unrelated fields and may compress repeated values well.
 
-**OLAP** &mdash; online analytical processing &mdash; is the reporting workload.
-Few concurrent users, each asking something large: revenue by region by month
-for three years. Queries touch millions of rows but only read three or four
-columns out of fifty. Throughput matters more than latency. A query taking two
-seconds instead of two hundred milliseconds is acceptable.
+Column storage does not guarantee a particular speedup. Results depend on compression, data distribution, query shape, hardware, and engine. Column stores also have trade-offs for point updates and transactional access.
 
-These two patterns want opposite things from disk. OLTP wants fast access to
-entire rows. OLAP wants fast scans of single columns. The disagreement is about
-physical layout, and that is what makes the storage engine choice matter.
+## Choose for the workload
+Start from actual query and concurrency needs. Use a transactional store for frequent, small updates; use an analytical warehouse or columnar engine when broad scans and aggregations dominate. Moving data between systems introduces freshness, failure, and reconciliation questions. Benchmark both workloads under realistic concurrency. For an analytical dimensional design, see [star schema](star_schema.html).
 
-## How rows are stored
+## Example: two queries, two bottlenecks
+A checkout query that fetches one customer's current cart needs a fast point lookup and a small write. A monthly revenue report may scan many transactions, group them by region, and return only a few columns. The first workload tends to value predictable response time under concurrent updates; the second values scan throughput and compression. Combining them on one system can work at modest scale, but a large report may compete with checkout. Run representative concurrent tests before separating the workloads.
 
-A **row store** keeps each row's fields contiguously:
+## Measure interference, not labels
+A mixed workload can remain on one engine if transactions and reports meet their latency targets. Measure transaction p95 latency while the analytical query runs, not only each query in isolation. If the report disrupts writes, options include a replica, scheduled extraction, workload limits, or a dedicated warehouse. Each introduces data freshness and operational cost. Row versus column storage is one design factor; caching, indexes, partitioning, concurrency control, and hardware also affect the outcome.
 
-```
-[1|Ada|Leeds|2026-08-01|120.00][2|Bo|Bristol|2026-08-03|64.50]...
-```
-
-Fetching order 2 is a single page read, and all needed is there. Perfect
-for OLTP.
-
-Now find the mean of `total` over ten million orders. each page has to be
-read, because the totals are scattered one per row, separated by all the other
-columns. To read 8 bytes of interest you read a 200-byte row, and 96% of the I/O
-is waste.
-
-## How columns are stored
-
-A **column store** keeps each column contiguously:
-
-```
-ids:     [1][2][3][4]...
-names:   [Ada][Bo][Cy][Di]...
-totals:  [120.00][64.50][45.00][220.00]...
-```
-
-That mean now reads only the `totals` region. Reading a fiftieth of the data
-is roughly a fiftieth of the time. The edge grows with the width of the
-table.
-
-Two further wins follow from the layout rather than being added to it.
-
-**Compression.** A column holds one type, and often few distinct values. A
-`country` column across ten million rows compresses to almost nothing with
-dict encoding. A sorted date column run-length codes brilliantly. Mixed
-row data does none of this. Ten-times ratios are plain, and the speed-up is
-mostly the reduced I/O.
-
-**Vectorised run.** Values of one type packed contiguously can be processed
-in batches with SIMD instructions, instead of one row at a time through a tuple
-interface.
-
-The cost is the mirror image: fetching one whole row means one read per column
-and reassembly, and inserting a row means writing into fifty places. Columnar
-stores are so often append-oriented and batch-loaded, not
-update-in-place.
-
-## Choosing
-
-| | Row store | Column store |
-|---|---|---|
-| Fetch a whole row | fast | slow |
-| Aggregate one column | slow | fast |
-| Insert or update one row | fast | slow |
-| Bulk load | fine | ideal |
-| Compression | poor | excellent |
-| Examples | PostgreSQL, MySQL | ClickHouse, BigQuery, DuckDB, Snowflake |
-
-## Do not run both on one database
-
-The usual mistake is analytics against the production OLTP DB. A report
-scanning ten million rows evicts the working set from the buffer cache, and each
-use query afterwards goes to disk. The dashboard is slow *and* the
-checkout is slow.
-
-The standard setup separates them: OLTP handles the use, data is
-copied into an analytical store on a schedule or a stream, and reports run there
-with a [star schema](star_schema.html) shaped for them. The copy is stale by
-minutes or hours, which is almost always acceptable for reporting and is the
-price of not having the two workloads fight.
-
-The variants above make the difference concrete: the same table queried the OLTP
-way and the OLAP way, with a note on how much of each row each one really
-needs.
-
-## Where the line has blurred
-
-**DuckDB** is columnar, embedded and single-file &mdash; analytical power with no
-cluster. **Postgres** has columnar extensions and can query Parquet through
-foreign data wrappers. **Parquet** itself has made columnar a file format rather
-than a DB, so the same data can be read by many engines.
-
-The result is that "we need a data warehouse" is a much bigger claim than it was.
-For datasets under a few hundred gigabytes, DuckDB over Parquet on one machine
-often beats a cluster.
-
-## The I/O gap, in bytes
-
-"A fiftieth of the data" deserves a concrete figure, because it's the whole
-arg for columnar. Take ten million orders, fifty columns, eight bytes each,
-and mean one column:
-
-|layout|bytes read for `AVG(total)`|
-|---|---|
-|row store|10M &times; 50 &times; 8 = **4.0 GB**|
-|column store|10M &times; 8 = **80 MB**|
-
-The row store must pass over each column of each row to reach the one it needs,
-so it reads the whole four gigabytes to sum eighty megabytes of actual interest.
-The column store reads only the `total` region. Fifty times less &mdash; and
-that ratio is why an aggregate that takes seconds on a row store returns in
-milliseconds on a columnar one. It also compounds with compression: that single
-column, being one type with few distinct values, often compresses a few-fold
-again, so the real read is smaller still. The wider the table, the larger the
-gap, which is just backwards from what OLTP wants.
-
-## Where the ten-times compression comes from
-
-"Ten-times ratios are plain" isn't a hope. It falls out of a column holding
-one type with few distinct values. A `country` column over ten million rows has
-maybe 200 distinct values, so dict encoding stores a one-byte code per row
-plus a tiny lookup, instead of the full string each time:
-
-|encoding|size of the country column|
-|---|---|
-|raw text (~10 bytes/value)|~100 MB|
-|dictionary (1 byte/row + dict)|~10 MB|
-
-Ten to one, and a sorted or slowly-changing column run-length codes even harder
-&mdash; a date column that repeats each value for a day's worth of rows stores a
-value and a count rather than the value a million times. A row store can't do any
-of this, because each value sits between bytes of other columns of other types,
-with nothing to compress against. The compression isn't a feature bolted on. It
-is a consequence of putting like values next to like, and most of the resulting
-speed-up is simply that there's less to read.
-
-## Questions people ask
-
-<strong>What is the difference between OLTP and OLAP?</strong> OLTP handles many small reads and writes, such as orders. OLAP runs large analytical queries over many rows.
-
-<strong>Why are columnar stores faster for analytics?</strong> They read only the columns a query needs, and similar values stored together compress well.
-
-<strong>Why are row stores better for OLTP?</strong> A row is stored together, so reading or writing one whole record touches a single place on disk.
-
-<strong>Can I run analytics on my production database?</strong> You can for small data, but long scans compete with transactions for resources. Use a replica or a separate warehouse.
-
-<strong>What is ETL?</strong> Extract, transform, load: copying data from the transactional system into an analytical store, reshaping it on the way.
-
-<strong>Are the two types converging?</strong> Partly. Some systems offer hybrid storage or columnar extensions, but each design still favours one workload.
-
-## Where it goes wrong
-
-**Reporting off the main.** Cache eviction makes the use slow, and the
-cause isn't obvious from the use's own metrics.
-
-**Row-by-row inserts into a columnar store.** They're built for batches. Single
-inserts are pathologically slow.
-
-**`SELECT *` on a column store.** It gives up the entire edge.
-
-**given you need a cluster.** Measure on one machine first.
+## Further reading
+- [C-Store: A Column-Oriented DBMS](https://www.vldb.org/conf/2005/papers/p553-stonebraker.pdf) presents a read-optimized columnar database architecture.
+- [PostgreSQL table expressions](https://www.postgresql.org/docs/current/queries-table-expressions.html) documents relational query structure.

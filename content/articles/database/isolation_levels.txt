@@ -1,178 +1,25 @@
-title: Isolation Levels
-intro: What one transaction is allowed to see while another is still running.
+title: Transaction Isolation Levels
+intro: Isolation rules determine which concurrent changes a transaction can observe and which anomalies the database prevents.
 
-## The dial
+## Why isolation matters
+A transaction may run while other transactions read and write the same data. Isolation defines how those operations interact. The SQL standard names levels such as Read Committed, Repeatable Read, and Serializable, but engines implement them differently. A level's name alone does not tell you every guarantee.
 
-When two transactions run at the same time, each one can interfere with the
-other. One writes a row that the other is reading. One inserts a row that
-changes the other's result set. The database has to decide how much of this
-interference to allow.
+## The anomalies in plain terms
+A dirty read observes another transaction's uncommitted change. A non-repeatable read sees a row change between two reads in one transaction. A phantom is a new or removed row that changes the result of repeating a predicate query. A serialization anomaly occurs when concurrent transactions produce a result that cannot be explained by any serial order.
 
-The I in ACID stands for isolation: the degree to which concurrent transactions
-are kept from seeing each other's work in progress.
+Serializable isolation aims to make concurrent transactions behave as if they ran one at a time. Some systems detect conflicts and abort a transaction, so applications must be ready to retry. Snapshot-based isolation can allow useful concurrency but may still permit anomalies such as write skew.
 
-Perfect isolation is easy to define. Run every transaction one after
-another. It is also unacceptable, because a database serving one
-transaction at a time serves almost no one. So the SQL standard defines a dial
-with four settings. Each setting is named not by what it does but by which
-**anomalies** it still permits.
+## Choose and handle conflicts
+Choose isolation based on the invariant the operation must preserve, not just a label. For a transfer or inventory reservation, consider using a constraint, atomic update, explicit lock, or serializable transaction as appropriate. Keep transactions short and handle serialization failures or deadlocks by retrying the complete transaction when safe. See [transactions and ACID](transactions_and_acid.html) and [deadlocks](deadlocks_in_sql.html).
 
-The trade-off is direct. More isolation means fewer surprises but less
-concurrency. Less isolation means more throughput but more risk of inconsistent
-reads. Choosing a level means choosing which anomalies you can tolerate.
+Test the target engine's actual behavior. SQLite serializes writes differently from PostgreSQL; its readers see snapshots while write concurrency is limited. PostgreSQL maps the standard levels to its MVCC implementation and documents the anomalies each level can permit.
 
-Step through the timeline above at each of the four levels. The schedule never
-changes. What A sees changes at nearly every step.
+## A write-skew example
+Two doctors are on call, and the rule says at least one must remain on call. Two concurrent transactions each read that both are on call, then each turns a different doctor off. Each transaction's individual update looks valid, but together the invariant is broken. This is write skew, which snapshot-style isolation can permit in some systems. A constraint, explicit locking strategy, or serializable isolation can prevent it. Choose based on the exact invariant and test concurrent schedules rather than reasoning from single-user examples.
 
-## The three anomalies
+## Use constraints as the first line of defense
+Some invariants are simpler to enforce with a unique, check, or foreign-key constraint than with a particular isolation level. For example, a unique constraint can prevent two concurrent transactions from claiming the same username. Constraints are checked by the database across all writers, while application checks can race. For rules involving several rows or external state, transactions and locks may still be necessary. Choose the narrowest database mechanism that expresses the invariant, then test concurrent updates and expected retries.
 
-**Dirty read.** Transaction A reads a row that B has changed but not committed.
-If B rolls back, A acted on data that never existed. Step 5 at READ UNCOMMITTED
-shows this: A reads 1500 from a change that is still draft.
-
-**Non-repeatable read.** A reads a row, B updates it and commits, A reads the
-same row again and gets a different value. Step 7 at READ COMMITTED shows it: A
-reads 1000 and then 1500 inside one transaction, with no error and no warning.
-
-**Phantom read.** A runs a query, B inserts a row matching its rule and
-commits, A runs the same query and gets an extra row. Step 9. The gap
-from a non-repeatable read is that no row A saw has changed &mdash; a new one
-has arrived.
-
-## The four levels
-
-| Level | Dirty | Non-repeatable | Phantom |
-|---|---|---|---|
-| READ UNCOMMITTED | allowed | allowed | allowed |
-| READ COMMITTED | prevented | allowed | allowed |
-| REPEATABLE READ | prevented | prevented | allowed by the standard |
-| SERIALIZABLE | prevented | prevented | prevented |
-
-**READ UNCOMMITTED** is unused. PostgreSQL accepts the syntax and
-silently gives you READ COMMITTED instead, because its architecture has no way
-to expose uncommitted data.
-
-**READ COMMITTED** is the default in PostgreSQL, Oracle and SQL Server. Each
-*statement* sees a fresh view of committed data. It's a sensible default and
-the outlier it permits is real: two queries in one transaction can disagree, so
-a report that reads the same table twice can give inside inconsistent
-totals.
-
-**REPEATABLE READ** pins the transaction to a snapshot taken at its first read.
-All it sees is steady as of that moment, no matter what commits
-elsewhere. It's MySQL InnoDB's default.
-
-**SERIALIZABLE** ensures the result is equal to some serial order.
-Modern setups achieve this without locking all, by tracking
-which transactions read which rows and aborting one when a genuine conflict is
-found.
-
-## The thing about SERIALIZABLE that surprises people
-
-It doesn't make your code wait. It makes your code **fail**.
-
-At step 10 under SERIALIZABLE, A may get a serialization failure instead of a
-good commit. That isn't a malfunction. It's how the ensure is
-delivered. The engine allowed both transactions to proceed optimistically,
-found afterwards that no serial order shows what happened, and rejected one.
-
-So any code running at SERIALIZABLE must catch that error and retry the whole
-transaction. Code that assumes commit succeeds will fail intermittently under
-load, which is the worst kind of bug to diagnose.
-
-## Where the standard stops helping
-
-The standard defines levels by which outliers are *permitted*, not which are
-blocked. An engine is free to prevent more than needed, and they do.
-
-PostgreSQL's REPEATABLE READ uses a full snapshot and so blocks
-phantoms, which the standard doesn't need. MySQL's InnoDB blocks them at
-that level too, by a different mechanism (gap locks). So code that leans on
-phantoms being blocked at REPEATABLE READ works on both and isn't portable by
-the standard, and code that leans on phantoms *appearing* is wrong on both.
-
-This is why "we use REPEATABLE READ" is an incomplete statement about a system's
-action. The engine matters.
-
-## Choosing
-
-Most uses should stay on the engine's default and reach for a thing
-stronger where a exact rule demands it. The pattern that most often
-needs it's read-then-write: check a balance, then deduct from it. Between the
-check and the write, another transaction can change the balance, and no
-alone level below SERIALIZABLE stops that on its own.
-
-The options are clear locking (`SELECT ... FOR UPDATE`) or letting the
-DB enforce the rule with a constraint. This Needs no alone
-thinking at all.
-
-## The lost update the levels do not stop
-
-The read-then-write hazard is best seen as one math. Two transactions both
-withdraw 100 from an account holding 1,000, each reading before either writes:
-
-|step|transaction A|transaction B|
-|---|---|---|
-|1|read balance = 1000|read balance = 1000|
-|2|compute 1000 &minus; 100 = 900||
-|3||compute 1000 &minus; 100 = 900|
-|4|write 900||
-|5||write 900|
-
-Two withdrawals of 100 leave the balance at **900, not 800** &mdash; one
-withdrawal has vanished. Nothing here is a dirty or non-repeatable read, so
-READ COMMITTED and even REPEATABLE READ permit it: both transactions read
-committed data and each is inside steady. Only SERIALIZABLE stops it on
-its own, by aborting one at commit. Which is why this pattern needs either
-that level with a retry, an clear `SELECT ... FOR UPDATE`, or a single
-`UPDATE ... SET balance = balance - 100` that never reads into the use at
-all. Thinking about alone is the hard way. Letting one statement do the
-math is the safe one.
-
-## READ UNCOMMITTED is often a no-op
-
-One level on the dial often does nothing, and given or else is a portable
-source of confusion. `READ UNCOMMITTED` is meant to permit dirty reads &mdash;
-seeing another transaction's uncommitted changes &mdash; but a
-[snapshot-based](mvcc_in_databases.html) engine has no uncommitted version to
-show. PostgreSQL accepts the syntax and silently gives you `READ COMMITTED`
-instead:
-
-|engine|`SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED`|
-|---|---|
-|PostgreSQL|accepted, runs as READ COMMITTED|
-|MySQL InnoDB|honoured; dirty reads are possible|
-
-So the same statement means two different things on two DBs, and a
-"speed" alone level chosen on one has no effect on the other. This is a
-given case of the general rule already stated. The standard names the
-outliers a level *permits*, and an engine may prevent more &mdash; and it's why
-the level a system runs at is a fact about the engine as much as about the
-`SET` statement.
-
-## Questions people ask
-
-<strong>What are the four standard isolation levels?</strong> READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ and SERIALIZABLE. Each one blocks more anomalies than the one before.
-
-<strong>What is a dirty read?</strong> Reading data another transaction has written but not yet committed. If that transaction rolls back, you acted on data that never existed.
-
-<strong>What is the difference between a non-repeatable read and a phantom?</strong> A non-repeatable read sees an existing row change between two reads. A phantom sees new rows appear that match your filter.
-
-<strong>Which isolation level should I use by default?</strong> READ COMMITTED is the default in PostgreSQL and many others, and it is fine for most work. Raise it only where a specific anomaly would hurt.
-
-<strong>Does SERIALIZABLE mean transactions run one at a time?</strong> No. It means the result is the same as if they had, but the database may run them together and abort one with a serialization error. Your code must retry.
-
-<strong>Do isolation levels prevent lost updates?</strong> Not always. A read-then-write pattern can lose updates even under READ COMMITTED. Use SELECT FOR UPDATE, an atomic UPDATE, or a version column.
-
-## Where it goes wrong
-
-**given a default.** They differ between engines, and code written against
-one silently changes action on the other.
-
-**Using SERIALIZABLE without retry logic.** Intermittent failures under load.
-
-**Long-running read transactions.** A snapshot held open forces the engine to
-retain old row versions. This Bloats storage and slows all.
-
-**Thinking about alone instead of using a constraint.** A `UNIQUE`
-constraint settles "no two of these" even so of what any transaction sees.
+## Further reading
+- [PostgreSQL transaction isolation](https://www.postgresql.org/docs/current/transaction-iso.html) details its guarantees and serialization failures.
+- [SQLite isolation](https://www.sqlite.org/isolation.html) explains snapshots and writer behavior.

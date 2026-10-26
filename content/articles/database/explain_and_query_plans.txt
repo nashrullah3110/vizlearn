@@ -1,163 +1,24 @@
-title: EXPLAIN and Query Plans
-intro: The DB will tell you what it plans to do. Very few people ask.
+title: EXPLAIN: Read a Database Query Plan
+intro: A query plan shows the operations the database chose to produce a result, helping you investigate performance instead of guessing.
 
-## SQL says what, not how
+## What a plan tells you
+SQL describes the result you want; the optimizer chooses how to retrieve it. A plan may scan a table, search an index, join tables in a particular order, or sort rows. `EXPLAIN` asks the database to show that chosen strategy.
 
-A query states the result you want. It says nothing about how to get it: which
-table to read first, whether to use an index, whether to sort or hash for a
-join. All of that is chosen by the **query tuner**, at runtime, from the
-statistics it holds about your data.
+In SQLite, `EXPLAIN QUERY PLAN` includes operations such as `SCAN` and `SEARCH`, and can show which index is used. A `SCAN` is not automatically bad: it can be best for a small table or a query that needs most rows. PostgreSQL's `EXPLAIN` shows estimated costs and row counts; `EXPLAIN ANALYZE` runs the query and adds actual measurements.
 
-Which means that two queries returning the same results can differ by orders of
-magnitude in cost, and nothing about the SQL text tells you which is which.
-`EXPLAIN` is how you find out, and it takes about ten seconds.
+## A useful investigation
+Start with the exact slow query and representative data. Check whether the plan reads far more rows than expected, repeats an expensive operation, sorts a large result, or fails to use an index that should help. Compare estimated and actual row counts where the engine exposes both. A large difference can mislead later planner choices.
 
-## SCAN against SEARCH
+Then change one thing—an index, predicate, or query shape—and compare plans and timing again. Keep in mind that timings vary with cache state and workload. Do not add an index just because one plan says `SCAN`; table size, selectivity, and write cost matter.
 
-Run the first variant. The plan reads:
+For example, an index on `orders(customer_id)` may help a selective lookup but not a query that returns nearly every order. See [indexes](indexes_in_sql.html) and [composite indexes](composite_and_covering_indexes.html).
 
-```
-SCAN orders
-```
+## Explain is engine-specific
+Plan output is not a stable cross-database format. SQLite's query-plan output is a high-level description, not an actual row-by-row execution profile. PostgreSQL's `EXPLAIN ANALYZE` executes the statement, so use care with statements that modify data. Consult the target engine and version.
 
-`SCAN` means the DB intends to read **each row** and test each one. Five
-thousand rows here. Five million in production, at which point the query is a
-problem.
+## Compare plans with a controlled test
+Use the same database state and query parameters when comparing plans. Record the selected index, actual row counts and timing where available, then vary one factor. A plan for a tiny development table may differ from production because statistics and selectivity differ. For PostgreSQL, EXPLAIN ANALYZE executes the statement, so wrap a data-changing experiment in a transaction and roll it back if appropriate. For SQLite, use EXPLAIN QUERY PLAN to inspect strategy, then measure execution separately; it does not report actual per-step timing.
 
-Run the second variant to create an index on `customer_id`, then the third. The
-plan now reads:
-
-```
-SEARCH orders USING INDEX idx_orders_customer (customer_id=?)
-```
-
-`SEARCH` means it can jump right to the matching rows. The query text didn't
-change. The result doesn't change. The work changed from thousands of row reads
-to a handful.
-
-That contrast is the whole skill: **look for SCAN on a large table where you
-expected a lookup.** Other engines use different words. PostgreSQL says
-`Seq Scan` against `Index Scan`, MySQL fills in a `type` column with `ALL`
-against `ref`. The gap is the same all over.
-
-## The index it will not use
-
-Run the fourth variant. The index still exists, the query means just the same
-thing, and the plan is back to `SCAN`.
-
-The difference is `customer_id + 0` instead of `customer_id`. An index stores
-values of the column, in order. It doesn't store values of *expressions over*
-the column, so the moment the column is wrapped in any of it, the sorting the
-index gives no longer matches to what the query is asking about.
-
-This is the most common way a good index goes unused, and it hides
-inside plain-looking SQL.
-
-| Written | Problem | Instead |
-|---|---|---|
-| `WHERE YEAR(created) = 2026` | function on the column | `WHERE created >= '2026-01-01' AND created < '2027-01-01'` |
-| `WHERE LOWER(email) = ?` | function on the column | index on `LOWER(email)`, or store it folded |
-| `WHERE id + 0 = 42` | arithmetic on the column | `WHERE id = 42` |
-| `WHERE status LIKE '%paid'` | leading wildcard | no index can help; a B-tree is ordered by prefix |
-
-The rule: **keep the indexed column bare on one side of the check.**
-
-## A scan is not always wrong
-
-On a table of fifty rows, reading all fifty is cheaper than consulting an index
-and then fetching rows one at a time. Tuners know this and will right
-skip an index on a small table.
-
-The same applies to selectivity. A query matching 60% of the rows is often
-better served by a scan. An index gives a list of row locations that
-then have to be fetched on their own. And fetching most of the table one
-row at a time costs more than reading it in order.
-
-This is why plans change as tables grow. Why a query that was fast in staging
-can be slow in production with the same schema and different statistics.
-
-## Estimated against actual
-
-`EXPLAIN` alone shows what the tuner *intends*, using row-count guesses.
-Those guesses come from statistics that can be stale or simply wrong.
-
-Most engines offer a form that runs the query and reports what really happened
-&mdash; `EXPLAIN ANALYZE` in PostgreSQL, `EXPLAIN ANALYZE` in MySQL 8.0.18 and
-later. Checking guessed rows against actual rows is the fastest way to find
-out that the tuner expected 10 rows and got 400,000. This Is almost always
-the reason a plan is bad.
-
-Two habits follow: run `ANALYZE` after a bulk load so the statistics reflect the
-data, and be suspicious of any plan step whose estimate is off by more than an
-order of magnitude.
-
-## What SCAN against SEARCH costs, in row reads
-
-The `SCAN` / `SEARCH` gap is easy to nod at and worth turning into
-numbers, because that is what makes it urgent on a growing table. `SCAN` reads
-each row and tests it. `SEARCH` through a B-tree index descends a sorted
-structure, so it does on the order of `log2(rows)` steps to reach the block it
-wants:
-
-|table size|`SCAN` reads|`SEARCH` (index steps)|
-|---|---|---|
-|5,000 rows|5,000|~13|
-|5,000,000 rows|5,000,000|~23|
-
-Two things follow. The gap isn't constant. It widens as the table grows,
-because the scan is linear and the search is logarithmic. So The query that was
-"fine in staging" on 5,000 rows is a thousandfold worse in production on five
-million while the indexed version barely moved from 13 steps to 23. And it's why
-`SCAN` on a large table where you expected a lookup is the single most valuable
-thing to spot in a plan: it's the difference between reading a handful of pages
-and reading the whole table.
-
-## Why a scan can beat the index
-
-"A scan isn't always wrong" deserves the reason, because it shows why the
-tuner at times skips an index you built for it. An index gives a list of
-row locations, which then have to be fetched one at a time &mdash; random access.
-A scan reads the table in order. Sequential access. This Is far cheaper per
-row. So there's a crossover in selectivity:
-
-|query matches|index path|better plan|
-|---|---|---|
-|0.1% of rows|a few random fetches|**index**|
-|60% of rows|0.6N random fetches|**scan**|
-
-Fetching 60% of a table one row at a time through an index costs more than reading
-the whole table sequentially and discarding 40%, because random reads dominate the
-bill. This is why the tuner's choice depends on the *statistics*, not just the
-SQL. A query that used the index in staging, against a few hundred
-rows, can right switch to a scan in production against millions with a
-different spread. The plan changing under you is the tuner doing its
-job, not misbehaving.
-
-## Questions people ask
-
-<strong>What does EXPLAIN actually show?</strong> The plan the database intends to follow: which tables it reads, which indexes it uses, and in what order. It does not run the query unless you ask for ANALYZE.
-
-<strong>What is the difference between SCAN and SEARCH?</strong> SCAN reads every row in the table. SEARCH uses an index to jump to matching rows.
-
-<strong>Why is my index not being used?</strong> Common causes are a function wrapped around the column, a leading wildcard in LIKE, a mismatched type, or a filter that matches most of the table.
-
-<strong>Is a table scan always bad?</strong> No. On a small table, or when you need most of the rows, a scan is cheaper than going through an index.
-
-<strong>What is the difference between EXPLAIN and EXPLAIN ANALYZE?</strong> EXPLAIN shows estimates. EXPLAIN ANALYZE runs the query and shows actual row counts and timings, so you can spot bad estimates.
-
-<strong>Why does the plan change when the data grows?</strong> The optimiser picks plans from table statistics. As row counts and value spread change, a different plan can become cheaper.
-
-## Where it goes wrong
-
-**Guessing instead of asking.** The plan is one command away and settles the
-arg.
-
-**Reading a plan for a query with no data.** Plans on an empty or tiny table
-tell you nothing about production.
-
-**Adding indexes until it's fast.** each index costs write time and space, and
-an unused index costs both for nothing. Add the one the plan asks for, then
-check the plan again.
-
-**given the plan is stable.** It's recomputed as statistics change. Today's
-plan isn't a ensure.
+## Further reading
+- [SQLite EXPLAIN QUERY PLAN](https://www.sqlite.org/eqp.html) describes its plan output.
+- [PostgreSQL EXPLAIN](https://www.postgresql.org/docs/current/using-explain.html) covers estimates, actual execution, and interpretation.

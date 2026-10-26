@@ -1,165 +1,26 @@
-title: Star Schema: Facts and Dimensions
-intro: The one schema design that analytical DBs are really optimised for.
+title: Star Schema: Fact Tables and Dimensions
+intro: A star schema organizes analytical data around measurable events and the descriptive dimensions used to group them.
 
-## Two kinds of table
+## Define the grain first
+A fact table records events or measurements, such as one order line, one payment, or one daily inventory snapshot. Its grain is the precise meaning of one row. A dimension table describes entities used to filter and group facts, such as customer, product, store, or date.
 
-A star schema organises a data warehouse around a single idea: separate what
-happened from the context it happened in. Every table is one or the other, and
-the split is sharper than it first sounds.
+A fact table can contain foreign keys to dimensions and numeric measures. Dimension tables are denormalized for convenient analysis. The layout resembles a star because dimensions connect to the central fact table.
 
-A **fact** table records something that happened. One row per sale, per
-click, per sensor reading. It holds numbers you want to aggregate &mdash;
-quantity, amount, duration &mdash; and foreign keys pointing at dimension
-tables. Almost nothing else. Fact tables are huge and narrow.
+## Why the grain prevents wrong totals
+Suppose one fact row represents an order line. If a query joins it to a dimension with multiple matching rows, the line can be duplicated and the sum inflated. Before aggregating, verify that each fact key matches at most one dimension row for the relevant point in time.
 
-A **dimension** table describes the context of a fact. The product dimension
-holds the name, category, brand, and supplier. The date dimension holds the day,
-month, quarter, day of week, and whether it was a holiday. Dimension tables are
-small and wide, and mostly text.
+Choose measures that can be aggregated as intended. Revenue can often be summed; a precomputed average generally cannot be summed or averaged correctly without its count or denominator. Ratios should usually be recomputed from additive components.
 
-Drawn on a diagram, the fact table sits in the centre with dimensions radiating
-outward like points of a star. That shape is where the name comes from.
+## Dimensions can change over time
+A customer may move to a new region. A slowly changing dimension strategy determines whether historical facts use the old description, the new one, or both through versioned dimension rows. The choice must match the reporting question. A date dimension can also store calendar, fiscal, and holiday attributes that are awkward to derive repeatedly.
 
-This layout is deliberately denormalised. You will see repeated text in
-dimension tables. That repetition is the point: it keeps every analytical query
-to a single join pattern rather than a chain of lookups.
+Star schemas are common in warehouses, but their details depend on the warehouse engine and modeling needs. See [OLTP vs OLAP](oltp_vs_olap_columnar.html) and [normalization](normalization_in_sql.html).
 
-## Why it is shaped that way
+## State the grain before adding dimensions
+Suppose one fact row is one product line on one order. Joining a line to a product dimension should match one product version for the order's relevant date. If the dimension contains multiple historical versions and the join omits the effective date, the line may match multiple rows and revenue is doubled. Add a test that counts matched dimension rows per fact key. When totals change after adding a dimension, inspect join cardinality before assuming the aggregation is wrong.
 
-each analytical question has the same form: *aggregate some measure, sliced by
-some fields, filtered by others*. Revenue by category by month for one
-region. Units sold by store by weekday.
+## Use conformed dimensions carefully
+A shared date or customer dimension can make reports across fact tables consistent, but only if its keys and definitions mean the same thing in each model. Joining two fact tables through dimensions can still multiply rows when both have many records per dimension key. Aggregate each fact to a compatible grain before combining measures. Document which dimensions are shared and which attributes are historical. Consistent naming does not guarantee compatible business definitions; the warehouse model should make those definitions explicit.
 
-In a star schema each such query is the same join: fact table to the dims
-the question mentions, group by their fields, aggregate the fact's measures.
-Run the variants above and they're all that shape.
-
-That uniformity has three consequences worth having.
-
-**Query planners handle it well.** The pattern is recognisable enough that
-analytical engines have a dedicated *star join* optimisation: filter the small
-dims first, use the result to restrict the fact-table scan, and never
-materialise a large mid.
-
-**Analysts can write the queries.** Adding a slice means adding a join and a
-group-by column. No investigation of a normed graph is needed.
-
-**BI tools make them.** Tableau, Looker and Power BI all assume this model,
-and give good SQL against it and poor SQL against any of it else.
-
-## The date dimension
-
-A table of dates looks redundant. A DB has date functions. It earns
-its place anyway, because it holds things no function knows: your fiscal
-calendar, public holidays in the markets you sell in. This Weeks were promotion
-periods, whether a day was a weekday in the local sense.
-
-`WHERE d.is_holiday` and `GROUP BY d.fiscal_quarter` are then plain joins
-rather than a growing pile of `CASE` expressions.
-
-## Grain
-
-The most consequential choice is the **grain**: what just one fact row
-shows.
-
-"One row per order line" and "one row per order" are different grains, and mixing
-them corrupts each aggregate &mdash; sum a per-order total across order lines
-and you've times'd the revenue by the number of lines. This is the most
-common defect in real warehouses, and it's silent.
-
-State the grain in one sentence before creating the table, and make each measure
-steady with it.
-
-## Slowly changing dimensions
-
-A product moves category. Do historical facts belong to the old category or the
-new one?
-
-**Type 1**: overwrite. Simple, and history is rewritten &mdash; last year's
-report changes.
-
-**Type 2**: add a new dimension row with validity dates and point new facts at
-it. History is preserved and the dim grows. This is the usual choice, and
-it's why dim tables have surrogate keys rather than using the natural
-business key.
-
-**Type 3**: keep a `previous_category` column. Enough for one level of history,
-rarely enough .
-
-## Star against snowflake
-
-Norming the dims &mdash; splitting `product` into product, category and
-supplier tables &mdash; gives a **snowflake schema**. It drops redundancy and
-adds joins.
-
-For warehouses the star is often preferred, because dims are small
-enough that the redundancy costs little, the extra joins cost real query time,
-and the denormalised version is far easier to read. The exception is a truly
-large dim &mdash; tens of millions of customers &mdash; where the
-duplication starts to matter.
-
-## Mixed grain, shown inflating a total
-
-"Times'd the revenue by the number of lines" is the most costly silent bug
-in warehousing, so it's worth watching happen. Three orders of $100 each, with
-3, 2 and 1 line items, joined fact-to-lines and summed the wrong way:
-
-|query|result|
-|---|---|
-|`SUM(total)` over orders|**$300** (correct)|
-|`SUM(total)` after joining order lines|**$600** (wrong)|
-
-The join repeats each order's total once per line. So The three-line order counts
-its $100 three times, and the total comes out just doubled &mdash; here 2&times;,
-but the factor is the mean number of lines per order, what that happens to
-be. Nothing errors, the number is plausible, and it's wrong on each run. This is
-what "state the grain in one sentence" blocks: a measure at order grain must be
-summed at order grain, and mixing it with a per-line join silently times it.
-
-## Text belongs in the dimension, and here is the cost
-
-"Text in the fact table" sounds harmless until you note which table is
-huge. The fact table has one row per event. Hundreds of millions of
-them &mdash; while dims are small. Storing a 20-byte product name on each
-fact row, instead of a 4-byte key pointing at the product dim, widens the
-largest table in the warehouse:
-
-|on a 100M-row fact table|storage|
-|---|---|
-|a 20-byte text column|~2.0 GB|
-|a 4-byte foreign key to a dimension|~0.4 GB|
-
-Five times the space, on the table each analytical scan has to read, for data
-that is duplicated millions of times. The same product name written on
-each one of its sales. The dim stores it once. And because columnar
-warehouses scan the columns a query touches, a bloated fact table isn't just disk;
-it's read on each query that goes near it. Narrow facts, wide dims isn't
-an aesthetic preference &mdash; it's keeping the big table small and the
-redundancy in the place where it's cheap.
-
-## Questions people ask
-
-<strong>What is a star schema?</strong> A central fact table of measurable events surrounded by dimension tables that describe them, such as product, customer and date.
-
-<strong>What is the grain of a fact table?</strong> What one row represents, for example one line item on one order. Settle it first, and keep it consistent.
-
-<strong>What is the difference between a fact and a dimension?</strong> Facts are numbers you add up. Dimensions are the descriptive attributes you filter and group by.
-
-<strong>Star schema or snowflake schema?</strong> A star keeps dimensions flat, with fewer joins. A snowflake normalises them, saving space but adding joins. Star is the usual default.
-
-<strong>What is a slowly changing dimension?</strong> A dimension whose attributes change over time, such as a customer's city. You choose whether to overwrite, or keep history with new rows.
-
-<strong>Why have a date dimension?</strong> It lets you group by week, quarter or holiday without computing them in every query, and it keeps date logic in one place.
-
-## Where it goes wrong
-
-**Mixed grain.** Silent, and it inflates each total.
-
-**Text in the fact table.** It belongs in a dim. It makes the largest table
-wider for no gain.
-
-**No date dim.** Fiscal calendars and holidays end up as `CASE`
-expressions copied between queries.
-
-**Type 1 all over.** History quietly rewrites itself, and last quarter's report
-no longer copies.
+## Further reading
+- [Microsoft's star schema guidance](https://learn.microsoft.com/power-bi/guidance/star-schema) explains fact grain and dimension modeling.

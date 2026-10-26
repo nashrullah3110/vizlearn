@@ -179,6 +179,7 @@ def page(t):
             </div>
         </div>
     </main>
+    <!-- VIZLEARN:LEDE:AFTER -->
 """ % {
         "crumb": shell.breadcrumb_bar([("Home", PREFIX + "index.html"),
                                        ("Databases & SQL", PREFIX + DIR + "/"),
@@ -227,21 +228,29 @@ def main():
 
     art_dir = os.path.join(ROOT, "content", "articles", DIR)
     os.makedirs(art_dir, exist_ok=True)
+    seeded = 0
     for t in TOPICS:
-        open(os.path.join(art_dir, "%s.txt" % t["slug"]), "w",
-             encoding="utf-8").write(t["article"].strip() + "\n")
+        path = os.path.join(art_dir, "%s.txt" % t["slug"])
+        # The embedded copy bootstraps new topics. Editorial sources in
+        # content/articles/database remain authoritative after that first run.
+        if not os.path.exists(path):
+            open(path, "w", encoding="utf-8").write(t["article"].strip() + "\n")
+            seeded += 1
 
     index = os.path.join(ROOT, "index.html")
     src = open(index, encoding="utf-8").read()
     data, start, end = read_course_data(index)
     if TOPIC_KEY not in data:
         raise SystemExit("courseData has no %r topic" % TOPIC_KEY)
-    data[TOPIC_KEY], added = catalog_entry(data[TOPIC_KEY])
-    block = json.dumps(data, indent=4, ensure_ascii=False)
-    open(index, "w", encoding="utf-8").write(src[:start] + block + src[end:])
+    updated_topic, added = catalog_entry(data[TOPIC_KEY])
+    if updated_topic != data[TOPIC_KEY]:
+        data[TOPIC_KEY] = updated_topic
+        block = json.dumps(data, indent=4, ensure_ascii=False)
+        open(index, "w", encoding="utf-8").write(src[:start] + block + src[end:])
 
     print("db pages written : %d" % len(TOPICS))
-    print("articles written : %d" % len(TOPICS))
+    print("article sources  : %d preserved, %d bootstrapped"
+          % (len(TOPICS) - seeded, seeded))
     print("catalog          : %d entries added, %d total in the track"
           % (added, len(data[TOPIC_KEY]["courses"])))
     return 0

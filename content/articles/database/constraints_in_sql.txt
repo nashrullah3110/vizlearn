@@ -1,155 +1,29 @@
-title: Constraints: UNIQUE, CHECK and NOT NULL
-intro: Rules written once in the schema, enforced against each client, forever.
+title: SQL Constraints: NOT NULL, UNIQUE, CHECK, and FOREIGN KEY
+intro: Constraints make the database reject invalid states, protecting data even when rows are written by different applications.
 
-## Where a rule should live
+## Put durable rules beside the data
+A constraint is a rule the database checks when data is inserted or changed. Unlike validation in one application screen, the rule applies to every writer that reaches the table. Use constraints for facts that must always hold, such as an identifier being unique or an order referring to an existing customer.
 
-"Age must be at least 18" can be written in three places: the form in the
-browser, the service that handles the request, or the table itself.
+<pre><code>CREATE TABLE orders (
+  id INTEGER PRIMARY KEY,
+  customer_id INTEGER NOT NULL,
+  total NUMERIC CHECK (total &gt;= 0),
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+);</code></pre>
 
-The first two are worth having and neither is enough. A browser check is a
-courtesy to the user and is bypassed by any of it that isn't a browser. A
-service check holds until someone writes a second service, a migration script,
-a bulk import or a manual fix at the console. And each one of those is
-written by someone who wasn't thinking about the rule at the time.
+<code>NOT NULL</code> rejects missing values; <code>UNIQUE</code> prevents duplicate non-NULL keys in SQLite and PostgreSQL; <code>CHECK</code> requires a condition not to be false; and a foreign key enforces a reference when foreign-key checking is enabled. SQLite applications must enable <code>PRAGMA foreign_keys = ON</code> for each connection unless the build/configuration sets it otherwise.
 
-A constraint in the schema holds for all of them, including the ones that do
-not exist yet. It's checked on each write, by the one component each path
-must go through.
+## NULL and defaults need care
+A <code>CHECK</code> condition that evaluates to <code>NULL</code> is not false, so it can pass. Combine it with <code>NOT NULL</code> when a value is required. In SQLite and PostgreSQL, a <code>UNIQUE</code> constraint permits multiple <code>NULL</code> values because NULLs are not treated as equal for this purpose. Other engines offer different options.
 
-## The three, and what each says
+A <code>DEFAULT</code> is not a validation rule: it supplies a value when a column is omitted (or <code>DEFAULT</code> is requested). It does not replace an explicitly supplied <code>NULL</code>. Test the exact behavior in your target engine.
 
-**NOT NULL** &mdash; the value must be known. NULL isn't a value. It's the
-lack of one. Allowing it means allowing rows where the question was never
-answered, and each query that touches the column then has to decide what to do
-about that.
+## Add rules safely
+For an existing table, first find and correct rows that violate the proposed constraint. Then apply a migration and check how the engine validates or locks the table. Constraint enforcement and <code>ALTER TABLE</code> capabilities differ by database. See [primary and foreign keys](primary_and_foreign_keys.html) for choosing identifiers and [normalization](normalization_in_sql.html) for schema structure.
 
-**UNIQUE** &mdash; no other row may hold this value. It's what stops two
-accounts sharing an email address without needing a read-then-write in the
-use, which is a race rule even when it looks correct.
+## Foreign-key actions are domain rules
+A foreign key can reject deletion of a referenced parent, cascade the deletion to children, or set the child reference to NULL. These choices change what data survives, so they should reflect the domain. Cascading deletion may be correct for temporary child records but dangerous for invoices or audit history. Constraint failures are useful signals: surface a clear application error instead of retrying blindly. Also test enforcement in the deployed environment, especially with connection pools and SQLite where the foreign-key setting is connection-specific.
 
-**CHECK** &mdash; this formula must be true for each row. It's the general
-case that the other two are special instances of, and it takes plain SQL:
-
-```
-CHECK (age >= 18)
-CHECK (salary > 0)
-CHECK (grade IN ('junior', 'mid', 'senior'))
-CHECK (end_date IS NULL OR end_date > start_date)
-```
-
-That last one is worth noticing. A constraint can relate two columns of the same
-row, so "an end date, if present, must come after the start date" is enforceable
-&mdash; a rule that is or else checked nowhere and violated eventually.
-
-## Read the error, not the row count
-
-Run each commented statement in turn. The value of doing so is that each one
-fails differently, and the message names the constraint that stopped it:
-
-| Attempt | Message |
-|---|---|
-| Duplicate email | `UNIQUE constraint failed: staff.email` |
-| Age 15 | `CHECK constraint failed` |
-| Negative salary | `CHECK constraint failed` |
-| Grade `'boss'` | `CHECK constraint failed` |
-| Missing salary | `NOT NULL constraint failed: staff.salary` |
-
-Naming constraints by name &mdash; `CONSTRAINT staff_age_adult CHECK (...)`
-&mdash; makes those messages far more handy, because "CHECK constraint failed"
-tells you nothing when a table has six of them.
-
-## The NULL subtlety in UNIQUE
-
-`UNIQUE` allows more than one NULL in almost each engine, and people are
-surprised by this until they see the thinking.
-
-`UNIQUE` forbids two rows being *equal*. Checking NULL to NULL doesn't
-give true. It makes NULL, because two unknown values aren't known to be
-the same. So two NULLs aren't equal, and the constraint has nothing to object
-to.
-
-The hands-on consequence is that `UNIQUE` on a nullable column doesn't
-ensure one row per real-world thing. It ensures one row per *known*
-value. If that isn't what you meant, add `NOT NULL`.
-
-## DEFAULT is not a constraint
-
-`DEFAULT 'junior'` supplies a value when the insert omits the column. It
-constrains nothing: an insert that by name passes NULL gets NULL, not the
-default, unless `NOT NULL` refuses it.
-
-Defaults and constraints are often paired for this reason. The default
-handles the common case, and the constraint handles the case where someone was
-clear about a thing they shouldn't have been.
-
-## The NULL count that surprises people, measured
-
-`UNIQUE` allowing many NULLs isn't a quirk to store but a consequence to see.
-Because NULL = NULL is *unknown* rather than true, two NULLs are never "equal" and
-the constraint has nothing to reject. In the SQLite this page runs, a `UNIQUE`
-column happily accepts row after row of NULL:
-
-```
-CREATE TABLE t (email TEXT UNIQUE);
-INSERT INTO t VALUES (NULL), (NULL), (NULL);   -- all three succeed
-INSERT INTO t VALUES ('a@x.com');
-INSERT INTO t VALUES ('a@x.com');              -- THIS one fails
-```
-
-Three unknown emails coexist. The first repeated *known* value is refused. This is
-not even steady across engines. SQL Server permits just one NULL in a
-unique column, while PostgreSQL, MySQL and SQLite permit many &mdash; so a schema
-that leans on either action isn't portable. If the rule you meant was "one row
-per real address", `UNIQUE` alone doesn't say it. `UNIQUE` plus `NOT NULL` does.
-
-## Adding one to a large table is not free
-
-A constraint added at `CREATE TABLE` costs nothing. One added later has to be
-*proved* against each existing row before the DB will accept it. Adding
-`CHECK (age >= 18)` or a `NOT NULL` to a 50-million-row table means the engine
-reads all 50 million rows to confirm none already violates it, and in most engines
-it holds a lock on the table while it does:
-
-|constraint added|what the database must do|
-|---|---|
-|at table creation|nothing; no rows exist yet|
-|to a 50M-row table|read all 50M rows, usually under a lock|
-
-So the same declaration is instant on an empty table and an outage on a full one.
-This is why constraints should encode what is *structurally* true &mdash; a
-salary is plus, an end date follows a start date &mdash; rather than current
-policy. A `CHECK` on this year's VAT rate has to be dropped and re-verified across
-each row each time the rate changes. Re-verifying a large table is the
-costly op above, paid on a schedule set by the tax authority rather
-than by you.
-
-## Questions people ask
-
-<strong>What is the difference between NOT NULL and a CHECK constraint?</strong> NOT NULL rejects missing values. CHECK evaluates any condition on the row, such as price greater than zero, and rejects the row if it is false.
-
-<strong>Does UNIQUE allow multiple NULLs?</strong> In most databases, yes, because NULL is not equal to NULL. SQL Server is a notable exception that allows only one, so check your engine.
-
-<strong>Is DEFAULT a constraint?</strong> No. DEFAULT only fills in a value when none is given. It does not stop someone inserting a different value or an explicit NULL.
-
-<strong>Why not validate everything in application code?</strong> Application checks can be bypassed by another service, a script, or a bug. A constraint is enforced for every writer, so the rule holds no matter who connects.
-
-<strong>Will adding a constraint to a big table lock it?</strong> It can. The database has to check every existing row, and some engines hold a lock while doing so. Many support adding the constraint as not validated first, then validating later.
-
-<strong>What error do I get when a constraint fails?</strong> The statement is rejected with an error naming the constraint, and no row from that statement is written. Read the message, because it tells you which rule was broken.
-
-## Where it goes wrong
-
-**Unnamed constraints.** Six `CHECK`s on a table and an error that says only
-"CHECK constraint failed" wastes real time. Name them.
-
-**Constraints that encode volatile policy.** A `CHECK` on a VAT rate has to be
-migrated when the rate changes, and migrating a constraint on a large table is
-not free. Constrain what is structurally true, not what is currently true.
-
-**given UNIQUE means one per thing.** With NULLs allowed it means one per
-known value.
-
-**Adding a constraint to a large live table without thinking.** The DB has
-to verify each existing row before it can accept the constraint, and in most
-engines that takes a lock while it does. Plan the migration during a low-traffic
-window so it does not block other writes.
+## Further reading
+- [SQLite CREATE TABLE](https://www.sqlite.org/lang_createtable.html) documents constraints and NULL behavior.
+- [PostgreSQL constraints](https://www.postgresql.org/docs/current/ddl-constraints.html) describes supported rules and caveats.

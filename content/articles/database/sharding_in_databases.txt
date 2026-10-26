@@ -1,154 +1,27 @@
-title: Sharding
-intro: The last resort of scaling, what it buys. The four things it takes away.
+title: Database Sharding: Distribute Data Across Nodes
+intro: Sharding splits a dataset across multiple database nodes so storage and work can be distributed horizontally.
 
-## What it is
+## What a shard is
+A shard is one part of a larger dataset stored on a separate node or cluster member. A sharding rule maps each record to a shard, commonly by range or hash of a shard key. An application or routing layer uses that key to locate the record.
 
-Sharding splits a dataset across free DB servers. Each **shard**
-holds a subset of the rows and knows nothing about the others.
+Sharding can add capacity when one server no longer meets storage or throughput needs. It also adds coordination, operations, and failure modes. Scaling a single database, archiving old data, or adding indexes may be simpler; measure the bottleneck before sharding.
 
-The gap from [splitting](partitioning_in_databases.html) is the
-machine boundary, and it's the whole trouble. Splits share a query
-planner, a transaction manager and a lock table. Shards share nothing, so
-any of it that needed a global view has to be rebuilt in the use or given
-up.
+## The shard key shapes the system
+A good shard key distributes writes and storage while appearing in common queries. A key with only a few values or one extremely popular value can create a hot shard. Queries that omit the key may need to contact many shards, and cross-shard transactions or joins can be more expensive.
 
-## The shard key
+Changing the shard key or adding nodes may require data movement and rebalancing. Design how routing metadata changes, how resharding is observed, and what happens when a shard is unavailable.
 
-One column decides where a row lives. often the key is hashed and the remainder
-taken modulo the shard count, so a routing rule might be
-`shard = hash(customer_id) % 4`.
+## Sharding versus partitioning
+Partitioning divides a logical table into pieces managed within a database system. Sharding distributes data across separate nodes and therefore requires routing and coordination. Some products combine both ideas. See [partitioning](partitioning_in_databases.html).
 
-The query above finds just that for a set of customers, and the variants
-show what different access patterns cost.
+## A tenant-key example
+Sharding by tenant ID can keep each tenant's requests on one shard, making tenant-scoped reads and transactions local. But a few unusually large tenants can create hot shards, and an administrative query across all tenants must fan out. Hashing tenant IDs may balance count but not workload size. Range-based placement can make range scans easier but may concentrate new writes. Track per-shard storage, request rate, and latency, and plan for a tenant that outgrows one shard.
 
-The consequence is stark and worth stating as a rule:
+## Choosing a key when queries differ
+There is rarely one key that makes every access local. A tenant-scoped request may fit a tenant key, while a global time-range report can touch all shards. Record the fraction of requests that include the proposed key and estimate the fan-out for the rest. Also check whether a single tenant can exceed one shard's capacity. If both tenant isolation and global reporting matter, the architecture may need a separate analytical copy rather than forcing one shard key to serve incompatible workloads.
 
-**A query that names the shard key touches one node. A query that doesn't
-touches all of them.**
+## Plan resharding before launch
+A shard map must support moving data when a node is added, removed, or overloaded. Define how routing changes without losing writes, how readers handle a moving range, and how progress is monitored. Consistent hashing or range splitting can help, but do not remove the need for a migration protocol and rollback plan. Backups and restores should be tested at both shard and whole-dataset levels. Operational complexity is part of the cost of sharding, even when the key distribution looks ideal on paper.
 
-A lookup by `customer_id` is a single-node request and stays fast as the fleet
-grows. A report grouped by `product_id` has to be sent to each shard and the
-partial results merged &mdash; a *scatter-gather*, whose latency is the slowest
-shard's, not the mean.
-
-So the shard key isn't a schema detail. It's a choice about which queries
-stay cheap forever and which never will, and it's extremely costly to change
-afterwards.
-
-## What you give up
-
-**Cross-shard joins.** Customers on shard 1, orders on shard 3, and no engine can
-join them. Either the join moves into the use, or related data is
-on purpose placed together &mdash; sharding orders by `customer_id` so a
-customer's orders live beside them.
-
-**Global uniqueness.** `UNIQUE(email)` can't be enforced across free
-servers. The usual answers are a separate lookup service that owns emails, or
-making ids that are unique by build &mdash; UUIDs, or Snowflake-style
-ids with a shard number embedded.
-
-**Cross-shard transactions.** ACID stops at the shard boundary. Spanning shards
-means two-phase commit, which is slow and adds a coordinator that can fail
-mid-protocol, or sagas, which are eventually steady with clear
-compensation. Most teams design so that transactions never span shards.
-
-**`AUTO_INCREMENT`.** each shard would start at 1. Ids must come from elsewhere.
-
-## Rebalancing
-
-Adding a shard when the rule is `hash(key) % 4` changes it to `% 5`, and almost
-each row's destination moves. Migrating the whole dataset while serving traffic
-is the single worst part of operating a sharded system.
-
-Two designs avoid it. **Steady hashing** places shards on a ring so adding
-one moves only the keys in its arc, rather than reshuffling all.
-**Virtual buckets** hash keys into a fixed large number of buckets &mdash; say
-1024 &mdash; and map buckets to physical shards. Adding a shard moves a few
-buckets and the hash rule never changes. The bucket approach is what most modern
-systems use, because moving is then a matter of copying a bucket and updating a
-map.
-
-## Do the cheaper things first
-
-Sharding is close to irreversible and touches each part of the use.
-Before it:
-
-1. **Index properly.** A great many "we need to shard" conversations end at a
-   missing [composite index](composite_and_covering_indexes.html).
-2. **Read replicas**, if reads dominate. Cheap, and reversible.
-3. **Caching**, for the hot small set.
-4. **Splitting**, if one table is the problem.
-5. **A bigger machine.** Unglamorous, and modern hardware goes a very long way.
-
-Shard when writes exceed what one machine can take, or the working set no longer
-fits in memory anywhere, and not before.
-
-## Why naive rebalancing is the nightmare
-
-"Almost each row's destination moves" isn't hyperbole, and the number is the
-reason steady hashing and virtual buckets exist. With the rule
-`hash(key) % N`, adding one shard changes the divisor, and a key moves when
-`hash % N` differs from `hash % (N+1)`. Which is almost always:
-
-|change|keys that must move|
-|---|---|
-|`% 4` &rarr; `% 5`|~80%|
-|`% 100` &rarr; `% 101`|~99%|
-
-Measured over two hundred thousand random keys, the `% 4` to `% 5` change relocated
-79.8% of them, and it only gets worse as the fleet grows. Steady hashing and
-virtual buckets bring that down to roughly `1/(N+1)`. About 20% and 1% for
-the two rows above &mdash; because a new shard takes a slice from its neighbours
-instead of forcing each key to recompute against a new divisor. Moving 1% of the
-data to add a machine is an afternoon. Moving 99% while serving traffic is the
-project everyone dreads.
-
-## The slowest shard sets the latency
-
-"Scatter-gather latency is the slowest shard's, not the mean" is a statement
-about tail chance, and the math is unforgiving. If each shard answers
-within its target 99% of the time, a query that must wait for *all* of them is
-fast only if *each* shard was fast. And that chance falls as the
-fan-out grows:
-
-|shards in the fan-out|each 99% fast|chance the query hits a slow shard|
-|---|---|---|
-|10|0.99|9.6%|
-|100|0.99|**63.4%**|
-|100|0.999|9.5%|
-
-A hundred-shard query with per-shard 99% latency is slow *most of the time*,
-because 0.99&#8313;&#8304. Is only 0.366. The fan-out has turned a rare per-shard
-event into the common case, and the only cures are to make each shard far more
-solid (the third row) or to avoid the fan-out by putting the shard key in the
-query. This is why a single degraded node makes an entire sharded tier feel slow,
-and why "the mean shard is fast" is the wrong thing to measure.
-
-## Questions people ask
-
-<strong>What is sharding?</strong> Splitting data across multiple database servers, so each holds only part of it. Each part is called a shard.
-
-<strong>When should I shard?</strong> Only after cheaper options fail: better indexes, read replicas, caching and a bigger machine. Sharding adds a lot of complexity.
-
-<strong>What makes a good shard key?</strong> One that spreads data and traffic evenly and appears in most queries. A bad key creates a hot shard that takes most of the load.
-
-<strong>Why are cross-shard joins hard?</strong> The rows live on different servers, so the join has to move data over the network or be done in application code.
-
-<strong>What is rebalancing?</strong> Moving data between shards when you add or remove servers. Consistent hashing reduces how much data has to move.
-
-<strong>Why does the slowest shard set the latency?</strong> A query that fans out to every shard must wait for all of them. One slow shard delays the whole answer.
-
-## Where it goes wrong
-
-**A shard key with skew.** Sharding by country puts most of the traffic on one
-node. Check the distribution of real values.
-
-**Sharding by a key the queries don't use.** each query turns
-scatter-gather, and you've bought spread-systems problems for no
-throughput.
-
-**given transactions still work.** They work within a shard. Across shards
-they don't, and code written before sharding often assumes or else.
-
-**Losing the slowest shard sets the latency.** One degraded node makes each
-fan-out query slow.
+## Further reading
+- [MongoDB sharding](https://www.mongodb.com/docs/manual/sharding/) describes shard keys, chunks, and balancing.

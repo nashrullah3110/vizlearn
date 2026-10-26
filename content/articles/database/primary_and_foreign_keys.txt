@@ -1,152 +1,29 @@
 title: Primary and Foreign Keys
-intro: The two constraints that make a row hopeless to write if it couldn't be true.
+intro: Keys identify rows and express references between tables, allowing the database to enforce important identity rules.
 
-## A key is a promise about identity
+## A primary key identifies a row
+A primary key is a column or set of columns whose values uniquely identify each row and cannot be NULL. A table has one primary-key constraint, though it may contain several columns. A good key is stable and actually unique in the modeled data. SQLite has a historical exception: some non-integer primary-key declarations in ordinary rowid tables can accept NULL. Declare such columns NOT NULL explicitly or use a STRICT or WITHOUT ROWID table when relying on the rule.
 
-A **main key** is the column, or set of columns, whose value spots a
-row uniquely and permanently. Declaring one asks the DB for two
-ensures at once: no two rows share this value, and no row leaves it NULL.
+A surrogate key such as an integer ID is convenient when no natural identifier is both unique and stable. Natural keys can still be useful as UNIQUE constraints. A surrogate ID does not make other real-world uniqueness rules disappear.
 
-That second half is easy to overlook and does real work. NULL means unknown. A
-row whose identity is unknown can't be referred to, updated with trust,
-or joined against, so a nullable identifier isn't an identifier at all.
+## A foreign key enforces a reference
+A foreign key says that a value in one table must match a candidate key in another table, or be NULL if the relationship is optional.
 
-Run the first statement in the editor. The insert is refused, and the message
-comes from SQLite rather than from any of it on this page:
-`UNIQUE constraint failed: orders.id`. Nothing in the use had to check
-first, and no amount of concurrent traffic can slip a duplicate past it.
+<pre><code>CREATE TABLE orders (
+  order_id INTEGER PRIMARY KEY,
+  customer_id INTEGER NOT NULL REFERENCES customers(customer_id)
+);</code></pre>
 
-## A foreign key is a promise about reference
+This prevents an order from referring to a customer row that does not exist. ON DELETE and ON UPDATE actions determine what happens when the referenced row changes; choose RESTRICT, CASCADE, or SET NULL to match the domain.
 
-A **foreign key** says: what value sits in this column must already exist
-in that column of that table. `orders.customer_id` refs `customers.id`,
-so an order can only belong to a customer who is really there.
+In SQLite, foreign-key enforcement must be enabled for each connection with PRAGMA foreign_keys = ON unless configured otherwise. Some engines do not automatically index the child-side foreign-key column, so add an index when joins or parent updates need it.
 
-Uncomment the second statement and run it. Order 9 claims customer 77, and
-customer 77 doesn't exist, so the write fails. Without the constraint the row
-would be accepted and the problem would surface much later, as a join that
-silently returns fewer rows than expected or a report whose totals don't
-merge.
+## Composite keys and design
+A composite key uses more than one column when identity is only unique in combination, such as (course_id, student_id) in an enrollment table. If referencing it, the foreign key must include the same key columns. See [normalization](normalization_in_sql.html) and [constraints](constraints_in_sql.html).
 
-This is the value of the constraint and it's worth stating plainly: it turns a
-data-quality problem, which is found weeks later by a human, into a write
-error, which is found right away by a machine.
+## Optional references and uniqueness
+A nullable foreign key can represent an optional relationship, but decide whether NULL means “not assigned yet” or “not applicable.” A UNIQUE constraint on a natural identifier may permit multiple NULL values in SQLite and PostgreSQL, so combine it with NOT NULL when every row must have an identifier. Composite keys can prevent duplicate pairs such as the same student enrolling twice in one course. They also enlarge foreign keys and indexes that carry the pair. Choose clarity and stability over minimizing the number of columns.
 
-## What happens to the other side
-
-Uncomment the third statement. Deleting customer 1 is refused, because orders 1
-and 2 point at that customer and dropping it would leave them pointing at
-nothing. The DB won't create the orphan.
-
-Refusing is one of a few available answers, chosen with `ON DELETE`:
-
-| Clause | Behaviour |
-|---|---|
-| `RESTRICT` / `NO ACTION` | refuse the delete while children exist (the default) |
-| `CASCADE` | delete the children too |
-| `SET NULL` | keep the children, blank the reference |
-| `SET DEFAULT` | point the children at a default row |
-
-`CASCADE` is convenient and worth respecting. Deleting one customer can silently
-drop thousands of orders, and a cascade that runs through a few tables can
-drop a great deal more than the person pressing the button expected.
-
-## Natural against surrogate
-
-Given a table of people, is the main key the email address or an int
-that means nothing?
-
-An email address is a **natural key**: it comes from the domain and carries
-meaning. It's also mutable, at times shared, at times absent, and awkward
-to index. each row that refs it stores a whole string, and a person
-changing their address means updating each one of them.
-
-A meaningless int is a **surrogate key**. It's stable because nothing in
-the world can force it to change, compact to store and to index, and safe to
-scatter across a dozen referencing tables.
-
-The usual practice is a surrogate main key plus a `UNIQUE` constraint on the
-natural one, which buys stable identity and still refuses two accounts on the
-same address.
-
-## Composite keys
-
-A key can span a few columns. A table recording which student is enrolled on
-which course has a main key of `(student_id, course_id)`: neither column
-alone spots a row, and the pair does. That declaration also states a
-business rule &mdash; a student can enrol on a course once &mdash; which the
-DB will now enforce for free.
-
-## Why the child side needs its own index
-
-The parent side of a foreign key is indexed for free. It's a main key.
-The child side often isn't, and that omission turns cheap ops into full
-scans, because each referential action has to ask "are there children?" and
-answer it by looking.
-
-Delete a customer with 5,000,000 orders in the child table. With no index on
-`orders.customer_id`:
-
-|operation|with no index on the child FK|with the index|
-|---|---|---|
-|`ON DELETE RESTRICT` check|scan up to 5,000,000 rows|a single index seek|
-|`ON DELETE CASCADE`|scan to find the children|seek straight to them|
-|a join `customers &#8904; orders`|scan the child table|indexed lookup|
-
-The DB enforces the constraint right either way. The difference is
-whether each check is a seek or a scan of the whole child table. This is the
-quiet reason a schema "with foreign keys" can still be slow: the constraint was
-declared, the supporting index on the referencing column wasn't, and each
-delete or cascade pays for it.
-
-## Why the surrogate key is usually smaller too
-
-The natural-versus-surrogate choice has a storage side that compounds with each
-referencing table. A natural key. An email, a UUID string &mdash; is copied
-into each child row that refs it. So Its width is paid once per ref,
-not once per person:
-
-|key in 5 child tables, 10M rows each|storage in the children|
-|---|---|
-|email as the foreign key (~30 bytes)|~1,500 MB|
-|surrogate integer (4 bytes)|~200 MB|
-
-The surrogate isn't just stable against change. It's seven times smaller
-across the refs, and a smaller key means more index entries per page, so the
-indexes that use it are smaller and shallower too. The natural key still earns a
-`UNIQUE` constraint so the real-world rule ("one account per email") is enforced;
-it simply doesn't also have to be the value scattered across a dozen tables. That
-is the thinking behind "surrogate main key plus a unique natural key" &mdash;
-stable, compact identity for the machine, and the business rule kept as well.
-
-## Questions people ask
-
-<strong>Can a table have more than one primary key?</strong> No. A table has exactly one primary key, though it can span several columns. Other columns that must be unique can use a UNIQUE constraint instead.
-
-<strong>Can a foreign key be NULL?</strong> Yes. A NULL foreign key means no reference, and the database skips the check for that row. Add NOT NULL to the column if every child must have a parent.
-
-<strong>Does a foreign key create an index?</strong> Not on the child side. The parent key is indexed because it is a primary or unique key, but the referencing column needs its own index if you join or cascade on it.
-
-<strong>Should I use an auto-increment integer or a UUID as the primary key?</strong> An integer is smaller and sorts in insert order, which keeps the index compact. A UUID is useful when ids are generated in many places, at the cost of larger keys and scattered inserts.
-
-<strong>What happens if I delete a parent row that has children?</strong> By default the delete is refused. You can choose ON DELETE CASCADE to remove the children, or SET NULL to keep them with no parent.
-
-<strong>Why does my foreign key not stop bad inserts in SQLite?</strong> SQLite leaves enforcement off unless you run PRAGMA foreign_keys = ON on each connection. Without it the REFERENCES clause is accepted and ignored.
-
-## Where it goes wrong
-
-**Turning foreign keys off for speed.** They cost a thing on write. The
-cost of not having them is found in production, in data that no longer
-makes sense, and it's much harder to pay.
-
-**Losing the pragma.** SQLite ships with foreign key enforcement off for
-backwards compatibility. A schema full of `Refs` clauses that were never
-enforced looks correct and ensures nothing.
-
-**Making the main key real.** any of it that carries meaning can change,
-and a main key that changes has to be chased through each table that
-refs it.
-
-**Leaving the foreign key column unindexed.** The parent side is indexed by its
-main key automatically. The child side often isn't, and each cascade or
-referential check then scans the whole child table.
+## Further reading
+- [SQLite CREATE TABLE](https://www.sqlite.org/lang_createtable.html) explains key declarations.
+- [PostgreSQL constraints](https://www.postgresql.org/docs/current/ddl-constraints.html) describes key constraints and referential actions.

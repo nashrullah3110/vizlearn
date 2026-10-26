@@ -1,155 +1,30 @@
-title: Aggregate Functions and the NULL Trap
-intro: Five functions that collapse many rows into one. The one action they share that quietly changes your answers.
+title: Aggregate Functions: Count, Sum, and Average
+intro: Aggregates summarize a set of rows into values; understanding NULL and empty input keeps those summaries honest.
 
-## Many rows in, one value out
+## Start with the question
+An aggregate calculates a value from several rows. <code>COUNT</code>, <code>SUM</code>, <code>AVG</code>, <code>MIN</code>, and <code>MAX</code> are common examples. They can summarize a whole result or one group at a time. The important detail is which rows each function sees, especially when a column contains <code>NULL</code>.
 
-An aggregate function takes a set of rows and returns a single value. With no
-`GROUP BY`, the set is the whole table. With one, it's each group in turn.
+## What each aggregate counts
+<code>COUNT(*)</code> counts rows, including rows with missing values. <code>COUNT(amount)</code> counts only rows where <code>amount</code> is not <code>NULL</code>. <code>SUM(amount)</code> and <code>AVG(amount)</code> also skip <code>NULL</code> values. <code>MIN</code> and <code>MAX</code> compare the non-NULL values. These rules mean that a count of rows and a count of known values can differ.
 
-The five that matter are `COUNT`, `SUM`, `AVG`, `MIN` and `MAX`. Run the
-starter query and all five appear side by side over the same nine rows. The
-numbers don't agree with each other in the way you might expect, and the reason
-is NULL.
+<pre><code>SELECT COUNT(*) AS rows,
+       COUNT(amount) AS known_amounts,
+       AVG(amount) AS average_amount
+FROM payments;</code></pre>
 
-## COUNT(*) and COUNT(col) are different functions
+If the rows contain amounts 10, NULL, and 20, the result is three rows, two known amounts, and an average of 15.
 
-This is the single most handy gap on the page.
+## Empty input and groups
+An aggregate query without <code>GROUP BY</code> still returns one result row when its input is empty. <code>COUNT(*)</code> returns 0; most other aggregates return <code>NULL</code> because there is no value to combine. <code>COALESCE(SUM(amount), 0)</code> is appropriate only when the application means “no rows” to count as zero.
 
-`COUNT(*)` counts **rows**. It doesn't look at any column, can't be affected
-by NULL, and answers "how many records are there".
+With <code>GROUP BY</code>, the database produces one output row per distinct grouping key. A group with no matching rows does not appear at all. For filtering groups by an aggregate, use <code>HAVING</code>; use <code>WHERE</code> to remove input rows before they are grouped. See [GROUP BY](groupby_in_sql.html) and [HAVING](having_in_sql.html).
 
-`COUNT(temp_c)` counts **non-NULL values in that column**. It answers "how many
-records really have a reading".
+## Averages need a denominator
+<code>AVG(amount)</code> is equivalent to the sum of known amounts divided by their count. It is not the same as treating every missing amount as zero. For 10, NULL, and 20, the average is 15; replacing the missing value with zero changes it to 10. Choose the interpretation based on what <code>NULL</code> means in the data.
 
-The table has nine rows and four of them have no temperature. So `COUNT(*)` is
-9 and `COUNT(temp_c)` is 5, and the gap between them is a free measure of
-missing data:
+## Weighted totals and joined rows
+Do not average already-calculated averages unless each group has the same number of observations. If one class has 5 students averaging 80 and another has 25 averaging 60, the overall average is weighted by 5 and 25, not the midpoint of 80 and 60. Keep each group’s sum and count if you need to combine summaries. Also check join cardinality before summing: a one-to-many join can repeat a value and inflate the total. Define the row grain first, then aggregate at that grain.
 
-```
-SELECT COUNT(*) - COUNT(temp_c) AS missing FROM readings;
-```
-
-That one line is worth reaching for when a column's quality is in question.
-It needs no subquery, no `IS NULL` filter and no second pass.
-
-## Everything else skips NULL silently
-
-`SUM`, `AVG`, `MIN` and `MAX` all skip NULL. They don't fail, warn, or
-return NULL because a NULL was present. They behave as though those rows
-weren't there.
-
-For `SUM`, `MIN` and `MAX` this is almost always what you want. For `AVG` it's
-the thing that catches people. **AVG cuts by the count of values, not
-the count of rows**:
-
-```
-AVG(temp_c)  =  SUM(temp_c) / COUNT(temp_c)
-```
-
-Run the second variant. Three numbers appear that all have a claim to being
-"the mean temperature", and they differ a lot:
-
-| Expression | What it means |
-|---|---|
-| `AVG(temp_c)` | mean of the readings that exist |
-| `AVG(COALESCE(temp_c, 0))` | mean if a broken sensor means zero degrees |
-| `SUM(temp_c) / COUNT(*)` | total spread across all rows including the broken ones |
-
-Which is correct depends fully on what NULL means in your data. If the sensor
-failed, the first is right and the others are nonsense &mdash; a broken sensor
-isn't a reading of zero. If NULL means "no sales that day", the second may well
-be right. The DB can't decide this for you, and it won't ask.
-
-## The empty group
-
-Run the fourth variant. It restricts to the rows that have no reading at all,
-so there are four rows and zero values. Each aggregate has to say what it
-does with nothing.
-
-`COUNT(*)` is 4 and `COUNT(temp_c)` is 0, as expected. `SUM`, `AVG`, `MIN` and
-`MAX` all come back **NULL**. Not zero, and not an error. The rule is
-that an aggregate over zero values returns NULL, and the single exception is
-`COUNT`, which returns 0 because counting nothing truly is zero.
-
-This matters when an aggregate feeds math. `SUM(amount) * 1.2` over a
-group with no rows is NULL, and NULL passes through each op it
-touches until a thing wraps it in `COALESCE`.
-
-## GROUP BY and the shape of the result
-
-Adding `GROUP BY station` changes the result from one row to one row per
-station. The rule that follows is the one beginners trip on: each column in the
-`SELECT` list must either be aggregated or appear in the `GROUP BY`.
-
-the query has to give just one value per group. Given
-three readings for `north`, there's no answer to "what is the id" &mdash;
-there are three, and the DB won't choose one. Some engines once
-allowed it and returned an any row. This Is worse than an error because
-it works until it doesn't.
-
-## Three averages of the same column
-
-The "AVG cuts by the count of values, not rows" rule is best seen as three
-numbers that all claim to be the mean. Five rows, two of them with a NULL
-reading, the three present values being 10, 20 and 30 (sum 60):
-
-|expression|value|what it computed|
-|---|---|---|
-|`AVG(t)`|**20**|60 / 3, the mean of the readings that exist|
-|`SUM(t) / COUNT(*)`|**12**|60 / 5, the total spread across all rows|
-|`AVG(COALESCE(t, 0))`|**12**|same, treating a missing reading as zero|
-
-Confirmed in the SQLite this page runs. The gap between 20 and 12 isn't rounding
-&mdash; it's the two NULLs, counted by `COUNT(*)` and skipped by `AVG`. Which one
-is correct is a question about the data, not the SQL: if a NULL means a sensor
-failed, 20 is right and 12 invents readings of zero. If it means "no sales that
-day", 12 is right and 20 overstates the common day. The DB will find
-whichever you write and warn you about neither.
-
-## The empty group returns NULL, not zero
-
-There's one more NULL action that breaks math downstream: an aggregate
-over *no values* returns NULL, and only `COUNT` returns 0. Restrict to rows that
-have no reading at all. A real group with zero values &mdash; and:
-
-|aggregate|over an empty group|
-|---|---|
-|`COUNT(*)`|0|
-|`COUNT(t)`|0|
-|`SUM`, `AVG`, `MIN`, `MAX`|**NULL**|
-
-`SUM` of nothing being NULL rather than 0 is the one that bites, because NULL then
-passes: `SUM(amount) * 1.2` over an empty group is NULL, and it stays NULL
-through each op until a thing wraps it in `COALESCE`. A report that
-subtotals by group and then does math on the subtotals will show blanks, not
-zeros, for the empty groups. And a blank where a number was expected is how
-this surfaces, often in front of someone who trusts the report.
-
-## Questions people ask
-
-<strong>What is the difference between COUNT(*) and COUNT(column)?</strong> COUNT(*) counts rows. COUNT(column) counts only rows where that column is not NULL, so the two can differ.
-
-<strong>Do aggregate functions ignore NULL?</strong> Yes, SUM, AVG, MIN, MAX and COUNT(column) all skip NULLs. That is why AVG of a column can differ from the sum divided by the row count.
-
-<strong>What does SUM return on an empty set?</strong> NULL, not zero. Wrap it in COALESCE(SUM(x), 0) if you want a zero.
-
-<strong>Why can I not use an aggregate in WHERE?</strong> WHERE filters rows before grouping, so the aggregate does not exist yet. Use HAVING to filter on aggregate results.
-
-<strong>Why does SQL complain about columns not in GROUP BY?</strong> Each output row represents a group, so every selected column must be either grouped or aggregated. Otherwise the database has no single value to show.
-
-<strong>How do I count distinct values?</strong> Use COUNT(DISTINCT column). It counts each different non-NULL value once, though it is slower than a plain count on large tables.
-
-## Where it goes wrong
-
-**Using AVG on data where NULL means zero.** The mean silently rises. Use
-`COALESCE` when lack really is a zero.
-
-**given COUNT(col) is a faster COUNT(*).** They answer different questions.
-On a nullable column they return different numbers.
-
-**Filtering aggregates in WHERE.** `WHERE COUNT(*) > 5` is an error &mdash;
-`WHERE` runs before grouping, so no counts exist yet. That is what
-[HAVING](having_in_sql.html) is for.
-
-**Losing that NULL breaks math.** One NULL anywhere in an formula
-makes the whole formula NULL.
+## Further reading
+- [SQLite aggregate functions](https://www.sqlite.org/lang_aggfunc.html) documents empty-input and NULL behavior.
+- [SQLite SELECT](https://www.sqlite.org/lang_select.html) explains aggregate queries and grouping.

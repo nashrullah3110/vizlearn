@@ -1,152 +1,25 @@
-title: MVCC: How Readers Avoid Blocking Writers
-intro: The idea that lets a long report run while the DB keeps taking writes.
+title: MVCC: Multi-Version Concurrency Control
+intro: MVCC lets a database keep row versions so readers can see a consistent snapshot while changes are being made.
 
-## The problem with locks
+## Why keep multiple versions
+Multi-Version Concurrency Control (MVCC) is a concurrency technique. Instead of overwriting a row in place for every change, the engine records enough version information to decide which version a transaction can see. A reader can then continue using a snapshot while another transaction writes, reducing some read-write blocking.
 
-The simple way to keep transactions from interfering is locking: a reader takes
-a shared lock, a writer takes an exclusive one. The two can't be held at
-once.
+The exact implementation differs by engine. PostgreSQL stores tuple versions in the table and later reclaims obsolete versions; SQLite uses journaling or WAL snapshots with its own locking model. “MVCC” does not mean that every read and write happens without locks.
 
-It's correct, and on a busy system it's miserable. A report that scans a large
-table holds read locks for its whole run. So Each write to that table waits.
-Meanwhile a long write transaction blocks each reader. The DB spends its
-time queueing rather than working, and the symptom is an use that is fast
-until it's inexplicably not.
+## Visibility is transaction-specific
+When a transaction reads a row, the database checks whether a version is visible according to the transaction's snapshot and isolation level. A second read may see a newer version under one isolation level and the same snapshot under another. This is why snapshot behavior and isolation guarantees need to be considered together. See [isolation levels](isolation_levels.html).
 
-## Versions instead of locks
+## The cleanup cost
+Old versions cannot be removed while active transactions may still need them. Long-running transactions can therefore delay cleanup and increase storage or maintenance work. In PostgreSQL, vacuum reclaims space from obsolete tuples for reuse and maintains visibility information. Monitor the engine's own maintenance signals rather than assuming MVCC is free.
 
-**Multi-version concurrency control** drops the conflict by refusing to destroy
-any of it. A write doesn't overwrite a row. It creates a *new version* of it, and
-the old version stays until no one can still need it.
+MVCC can improve concurrency, but it does not prevent write-write conflicts, deadlocks, or every serialization anomaly. Use constraints and transaction logic to protect business rules; see [transactions and ACID](transactions_and_acid.html).
 
-each transaction is given a **snapshot**. In effect a rule saying which
-versions count as visible &mdash; fixed at the moment it starts, or at the moment
-each statement starts, based on the
-[alone level](isolation_levels.html).
+## MVCC does not remove all blocking
+Two transactions that update the same row still need to coordinate. DDL and explicit locks can block readers or writers, and a database may abort a transaction when its snapshot is no longer safe. In PostgreSQL, an update creates a new tuple version; old versions remain until no active transaction needs them and vacuum can reclaim them. In SQLite WAL mode, readers can continue on a snapshot while a writer commits, but SQLite still permits only one simultaneous writer. The label MVCC does not make engine behavior identical.
 
-A reader that began before a write simply continues to see the older version.
-Nothing waits.
+## Keep transactions short-lived
+A transaction that remains open while a user waits on a page or an external service can pin an old snapshot. That may delay cleanup of obsolete versions, increase storage, and make maintenance less effective. Fetch what is needed, commit, and do network work outside the transaction when consistency permits. If a workflow truly needs a long snapshot, monitor its duration and understand the engine's cleanup behavior. MVCC improves concurrent access, but old snapshots are resources the database must preserve.
 
-## What each version carries
-
-Conceptually each row version records which transaction created it and which
-transaction deleted it:
-
-```
-id  | balance | created_by | deleted_by
-----+---------+------------+-----------
-7   |   1000  |    100     |    142
-7   |    850  |    142     |    NULL
-```
-
-Transaction 142 changed the balance. It didn't edit the first line. It marked it
-deleted and appended the second. A transaction with a snapshot older than 142 is
-shown the first version, a newer one the second. Visibility turns an math
-check of transaction ids rather than a queue.
-
-## What MVCC does not solve
-
-This is the part that gets missed. MVCC removes reader/writer conflicts. It
-does **not** remove writer/writer conflicts.
-
-Two transactions updating the same row still contend: the second must wait for
-the first to commit or roll back. They would or else both give a new
-version from the same old one and one update would vanish. That is the
-[lost update](isolation_levels.html) problem, and MVCC's answer to it's either a
-lock on that row or a serialisation failure at commit.
-
-So the rule is: **readers never wait, writers to the same row still do.**
-
-## The cost: garbage
-
-Old versions build up. a thing has to decide when a version can no longer be
-seen by any live snapshot and reclaim the space.
-
-In PostgreSQL that job is `VACUUM`, often run by autovacuum. When it can't
-keep up &mdash; often because a very old transaction is still open and
-pinning each version created since. Tables **bloat**: the row count is
-unchanged while the file grows, and each scan reads more pages for the same
-data.
-
-The hands-on consequence is worth stating plainly: **a transaction left open
-does damage even when it's doing nothing**, because it holds back cleanup for
-the whole DB. An idle-in-transaction link is a bug, not a small
-waste.
-
-Different engines pay this differently. PostgreSQL keeps old versions in the
-table itself and vacuums them. MySQL's InnoDB keeps them in a separate undo log
-and purges it. Oracle uses undo segments, and the same open-transaction problem
-appears as `ORA-01555 snapshot too old`. The old version needed was
-already discarded.
-
-## What an open transaction actually costs
-
-"Does damage even when it's doing nothing" is measurable. A snapshot can't be
-released while any transaction that might still need it's open, so each row
-version superseded *after* that transaction began has to be kept.
-
-Picture a table taking a steady 1,000 updates a second. Each update leaves a dead
-version behind. A reporting transaction that opens and then sits idle &mdash; a
-link returned to a pool without a commit, a debugger stopped at a
-breakpoint &mdash; pins cleanup for if it stays open:
-
-|idle for|dead versions pinned|
-|---|---|
-|1 minute|60,000|
-|10 minutes|600,000|
-|1 hour|3,600,000|
-
-The live row count never moved. But the table now holds millions of dead
-versions the vacuum can't touch, each scan reads the pages they sit on, and the
-file keeps growing. One forgotten transaction, doing nothing, taxes each query
-against that table until it's closed. Which is why "idle in transaction"
-is a state worth alerting on, not just avoiding.
-
-## Visibility is one comparison
-
-The claim that visibility turns math rather than a queue is worth making
-literal, because it's why reads never wait. A version is visible to a snapshot
-`S` just when `created_by <= S AND (deleted_by IS NULL OR deleted_by > S)`.
-Take the two versions from earlier. V1 created by 100 and deleted by 142,
-v2 created by 142 and still live:
-
-|snapshot|v1 (100&ndash;142)|v2 (142&ndash;)|sees|
-|---|---|---|---|
-|120|100&le;120 and 142&gt;120 &rarr; **yes**|142&le;120 &rarr; no|v1, balance 1000|
-|150|142&gt;150 is false &rarr; no|142&le;150 and live &rarr; **yes**|v2, balance 850|
-
-No lock is consulted and nothing blocks. Each reader checks transaction ids and
-picks its version. A snapshot of 120 keeps seeing 1000 no matter how many times
-142 commits, because the numbers don't change once fixed. That is the entire
-mechanism by which a long report runs undisturbed beside a stream of writes. It's also why the visible version is found without a scan of the history: the
-engine keeps versions chained newest-first and walks until the check first
-succeeds, which for a recently-read row is often the very first link.
-
-## Questions people ask
-
-<strong>What does MVCC stand for?</strong> Multi-Version Concurrency Control. The database keeps several versions of a row so readers and writers do not block each other.
-
-<strong>Do readers block writers under MVCC?</strong> No. Readers see a snapshot of older versions while writers create new ones, so neither waits for the other.
-
-<strong>Does MVCC remove the need for locks?</strong> No. Two writers changing the same row still conflict, and the second one waits or fails.
-
-<strong>What is VACUUM and why does PostgreSQL need it?</strong> Old row versions pile up after updates and deletes. VACUUM reclaims their space once no transaction can still see them.
-
-<strong>Why can a long-running transaction cause table bloat?</strong> It holds an old snapshot, so the database cannot discard any version that snapshot might need.
-
-<strong>How does a transaction decide which version it can see?</strong> Each version records which transaction created and removed it. A transaction sees the versions committed before its snapshot was taken.
-
-## Where it goes wrong
-
-**Long-running transactions.** They pin versions across the entire DB.
-Keep them short, and never leave one open across a user interplay.
-
-**given no waiting at all.** Writers to the same row still contend, and the
-error surfaces as a lock wait or a serialisation failure.
-
-**Treating table bloat as a disk problem.** It's a symptom of vacuum not
-keeping up, and adding disk hides it rather than fixing it.
-
-**Counting rows to check for bloat.** The row count is right. The file size is
-the thing that grew. Compare `pg_total_relation_size` before and after vacuum to
-see whether the cleanup actually freed space.
+## Further reading
+- [PostgreSQL MVCC introduction](https://www.postgresql.org/docs/current/mvcc-intro.html) explains snapshots and row versions.
+- [SQLite isolation](https://www.sqlite.org/isolation.html) describes reader snapshots and write behavior.

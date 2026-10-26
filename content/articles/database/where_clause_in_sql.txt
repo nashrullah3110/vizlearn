@@ -1,212 +1,30 @@
-title: The WHERE Clause: Keeping Only What You Asked For
-intro: A filter applied to every row, one at a time. Simple &mdash; until NULL gets involved.
+title: SQL WHERE: Filter Rows with Conditions
+intro: WHERE keeps only rows for which its condition is TRUE; NULL makes some familiar comparisons evaluate to UNKNOWN instead.
 
-## How WHERE filters rows and why it matters
+## Filter before grouping
+WHERE applies a condition to input rows. For each row, SQL evaluates the condition and retains the row only when the result is TRUE. FALSE and UNKNOWN are both excluded. This filtering happens before GROUP BY and aggregate calculations.
 
-Every `SELECT` without a `WHERE` returns every row in the table. That is almost never what you want. The `WHERE` clause attaches a condition, and the database tests that condition against each row one at a time. If the condition comes back TRUE, the row stays in the result. If it comes back FALSE or UNKNOWN, the row is gone.
+<pre><code>SELECT order_id, total
+FROM orders
+WHERE status = 'paid'
+  AND total &gt;= 50;</code></pre>
 
-That row-at-a-time model is the single most useful mental picture in SQL. The database is not filtering "the table" as a whole. It is asking one yes-or-no question of every individual row and keeping only the rows that answer yes.
+This returns paid orders whose total is at least 50. Conditions can combine comparisons with AND, OR, and NOT; parentheses make mixed logic easier to review.
 
-`WHERE` also controls performance. A tight filter means fewer rows survive into the join, the sort, the group, and the network transfer. Most query tuning starts here: make the filter selective, make sure an index supports it, and the rest of the plan usually falls into place.
+## NULL and three-valued logic
+A comparison such as email = NULL is UNKNOWN, so it does not select missing emails. Use IS NULL or IS NOT NULL. Be careful with NOT IN when the candidate set may contain NULL; see [NULL handling](null_handling_in_sql.html) and [EXISTS vs IN](exists_vs_in_vs_join.html).
 
-The biggest surprise in `WHERE` is NULL. SQL uses three-valued logic, so a comparison against NULL does not return FALSE &mdash; it returns UNKNOWN, and UNKNOWN is not TRUE, so the row disappears. That trap catches every SQL beginner and quite a fair number of experienced developers too. You will see it in action below.
+## Write filters the planner can use
+A simple predicate on an indexed column can make an index useful, but the planner decides whether that is cheaper than scanning. Wrapping a column in a function may prevent a regular index from helping unless an expression index exists. Do not rewrite a correct condition based on guesswork; inspect [query plans](explain_and_query_plans.html) and measure.
 
-This page covers the operators you need, the NULL behaviour you need to memorise, and the performance rules that keep your filters fast.
+For grouped results, use HAVING rather than trying to filter aggregates in WHERE. See [GROUP BY](groupby_in_sql.html).
 
-## The Operators You Actually Need
+## Test boundary cases
+For a numeric filter such as quantity >= 5, test values 4, 5, and 6 to confirm the boundary is inclusive. For text and dates, check collation and time-zone assumptions. Parenthesize mixed AND and OR conditions because AND generally binds more tightly than OR. A predicate like status = 'paid' OR status = 'refunded' AND region = 'west' does not mean both statuses are limited to west; parentheses make the intended grouping clear. Test NULL separately because ordinary comparisons evaluate to UNKNOWN.
 
-- <strong>Comparison</strong> &mdash; <span class="mono-font">= &lt;&gt; &lt; &gt; &lt;= &gt;=</span>. Note SQL uses <span class="mono-font">=</span> for equality, not <span class="mono-font">==</span>.
-- <strong>Logical</strong> &mdash; <span class="mono-font">AND</span>, <span class="mono-font">OR</span>, <span class="mono-font">NOT</span>. <span class="mono-font">AND</span> binds tighter than <span class="mono-font">OR</span>, so use parentheses when mixing them.
-- <span class="mono-font">IN (a, b, c)</span> &mdash; shorthand for a chain of ORs.
-- <span class="mono-font">BETWEEN x AND y</span> &mdash; inclusive of <em>both</em> endpoints, which surprises people regularly.
-- <span class="mono-font">LIKE</span> &mdash; pattern matching where <span class="mono-font">%</span> is any run of characters and <span class="mono-font">_</span> is exactly one.
-- <span class="mono-font">IS NULL</span> / <span class="mono-font">IS NOT NULL</span> &mdash; the only correct way to test for missing values.
+## Read predicates as truth tables
+When conditions mix AND and OR, write the intended groups explicitly. For example, a paid or refunded order from the west region should group the two status alternatives before combining them with the region condition. Without parentheses, operator precedence can include paid orders from other regions. NULL adds a third outcome: NOT UNKNOWN remains UNKNOWN, so a row with a missing status still fails the WHERE filter. A small table with one row per boundary case is often the fastest way to validate a complicated predicate.
 
-## The NULL Trap: SQL Has Three Truth Values
-
-NULL does not mean zero or empty string &mdash; it means <em>unknown</em>. Comparing anything to an unknown gives an unknown result, so <span class="mono-font">manager = 'Ada Lovelace'</span> is neither TRUE nor FALSE for a row where manager is NULL. It is <strong>UNKNOWN</strong>, and WHERE only keeps TRUE.
-
-Run the two manager examples in this lab and watch the UNKNOWN counter. The consequence catches everyone eventually: <span class="mono-font">WHERE manager = 'X'</span> and <span class="mono-font">WHERE manager &lt;&gt; 'X'</span> together do <em>not</em> return every row. The NULL rows fall through both. To include them you must say <span class="mono-font">OR manager IS NULL</span> explicitly.
-
-## WHERE and Performance
-
-WHERE is also where indexes earn their keep. A condition like <span class="mono-font">salary &gt; 65000</span> can use an index on <span class="mono-font">salary</span> to skip most of the table. But wrapping the column in a function &mdash; <span class="mono-font">WHERE UPPER(name) = 'ADA'</span> &mdash; usually defeats the index, because the stored values are no longer what is being compared. Similarly, <span class="mono-font">LIKE 'A%'</span> can use an index while <span class="mono-font">LIKE '%a'</span> cannot, since the leading wildcard gives the engine no prefix to seek on.
-
-## Filtering is the cheapest optimisation there is
-
-`WHERE` decides which rows survive. Every row it removes is a row that never has to be joined, grouped, sorted, sent over the network or rendered in a browser &mdash; which is why the fastest queries are usually the ones that filter early and filter hard.
-
-The clause runs after `FROM` and before `GROUP BY`, so it sees individual rows before any aggregation exists. That single fact explains its two limitations: you cannot filter on an aggregate here (use `HAVING`), and you usually cannot refer to a `SELECT` alias here (it has not been computed yet).
-
-```sql
-SELECT   name, salary
-FROM     employees
-WHERE    department = 'Engineering'
-  AND    salary > 50000
-  AND    start_date >= '2024-01-01';
-```
-
-Three conditions, all on individual rows, all resolvable before anything else happens. This query can be answered from an index without reading most of the table &mdash; the ideal case.
-
-## A worked example on one small table
-
-Six employees, and the results of five different conditions:
-
-|Name|Dept|Salary|Manager ID|
-|---|---|---|---|
-|Alice|Eng|75,000|NULL|
-|Bob|Eng|55,000|1|
-|Carol|Sales|48,000|1|
-|Dan|Sales|62,000|3|
-|Eve|Marketing|NULL|1|
-|Frank|Eng|90,000|3|
-
-|Condition|Rows returned|
-|---|---|
-|`salary > 60000`|Alice, Dan, Frank|
-|`dept = 'Eng' AND salary < 80000`|Bob only &mdash; Alice and Frank are too well paid|
-|`dept IN ('Sales','Marketing')`|Carol, Dan, Eve|
-|`salary IS NULL`|Eve|
-|`manager_id IS NULL`|Alice|
-|`salary > 60000 OR dept = 'Sales'`|Alice, Carol, Dan, Frank|
-
-Two of those rows are the ones worth staring at. `salary > 60000` does not return Eve, whose salary is NULL &mdash; and neither does `salary <= 60000`. A NULL salary satisfies no comparison at all, in either direction, which is the single most surprising thing about SQL filtering.
-
-## Three-valued logic, in practice
-
-SQL conditions evaluate to TRUE, FALSE or UNKNOWN, and only rows evaluating to TRUE are returned.
-
-Any comparison involving NULL yields UNKNOWN, because NULL means "no value recorded" rather than "empty" or "zero". Asking whether an unknown salary exceeds 60,000 has no answer, and SQL says so rather than guessing.
-
-|Expression|Result|
-|---|---|
-|`NULL = NULL`|UNKNOWN|
-|`NULL <> 5`|UNKNOWN|
-|`NULL IS NULL`|TRUE|
-|`TRUE AND UNKNOWN`|UNKNOWN|
-|`TRUE OR UNKNOWN`|TRUE|
-|`NOT UNKNOWN`|UNKNOWN|
-
-So `IS NULL` and `IS NOT NULL` are not stylistic alternatives to `=` and `<>` &mdash; they are the only operators that can test for absence.
-
-The trap that follows is `NOT IN` with a NULL in the list:
-
-```sql
-SELECT * FROM employees
-WHERE  manager_id NOT IN (SELECT id FROM managers);   -- returns nothing if
-                                                      -- any id is NULL
-```
-
-If the subquery returns a single NULL, every row evaluates to UNKNOWN and the query returns zero rows &mdash; silently, with no error. Use `NOT EXISTS` instead, which handles NULLs correctly, or filter them out of the subquery explicitly.
-
-## Writing conditions an index can use
-
-An index on a column only helps if the column appears in the condition in its raw form. Wrap it in a function and the index is bypassed, because the database has no index on the function's output.
-
-|Slow &mdash; index unusable|Fast &mdash; index usable|
-|---|---|
-|`WHERE YEAR(order_date) = 2026`|`WHERE order_date >= '2026-01-01' AND order_date < '2027-01-01'`|
-|`WHERE UPPER(email) = 'A@B.COM'`|`WHERE email = 'a@b.com'` with a case-insensitive collation|
-|`WHERE price * 1.2 > 100`|`WHERE price > 83.33`|
-|`WHERE name LIKE '%smith'`|`WHERE name LIKE 'smith%'`|
-
-The last row deserves its own note: a leading wildcard forces a full scan, because a B-tree index is ordered by the start of the string and there is nothing to seek to. Trailing wildcards are fine.
-
-Two other habits that pay. Put the most selective condition first when readability allows &mdash; the planner usually reorders anyway, but it costs nothing. And keep the column's data type consistent with the value you compare it to; comparing a text column to a number can force an implicit conversion that disables the index.
-
-If you genuinely need `YEAR(order_date)` or `UPPER(email)` in a condition, create an <strong>expression index</strong> on exactly that expression, and the planner can use it.
-
-## The operators, and the one that quietly drops rows
-
-WHERE keeps rows whose condition evaluates to true. Most of it is unsurprising -- and the exception matters enough that it is worth meeting on real data rather than in the abstract.
-
-```sql-run
--- Each row below is one filter and how many rows it keeps.
--- Change any condition and re-run.
-
-SELECT 'signup >= 2024-01-01' AS filter, count(*) AS kept FROM customers WHERE signup >= '2024-01-01'
-UNION ALL
-SELECT 'city LIKE L%',        count(*) FROM customers WHERE city LIKE 'L%'
-UNION ALL
-SELECT 'city IN (London,Lagos)', count(*) FROM customers WHERE city IN ('London', 'Lagos')
-UNION ALL
-SELECT 'city NOT IN (London)', count(*) FROM customers WHERE city NOT IN ('London')
-UNION ALL
-SELECT 'all customers',       count(*) FROM customers
-UNION ALL
-SELECT 'discount > 0',        count(*) FROM orders WHERE discount > 0
-UNION ALL
-SELECT 'discount <= 0 OR > 0', count(*) FROM orders WHERE discount <= 0 OR discount > 0
-UNION ALL
-SELECT 'all orders',          count(*) FROM orders;
-
--- Look at the last three rows. Only 2 of the 6 orders carry a discount;
--- the other 4 are NULL. "discount > 0" finds 2, and so does
--- "discount <= 0 OR discount > 0" -- a condition that looks like it must
--- hold for every number. It does not hold for NULL, because NULL is not
--- a number, and WHERE keeps only what is TRUE.
---
--- Same reason "city NOT IN (London)" does not find Dara.
-```
-
-## Try it yourself
-
-1. <strong>Run the default predicate.</strong> The evaluation column shows TRUE or FALSE for every row &mdash; the filter is genuinely parsed and applied, so you can type your own.
-2. <strong>Try <span class="mono-font">manager IS NULL</span>, then <span class="mono-font">manager = 'Ada Lovelace'</span>.</strong> Watch the UNKNOWN counter appear in the second case.
-3. <strong>Test <span class="mono-font">salary BETWEEN 60000 AND 75000</span></strong> and confirm that a row sitting exactly on an endpoint is included.
-4. <strong>Break the syntax on purpose</strong> &mdash; delete a closing quote. The parser reports the error rather than silently returning nothing, exactly as a database would.
-5. <strong>Compare <span class="mono-font">NOT (dept = 'Engineering') OR salary &lt; 65000</span> with the parentheses removed.</strong> Operator precedence changes the answer.
-
-## In one line
-
-WHERE asks one yes/no question of every row &mdash; except the answer can also be "unknown", and unknown rows are silently dropped. Most WHERE-clause bugs in production are really NULL bugs.
-
-## Operators worth knowing properly
-
-- <strong>`BETWEEN a AND b`</strong> is inclusive at both ends. For dates this is a common source of off-by-one bugs, because `BETWEEN '2026-01-01' AND '2026-01-31'` excludes anything timestamped later on the 31st. Prefer `>= start AND < next_start`.
-- <strong>`IN (...)`</strong> is shorthand for a chain of ORs, and works with a subquery as well as a literal list.
-- <strong>`LIKE`</strong> uses `%` for any run of characters and `_` for exactly one. Escape literal percent signs with an `ESCAPE` clause.
-- <strong>`IS DISTINCT FROM`</strong> compares two values treating NULLs as comparable &mdash; `NULL IS DISTINCT FROM 5` is TRUE. It is the operator you want when comparing nullable columns, and it is supported by PostgreSQL and several others.
-- <strong>`EXISTS`</strong> tests whether a subquery returns any row at all, and stops at the first one. Usually the right tool for "does a related record exist".
-
-Parentheses matter more than people expect once `OR` appears. `WHERE a = 1 AND b = 2 OR c = 3` binds as `(a = 1 AND b = 2) OR c = 3`, because `AND` has higher precedence. If you meant the other grouping, the parentheses are not optional.
-
-## Reading a plan when a filter is slow
-
-The reliable way to find out why a filtered query is slow is to ask the database:
-
-```sql
-EXPLAIN ANALYZE
-SELECT * FROM orders WHERE customer_id = 42 AND status = 'open';
-```
-
-Three things to look for in the output:
-
-1. <strong>Seq Scan / Full Table Scan</strong> on a large table means no index was used. Either none exists, or the condition is written in a form that cannot use it.
-2. <strong>A large gap between estimated and actual rows</strong> means the planner's statistics are stale. Refreshing them (`ANALYZE`) often fixes the plan outright.
-3. <strong>Filter removed N rows</strong> after an index scan means the index narrowed the search but the engine still had to check each row. A composite index covering both columns may remove that step.
-
-For the query above, an index on `(customer_id, status)` lets the engine seek straight to the matching rows. An index on `status` alone would be close to useless if most orders are open &mdash; an index on a low-selectivity column rarely earns its keep.
-
-## Questions people ask
-
-<strong>Does the order of `AND` conditions matter?</strong> Not for correctness, and rarely for speed &mdash; the planner reorders based on statistics. Write them in the order that reads best.
-
-<strong>Why does `WHERE column != 'x'` exclude NULL rows?</strong> Because `NULL != 'x'` is UNKNOWN, not TRUE. Add `OR column IS NULL` if you want them.
-
-<strong>Is `IN` slower than `OR`?</strong> No &mdash; they usually produce identical plans. `IN` with a very long literal list can get slow; a temporary table or a `VALUES` join is faster past a few thousand items.
-
-<strong>Can I filter on a window function?</strong> Not in `WHERE`, because window functions are computed after it. Wrap the query in a CTE or subquery and filter outside.
-
-<strong>What about `WHERE 1=1`?</strong> A harmless idiom used when building queries programmatically, so every real condition can be appended as `AND ...`. The planner discards it.
-
-<strong>Should I use `LIKE` for search?</strong> For prefix matching, yes. For real text search &mdash; word matching, ranking, stemming &mdash; use the database's full-text search features or a dedicated search engine.
-
-## Recap in one screen
-
-- `WHERE` filters individual rows before grouping, so it cannot see aggregates or most aliases.
-- NULL comparisons return UNKNOWN, and only TRUE rows are returned &mdash; use `IS NULL`.
-- `NOT IN` with a NULL in the list returns nothing at all; prefer `NOT EXISTS`.
-- Wrapping an indexed column in a function disables the index; rewrite as a range, or index the expression.
-- `BETWEEN` is inclusive; for timestamps use `>= start AND < next_start`.
-- When it is slow, read `EXPLAIN ANALYZE` before changing anything.
+## Further reading
+- [SQLite expressions](https://www.sqlite.org/lang_expr.html) documents operators and NULL logic.
+- [PostgreSQL table expressions](https://www.postgresql.org/docs/current/queries-table-expressions.html) explains WHERE processing.

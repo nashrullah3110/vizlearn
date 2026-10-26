@@ -241,13 +241,13 @@ def process(rel):
         ids.append((idm.group(1) if idm else slug_, title))
 
     slot_start = slot_end = None
-    # ML and DSA pages lead with one concise paragraph after the visualiser.
+    # ML, DSA, and database pages lead with one concise paragraph after the visualiser.
     # Moving the whole first section made the Overview absorb examples, control
     # instructions, and long explanations. Keep the remaining paragraphs and
     # section heading in the article body so the overview stays an orientation,
     # not a replacement for the lesson.
     track = rel.split("/", 1)[0]
-    concise_track = track in ("dsa", "machine_learning")
+    concise_track = track in ("dsa", "machine_learning", "database")
     if concise_track:
         section_start, section_end, _title = blocks[0]
         heading = H3.search(src, section_start, section_end)
@@ -258,10 +258,10 @@ def process(rel):
         first_start, first_end = paragraph.span()
         remainder = (src[section_start:paragraph.start()]
                      + src[paragraph.end():section_end])
-        remainder = H3.sub("", remainder)
+        detail = H3.sub("", remainder)
         has_section_detail = bool(
-            text_of(remainder).split()
-            or re.search(r"<(?:pre|table|ul|ol|svg|canvas)\b", remainder, re.I)
+            text_of(detail).split()
+            or re.search(r"<(?:pre|table|ul|ol|svg|canvas)\b", detail, re.I)
         )
         if has_section_detail:
             rest = [i for i in ids if i]
@@ -299,6 +299,12 @@ def process(rel):
     slot_start = first_start if slot_start is None else slot_start
     slot_end = first_end if slot_end is None else slot_end
     src = src[:slot_start] + SLOT + src[slot_end:]
+    if concise_track and track != "database" and has_section_detail and heading:
+        # Keep the established DSA/ML presentation; database articles retain
+        # the section heading so the detail following their short Overview has
+        # a useful label.
+        tail = src[section_start:]
+        src = src[:section_start] + tail.replace(heading.group(0), "", 1)
     block = render(first, rest)
 
     after = src.find(AFTER_MARKER)

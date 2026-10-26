@@ -1,157 +1,30 @@
-title: Self-Joins
-intro: A table joined to itself, and the three questions that need one.
+title: Self-Joins: Relate Rows in the Same Table
+intro: A self-join uses two aliases of one table to compare or connect different rows in that table.
 
-## Nothing new, except the alias
+## One table, two roles
+An employee table may include both an employee ID and a manager ID. To show each employee beside their manager's name, join the table to itself and assign each copy a clear alias.
 
-A self-join is an plain join in which both sides are the same table. There
-is no special keyword and no special run. The only thing that changes is
-that aliases become mandatory.
+<pre><code>SELECT e.name AS employee,
+       m.name AS manager
+FROM employees AS e
+LEFT JOIN employees AS m
+  ON e.manager_id = m.employee_id;</code></pre>
 
-```
-FROM  employees e
-JOIN  employees m ON e.manager_id = m.id
-```
+The aliases name the roles: e is the employee row and m is the referenced manager row. The left join keeps employees who have no manager, such as a top-level executive.
 
-`e` and `m` are two free views of the same rows. Without them, `name`
-would be ambiguous &mdash; the DB has two columns with that name in scope
-and no way to guess which was meant.
+## Compare rows within a table
+Self-joins can find pairs such as products in the same category or rows whose date ranges overlap. The join condition determines which pairs appear. For unordered pairs, use a strict condition like a.id &lt; b.id; using a.id &lt;&gt; b.id returns both (A, B) and (B, A).
 
-The mental move that makes this click is to stop thinking of `e` and `m` as one
-table used twice, and start thinking of them as two tables that happen to
-hold the same data. All else about joins then applies unchanged.
+The number of output rows can grow quickly when many rows match. Check uniqueness and cardinality before aggregating the result. If the problem is variable-depth traversal through a hierarchy, a [recursive CTE](recursive_ctes_in_sql.html) may be more suitable.
 
-## When you need one
+## Common mistakes
+Joining each row to itself can create a trivial match; exclude it if the question needs distinct rows. Ambiguous column names are another risk, so qualify columns with aliases. A LEFT JOIN becomes effectively inner if a condition on the right alias is placed in WHERE and rejects NULLs; put match restrictions in ON when unmatched left rows must remain. See [joins](joins_in_sql.html).
 
-Self-joins answer questions that involve **checking a row to another row of the
-same kind**, which SQL or else makes awkward.
+## Pair each unordered relationship once
+To find pairs of coworkers in the same team, joining on equal team IDs matches each person with themselves and returns both directions of every pair. Add a.id < b.id to exclude self-pairs and keep only one orientation. If the question instead concerns ordered relationships, such as employee and manager, do not impose that condition; use the directional foreign key. The pair condition encodes the meaning of the result, so state whether (A, B) differs from (B, A) before choosing it.
 
-**Hierarchies stored in one table.** An employee's manager is another employee.
-A category's parent is another category. A reply's target is another comment.
-Joining the table to itself resolves the ref into real columns.
+## Use a self-join for one-level relationships
+A manager lookup is a one-level relationship: each employee row points to at most one manager row. For a chain of managers several levels above an employee, a single self-join only reaches the number of levels explicitly written. Use a recursive CTE when depth is variable. A self-referencing foreign key can ensure the manager ID exists, but it does not necessarily prevent a person from becoming their own manager or creating a longer cycle; those are separate integrity rules.
 
-**Row-to-row checks.** "Who earns more than their manager" needs both
-salaries available at once. Run the third variant: Barbara earns 101,000 and
-reports to Grace on 98,000, and the join is what puts those two numbers in one
-row so a `WHERE` can compare them.
-
-**Pairing rows within a group.** "Which colleagues share a manager" pairs the
-table with itself on `manager_id`.
-
-## The two conditions that keep pairs sane
-
-The fourth variant holds a detail that looks small and isn't:
-
-```
-ON a.manager_id = b.manager_id AND a.id < b.id
-```
-
-Without `a.id < b.id`, two things go wrong. each row pairs with **itself**,
-because a row trivially shares its own manager. And each genuine pair appears
-**twice**, once as (Alan, Grace) and once as (Grace, Alan).
-
-Writing `a.id <> b.id` fixes the first problem and not the second. Writing
-`a.id < b.id` fixes both at once. For any two distinct rows just one
-sorting meets it. That is the standard idiom for "each unordered pair once"
-and it's worth recognising on sight.
-
-## The top of the hierarchy disappears
-
-Run the first variant and count the rows: five, not six. Ada is missing.
-
-Ada is the root &mdash; her `manager_id` is NULL &mdash; and an inner join
-needs a match on both sides. NULL matches nothing. So Her row is dropped
-without comment.
-
-The second variant uses `LEFT JOIN` and Ada reappears with a NULL manager. This
-is nearly always what was intended, and the failure is quiet enough to reach
-production: the query works, returns plausible rows, and is missing just the
-most senior person in the organisation.
-
-## Depth is where it stops
-
-A self-join resolves **one** level. Employee to manager is one join. Employee to
-manager's manager is two, written out by hand:
-
-```
-FROM employees e
-JOIN employees m  ON e.manager_id = m.id
-JOIN employees mm ON m.manager_id = mm.id
-```
-
-Three levels needs three, and an any depth can't be written this way at
-all, because the number of joins would have to depend on the data.
-
-That is the boundary where the technique runs out and
-[recursive CTEs](recursive_ctes_in_sql.html) take over. A recursive CTE walks
-down as many levels as exist. It's the correct tool the moment the depth is
-not known in advance.
-
-## Why the pair condition is not optional
-
-The `a.id < b.id` line is easy to read past. It's worth seeing what its
-lack does to the row count. Pairing a group against itself is a Cartesian
-product within the group: `n` colleagues under one manager give `n &times; n`
-sorted pairs before any rule trims them.
-
-|colleagues under a manager|no condition (n&sup2;)|`a.id <> b.id`|`a.id < b.id`|
-|---|---|---|---|
-|5|25|20|10|
-|10|100|90|45|
-|50|2,500|2,450|1,225|
-
-The middle column still counts each pair twice. Only `a.id < b.id` gives the
-`n(n-1)/2` unordered pairs you meant. And the gap is quadratic, so on a manager
-with fifty reports the wrong rule doesn't return a few extra rows &mdash; it
-returns 2,500 where 1,225 were wanted, and any total found over them comes out
-roughly doubled. That is why the idiom is worth recognising on sight rather than
-rediscovering after a report reads twice what it should.
-
-## A self-join reads the table twice
-
-The other cost hides in the plan. A self-join names the table twice, so the engine
-reads it twice, and if the join column is unindexed each read is a full scan with
-a hash build in between. On `employees` self-joined on `manager_id`:
-
-|`manager_id`|plan|
-|---|---|
-|indexed|SEARCH the second copy per row &mdash; a seek|
-|unindexed|SCAN both copies, hash-join in memory|
-
-On a hundred employees no one notices. On a hundred thousand, the unindexed
-version builds a hash table of each row and probes it with each row &mdash; the
-work grows with the square of the table where the indexed plan grows with its
-logarithm. A hundred thousand employees joined without that index is on the order of ten
-billion row checks. With it, a hundred thousand seeks of about seventeen
-steps each &mdash; the difference between a query that returns and one that does
-not. The index on the parent column that a foreign key would give you is on
-the *referenced* side. The self-join reads the *referencing* column, which is the
-one that often lacks an index. This is easy to miss until the table grows.
-
-## Questions people ask
-
-<strong>What is a self join?</strong> It is a join of a table to itself, using two different aliases so each copy can be referred to separately.
-
-<strong>Why do I need aliases in a self join?</strong> Without aliases the column names are ambiguous, because both copies share the same names. Aliases such as e and m let you say which copy you mean.
-
-<strong>How do I stop a self join pairing a row with itself?</strong> Add a condition such as a.id <> b.id. For unordered pairs use a.id < b.id, which also removes mirrored duplicates.
-
-<strong>Why does the top of my hierarchy vanish from the result?</strong> An inner join drops rows with no match, and the top manager has no manager. Use a LEFT JOIN to keep them.
-
-<strong>How many levels can a self join walk?</strong> One level per join. For a hierarchy of unknown depth, use a recursive CTE instead.
-
-<strong>Are self joins slow?</strong> They are as fast as the join condition allows. Index the column you join on, such as manager_id, and they stay quick.
-
-## Where it goes wrong
-
-**Inner join on a nullable parent.** The root vanishes. This is the single most
-common self-join bug.
-
-**Losing the anti-self rule.** Without `a.id < b.id` each row pairs
-with itself, and totals come out roughly double.
-
-**Using one for any depth.** If the query has four copies of the same
-table and someone is about to add a fifth, it wants to be recursive.
-
-**Leaving the join column unindexed.** A self-join reads the table twice. On a
-large table with no index on `manager_id`, that is two full scans and a hash in
-between. Add the index before the table grows.
+## Further reading
+- [PostgreSQL table expressions](https://www.postgresql.org/docs/current/queries-table-expressions.html) documents aliases and joins.

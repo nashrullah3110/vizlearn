@@ -1,207 +1,29 @@
-title: DML: Changing What Is Inside the Table
-intro: Four verbs do almost all the work in day-to-day SQL. Two of them can ruin your afternoon if you forget a WHERE clause.
+title: DML: Insert, Update, and Delete Rows
+intro: Data Manipulation Language changes table contents; careful predicates and transactions keep those changes scoped and recoverable.
 
-## The idea in brief
+## The commands that change rows
+DML (Data Manipulation Language) includes statements that insert, update, and delete rows. <code>INSERT</code> adds data, <code>UPDATE</code> changes selected rows, and <code>DELETE</code> removes selected rows. <code>SELECT</code> is often taught alongside DML, though SQL classifications vary.
 
-<strong>Data Manipulation Language</strong> (DML) is what you use after the table exists. DDL creates the container; DML fills it, changes it, and empties it. Four statements do almost all the work: <span class="mono-font kw">INSERT</span> adds rows, <span class="mono-font kw">UPDATE</span> changes values in existing rows, <span class="mono-font kw">DELETE</span> removes rows, and <span class="mono-font kw">SELECT</span> reads them without changing anything. These four are the verbs of every day-to-day database task. Two of them — UPDATE and DELETE — can wipe out your entire table if you forget the WHERE clause, which is why database professionals treat them with caution in production systems. A WHERE clause filters which rows the statement touches. Without it, UPDATE touches every row and DELETE empties the table entirely. The row count is your signal — before running any UPDATE or DELETE, predict how many rows it will affect, then compare that prediction to what actually happened. If the number surprises you, you can roll back the change inside a transaction. Understanding when each DML statement is necessary, how to write the WHERE clause correctly, what constraints the database enforces, how transactions protect you from mistakes, and how to recover from them are the skills this article teaches. You will also learn about upserts — statements that insert a row if it does not exist, or update it if it does — and the RETURNING clause that hands back the affected rows.
+<pre><code>UPDATE inventory
+SET quantity = quantity - 1
+WHERE product_id = 17 AND quantity &gt; 0;</code></pre>
 
-## The Four Statements
+The <code>WHERE</code> clause limits which rows change. Before running a broad update or delete, run an equivalent <code>SELECT</code> with the same predicate and inspect the rows. A missing <code>WHERE</code> can change or delete every row.
 
-- <span class="mono-font kw">INSERT INTO ... VALUES</span> &mdash; adds new rows. Every constraint declared in DDL is checked here; a duplicate primary key is rejected outright.
-- <span class="mono-font kw">UPDATE ... SET ... WHERE</span> &mdash; changes values in existing rows. The <span class="mono-font">WHERE</span> decides which.
-- <span class="mono-font kw">DELETE FROM ... WHERE</span> &mdash; removes rows. The structure stays.
-- <span class="mono-font kw">SELECT</span> &mdash; reads without changing anything. The only one of the four that is always safe.
+## Make multi-step changes atomic
+When several statements must succeed together, use a transaction: begin, perform the changes, then commit only when the required conditions hold. Roll back when any step fails. The exact syntax and error recovery behavior are engine-specific; see [transactions and ACID](transactions_and_acid.html).
 
-## The missing WHERE clause
+For an operation that inserts a row or updates it on a key conflict, many engines provide an upsert syntax. Names and semantics differ (<code>ON CONFLICT</code>, <code>ON DUPLICATE KEY</code>, or <code>MERGE</code>), so consult the target engine. Make the conflict key explicit and consider whether a retry can duplicate an external side effect.
 
-```sql
-UPDATE employees SET salary = 50000;    -- every employee. All of them.
-DELETE FROM orders;                     -- every order.
-```
+## Bulk changes and safety
+Large changes can hold locks, generate substantial logs, and affect replication. Batch them only when the batches preserve the intended transaction semantics. Record how many rows changed and verify important invariants afterward. Use bound parameters for values supplied by users; see [SQL injection prevention](sql_injection_and_parameters.html).
 
-Both are valid SQL, both run without complaint, and both are the reason database people flinch at typing `UPDATE` into a production console.
+## Verify the scope of destructive statements
+For a critical update, check both the predicate and the number of affected rows. An update expected to change exactly one account should fail safely if it changes zero or several rows. Use a transaction when the count must be checked before commit. For deletion, decide whether records should be physically removed or retained with a status and audit trail; soft deletion changes every query that must hide inactive rows. See [WHERE](where_clause_in_sql.html) for predicate behavior.
 
-Three defences, in order of reliability:
+## Use conditional updates for invariants
+A read followed by a write can race when two clients act at once. For inventory, subtract one only where the current quantity is positive, then check that exactly one row changed. The database evaluates the predicate and update as one statement, avoiding an application-level gap between the check and the write. If several tables must change together, put those statements in a transaction. The correct isolation and locking strategy still depends on the database and the rest of the workflow.
 
-1. <strong>Write the `SELECT` first.</strong> Run `SELECT * FROM employees WHERE dept_id = 3` and look at what comes back. Then change the word `SELECT *` to `UPDATE ... SET`, keeping the same `WHERE`.
-2. <strong>Wrap it in a transaction.</strong> `BEGIN`, run the statement, check the reported row count, then `COMMIT` or `ROLLBACK`. If it says "4,912 rows affected" and you expected 12, roll back.
-3. <strong>Turn off autocommit in your client,</strong> or enable safe-update mode &mdash; MySQL's `sql_safe_updates` refuses an `UPDATE` or `DELETE` without a key-based `WHERE`.
-
-The row count is the signal that catches this. Get into the habit of predicting it before running and comparing afterwards.
-
-## Transactions Are the Safety Net
-
-Unlike DDL, DML <em>is</em> transactional. Wrap your changes in a transaction and nothing is permanent until you say so:
-
-BEGIN; UPDATE employees SET salary = salary * 1.1 WHERE dept = 'Engineering'; -- check the result ROLLBACK; -- or COMMIT;
-
-Press BEGIN in this lab, delete some rows, then press ROLLBACK &mdash; they all come back. This is the single most valuable habit when running a statement you are not completely sure about.
-
-Transactions also provide <strong>atomicity</strong>: if you debit one account and credit another, either both happen or neither does. A crash between the two statements cannot leave money missing.
-
-## The four statements that move data
-
-DDL defines the containers; DML fills, changes and empties them.
-
-```sql
--- INSERT: add rows
-INSERT INTO employees (name, email, salary)
-VALUES ('Alice', 'alice@example.com', 75000),
-       ('Bob',   'bob@example.com',   62000);
-
--- UPDATE: change existing rows
-UPDATE employees SET salary = salary * 1.05 WHERE dept_id = 3;
-
--- DELETE: remove rows
-DELETE FROM employees WHERE hired_on < '2015-01-01';
-
--- SELECT: read rows (the one you run a thousand times a day)
-SELECT name, salary FROM employees WHERE salary > 70000;
-```
-
-Two habits worth adopting immediately. Always list the columns in an `INSERT` &mdash; `INSERT INTO employees VALUES (...)` breaks the moment someone adds a column. And insert many rows in one statement rather than one statement per row; the difference on a few thousand rows is often a hundredfold, because each statement carries its own round trip and transaction overhead.
-
-## Upserts: insert or update in one statement
-
-"Insert this row, or update it if it already exists" is such a common need that every engine has a form of it, and doing it with a `SELECT` followed by an `INSERT` is a race condition waiting to happen.
-
-```sql
--- PostgreSQL and SQLite
-INSERT INTO inventory (sku, quantity)
-VALUES ('ABC-1', 10)
-ON CONFLICT (sku) DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity;
-
--- MySQL
-INSERT INTO inventory (sku, quantity) VALUES ('ABC-1', 10)
-ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity);
-
--- Standard SQL / SQL Server / Oracle
-MERGE INTO inventory AS t
-USING (SELECT 'ABC-1' AS sku, 10 AS qty) AS s ON t.sku = s.sku
-WHEN MATCHED THEN UPDATE SET quantity = t.quantity + s.qty
-WHEN NOT MATCHED THEN INSERT (sku, quantity) VALUES (s.sku, s.qty);
-```
-
-The conflict target must be backed by a unique constraint or index &mdash; the engine needs a defined way to detect the collision.
-
-`RETURNING` (PostgreSQL, and now several others) is the natural companion: it hands back the affected rows, so you can get the generated id without a second query.
-
-```sql
-INSERT INTO employees (name) VALUES ('Carol') RETURNING id, hired_on;
-```
-
-## Changing rows, and the clause you must not forget
-
-INSERT, UPDATE and DELETE are the three statements that change data, and two of them take a WHERE clause that is optional in the grammar and mandatory in practice. Everything here runs against a copy you can reset.
-
-```sql-run
--- Start by looking at what is there.
-
-SELECT id, name, city FROM customers ORDER BY id;
-
--- INSERT adds rows. Naming the columns is not optional style: without
--- the list, the statement breaks silently the day someone adds a column.
-
-INSERT INTO customers (id, name, city, signup)
-VALUES (6, 'Fen', 'Oslo', '2024-08-01');
-
-SELECT id, name, city FROM customers ORDER BY id;
-
--- UPDATE changes them. The WHERE decides how many.
-
-UPDATE customers SET city = 'Bergen' WHERE id = 6;
-
-SELECT id, name, city FROM customers WHERE id = 6;
-
--- Now the dangerous one. UPDATE without WHERE is valid SQL and updates
--- every row. Uncomment the next line, run it, and look at the table:
---
---     UPDATE customers SET city = 'nowhere';
---
--- Press "Reset database" afterwards to get the original data back.
---
--- The habit that prevents it is to write the WHERE first, run it as a
--- SELECT, count the rows, and only then change SELECT to UPDATE.
-
-SELECT count(*) AS about_to_change FROM customers WHERE id = 6;
-
-DELETE FROM customers WHERE id = 6;
-
-SELECT count(*) AS remaining FROM customers;
-
--- DELETE also removes rows one at a time and can be rolled back, which
--- is what separates it from TRUNCATE. And note what happens if you try
--- to delete a customer who has orders -- the foreign key in orders
--- points at them, and a database with foreign keys enforced will refuse.
-```
-
-## Guided tour
-
-1. <strong>Insert a row</strong> and watch it appear highlighted in green, with the table count rising by one.
-2. <strong>Update salaries for one department.</strong> Only matching rows turn amber &mdash; the filter decided the blast radius.
-3. <strong>Switch the filter to "all rows" and run a DELETE.</strong> Every row is struck through. This is what a forgotten WHERE looks like.
-4. <strong>Now do it inside a transaction:</strong> BEGIN, DELETE, then ROLLBACK. The table returns exactly as it was.
-5. <strong>Try inserting a duplicate id.</strong> The primary key constraint from DDL rejects it &mdash; the database defends its own rules.
-
-## Worth remembering
-
-DML is where data actually changes, and the WHERE clause is what stands between a targeted fix and a table-wide accident. Preview with SELECT, wrap risky work in a transaction, and let the constraints you declared in DDL catch what you miss.
-
-## Updating from another table
-
-Changing rows based on data elsewhere is routine, and the syntax is one of the least portable corners of SQL.
-
-```sql
--- PostgreSQL
-UPDATE employees e
-SET    dept_name = d.name
-FROM   departments d
-WHERE  d.id = e.dept_id;
-
--- MySQL
-UPDATE employees e
-JOIN   departments d ON d.id = e.dept_id
-SET    e.dept_name = d.name;
-
--- Portable, if slower
-UPDATE employees e
-SET    dept_name = (SELECT name FROM departments d WHERE d.id = e.dept_id);
-```
-
-The portable version has a trap: rows with no matching department get `NULL` rather than being left alone. Add `WHERE EXISTS (...)` if that is not what you want.
-
-## Deleting and updating at scale
-
-A `DELETE` touching millions of rows holds locks, generates enormous undo or WAL volume, and can block everything else for minutes. Batch it instead:
-
-```sql
--- repeat until zero rows are affected
-DELETE FROM events
-WHERE  id IN (SELECT id FROM events WHERE created_at < '2025-01-01' LIMIT 10000);
-```
-
-Each batch is a short transaction, other queries get a chance to run between them, and an interruption leaves the job resumable rather than rolled back.
-
-For deleting most of a very large table, an even better pattern is to copy the rows you are keeping into a new table, then swap the names. And for data with a natural time boundary, partitioning turns "delete last year" into "drop a partition", which is instant.
-
-## Questions people ask
-
-<strong>Does `UPDATE` rewrite the whole row?</strong> In PostgreSQL, yes &mdash; an update writes a new row version and marks the old one dead, which is why heavily updated tables need vacuuming. In MySQL's InnoDB, only the changed columns and the undo record.
-
-<strong>Why did my `INSERT` succeed but the data is gone?</strong> Autocommit was off and the transaction was never committed, or a rollback happened later in the session.
-
-<strong>Can I `INSERT` from a `SELECT`?</strong> Yes &mdash; `INSERT INTO archive SELECT * FROM orders WHERE completed` is the standard way to copy rows between tables.
-
-<strong>How do I get the id of a row I just inserted?</strong> `RETURNING id` where supported, otherwise the driver's last-insert-id function. Never re-query by the values you inserted; that is racy.
-
-<strong>Is `TRUNCATE` a DML statement?</strong> It is usually classified as DDL, which is why it auto-commits in some engines and does not fire triggers. Treat it as a structural operation.
-
-<strong>What happens if an `INSERT` violates a constraint?</strong> The statement fails and, inside a transaction, the whole transaction is typically marked as aborted &mdash; in PostgreSQL you must roll back or use a savepoint before continuing.
-
-## Recap in one screen
-
-- `INSERT`, `UPDATE`, `DELETE` and `SELECT` are the statements that move data.
-- Always name your columns in `INSERT`, and insert in batches rather than row by row.
-- A missing `WHERE` is the classic disaster &mdash; write the `SELECT` first, and use a transaction.
-- Upserts belong in one statement (`ON CONFLICT` / `ON DUPLICATE KEY` / `MERGE`), never in read-then-write application code.
-- Delete and update large volumes in batches, and prefer partition drops where the data allows.
+## Further reading
+- [SQLite INSERT](https://www.sqlite.org/lang_insert.html), [UPDATE](https://www.sqlite.org/lang_update.html), and [DELETE](https://www.sqlite.org/lang_delete.html) document row-changing statements.
+- [PostgreSQL transactions](https://www.postgresql.org/docs/current/tutorial-transactions.html) shows commit and rollback.
