@@ -1,13 +1,15 @@
 title: Nested Models: Structure That Validates Itself
 intro: Models inside models, and the error paths that make deep payloads debuggable.
 
-## Composition is the whole mechanism
+## The core idea
 
-Real data has structure. A course has modules. A module has an author. An order has a customer and a list of items. Flat models cannot describe that, so Pydantic lets one model appear as the type of a field in another.
+Real data has structure. A course has modules. A module has an author.
+
+## Composition is the whole mechanism
 
 That is all nesting is. You do not write any special code to make it work. When the outer model validates, it hands each inner piece to the inner model, and the inner model checks it by its own rules. A plain dictionary goes in. A tree of typed objects comes out.
 
-This article explains how composition works and why it needs so little from you. You will see how a dictionary becomes an object at every level of the tree. You will also see how errors report the exact path to the bad value, which matters when the data is three levels deep. The last part makes the point that every rule you set on a model still applies when that model is used inside another one. Constraints, defaults and validators all come along without extra effort.
+
 
 This is the point where models start to look like the data you actually handle, so it is worth getting comfortable with it. Nothing new is needed beyond what you have already seen. The syntax is the same as any other type annotation, which keeps the learning curve flat.
 
@@ -23,10 +25,9 @@ class Module(BaseModel):
     author: Author
 ```
 
-That is it. all else follows from that one fact. This Is worth stating plainly because people often expect a nested schema to need declaring somehow. It doesn't. If you can write the inner model on its own, you can use it as a field type.
+That is it. all else follows from that one fact. This is worth stating plainly because people often expect a nested schema to need declaring somehow. It doesn't. If you can write the inner model on its own, you can use it as a field type.
 
 When `Module` is checked, the value for `author` is handed to `Author` for check. If it's already an `Author`, it passes through. If it's a dict, it turns one. If it's neither, the error says so.
-
 
 ## A model can be a field type
 
@@ -147,7 +148,7 @@ print("given        :", full.author)
 print("inner default:", full.author.email)
 ```
 
-The rules from the defaults module apply without change. One of them has a exact trap here.
+The rules from the defaults module apply without change. One of them has an exact trap here.
 
 For a nested model that should always exist, use `default_factory`:
 
@@ -221,6 +222,7 @@ print()
 print("just a bit :", m.model_dump(include={"title": True,
                                             "author": {"name"}}))
 ```
+
 ## Dicts in, objects out
 
 The conversion from dict to object is the part that makes nesting handy rather than merely possible.
@@ -239,7 +241,7 @@ A failure two levels down makes `loc: ("author", "email")`. Joined with dots, `a
 
 Compare that with what a hand-rolled checker often manages: "invalid module". For a payload of any size, the gap is between a caller who can fix the problem in ten seconds and one who has to bisect their own request.
 
-There's a related failure worth recognising. If the value for a nested field isn't a mapping at all. A string, say. The error is on the field itself, with `loc: ("author",)` and the type `model_attributes_type`. That means "I couldn't even begin to read this as an Author". This Is a other problem from a field inside it being wrong. The shape of the error tells you which you've.
+There's a related failure worth recognising. If the value for a nested field isn't a mapping at all. A string, say. The error is on the field itself, with `loc: ("author",)` and the type `model_attributes_type`. That means "I couldn't even begin to read this as an Author". This is another problem from a field inside it being wrong. The shape of the error tells you which you've.
 
 ## Every rule still applies, at every level
 
@@ -254,6 +256,7 @@ class Author(BaseModel):
 Use that as a field type and each parent gets those rules for free. This is the compounding gain of composition. A well-given small model is reusable. Each place it's reused takes from the entire specification rather than a copy of it that can drift.
 
 It's also the arg for making small models. `Address`, `Money`, `DateRange`, `Contact`. Anything that appears in more than one place and has rules of its own is a model waiting to be extracted. The option is the same four fields and the same three constraints written out in five parent models, four of which get updated when the rule changes.
+
 ## Shaping the output
 
 `model_dump` takes `include` and `exclude`, and both understand structure. A set names top-level fields. A dict reaches inside. The two spellings don't mix in one literal. Once any entry needs to reach inside, each entry turns a key:
@@ -262,7 +265,7 @@ It's also the arg for making small models. `Address`, `Money`, `DateRange`, `Con
 m.model_dump(exclude={"internal_notes": True, "author": {"email"}})
 ```
 
-That drops one top-level field and one field of the nested model, keeping all else. For lists of models there's a special key, `"__all__"`. This Applies the same pick to each item.
+That drops one top-level field and one field of the nested model, keeping all else. For lists of models there's a special key, `"__all__"`. This applies the same pick to each item.
 
 This is truly handy for the common case of one inner form and a few external views. It's also easy to overuse. Once the exclusion dict is more than a couple of entries, a split output model is clearer. It's checked, it appears right in the schema. No one has to trace an exclusion formula to work out what an endpoint really returns.
 
@@ -270,7 +273,7 @@ The rule of thumb: `exclude` for dropping one obviously-inner field, a split mod
 
 ## Recursive models
 
-A model can refer to itself. This Is how you show trees. Comment threads, group trees, nested menus:
+A model can refer to itself. This is how you show trees. Comment threads, group trees, nested menus:
 
 ```python
 class Node(BaseModel):
@@ -280,7 +283,7 @@ class Node(BaseModel):
 
 The quotes are needed because the class doesn't exist yet at the point the annotation is written. In modern Python with `from __future__ import annotations`, or in files where all annotations are strings, you can drop them.
 
-Recursive models validate to any depth and dump to nested dicts as you'd expect. Two cautions. Depth is bounded by the recursion limit. Truly deep or maliciously nested input can raise. This Is worth thinking about if the data is untrusted. And a cycle. A node that holds itself. Won't terminate on dump. Pydantic detects some cases and raises. But The honest fix isn't to build cyclic data in a model designed as a tree.
+Recursive models validate to any depth and dump to nested dicts as you'd expect. Two cautions. Depth is bounded by the recursion limit. Truly deep or maliciously nested input can raise. This is worth thinking about if the data is untrusted. And a cycle. A node that holds itself. Won't terminate on dump. Pydantic detects some cases and raises. But The honest fix isn't to build cyclic data in a model designed as a tree.
 
 ## What good nesting looks like
 
@@ -320,7 +323,7 @@ class ModuleOut(BaseModel):
 
 Now `ModuleOut.model_validate(orm_row)` reads `row.title` and `row.author`. Validates the nested object the same way. This is how a model turns a DB row into a response, and it recurses. A row with a related object turns a nested model without any manual walking.
 
-In Pydantic v1 this setting was called `orm_mode`. This Is the name most existing tutorials use.
+In Pydantic v1 this setting was called `orm_mode`. This is the name most existing tutorials use.
 
 ## Performance, and what nesting costs
 
@@ -373,22 +376,7 @@ Three levels is comfortable. Four is worth a second look. Beyond that, the quest
 
 Nesting one model inside another is half the picture. The other half is sets. Lists of models, dicts keyed by a thing real. What happens to the error path when the failure is in the seventeenth item.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>How do I put a model inside another model?</strong> Use the inner class as a field type, for example `author: Author`. Pydantic validates a nested dict into an `Author` instance.
-
-<strong>Where does the error point when a nested value is wrong?</strong> The `loc` is the full path, such as `('author', 'email')`, so you can see exactly which inner field failed.
-
-<strong>Can a nested model be optional?</strong> Yes. Use `author: Author | None = None`. A missing key then gives `None`, while a present dict is validated.
-
-<strong>Can a model contain itself?</strong> Yes, use a forward reference like `children: list["Category"]`. Pydantic resolves it once the class exists.
-
-<strong>How do I dump only part of a nested model?</strong> Pass a nested `exclude` such as `exclude={"author": {"email"}}`. `include` accepts the same shape.
-
-<strong>Do nested models get copied or shared?</strong> If you pass an existing model instance, Pydantic keeps the same object by default (`revalidate_instances='never'`). Passing a dict creates a new one.
-
-## Summary
-
-A model used as a field type is checked with its full rules, dicts become objects recursively. Errors carry the whole path to the failing value.
-
-Extract a model when fields travel together or a group of them is repeated. Use `default_factory` for a nested default. Reach for `include`/`exclude` to drop a field or two. For a split output model when the gap is structural.
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/models/)
+- Continue with [Nested Models](collections_of_models.html).

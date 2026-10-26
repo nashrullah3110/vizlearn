@@ -1,13 +1,15 @@
 title: APIRouter
 intro: Splitting an app before main.py turns the file no one wants to open.
 
-## The problem it solves
+## The core idea
 
-An APIRouter is a group of related endpoints that you define in its own file and attach to the main app later. It works like a small app of its own. It has routes, tags, and dependencies, but it does not run by itself. You plug it into the real app, and its routes join the rest.
+An APIRouter is a group of related endpoints that you define in its own file and attach to the main app later. It works like a small app of its own.
+
+## The problem it solves
 
 You need one as soon as your project grows past a handful of endpoints. Everything in a single main.py works at first. Then the file reaches a thousand lines, two people edit it at once, and nobody wants to open it. Routers let you split the work by topic, so users, orders, and billing each get a home.
 
-This article starts with the problem a router solves and why the single-file approach stops scaling. It then explains that a router is a mini-app, with most of the same decorators you already know. You will see the shape a project usually takes once it is split, with a folder of routers and a short main file.
+
 
 The later sections cover details that save repetition. A prefix can be added when you include the router, so each endpoint does not repeat the same start of the path. Dependencies can be attached to a whole section, so authentication is declared once instead of fifty times.
 
@@ -58,7 +60,7 @@ def list_modules():
 app.include_router(router)
 ```
 
-The decorators are the same. The prefix is prepended to each path in the router. `@router.get("")` turns `/modules`. The tags apply to each route. This Is what groups them into a section in the interactive docs.
+The decorators are the same. The prefix is prepended to each path in the router. `@router.get("")` turns `/modules`. The tags apply to each route. This is what groups them into a section in the interactive docs.
 
 Note `@router.get("")` rather than `@router.get("/")` for the set itself. With a prefix, the empty string gives `/modules` and a slash gives `/modules/`. The gap is the trailing-slash redirect from earlier. Pick one rule.
 
@@ -125,7 +127,7 @@ A prefix can be given when including instead of when creating:
 app.include_router(router, prefix="/v1")
 ```
 
-That lets one router be mounted at a few paths. This Is the method behind version prefixes. Whether you *should* mount the same handlers at two versions is a other question. Often a new version exists because action differs. Then you want two routers.
+That lets one router be mounted at a few paths. This is the method behind version prefixes. Whether you *should* mount the same handlers at two versions is another question. Often a new version exists because action differs. Then you want two routers.
 
 Where this truly helps is keeping the version out of the router file fully. The routes read as `/modules` and the assembly decides they live under `/v1`.
 
@@ -223,6 +225,7 @@ right.include_router(generic)
 print("wrong order:", TestClient(wrong).get("/modules/latest").json())
 print("right order:", TestClient(right).get("/modules/latest").json())
 ```
+
 ## The shape a project takes
 
 One router per resource, one file each, assembled in one place:
@@ -236,9 +239,10 @@ app/
     admin.py
 ```
 
-`main.py` turns short and boring. This Is what you want from the file that wires all together. Each router file owns one resource and can be read on its own.
+`main.py` turns short and boring. This is what you want from the file that wires all together. Each router file owns one resource and can be read on its own.
 
 The advice worth acting on: create `routers/` on day one, even with two endpoints in it. Moving three routes later is trivial. Moving eighty is a weekend. By then a thing will depend on the import layout.
+
 ## Dependencies for a section
 
 ```python
@@ -255,7 +259,7 @@ Dependencies get a full tier next. This is the first truly handy thing they do.
 
 `responses=` on a router docs a failure shape for each route in it. If each endpoint under `/modules` can 404, saying so once is better than repeating it six times.
 
-`deprecated=True` on a router marks a whole section as deprecated in the docs. This Is a civilised way to retire a version.
+`deprecated=True` on a router marks a whole section as deprecated in the docs. This is a civilised way to retire a version.
 
 ## Nesting
 
@@ -297,7 +301,6 @@ The handlers should be thin, calling into a service module. The models can live 
 
 What shouldn't be in there's business logic, DB access or config. A router file that imports your ORM right works and stops being testable without a DB.
 
-
 ## Mistakes people make
 
 **Waiting to split.** Moving three routes is trivial. Moving eighty is a weekend. By then imports depend on the layout. Create `routers/` on day one.
@@ -314,7 +317,7 @@ What shouldn't be in there's business logic, DB access or config. A router file 
 
 ## What a good layout looks like
 
-For an use of any size the setup that holds up is plain. This Is the point.
+For an use of any size the setup that holds up is plain. This is the point.
 
 `main.py` creates the app, registers exception handlers and includes routers. It should be short enough to read in one screen.
 
@@ -327,7 +330,6 @@ For an use of any size the setup that holds up is plain. This Is the point.
 `dependencies.py` holds the shared `Depends` functions, since a few routers need the same ones.
 
 Nothing there's clever. Its value is that a newcomer can guess where anything lives. That each piece can be tested without starting the whole use.
-
 
 ## Assembling the app
 
@@ -349,7 +351,7 @@ Two things often end up in `main.py` that are worth separating.
 
 **Settings** belong in their own module - a Pydantic settings model read once. Scattering `os.getenv` through routers makes it hopeless to see what the use needs to run.
 
-**Startup work** - opening a link pool, loading a model - belongs in a lifespan handler rather than at import time. Work done at import happens when a test imports the module. This Is how a test suite ends up needing a DB to collect.
+**Startup work** - opening a link pool, loading a model - belongs in a lifespan handler rather than at import time. Work done at import happens when a test imports the module. This is how a test suite ends up needing a DB to collect.
 
 Both get proper treatment in the runtime tier. The habit worth forming now isn't putting either in the file that wires routes together.
 
@@ -367,16 +369,6 @@ For anything past a few resources, resource-first inside a shallow layer structu
 
 That ends the request tier: methods, headers, forms, files, status codes, error handling and structure. The next tier is dependencies. `Depends`, the feature that makes all of the above composable. The one that most sets apart FastAPI from what came before it.
 
-
-## A closing thought
-
-Structure is the cheapest thing to get right early and among the most costly to fix late.
-
-A router file created on the first day costs nothing. The same split attempted after eighty endpoints means untangling imports, moving tests. A diff no one can review properly - so it doesn't happen, and the file keeps growing.
-
-The rule of thumb: if you can imagine a second resource, make the folder now.
-
-
 ## One more benefit
 
 Splitting an app makes it testable in pieces. That is worth more than the tidiness.
@@ -385,36 +377,13 @@ A router included into a small `FastAPI()` built for one test file gives you a c
 
 That means a test suite that runs fast, fails namely. Doesn't need the whole system to be constructible. It's the gap between "the tests need a DB, Redis and three setting vars" and "the tests need the module under test".
 
-## Summary
-
-An `APIRouter` takes the same decorators as an app, carries a prefix and tags. Merges in through `include_router`. Routers nest, accept shared dependencies and responses. Can be mounted at more than one prefix.
-
-Inclusion order is match order. So A var route in an early router shadows a fixed one included later.
-
-Create the folder on day one. Keep handlers thin and business logic out of router files. Each piece can be tested without starting the whole use - which is the quiet gain of splitting up. The reason it's worth doing before it hurts.
-
-## Where this leaves you
-
-That ends the request tier. You can route by path and method, read each source of input a request has, decide what comes back and with which status, give errors that a caller can act on. Split an use before its main file turns unmanageable.
-
-What is still missing is the thing that makes all of it composable. A way to declare that an endpoint needs a DB session, an authenticated user or a checked set of filters. Have that need met, cached and documented on its own. That is `Depends`, and it's the next tier.
-
-## Questions people ask
-
-<strong>What is an APIRouter?</strong> A mini app that holds a group of routes. You define routes on it and attach it to the main app with include_router.
-
-<strong>How do I add a common prefix to all routes in a router?</strong> Pass prefix="/users" to APIRouter or to include_router.
-
-<strong>How do I group routes in the docs?</strong> Pass tags=["users"] to the router or to include_router.
-
-<strong>Can routers be nested?</strong> Yes. A router can include another router, and prefixes and dependencies stack.
-
-<strong>Does route order still matter across routers?</strong> Yes. Routes match in registration order, so fixed paths in an earlier router can still be shadowed by variable ones.
-
-<strong>How should I split files?</strong> By resource, such as users.py and orders.py, not by layer. Each file keeps its routes, models, and dependencies together.
-
 ## A final note
 
 None of the structure in this module is FastAPI-exact. Grouping by resource, keeping handlers thin, separating config and startup. Assembling in a boring file are practices that predate the framework and outlast it.
 
 What FastAPI adds is that following them costs almost nothing. A router is four lines, inclusion is one. The docs reorganises itself around your tags without being asked.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/bigger-applications/)
+- Continue with [APIRouter](dependency_injection.html).

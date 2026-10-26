@@ -1,12 +1,11 @@
 title: concurrent.futures: One Interface for Both
 intro: One API over threads and processes, and a Future is a small state machine you can drive by hand to see exactly what it promises.
 
-## One interface, two backends
+## The core idea
 
-<code>concurrent.futures</code> exists so that the decision from the
-[previous page](threads_or_processes.html) is a one-word change. Both
-executors have the same methods, so switching between them is switching a
-class name:
+concurrent.futures exists so that the decision from the previous page is a one-word change. Both executors have the same methods, so switching between them is switching a class name:
+
+## One interface, two backends
 
 ```python
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
@@ -368,25 +367,7 @@ least loud &mdash; see [the boundary](threads_or_processes.html).
 For waiting, the limit is what the other end tolerates, and it is usually much
 higher.
 
-## Questions people ask
+## Sources and next steps
 
-<strong><code>map</code> or <code>as_completed</code>?</strong> <code>map</code> when you want results in argument order and a failure should stop everything. <code>as_completed</code> when you want each result as it lands and want to see every failure &mdash; which is most of the time. And the reason the extra three lines are worth it.
-
-<strong>Does <code>map</code> run lazily?</strong> The submission is eager &mdash; every item is queued at once. So <code>map</code> over a million items queues a million futures. While the *iteration* is lazy and in order. Use <code>chunksize</code> with a process pool to amortise the boundary cost over several items per trip.
-
-<strong>How do I get a timeout?</strong> <code>result(timeout=...)</code> and <code>as_completed(..., timeout=...)</code> raise <code>TimeoutError</code>. What they do not do is stop the work. The future is still running and the worker is still occupied. So a timeout here is "I stopped waiting", not "it stopped".
-
-<strong>Can I nest pools?</strong> Nesting process pools deadlocks easily and is best avoided; the usual pattern is one process pool whose workers each use threads. A thread pool inside a process pool worker is fine and common.
-
-<strong>Why did my pool hang at exit?</strong> Because <code>shutdown(wait=True)</code> is the default. So the interpreter waits for every submitted job. If jobs can hang, give them their own timeouts. The pool will not impose one.
-
-<strong>Is this the same as asyncio's Future?</strong> No, and they are not interchangeable. <code>asyncio.Future</code> is awaitable and bound to an event loop; <code>concurrent.futures.Future</code> is blocking and thread-based. <code>asyncio.wrap_future</code> converts one into the other, which is how you await a thread-pool job.
-
-## Recap in one screen
-
-- One interface over both backends, so the threads-or-processes decision is a class name. In one direction, because the process pool still needs everything to pickle.
-- A <code>Future</code> has four states: <code>PENDING</code>, <code>RUNNING</code>, <code>FINISHED</code>, <code>CANCELLED</code>. Driving one by hand shows the whole contract.
-- <code>cancel()</code> only works before the work starts. Nothing can interrupt a running Python function.
-- An exception is stored on the future and re-raised by <code>result()</code>. A <code>submit</code> whose future is never read discards the failure silently.
-- <code>map</code> gives argument order and stops at the first failure; <code>as_completed</code> gives completion order and lets you inspect every one. Default to the second.
-- <code>wait(..., return_when=FIRST_COMPLETED)</code> is the general form, and it is honest about the stragglers: you can drop queued work, not running work.
+- Official reference: [concurrent.futures](https://docs.python.org/3/library/concurrent.futures.html)
+- Continue with [concurrent.futures: One Interface for Both](queues_between_threads.html).

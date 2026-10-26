@@ -1,9 +1,11 @@
 title: Time Series
-intro: resample, rolling and shift.
+intro: Resample, rolling and shift.
+
+## The core idea
+
+Time series analysis in pandas depends almost entirely on having a DatetimeIndex. Without one, none of the time-aware methods work. resample raises. Rolling windows with time-based spans refuse to run.
 
 ## The index does the work
-
-Time series analysis in pandas depends almost entirely on having a DatetimeIndex. Without one, none of the time-aware methods work. resample raises. Rolling windows with time-based spans refuse to run. Date-based selection returns nothing useful.
 
 Setting up the DatetimeIndex is a two-step process. First, parse the date column with pd.to_datetime. Second, set it as the index with set_index. People skip the second step more often than the first, because the frame already has a datetime column and seems ready to use. But resample and time-based loc selections operate on the index, not on an arbitrary column.
 
@@ -15,7 +17,6 @@ Rolling windows compute statistics over a sliding window of time. A 30-day movin
 
 shift moves values forward or backward by a number of periods. It is how you compute period-over-period changes. The difference between this month and last month is a subtraction of the original and the shifted version. pct_change wraps that pattern into a single method.
 
-This module covers setting up the DatetimeIndex, resample for aggregation and upsampling, rolling for moving statistics, and shift for period comparisons. The examples use daily and monthly data to show the mechanics clearly.
 
 
 all in this module depends on the frame having a `DatetimeIndex`. `resample` raises without one. Time-based windows have nothing to measure against.
@@ -23,7 +24,6 @@ all in this module depends on the frame having a `DatetimeIndex`. `resample` rai
 `df.set_index("date")` after `pd.to_datetime` is the usual setup. It's the step people skip before wondering why `resample` won't run.
 
 Once the index is a timeline, pandas can do things that would else need a lot of math. Select a month by name, aggregate by period, window by duration rather than by row count.
-
 
 ## A DatetimeIndex is the prerequisite
 
@@ -160,6 +160,7 @@ print()
 print("pandas did not warn either time. sort_index() before any")
 print("shift, diff, rolling or resample on data you did not sort.")
 ```
+
 ## resample
 
 `resample` is group-by where the groups are time periods.
@@ -176,7 +177,7 @@ The label of each output row is the **end** of the period for `ME`. The start fo
 
 Going to a finer rate creates rows that didn't exist, and they start as `NaN`.
 
-`asfreq()` leaves them empty. This Is honest and rarely handy on its own.
+`asfreq()` leaves them empty. This is honest and rarely handy on its own.
 
 `ffill()` carries the last known value forward. That asserts the value **held constant** until the next finding. Correct for a price, a status, a setting.
 
@@ -188,7 +189,7 @@ These are other claims about the world. Choosing between them is a modelling cho
 
 `s.rolling(3).mean()` gives a moving mean over the last three **rows**.
 
-The first two results are `NaN`. The window isn't yet full. That is deliberate. A three-row mean found from one row isn't a three-row mean. `min_periods=1` replaces it and starts finding at once. This Is convenient and slightly dishonest at the edges.
+The first two results are `NaN`. The window isn't yet full. That is deliberate. A three-row mean found from one row isn't a three-row mean. `min_periods=1` replaces it and starts finding at once. This is convenient and slightly dishonest at the edges.
 
 `s.rolling("3D")` windows by **time** rather than row count. This is the one to use when findings are irregularly spaced. Three rows might span three days or three months. Only the time-based window means what you said.
 
@@ -228,7 +229,7 @@ The renames: `M` to `ME`, `H` to `h`, `T` to `min`, `S` to `s`. Older code and m
 
 Multiples work: `"15min"`, `"2W"`, `"3ME"`.
 
-Anchored offsets pin the boundary: `"W-FRI"` for weeks ending Friday, `"QE-JAN"` for quarters ending in January. This Matters for fiscal years that don't start in January.
+Anchored offsets pin the boundary: `"W-FRI"` for weeks ending Friday, `"QE-JAN"` for quarters ending in January. This matters for fiscal years that don't start in January.
 
 ## Which label a period gets
 
@@ -248,7 +249,7 @@ Settling on a rule early. Often period start &mdash; saves reconciliation later.
 df.groupby([pd.Grouper(key="date", freq="ME"), "city"])["sales"].sum()
 ```
 
-`key=` names the date column. So This works without setting an index. This Is what makes `Grouper` more handy than `resample` .
+`key=` names the date column. So This works without setting an index. This is what makes `Grouper` more handy than `resample` .
 
 The result is a MultiIndex, and `unstack("city")` gives the wide table.
 
@@ -256,7 +257,7 @@ The result is a MultiIndex, and `unstack("city")` gives the wide table.
 
 `min_periods` decides how many findings a window needs before making a value. The default for a fixed-size window is the window size. For a time-based window it's 1.
 
-`closed=` controls whether the window includes its endpoints. This Matters for time-based windows where an finding may sit just on the boundary.
+`closed=` controls whether the window includes its endpoints. This matters for time-based windows where an finding may sit just on the boundary.
 
 `win_type` gives weighted windows &mdash; Gaussian, tri &mdash; for smoothing.
 
@@ -274,7 +275,7 @@ Two fixes:
 
 **Regularise first**: `resample("D").mean()` produces a row per day, with `NaN` where there was no data, after which row-based windows mean what they say.
 
-Which is right depends on whether an absent finding should count as missing or simply not exist. That is a modelling question. `resample` forces you to answer it. This Is an arg for doing it early.
+Which is right depends on whether an absent finding should count as missing or simply not exist. That is a modelling question. `resample` forces you to answer it. This is an arg for doing it early.
 
 ## A checklist for time-series work
 
@@ -315,11 +316,11 @@ Which direction is right depends on the question. Aggregating up loses detail an
 
 `shift(1)` gives the previous value. A lag, safe to use as a predictor.
 
-`shift(-1)` gives the next value. A lead. This Is the **target** in a forecasting problem and must never be a feature.
+`shift(-1)` gives the next value. A lead. This is the **target** in a forecasting problem and must never be a feature.
 
 Using a lead as a feature is data leakage. It makes models that score beautifully and fail in production. Because both are one method with a sign, the mistake is easy to make and invisible in the code.
 
-Rolling features have the same hazard: `rolling(3, center=True)` uses future values. For anything predictive, windows must look backwards only. This Is the default without `center`.
+Rolling features have the same hazard: `rolling(3, center=True)` uses future values. For anything predictive, windows must look backwards only. This is the default without `center`.
 
 Within groups, all of these need the group-wise form, or the lag crosses from one entity to the next.
 
@@ -333,50 +334,13 @@ A gap in a time series is either "no finding" or "no event". The two need other 
 
 Choosing the wrong one makes a series that looks full and is wrong at just the notable points.
 
-`asfreq()` makes the gaps clear without aggregating. This Is the honest first step when you aren't yet sure.
-
-## A summary
-
-A `DatetimeIndex` is the prerequisite for `resample` and time-based windows.
-
-rate aliases were renamed in pandas 2.2 &mdash; `ME`, `h`, `min`.
-
-Downsampling aggregates. Upsampling invents rows that need filling on purpose.
-
-`ffill` asserts a value held. `interpolate` asserts it moved smoothly.
-
-`rolling("3D")` for irregular spacing. `min_periods` for the edges.
-
-`shift(-1)` is a lead and belongs only in a target, never a feature.
-
-Use the group-wise forms on panel data.
-
-`sort_index()` first, always, because none of these check.
-
-## A closing note
-
-Time series work rewards setting things up properly and punishes assumptions.
-
-The setup is short: parse the dates with an clear format, check the dtype, decide on a time zone, set a `DatetimeIndex` if you need period pick. Sort. each step in this module assumes that order and none of them check it. `diff` on unsorted rows returns numbers that mean nothing.
-
-The recurring choice is what a gap means. A day with no rows is either zero events or an unrecorded reading. `resample("D").sum()` and `.mean()` encode those two other answers. Choosing without noticing gives a series that looks full and is wrong just where the notable things happen.
-
-And on panel data &mdash; a few entities stacked in one frame &mdash; `shift`, `diff` and `rolling` must be done within groups, or the compare runs across the boundary from one entity into the next and makes a plausible number from unrelated rows.
-
-## Questions people ask
-
-<strong>How do I change the frequency of a time series?</strong> Use resample, for example df.resample('M').sum() for monthly totals. It needs a DatetimeIndex or an on= column.
-
-<strong>What is the difference between resample and groupby?</strong> resample groups by time intervals and fills in intervals with no data, while groupby only produces groups that exist. resample is a groupby specialised for dates.
-
-<strong>How do I compute a moving average?</strong> Use df['x'].rolling(window=7).mean(). The first window-1 values are NaN unless you set min_periods.
-
-<strong>What does shift do?</strong> It moves the values down by n rows, which gives the previous period's value. Combine it with subtraction, or use diff() and pct_change(), for changes over time.
-
-<strong>Why do I get NaN or surprising results after resampling?</strong> Periods with no data are empty, so sums give 0 and means give NaN. Also check that the index is sorted and that you know which edge labels the bins.
-
-<strong>Do I need to sort by date first?</strong> Yes. rolling, shift, diff and slicing assume the rows are in time order and do not check it.
+`asfreq()` makes the gaps clear without aggregating. This is the honest first step when you aren't yet sure.
 
 ## One more thing
 
 `resample` accepts `origin=` and `offset=`. This Control where the period boundaries fall. That matters for data that should be bucketed on a thing other than midnight or the first of the month. A business day starting at 6am, or weeks aligned to a fiscal calendar.
+
+## Sources and next steps
+
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/timeseries.html)
+- Continue with [Time Series](reading_and_writing.html).

@@ -1,12 +1,15 @@
 title: Background Tasks
 intro: Work that should happen after the response has gone. The point at which it needs a real queue instead.
-## The mechanism
 
-A background task is work that runs after the response has already been sent. The client gets its answer quickly, and the slower job carries on afterward. Typical examples are sending a confirmation email, writing an audit log, or resizing an image. The user does not need to wait for any of them.
+## The core idea
+
+A background task is work that runs after the response has already been sent. The client gets its answer quickly, and the slower job carries on afterward. Typical examples are sending a confirmation email, writing an audit log, or resizing an image.
+
+## The mechanism
 
 FastAPI includes a simple tool for this called BackgroundTasks. You ask for it in your handler, add a function to it, and the framework runs that function once the response goes out. It needs no extra services or setup, which makes it very convenient for small jobs.
 
-This article starts with the mechanism and how little code it takes. It then explains ordering precisely, so you know exactly when the task starts relative to the response and to any cleanup in your dependencies. That timing is more subtle than it seems.
+
 
 An honest section follows on what background tasks are not. They are not a job queue. They run inside the same process, they vanish if the server restarts, and they have no retry or tracking. The next section explains when to move to a real queue, and what signs tell you it is time.
 
@@ -26,7 +29,6 @@ def signup(email: str, tasks: BackgroundTasks):
 Declare a `BackgroundTasks` param, add callables to it. They run once the response has been made.
 
 The caller isn't waiting for the welcome email. That is the entire value. A request that must do a thing slow and inessential can answer at once and do it later.
-
 
 ## Declare it and add to it
 
@@ -184,13 +186,14 @@ c.request("GET", "/a", headers={"x-actor": "ada"})
 c.request("GET", "/b")
 print("trail:", trail)
 ```
+
 ## Ordering, precisely
 
 The response is made and sent, then the tasks run, in the order they were added, one after another.
 
 Not concurrently. A slow first task delays the second. Both delay nothing that the client can see. But they do occupy the worker.
 
-For a sync handler the tasks run in the threadpool. For an async one they run on the loop. The same rule as endpoints applies to a task's own body. A blocking task added by an async handler blocks the loop, after the response. This Is easy to miss just because nothing appears slow to the caller.
+For a sync handler the tasks run in the threadpool. For an async one they run on the loop. The same rule as endpoints applies to a task's own body. A blocking task added by an async handler blocks the loop, after the response. This is easy to miss just because nothing appears slow to the caller.
 
 ## What they are not
 
@@ -246,7 +249,6 @@ Any callable that can declare params can declare `BackgroundTasks`, which includ
 
 That is a tidy way to attach cross-cutting after-the-fact work. An audit trail, a metrics event. To a whole router without touching a single handler. The dependency schedules. The handlers stay unaware.
 
-
 ## Mistakes people make
 
 **Treating them as durable.** They live in memory in the serving process. A deploy discards all queued, with no record it existed.
@@ -259,7 +261,7 @@ That is a tidy way to attach cross-cutting after-the-fact work. An audit trail, 
 
 **Blocking the loop from an async handler.** A synchronous task added by an async endpoint runs on the loop after the response - stalling all, while appearing fast to the caller who already left.
 
-**Returning 201 for queued work.** It says a thing was created. 202 says it was accepted and isn't finished. This Is what really happened.
+**Returning 201 for queued work.** It says a thing was created. 202 says it was accepted and isn't finished. This is what really happened.
 
 ## The line
 
@@ -280,7 +282,6 @@ Above them: anything durable, retried, observable, slow, or scaled apart. That i
 Below them: anything the caller needs the result of. That belongs in the request. If it's slow the honest answer is 202 with a thing to poll rather than a background task and a hopeful 200.
 
 What is left is truly handy - the log line, the cache warm, the notification no one will chase - and for that they're just right, cost nothing to adopt. Need no infrastructure at all.
-
 
 ## A worked upgrade path
 
@@ -304,39 +305,13 @@ one spot to look, when there's anything to look at. A job id and a `GET /jobs/{i
 
 Without those, the caller assumes completion. That assumption is fine for a log line and wrong for anything they'll ask about later.
 
-## Summary
-
-Declare `BackgroundTasks`, call `add_task`, and the work happens after the response.
-
-They run in the same process, sequentially, without retries. Are lost on restart. Catch exceptions inside them because no one is listening. Return 202 when queueing rather than completing. And move to a real queue the first time you find yourself hoping a task didn't get lost.
-
 ## Next
 
 Work that happens once per process rather than once per request. Startup and shutdown. Here A link pool really belongs. Why anything that must happen just once for the use doesn't belong there either.
 
-
-## The honest summary
-
-Background tasks are a small, sharp tool with a narrow band of good uses.
-
-They cost nothing to adopt, need no infrastructure. Drop truly inessential work from the request path. For a log line, a cache warm or a notification no one will chase, they're just right.
-
-They're also in-memory, in-process, sequential, unretried, unobserved and lost on restart. each one of those is fine for the uses above and disqualifying for anything else.
-
-The failure isn't using them. It's using them for a thing that matters and discovering the properties later, often when somebody asks why a confirmation never arrived and there's no record that it was ever attempted.
-
-
-## A closing thought
-
-The value of background tasks is that they exist at all, for free, with no infrastructure.
-
-Most uses have a handful of things that truly shouldn't delay a response and truly don't matter enough to build a queue for. Before this feature the choice was to do them in the request anyway, or to add a broker for a thing trivial.
-
-Knowing just what they promise - which is very little - is what makes them safe to use for that handful. What stops them being reached for when the promise matters.
-
 ## One more consideration
 
-Background tasks share the process with the requests they follow. This Means they share its limits.
+Background tasks share the process with the requests they follow. This means they share its limits.
 
 A sync task added by a sync handler runs in the threadpool, occupying a worker that could have served a request. A sync task added by an *async* handler runs on the loop, after the response - stalling every other request in the process while appearing just right fast to the caller who has already left.
 
@@ -344,24 +319,7 @@ That second case is worth watching for. Nothing about it looks slow from outside
 
 The rule from the async module applies unchanged: if the task blocks, it shouldn't be running on the loop.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>How do I run something after sending the response?</strong> Add a BackgroundTasks parameter and call tasks.add_task(func, arg).
-
-<strong>When does the task run?</strong> After the response has been sent to the client, in the same process.
-
-<strong>What if the task fails?</strong> The client has already received success, so the error is not reported to them. Log inside the task.
-
-<strong>Can background tasks be async?</strong> Yes. An async def task runs on the event loop and a plain def task runs in a thread pool.
-
-<strong>When should I use Celery or a queue instead?</strong> When the work is long, must survive a restart, needs retries, or should run on another machine.
-
-<strong>Can I add a task from a dependency?</strong> Yes. Dependencies can declare BackgroundTasks and add to the same shared instance.
-
-## In one line
-
-A background task is in-memory, in-process, sequential, unretried and lost on restart - which makes it just right for the log line and just wrong for the confirmation email. The whole skill is telling those apart before rather than after.
-
-The tell that you've crossed the line is simple. If you'd be uncomfortable telling a user "we may have lost this and can't check", the work doesn't belong in a background task. That sentence is just what the feature promises.
-
-A last hands-on note: write the call site as one function - `enqueue(fn, *args)` rather than task build spread through the handler. If the work later needs a real queue, that is a one-line change in one place instead of an edit to each endpoint that scheduled anything.
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/background-tasks/)
+- Continue with [Background Tasks](lifespan_events.html).

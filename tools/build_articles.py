@@ -194,7 +194,7 @@ def main():
         # These tracks already show their title and short orientation above
         # the visualiser, then place an Overview below it. Repeating an article
         # title and deck immediately before the body adds no new teaching.
-        include_header = not rel.startswith(("dsa/", "machine_learning/", "database/", "interview/"))
+        include_header = not rel.startswith(("dsa/", "machine_learning/", "database/", "interview/", "async_python/", "concurrency/", "pydantic/", "fastapi/", "numpy/", "pandas/", "matplotlib/", "sklearn/"))
         block = render(title, entry, include_header=include_header)
 
         if BLOCK.search(src):

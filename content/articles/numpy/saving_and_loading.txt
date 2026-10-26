@@ -1,9 +1,11 @@
 title: Saving and Loading Arrays
-intro: npy, npz, text and bytes, and which one to reach for.
+intro: Npy, npz, text and bytes, and which one to reach for.
 
-## The native format
+## The core idea
 
 NumPy arrays need to be saved to disk and loaded back frequently. Intermediate results, preprocessed datasets, trained model weights, and test fixtures all need persistent storage. NumPy provides its own binary format and also supports text formats for interoperability.
+
+## The native format
 
 The native format is the .npy file. np.save writes a short header with the dtype, shape, and byte order, followed by the raw bytes of the array. np.load reads it back. The round trip is lossless. The dtype and shape are preserved exactly. An int16 array comes back as int16, not as int64. A (3, 4, 5) array comes back with the same shape. There is no parsing cost because the file is just the bytes.
 
@@ -15,7 +17,6 @@ The choice between formats depends on who will read the file. If the reader is a
 
 np.load with allow_pickle=False is a security consideration. Pickle files can execute arbitrary code on load. The default in current NumPy versions already disables pickle, but older code may not. Never load an untrusted .npy file with allow_pickle=True.
 
-This module covers np.save, np.load, np.savez, np.savetxt, np.loadtxt, and the trade-offs between binary and text formats. The examples show round-trip preservation and the pitfalls of text serialisation.
 
 
 `np.save(path, a)` writes a `.npy` file: a short header showing dtype, shape and byte order, followed by the raw bytes.
@@ -25,7 +26,6 @@ This module covers np.save, np.load, np.savez, np.savetxt, np.loadtxt, and the t
 It's the right default for anything that only needs to be read by NumPy. Files are compact, writing and reading are fast, and nothing is lost.
 
 The extension is added on its own if you omit it.
-
 
 ## .npy keeps dtype and shape exactly
 
@@ -169,6 +169,7 @@ print()
 print("mmap_mode='r' is read-only; 'r+' allows writing back.")
 print("np.array(mm) materialises the whole thing when you do want it.")
 ```
+
 ## Bundles
 
 `np.savez(path, train=X, labels=y)` writes an `.npz`. A zip archive of `.npy` files, one per keyword arg.
@@ -183,7 +184,7 @@ It holds an open file handle. Use it as a context manager or call `close()`. Los
 
 `np.savetxt` and `np.loadtxt` handle CSV and similar.
 
-They're the right choice when a thing other than NumPy must read the file. A spreadsheet, a colleague, a other language.
+They're the right choice when a thing other than NumPy must read the file. A spreadsheet, a colleague, another language.
 
 They're the wrong choice else, for three reasons. Files are a few times larger. Parsing is far slower than reading raw bytes. And **the dtype is lost**. All comes back as `float64`, what went in. An `int8` array round-trips into `float64`.
 
@@ -266,9 +267,9 @@ people = np.array([("ana", 31, 8.5)], dtype=dt)
 
 Fields are accessed by name: `people["age"]`. The result is a view. Assigning into it modifies the first.
 
-Structured arrays save and load through `.npy` without pickling. This Is their main edge over an object array. The data stays plain bytes.
+Structured arrays save and load through `.npy` without pickling. This is their main edge over an object array. The data stays plain bytes.
 
-They also sort by field name with `order=`. This Is the closest NumPy comes to sorting a table by columns.
+They also sort by field name with `order=`. This is the closest NumPy comes to sorting a table by columns.
 
 The honest caveat: for anything with more than a few columns or any real analysis, pandas does this better. Structured arrays are worth knowing for reading fixed-format binary files and for the cases where adding pandas isn't justified.
 
@@ -290,7 +291,7 @@ The security point deserves restating because it's the one thing in this module 
 
 `np.load` runs any code when loading a pickled object array. `allow_pickle=False` is the default and it's protecting you.
 
-Enable it only for files you made, or that arrived through a channel you'd trust with an executable. A `.npy` file from an untrusted source should be treated the way you'd treat a downloaded script. In the object-array case that is what it's.
+Enable it only for files you made, or that arrived through a channel you'd trust with an executable. A `.npy` file from an untrusted source should be treated the way you'd treat a downloaded script. In the object-array case that is what it is.
 
 The safe options, in order of preference: keep the data in plain numeric arrays so pickling never arises. Use a structured dtype for records. Use JSON or Parquet for anything truly heterogeneous.
 
@@ -326,7 +327,7 @@ int data with a small range, arrays with many repeated values. Anything sparse c
 
 Floating-point reading data compresses poorly. The low-order bits are in effect random. A 10&ndash;20% saving for a few times the CPU is rarely a good trade.
 
-The way to decide is to try both on a representative sample and compare. This Takes a minute and settles it for that dataset.
+The way to decide is to try both on a representative sample and compare. This takes a minute and settles it for that dataset.
 
 ## Writing for other people
 
@@ -352,22 +353,7 @@ HDF5, Zarr or Parquet past a few hundred megabytes, or when other tools are invo
 
 `allow_pickle=False` &mdash; the default &mdash; on anything you didn't give yourself. That one isn't a speed preference. It's the gap between reading a file and running one.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What is the difference between save and savetxt?</strong> save writes a binary .npy file that keeps dtype and shape exactly. savetxt writes readable text, which is bigger, slower and loses precision unless you set the format.
-
-<strong>How do I store several arrays in one file?</strong> Use np.savez, or savez_compressed for smaller files. Loading returns a dict-like object keyed by the names you gave.
-
-<strong>Is it safe to load any .npy file?</strong> Arrays of plain numbers are safe. Object arrays use pickle, so np.load refuses them by default; only set allow_pickle=True for files you trust.
-
-<strong>How do I load a CSV with a header?</strong> Use np.genfromtxt or np.loadtxt with skiprows=1 and delimiter=','. For messy or mixed-type data, pandas is the better tool.
-
-<strong>Can I read a file bigger than memory?</strong> Yes, pass mmap_mode='r' to np.load. The array is mapped from disk and only the pages you touch are read.
-
-<strong>Does loading keep the dtype?</strong> With .npy and .npz, yes, exactly. With text formats you get float64 unless you pass dtype.
-
-## A closing note
-
-Storage is where a project's choices become permanent. A format chosen for convenience during a first test tends to live into production. By then there's data in it.
-
-`.npy` and `.npz` are good enough for a great deal of work and cost nothing to adopt. The point to reconsider is when files grow past a few hundred megabytes, when a thing other than Python needs to read them, or when only part of an array is needed at a time. And recognising that point early is easier than migrating later.
+- Official reference: [Numpy documentation](https://numpy.org/doc/stable/reference/routines.io.html)
+- Continue with [Performance and Memory](performance_and_memory.html).

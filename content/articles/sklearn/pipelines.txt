@@ -1,9 +1,11 @@
 title: Pipelines: A Practical Guide
 intro: A pipeline isn't a convenience. It's the mechanism that makes each score in this track honest. Using one turns a rule you've to note into a property of the code.
 
-## What it is
+## The core idea
 
-Most machine-learning workflows have several preprocessing steps before the model. Imputing missing values, encoding categories, scaling features. Without a pipeline, each step is a separate call. Each call must be applied in the right order, to the right data, at the right time. Mistakes in that sequence are common and hard to spot.
+Most machine-learning workflows have several preprocessing steps before the model. Imputing missing values, encoding categories, scaling features. Without a pipeline, each step is a separate call.
+
+## What it is
 
 A pipeline bundles those steps into a single object. It applies them in order during `fit` and again during `predict`. Because the whole sequence is one object, it can be passed to `cross_val_score`, `GridSearchCV` or any other tool that expects an estimator. The preprocessing runs inside the cross-validation loop, which is the only way to get an honest score.
 
@@ -11,14 +13,13 @@ The alternative -- scaling the full dataset, then splitting, then fitting -- lea
 
 Pipelines also make deployment simpler. You save one object that contains both the preprocessing and the model. At prediction time, you call `predict` on the pipeline and it handles every step. There is no risk of forgetting to scale or encode at serving time.
 
-This page covers building a pipeline, inspecting its steps, and combining it with a column transformer for mixed-type data. It also covers the `make_pipeline` shortcut and the `set_output` method that preserves DataFrame column names.
+
 
 A `Pipeline` chains transformers together and ends with an estimator. The result behaves as a single estimator.
 
 That last sentence is the key one. A pipeline has `fit`, `predict` and `score`. Anywhere a model can go. `cross_val_score`, `GridSearchCV`, a pickle file, a check loop. A whole pipeline can go instead, with no changes to the nearby code.
 
 What it does inside is straightforward. `fit` calls `fit_transform` on each step in turn, passing the output of one to the next. `fit` on the final estimator. `predict` calls only `transform` on each step, then `predict` on the last.
-
 
 ## Two ways to build one
 
@@ -175,11 +176,12 @@ print()
 print("'passthrough' disables a step without rebuilding the pipeline,")
 print("which is how a search can treat a whole step as a hyperparameter.")
 ```
+
 ## The asymmetry is the point
 
 Look again at those two sentences: `fit` **fits** the transformers. `predict` only **transforms**.
 
-That skew is what makes a pipeline more than plumbing. Inside a cross-validation loop, `fit` is called on the training folds. So the scaler finds its mean there, the imputer its median, the encoder its category list. Then `predict` runs on the held-out fold. This Is transformed using those numbers and never adds to them.
+That skew is what makes a pipeline more than plumbing. Inside a cross-validation loop, `fit` is called on the training folds. So the scaler finds its mean there, the imputer its median, the encoder its category list. Then `predict` runs on the held-out fold. This is transformed using those numbers and never adds to them.
 
 Doing the same thing by hand means remembering, each time, to fit each transformer on the training part only. To apply it to the test part without refitting. That is four or five opportunities per test to make a mistake that inflates the score and makes no error.
 
@@ -235,7 +237,7 @@ Pipelines handle a sequence of steps applied to all the columns. Two situations 
 
 ## Caching, when the fitting gets slow
 
-A grid search over a pipeline refits each step for each combination. Most of that work is repeated. Tuning only the classifier means the scaler and the imputer are refitted the same way for each pick. This Is wasted time on any of it costly.
+A grid search over a pipeline refits each step for each combination. Most of that work is repeated. Tuning only the classifier means the scaler and the imputer are refitted the same way for each pick. This is wasted time on any of it costly.
 
 `Pipeline(steps, memory="./cache")` caches the fitted transformers, keyed on the step and the data they were given. The first combination pays for the prep. The rest reuse it. On a pipeline whose costly part is the prep. Text vectorisation, a costly feature build. This can be the difference between a search that finishes and one that doesn't.
 
@@ -247,11 +249,11 @@ A pipeline accepts any of it with `fit` and `transform`. This Includes classes y
 
 For a stateless change &mdash; a log, a ratio between two columns, a date part &mdash; `FunctionTransformer(func)` wraps a plain function and needs nothing else. It's the shortest route into a pipeline and covers a surprising amount.
 
-When the step needs to *learn* a thing, subclassing `BaseEstimator` and `TransformerMixin` gives you the rest of the interface for free: `fit` stores what it learned on `self` with a trailing underscore, `transform` applies it. `TransformerMixin` supplies `fit_transform`. `get_params` and `set_params` arrive from `BaseEstimator`. This Is what makes the custom step tunable by a search like any other.
+When the step needs to *learn* a thing, subclassing `BaseEstimator` and `TransformerMixin` gives you the rest of the interface for free: `fit` stores what it learned on `self` with a trailing underscore, `transform` applies it. `TransformerMixin` supplies `fit_transform`. `get_params` and `set_params` arrive from `BaseEstimator`. This is what makes the custom step tunable by a search like any other.
 
-The rule that keeps a custom step honest is the same as for the built-in ones. All learned from data must be learned in `fit`. `transform` must use only what `fit` stored. A transformer that finds a statistic inside `transform` recomputes it on the test fold. This Is the leak the pipeline was supposed to prevent.
+The rule that keeps a custom step honest is the same as for the built-in ones. All learned from data must be learned in `fit`. `transform` must use only what `fit` stored. A transformer that finds a statistic inside `transform` recomputes it on the test fold. This is the leak the pipeline was supposed to prevent.
 
-<strong>Can a pipeline end in a transformer?</strong> Yes. It then has `transform` rather than `predict`. This Is handy when the pipeline exists to prepare features for a thing else.
+<strong>Can a pipeline end in a transformer?</strong> Yes. It then has `transform` rather than `predict`. This is handy when the pipeline exists to prepare features for a thing else.
 
 <strong>How do I see what the model really receives?</strong> `pipe[:-1].transform(X)` runs each step except the last and hands back the array the estimator was given.
 
@@ -263,9 +265,9 @@ The rule that keeps a custom step honest is the same as for the built-in ones. A
 
 An unseen pipeline is quicker to understand than an unseen script. The steps are the structure and they're listed in order.
 
-Three questions cover it. **What are the steps?** `[name for name, _ in pipe.steps]` prints the sequence. The order is the order data flows through. **What does each one learn?** each step's fitted fields end in an underscore. `pipe["scale"].mean_` and `pipe["encode"].categories_` say what it took from the data. **What comes out?** `pipe[:-1].transform(X).shape` tells you how many features the model is really seeing. This Is often surprising after one-hot encoding.
+Three questions cover it. **What are the steps?** `[name for name, _ in pipe.steps]` prints the sequence. The order is the order data flows through. **What does each one learn?** each step's fitted fields end in an underscore. `pipe["scale"].mean_` and `pipe["encode"].categories_` say what it took from the data. **What comes out?** `pipe[:-1].transform(X).shape` tells you how many features the model is really seeing. This is often surprising after one-hot encoding.
 
-The display helps too. Printing a pipeline in a notebook renders a diagram of the steps. `sklearn.set_config(display="diagram")` makes that the default. In a plain terminal, `print(pipe)` gives the nested repr. This Is dense but complete. each step and each non-default setting.
+The display helps too. Printing a pipeline in a notebook renders a diagram of the steps. `sklearn.set_config(display="diagram")` makes that the default. In a plain terminal, `print(pipe)` gives the nested repr. This is dense but complete. each step and each non-default setting.
 
 What to look for when reviewing one: whether any of it that learns from data sits *outside* it. A script that scales, imputes or selects features before building the pipeline has moved that step out of the folds. The pipeline's presence gives a false impression of safety. The pipeline only protects what is inside it.
 
@@ -277,7 +279,7 @@ Imputation before scaling, because a scaler can't find a mean across missing val
 
 The sequence that covers most tabular problems is. Impute, encode, transform any skew, scale, select, fit. Not each problem needs all six. The scaled order of the ones you use should follow that list.
 
-Getting it wrong often raises. This Is fortunate. The exception is putting pick before scaling when the selector's criterion is scale-sensitive. That runs. Quietly selects the columns with the largest units.
+Getting it wrong often raises. This is fortunate. The exception is putting pick before scaling when the selector's criterion is scale-sensitive. That runs. Quietly selects the columns with the largest units.
 
 ## Things to try
 
@@ -286,20 +288,7 @@ Getting it wrong often raises. This Is fortunate. The exception is putting pick 
 3. <strong>Tune the prep.</strong> In the fourth editor, add `"scale__with_std": [True, False]` to the grid and see whether it changes the winner.
 4. <strong>Break it on purpose.</strong> Fit the scaler outside a pipeline on all of `X`, then cross-validate the model alone. Compare against the pipeline version.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>Why use a pipeline instead of separate steps?</strong> It ensures each step is fitted on training data only and replays the same steps on new data, which removes a common source of leakage.
-
-<strong>What is the difference between Pipeline and make_pipeline?</strong> `make_pipeline` names the steps automatically from their class names. `Pipeline` lets you name them yourself.
-
-<strong>How do I tune a step inside a pipeline?</strong> Use the step name, two underscores and the parameter, for example `clf__C`, in the grid passed to the search.
-
-<strong>How do I get at a fitted step?</strong> Use `pipe.named_steps['name']` or index it, such as `pipe[-1]`, to read coefficients or learned attributes.
-
-<strong>Can the last step be a transformer?</strong> Yes. Only the final step may lack `predict`, and then the pipeline acts as a transformer.
-
-<strong>Can I save a pipeline?</strong> Yes. Persist the whole fitted pipeline with `joblib.dump` so preprocessing and model travel together.
-
-## Where this leaves you
-
-One object, fitted once, holding each step that learns any of it. It makes cross-validation honest, makes the prep tunable. Makes deployment a single file. There's no situation in this track where doing the steps by hand is preferable. Forming the habit early costs nothing.
+- Official reference: [Sklearn documentation](https://scikit-learn.org/stable/modules/compose.html#pipeline)
+- Continue with [Pipelines in scikit-learn](column_transformer.html).

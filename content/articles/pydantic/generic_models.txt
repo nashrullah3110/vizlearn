@@ -1,13 +1,15 @@
 title: Generic Models: One Envelope, Many Payloads
 intro: The pattern behind each paginated response, written once instead of once per resource.
 
-## The duplication
+## The core idea
 
-Imagine an API that wraps every response in an envelope. The envelope has a status, a message and a payload. The payload changes from endpoint to endpoint. You could write a separate envelope model for each one, but they would all repeat the same fields.
+Imagine an API that wraps every response in an envelope. The envelope has a status, a message and a payload. The payload changes from endpoint to endpoint.
+
+## The duplication
 
 A generic model solves that. You define the envelope once, with a type parameter standing in for the payload. When you use it, you fill in the parameter, and you get a model specialised for that payload. The shared structure is written once, and the varying part is chosen at the point of use.
 
-This article starts with the duplication and then shows the generic version. It makes clear that the result is still fully validated, so the payload is checked against the type you chose. Each filled-in version is a real class of its own, which you can inspect and reuse. The last section covers bounded parameters, which limit what types are allowed. Generic models fit best for the wrappers and containers that appear all over an API, such as pages of results.
+
 
 If you have ever copied a model and changed one field, this article is for you. Wrappers for pages, results, responses and events all share this pattern. The typing is not complicated, and you need no advanced knowledge of Python generics to follow it. You will see how a single definition produces many classes. You will also see how Pydantic checks the filled-in type, so a mistake in the payload is caught exactly as it would be in a hand-written model. The article ends with bounds, which let you say that a parameter must be a model, or a number, instead of anything at all. That keeps the shared structure honest and gives your editor better hints. Small as the idea is, it removes a surprising amount of repeated code from a typical API project.
 
@@ -26,7 +28,6 @@ class LessonPage(BaseModel):
 ```
 
 same apart from one type. A third resource means a third copy. A change to pagination means editing all of them. Or, more realistically, editing most of them.
-
 
 ## The duplication a generic removes
 
@@ -214,6 +215,7 @@ print("$defs :", list(schema.get("$defs", {})))
 print()
 print("items :", json.dumps(schema["properties"]["items"]))
 ```
+
 ## The generic version
 
 ```python
@@ -247,7 +249,7 @@ A common assumption is that a plain loosens things. It doesn't.
 
 That has two results worth knowing.
 
-It has a name, `Page[Module]`. This Appears in the schema and in error messages. A consumer sees a exact type rather than a vague envelope.
+It has a name, `Page[Module]`. This appears in the schema and in error messages. A consumer sees an exact type rather than a vague envelope.
 
 And building it costs a thing. The cost is small and paid once per parameterisation. It means `Page[Module]` inside a hot function is doing a lookup that a module-level alias would avoid:
 
@@ -274,6 +276,7 @@ class Page(BaseModel, Generic[TResource]):
 Because the param must be a `Resource`, each item is sure to have `id`. The method is safe. Without the bound, mypy would object and the method would be a runtime gamble.
 
 Bounds are also docs. `plain[TResource]` with a bound says what kind of thing this envelope is for. A bare `T` says nothing.
+
 ## Schemas and clients
 
 Each parameterisation makes its own schema, titled with the parameterised name.
@@ -321,15 +324,6 @@ That is worth doing rather than falling back to an untyped envelope. A response 
 
 The same applies to a `Result[Data, Error]` envelope. If your API wraps each response, making that wrapper plain is the gap between a client library that knows what each endpoint returns and one that unwraps `any`.
 
-## Summary
-
-`class Page(BaseModel, plain[T])`, used as `Page[Module]`. The param is fully checked with its own rules. Each parameterisation is a real, named class that appears right in the schema and in made clients.
-
-Bound the type var when the plain needs to lean on what the param gives. Alias parameterisations at module level. Keep the param count to one or two.
-
-And reach for it at the third copy of an envelope, not the second. Two similar classes are easier to read than a plain. The pattern earns its keep as soon as there are more.
-
-
 ## Mistakes people make
 
 **Reaching for one at the second copy.** Two similar classes read better than a plain. The pattern earns its keep around the third or fourth, and waiting costs almost nothing.
@@ -350,9 +344,9 @@ And reach for it at the third copy of an envelope, not the second. Two similar c
 
 One hands-on note for anyone keeping these.
 
-A plain reads worse than the classes it replaces. That is the trade. `class ModulePage(BaseModel)` with three concrete fields can be understood at a glance. `class Page(BaseModel, plain[T])` needs the reader to hold a type var in their head and then find the parameterisations to know what it's ever filled with.
+A plain reads worse than the classes it replaces. That is the trade. `class ModulePage(BaseModel)` with three concrete fields can be understood at a glance. `class Page(BaseModel, plain[T])` needs the reader to hold a type var in their head and then find the parameterisations to know what it is ever filled with.
 
-Two things make that cost small. Name the type var usefully. `TResource` says more than `T` once there's more than one. And alias the parameterisations at module level. A reader searching for "what does the modules endpoint return" finds `ModulePage = Page[Module]` rather than an formula buried in a decorator.
+Two things make that cost small. Name the type var usefully. `TResource` says more than `T` once there's more than one. And alias the parameterisations at module level. A reader searching for "what does the modules endpoint return" finds `ModulePage = Page[Module]` rather than a formula buried in a decorator.
 
 Neither costs anything, and both turn a plain from a thing clever into a thing plain.
 
@@ -401,20 +395,6 @@ That validates nothing about the payload, tells mypy nothing. Makes a schema in 
 
 The choice isn't really "plain or concrete". It's "typed or untyped". The plain is what makes the typed option cheap enough that no one reaches for the untyped one.
 
-## Questions people ask
-
-<strong>What is a generic model?</strong> A model parameterised by a type, declared with `class Page(BaseModel, Generic[T])`. You then write `Page[Course]` to get a version whose `items` are validated as courses.
-
-<strong>Do I need `Generic[T]` in Pydantic v2?</strong> Not on Python 3.12 and later with a recent Pydantic, where `class Page[T](BaseModel)` works. On older versions inherit from `Generic[T]`.
-
-<strong>Is `Page[Course]` a separate class?</strong> Yes. Pydantic creates and caches a real subclass for each parameterisation, so `Page[Course]` and `Page[Track]` validate independently.
-
-<strong>How do I restrict what T can be?</strong> Give the type variable a bound, such as `T = TypeVar("T", bound=BaseModel)`. Anything else is rejected by type checkers.
-
-<strong>What happens if I use `Page` without a parameter?</strong> `T` is treated as `Any` (or its bound), so items are not validated beyond that. Always use `Page[Course]` for real validation.
-
-<strong>Do generics work with FastAPI?</strong> Yes. A parameterised model such as `Page[Course]` works as a `response_model` and appears in the OpenAPI schema with a name built from the parameter.
-
 ## Why envelopes end up generic
 
 It's worth noticing why this pattern appears in nearly each API of any size. It isn't really about type vars.
@@ -423,4 +403,9 @@ An API with fifteen list endpoints has fifteen responses that differ in just one
 
 The plain is simply the language feature that lets the shape have a name. `Page` is the concept. `Page[Module]` is that concept applied. Once written, adding a field to pagination is a single edit that can't miss a case. Each consumer sees the change always.
 
-That is the same arg as extracting a nested model, or naming a constrained type, or putting config on a shared base. Each is a other method for the same principle. State a choice once, in a place that has a name. Let all that needs it refer to that rather than to a copy.
+That is the same arg as extracting a nested model, or naming a constrained type, or putting config on a shared base. Each is another method for the same principle. State a choice once, in a place that has a name. Let all that needs it refer to that rather than to a copy.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/models/#generic-models)
+- Continue with [Generic Models](settings_management.html).

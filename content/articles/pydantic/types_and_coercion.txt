@@ -1,9 +1,11 @@
 title: Types and Coercion: What Pydantic Will and Will Not Convert
 intro: The rules behind the library's most surprising action, one value at a time.
 
-## Why it converts at all
+## The core idea
 
-Pydantic does not demand that incoming data already has the right Python type. It will try to convert it first. A string "36" becomes the integer 36. The number 1 can become True. This behaviour is called coercion, and it exists because most data arrives as text.
+Pydantic does not demand that incoming data already has the right Python type. It will try to convert it first. A string "36" becomes the integer 36.
+
+## Why it converts at all
 
 Coercion is useful, and it is also the source of many surprises. Some conversions feel obvious and others feel strange. A float with a fractional part will not become an integer, but a float like 3.0 will. A string will not be built out of an integer unless you ask for it. Knowing where the lines sit saves you from bugs that only show up with real traffic.
 
@@ -13,10 +15,9 @@ Keep the examples in mind as you read. Each one is short enough to try yourself.
 
 The first time someone sees `minutes="9"` become `9` they often ask whether that is safe. It's a fair question. The answer is in where models get used.
 
-Data arriving from outside a program is nearly always text. A query string is text. An HTML form submission is text. A CSV is text. An setting var is text. If a model refused all that wasn't already the right Python type, the code in front of each model would be a pile of `int(...)` calls wrapped in `try`. This Is just the code the library exists to drop.
+Data arriving from outside a program is nearly always text. A query string is text. An HTML form submission is text. A CSV is text. An setting var is text. If a model refused all that wasn't already the right Python type, the code in front of each model would be a pile of `int(...)` calls wrapped in `try`. This is just the code the library exists to drop.
 
 So the default &mdash; **lax mode** &mdash; is to accept any value with one unambiguous reading. Refuse the rest. The rules are worth knowing just. "unambiguous" turns out to be a stricter test than most people expect.
-
 
 ## What becomes an int
 
@@ -170,6 +171,7 @@ for name, value in m.model_dump().items():
 print()
 print("arithmetic works now:", m.minutes * 2, "|", round(m.rating + 0.5, 1))
 ```
+
 ## Into int
 
 A string converts if it reads as a whole number, nearby whitespace included: `"9"` and `"  9  "` both give `9`.
@@ -200,7 +202,7 @@ Booleans have their own table, and it isn't Python's.
 
 `True` comes from `True`, `1`, `1.0`. The strings `"1"`, `"true"`, `"True"`, `"yes"`, `"on"`, `"t"`, `"y"`. `False` comes from `False`, `0`, `0.0`, and the strings `"0"`, `"false"`, `"no"`, `"off"`, `"f"`, `"n"`. Anything else. `"maybe"`, `2`, `""`, `None` &mdash; raises.
 
-Compare that with plain Python. Here `bool("false")` is `True` because the string is non-empty. Pydantic reads the *meaning* of the word rather than the emptiness of the holder. This Is almost always what you wanted when the value came from a checkbox or a query param. It's also why `?published=false` does the right thing without you writing a special case.
+Compare that with plain Python. Here `bool("false")` is `True` because the string is non-empty. Pydantic reads the *meaning* of the word rather than the emptiness of the holder. This is almost always what you wanted when the value came from a checkbox or a query param. It's also why `?published=false` does the right thing without you writing a special case.
 
 ## Unions and order
 
@@ -222,7 +224,7 @@ class Strict(BaseModel):
     minutes: int
 ```
 
-`Strict(minutes="9")` now raises. `Strict(minutes=9)` is fine. Strictness can also be set on a single field. This Is the more common need. Lax about most things, exact about the one that matters.
+`Strict(minutes="9")` now raises. `Strict(minutes=9)` is fine. Strictness can also be set on a single field. This is the more common need. Lax about most things, exact about the one that matters.
 
 There's a module on strict mode in the next tier that covers when the trade is worth making.
 
@@ -230,7 +232,7 @@ There's a module on strict mode in the next tier that covers when the trade is w
 
 each refusal carries a stable `type` code. They're worth recognising because they say just which rule fired:
 
-`int_parsing` means a string didn't read as an int. `int_from_float` means a float had a fractional part. `string_type` means a non-string reached a `str` field. `bool_parsing` means a string wasn't in the boolean table. Matching on these is more solid than matching on the message. This Is prose and may be reworded.
+`int_parsing` means a string didn't read as an int. `int_from_float` means a float had a fractional part. `string_type` means a non-string reached a `str` field. `bool_parsing` means a string wasn't in the boolean table. Matching on these is more solid than matching on the message. This is prose and may be reworded.
 
 ## Dates, times and the other standard types
 
@@ -252,7 +254,7 @@ holder types coerce their contents, item by item.
 
 There's a shape rule and a content rule. A `List[int]` accepts a list. In lax mode also a tuple, a set or a gen. All of those are sequences of items. It does **not** accept a bare string, though a string is strictly iterable. That exception is deliberate and it's a mercy: `List[str]` given `"abc"` making `["a", "b", "c"]` would be a memorably bad afternoon.
 
-`Dict[str, int]` coerces keys and values on its own. `Set[int]` deduplicates. This Means a set field can quietly return fewer items than were sent. Often what you want, at times a surprise.
+`Dict[str, int]` coerces keys and values on its own. `Set[int]` deduplicates. This means a set field can quietly return fewer items than were sent. Often what you want, at times a surprise.
 
 `Tuple[int, str]` is checked positionally and by length. Just two items, first an int, second a string. `Tuple[int, ...]` means any number of ints.
 
@@ -296,7 +298,7 @@ That last line is the principle the whole table is made from. If you note one th
 
 ## Debugging a conversion you did not expect
 
-When a field comes out as a thing surprising, there's a quick sequence that finds the cause almost each time.
+When a field comes out as a thing surprising, there's a quick sequence that finds the cause almost every time.
 
 **Print the type, not the value.** `print(type(m.minutes).__name__, m.minutes)` sets apart `9` the int from `9` the string, which `print(m.minutes)` doesn't.
 
@@ -312,20 +314,6 @@ Coercion is the feature people distrust first and lean on most. It exists becaus
 
 Once that principle is in your head, the single rules stop needing to be stored. `9.5` to an int loses data. It raises. `"9"` to an int loses nothing. So It converts. `9` to a string loses nothing either. But That direction hides caller mistakes, so it's the one deliberate exception. And knowing it's an exception is easier than remembering it as an any rule.
 
-## Questions people ask
-
-<strong>Why does `"36"` become the integer 36?</strong> Lax mode converts compatible values. A numeric string is accepted for an `int`, and a float with no fractional part is accepted too.
-
-<strong>Why is `"abc"` rejected for an int?</strong> It cannot be parsed as a number, so you get an `int_parsing` error. Pydantic only coerces when the conversion is unambiguous.
-
-<strong>Which strings become `True` for a bool?</strong> `"true"`, `"yes"`, `"on"`, `"1"` and `"t"`, `"y"`, in any case. The false set is the matching negatives. Other strings fail.
-
-<strong>Is a float accepted for an int field?</strong> Only if it has no fractional part. `3.0` becomes `3`, but `3.5` raises an `int_from_float` error.
-
-<strong>Does an int become a str?</strong> No. Pydantic v2 does not turn numbers into strings by default. Set `coerce_numbers_to_str=True` if you want that.
-
-<strong>How do I stop coercion?</strong> Use strict mode, either on one field with `Field(strict=True)` or on the whole model with `ConfigDict(strict=True)`.
-
 ## The practical shape
 
 Run the last editor above and look at what happened. A dict of four strings. Just what a browser sends. Became a model with a string, an int, a float and a bool, each usable in math without a single conversion call in sight.
@@ -333,3 +321,8 @@ Run the last editor above and look at what happened. A dict of four strings. Jus
 That is the whole value proposition. You wrote the types once, in the annotations. The messy part happened at the boundary where it belongs.
 
 The next module deals with the fields that aren't always there. Optional values, defaults. The gap between "missing" and "null" that trips up nearly all.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/conversion_table/)
+- Continue with [Types and Coercion](required_optional_and_defaults.html).

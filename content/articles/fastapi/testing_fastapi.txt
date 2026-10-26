@@ -1,12 +1,15 @@
 title: Testing
 intro: A client that calls the app right. What a good FastAPI test suite really asserts.
-## No server involved
 
-Testing a FastAPI app is easier than most people expect. The framework ships with a test client that calls your application directly, in the same process, without starting a server or opening a network port. You write a normal test function, make a request, and check the response.
+## The core idea
+
+Testing a FastAPI app is easier than most people expect. The framework ships with a test client that calls your application directly, in the same process, without starting a server or opening a network port.
+
+## No server involved
 
 This is valuable because it makes tests fast and reliable. A suite of hundreds of endpoint tests can run in seconds. There are no ports to clash, no processes to clean up, and no waiting for a server to boot. You test the real routing, validation, and serialization, which is exactly where bugs tend to hide.
 
-This article starts with how the client works and why no server is involved. It then covers what a good test should assert. Checking the status code is the minimum. The shape of the body, the headers, and the error details tell you much more about whether the behavior is right.
+
 
 Overrides are the next topic, and they are the heart of the approach. By replacing a dependency, you can feed the app a fake database or a fixed user, and keep the test isolated. You will also see how to test a single router alone, without the rest of the app.
 
@@ -18,8 +21,7 @@ That is why FastAPI tests are fast: no socket, no port, no process, no waiting f
 
 It's also why the editors on these pages work at all. They use the same idea.
 
-In real code the import is `from fastapi.testclient import TestClient`. It wraps httpx. It needs `httpx` installed. This Is the usual reason a first test fails on a fresh setting.
-
+In real code the import is `from fastapi.testclient import TestClient`. It wraps httpx. It needs `httpx` installed. This is the usual reason a first test fails on a fresh setting.
 
 ## The client calls the app, not a server
 
@@ -195,6 +197,7 @@ r = TestClient(app).get("/modules/1")
 print("response         :", r.json())
 print("no leak          :", "internal" not in r.json())
 ```
+
 ## What to assert
 
 **Status first.** It's the contract, and it's what each client branches on. A test that checks only the body will keep passing when a 200 quietly turns a 500 with an error body that happens to hold the key you looked for.
@@ -254,7 +257,6 @@ Beyond that: one test per dependency that can reject. The 401 and 403 paths are 
 
 That is a few short functions per endpoint. Between them they cover the branches most likely to be wrong. The parts people skip. The error paths. Are the parts that get exercised most in production.
 
-
 ## Mistakes people make
 
 **Asserting only on the body.** A 200 that turns a 500 carrying a similar key keeps the test green. Status first.
@@ -297,14 +299,6 @@ Error paths, and they're the ones exercised most in production.
 
 A test that a missing resource gives 404, a copy gives 409, a bad payload gives 422 with the right `loc`. An unauthenticated request gives 401 costs four short functions - and covers the branches most likely to be wrong. They're the branches no one exercises by hand.
 
-## Summary
-
-`TestClient` builds the ASGI scope and calls the app right. There's no server, no port and no waiting.
-
-Assert the status first and the body second. For check, assert `loc` and `type` rather than the message. replace dependencies to drop the DB and the token, fake at the edges, and clear between tests.
-
-Include a router into a small app to test one resource alone. Use the context-manager form when the test should exercise startup. And assert on the made schema for anything with consumers. A removed `response_model` is a breaking change nothing else catches.
-
 ## What makes an endpoint hard to test
 
 Worth naming, because the answer is often a design signal rather than a testing problem.
@@ -319,7 +313,6 @@ Worth naming, because the answer is often a design signal rather than a testing 
 
 Each of those makes tests awkward and each is fixed by a change to the use rather than to the test. When a test is hard to write, the handy first question is what the endpoint is doing that it shouldn't.
 
-
 ## What to test, and what not to
 
 A suite is a set of choices about what is worth the maintenance. Two extremes are both wrong.
@@ -332,37 +325,11 @@ The middle is per endpoint: the success case, one check failure, one domain fail
 
 That is small enough to keep and exact enough to be worth keeping. The measure is whether a failure tells you what broke without opening the test - and asserting on status, `loc` and `type` is what makes it do that.
 
-
-## A closing thought
-
-The reason FastAPI uses tend to be well tested isn't discipline. It's that the framework removed the usual excuses.
-
-There's no server to start. Tests are fast. Dependencies are declared rather than reached for. So They can be replaced. Routers can be included one at a time, so a test can be narrow. check happens at the boundary, so handlers have less to test.
-
-What remains is writing the tests. The shape is small: success, check failure, domain failure, per endpoint.
-
 ## Next
 
 The doc all of this makes - and how much of an API's usability is decided by how carefully it was filled in.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>How do I test an endpoint?</strong> Create TestClient(app) from fastapi.testclient and call client.get("/path"), then assert on status_code and json().
-
-<strong>Do I need a running server?</strong> No. TestClient calls the app directly in-process.
-
-<strong>How do I avoid hitting a real database?</strong> Override the database dependency with dependency_overrides to return a test session.
-
-<strong>How do I test async endpoints?</strong> TestClient handles them. For async test functions, use httpx.AsyncClient with ASGITransport and pytest-asyncio or anyio.
-
-<strong>How do I send auth in tests?</strong> Pass headers={"Authorization": "Bearer token"} or override the current-user dependency.
-
-<strong>What should I assert on?</strong> The status code, the response body shape, and side effects such as database rows, not the internals of the handler.
-
-## In one line
-
-No server, no port, no network: assert the status first, `loc` and `type` for check, replace at the edges, clear between tests. Cover the error branches. Those are the ones production exercises most and suites cover least.
-
-The measure of a suite is whether a failure tells you what broke without opening the test file. Asserting on the status, the `loc` and the `type` is what makes it do that. Asserting on prose and whole payloads is what stops it.
-
-And keep one test with nothing overridden, exercising the real dependency tree. Heavy faking has a failure mode of its own. The fakes quietly stop resembling what they stand in for. Each test keeps passing while the use stops working.
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/testing/)
+- Continue with [Testing](openapi_and_docs.html).

@@ -1,13 +1,15 @@
 title: Custom Serializers: Changing What Comes Out
 intro: Per-field and per-model output control, and the strong arg for not using it.
 
-## What they do
+## The core idea
 
-Pydantic knows how to turn most values into JSON. Sometimes the default is not what you want. A datetime should go out in a particular format. A set should become a sorted list. A secret value should be masked. A serializer lets you control what comes out.
+Pydantic knows how to turn most values into JSON. Sometimes the default is not what you want. A datetime should go out in a particular format.
+
+## What they do
 
 The important point is that a serializer changes only the output. The data inside the model stays exactly as it was validated. Nothing about how the object is stored or used in your code changes. You are choosing how it looks at the moment it leaves.
 
-This article explains what serializers do and what they leave alone. It shows that you can get two different outputs from one serializer, depending on whether you dump to Python or to JSON. You will see how to serialise a whole model rather than a single field, which is useful for reshaping the output. The last section covers the schema problem, since a serializer can change the type a client sees, and your documentation needs to say so. It is the tool to reach for when the default output is almost right.
+
 
 Use a serializer only when the default output is not what you want, because every one adds code you must maintain. The article shows the common cases, so you can tell quickly whether you need one at all. Often the answer is a small function of three lines. It also explains how serializers interact with the exclusion options you met earlier, so your output stays predictable when you combine them.
 
@@ -181,6 +183,7 @@ print()
 print("A client can sort, filter and localise the second.")
 print("The first has to be parsed back, and only by an English reader.")
 ```
+
 ## Two modes, two outputs
 
 `when_used` restricts a serialiser to one direction:
@@ -229,7 +232,7 @@ For a public API that is a real defect. Made clients will give a type that doesn
 @field_serializer("amount", return_type=str)
 ```
 
-Now the output schema reports a string. The docs matches reality. Set it when the serialised type differs from the field type. This Is most of the time.
+Now the output schema reports a string. The docs matches reality. Set it when the serialised type differs from the field type. This is most of the time.
 
 ## Secrets: a serialiser is the weakest option
 
@@ -237,11 +240,11 @@ Masking a token with a serialiser is a common idea and the worst of the three on
 
 `@field_serializer` making `tok_…ef` keeps the value out of dumps and leaves it in `repr`, in logs, in tracebacks. In any code that reads the field.
 
-`SecretStr` hides it from `repr` and needs `.get_secret_value()`. This Makes access deliberate and greppable.
+`SecretStr` hides it from `repr` and needs `.get_secret_value()`. This makes access deliberate and greppable.
 
 `Field(exclude=True)` keeps it out of each output fully.
 
-For anything truly secret, use the type and the exclusion. Reach for a serialiser only when you want a *partial* value in the output on purpose. Showing the last four digits of a card. This Is a product choice rather than a security one.
+For anything truly secret, use the type and the exclusion. Reach for a serialiser only when you want a *partial* value in the output on purpose. Showing the last four digits of a card. This is a product choice rather than a security one.
 
 ## The argument against most custom serialisers
 
@@ -251,7 +254,7 @@ Most custom serialisers are display formatting that has ended up in the wrong la
 
 `"2026-08-26"` is data. each client can sort it, compare it and format it but that client's user needs.
 
-The same arg applies to currency symbols, thousands separators, scaled times ("3 days ago") and rounded numbers. All of them are choices that belong where the audience is known. This Is the presentation layer, not the data model.
+The same arg applies to currency symbols, thousands separators, scaled times ("3 days ago") and rounded numbers. All of them are choices that belong where the audience is known. This is the presentation layer, not the data model.
 
 So the honest guidance: before writing a serialiser, ask whether the default was wrong or merely unseen. If it's being changed for a human reader, that logic probably belongs closer to the human.
 
@@ -275,7 +278,7 @@ Both decorators accept an optional `info` param carrying `mode`, `context` and t
 
 `mode` lets one serialiser behave differently for Python and JSON output without needing `when_used`.
 
-`context` is the notable one. It's a dict passed to the dump call. This Makes output dependent on a thing the model doesn't know:
+`context` is the notable one. It's a dict passed to the dump call. This makes output dependent on a thing the model doesn't know:
 
 ```python
 @field_serializer("salary")
@@ -315,15 +318,7 @@ Before writing one, three questions.
 
 **Will the schema still be true?** If not, set `return_type`, or you're publishing a doc that lies about your own output.
 
-Most proposed serialisers fail one of those. This Is the reason this module argues against its own subject as much as for it.
-
-## Summary
-
-`@field_serializer` for one field, `@model_serializer` for the whole output, `mode="wrap"` when boosting rather than replacing so new fields still flow through.
-
-`when_used="json"` keeps Python dumps handy. `return_type` keeps the schema honest. `info.context` makes output gated when that is truly needed.
-
-For secrets prefer `SecretStr` and `Field(exclude=True)`. And reach for a serialiser when an external constraint demands a shape. Not when a default merely looks unseen.
+Most proposed serialisers fail one of those. This is the reason this module argues against its own subject as much as for it.
 
 ## What to remember
 
@@ -332,7 +327,6 @@ output is the last thing that happens and the first thing a consumer sees.
 Pydantic's defaults are chosen so that output is data. Sortable, close, parseable, unambiguous across locales. Most reasons to replace them turn out to be formatting for a human. Humans are downstream of the layer that knows who they're.
 
 replace when a thing outside truly demands a shape. Set `return_type` so the schema keeps telling the truth. And test what you emit. No other test does.
-
 
 ## Mistakes people make
 
@@ -356,28 +350,7 @@ Only the first is a serialiser's job. all else. Currency symbols, readable dates
 
 Applying that one question honestly drops most proposed serialisers. Makes the left ones easy to justify.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>How do I change how one field is written out?</strong> Decorate a method with `@field_serializer("published_at")` and return the value you want. Only the output changes, and validation on input is untouched.
-
-<strong>What is the difference between `@field_serializer` and `@model_serializer`?</strong> `field_serializer` reshapes a single field. `model_serializer` receives the whole model and returns the dict you want, so it can rename, merge or drop fields in one place.
-
-<strong>How do I apply a serialiser only to JSON output?</strong> Pass `when_used="json"` to the decorator. The default is `"always"`, and `"json-unless-none"` and `"unless-none"` are the other options.
-
-<strong>Does a custom serialiser change the JSON schema?</strong> No, the schema still describes the original type. Set `return_type` on the serialiser or tune the schema with `json_schema_extra` if the output shape differs.
-
-<strong>Should I use a serialiser to hide a password?</strong> Prefer `Field(exclude=True)` or a `SecretStr`, which are simpler and harder to bypass. A serialiser that blanks the value is easy to forget when you add the next field.
-
-<strong>Can the serialiser see the other fields?</strong> Yes. A `field_serializer` method receives `self`, so it can read other attributes, and it can take an `info` argument (a `SerializationInfo`) for context such as the mode.
-
-## A final framing
-
-It helps to think of output as the boundary in the other direction.
-
-check is where you stop trusting the outside world and convert its text into your types. output is where you stop given your types and give a thing the outside world can read.
-
-Both are conversions at an edge. Both work best when they convert to a thing *neutral*. check doesn't try to guess what a caller meant. It accepts unambiguous readings and refuses the rest. output should be symmetrical. Emit data with a single unambiguous reading, and let the consumer decide how to present it.
-
-A custom serialiser that formats for a human breaks that symmetry. It takes a value with one meaning and makes one with a presentation baked in. This The next layer has to undo before it can do anything else.
-
-That is the underlying reason the advice in this module runs against its own subject. The feature is well designed and at times key. It's just that most of the reasons people reach for it are reasons to do the work one spot else.
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/serialization/#serializers)
+- Continue with [Custom Serializers](json_schema.html).

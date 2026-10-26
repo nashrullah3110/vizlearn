@@ -1,9 +1,11 @@
 title: The Index
-intro: The labelled axis that participates in almost each step.
+intro: The labelled axis that participates in almost every step.
+
+## The core idea
+
+The index is the feature most people ignore until it causes a bug. It sits on every Series and every DataFrame. By default it looks like row numbers, so nothing about it seems worth thinking about.
 
 ## What it is
-
-The index is the feature most people ignore until it causes a bug. It sits on every Series and every DataFrame. By default it looks like row numbers, so nothing about it seems worth thinking about. Then a filter, a merge or a group-by produces an unexpected result, and the index is the reason.
 
 Understanding the index early prevents a category of confusion that otherwise recurs for months. Almost every "pandas is broken" question on forums traces back to index behaviour the author did not expect.
 
@@ -11,14 +13,13 @@ An index is an immutable, ordered set of labels. One label per row. It can hold 
 
 The default RangeIndex of 0, 1, 2 hides all of this. It makes the index look like a row counter. For a freshly created frame, it behaves like one. After a single filter, the positions and labels diverge, and code that assumed they were the same gives wrong answers or raises a KeyError.
 
-This module covers what the index is, how it sticks to rows through filtering, how alignment uses it, and how to reset it when you need positional access again. The examples are short and show the index before and after each operation, so the behaviour is visible rather than implied. Each one prints the index explicitly so you can track how labels move, stick and sometimes surprise you. That visibility makes the behaviour concrete rather than abstract.
+
 
 each Series and each DataFrame carries an index. An sorted set of labels, one per row. A DataFrame also has an index for its columns.
 
 If you don't supply one, pandas creates a `RangeIndex` of `0, 1, 2, ...`. That default is why the index is easy to overlook. It looks like row numbers. For a freshly created frame it behaves like them.
 
 It isn't row numbers. It's a labelled axis that takes part in pick, alignment, joining, grouping and reshaping. Nearly each pandas action that surprises people is the index doing a thing they didn't ask for.
-
 
 ## Every Series and DataFrame has one
 
@@ -160,6 +161,7 @@ except Exception as e:
 print()
 print("sort_index() fixes it:", list(dup.sort_index().loc[1:4]))
 ```
+
 ## Labels stick to rows
 
 Filter a Series of five values down to three and the surviving rows keep their first labels. The result's index might be `1, 3, 4`.
@@ -172,13 +174,13 @@ Two results worth internalising.
 
 **After filtering, use `iloc` for spot and `loc` for labels**. Know which you mean. The next module is fully about that gap.
 
-**`reset_index(drop=True)` renumbers** when you truly want a fresh `0..n-1`. Without `drop=True`, the old index is kept as a new column. This Is at times what you want and often not.
+**`reset_index(drop=True)` renumbers** when you truly want a fresh `0..n-1`. Without `drop=True`, the old index is kept as a new column. This is at times what you want and often not.
 
 ## set_index and reset_index
 
 `df.set_index("city")` makes the `city` column the index. Lookups by city then work with `.loc`, joins on city become index joins, and grouping by it's cheaper.
 
-`df.reset_index()` reverses it, putting the index back as an plain column and restoring a `RangeIndex`.
+`df.reset_index()` reverses it, putting the index back as a plain column and restoring a `RangeIndex`.
 
 Setting a real index is worth doing when you'll look rows up by that key again and again. It isn't worth doing reflexively. An index carries rules. A frame with a `RangeIndex` is simpler to reason about.
 
@@ -202,7 +204,7 @@ An index may hold the same label more than once. pandas doesn't prevent it.
 
 The result is that `s["a"]` returns a **scalar** when `a` appears once and a **Series** when it appears twice. Downstream code written against the scalar case fails when a copy appears. Copies often appear in production rather than in the sample used for development.
 
-`s.index.is_unique` checks. `set_index(..., verify_integrity=True)` refuses to build a duplicated index. This Is worth passing when uniqueness is part of what the data means.
+`s.index.is_unique` checks. `set_index(..., verify_integrity=True)` refuses to build a duplicated index. This is worth passing when uniqueness is part of what the data means.
 
 `df.index.duplicated()` gives a mask of the repeats. So You can inspect them rather than guess.
 
@@ -210,11 +212,11 @@ The result is that `s["a"]` returns a **scalar** when `a` appears once and a **S
 
 `is_monotonic_increasing` tells you whether the index is sorted.
 
-A sorted index allows binary-search lookups. This Matters on large frames.
+A sorted index allows binary-search lookups. This matters on large frames.
 
 It's often said that label-range slicing *needs* a sorted index. That isn't quite the rule. The editor above shows it. A **unique** index slices fine what order it's in. Pandas can find each bound unambiguously and take all between them. What it can't do is slice a **non-unique, unsorted** index. There's no single spot for a repeated bound. It raises rather than guessing.
 
-Worth knowing what that slice returns on an unsorted index. All between the two bounds *in the index's own order*. This Isn't numeric order. That is rarely what people intend. `sort_index()` first is still good practice even where it isn't needed.
+Worth knowing what that slice returns on an unsorted index. All between the two bounds *in the index's own order*. This isn’t numeric order. That is rarely what people intend. `sort_index()` first is still good practice even where it isn't needed.
 
 Note that label slicing with `.loc` is **inclusive of the endpoint**, unlike every other slice in Python. `s.loc[100:200]` includes 200. That is deliberate. With labels there's no "one past the end" to point at. And it's a solid source of off-by-one surprises.
 
@@ -250,7 +252,7 @@ You rarely choose between these on purpose. They arrive from what made the objec
 
 `RangeIndex` costs almost nothing. Any other index stores one label per row. A string index over a million rows is a million Python strings. Often larger than the numeric columns it labels.
 
-`df.index.dtype` and `df.memory_usage(deep=True)` show it. `reset_index(drop=True)` discards it and returns to a `RangeIndex`. This Is worth doing when the labels carry no meaning.
+`df.index.dtype` and `df.memory_usage(deep=True)` show it. `reset_index(drop=True)` discards it and returns to a `RangeIndex`. This is worth doing when the labels carry no meaning.
 
 That is the hands-on arg for not setting a real index reflexively. It costs memory. It only pays if you really select or join on it.
 
@@ -286,7 +288,7 @@ An Index behaves like an immutable set. The set steps are at times just what you
 
 `idx.get_loc(label)` &mdash; the spot of a label, for when you truly need to cross from labels to spots.
 
-`idx.str` &mdash; the string accessor works on an Index too. This Is how you clean column names in one formula.
+`idx.str` &mdash; the string accessor works on an Index too. This is how you clean column names in one formula.
 
 Indexes are immutable. You can't assign into one. You build a new one and attach it. That is deliberate. A mutable index would break the hash-based lookups that make label pick fast.
 
@@ -320,9 +322,9 @@ That makes it the tool for two jobs.
 
 **Making frames close.** `b.reindex(a.index)` puts `b` on `a`'s labels. A later step aligns just and any mismatch is visible as `NaN` rather than silently reordering.
 
-**Filling out a sparse axis.** Reindexing onto a full date range turns missing days into clear `NaN` rows. This Is what you want before plotting or before a rolling window over rows.
+**Filling out a sparse axis.** Reindexing onto a full date range turns missing days into clear `NaN` rows. This is what you want before plotting or before a rolling window over rows.
 
-`fill_value=` sets what the gaps become. `method="ffill"` carries values forward. This Needs a sorted index.
+`fill_value=` sets what the gaps become. `method="ffill"` carries values forward. This needs a sorted index.
 
 `reindex_like(other)` is the shorthand for the first case.
 
@@ -333,20 +335,6 @@ The index is written by `to_csv` unless you pass `index=False`. Read back as an 
 `to_dict()`, `to_json()` and `to_excel` all have their own views about the index. All of them are worth checking once for any output that another system consumes.
 
 The rule that avoids most of it: if the index is real data, name it and write it on purpose. If it isn't, `reset_index(drop=True)` before writing.
-
-## Questions people ask
-
-<strong>What is the index in pandas?</strong> It is the set of labels attached to each row. Labels travel with the rows through filtering, sorting and joins, and they decide how two objects line up in arithmetic.
-
-<strong>What is the difference between set_index and reset_index?</strong> set_index moves a column into the index, and reset_index moves the index back into a regular column and replaces it with 0, 1, 2 and so on.
-
-<strong>Does the index have to be unique?</strong> No. Duplicate labels are allowed, but loc then returns several rows for one label and some operations, such as reindex, raise errors.
-
-<strong>Why did my result gain NaN values after adding two Series?</strong> Arithmetic aligns on index labels first. Any label present in only one Series produces NaN, so mismatched labels give missing values rather than an error.
-
-<strong>When should I drop the index with drop=True?</strong> Use reset_index(drop=True) when the old labels carry no meaning, for example after filtering or concatenating, and you just want a clean 0..n-1 range.
-
-<strong>Is a custom index faster than a column?</strong> Lookups by label on a unique, sorted index are fast. For one-off filters a boolean mask on a column is just as good, so set an index when you will look up or align on it repeatedly.
 
 ## A working summary
 
@@ -361,3 +349,8 @@ Check `is_unique` before leaning on lookups.
 `sort_index()` after building or reshaping anything with a non-trivial index.
 
 And when a result has the wrong number of rows or surprise `NaN`, look at the indexes of the inputs first. That is the cause more often than anything in the step itself.
+
+## Sources and next steps
+
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/indexing.html)
+- Continue with [The Index](creating_dataframes.html).

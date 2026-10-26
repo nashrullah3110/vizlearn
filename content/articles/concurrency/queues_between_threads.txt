@@ -1,14 +1,11 @@
 title: Handing Work Between Threads with a Queue
 intro: A queue is a lock, a condition and a deque already assembled correctly - which is why it is the one piece of threading plumbing you should reach for first.
 
-## Why a queue rather than a lock
+## The core idea
 
-The previous pages built up a set of primitives and a set of ways to misuse
-them. There is a [lock](locks_and_the_ways_they_go_wrong.html) you must take on
-every access, a <code>Condition</code> whose wait must sit in a
-<code>while</code> loop, a [race](race_conditions_in_python.html) waiting in
-any check-then-act. A <code>queue.Queue</code> is those three things already
-put together by someone who got the details right.
+The previous pages built up a set of primitives and a set of ways to misuse them. There is a lock you must take on every access, a Condition whose wait must sit in a while loop, a race waiting in any check-then-act.
+
+## Why a queue rather than a lock
 
 It is internally locked, so <code>put</code> and <code>get</code> are safe from
 any number of threads with no locking of your own. It blocks when it has
@@ -255,26 +252,7 @@ the waiting; the count is for logging, not control.
 **Using <code>queue.Queue</code> in a coroutine.** Its <code>get</code> blocks
 the thread, so it stops the event loop. Use <code>asyncio.Queue</code> there.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>Sentinels or an Event?</strong> An <code>Event</code> scales better: one <code>set()</code> is seen by every worker, where sentinels need one per worker and exact bookkeeping. Sentinels remain useful when workers must finish the queued work first, because the sentinel is ordered behind it and a flag is not.
-
-<strong>How many workers?</strong> For waiting-bound work, as many as the far end tolerates; for computing-bound work, threads will not help at all and the answer is [processes](threads_or_processes.html). The queue's value is that this becomes one number in one place.
-
-<strong>Do I need <code>join</code> if I use sentinels?</strong> Not strictly, but the two answer different questions. <code>join</code> tells you the work is done; joining the threads tells you the workers have exited. Doing both, in that order, is what makes shutdown deterministic.
-
-<strong>Is <code>get</code> fair between workers?</strong> Roughly, and it is not guaranteed. Items go to whichever worker the OS wakes, so a run where one worker takes more than its share is normal and not a bug.
-
-<strong>Can I put anything in it?</strong> Any object &mdash; it is the same process, so nothing is pickled and nothing is copied. That is a real advantage over a [process pool](threads_or_processes.html), and it is also why the item is still shared mutable state. Two threads holding the same object still need a lock if they both mutate it.
-
-<strong>What if a worker dies?</strong> The item is lost and <code>unfinished_tasks</code> never decrements, so <code>join</code> hangs. Wrapping the body in <code>try/finally</code> with <code>task_done</code> in the <code>finally</code> is what keeps a crashing worker from hanging the shutdown.
-
-## Recap in one screen
-
-- A queue is a lock, a condition and a deque already assembled correctly, so it is the first thing to reach for rather than the last.
-- It converts shared mutable state into message passing: an item has exactly one owner at a time, which removes races instead of guarding them.
-- <code>put</code>/<code>get</code> block and pace the program; <code>put_nowait</code>/<code>get_nowait</code> raise <code>Full</code>/<code>Empty</code> for when waiting is wrong.
-- <code>task_done</code>/<code>join</code> is a counter of outstanding items, not a queue length &mdash; an item taken but unfinished is neither in the queue nor done.
-- Put <code>task_done</code> in a <code>finally</code>, call <code>join</code> before sending sentinels, and send one sentinel per worker.
-- <code>maxsize</code> is backpressure and the difference between pacing a producer and hiding a leak.
-- <code>queue.Queue</code> is thread-safe and blocking; <code>asyncio.Queue</code> is neither. They are not interchangeable in either direction.
+- Official reference: [Python queue](https://docs.python.org/3/library/queue.html)
+- Continue with [Handing Work Between Threads with a Queue](choosing_threads_processes_or_async.html).

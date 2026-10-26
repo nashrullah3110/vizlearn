@@ -1,22 +1,23 @@
 title: Missing Values: A Practical Guide
 intro: A gap in the data is two problems: the estimator won't run. The gap itself may have been telling you a thing.
 
-## Why it has to be handled
+## The core idea
 
 Real datasets almost always have missing values. A sensor drops a reading, a survey respondent skips a question, a join produces nulls where records do not match. The gaps are part of the data, and handling them is part of the modelling work.
+
+## Why it has to be handled
 
 scikit-learn does not fill missing values for you. Most estimators raise an error when they encounter a NaN. That design is deliberate. There is more than one way to fill a gap, and the choice affects the model. Filling with the mean preserves the column's average but shrinks its variance. Filling with the median is less affected by outliers. Filling with a constant like -1 creates a new category that the model can split on.
 
 The right strategy depends on why the data is missing and what the model will do with it. A column where missingness itself is informative -- for example, income is missing because the respondent refused to answer -- should not be filled with the median. The fact that it is missing carries signal.
 
-This page covers the imputation strategies scikit-learn provides, the tree-based models that handle NaN natively, and the common mistake of imputing before splitting.
 
-Almost each estimator in scikit-learn raises `ValueError: Input X holds NaN` rather than guessing. That refusal is deliberate. There's no universally correct fill. Silently choosing one would hide a choice that changes the model.
 
-The exceptions are worth knowing before you reach for an imputer at all. `HistGradientBoostingClassifier` and its regressor sibling handle missing values natively. At each split, the tree learns which side the missing rows should go. This Is a truly better answer than filling in a number. It lets the missingness itself sway the guess without inventing data. On tabular problems with gaps, starting there and skipping imputation fully is often the right move.
+Almost every estimator in scikit-learn raises `ValueError: Input X holds NaN` rather than guessing. That refusal is deliberate. There's no universally correct fill. Silently choosing one would hide a choice that changes the model.
+
+The exceptions are worth knowing before you reach for an imputer at all. `HistGradientBoostingClassifier` and its regressor sibling handle missing values natively. At each split, the tree learns which side the missing rows should go. This is a truly better answer than filling in a number. It lets the missingness itself sway the guess without inventing data. On tabular problems with gaps, starting there and skipping imputation fully is often the right move.
 
 For all else, a thing has to fill the gap.
-
 
 ## Most estimators simply refuse
 
@@ -147,6 +148,7 @@ print("impute + indicator :", round(cross_val_score(flagged, Xm, y, cv=5).mean()
 print()
 print("when absence itself carries the signal, throwing it away costs you.")
 ```
+
 ## The simple strategies, and choosing between them
 
 `SimpleImputer` replaces missing values with one number per column, learned during `fit` and stored in `statistics_`.
@@ -157,7 +159,7 @@ print("when absence itself carries the signal, throwing it away costs you.")
 
 **most_frequent** works for cat columns and for numeric ones with few distinct values.
 
-**constant** fills with `fill_value` &mdash; handy when there's a real default. Handy with a sentinel like -1 when you want the model to be able to see the imputed rows. For cat data, `fill_value="missing"` makes lack an clear category. This Is often just right.
+**constant** fills with `fill_value` &mdash; handy when there's a real default. Handy with a sentinel like -1 when you want the model to be able to see the imputed rows. For cat data, `fill_value="missing"` makes lack an clear category. This is often just right.
 
 ## The fill value is learned
 
@@ -187,7 +189,7 @@ When features are linked, a column constant is a poor guess. Two better options 
 
 `KNNImputer` finds the most similar complete rows and means their values for the missing feature. The editor above shows it getting back 8.0 where the column mean gives 5.5. The two columns move together and the neighbours know it. It needs the features scaled. It measures distance. It's costly on large data because it searches for neighbours.
 
-`IterativeImputer` models each column with missing values as a function of the others, in rounds, until the guesses settle. It's the most capable of the three and the slowest. It's still marked experimental. Importing it needs `from sklearn.experimental import enable_iterative_imputer` first. This Catches everyone once.
+`IterativeImputer` models each column with missing values as a function of the others, in rounds, until the guesses settle. It's the most capable of the three and the slowest. It's still marked experimental. Importing it needs `from sklearn.experimental import enable_iterative_imputer` first. This catches everyone once.
 
 Both are worth trying when imputation quality matters. Neither is worth the cost when the missingness is light and the model is a grad booster that could have handled it natively.
 
@@ -205,9 +207,9 @@ The skew to note: you can drop rows from the training data. You can't drop them 
 
 All above assumes numeric data. Text columns have gaps too. The math strategies don't apply.
 
-`SimpleImputer(strategy="most_frequent")` works and quietly asserts that the missing rows are like the majority. This Is often just the claim that is false. `strategy="constant", fill_value="missing"` is often better. It creates an clear category, the encoder gives it its own column. The model can learn what that column is worth. Lack turns a value rather than a guess.
+`SimpleImputer(strategy="most_frequent")` works and quietly asserts that the missing rows are like the majority. This is often just the claim that is false. `strategy="constant", fill_value="missing"` is often better. It creates an clear category, the encoder gives it its own column. The model can learn what that column is worth. Lack turns a value rather than a guess.
 
-`OneHotEncoder` also handles `NaN` right, treating it as its own category without any imputation step. This Is the shortest route to the same result.
+`OneHotEncoder` also handles `NaN` right, treating it as its own category without any imputation step. This is the shortest route to the same result.
 
 The reason the clear category often wins is the same as for the indicator. In real data, "not stated" is a fact about the record rather than a hole where a fact should be. A blank employer field, an unselected optional dropdown, a survey question skipped. Each tells you a thing. Folding it into the most common value asserts the opposite.
 
@@ -223,7 +225,7 @@ A quick rule for triage, applied per column rather than to the dataset as a whol
 
 **Over 80%.** often drop the column, unless the small present portion is known to be highly helpful.
 
-These are rules of thumb rather than thresholds. The honest way to settle any of them is to try both inside a pipeline and compare cross-validated scores. That takes two lines. This Is less effort than arguing about it.
+These are rules of thumb rather than thresholds. The honest way to settle any of them is to try both inside a pipeline and compare cross-validated scores. That takes two lines. This is less effort than arguing about it.
 
 <strong>Why does IterativeImputer need a special import?</strong> It's still marked experimental. `from sklearn.experimental import enable_iterative_imputer` has to run first. The import looks unused and isn't.
 
@@ -237,7 +239,7 @@ These are rules of thumb rather than thresholds. The honest way to settle any of
 
 Before choosing a strategy, two minutes of counting decides most of it.
 
-Count per column rather than in total. `df.isna().sum()` gives the picture. It's often uneven. One or two columns carry nearly all the gaps while the rest are complete. That changes the problem from "how do I impute this dataset" to "what do I do about these two columns". This Is a much easier question.
+Count per column rather than in total. `df.isna().sum()` gives the picture. It's often uneven. One or two columns carry nearly all the gaps while the rest are complete. That changes the problem from "how do I impute this dataset" to "what do I do about these two columns". This is a much easier question.
 
 Then look at whether the gaps coincide. Columns that are missing together often come from the same source. A form section that was skipped, a system that was down, a join that failed for a subset. If three columns are missing on just the same rows, they're one piece of info absent once. One indicator covers all three rather than three separate ones.
 
@@ -256,20 +258,7 @@ None of this needs a plot or a library. Three counts and a check, before any cho
 3. <strong>Turn the indicator off.</strong> The last editor drops from 0.987 to 0.77. That gap is the value of one extra column.
 4. <strong>Skip imputation fully.</strong> Replace the pipeline in the last editor with `HistGradientBoostingClassifier()` on the raw data with gaps.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>Should I drop rows or fill them in?</strong> Dropping is fine when few rows are affected and the loss is random. Otherwise impute, and keep an indicator if missingness could carry signal.
-
-<strong>Which SimpleImputer strategy should I use?</strong> Median for skewed numbers, mean for roughly symmetric ones, and most_frequent for categories. Constant works when you want an explicit placeholder.
-
-<strong>Why fit the imputer on training data only?</strong> Because the fill value is learned. Learning it from test rows leaks information.
-
-<strong>What does add_indicator do?</strong> It appends binary columns marking which values were missing, so the model can use the pattern of missingness.
-
-<strong>When is KNNImputer or IterativeImputer worth it?</strong> When columns are related and a simple fill would ignore that. They are slower, so test whether they actually improve the score.
-
-<strong>Do all models need imputation?</strong> No. `HistGradientBoosting` models handle NaN natively, but most other estimators raise an error.
-
-## Where this leaves you
-
-Median rather than mean for numeric columns, an clear category for cat ones, `add_indicator=True` almost always, the imputer inside a pipeline so the fill value obeys the split. A check of whether a grad booster could have handled the gaps without any of it.
+- Official reference: [Sklearn documentation](https://scikit-learn.org/stable/modules/impute.html)
+- Continue with [Missing Values](pipelines.html).

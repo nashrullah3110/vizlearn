@@ -1,9 +1,11 @@
 title: Text Columns
 intro: The .str accessor, and what it does with missing values.
 
-## Why the accessor exists
+## The core idea
 
-Text data in pandas is stored as a column of Python string objects. Each cell is an independent object sitting somewhere in memory, connected to the column by a pointer. That storage model is why string columns are slow and memory-heavy compared to numeric columns.
+Text data in pandas is stored as a column of Python string objects. Each cell is an independent object sitting somewhere in memory, connected to the column by a pointer.
+
+## Why the accessor exists
 
 You could process strings with a Python loop or with apply. Both work. Both are slow, because they call Python once per cell. The str accessor provides vectorised string methods that push the loop into compiled code where possible, and that return a properly aligned Series with NaN for missing entries.
 
@@ -13,7 +15,6 @@ The accessor also handles missing values consistently. Every str method returns 
 
 String cleaning is a large part of real-world data work. Names arrive in mixed case, with extra whitespace, with inconsistent separators. Codes arrive with trailing spaces that make exact matches fail. Categories have multiple spellings. The str accessor is how you fix all of these at column scale.
 
-This module covers the most-used methods: strip, lower, upper, contains, replace, extract, split and len. It also covers when to convert a text column to the category dtype for better performance on repeated values.
 
 
 A Series of strings is a column of Python string objects. You could loop over them. `apply(str.strip)` would work. Both are slow and neither reads well.
@@ -79,7 +80,7 @@ That is often right: the uppercase of an unknown value is unknown.
 
 It turns a problem for **predicates**. `s.str.holds("a")` returns `True`, `False` **or `NaN`**. A mask holding `NaN` can't be used to index a frame. Pandas raises "Can't mask with non-boolean array holding NA / NaN values".
 
-The fix is `na=False`. This Decides what a missing value should count as:
+The fix is `na=False`. This decides what a missing value should count as:
 
 ```python
 df[df["name"].str.contains("ana", na=False)]
@@ -134,7 +135,7 @@ print("   note num is object - extract returns text, convert if you need numbers
 
 `s.str.split("-")` gives a Series of lists. That is rarely what you want right.
 
-`expand=True` turns it into a DataFrame with one column per piece. This Is how you split a mixed field into real columns. Rows with fewer pieces get `None` in the trailing columns.
+`expand=True` turns it into a DataFrame with one column per piece. This is how you split a mixed field into real columns. Rows with fewer pieces get `None` in the trailing columns.
 
 `s.str.split("-").str[0]` takes one piece &mdash; the second `.str` indexes into the lists.
 
@@ -144,7 +145,7 @@ print("   note num is object - extract returns text, convert if you need numbers
 s.str.extract(r"(?P<kind>[a-z]+)-(?P<num>\d+)")
 ```
 
-Rows that don't match give `NaN` across the row. This Makes non-matching input visible rather than silently mangled.
+Rows that don't match give `NaN` across the row. This makes non-matching input visible rather than silently mangled.
 
 `extract` returns **text**, even for digits. Convert later with `pd.to_numeric` if you need numbers.
 
@@ -201,6 +202,7 @@ print("Object columns store pointers to Python strings, so every")
 print("operation walks them one at a time. Convert to category when")
 print("the values repeat, and do text work once rather than in a loop.")
 ```
+
 ## Testing
 
 `holds` searches anywhere in the string. `startswith` and `endswith` anchor. `match` anchors at the start, `fullmatch` at both ends.
@@ -211,12 +213,13 @@ Pass `regex=False` for a literal search. It's also faster.
 
 `case=False` makes the test case-insensitive without a split `.lower()` pass.
 
-`startswith` and `endswith` do **not** take a regex. This Is an inconsistency worth remembering rather than deriving.
+`startswith` and `endswith` do **not** take a regex. This is an inconsistency worth remembering rather than deriving.
+
 ## Replacing
 
 `s.str.replace(old, new, regex=...)` needs the `regex` arg to be clear in pandas 2. The default changed. Code written against pandas 1 that leaned on the old action can silently do the wrong thing.
 
-Two clean-ups earn their place in almost each script:
+Two clean-ups earn their place in almost every script:
 
 Merging whitespace: `s.str.replace(r"\s+", " ", regex=True).str.strip()`.
 
@@ -243,13 +246,13 @@ Three things help.
 
 **Convert to `group`** when values repeat. steps then run on the small set of distinct values rather than each row.
 
-**Consider the `string` dtype.** `astype("string")` gives the nullable extension type. This Has clearer missing-value semantics than `object` and is where pandas' future tuning work is going.
+**Consider the `string` dtype.** `astype("string")` gives the nullable extension type. This has clearer missing-value semantics than `object` and is where pandas' future tuning work is going.
 
 For very large text columns, the honest answer is that pandas isn't the right tool. The work belongs in a DB or a purpose-built library.
 
 ## The cleaning pipeline
 
-Text from the real world needs the same handful of steps almost each time. Doing them in one pass at load time is far better than scattering them through the analysis:
+Text from the real world needs the same handful of steps almost every time. Doing them in one pass at load time is far better than scattering them through the analysis:
 
 ```python
 df["city"] = (df["city"]
@@ -280,7 +283,7 @@ That check is worth making. A regex that matches 90% of rows silently discards t
 
 `str.extractall` returns each match rather than the first, with a MultiIndex that has a `match` level.
 
-`str.findall` returns a list per row. This Is harder to work with and at times what you want.
+`str.findall` returns a list per row. This is harder to work with and at times what you want.
 
 ## Testing and counting
 
@@ -308,9 +311,9 @@ Building an alternation is fine for a handful of words. For a long list. For who
 
 `str.split(sep, expand=True)` gives a DataFrame. Rows with fewer parts get `None` in the trailing columns. Rows with more parts are **truncated** unless you pass `n` to limit the splits.
 
-`n=1` splits only on the first separator. This Is what you want for `key. Value` text where the value may hold the separator.
+`n=1` splits only on the first separator. This is what you want for `key. Value` text where the value may hold the separator.
 
-`str.rsplit` splits from the right. This Handles "all before the last dot" cleanly.
+`str.rsplit` splits from the right. This handles "all before the last dot" cleanly.
 
 `str.split` returns just three columns. Before, separator, after &mdash; which avoids the var-width problem fully.
 
@@ -334,7 +337,7 @@ For token split, stemming, language spotting or anything linguistic, a dedicated
 
 For very large corpora, the `object` dtype's per-row Python cost dominates. The work belongs in a DB, in Polars, or in a purpose-built pipeline.
 
-The signal is often the profile: if `.str` steps are the slowest part of your script and the frame is large, the answer is a other tool rather than a cleverer regex.
+The signal is often the profile: if `.str` steps are the slowest part of your script and the frame is large, the answer is another tool rather than a cleverer regex.
 
 ## Regex, briefly
 
@@ -362,7 +365,7 @@ Text that arrives mangled &mdash; `Ã©` where `é` belongs &mdash; was decoded 
 
 The fix is at `read_csv`, with `encoding="latin-1"` or `encoding="cp1252"`, not in pandas later. Repairing mojibake after the fact is possible and unreliable.
 
-`df["col"].str.encode("utf-8").str.decode("utf-8")` round-trips text and raises on anything invalid. This Is a way to find the offending rows.
+`df["col"].str.encode("utf-8").str.decode("utf-8")` round-trips text and raises on anything invalid. This is a way to find the offending rows.
 
 For matching across accented and unaccented spellings, norming with `str.norm("NFKD")` and stripping mixing characters puts both forms into the same shape.
 
@@ -378,48 +381,11 @@ Three things make text work faster, in order of effect:
 
 And the structural point: if `.str` steps dominate the profile on a large frame, pandas is the wrong layer for that work. A DB, Polars, or a purpose-built text pipeline will do it in a fraction of the time.
 
-## A summary
-
-`.str` applies string methods elementwise and chains.
-
-Missing values pass through as `NaN`. Pass `na=False` on any predicate used for filtering.
-
-`holds` is a regex by default. `startswith` isn't a regex at all.
-
-`split(expand=True)` makes columns. `extract` with named groups is often clearer.
-
-`replace` needs an clear `regex=` in pandas 2.
-
-Norm column names and text values once, at load.
-
-Convert repeated text to `group`.
-
-And check how many rows a pattern really matched, rather than given it matched them all.
-
-## A closing note
-
-Text is where pandas is least like an array library and most like plain Python, and both facts show.
-
-`.str` gives you the string methods across a whole column. This Is convenient and reads well. Underneath it's per-element Python over a column of pointers. This Is why text work is an order of magnitude slower than math on the same number of rows.
-
-Two things follow. Clean text **once**, at load, rather than again and again in the middle of a pipeline. And convert repeated values to `group`, after which `.str` steps apply to the handful of distinct values rather than to each row. Often the largest single speed-up on hand, for a one-line change.
-
-The correctness trap is missing values. `.str` predicates return `NaN` rather than `False`. A mask holding `NaN` can't index a frame. `na=False` on each `.str` filter is the habit. Its lack is the error that appears only once the data has a gap.
-
-## Questions people ask
-
-<strong>How do I apply string functions to a whole column?</strong> Use the .str accessor, for example df['name'].str.lower() or df['name'].str.strip(). It works element by element and skips missing values.
-
-<strong>Why do I get an AttributeError on .str?</strong> The column is not a string dtype, often because it holds numbers or mixed types. Convert with astype(str) or fix the source column.
-
-<strong>How do I split one column into several?</strong> Use df['full'].str.split(' ', expand=True), which returns a frame with one column per piece. Assign the result to new column names.
-
-<strong>How do I filter rows that contain some text?</strong> Use df[df['col'].str.contains('abc', case=False, na=False)]. The na=False part keeps missing values from breaking the mask.
-
-<strong>Does str.contains use regular expressions?</strong> Yes, by default. Pass regex=False for a plain substring, especially when your pattern contains characters like ( or .
-
-<strong>Are .str methods fast?</strong> They are convenient but still loop over the values in Python. For big columns, convert to category first or use vectorised alternatives where they exist.
-
 ## One more thing
 
-`str.get(i)` indexes into each string or list. This Is the concise form of `str[i]` and works the same way. It returns `NaN` rather than raising where the index is out of range. This Is often what you want on ragged data.
+`str.get(i)` indexes into each string or list. This is the concise form of `str[i]` and works the same way. It returns `NaN` rather than raising where the index is out of range. This is often what you want on ragged data.
+
+## Sources and next steps
+
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/text.html)
+- Continue with [Text Columns](datetimes.html).

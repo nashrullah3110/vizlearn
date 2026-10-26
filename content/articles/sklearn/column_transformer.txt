@@ -1,24 +1,25 @@
 title: Different Columns, Different Treatment: A Practical Guide
 intro: A pipeline applies each step to each column. Real tables need scaling on some columns and encoding on others. ColumnTransformer is how you say which is which.
 
-## The problem
+## The core idea
 
-Real tables have mixed types. Some columns are numeric, some are categorical, and each type needs different preprocessing. A scaler makes no sense on a city-name column. A one-hot encoder makes no sense on a temperature column. Applying the same transformer to every column either crashes or produces nonsense.
+Real tables have mixed types. Some columns are numeric, some are categorical, and each type needs different preprocessing. A scaler makes no sense on a city-name column.
+
+## The problem
 
 `ColumnTransformer` solves this by routing each group of columns to its own transformer. You specify which columns get which treatment. The transformer applies each sub-pipeline to its columns and concatenates the results into a single array. Because `ColumnTransformer` is itself a transformer, it fits into a `Pipeline` as one step. That keeps the routing inside the cross-validation loop, which prevents the preprocessing leak.
 
 Without a column transformer, the usual workaround is to slice the DataFrame, transform each slice, and concatenate manually. That works for a single train-test split. It breaks under cross-validation because the slicing and transforming happen outside the fold loop. The test-fold statistics leak into the training set.
 
-This page covers building a column transformer, combining it with a pipeline, inspecting the output columns, and handling columns that should be passed through or dropped.
+
 
 A `Pipeline` is a sequence applied to all of `X`. That works when the columns are homogeneous and breaks right away on a real table.
 
 Numeric columns want imputing with a median and scaling. cat columns want imputing with a constant and one-hot encoding. Applying a scaler to a text column raises. Applying an encoder to a smooth one makes a column per distinct value, which is nonsense.
 
-The manual workaround &mdash; split the frame, transform each part, concatenate &mdash; works and puts the changes outside any pipeline. This Puts them outside the cross-validation folds. This Is the leak this track keeps returning to.
+The manual workaround &mdash; split the frame, transform each part, concatenate &mdash; works and puts the changes outside any pipeline. This Puts them outside the cross-validation folds. This is the leak this track keeps returning to.
 
 `ColumnTransformer` solves it properly: it routes each subset of columns to its own transformer and concatenates the results. Because it's itself a transformer, the whole thing drops into a pipeline as a single step.
-
 
 ## Two treatments, one object
 
@@ -188,25 +189,26 @@ print()
 print("a list selects a DataFrame (2-D); a bare name selects a Series (1-D),")
 print("and the encoder wants two dimensions.")
 ```
+
 ## How it is written
 
 Each entry is a triple: a name, a transformer, and the columns it applies to.
 
 The name is yours to choose and appears in the made feature names and in the param keys for tuning. Short and real pays off. `num` and `cat` rather than `transformer_1`.
 
-The columns can be a list of names, a list of int spots, a boolean mask, or a callable. Passing a **list** matters. A list of one name selects a DataFrame. This Is two-dimensional. A bare string selects a Series. This Is one-dimensional. The transformer raises. The error message says "Expected a 2-dimensional container", which is precise once you know what it refers to.
+The columns can be a list of names, a list of int spots, a boolean mask, or a callable. Passing a **list** matters. A list of one name selects a DataFrame. This is two-dimensional. A bare string selects a Series. This is one-dimensional. The transformer raises. The error message says "Expected a 2-dimensional container", which is precise once you know what it refers to.
 
-The outputs are concatenated left to right in the order the transformers are listed, not in the first column order. So the resulting array's columns follow your specification. This Is why `get_feature_names_out()` is the solid way to know what ended up where.
+The outputs are concatenated left to right in the order the transformers are listed, not in the first column order. So the resulting array's columns follow your specification. This is why `get_feature_names_out()` is the solid way to know what ended up where.
 
 ## remainder, and the columns you forgot
 
 By default, any column not named in any transformer is **dropped**.
 
-That is often right &mdash; ids, timestamps and free text often shouldn't reach the model &mdash; and it's silent. This Is the part worth knowing. A column added to the source data will simply not appear in the model, with no warning. The effect is a model quietly skipping a feature somebody thought they had added.
+That is often right &mdash; ids, timestamps and free text often shouldn't reach the model &mdash; and it's silent. This is the part worth knowing. A column added to the source data will simply not appear in the model, with no warning. The effect is a model quietly skipping a feature somebody thought they had added.
 
-`remainder="passthrough"` keeps the unnamed columns as they're. It's convenient and slightly dangerous. It will happily pass through an id column. This Is just the sort of thing that lets a model store rows.
+`remainder="passthrough"` keeps the unnamed columns as they're. It's convenient and slightly dangerous. It will happily pass through an id column. This is just the sort of thing that lets a model store rows.
 
-`remainder=SomeTransformer()` applies a transformer to all left over. This Is at times the tidiest way to say "scale all I haven't or else mentioned".
+`remainder=SomeTransformer()` applies a transformer to all left over. This is at times the tidiest way to say "scale all I haven't or else mentioned".
 
 The habit worth adopting: name each column by name, or use selectors that provably cover all. Treat the default drop as a safety net rather than as the design.
 
@@ -216,13 +218,13 @@ Listing column names by hand is fine for a fixed table and a maintenance burden 
 
 `make_column_selector(dtype_include="number")` selects the numeric columns what they're called. `dtype_include=object` picks up the strings. `pattern="^date_"` selects by name. The selector runs at `fit` time against what frame it's given. A new numeric column is handled without touching the pipeline.
 
-The caution is that dtypes aren't always what you expect. A cat column stored as ints. A postcode district, a department id. Is selected as numeric and scaled. This Is the mistake the encoding module warned about, now happening automatically. Converting such columns to a string or a pandas `category` dtype before the pipeline is what makes dtype-based pick safe.
+The caution is that dtypes aren't always what you expect. A cat column stored as ints. A postcode district, a department id. Is selected as numeric and scaled. This is the mistake the encoding module warned about, now happening automatically. Converting such columns to a string or a pandas `category` dtype before the pipeline is what makes dtype-based pick safe.
 
 ## Nesting a pipeline inside a branch
 
 A single column group often needs more than one step: numeric columns want imputing *and* scaling.
 
-The transformer in a `ColumnTransformer` entry can be a `Pipeline`. This Is how that is expressed. `make_pipeline(SimpleImputer(strategy="median"), StandardScaler())` turns the numeric branch. The cat branch gets its own with an imputer and an encoder.
+The transformer in a `ColumnTransformer` entry can be a `Pipeline`. This is how that is expressed. `make_pipeline(SimpleImputer(strategy="median"), StandardScaler())` turns the numeric branch. The cat branch gets its own with an imputer and an encoder.
 
 The result is a small tree: a pipeline holding a column transformer holding pipelines holding transformers. That sounds elaborate and is the standard shape of each real scikit-learn program. It's the min structure that does the right thing on a mixed table.
 
@@ -236,7 +238,7 @@ The double-underscore rule composes, so params deep in the tree are addressable.
 
 This is more handy than it first appears. Whether to impute with the mean or the median, whether to scale, whether to drop the first one-hot column. These are choices often made by guesswork. They can be made by cross-validation instead, in the same search that tunes the model.
 
-`pipe.get_params().keys()` lists each addressable param. This Is the fastest way to find the right spelling rather than deriving it.
+`pipe.get_params().keys()` lists each addressable param. This is the fastest way to find the right spelling rather than deriving it.
 
 ## Getting the names back
 
@@ -244,11 +246,11 @@ After one-hot encoding, the array has more columns than the frame had, with name
 
 `get_feature_names_out()` rebuilds them, prefixed by the transformer name: `num__age`, `cat__city_paris`. Called on the outer pipeline, it traces through each step.
 
-That matters for reading the model. Zipping the names against `coef_` or `feature_importances_` turns an anonymous array into a labelled result. Without it the mapping has to be rebuilt by counting. This Is both tedious and easy to get wrong by one after any change to the prep.
+That matters for reading the model. Zipping the names against `coef_` or `feature_importances_` turns an anonymous array into a labelled result. Without it the mapping has to be rebuilt by counting. This is both tedious and easy to get wrong by one after any change to the prep.
 
 ## The shape of a real preprocessing block
 
-Almost each tabular project ends up with the same structure. It's worth having it in mind as a template rather than deriving it each time.
+Almost every tabular project ends up with the same structure. It's worth having it in mind as a template rather than deriving it each time.
 
 A numeric branch: impute with the median, then scale. A cat branch: impute with a constant such as `"missing"`, then one-hot encode with `handle_unknown="skip"`. A column transformer routing the two by dtype. A model on the end. The whole thing in one `Pipeline`, cross-validated, with the prep choices exposed to a search.
 
@@ -264,7 +266,7 @@ A limitation worth knowing, because it isn't obvious from the interface.
 
 each transformer in a `ColumnTransformer` receives the same rows and must return the same number of rows, in the same order. The results are concatenated flatly. Any of it that reordered or dropped rows would misalign the columns against each other and against `y`.
 
-That rules out row-level ops inside it: no dropping outliers, no resampling, no aggregating. Those belong before the pipeline, applied to the training data only, or in a library built for it. `imbalanced-learn` gives a pipeline that understands row changes. This Is the right tool when resampling is part of the model rather than part of the data preparation.
+That rules out row-level ops inside it: no dropping outliers, no resampling, no aggregating. Those belong before the pipeline, applied to the training data only, or in a library built for it. `imbalanced-learn` gives a pipeline that understands row changes. This is the right tool when resampling is part of the model rather than part of the data preparation.
 
 It also means a transformer that returns a different number of rows than it received will fail with a shape error rather than a helpful message. A custom transformer that filters is a mistake worth ruling out early.
 
@@ -282,11 +284,11 @@ A column transformer that misbehaves is harder to inspect than a plain pipeline.
 
 **The output shape.** `pre.fit_transform(df).shape` against what you expected. Too few columns often means a branch selected nothing. Too many often means a high-cardinality column reached the one-hot encoder.
 
-**What each branch really selected.** After fitting, `pre.transformers_` holds the resolved triples, with the callable selectors already turned into concrete column lists. Printing the third element of each entry says just which columns went where. This Is the fastest way to find a column that fell through to `remainder`.
+**What each branch really selected.** After fitting, `pre.transformers_` holds the resolved triples, with the callable selectors already turned into concrete column lists. Printing the third element of each entry says just which columns went where. This is the fastest way to find a column that fell through to `remainder`.
 
 **The names.** `pre.get_feature_names_out()` lists each output column with its branch prefix. If a name you expected is absent, the column was dropped. If there are hundreds of `cat__` names, an identifier reached the encoder.
 
-**One branch at a time.** `pre.named_transformers_["num"]` gives the fitted branch. This Can be inspected on its own. Its imputer's `statistics_`, its scaler's `mean_`. When the whole thing makes a thing odd, narrowing to one branch often localises it in a minute.
+**One branch at a time.** `pre.named_transformers_["num"]` gives the fitted branch. This can be inspected on its own. Its imputer's `statistics_`, its scaler's `mean_`. When the whole thing makes a thing odd, narrowing to one branch often localises it in a minute.
 
 The general lesson is that the object is introspectable at each level. The trouble is only that the handy fields have to be asked for by name.
 
@@ -301,20 +303,7 @@ The general lesson is that the object is introspectable at each level. The troub
 3. <strong>Add a column.</strong> In the second editor, add another numeric column to the frame and confirm the selector picks it up with no edit to the transformer.
 4. <strong>Find the param names.</strong> In the fifth editor, print `sorted(pipe.get_params())` and look for the keys you could tune.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What is ColumnTransformer for?</strong> It applies different preprocessing to different columns, such as scaling numbers and one-hot encoding categories, then joins the results.
-
-<strong>What does remainder do?</strong> Columns not named in any branch are dropped by default. Set `remainder='passthrough'` to keep them unchanged.
-
-<strong>How do I select columns by type?</strong> Use `make_column_selector(dtype_include=...)` so the transformer picks numeric or object columns automatically.
-
-<strong>Can a branch be a pipeline?</strong> Yes. A branch such as impute then scale is a small pipeline, and it can be nested inside the transformer.
-
-<strong>How do I get the output column names?</strong> Call `get_feature_names_out()` on the fitted transformer. It returns names prefixed by branch.
-
-<strong>How do I tune parameters inside it?</strong> Use the double-underscore path, like `pre__num__imputer__strategy`, through the outer pipeline.
-
-## Where this leaves you
-
-One object that sends each group of columns to the transformer it needs, nests pipelines inside its branches, drops what you didn't mention. Exposes each setting inside it to a search. Together with `Pipeline` it's the shape of each real scikit-learn program on tabular data.
+- Official reference: [Sklearn documentation](https://scikit-learn.org/stable/modules/compose.html#columntransformer-for-heterogeneous-data)
+- Continue with [Different Columns, Different Treatment](data_leakage.html).

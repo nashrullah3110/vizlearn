@@ -1,12 +1,15 @@
 title: Project Structure
 intro: How the pieces are arranged once the use is more than one file.
-## The layout
 
-Project structure is how you arrange your files and folders so a growing app stays easy to understand. FastAPI does not require any layout. A single file works for a demo. Once you have users, orders, and billing, though, where each piece of code lives starts to decide how quickly you can change anything.
+## The core idea
+
+Project structure is how you arrange your files and folders so a growing app stays easy to understand. FastAPI does not require any layout. A single file works for a demo.
+
+## The layout
 
 A good structure answers a simple question: if I need to change this behavior, where do I look? When the answer is obvious, new teammates become useful faster, and reviews get shorter. When it is not, the same logic gets copied into three places and drifts apart.
 
-This article starts with a layout that works for most projects and the reasoning behind each folder. It then argues that main.py should be boring. It creates the app, includes the routers, and does little else. Interesting logic belongs elsewhere.
+
 
 The next section covers grouping by resource inside a shallow layer structure. You keep a few clear layers, such as routers, services, and schemas, but you do not let them grow deep. Then comes a rule for dividing the work: handlers translate between HTTP and your domain, and services do the real work. That separation keeps your business logic free of web concerns and easy to test.
 
@@ -31,7 +34,6 @@ app/
 ```
 
 The test of a layout is whether somebody asked to add a field can guess which files to open. If the answer is "search for the word", the structure has stopped helping.
-
 
 ## A router per resource
 
@@ -202,7 +204,7 @@ class Settings(BaseModel):
     debug: bool = False
 ```
 
-Two gains over reading the setting where it's needed. A missing or invalid value fails at startup with a message naming the field, rather than at request time in a handler. And the model is a list of all the use needs to run, in one place. This Is what a deployment checklist wants to be made from.
+Two gains over reading the setting where it's needed. A missing or invalid value fails at startup with a message naming the field, rather than at request time in a handler. And the model is a list of all the use needs to run, in one place. This is what a deployment checklist wants to be made from.
 
 `pydantic-settings` does the setting reading properly, including `.env` files and nested config.
 
@@ -292,6 +294,7 @@ print(c.get("/modules?limit=3").json())
 print(c.get("/modules/2").json())
 print("missing:", c.get("/modules/99").status_code)
 ```
+
 ## main.py should be boring
 
 It does four things: create the `FastAPI` instance, register exception handlers, include routers, add middleware.
@@ -326,13 +329,14 @@ From the response-model module, and it belongs in the layout too.
 
 `ModuleCreate` takes what a caller may supply. `ModuleUpdate` has all optional. `ModuleOut` declares what may be seen. Three small classes in one file, rather than one clever class with all optional that docs nothing.
 
-Keeping them beside each other makes the differences visible. This Is when people notice that the output model still holds a field it shouldn't.
+Keeping them beside each other makes the differences visible. This is when people notice that the output model still holds a field it shouldn't.
 
 ## Dependencies in one module
 
 a few routers need the same ones. The session, the current user, pagination. A shared `dependencies.py` is where they're found.
 
-Reading that file should tell you what the use's endpoints are allowed to assume. That is a truly handy summary. It's the same arg as the `types.py` from the Pydantic track.
+Reading that file should tell you what the users' endpoints are allowed to assume. That is a truly handy summary. It's the same arg as the `types.py` from the Pydantic track.
+
 ## When to split
 
 Earlier than feels needed.
@@ -346,7 +350,6 @@ The same applies to the service boundary. Extracting the first service when ther
 Each piece testable on its own: a router included into a small app, a service called as a plain function, a schema checked against a payload, settings made from a dict.
 
 A suite that needs "the module under test" rather than "a DB, Redis and three setting vars" is the hands-on gap. It comes almost fully from where things were put.
-
 
 ## Mistakes people make
 
@@ -392,15 +395,7 @@ Each step is prompted by a thing real rather than anticipated. Each takes minute
 
 Not tidiness. Testability, and the ability for somebody new to guess where things are.
 
-Those two are related: code that can be tested in alone is code whose pieces have clear boundaries. Clear boundaries are what make a layout guessable. A structure that scores well on one often scores well on the other. This Is a convenient property when deciding whether an setup is worth the move.
-
-## Summary
-
-One router per resource in its own file, created on day one. Handlers translate HTTP and call services that import nothing from the framework, raising domain exceptions that one handler maps to statuses.
-
-Schemas split by direction. Shared dependencies in one module. Settings in one checked model read at startup. And a `main.py` short enough to read in a screen, doing nothing but assembly.
-
-The value isn't tidiness - it's that each piece turns testable on its own. The suite needs the module under test rather than the whole world.
+Those two are related: code that can be tested in alone is code whose pieces have clear boundaries. Clear boundaries are what make a layout guessable. A structure that scores well on one often scores well on the other. This is a convenient property when deciding whether an setup is worth the move.
 
 ## Where the track leaves you
 
@@ -414,7 +409,6 @@ And the practices: a suite that runs in seconds, a made doc consumers can build 
 
 That is enough to build and maintain a real API. What is left is largely not FastAPI - DBs, deployment, observability, the working parts - and each is easier once the layer underneath is arranged so it can be reasoned about a piece at a time.
 
-
 ## A note on imports
 
 One hands-on detail that decides whether a layout lives.
@@ -427,15 +421,6 @@ Follow that and cycles are hopeless. Break it once - a service that raises `HTTP
 
 The domain-exception pattern isn't only about testability. It's also what keeps the arrow pointing one way.
 
-
-## A closing thought
-
-None of this layout is FastAPI-exact. None of it's new. Grouping by resource, keeping handlers thin, separating config, and assembling in a boring file are practices older than the framework.
-
-What FastAPI adds is that following them is nearly free. A router is four lines. Inclusion is one. The docs reorganises itself around your tags without being asked. A dependency is a default arg.
-
-When good structure costs almost nothing, the reason not to have it stops being effort and starts being habit - which is why the advice throughout this module is to do each piece earlier than it feels needed.
-
 ## What was left out, and why
 
 Three subjects have no module here, on purpose.
@@ -444,24 +429,9 @@ Three subjects have no module here, on purpose.
 
 **WebSockets** need a real link. This No amount of cleverness conjures in a browser tab.
 
-They're real parts of the framework and worth learning from the official docs. The rest of this track runs. This Is the trade that was chosen.
+They're real parts of the framework and worth learning from the official docs. The rest of this track runs. This is the trade that was chosen.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>Where should I put the FastAPI instance?</strong> In main.py (or app/main.py), which creates the app, includes routers, and stays short.
-
-<strong>How do I split a growing project?</strong> Group by resource into folders such as users/ and orders/, each with routes, schemas, and dependencies.
-
-<strong>Where do Pydantic models go?</strong> Beside the routes that use them, in a schemas.py per resource, kept separate from database models.
-
-<strong>Where does configuration go?</strong> In a settings class, typically pydantic-settings BaseSettings, that reads environment variables once.
-
-<strong>How do I avoid circular imports?</strong> Keep dependencies and models in modules that do not import the routers, and import routers only in main.py.
-
-<strong>Where do tests live?</strong> In a top-level tests/ folder that mirrors the app layout, with shared fixtures in conftest.py.
-
-## In one line
-
-One router per resource, services that never import the framework, schemas by direction, settings in one checked model. An assembly file short enough to read at a glance - each added the moment it's prompted rather than once the file has become unmanageable.
-
-The arrow points one way - routers to services to schemas - and keeping it pointing that way is what blocks the circular imports that else arrive from a direction no one expected.
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/bigger-applications/)
+- Continue with [Security Basics](security_basics.html).

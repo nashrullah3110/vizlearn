@@ -1,8 +1,11 @@
 title: Transpose and Moving Axes
 intro: Reordering axes without moving a single byte.
-## Strides again
 
-Transposing an array swaps its axes. For a 2-D array, rows become columns and columns become rows. For higher-dimensional arrays, the axes are permuted in a specified order. The operation is instant because no data is moved. NumPy simply changes the strides and the shape in the array description.
+## The core idea
+
+Transposing an array swaps its axes. For a 2-D array, rows become columns and columns become rows. For higher-dimensional arrays, the axes are permuted in a specified order.
+
+## Strides again
 
 That zero-cost property is worth understanding. A 2-D array with shape (1000, 2000) uses the same memory as its transpose. np.shares_memory confirms that the transpose is a view of the original. Writing to the transpose changes the original, because they are the same block of bytes with different descriptions.
 
@@ -14,7 +17,6 @@ The practical consequence of strides is memory layout. A C-contiguous array has 
 
 That performance difference is small for most work. It matters for tight numerical loops and for interoperating with libraries that expect a specific memory order. np.ascontiguousarray copies the data into C order when you need it.
 
-This module covers transpose for 2-D and higher-dimensional arrays, the strides that make it free, the memory-order conventions, and swapaxes and moveaxis for targeted axis manipulation. The examples verify the view property and show how strides change.
 
 
 An array knows how many bytes to step for each axis. Transposing swaps those numbers along with the shape. The underlying buffer is untouched.
@@ -158,6 +160,7 @@ print()
 print("rot90 twice == flipping both ways:",
       np.array_equal(np.rot90(a, 2), np.flipud(np.fliplr(a))))
 ```
+
 ## More than two axes
 
 `.T` reverses **all** axes. On shape `(2, 3, 4)` it gives `(4, 3, 2)`.
@@ -186,7 +189,7 @@ Most steps don't care. But anything that needs a flat contiguous buffer must cop
 
 `ravel()` returns a view when it can and a copy when it can't. On a transposed array, it can't.
 
-`reshape` has the same action. This Is why "reshape returns a view" carries a *often*.
+`reshape` has the same action. This is why "reshape returns a view" carries a *often*.
 
 Neither warns you. If it matters. Because the array is large, or because you were leaning on writing through the result. Check with `np.shares_memory`, or force the issue with `np.ascontiguousarray` so the copy is clear and happens where you can see it.
 
@@ -222,11 +225,11 @@ A result comes back as `(n, 1)` and the next function wants `(n,)`. `squeeze` dr
 
 `expand_dims(a, axis)` is the clear form of `a[None]`. Reads better when the axis spot is found rather than literal.
 
-`squeeze` with no arg drops **each** length-1 axis. This Is the source of a truly nasty intermittent bug. A batch of one sample loses its batch dim. The code works for each batch size except one. Always name the axis. `squeeze(axis=1)`. In code that handles var batch sizes.
+`squeeze` with no arg drops **each** length-1 axis. This is the source of a truly nasty intermittent bug. A batch of one sample loses its batch dim. The code works for each batch size except one. Always name the axis. `squeeze(axis=1)`. In code that handles var batch sizes.
 
 ## einsum as general axis manipulation
 
-Once an step needs a transpose, two `newaxis` insertions and a sum over a given axis, `np.einsum` often expresses it more clearly.
+Once a step needs a transpose, two `newaxis` insertions and a sum over a given axis, `np.einsum` often expresses it more clearly.
 
 The subscript string names an index for each axis of each operand and says which live:
 
@@ -266,9 +269,9 @@ And keep the batch axis first. Most of the shape gymnastics people write is the 
 
 `np.trace(a)` sums the main-line without materialising it.
 
-`np.fill_diagonal(a, value)` writes to the main-line in place. This Is the supported way to modify it. It's the standard step when building an adjacency or distance mat that should have zeros on the main-line.
+`np.fill_diagonal(a, value)` writes to the main-line in place. This is the supported way to modify it. It's the standard step when building an adjacency or distance mat that should have zeros on the main-line.
 
-`offset` on `main-line` selects the super- or sub-diags. This Is how you extract a band.
+`offset` on `main-line` selects the super- or sub-diags. This is how you extract a band.
 
 ## rollaxis, and why not to use it
 
@@ -306,30 +309,13 @@ This is worth doing because the failure mode. Correct shape, permuted contents. 
 
 All of them return views. That is what makes them free. It's also why a later `ravel` or `reshape` may copy without saying so. `np.shares_memory` when it matters, `np.ascontiguousarray` when you want the copy to happen one spot visible.
 
-## A closing note on cost
-
-each step in this module is free. That is worth stating once more because it changes how you write code.
-
-There's no reason to avoid a transpose, a `moveaxis` or an `expand_dims` on speed grounds. They adjust a handful of ints showing the array and return at once, what its size.
-
-The cost, when it comes, arrives later. At the point a thing needs contiguous memory and quietly copies. That is where to look when a pipeline is slower than the steps in it suggest. `a.flags` plus `np.shares_memory` will tell you within a minute.
-
-## Questions people ask
-
-<strong>Does transpose copy the data?</strong> No. It returns a view with the strides swapped, so it is instant. Some later operations may then need to copy.
-
-<strong>What does a.T do for a 1D array?</strong> Nothing, because there is only one axis. Turn the vector into a column with a[:, None] if you need a 2D shape.
-
-<strong>How do I transpose a 3D array?</strong> Use a.transpose(order), listing the new axis order, for example a.transpose(2, 0, 1). a.T just reverses all the axes.
-
-<strong>What do swapaxes and moveaxis do?</strong> swapaxes exchanges two axes. moveaxis moves one axis to a new position and leaves the others in order, which is often clearer.
-
-<strong>Why is my transposed array slower to process?</strong> It is no longer C-contiguous, so memory access jumps around. np.ascontiguousarray makes a copy in the order you want.
-
-<strong>How do I turn images from HWC to CHW?</strong> Use np.moveaxis(img, -1, 0) or img.transpose(2, 0, 1). Both are views until you force a copy.
-
 ## Where axis work fits
 
 Reordering axes is almost always a translation step: between how data arrived and how the next function wants it.
 
 That means the right question is rarely "how do I transpose this" but "what layout does the thing I am calling expect". Answering that first often reveals that one `moveaxis` at the boundary replaces a few scattered ones inside. That keeping a single rule throughout drops most of them fully.
+
+## Sources and next steps
+
+- Official reference: [Numpy documentation](https://numpy.org/doc/stable/user/basics.transpose.html)
+- Continue with [Transpose and Moving Axes](sorting_and_searching.html).

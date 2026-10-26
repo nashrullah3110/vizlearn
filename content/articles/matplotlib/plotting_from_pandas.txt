@@ -1,9 +1,11 @@
 title: Plotting from pandas
-intro: df.plot as a shortcut, and when to drop back to matplotlib.
+intro: Df.plot as a shortcut, and when to drop back to matplotlib.
+
+## The core idea
+
+pandas has a built-in plotting interface. df.plot() draws a chart directly from a DataFrame or Series. It calls matplotlib under the hood, returns a matplotlib Axes, and accepts most of the same keyword arguments.
 
 ## What it does for you
-
-pandas has a built-in plotting interface. `df.plot()` draws a chart directly from a DataFrame or Series. It calls matplotlib under the hood, returns a matplotlib Axes, and accepts most of the same keyword arguments.
 
 The value of the pandas plotting interface is speed of exploration. One call draws a chart with labelled axes, a legend from column names, and date formatting from a DatetimeIndex. Doing the same in raw matplotlib takes five or six lines. For a quick look at data during analysis, that difference matters.
 
@@ -11,7 +13,7 @@ The interface covers line charts, bar charts, scatter plots, histograms, box plo
 
 The trade-off is control. pandas plotting handles the common cases quickly but makes unusual layouts harder. Once you need a second y axis, custom tick formatting, insets or precise spacing, you are better off using matplotlib directly. Knowing when to drop back is part of the skill.
 
-This page covers the common chart types through pandas, the relationship between the pandas wrapper and the matplotlib objects underneath, and the patterns for combining pandas convenience with matplotlib control. It also covers the DataFrame shapes that map cleanly to charts and the reshaping operations that produce them.
+
 
 The most common mistake is treating `df.plot` as a separate library. It is not. It returns a matplotlib Axes. You can call `ax.set_title`, `ax.set_ylabel`, `ax.legend` and any other matplotlib method on the result. The two layers are designed to work together.
 
@@ -22,7 +24,6 @@ A second common mistake is plotting a wide DataFrame when a long one is needed. 
 For a time-indexed frame that is a dated axis, sensible tick spacing, one line per column and a legend. From one call. Doing the same in raw matplotlib is five or six lines.
 
 That is the case for using it: for exploration. For the common chart types, it's simply faster.
-
 
 ## df.plot draws every column against the index
 
@@ -197,6 +198,7 @@ print()
 print("The two mix freely, because df.plot is a thin wrapper that")
 print("returns the same Axes object.")
 ```
+
 ## It is a thin wrapper
 
 The key thing to know is that `df.plot` **returns a matplotlib Axes**, and accepts one through `ax=`.
@@ -210,7 +212,7 @@ ax.set_title(...)
 ax.axhline(...)
 ```
 
-`ax=` also matters for a other reason: without it, pandas creates its **own** figure. A `df.plot` call inside a loop over subplots draws each chart in a new figure rather than the panel you intended. This Is a common and confusing result.
+`ax=` also matters for another reason: without it, pandas creates its **own** figure. A `df.plot` call inside a loop over subplots draws each chart in a new figure rather than the panel you intended. This is a common and confusing result.
 
 ## kinds
 
@@ -228,7 +230,7 @@ This is the part that finds whether the output is what you wanted.
 
 Each **column** turns a series. Each **row** turns a spot on the x axis.
 
-So a frame with quarters as rows and products as columns gives grouped bars with one cluster per quarter. If you wanted one cluster per product, the frame needs transposing. `df.T.plot(kind="bar")`. Not a other plotting arg.
+So a frame with quarters as rows and products as columns gives grouped bars with one cluster per quarter. If you wanted one cluster per product, the frame needs transposing. `df.T.plot(kind="bar")`. Not another plotting arg.
 
 When a chart comes out grouped the wrong way, the fix is nearly always a `pivot`, a `groupby().unstack()`, or a transpose. That is the reshaping module doing its job: **getting the frame into the right shape is the plotting work**. The plot call is then trivial.
 
@@ -296,9 +298,9 @@ Recognising which of these you've, and which the chart needs, is most of the wor
 
 `df.plot` has its own views that at times conflict with matplotlib's.
 
-It sets its own tick locators for date axes. This Are often good and are awkward to replace later. Setting a matplotlib locator on an axes pandas has already formatted at times has no effect. Plotting with `ax.plot(df.index, df[col])` instead gives back full control.
+It sets its own tick locators for date axes. These are often good and are awkward to replace later. Setting a matplotlib locator on an axes pandas has already formatted at times has no effect. Plotting with `ax.plot(df.index, df[col])` instead gives back full control.
 
-It creates a figure if not given one. This Is the `ax=` issue.
+It creates a figure if not given one. This is the `ax=` issue.
 
 And `secondary_y=True` exists and makes a twin axis with all the problems from that module, plus a legend that is harder to assemble.
 
@@ -368,18 +370,6 @@ Real plotting code sits across three libraries. Knowing which one owns a problem
 
 The common mistake is trying to solve a data problem in the plotting call. Adding args to `df.plot` to fix a grouping that should have been a `pivot`.
 
-## In summary
-
-`df.plot()` draws each column against the index and builds the legend from the column names.
-
-It returns an Axes and takes one. This Is what makes it a shortcut rather than a split system. And `ax=` is needed, or a plot inside a subplot loop creates its own figure.
-
-The frame's shape is the chart: columns are series, rows are groups. A chart grouped the wrong way needs a transpose or a pivot.
-
-`subplots=True` gives small multiples and split y axes unless you say else.
-
-Reach for matplotlib for annotations, thresholds, shading and exact control. And mix freely. It's the same Axes object either way.
-
 ## Reshaping is the plotting work
 
 The recurring lesson of this module is worth stating on its own.
@@ -396,32 +386,7 @@ Moving between them is `pivot`, `melt`, `groupby().agg()` and `unstack`, all cov
 
 When a chart comes out grouped by the wrong var, or with the series and groups swapped, or with one line where there should be five, the fix is almost never an arg to `plot`. It's the shape of the frame. Recognising that at once saves a lot of time reading plotting docs for a thing the data work should have solved.
 
-## A closing note
+## Sources and next steps
 
-`df.plot` is a shortcut, and its value is scaled to how standard the chart is.
-
-For a quick line chart of a time-indexed frame it's unbeatable. One call, correct axis, legend included. For anything with an annotation, a threshold, a highlighted series or a exact tick format, it stops helping and matplotlib underneath does the work.
-
-The two together are the normal way to write plotting code. The boundary isn't a choice you make once. `df.plot(ax=ax)` followed by half a dozen `ax.` calls is a just right plain chart.
-
-What is worth internalising is that most plotting problems are data problems. When the chart is grouped wrongly, or has too many lines, or shows a group as a number, the fix is in the frame.
-
-## Questions people ask
-
-<strong>Does pandas use matplotlib?</strong> Yes. `df.plot` builds a matplotlib figure and returns an Axes, so every matplotlib method works on the result.
-
-<strong>How do I put a pandas plot on my own axes?</strong> Pass `ax=ax` to `df.plot`. This is how you place pandas charts in a subplot grid.
-
-<strong>Why is my index on the x axis?</strong> `df.plot` uses the index for x by default. Set the index first, or pass `x='column'`.
-
-<strong>How do I plot one column against another?</strong> Use `df.plot(x='a', y='b')`, or pass the columns to `ax.plot` directly.
-
-<strong>How do I get dates formatted well?</strong> Use a `DatetimeIndex`. pandas then picks sensible date ticks for you, and you can adjust them with matplotlib's date tools.
-
-<strong>Should I aggregate before plotting?</strong> Yes. Use `groupby` or `resample` first, so the chart draws the summary rather than every raw row.
-
-## The short version
-
-`df.plot` is a shortcut that returns a matplotlib Axes. This Is what makes it a convenience rather than a split system.
-
-Its limits arrive quickly, and the boundary isn't a choice made once: `df.plot(ax=ax)` followed by half a dozen `ax.` calls is plain code. And most plotting problems are data problems.
+- Official reference: [Matplotlib documentation](https://matplotlib.org/stable/users/explain/quick_start.html)
+- Continue with [Plotting from pandas](choosing_a_chart.html).

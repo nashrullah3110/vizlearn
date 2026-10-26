@@ -1,13 +1,15 @@
 title: Unions and Discriminated Unions: Stop Pydantic Guessing
 intro: A field that could be a few shapes. How to make the choice clear.
 
-## The problem a union creates
+## The core idea
 
-Sometimes a field can hold more than one kind of value. A payment could be a card or a bank transfer. A message could be text or an image. In Python typing you write that as a union, and Pydantic has to decide which member of the union the data belongs to.
+Sometimes a field can hold more than one kind of value. A payment could be a card or a bank transfer. A message could be text or an image.
+
+## The problem a union creates
 
 That decision is harder than it sounds. Pydantic tries the members and picks the best match, but when two members look alike, it can choose the wrong one without telling you. With unions of plain types the result is usually fine. With unions of models it can go badly, and the error messages get long and confusing.
 
-This article starts with the problem a union creates. It explains how smart mode picks a member, and the places where order still decides the outcome. It then shows why unions of models are worse, and what the error looks like when every member fails. The fix is a tag. A discriminated union uses one field, such as a type name, to say which model applies, so Pydantic no longer guesses. The result is faster, clearer, and far easier to debug.
+
 
 You will meet unions sooner than you expect. Any API that accepts more than one kind of thing needs one. Events, payments, notifications and search results all fall into that group. The trouble is that a union that works in a quick test can misbehave on real traffic. The wrong member wins, or the error report becomes a wall of text that hides the real problem. This article shows you both of those failures before it shows the cure, so you can recognise them in your own code. The cure is small, and once you have used it you will reach for it by default. It also makes the generated documentation much clearer for anyone who calls your API. The performance gain from a discriminated union is a bonus on top of the clarity.
 
@@ -16,7 +18,6 @@ Once you see the failure, the fix will feel obvious and easy to remember.
 `Union[A, B]` says a value may be either. What it doesn't say is how to decide which, and a thing has to decide.
 
 For simple types the choice is often obvious and often right. For models it's often neither. The failure mode is the worst kind. It doesn't raise, it just gives you the wrong object.
-
 
 ## Smart mode: exact match first
 
@@ -188,9 +189,10 @@ except ValidationError as e:
     print("type :", err["type"])
     print("said :", err["msg"])
 ```
+
 ## Smart mode, and what it actually does
 
-Pydantic v2 doesn't simply try members left to right. It uses **smart mode**. This Is a two-pass plan.
+Pydantic v2 doesn't simply try members left to right. It uses **smart mode**. This is a two-pass plan.
 
 First it looks for a member the value already matches just, without any conversion. An `int` input against `Union[int, str]` matches `int`. A `str` input matches `str`. No ambiguity, no order dependence.
 
@@ -226,7 +228,7 @@ Both accept `{"title": "Vectors"}`, because the other field has a default in eac
 
 The result is a `Video` that was meant to be a `Quiz`, made without any error. Found one spot much later when `questions` is missing.
 
-Defaults make this sharply more likely. This Is worth noticing. Adding a default to a field of one union member can change how *other* payloads are classified.
+Defaults make this sharply more likely. This is worth noticing. Adding a default to a field of one union member can change how *other* payloads are classified.
 
 ## The fix is a tag
 
@@ -262,13 +264,13 @@ That gap is stark on a union with five members. It turns "here are fifteen error
 
 ## When the tag is wrong
 
-The critic field is checked too. A value that matches no member makes a single `union_tag_invalid` error listing the permitted tags. This Is an great error. It tells the caller both what was wrong and what the options are.
+The critic field is checked too. A value that matches no member makes a single `union_tag_invalid` error listing the permitted tags. This is an great error. It tells the caller both what was wrong and what the options are.
 
 A payload missing the tag fully gives `union_tag_not_found`. Again, one clear error rather than a scatter.
 
 ## Practical shapes
 
-Discriminated unions compose. A `List[Union[Video, Quiz]]` with a critic validates each item by its own tag. This Is just what a feed of mixed content needs. Errors still carry the index.
+Discriminated unions compose. A `List[Union[Video, Quiz]]` with a critic validates each item by its own tag. This is just what a feed of mixed content needs. Errors still carry the index.
 
 The tag field is a real field. It appears in `model_dump()`, it's needed. It must be a `Literal`. A plain `str` won't do. The whole method depends on the value being known at class-meaning time.
 
@@ -335,7 +337,7 @@ class Video(BaseModel):
     kind: Literal["video"] = "video"
 ```
 
-Existing code that makes `Video(...)` without a tag keeps working. The default fills it in. Existing *data* without the tag will now fail check. This Is the part to plan for. Either a migration that adds the field, or a `model_validator(mode="before")` that infers the tag from the shape for a transition period.
+Existing code that makes `Video(...)` without a tag keeps working. The default fills it in. Existing *data* without the tag will now fail check. This is the part to plan for. Either a migration that adds the field, or a `model_validator(mode="before")` that infers the tag from the shape for a transition period.
 
 The inference checker is a handy trick and a temporary one. It looks at which fields are present, decides what the payload must be. Writes the tag in. Keep it until the old data is gone, then delete it. It's just the guessing that the critic was added to drop.
 
@@ -357,13 +359,13 @@ If the members are simple, disjoint scalar types, a plain union is fine.
 
 If you're leaning on the order you wrote the members in, stop and add a tag. That dependency is invisible to the next reader.
 
-And if you can't find a natural tag, consider whether the union is really modelling one thing with optional parts. This Is often what a hard-to-tag union turns out to be.
+And if you can't find a natural tag, consider whether the union is really modelling one thing with optional parts. This is often what a hard-to-tag union turns out to be.
 
 ## What the tag is really doing
 
 A discriminated union works because it moves a choice from inference to declaration.
 
-Without a tag, a thing has to work out what a payload is by looking at what it holds. That is guessing. Carefully built. Guessing has a failure mode where it's confidently wrong. With a tag, the payload states what it's and check checks that claim against one schema.
+Without a tag, a thing has to work out what a payload is by looking at what it holds. That is guessing. Carefully built. Guessing has a failure mode where it's confidently wrong. With a tag, the payload states what it is and check checks that claim against one schema.
 
 That is a pattern well beyond Pydantic. Any time a system decides what a thing is by checking its shape, adding an clear marker makes the system simpler, faster and more honest about its failures. The critic is the version of that idea you get for one line of annotation.
 
@@ -375,20 +377,11 @@ A union of two models that share nine of their ten fields is often the second th
 
 Reach for a union when the options are truly other. Other needed fields, other meaning, other handling downstream. When they're the same thing with a variation, model the variation.
 
-## Questions people ask
-
-<strong>How does Pydantic choose a member of a union?</strong> In smart mode, which is the default, it tries each member and prefers an exact type match, then the best partial match. It does not just take the first that works.
-
-<strong>What is a discriminated union?</strong> A union of models that each carry a literal tag field, such as `kind: Literal["video"]`. Pydantic reads the tag and validates against that one model only.
-
-<strong>How do I declare one?</strong> Write `Annotated[Video | Article, Field(discriminator="kind")]` as the field type.
-
-<strong>Why use a discriminator?</strong> Errors become clearer, since only the chosen model's errors appear, and validation is faster because there is no trial and error.
-
-<strong>What error do I get for an unknown tag?</strong> A `union_tag_invalid` error that lists the allowed tags.
-
-<strong>Is `Optional[X]` a union?</strong> Yes, it is `X | None`. Pydantic tries `X` and then accepts `None`.
-
 ## Next
 
-Unions choose between shapes. The next module is about choosing between *values*. Enums and literals. This Are how you say a field may only ever hold one of a small fixed set.
+Unions choose between shapes. The next module is about choosing between *values*. Enums and literals. These are how you say a field may only ever hold one of a small fixed set.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/types/#unions)
+- Continue with [Unions and Discriminated Unions](enums_and_literals.html).

@@ -1,9 +1,11 @@
 title: merge and join
 intro: SQL-style joins, and the copy key that silently times your rows.
 
-## The four kinds
+## The core idea
 
-Merging is how you combine two DataFrames that share a key column but hold different information. One frame has customer ids and names. Another has customer ids and orders. A merge on the id column produces a single frame with names and orders side by side. That is the same operation as a SQL join, and pandas borrows the vocabulary.
+Merging is how you combine two DataFrames that share a key column but hold different information. One frame has customer ids and names. Another has customer ids and orders.
+
+## The four kinds
 
 The four join types decide what happens to keys that appear on only one side. The choice between them is the single most important decision in a merge, and the default is the one that causes the most silent data loss.
 
@@ -15,7 +17,6 @@ A right join is the mirror image. An outer join keeps every key from both sides.
 
 Duplicate keys are the other major hazard. If a key appears three times on the left and twice on the right, the merge produces six rows for that key. The result is larger than either input, and nothing warns you. Checking the row count after a merge catches this immediately.
 
-This module covers merge with all four join types, single and multiple keys, indicator for diagnosing unmatched rows, and validate for catching duplicate keys before they multiply your data.
 
 
 `merge` mixes two frames on one or more key columns. `how` decides what happens to keys that appear on only one side.
@@ -29,7 +30,6 @@ This module covers merge with all four join types, single and multiple keys, ind
 `outer` &mdash; each key from either side.
 
 The default being `inner` is worth remembering. A join that was meant to add a column can quietly drop rows. The only sign is a row count you weren't checking.
-
 
 ## The four kinds of join
 
@@ -164,6 +164,7 @@ print()
 print("Index joins are faster on a sorted unique index, which is a")
 print("reason to set_index on a key you join on repeatedly.")
 ```
+
 ## Check what happened
 
 Two habits catch nearly each join problem.
@@ -176,7 +177,7 @@ That is far better than guessing. It tells you not just that rows went missing b
 
 A frequent cause of a "failed" join is a **dtype mismatch**: `1` as an int on one side and `"1"` as a string on the other never match. Nothing warns. Checking both key columns' dtypes takes a second.
 
-Whitespace and case do the same thing to string keys. This Is why the cleaning modules come before this one.
+Whitespace and case do the same thing to string keys. This is why the cleaning modules come before this one.
 
 ## The duplicate-key multiplication
 
@@ -198,7 +199,7 @@ The results are quiet and severe: inflated revenue, double-counted users, a mode
 
 `"many_to_one"` &mdash; unique on the right. This is the common case for a lookup table. The one worth reaching for by default when joining link data.
 
-`"many_to_many"` &mdash; no constraint. This Is the current action spelled out loud.
+`"many_to_many"` &mdash; no constraint. This is the current action spelled out loud.
 
 Adding it costs one arg and converts an invisible data-corruption bug into a clear exception at the point it happens. On any join that feeds a number someone will act on, it's worth having.
 
@@ -216,7 +217,7 @@ That is where a subtle error lives: `v_x` and `v_y` both look plausible. Picking
 
 Two other defaults for two similar methods is a genuine wart. When it matters, use `merge` with clear args. `join` is a convenience for the index case.
 
-Index joins are faster than column joins on a sorted, unique index. This Is a reason to `set_index` on a key you join on again and again rather than passing `on=` each time.
+Index joins are faster than column joins on a sorted, unique index. This is a reason to `set_index` on a key you join on again and again rather than passing `on=` each time.
 
 ## An order of operations
 
@@ -251,7 +252,7 @@ Using a merge for either is a common way to add accidental row product.
 
 `pd.merge_ordered` merges two sorted frames and can fill forward across the join. This Suits time series with other sampling.
 
-`pd.merge_asof` joins on the **nearest** key rather than an exact match. This Is the standard tool for joining a reading to the most recent preceding link value. A trade to the latest quote, a reading to the last tuning.
+`pd.merge_asof` joins on the **nearest** key rather than an exact match. This is the standard tool for joining a reading to the most recent preceding link value. A trade to the latest quote, a reading to the last tuning.
 
 Both need sorted inputs and both are much faster than the option of a cross join and a filter. This On real data doesn't fit in memory.
 
@@ -263,7 +264,7 @@ Merging is roughly `O(n + m)` with hashing, and the hands-on costs are elsewhere
 
 **Key dtype.** Joining on ints or cats is faster than on strings.
 
-**Index joins.** A sorted, unique index makes `join` faster than a column merge. This Is a reason to `set_index` on a key used again and again.
+**Index joins.** A sorted, unique index makes `join` faster than a column merge. This is a reason to `set_index` on a key used again and again.
 
 **Result size.** A many-to-many join can give a frame far larger than either input. Checking the expected size before running it. The product of the group counts. Avoids allocating a thing that doesn't fit.
 
@@ -297,7 +298,7 @@ Compare row counts with the input.
 
 Check the `_merge` counts.
 
-Check `isna()` on the newly added columns. A left join that matched nothing gives a column that is fully null. This Is easy to miss and obvious once looked for.
+Check `isna()` on the newly added columns. A left join that matched nothing gives a column that is fully null. This is easy to miss and obvious once looked for.
 
 ## What to do when a join goes wrong
 
@@ -339,39 +340,7 @@ a few questions phrased as joins are really membership tests:
 
 "What is the share between two key sets?". `a.index.intersection(b.index)`, or set steps on the columns.
 
-All three avoid the join machinery fully and can't change the row count. This Makes them both safer and clearer when the answer is a filter rather than an enrichment.
-
-## A summary
-
-`how="inner"` is the default and drops unmatched rows silently.
-
-`indicator=True` while developing. It shows the result.
-
-`validate=` states the link and turns silent product into an error.
-
-Clean and type-check the key columns first. Most failed joins are dtype or whitespace.
-
-Select only the columns you need from the right frame.
-
-Set `suffixes` when names share.
-
-`join()` merges on the index and defaults to `left`, unlike `merge`.
-
-Use `transform` instead of a self-join for group statistics. `isin` instead of a join for membership.
-
-And compare row counts before and after, each time.
-
-## A closing note
-
-Joins are where the costly, quiet errors live.
-
-An inner join silently drops the rows that didn't match. A duplicated key on either side silently times the rows that did. Neither raises, both give output of the right shape. Each number found later is wrong in a way that looks fair.
-
-Three habits reduce almost all of it to nothing. Check the key columns' dtypes before joining. Most "nothing matched" cases are an int against a string. Pass `validate=` to state the link you expect. And compare the row count before and after, each single time.
-
-Those cost a few seconds and replace the option. This Is discovering months later that a total has been inflated because one link table gained a copy.
-
-And a good share of joins aren't joins at all. A group statistic wants `transform`. A membership test wants `isin`. Both are safer. Neither can change the number of rows.
+All three avoid the join machinery fully and can't change the row count. This makes them both safer and clearer when the answer is a filter rather than an enrichment.
 
 ## One more thing
 
@@ -379,24 +348,7 @@ And a good share of joins aren't joins at all. A group statistic wants `transfor
 
 For the common case of filling out a full grid before joining sparse data onto it, `pd.MultiIndex.from_product` and `reindex` are often the better route.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What are the types of merge?</strong> inner keeps keys found in both frames, left keeps all keys from the left, right keeps all from the right, and outer keeps all from both.
-
-<strong>Why did my merge produce more rows than I started with?</strong> Duplicate keys on one or both sides multiply: three matches on the right produce three output rows. Check df['key'].is_unique and use validate='one_to_one' or 'many_to_one'.
-
-<strong>What is the difference between merge and join?</strong> join is a shortcut for merging on the index and defaults to a left join. merge is more general and works on columns or the index.
-
-<strong>How do I merge when the key columns have different names?</strong> Use left_on='a', right_on='b'. Both columns stay in the result, so drop the extra one afterwards.
-
-<strong>What do the _x and _y suffixes mean?</strong> They are added when both frames have a non-key column with the same name. Set suffixes=('_left', '_right') to choose better names.
-
-<strong>How can I see which rows did not match?</strong> Pass indicator=True, which adds a _merge column with the values left_only, right_only or both.
-
-## In summary
-
-The default is an inner join. This Drops unmatched rows without a word. A duplicated key on either side times rows without a word either.
-
-Both are blocked by the same short routine. Clean and type-check the keys, assert uniqueness where you assume it, pass `validate=`. Compare the row count before and after.
-
-And a good number of steps phrased as joins aren't. A group statistic is `transform`. A membership test is `isin`. Both are safer. Neither can change how many rows you've.
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/merging.html)
+- Continue with [merge and join](pivot_and_melt.html).

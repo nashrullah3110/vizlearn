@@ -1,9 +1,11 @@
 title: Views versus Copies
 intro: Which steps give you a second window onto the same numbers, and why it matters.
 
-## One buffer, several descriptions
+## The core idea
 
-Understanding views and copies is the single most important thing for writing correct NumPy code. A view shares memory with the original array. A copy has its own memory. The difference is invisible when you only read. It shows up the moment you write.
+Understanding views and copies is the single most important thing for writing correct NumPy code. A view shares memory with the original array. A copy has its own memory.
+
+## One buffer, several descriptions
 
 Every slice creates a view. That means modifying a slice modifies the original array. This is a performance feature. Copying a gigabyte array every time you take a slice would be wasteful. But it is also a correctness hazard. If you pass a slice to a function and that function writes to it, the original array changes. Nothing warns you.
 
@@ -15,7 +17,6 @@ The distinction matters for three reasons. First, correctness. Writing through a
 
 np.shares_memory tells you whether two arrays share the same underlying buffer. It is the definitive check. When you are unsure, call it. When debugging an unexpected mutation, call it on every array that might be a view of the one that changed.
 
-This module covers how views are created, how copies are created, how to tell the difference, and how to force a copy when you need one. The examples show mutations propagating through views and stopping at copies.
 
 
 An array is a block of memory plus a description. Where it starts, what shape it has. How many bytes to step for each axis. Those steps are the **strides**.
@@ -25,7 +26,6 @@ A **view** is a new description of the same block. Making one is free. Writing t
 A **copy** is a new block. It costs time and memory, and it's split.
 
 Nearly each surprise in NumPy that isn't about broadcasting is about this gap.
-
 
 ## The rule, in one table
 
@@ -168,6 +168,7 @@ b = np.array(a, copy=True)
 b[0] = -1
 print("   a:", a, " b:", b)
 ```
+
 ## Where the line falls
 
 **Views**: basic slicing, `reshape` (usually), `.T` and other transposes, `ravel` (usually), `np.newaxis`, and `view()`.
@@ -178,7 +179,7 @@ The rule underneath is rote. If the selected elements can be given by a start an
 
 That is why the list isn't any and doesn't need storing once you've the reason.
 
-Two entries carry an "often". `reshape` returns a view when the result can be strided over the existing layout. Copies when it can't. Often after a transpose. `ravel` is the same. Neither tells you which happened. This Is why the check below matters.
+Two entries carry an "often". `reshape` returns a view when the result can be strided over the existing layout. Copies when it can't. Often after a transpose. `ravel` is the same. Neither tells you which happened. This is why the check below matters.
 
 ## Checking
 
@@ -237,7 +238,7 @@ Two steps in the view column carry a qualifier. Both are worth understanding rat
 
 `ravel` is the same. `flatten` is the version that always copies. Its existence is really just a way of asking for the promise.
 
-If you need the opposite promise. A view or an error, never a silent copy. Assign to `.shape` right. `a.shape = (3, 4)` raises if a view is hopeless. This Turns an invisible speed problem into a visible failure.
+If you need the opposite promise. A view or an error, never a silent copy. Assign to `.shape` right. `a.shape = (3, 4)` raises if a view is hopeless. This turns an invisible speed problem into a visible failure.
 
 ## copy is shallow, in the way that matters
 
@@ -247,7 +248,7 @@ For an **object** array it isn't. The new array has its own array of pointers. T
 
 `copy.deepcopy(a)` from the standard library copies the objects too.
 
-This only arises with `dtype=object`. This Is uncommon and often worth avoiding. The failure is confusing when it happens because `copy()` did just what its name suggests at the level it operates on.
+This only arises with `dtype=object`. This is uncommon and often worth avoiding. The failure is confusing when it happens because `copy()` did just what its name suggests at the level it operates on.
 
 ## In-place operations on a fancy index
 
@@ -329,21 +330,7 @@ The default of copying is defensive: `astype` is often called to give a thing th
 
 `a.flags["OWNDATA"]` &mdash; whether the array owns its buffer.
 
-`a.flags` in full also reports contiguity. This Is what finds whether the next `reshape` or `ravel` will copy.
-
-## Questions people ask
-
-<strong>How can I tell whether two arrays share memory?</strong> Use np.shares_memory(a, b), or check b.base is a. A view keeps a reference to the array that owns the data.
-
-<strong>Which operations return views?</strong> Slices, reshape when possible, transpose, ravel when possible, and view. Basic indexing gives views.
-
-<strong>Which operations return copies?</strong> Fancy indexing, boolean masking, flatten, astype and explicit .copy(). Arithmetic always produces a new array.
-
-<strong>Why did changing b change a?</strong> b was a view of a, probably from a slice. Call .copy() when you create b if you want independent data.
-
-<strong>Is a copy always safe?</strong> It is safe but costs memory and time. On big arrays, a stray copy in a loop is a common slow-down.
-
-<strong>What is the pitfall with chained indexing and assignment?</strong> a[mask][0] = 1 assigns into a temporary copy and is lost. Combine the index into one expression such as a[mask] = 1.
+`a.flags` in full also reports contiguity. This is what finds whether the next `reshape` or `ravel` will copy.
 
 ## The habits that prevent the bugs
 
@@ -356,3 +343,8 @@ The default of copying is defensive: `astype` is often called to give a thing th
 **Check with `shares_memory`** when a mutation appears from nowhere. It's the fastest route from symptom to cause. It gives a definite answer where thinking about which steps copy gives a probable one.
 
 None of this argues against views. They're why slicing a gigabyte array is free and why array code can pass windows around without thought. The goal is to know which one you're holding at the three moments it matters. Across a function boundary, before modifying in place. When keeping a fragment of a thing large.
+
+## Sources and next steps
+
+- Official reference: [Numpy documentation](https://numpy.org/doc/stable/user/basics.copies.html)
+- Continue with [Views versus Copies](stacking_and_splitting.html).

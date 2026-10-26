@@ -1,13 +1,11 @@
 title: Race Conditions: Why x += 1 Is Three Operations
 intro: The GIL makes one bytecode atomic. An increment is not one bytecode, and the gap is where a count goes missing.
 
-## One statement, several bytecodes
+## The core idea
 
-The [previous page](the_gil_and_what_it_locks.html) ended on a fact worth
-repeating, because everything here follows from it: a thread switch can only
-happen *between* bytecodes, so a single bytecode is atomic with respect to
-other threads. That sounds reassuring until you ask how many bytecodes an
-ordinary line of Python is.
+The previous page ended on a fact worth repeating, because everything here follows from it: a thread switch can only happen between bytecodes, so a single bytecode is atomic with respect to other threads.
+
+## One statement, several bytecodes
 
 ```python-run
 import dis
@@ -365,25 +363,7 @@ decide.
 changes the scheduling, so the class of bug most in need of one is the class
 least likely to reproduce under it.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>Why is the count different every run?</strong> Because the operating system decides when to switch threads, and it does not decide the same way twice. The number of lost updates is the number of times a switch landed between a read and a write, which is a property of that particular run.
-
-<strong>Is <code>counter += 1</code> safe if it is the only shared thing?</strong> No &mdash; being the only shared variable does not make it fewer bytecodes. Two threads incrementing one integer is the canonical race, and it is the example on this page.
-
-<strong>Does making it a local variable fix it?</strong> Yes, and that is the first fix above rather than a trick. A local is private to the call, so two threads have two of them; the race only exists because the name resolves to one shared object.
-
-<strong>Is <code>+=</code> on a list also a race?</strong> It is, and it is worse than it looks, because <code>lst += [x]</code> mutates in place and rebinds. Use <code>append</code>, which is the single C call.
-
-<strong>What about the free-threaded build?</strong> Races get easier to hit, not harder. Under the GIL a switch can only land between bytecodes; without it two threads genuinely execute at once, so an interleaving that was rare becomes common. Code that passed by luck is the code that breaks first.
-
-<strong>How do I find one in an existing program?</strong> Look for shared mutable state and then for read-modify-write or check-then-act against it &mdash; the shapes in the table above. Raising the thread count and the iteration count makes an intermittent failure reproducible far more reliably than reading the code does.
-
-## Recap in one screen
-
-- A switch lands only between bytecodes, so one bytecode is atomic and a statement generally is not.
-- <code>counter += 1</code> is <code>LOAD_GLOBAL</code>, <code>BINARY_OP</code>, <code>STORE_GLOBAL</code>: read, modify, write, with two gaps.
-- If both threads read before either writes, the second write replaces the first instead of building on it. Every individual step was correct; the interleaving was not.
-- The damage scales with how often a switch lands in a gap, which is why the total differs every run and why small tests pass.
-- One C call cannot be split, so <code>append</code> and <code>d[k] = v</code> are safe while <code>d[k] += 1</code> and check-then-act are not.
-- Preferred fixes in order: stop sharing the state, take a lock around every access, or use something already atomic.
+- Official reference: [Python threading and locks](https://docs.python.org/3/library/threading.html#lock-objects)
+- Continue with [Race Conditions: Why x += 1 Is Three Operations](locks_and_the_ways_they_go_wrong.html).

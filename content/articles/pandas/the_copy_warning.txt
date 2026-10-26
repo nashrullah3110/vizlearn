@@ -1,9 +1,11 @@
 title: The Copy Warning
 intro: Why an set that looks right silently does nothing.
 
-## The problem
+## The core idea
 
-Chained indexing is the source of one of the most confusing errors in pandas. The code looks correct. It selects rows, then assigns a value. Sometimes it works. Sometimes it silently does nothing. The outcome depends on whether an intermediate object shares memory with the original frame or is an independent copy.
+Chained indexing is the source of one of the most confusing errors in pandas. The code looks correct. It selects rows, then assigns a value.
+
+## The problem
 
 That unpredictability is the real issue. If it always failed, you would learn the pattern and avoid it. If it always worked, there would be no problem. Because it depends on internal memory layout, the same code can behave differently depending on the dtypes, the size of the frame, or the version of pandas.
 
@@ -11,7 +13,6 @@ The SettingWithCopyWarning was added to catch this. It appears when pandas detec
 
 The fix is straightforward. Use a single loc or iloc expression for combined selection and assignment. That avoids the intermediate object entirely. The assignment goes directly into the original frame, with no ambiguity about where the write lands.
 
-This module explains why the problem exists, what the warning means, and how to write assignments that are unambiguous. It also covers the copy-on-write mode introduced in newer pandas versions, which changes the default behaviour so that every indexing operation returns an independent copy. That eliminates the ambiguity at the cost of requiring an explicit copy when you want shared memory.
 
 
 ```python
@@ -25,7 +26,6 @@ there are **two** steps here, not one.
 `df[df["age"] < 30]` runs first and makes a new object. Then `["age"] = 99` assigns into *that* object. Whether the new object shares memory with `df` decides whether `df` sees the change. And if it doesn't, the write lands on a temporary that is discarded on the next line.
 
 Once pandas noticed this pattern and raised `SettingWithCopyWarning`. The warning is famous for being confusing. It appears where the code looks fine, it at times appears when nothing is wrong. It at times fails to appear when a thing is. In current versions the set may simply do nothing, silently.
-
 
 ## The assignment that does nothing
 
@@ -168,11 +168,12 @@ print("back. To change the original you must say df.loc[...] = ...")
 print("It is the default from pandas 3.0 - writing code that way now")
 print("means nothing changes when you upgrade.")
 ```
+
 ## Why pandas cannot just fix it
 
 The obvious question is why pandas doesn't make chained set work.
 
-It can't know, at the time the first bracket runs, that an set is coming. `df[mask]` is an plain formula that returns an object. Python then calls `__setitem__` on that object. By then the data that this was one statement is gone.
+It can't know, at the time the first bracket runs, that an set is coming. `df[mask]` is a plain formula that returns an object. Python then calls `__setitem__` on that object. By then the data that this was one statement is gone.
 
 Whether the mid is a view or a copy depends on the inner layout. This Depends on the dtypes.
 
@@ -198,7 +199,7 @@ Anything with two sets of brackets to the left of `=` deserves a second look. Th
 
 `df[mask]["age"] = 99` &mdash; the classic.
 
-`sub = df[mask]` then later `sub["age"] = 99`. The same thing spread across two statements. This Is how it often appears in real code and why it's harder to spot.
+`sub = df[mask]` then later `sub["age"] = 99`. The same thing spread across two statements. This is how it often appears in real code and why it's harder to spot.
 
 ## The subset case
 
@@ -240,7 +241,7 @@ Writing code that assumes copy-on-write today means nothing changes when you upg
 
 Don't silence it. `pd.options.mode.chained_assignment = None` turns off the message and leaves the bug.
 
-Instead, find the line, and ask which of the two things you meant. The answer is always one of them, and writing it down fixes the code and docs the intent also.
+Instead, find the line, and ask which of the two things you meant. The answer is always one of them, and writing it down fixes the code and documents the intent also.
 
 ## How to read the warning
 
@@ -361,30 +362,11 @@ Enabling `pd.options.mode.copy_on_write = True` in a project today is the cheape
 
 If you note nothing else from this module: **two sets of brackets to the left of an equals sign is a bug**. `.loc` with both picks inside it's the fix.
 
-## A closing note
-
-This is the only module in the track devoted to a warning message. It earns the space by how much time it wastes.
-
-The underlying situation is truly awkward. `df[mask]["col"] = x` is two steps. By the time the set runs, that it was one statement is gone. pandas can't fix it from where it stands. It warns instead. Imperfectly, at times when nothing is wrong and at times not when a thing is.
-
-That imperfection is why "make the warning stop" is the wrong goal. The right goal is to know which object you're writing to. There are only two answers. A split frame you made with `.copy()`, or the first, handled through a single `.loc`.
-
-Copy-on-write drops the ambiguity fully and turns the default in pandas 3.0. Writing code today as though it's already on costs nothing and means the upgrade changes nothing.
-
-## Questions people ask
-
-<strong>What does SettingWithCopyWarning actually mean?</strong> pandas cannot tell if you are writing to a copy or to a view of the original frame. Your assignment may not reach the frame you meant to change.
-
-<strong>How do I make the warning go away properly?</strong> Call .copy() when you intend an independent subset, or use a single df.loc[mask, 'col'] = value when you intend to modify the original.
-
-<strong>Why not just turn the warning off?</strong> Silencing it hides real bugs where your assignment is lost. The warning is a symptom of code whose result depends on internal details.
-
-<strong>What is copy-on-write?</strong> It is a pandas mode in which any derived object behaves as a copy, so changing it never changes its parent. It removes the ambiguity and the warning, and it is the default from pandas 3.0.
-
-<strong>Is chained indexing always a problem?</strong> Chained assignment such as df[mask]['a'] = 1 is the problem. Chained reading such as df[mask]['a'] is fine, though a single loc is clearer.
-
-<strong>How do I check whether I have a copy or a view?</strong> You cannot rely on a check, because it depends on dtypes and the operation. Write code that makes the intent explicit with .copy() or one loc call.
-
 ## One more thing
 
 `df._is_copy` holds the inner flag that drives the warning. It's private, it shouldn't be leaned on. Knowing it exists at times helps when thinking about why a warning appeared where it did.
+
+## Sources and next steps
+
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/copy_on_write.html)
+- Continue with [The Copy Warning](adding_and_dropping.html).

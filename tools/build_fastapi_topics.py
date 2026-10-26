@@ -254,7 +254,7 @@ def page(t):
         </div>
     </section>
 """
-    return head + shell.header(PREFIX) + main + mount + shell.close(PREFIX)
+    return head + shell.header(PREFIX) + main + "\n<!-- VIZLEARN:LEDE:AFTER -->\n" + mount + shell.close(PREFIX)
 
 
 def catalog_entry(existing):

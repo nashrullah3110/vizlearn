@@ -1,22 +1,23 @@
 title: Strict vs Lax Mode: Where Coercion Helps and Where It Hides Bugs
 intro: The default is right at the edge of your system and wrong in the middle. Choosing per field is the answer.
 
-## Two different jobs
+## The core idea
 
-By default Pydantic runs in lax mode. It converts values when it can, so "5" becomes 5 and 1 becomes True. That is friendly, and for data that arrives as text it is usually what you want. It can also hide bugs, because a wrong type gets quietly fixed instead of reported.
+By default Pydantic runs in lax mode. It converts values when it can, so "5" becomes 5 and 1 becomes True. That is friendly, and for data that arrives as text it is usually what you want.
+
+## Two different jobs
 
 Strict mode does the opposite. It accepts only values that already have the right type. A string where an integer belongs is an error, even if the string looks like a number. The two modes do different jobs, and choosing between them is a design decision about how much you trust your input.
 
-This article explains the two jobs and how to switch strict mode on. It shows that you can set it for a whole model, but that a per-field setting is usually the better answer. It also covers what strict mode still allows, since it is less rigid than people expect. The last section looks at strict mode and JSON, where the rules differ from Python input. After reading it you will know when a strict field is worth the friction. You will also see how to mix both modes in a single model, which is often the practical choice.
 
-all in this tier has assumed lax mode. This Is the default: convert anything with an unambiguous reading, refuse the rest.
 
-That is just right at a boundary. A query string is text. A form post is text. A CSV is text. If check refused all that wasn't already the right Python type, the code in front of each model would be a pile of `int()` calls in `try` blocks. This Is the code the library exists to delete.
+all in this tier has assumed lax mode. This is the default: convert anything with an unambiguous reading, refuse the rest.
+
+That is just right at a boundary. A query string is text. A form post is text. A CSV is text. If check refused all that wasn't already the right Python type, the code in front of each model would be a pile of `int()` calls in `try` blocks. This is the code the library exists to delete.
 
 It's just wrong three layers in. If a function inside your own system passes a string where an int was expected, that is a bug you wrote. Converting it silently means the bug lives. The symptom appears one spot else. Often as a number that is subtly wrong rather than an error that names the cause.
 
 Same action, opposite value, based on which side of the boundary you're standing on. Which is why the setting exists.
-
 
 ## The same model, two answers
 
@@ -199,6 +200,7 @@ try:
 except ValidationError as e:
     print("caught our own bug:", e.errors()[0]["msg"])
 ```
+
 ## Turning it on
 
 Per model:
@@ -214,13 +216,13 @@ Per field:
 user_id: int = Field(strict=True)
 ```
 
-Or as a reusable type. This Is often the nicest:
+Or as a reusable type. This is often the nicest:
 
 ```python
 UserId = Annotated[int, Field(strict=True)]
 ```
 
-Pydantic also ships `StrictInt`, `StrictStr`, `StrictBool` and `StrictFloat`. This Are the same thing pre-named.
+Pydantic also ships `StrictInt`, `StrictStr`, `StrictBool` and `StrictFloat`. These are the same thing pre-named.
 
 ## Per field is the usual answer
 
@@ -230,9 +232,10 @@ The narrower need is much more common: be lax about most of a model and exact ab
 
 **Identifiers** are the classic case. A `user_id` arriving as `"42"` rather than `42` often means a thing upstream lost a type. A JSON serialiser configured oddly, a value that went through a URL and was never converted back. Accepting it papers over that. Refusing it tells you where the problem is while it's still cheap to find.
 
-**Money** is the other. A `Decimal` field that accepts a float will accept an already-inexact value and validate it happily. This Is the worst possible outcome for a currency amount.
+**Money** is the other. A `Decimal` field that accepts a float will accept an already-inexact value and validate it happily. This is the worst possible outcome for a currency amount.
 
 **Booleans** are worth considering too. `bool` is generous in lax mode. `"yes"`, `"on"`, `"t"` all work. And that is truly handy for a checkbox and truly alarming for a flag that controls whether money moves.
+
 ## Strict and JSON
 
 There's a subtlety worth understanding, because it looks like an inconsistency and isn't.
@@ -319,7 +322,7 @@ Strict failures have their own error types, and recognising them saves a moment'
 
 Where a lax model would report `int_parsing` for `"twelve"`, a strict model reports `int_type` for `"12"`. The message is about the *type* being wrong rather than the value being unparseable.
 
-That gap is truly handy in a log. `int_parsing` means somebody sent nonsense. `int_type` on a strict field means somebody sent a well-formed value in the wrong form. This Is often a wiring problem in a caller rather than bad input from a user. The two deserve other responses.
+That gap is truly handy in a log. `int_parsing` means somebody sent nonsense. `int_type` on a strict field means somebody sent a well-formed value in the wrong form. This is often a wiring problem in a caller rather than bad input from a user. The two deserve other responses.
 
 ## A decision you can apply mechanically
 
@@ -337,7 +340,7 @@ Applied field by field, that makes models that are permissive just where permiss
 
 ## The principle underneath
 
-Both modes exist because check answers a other question in other places.
+Both modes exist because check answers another question in other places.
 
 At the boundary the question is "can I make sense of this?". Being generous is correct. The sender had no better option than text.
 
@@ -369,22 +372,7 @@ You can now show data with real shape. Models inside models, sets with real erro
 
 What you can't yet do is express a rule that no annotation can hold. A value that must be checked against another value, a field found from the rest, a scaling applied before checking. That is the next tier, and it starts with checkers.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What does lax mode do?</strong> It converts compatible input, so `"42"` becomes `42`. It is the default.
-
-<strong>What changes in strict mode?</strong> No type conversion happens. A string where an int is expected is rejected with an `int_type` error.
-
-<strong>How do I turn strict on for one field?</strong> Use `Field(strict=True)` or a type like `StrictInt`. This is usually better than switching the whole model.
-
-<strong>Can I enable strict for a whole model?</strong> Yes, with `model_config = ConfigDict(strict=True)`. Individual calls can also pass `strict=True` to `model_validate`.
-
-<strong>Does strict mode treat JSON differently?</strong> Yes. JSON has no distinct date type, so strict JSON mode still accepts ISO strings for dates, while strict Python mode wants a real `date`.
-
-<strong>Does strict stop `True` being accepted as an int?</strong> Yes. In strict mode a bool is not accepted for an `int` field, even though `bool` subclasses `int` in Python.
-
-## Summary
-
-Lax mode converts anything unambiguous and is correct at the boundary. The boundary is text. Strict mode needs the annotated type and is correct inside, because a mismatch there's your own bug.
-
-Set it per field rather than per model often. Strict still permits lossless widening. Still accepts the string forms JSON has no option to. Identifiers, money and consequential flags are the fields where it earns its place first.
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/strict_mode/)
+- Continue with [Strict vs Lax Mode](field_validator.html).

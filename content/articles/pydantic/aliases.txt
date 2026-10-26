@@ -1,24 +1,21 @@
 title: Aliases: When the Wire and Your Code Disagree
-intro: camelCase payloads, reserved words, legacy names, and nested shapes flattened into yours.
+intro: CamelCase payloads, reserved words, legacy names, and nested shapes flattened into yours.
+
+## The core idea
+
+The name a field has in your code is not always the name it has in the data. An external API may send camelCase keys, while your Python code uses snakecase.
 
 ## Four reasons a field needs another name
 
-The name a field has in your code is not always the name it has in the data. An external API may send camelCase keys, while your Python code uses snake_case. A legacy system may use cryptic names you would rather not spread through your code. An alias connects the two.
-
 An alias tells Pydantic that the input key differs from the attribute name. You work with a clean name in Python and accept the awkward name on the wire. That keeps outside conventions at the edge, where they belong, instead of leaking into your own code.
-
-This article begins with the four reasons a field needs another name. It then shows the simple form of an alias and how to use by_alias on the way out. It covers how to separate the direction, so the name you accept can differ from the name you send. You will also see how a field can accept several spellings, which helps when you migrate from an old format. Aliases are a small feature, but a lot of real integration work depends on them.
-
-Anyone who has connected to a third-party service has met this problem. The data never quite matches the naming you would choose. You can rename things by hand in a conversion step, but that step is one more place for a typo to hide. An alias moves the mapping into the model, where it is declared once and checked every time. The same declaration can serve both directions, or each direction can have its own rule, depending on what the other side expects. The article also touches on the settings that decide whether the alias or the real name is accepted on input, which is a frequent source of confusion. You only need to set this up once per field, and the mapping follows the model wherever it goes. Learn it once, and mismatched names stop being a source of friction in your integrations.
 
 **The wire is camelCase.** JavaScript clients and a great many APIs use `publishedAt`. Python uses `published_at`. Renaming your fields to match makes each Python file read badly. Renaming their payload isn't an option.
 
-**The key is a reserved word.** A payload with `from`, `class`, `import` or `id` can't map onto an field with the same name.
+**The key is a reserved word.** A payload with `from`, `class`, `import` or `id` can't map onto a field with the same name.
 
 **The name is bad.** A third-party API calls a thing `dt2`. You don't have to.
 
 **The name changed.** You're renaming a field and both spellings must work through a deprecation window.
-
 
 ## The wire says camelCase
 
@@ -160,13 +157,14 @@ print("python :", m.reading_minutes)
 print("out    :", m.model_dump(by_alias=True))
 print("by name:", Module(title="X", published_at="Y", reading_minutes=1).reading_minutes)
 ```
+
 ## The simple form
 
 ```python
 published_at: str = Field(alias="publishedAt")
 ```
 
-One alias, used for input and output. There's one action here that catches all: **by default the alias replaces the Python name as input**. `Module(published_at="...")` now raises. This Is surprising when you've been making the model in your own tests.
+One alias, used for input and output. There's one action here that catches all: **by default the alias replaces the Python name as input**. `Module(published_at="...")` now raises. This is surprising when you've been making the model in your own tests.
 
 `populate_by_name=True` fixes it:
 
@@ -240,13 +238,13 @@ class ApiModel(BaseModel):
 
 Inherit from that and each model in your API speaks camelCase, with no per-field config at all. Pydantic ships `to_camel` and `to_pascal` in `pydantic.alias_generators`. You often don't even write the function.
 
-An clear `alias` on a field replaces the gen. This Is what you want for the handful of exceptions each real API has.
+An clear `alias` on a field replaces the gen. This is what you want for the handful of exceptions each real API has.
 
 This is the right shape for a code-wide rule. One base model, one setting, each model steady. One place to change it.
 
 ## Aliases in the schema
 
-The made JSON Schema uses aliases. This Is correct. The schema shows the wire format. The wire format is what the alias names.
+The made JSON Schema uses aliases. This is correct. The schema shows the wire format. The wire format is what the alias names.
 
 So consumers of your OpenAPI doc see `publishedAt`, made clients give `publishedAt`. The docs matches what the endpoint really accepts. This is one of the places where getting aliases right pays off beyond your own code.
 
@@ -256,7 +254,7 @@ So consumers of your OpenAPI doc see `publishedAt`, made clients give `published
 
 **Losing `populate_by_name`** and then being unable to make the model in tests using Python names.
 
-**Aliasing to a name that collides** with another field's name. This Makes confusing action rather than a clear error.
+**Aliasing to a name that collides** with another field's name. This makes confusing action rather than a clear error.
 
 **Using aliases to paper over a bad model.** If half your fields need aliases to make sense, the model may be showing someone else's payload rather than your domain. A translation layer. An input model matching their shape, converted to yours. Is at times clearer than twenty aliases.
 
@@ -264,13 +262,13 @@ So consumers of your OpenAPI doc see `publishedAt`, made clients give `published
 
 An alias applies to the field it's declared on. Nesting is unaffected. A nested model's own aliases apply when it's checked. `by_alias=True` passes through the whole tree on the way out.
 
-So a camelCase rule applied through a shared base model reaches each level without extra work. This Is the main reason to prefer `alias_generator` on a base over per-field aliases.
+So a camelCase rule applied through a shared base model reaches each level without extra work. This is the main reason to prefer `alias_generator` on a base over per-field aliases.
 
 The one thing to check is agreement. A tree where the parent is aliased and one nested model isn't makes output that is camelCase at the top and snake_case two levels down. Valid, confusing. Just the kind of thing that lives review.
 
 ## What the schema says
 
-made schemas use aliases. This Is correct: the schema shows the wire. The alias is the wire name.
+made schemas use aliases. This is correct: the schema shows the wire. The alias is the wire name.
 
 That has a hands-on result worth knowing. If you make a schema for inner purposes and expect Python names, you won't get them. `model_json_schema(by_alias=False)` makes the Python-named version when that is truly what you need.
 
@@ -280,7 +278,7 @@ For anything published, the aliased schema is the right one. It matches what the
 
 An error's `loc` uses the **alias**, not the Python name, when check failed on an aliased field.
 
-That is the right action. The caller sent `publishedAt` and should be told about `publishedAt`, not about an field name they've never seen. But it means error-handling code can't assume `loc` matches your field names. This At times matters when mapping errors back to inner state.
+That is the right action. The caller sent `publishedAt` and should be told about `publishedAt`, not about a field name they've never seen. But it means error-handling code can't assume `loc` matches your field names. This At times matters when mapping errors back to inner state.
 
 ## A migration recipe
 
@@ -308,14 +306,6 @@ If you consume a third-party API with thirty oddly-named fields, two models can 
 
 Aliases are best when the gap is a *rule*. CamelCase versus snake_case, a reserved word, a rename in progress. When the gap is a whole foreign vocab, a translation layer says more.
 
-## Summary
-
-`alias` for one name both ways. `validation_alias` and `serialization_alias` when the directions differ. `populate_by_name=True` so Python names still work as input. `by_alias=True` to emit them.
-
-`AliasChoices` for a few accepted spellings. This Makes renames painless. `AliasPath` for flattening nested payloads. `alias_generator` on a shared base for a whole-API rule.
-
-And the one to note: aliases aren't used on output unless you ask for them.
-
 ## The one-line summary
 
 Aliases exist so your Python can read like Python while your API reads like what your consumers expect.
@@ -323,7 +313,6 @@ Aliases exist so your Python can read like Python while your API reads like what
 Set the rule once on a shared base with `alias_generator` and `populate_by_name`, note `by_alias=True` when dumping by hand. Reach for `AliasChoices` the moment you need to rename a thing without breaking anyone.
 
 all else in this module is a variation on those three.
-
 
 ## Mistakes people make
 
@@ -345,7 +334,7 @@ If a thing about aliases isn't working, check `by_alias=True` first.
 
 It accounts for most alias problems, it makes no error. The symptom. An API that accepts one rule and returns another. Looks like a config problem rather than a missing arg on a single call.
 
-The second thing to check is `populate_by_name`. This Is what stops your own tests being able to make the model using the names you wrote.
+The second thing to check is `populate_by_name`. This is what stops your own tests being able to make the model using the names you wrote.
 
 ## The convention decision
 
@@ -361,22 +350,7 @@ What makes trouble is deciding case by case. Some endpoints camelCase, some not,
 
 Make the choice once, express it in a base model. Let the exceptions be genuine exceptions rather than accidents.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>Why does my model reject the Python field name after I add an alias?</strong> By default an alias replaces the field name as the input key, so `Module(published_at=...)` raises. Set `populate_by_name=True` in `model_config` and both spellings work.
-
-<strong>Why does `model_dump()` return snake_case when I set an alias?</strong> Aliases are only used on output when you ask for them. Call `model_dump(by_alias=True)`, or set `serialize_by_alias` in the config on newer releases.
-
-<strong>What is the difference between alias, validation_alias and serialization_alias?</strong> `alias` sets one name for both directions. `validation_alias` only controls the input key and `serialization_alias` only controls the output key, and each wins over `alias` in its own direction.
-
-<strong>How do I accept several spellings of the same key?</strong> Use `validation_alias=AliasChoices("durationMinutes", "duration", "minutes")`. Pydantic takes the first key it finds in the input.
-
-<strong>Can I make every field camelCase without writing each alias?</strong> Yes. Put `alias_generator=to_camel` (from `pydantic.alias_generators`) in the config of a shared base model, and every field gets a camelCase alias.
-
-<strong>How do I read a value from inside a nested payload?</strong> Use `AliasPath("author", "name")` as the validation alias. It walks the keys in order and pulls the inner value up into a flat field.
-
-## One thing to remember
-
-If just one fact lives this module, make it `by_alias=True`.
-
-Aliases configured just right still do nothing on output until that arg is passed, the failure is silent. The symptom looks like a config problem rather than a missing keyword on a single call. It's the first thing to check when aliases appear not to work.
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/alias/)
+- Continue with [Aliases](parsing_json.html).

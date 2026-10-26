@@ -1,13 +1,15 @@
 title: model_config: Settings That Change the Whole Model
 intro: Extra keys, mutability, set checking and string handling - the switches worth knowing.
 
-## Where behaviour lives
+## The core idea
 
-Each model has settings that change how it behaves as a whole. Should it reject keys it does not know? Should it trim whitespace from every string? Should it allow its fields to be changed after creation? Those are questions about the model, not about a single field.
+Each model has settings that change how it behaves as a whole. Should it reject keys it does not know? Should it trim whitespace from every string?
+
+## Where behaviour lives
 
 The answers live in model_config, a small dictionary on the class. You set it once, and it applies to every field. It is where Pydantic keeps its switches, and a handful of them come up in nearly every project.
 
-This article explains where behaviour lives and how to read the options. It spends the most time on the extra setting, which decides what happens to keys you did not declare. It covers the fact that validation happens once, when the object is created, and what that means for later changes. It then looks at the frozen setting, which is the other answer to the problem of mutation. Along the way you will see which settings are worth knowing by heart and which you can look up when you need them. After this, the model stops being a fixed thing and becomes something you can tune.
+
 
 Think of the config as the control panel for a model. You rarely need all of it, but a few switches matter a great deal. Some protect you from typos in incoming data. Some save you from cleaning strings by hand. Some make an object safe to share, because it can no longer change. The article names the ones worth remembering and shows what each does to real input. You will also see how config is inherited, so one base class can set the rules for a whole family of models. Learning the handful that matter will save you from writing the same defensive code again and again. Reach for this article whenever a model behaves in a way you did not expect.
 
@@ -22,7 +24,6 @@ class Module(BaseModel):
 In Pydantic v1 this was an inner `class Config`. That still works and is deprecated. It's the clearest signal that a tutorial predates v2.
 
 There are a lot of settings. These are the ones that come up constantly.
-
 
 ## Unknown keys are ignored by default
 
@@ -192,6 +193,7 @@ print("with    :", FromObj.model_validate(row))
 print()
 print("In Pydantic v1 this setting was called orm_mode.")
 ```
+
 ## extra: what to do with keys you did not declare
 
 The default is `"skip"` &mdash; unknown keys are silently dropped.
@@ -214,7 +216,7 @@ The arg for `"skip"` is forward match on a public API. A client sending fields f
 
 This surprises people, and it's worth being clear about.
 
-A model is checked when it's made. Assigning to an field later is a plain Python set: no checking, no coercion.
+A model is checked when it's made. Assigning to a field later is a plain Python set: no checking, no coercion.
 
 ```python
 m = Module(minutes=8)
@@ -227,7 +229,7 @@ The thinking is speed &mdash; most models are built, read and discarded. Checkin
 
 Turn it on for any model that is truly mutated after build, above all one holding config or building up state. It costs a little per set and drops a class of bug where a model's declared types quietly stop being true.
 
-Note that it also makes any `model_validator(mode="after")` run again on each set. This Is often what you want and is worth knowing if those checkers are costly.
+Note that it also makes any `model_validator(mode="after")` run again on each set. This is often what you want and is worth knowing if those checkers are costly.
 
 ## frozen: the other answer to mutation
 
@@ -249,7 +251,7 @@ Three settings that apply to each string field:
 
 `str_to_lower=True` and `str_to_upper=True` norm case. handy for emails, codes and identifiers. Wrong for anything with display text. Apply it to models that are all identifiers rather than reaching for it globally.
 
-`str_min_length=1` sets a floor for each string. Mixed with stripping, this is the compact way to say "no blank strings anywhere in this model". This Is a rule most form models want and few state.
+`str_min_length=1` sets a floor for each string. Mixed with stripping, this is the compact way to say "no blank strings anywhere in this model". This is a rule most form models want and few state.
 
 ## from_attributes: reading objects
 
@@ -266,7 +268,7 @@ ModuleOut.model_validate(orm_row)
 
 This is how a model turns a DB row into a response. It recurses. A row with related objects turns nested models without any manual conversion.
 
-It was `orm_mode` in v1. This Is the name most existing material uses.
+It was `orm_mode` in v1. This is the name most existing material uses.
 
 Two cautions. It reads fields. So A lazy-loading ORM link will be *loaded* when the model touches it. Which is how a single output quietly turns fifty queries. And it will read any field matching a field name, so a model with a field called `password_hash` pointed at a user row will faithfully put the hash in your response. Output models should list only what may be seen.
 
@@ -307,19 +309,19 @@ For **anything mutated after build**: `validate_assignment=True`.
 
 ## Settings that catch mistakes
 
-Three more worth knowing because each closes a exact hole.
+Three more worth knowing because each closes an exact hole.
 
-`validate_default=True` checks default values. This Are else trusted. A mistyped default sits silently until a thing downstream does math on a string. Worth turning on for models whose defaults come from constants defined elsewhere.
+`validate_default=True` checks default values. These are else trusted. A mistyped default sits silently until a thing downstream does math on a string. Worth turning on for models whose defaults come from constants defined elsewhere.
 
 `revalidate_instances="always"` re-validates a model instance passed into another model. By default an object that is already the right class is accepted as-is, on the fair assumption it was checked when built. If it was mutated later without `validate_assignment`, that assumption is wrong. This setting closes the gap at the cost of re-running check.
 
-`ser_json_timedelta` and `ser_json_bytes` control how those two types serialise. This Matters when a consumer expects seconds rather than an ISO duration.
+`ser_json_timedelta` and `ser_json_bytes` control how those two types serialise. This matters when a consumer expects seconds rather than an ISO duration.
 
 ## Protected namespaces
 
 By default Pydantic reserves the `model_` prefix and warns if you declare a field starting with it. That is where its own methods live &mdash; `model_dump`, `model_validate`, `model_fields`.
 
-That is a genuine problem if your domain has fields like `model_name` or `model_version`. This Is common in anything ML-adjacent.
+That is a genuine problem if your domain has fields like `model_name` or `model_version`. This is common in anything ML-adjacent.
 
 `protected_namespaces=()` turns the warning off, and `protected_namespaces=("model_config",)` narrows it. Be aware that a field truly named `model_dump` would shadow the method. The warning is doing real work. Disable it on purpose rather than to silence noise.
 
@@ -337,7 +339,7 @@ For a code of any size, the base model is the answer. One file states the rules,
 
 ## Config and inheritance
 
-Config merges rather than replaces. A subclass setting one key keeps its parent's other settings. This Is what makes the base-model pattern hands-on.
+Config merges rather than replaces. A subclass setting one key keeps its parent's other settings. This is what makes the base-model pattern hands-on.
 
 That also means an from parent setting can be surprising in a subclass that didn't ask for it. If a base sets `extra="forbid"` and a subclass truly needs passthrough, it must say so by name. Which is the right default. Silently permissive is worse than by name permissive.
 
@@ -360,27 +362,6 @@ each model taking from from that is steady with every other. A new developer tak
 
 The one thing to avoid is a base so opinionated that half the models replace half of it. If a setting is wrong for a third of your models, it doesn't belong in the shared base.
 
-## Summary
-
-`model_config` is where model-wide action is decided. The four that matter most: `extra` for unknown keys, `validate_assignment` for mutation, `frozen` for immutability and hashability. The `str_*` family for human input.
-
-Set them on purpose rather than by default, put your house settings on a shared base. Note that the two most common silent bugs in this area. An skipped typo in a key and an unvalidated set. Are both one config entry away from being loud.
-
-## The short version
-
-Four settings account for most of the value.
-
-`extra="forbid"` turns a typo in a key from a silent nothing into a named error. Set it anywhere you control both ends.
-
-`validate_assignment=True` extends check past build. So A model's declared types stay true for its whole life.
-
-`frozen=True` makes checked data immutable and hashable. This Is the right shape for anything that arrives from outside and is then only read.
-
-`str_strip_whitespace=True` drops a group of trivial checker and a group of trivial bug.
-
-Put them on a shared base, decide them once. Let each model in the code inherit the same rules.
-
-
 ## Mistakes people make
 
 **Leaving `extra` at its default where you control both ends.** A typo in a key makes no error, no field and a value that silently falls back to a default. `extra="forbid"` turns a mystery into a message.
@@ -389,25 +370,11 @@ Put them on a shared base, decide them once. Let each model in the code inherit 
 
 **Copying the same `ConfigDict` into forty classes.** They drift. Four of them end up other for no reason anybody remembers. A shared base makes the rule one edit.
 
-**Using `from_attributes` on an output model without listing fields carefully.** It reads what field matches a field name. A model pointed at a user row will faithfully serialise a password hash. It also triggers lazy ORM links. This Is how one output turns fifty queries.
+**Using `from_attributes` on an output model without listing fields carefully.** It reads what field matches a field name. A model pointed at a user row will faithfully serialise a password hash. It also triggers lazy ORM links. This is how one output turns fifty queries.
 
 **Silencing the protected-namespace warning reflexively.** A field truly named `model_dump` would shadow the method. Disable the warning on purpose for a domain that needs `model_` names, not to quieten noise.
 
 **Building a base so opinionated that half the models replace it.** If a setting is wrong for a third of your models, it isn't a house rule and doesn't belong in the shared base.
-
-## Questions people ask
-
-<strong>How do I set model configuration in v2?</strong> Assign `model_config = ConfigDict(...)` in the class body. The old inner `class Config` still works but is deprecated.
-
-<strong>How do I stop a model accepting unknown keys?</strong> Set `extra="forbid"`. The default is `"ignore"`, which drops unknown keys silently, and `"allow"` keeps them.
-
-<strong>How do I make a model immutable?</strong> Use `frozen=True`. Assigning to a field then raises an error, and the model also becomes hashable.
-
-<strong>What does `from_attributes=True` do?</strong> It lets `model_validate` read attributes from an arbitrary object, such as an ORM row, instead of requiring a dict.
-
-<strong>Is config inherited by subclasses?</strong> Yes, and a subclass's `model_config` is merged with its parent's. Keys you set override the parent, and the rest carry over.
-
-<strong>What does `validate_assignment` do?</strong> It re-runs validation whenever you set an attribute after creation. Without it, `m.age = "oops"` is accepted silently.
 
 ## What it is really for
 
@@ -416,3 +383,8 @@ Config is where a code records the choices it has made about its own data.
 Whether an surprise key is a mistake or a courtesy. Whether checked objects may change. Whether the wire speaks camelCase. Whether a blank string is a value.
 
 Those are real choices, and each code makes them. Often silently, differently in other files, and rediscovered by each new person. Writing them once, on a shared base, turns a set of accidents into a rule.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/config/)
+- Continue with [model_config](annotated_and_custom_types.html).

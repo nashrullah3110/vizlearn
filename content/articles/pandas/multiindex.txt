@@ -1,9 +1,11 @@
 title: The MultiIndex
 intro: More than one level on an axis, and when to flatten it away.
 
-## It arrives whether you asked or not
+## The core idea
 
 A MultiIndex is an index with more than one level. It appears whenever a pandas operation produces labels that have structure. That happens more often than you might expect, and it surprises people who did not ask for it.
+
+## It arrives whether you asked or not
 
 The most common source is group-by with multiple keys. Grouping by city and year gives a result with a two-level index: city on the outer level, year on the inner. The result prints with a hierarchical layout, and selecting from it requires different syntax than selecting from a flat index.
 
@@ -15,7 +17,6 @@ The most common fix is to flatten the MultiIndex and go back to a simple frame. 
 
 Knowing when to keep a MultiIndex and when to flatten it depends on what you are doing next. Plotting and exporting usually want a flat frame. Further aggregation and selection sometimes benefit from the hierarchical structure. The default choice, when you are unsure, is to flatten. You can always re-group later.
 
-This module covers how a MultiIndex is created, how to select from it, how to flatten it, and the methods that move levels between rows and columns. The examples use small frames so every level is visible in the output.
 
 
 Almost no one makes a MultiIndex on purpose. It appears as the result of steps you were doing anyway:
@@ -29,7 +30,6 @@ Almost no one makes a MultiIndex on purpose. It appears as the result of steps y
 `agg` with a few statistics per column gives nested **columns**.
 
 So the hands-on question is rarely "should I build one" and almost always "I have one, now what".
-
 
 ## Where it comes from
 
@@ -170,6 +170,7 @@ print()
 print("Keep the MultiIndex when you will select through it or unstack.")
 print("Flatten it when the result is going into a merge, a file or a chart.")
 ```
+
 ## Selecting
 
 The mental model: a tuple handles the levels in order, the way a nested dict would.
@@ -218,7 +219,7 @@ Losing that step is a common source of confusion later, when a thing downstream 
 
 **Keep it** when you're going to select through it, `unstack` it into a table, or aggregate over its levels. For truly nested data. Country/region/city, or a panel indexed by entity and date. It's the right structure and makes those steps natural.
 
-**Flatten it** when the result is leaving pandas or going into an step that doesn't care about tree. A merge, a CSV, a plotting call, a model.
+**Flatten it** when the result is leaving pandas or going into a step that doesn't care about tree. A merge, a CSV, a plotting call, a model.
 
 `reset_index()` turns index levels into plain columns. `groupby(..., as_index=False)` avoids creating one in the first place.
 
@@ -230,11 +231,11 @@ at times you want a MultiIndex before any group-by:
 
 `pd.MultiIndex.from_tuples([...], names=[...])` &mdash; from clear pairs.
 
-`pd.MultiIndex.from_product([["a","b"], [2023, 2024]])` &mdash; each mix. This Is how you build a full frame to reindex sparse data onto.
+`pd.MultiIndex.from_product([["a","b"], [2023, 2024]])` &mdash; each mix. This is how you build a full frame to reindex sparse data onto.
 
 `pd.MultiIndex.from_arrays([...])` &mdash; from parallel label arrays.
 
-`df.set_index(["city", "year"])` &mdash; from existing columns. This Is the usual route.
+`df.set_index(["city", "year"])` &mdash; from existing columns. This is the usual route.
 
 `from_product` plus `reindex` is the standard way to make a sparse panel dense. Build each expected mix, reindex onto it. The missing ones appear as `NaN` rather than being silently absent.
 
@@ -246,7 +247,7 @@ Pick on inner levels needs a **lexsorted** index. Without it, pandas raises `Uns
 
 The habit worth forming is to call `sort_index()` at once after building or reshaping a MultiIndexed object. It's cheap, it drops a class of error. It makes label ranges work.
 
-`df.index.lexsort_depth` reports how many levels are sorted. This Shows why pick works on the first level and fails on the second.
+`df.index.lexsort_depth` reports how many levels are sorted. This shows why pick works on the first level and fails on the second.
 
 ## droplevel, swaplevel, reorder_levels
 
@@ -292,7 +293,7 @@ You're fighting `UnsortedIndexError` and `slice(None)`.
 
 The result is heading for a merge, a CSV or a plotting call.
 
-In the second case, `as_index=False` on the group-by avoids creating it at all. This Is simpler than creating and flattening.
+In the second case, `as_index=False` on the group-by avoids creating it at all. This is simpler than creating and flattening.
 
 ## Getting values out
 
@@ -308,7 +309,7 @@ A recurring need is turning a MultiIndexed result into a thing plain code can us
 
 `list(df.index)` &mdash; the labels as tuples.
 
-`df.index.get_level_values("city")` &mdash; one level as a flat array. This Is what you want for filtering or for building a mask without resetting anything.
+`df.index.get_level_values("city")` &mdash; one level as a flat array. This is what you want for filtering or for building a mask without resetting anything.
 
 That last one is under-used: `df[df.index.get_level_values("year") == 2024]` filters on a level without any `slice(None)` syntax.
 
@@ -332,27 +333,11 @@ The better answer is often to avoid creating them: **named aggregation** makes f
 
 A MultiIndex is a set of int codes plus level values. It's compact. Often more so than the equal columns. Repeated labels are stored once.
 
-Pick is fast on a lexsorted index and slow else. This Is why `sort_index()` matters here more than elsewhere.
+Pick is fast on a lexsorted index and slow else. This is why `sort_index()` matters here more than elsewhere.
 
 Group-by on index levels is close to group-by on columns.
 
 The costs are in usability rather than speed: more concepts, more edge cases. Code that other people find harder to follow.
-
-## A summary
-
-They arrive from group-by, `concat(keys=)`, `stack` and `agg` rather than being built.
-
-A tuple handles the levels. `xs` takes a cross-section. `slice(None)` is the wildcard.
-
-`sort_index()` after building one, always.
-
-`groupby(level=...)` aggregates over a level.
-
-`unstack` turns a level into columns and is often what you really wanted.
-
-Flatten nested columns with a join over the tuples, or avoid them with named aggregation.
-
-Keep it when the tree is real and you select through it. `reset_index()` when it's an artefact.
 
 ## Where it fits
 
@@ -364,15 +349,15 @@ The test is whether you'll use the tree. If the next step selects a level, aggre
 
 Neither choice is permanent. `set_index` and `reset_index` are cheap and reversible. The choice can be made per step rather than committed to at the start.
 
-The one thing worth doing always is `sort_index()` after building one. Almost each confusing MultiIndex error traces back to an unsorted index. The fix is a single call that costs nothing on data of plain size.
+The one thing worth doing always is `sort_index()` after building one. Almost every confusing MultiIndex error traces back to an unsorted index. The fix is a single call that costs nothing on data of plain size.
 
 ## Two more things worth knowing
 
 `df.index.names` gives the level names and is writable. An index built without names can be labelled after the fact. Named levels make each later `groupby(level=...)`, `xs` and `unstack` call readable. Unnamed ones force you to count spots.
 
-`pd.IndexSlice` deserves a mention on its own. Written as `idx = pd.IndexSlice`, it turns the awkward `df.loc[(slice(None), 2024), :]` into `df.loc[idx[:, 2024], :]`. This Is close enough to plain slicing to read at a glance.
+`pd.IndexSlice` deserves a mention on its own. Written as `idx = pd.IndexSlice`, it turns the awkward `df.loc[(slice(None), 2024), :]` into `df.loc[idx[:, 2024], :]`. This is close enough to plain slicing to read at a glance.
 
-Finally, a MultiIndex on the **columns** and one on the **rows** can coexist. This Is what `pivot_table` with lists for both `index` and `columns` makes. That is a truly handy shape for a printed report and a truly awkward one to find against. This Is the trade this whole module shows. The structure that displays best is rarely the structure that changes best.
+Finally, a MultiIndex on the **columns** and one on the **rows** can coexist. This is what `pivot_table` with lists for both `index` and `columns` makes. That is a truly handy shape for a printed report and a truly awkward one to find against. This is the trade this whole module shows. The structure that displays best is rarely the structure that changes best.
 
 ## A worked selection
 
@@ -390,32 +375,15 @@ Given sales indexed by `(city, year)`:
 
 `s.loc[pd.IndexSlice[:, 2024]]` &mdash; the same, in slice form.
 
-`s[s.index.get_level_values("year") == 2024]` &mdash; the same again, as an plain mask. The form that composes with other rules.
+`s[s.index.get_level_values("year") == 2024]` &mdash; the same again, as a plain mask. The form that composes with other rules.
 
 `s.groupby(level="city").sum()` &mdash; totals per city.
 
 `s.unstack("year")` &mdash; a table, cities down, years across.
 
-Six ways to ask about one year. This Is a fair summary of why MultiIndexes feel heavy. The last two are the ones worth reaching for by default. Aggregate a level, or unstack it into a shape that reads.
+Six ways to ask about one year. This is a fair summary of why MultiIndexes feel heavy. The last two are the ones worth reaching for by default. Aggregate a level, or unstack it into a shape that reads.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What is a MultiIndex?</strong> It is an index with more than one level, so each row is identified by a combination of labels, such as (country, year). It usually appears after grouping by several columns.
-
-<strong>How do I select rows from a MultiIndex?</strong> Use df.loc[('UK', 2020)] for an exact key, df.xs(2020, level='year') for one level, or df.loc['UK'] for the outer level.
-
-<strong>How do I turn a MultiIndex back into columns?</strong> Call reset_index(), or groupby with as_index=False in the first place. Pass level= to reset only some levels.
-
-<strong>Why do I get a PerformanceWarning or a slow lookup?</strong> Slicing a MultiIndex needs it sorted. Call sort_index() first.
-
-<strong>How do I flatten MultiIndex column names?</strong> Join the levels: df.columns = ['_'.join(c) for c in df.columns].
-
-<strong>Should I use a MultiIndex at all?</strong> Often a flat frame with ordinary columns is easier to filter and merge. Keep a MultiIndex when it speeds up lookups or you are reshaping with stack and unstack.
-
-## In summary
-
-A MultiIndex arrives from steps you were doing anyway. The handy question is whether to keep it.
-
-Keep it when the tree is real and the next step selects a level, aggregates over one, or unstacks it into a table. Flatten it when the result is heading for a merge, a file or a chart.
-
-Sort it as soon as you build it. Most confusing errors here are an unsorted index. Use `xs` or a mask on `get_level_values` rather than fighting `slice(None)`. And prefer named aggregation. This Avoids nested columns fully rather than needing them to be flattened later.
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/advanced.html)
+- Continue with [The MultiIndex](time_series.html).

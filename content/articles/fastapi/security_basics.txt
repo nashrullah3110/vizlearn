@@ -1,12 +1,15 @@
 title: Security Basics
 intro: Authentication as a dependency, what a token really is. The mistakes that matter most.
-## Authentication is a dependency
 
-Security in an API comes down to two questions. Who is making this request, and are they allowed to do it? The first is authentication, and the second is authorization. FastAPI does not force a particular answer. It gives you building blocks, and the most useful of them is the dependency.
+## The core idea
+
+Security in an API comes down to two questions. Who is making this request, and are they allowed to do it? The first is authentication, and the second is authorization.
+
+## Authentication is a dependency
 
 This matters because mistakes here are costly. A missing check, a weak comparison, or a token that is trusted without verification can expose every user's data. Most breaches come from small errors in basic steps, not from clever attacks. Getting the fundamentals right protects you from the majority of them.
 
-This article starts with the idea that authentication is a dependency. You write one function that reads the credentials and returns the user or raises an error, and every protected endpoint asks for it. It then explains the difference between 401 and 403, which are often mixed up. One means the caller is not identified. The other means they are identified but not permitted.
+
 
 Next it describes what a token actually is, in plain terms. A section follows on a point that surprises many people: a valid signature is not the same as a valid token, since expiry and purpose also matter. The article ends with comparing secrets safely, because an ordinary equality check can leak information through timing.
 
@@ -25,7 +28,6 @@ def current_user(authorization: str = Header(default="")) -> User:
 Stated once. each endpoint that needs a user declares one param. One that doesn't, doesn't. An endpoint can't forget the check. If it declares `current_user` then the check ran. The request couldn't have reached the handler else.
 
 A section is protected by putting it on the router. A route added next year takes from it rather than needing somebody to note.
-
 
 ## Reading a bearer token
 
@@ -233,6 +235,7 @@ print("public response :", TestClient(app).get("/users/1").json())
 print("internal repr   :", u)
 print("internal dump   :", u.model_dump())
 ```
+
 ## 401 and 403
 
 Worth restating because merging them is so common.
@@ -287,7 +290,7 @@ Two rules, and the second isn't optional.
 
 **Never store a password.** Store a hash.
 
-**Never hash it with SHA-256 alone.** All-round hashes are designed to be fast. This Is just the wrong property. Use a on purpose slow, salted method designed for passwords. Bcrypt, scrypt or argon2, through a library like `passlib`.
+**Never hash it with SHA-256 alone.** All-round hashes are designed to be fast. This is just the wrong property. Use a on purpose slow, salted method designed for passwords. Bcrypt, scrypt or argon2, through a library like `passlib`.
 
 The editor above uses PBKDF2 from the standard library to show the shape without pulling in a dependency. It's better than a bare SHA-256 and it isn't what you should ship. The real answer is a library that keeps its params current as hardware gets faster.
 
@@ -297,14 +300,13 @@ The last line of defence, and the one that lives a future handler being careless
 
 A `response_model` listing only what may be seen can't leak a field added to the table later. `Field(exclude=True)` keeps a value out of each dump. `SecretStr` keeps it out of `repr`, logs and tracebacks.
 
-Use all three where they fit. Prefer the split output model. It's the only one that can't be forgotten by somebody editing a other file.
+Use all three where they fit. Prefer the split output model. It's the only one that can't be forgotten by somebody editing another file.
 
 ## What this module does not cover
 
 Enough to be worth naming: CSRF for cookie-based sessions, CORS config, rate limiting, input sanitisation for anything rendered as HTML, dependency scanning, and secrets management.
 
 Each is a real subject. The point of this one is that the *shape*. Authentication as a dependency, authorisation layered on top, secrets kept out of payloads and responses. Is what the framework gives you. Getting that shape right is what makes the rest tractable.
-
 
 ## Mistakes people make
 
@@ -346,24 +348,15 @@ For anything real, use libraries rather than the primitives shown here.
 
 Tokens: PyJWT or Authlib. This Handle method choice, claim rules and the parsing edge cases a hand-rolled version gets wrong - including the `alg: none` family of attacks.
 
-Passwords: passlib with bcrypt or argon2. This Keeps its params current as hardware gets faster.
+Passwords: passlib with bcrypt or argon2. This keeps its params current as hardware gets faster.
 
 OAuth2 and OpenID Connect: FastAPI ships `OAuth2PasswordBearer` and friends. This Integrate with the docs so the interactive page can authenticate.
 
 The editors here build things from `hmac` and `hashlib` to show what is underneath. That is worth seeing once and isn't what you should ship.
 
-## Summary
-
-Authentication belongs in a dependency: stated once, hopeless for an endpoint to forget. Visible in the schema. Authorisation layers above it. The two give other status codes for other questions.
-
-A signed token is readable by anyone holding it. Nothing secret goes in the payload. A valid signature isn't a valid token - expiry is a split check and revocation needs state.
-
-Compare secrets in constant time, say the same thing for an unknown user as for a wrong password, hash passwords with a thing on purpose slow. Let a response model decide what may leave.
-
 ## Next
 
 How the pieces are arranged once the use is more than one file. Routers per resource, services that know nothing about HTTP, schemas split by direction. An assembly file short enough to read at a glance.
-
 
 ## The shape to take away
 
@@ -373,39 +366,7 @@ all else in this module is a detail hung on that frame. What goes in a token, ho
 
 The frame is what the framework gives you. The details are what a review should check before anything real depends on them.
 
+## Sources and next steps
 
-## A closing thought
-
-The most handy thing in this module isn't any single rule. It's that authentication has one place to live.
-
-An use where each endpoint checks a header its own way has as many security models as it has endpoints. No way to review them. One where each endpoint declares `Depends(current_user)` has one, written down, that a reviewer can read in a minute.
-
-That doesn't make it correct. It makes it *reviewable*. This Is the precondition for it turning correct.
-
-## A closing note
-
-Security is the area where the framework helps most with shape and least with substance.
-
-`Depends` makes authentication hopeless for an endpoint to forget, gives it one place to live. Puts it in the schema. That is truly valuable and it's structural - it says nothing about whether your token lifetime is sensible, your hashing is current, or your permission model matches what the business intended.
-
-Those are choices, and they need review by someone who does this for a living before anything real depends on them. What this module offers is the setup that makes such a review possible. Rules in one place, expressed once, visible in the signature of each endpoint that leans on them.
-
-## Questions people ask
-
-<strong>Does FastAPI handle authentication for me?</strong> It provides tools such as OAuth2PasswordBearer and the docs Authorize button, but you write the logic that checks passwords and tokens.
-
-<strong>How should I store passwords?</strong> Hash them with a slow algorithm such as bcrypt or argon2 and never store plain text.
-
-<strong>What is a JWT used for here?</strong> It is a signed token that carries the user id and an expiry, so the server can verify the caller without a database lookup on every request.
-
-<strong>Where do I enforce authentication?</strong> In a dependency such as get_current_user, so protected routes depend on it and public routes do not.
-
-<strong>What is CORS and do I need it?</strong> CORS controls which browser origins may call your API. Add CORSMiddleware if a web page on another origin calls it.
-
-<strong>Is HTTPS part of FastAPI?</strong> No. Terminate TLS at a proxy or load balancer in front of the app. Without it, tokens travel in clear text.
-
-## In one line
-
-Authentication is a dependency and authorisation depends on it. A signed token is readable, a valid signature isn't a valid token, secrets compare in constant time, logins say one thing either way. A response model decides what leaves.
-
-And for anything real, use libraries rather than the primitives shown here. They exist because the edge cases are numerous and the results of missing one aren't proportionate to the effort saved.
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/security/first-steps/)
+- Continue with [Security Basics](project_structure.html).

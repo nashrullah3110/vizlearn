@@ -1,28 +1,29 @@
 title: Creating DataFrames
 intro: From dicts, records, arrays and files, and which orientation each assumes.
 
-## The two orientations
+## The core idea
 
-Building a DataFrame is the first thing you do in pandas. The constructor accepts many input shapes. Dicts, lists of dicts, NumPy arrays, other DataFrames, even a single scalar with an explicit index. Each shape implies a different orientation, and picking the wrong one gives you a transposed result with no error.
+Building a DataFrame is the first thing you do in pandas. The constructor accepts many input shapes. Dicts, lists of dicts, NumPy arrays, other DataFrames, even a single scalar with an explicit index.
+
+## The two orientations
 
 The most common mistake is mixing up column-oriented and row-oriented input. A dict of lists treats each key as a column name. A list of dicts treats each dict as a row. Both produce a valid frame. If you expected one and wrote the other, every downstream number is wrong, and nothing warns you.
 
 Knowing which constructor form matches your data source prevents a class of silent bug. Data from an API usually arrives as a list of records. Parallel arrays from a computation are columns. CSV files go through a reader. Each path has a natural form. Choosing it means the frame comes out right on the first try.
 
-This module covers the main forms, what each tolerates in terms of missing keys and mismatched lengths, and how dtype inference works at construction time. The last point matters because a column that starts as the wrong type stays wrong until you fix it, and most people do not check.
+
 
 The examples build small frames and print them. That is faster than loading a file when you want to see what a constructor does with a particular input shape. After working through them, you should be able to look at any input and predict the shape and dtypes of the resulting frame.
 
 Later modules cover reading from CSV and Parquet files, which is how most real data enters pandas. This module focuses on constructing frames from in-memory objects, which is the skill you need for testing, prototyping, and building fixtures.
 
-Almost each confusion about making a DataFrame comes from one question: does this input show **columns** or **rows**?
+Almost every confusion about making a DataFrame comes from one question: does this input show **columns** or **rows**?
 
 `pd.DataFrame({"a": [1,2,3], "b": [4,5,6]})` shows columns. Each key is a column name and each value is the entire column. This is the most common form and the one to reach for when you've parallel lists.
 
 `pd.DataFrame([{"a":1,"b":4}, {"a":2,"b":5}])` shows rows. Each dict is one record. This is the shape data arrives in from an API or a DB cursor, and pandas handles it right.
 
 Both give the same frame. Knowing which one you're writing blocks a transposed result.
-
 
 ## From a dict of columns
 
@@ -170,9 +171,10 @@ print()
 print("Each .loc assignment reallocates the whole frame.")
 print("df.append() used to be the popular way - it was removed in pandas 2.0.")
 ```
+
 ## What each form tolerates
 
-**Dict of columns** needs equal lengths and raises else. This Is a handy check. A **scalar** value is the exception. It broadcasts to each row. `{"a": [1,2,3], "flag": True}` gives a flag column of three `True` values.
+**Dict of columns** needs equal lengths and raises else. This is a handy check. A **scalar** value is the exception. It broadcasts to each row. `{"a": [1,2,3], "flag": True}` gives a flag column of three `True` values.
 
 **List of dicts** doesn't need the keys to match. Missing keys become `NaN`. The column order follows first appearance across all records. That handling is convenient for messy input and worth watching. A typo in one record's key silently creates a new mostly-empty column rather than raising.
 
@@ -188,13 +190,13 @@ The args worth knowing early:
 
 `index_col` sets a column as the index during the read rather than later.
 
-`usecols` reads only the columns you name. This Matters on wide files. It saves both time and memory.
+`usecols` reads only the columns you name. This matters on wide files. It saves both time and memory.
 
 `dtype` replaces inference. This is how you stop an identifier column being read as an int and losing its leading zeros. How you read a low-cardinality column straight into `group`.
 
-`parse_dates` converts date columns during the read. This Is faster than converting later.
+`parse_dates` converts date columns during the read. This is faster than converting later.
 
-`nrows` reads a sample. This Is the right way to inspect a large file before committing to it.
+`nrows` reads a sample. This is the right way to inspect a large file before committing to it.
 
 It accepts any file-like object. So `io.StringIO` works for testing and for data that is already in memory.
 
@@ -210,11 +212,11 @@ Both are worth checking with `df.dtypes` at once after loading. It takes one lin
 
 ## Never grow a frame
 
-`acc.loc[len(acc)] = row` inside a loop reallocates the entire frame on each loop. So did `df.append`. This Is why it was **removed in pandas 2.0** rather than merely deprecated.
+`acc.loc[len(acc)] = row` inside a loop reallocates the entire frame on each loop. So did `df.append`. This is why it was **removed in pandas 2.0** rather than merely deprecated.
 
 The correct pattern is the same as NumPy's. Collect into a Python list and make once at the end. Lists append cheaply. DataFrames don't append at all.
 
-If the pieces are already frames, `pd.concat(list_of_frames)` once at the end is the right call. And `pd.concat` inside a loop is just the same mistake in a other costume.
+If the pieces are already frames, `pd.concat(list_of_frames)` once at the end is the right call. And `pd.concat` inside a loop is just the same mistake in another costume.
 
 The last editor measures it. The gap grows with the number of rows. A pattern that seems acceptable on a hundred records turns unusable on a hundred thousand.
 
@@ -301,13 +303,13 @@ In each branch, set the dtype at creation rather than converting later. `astype`
 
 ## Reproducible test frames
 
-Small frames written by hand are how you check that an step does what you think. It's worth having a habit for them.
+Small frames written by hand are how you check that a step does what you think. It's worth having a habit for them.
 
 A dict of columns is the most readable form for a handful of rows. `pd.DataFrame({"a": [1,2,3], "b": list("xyz")})` fits on one line and shows the columns clearly.
 
-For a frame with a exact index, pass `index=` rather than setting it later.
+For a frame with an exact index, pass `index=` rather than setting it later.
 
-For random test data, seed it: `np.random.default_rng(0)`. Unseeded random test data makes a failing check unreproducible. This Is the opposite of what a test is for.
+For random test data, seed it: `np.random.default_rng(0)`. Unseeded random test data makes a failing check unreproducible. This is the opposite of what a test is for.
 
 `pd.util.testing` used to provide frame gens. The supported route now is `pd.testing.assert_frame_equal` for checks, and building the frames yourself.
 
@@ -315,7 +317,7 @@ For random test data, seed it: `np.random.default_rng(0)`. Unseeded random test 
 
 `pd.testing.assert_frame_equal(a, b)` is the precise compare: values, dtypes, index and column order all have to agree. The error message says which differed.
 
-`check_dtype=False` relaxes the type compare. This Is often needed when one side came through a CSV.
+`check_dtype=False` relaxes the type compare. This is often needed when one side came through a CSV.
 
 `check_like=True` skips row and column order.
 
@@ -325,9 +327,9 @@ This is what belongs in a test, rather than `a.equals(b)`. When it fails it tell
 
 `pd.DataFrame(some_array)` does **not** always copy. If the array's dtype and layout are usable right, pandas may wrap it. Writing to the frame then writes to the array.
 
-`copy=True` forces a copy. Under copy-on-write this stops mattering. This Is another reason that change is welcome.
+`copy=True` forces a copy. Under copy-on-write this stops mattering. This is another reason that change is welcome.
 
-`pd.DataFrame(dict_of_series)` aligns the Series on their indexes. This Is easy to forget. Three Series with other labels give a frame with the union of them and `NaN` in the gaps, not three columns side by side.
+`pd.DataFrame(dict_of_series)` aligns the Series on their indexes. This is easy to forget. Three Series with other labels give a frame with the union of them and `NaN` in the gaps, not three columns side by side.
 
 If you meant "these are parallel columns", reset the indexes first or pass plain lists.
 
@@ -347,38 +349,13 @@ Never grow a frame in a loop.
 
 That is six lines of discipline that prevent most of what the cleaning modules exist to repair.
 
-## A closing note
-
-build is where a frame's types are decided. Types decided badly here cause problems all over later.
-
-The two questions worth answering on purpose are whether the input shows rows or columns. What the dtypes should be. Getting the first wrong gives a transposed frame that is at once obvious. Getting the second wrong gives a frame that looks correct and behaves oddly much later.
-
-`dtype=` at build costs nothing. `astype` later allocates a second copy of each column it touches. By then the leading zeros may already be gone.
-
-The other rule is the one shared with NumPy. Never grow a frame in a loop. Collect into a list and make once. `df.loc[len(df)] = row` and `pd.concat` inside a loop are the same quadratic mistake wearing other syntax. `df.append` was removed rather than merely deprecated because of it.
-
 ## One more thing
 
 `pd.DataFrame.from_records` handles an iterable of tuples with a `columns` arg. Accepts an `index` naming one of the fields. It's the constructor that fits a DB cursor most right. Cursors yield tuples rather than dicts.
 
 And `pd.concat` of many small frames is often faster than building one large list of dicts when the pieces are already frames. The rule is to avoid the loop, not to prefer one holder over the other.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What is the easiest way to build a small DataFrame by hand?</strong> Pass a dict of lists to pd.DataFrame, where each key becomes a column name and each list becomes that column's values.
-
-<strong>What is the difference between a dict of lists and a list of dicts?</strong> A dict of lists is column-oriented, with one key per column. A list of dicts is row-oriented, with one dict per record, and missing keys become NaN.
-
-<strong>Why should I not grow a DataFrame row by row in a loop?</strong> Each append copies the whole frame, so the loop gets slower as it grows. Collect rows in a list and call pd.DataFrame once at the end.
-
-<strong>How do I create a DataFrame from a NumPy array?</strong> Call pd.DataFrame(arr, columns=[...]). Without the columns argument the columns are numbered 0, 1, 2.
-
-<strong>How do I create an empty DataFrame with the right columns?</strong> Use pd.DataFrame(columns=['a', 'b']), then set dtypes explicitly with astype. Otherwise every column is object and later arithmetic can fail.
-
-<strong>Does pd.DataFrame copy my data?</strong> Passing a NumPy array may share memory with it, so changing one can change the other. Pass copy=True when you need an independent frame.
-
-## In summary
-
-Decide whether the input shows rows or columns, set the dtypes at build. Check `shape`, `dtypes` and `head` at once later.
-
-Never grow a frame in a loop. Collect into a list and build once. `df.append` was removed rather than deprecated because of just that pattern.
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/dsintro.html)
+- Continue with [Creating DataFrames](inspecting_data.html).

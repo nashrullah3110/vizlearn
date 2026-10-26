@@ -1,9 +1,11 @@
 title: Performance and Memory
 intro: Where the time and the bytes really go.
 
-## The order to try things
+## The core idea
 
 Performance tuning in NumPy follows a predictable order, and the biggest gains come from the simplest changes. The most expensive mistake is to optimise the wrong thing first.
+
+## The order to try things
 
 The first question is whether there is still a Python loop. A for-loop over array elements drops from compiled code into the Python interpreter, which is roughly a hundred times slower. Replacing the loop with a vectorised operation gives you that factor back. Most NumPy performance problems are this problem, and most people skip it to look for fancier solutions.
 
@@ -17,7 +19,6 @@ The fifth and last question is whether NumPy is the right tool. For very large d
 
 This module works through the list in order, with timing measurements that show the payoff of each step. The point is not just what to do, but what to do first.
 
-
 Most NumPy speed work comes down to four questions, roughly in order of payoff:
 
 1. Is there still a Python loop? Dropping it's worth 10&ndash;100x.
@@ -26,7 +27,6 @@ Most NumPy speed work comes down to four questions, roughly in order of payoff:
 4. Is the memory access pattern fighting the cache? Layout changes can be worth 2&ndash;5x.
 
 The first is covered in the introductory module and dwarfs the rest. This module is about the other three. This Matter once the obvious loop is gone.
-
 
 ## dtype is the cheapest saving there is
 
@@ -185,13 +185,14 @@ print()
 print("Take the BEST of several runs, not the average - the slow runs")
 print("are measuring the machine, not the code.")
 ```
+
 ## dtype
 
 `float64` is the default and is often more precision than the data justifies. Sensor readings good to three large figures don't gain from fifteen.
 
 `float32` keeps about seven large digits, halves the memory. Often runs faster. Not because the math is cheaper. Because half as much data has to travel from memory to the processor, and memory bandwidth is often the limit.
 
-The same applies to ints. An array of small counts doesn't need `int64`. An array of flags should be `bool_`. This Is one byte, not `int64`, which is eight.
+The same applies to ints. An array of small counts doesn't need `int64`. An array of flags should be `bool_`. This is one byte, not `int64`, which is eight.
 
 The caution from the dtypes module still applies. Narrow ints overflow silently. Choose the smallest type that can't overflow for your actual data, not the smallest that happens to fit today's sample.
 
@@ -203,7 +204,7 @@ You never see them, and for a single formula it rarely matters. In a loop, or in
 
 Two ways to avoid it.
 
-**In-place ops.** `a *= 2` modifies the existing buffer and allocates nothing. note that it also modifies anything sharing that buffer. This Is the views-versus-copies problem again.
+**In-place ops.** `a *= 2` modifies the existing buffer and allocates nothing. note that it also modifies anything sharing that buffer. This is the views-versus-copies problem again.
 
 **`out=`.** each ufunc accepts `out`. This Names the destination by name. `np.times(a, 3, out=dest)` writes into `dest`. `out` may be one of the inputs. This is the clearest form when you're building up into a buffer across loops.
 
@@ -237,7 +238,7 @@ Guessing is unreliable, and the intuitions transferred from pure Python are ofte
 
 For time, run the step a few times and take the **min**, not the mean. The slow runs are measuring interference from the rest of the machine. The fastest run is the closest guess of the actual cost. A single timed run of a fast step measures mostly noise.
 
-And measure the thing you intend to change. Optimising an step that accounts for 2% of the runtime is effort spent for a 2% ceiling. Meeting the local speedup looks.
+And measure the thing you intend to change. Optimising a step that accounts for 2% of the runtime is effort spent for a 2% ceiling. Meeting the local speedup looks.
 
 ## Views and memory that will not go away
 
@@ -253,7 +254,7 @@ The fix is `copy()` at the point you decide to keep a thing small from a thing l
 
 ## Threads and the GIL
 
-NumPy releases the GIL during most array steps. This Means threads truly run in parallel inside a NumPy math. Unlike most pure Python code.
+NumPy releases the GIL during most array steps. This means threads truly run in parallel inside a NumPy math. Unlike most pure Python code.
 
 That makes `concurrent.futures.ThreadPoolExecutor` a real option for parallelising array work, with none of the pickling and process-startup costs of multiprocessing.
 
@@ -263,7 +264,7 @@ Measure before given threading helps. For large mat steps it often does nothing.
 
 ## Chunking
 
-When an step would allocate more than fits in memory, the answer is often to do it in pieces.
+When a step would allocate more than fits in memory, the answer is often to do it in pieces.
 
 The classic case is a pairwise distance mat. For 100,000 points, the mid is 10 billion entries and no machine will hold it. handling 1,000 rows at a time keeps the mid at 100 million and gives the same answer.
 
@@ -299,7 +300,7 @@ The order to consider them: is it vectorisable in NumPy, is it in SciPy, is it s
 
 The instinct about where time goes is unreliable, and array code is no exception.
 
-`cProfile` gives function-level timings and finds the hot function. `line_profiler` gives per-line timings within it. This Is what you really need when one function holds the whole math.
+`cProfile` gives function-level timings and finds the hot function. `line_profiler` gives per-line timings within it. This is what you really need when one function holds the whole math.
 
 `memory_profiler` tracks allocation line by line. `a.nbytes` summed over the arrays you're holding is a quick manual version.
 
@@ -325,7 +326,7 @@ And keep the ceiling in view: a function taking 5% of runtime can't give more th
 
 **Reach past NumPy.** Numba, SciPy, a GPU. When the method truly doesn't vectorise or the data truly doesn't fit.
 
-Working down that list in order means the large wins come first. It avoids the common trap of micro-optimising an formula inside a loop that shouldn't exist.
+Working down that list in order means the large wins come first. It avoids the common trap of micro-optimising a formula inside a loop that shouldn't exist.
 
 ## Things that look slow and are not
 
@@ -337,7 +338,7 @@ Working down that list in order means the large wins come first. It avoids the c
 
 **Reversing with `[::-1]`.** A view. Free.
 
-**Broadcasting the inputs.** No allocation. The strides are set to zero. The *output* is allocated. This Is a other thing.
+**Broadcasting the inputs.** No allocation. The strides are set to zero. The *output* is allocated. This is another thing.
 
 Rewriting any of these to "avoid the copy" is effort spent on a copy that was never happening. Confirm with `np.shares_memory` before optimising a thing that may already be free.
 
@@ -361,28 +362,19 @@ Take the min of a few timed runs, not the mean.
 
 Fix the top item and measure again, because the bottleneck moves.
 
-Keep the ceiling in view: an step taking 5% of the runtime can't yield more than 5%. Thoroughly it's optimised.
+Keep the ceiling in view: a step taking 5% of the runtime can't yield more than 5%. Thoroughly it's optimised.
 
 And weigh readability honestly. A vectorised one-liner that no one can safely modify has a maintenance cost that doesn't show up in a benchmark. The version a colleague can read is often the better engineering answer even when it's slower.
 
-## Questions people ask
-
-<strong>Why is a NumPy loop so much faster than a Python loop?</strong> The loop runs in compiled C over contiguous memory, with no per-element Python object overhead or type checks.
-
-<strong>How much memory does an array use?</strong> Read a.nbytes, which is the element count times the item size. The shape and dtype fields add only a small fixed overhead.
-
-<strong>How do I avoid temporary arrays?</strong> Use in-place operators like a += b, or the out= argument on ufuncs. Chained expressions each allocate an intermediate array.
-
-<strong>Does memory layout matter?</strong> Yes. Walking along the contiguous axis is faster because of CPU caching. In a C-ordered array that means iterating over the last axis.
-
-<strong>When should I use float32?</strong> When memory or bandwidth is the limit and you can accept about seven digits of precision. It halves the footprint and often speeds up big operations.
-
-<strong>How do I time code properly?</strong> Use timeit or %timeit, which repeats the run and takes the best result. A single time.time() measurement is noisy.
-
 ## The lock behind two of these timings
 
-Some of the numbers above only make sense in the presence of the interpreter lock. It deserves a sentence rather than a hand-wave. CPython holds one lock around bytecode run. Two Python-level threads never execute Python also. But a NumPy call that spends its time in C can *release* that lock while it works. This Is why a large `dot` or a big elementwise step shares across threads and a Python loop over the same array doesn't.
+Some of the numbers above only make sense in the presence of the interpreter lock. It deserves a sentence rather than a hand-wave. CPython holds one lock around bytecode run. Two Python-level threads never execute Python also. But a NumPy call that spends its time in C can *release* that lock while it works. This is why a large `dot` or a big elementwise step shares across threads and a Python loop over the same array doesn't.
 
 So the vectorised version isn't merely faster. It's differently parallel. That is a property of where the time is spent rather than of NumPy's API.
 
 <ul><li><a href="../concurrency/the_gil_and_what_it_locks.html">The GIL, and what it really locks</a>. Measured. Threads share waiting and don't share finding, and what "releases the GIL" means at the C boundary.</li><li><a href="../concurrency/threads_or_processes.html">Threads or processes: what is and isn't shared</a>. And the cost of moving an array across a process boundary. This For a large array can exceed the work you were trying to parallelise.</li><li><a href="../concurrency/choosing_threads_processes_or_async.html">Choosing threads, processes, or async</a>. The choice with the cases stated rather than implied.</li></ul>
+
+## Sources and next steps
+
+- Official reference: [Numpy documentation](https://numpy.org/doc/stable/user/basics.broadcasting.html)
+- Continue with [Performance and Memory](saving_and_loading.html).

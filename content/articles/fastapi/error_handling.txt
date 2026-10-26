@@ -1,12 +1,15 @@
 title: Error Handling
 intro: HTTPException, custom handlers, and keeping HTTP out of the code that does the work.
-## The ordinary case
 
-Error handling is the part of an API that decides what a client sees when something goes wrong. A missing record, a rule that was broken, or a bug in your own code all need a response. If you plan for them, clients get clear messages. If you do not, they get a confusing mix of formats.
+## The core idea
+
+Error handling is the part of an API that decides what a client sees when something goes wrong. A missing record, a rule that was broken, or a bug in your own code all need a response.
+
+## The ordinary case
 
 FastAPI gives you HTTPException for the ordinary case. You raise it with a status code and a message, and the framework turns it into a JSON response. That covers a lot. As your app grows, you will want more control over the shape of every error and over where in the code each one gets raised.
 
-This article starts with the ordinary case and what the client receives. It then shows how to add headers to an error, which some protocols require. After that it explains how to replace the default error envelope with one that matches the rest of your API, so every failure has the same structure.
+
 
 A larger idea follows. Your business logic should not know about HTTP. It should raise its own errors, such as a missing item or a conflict, and the edge of your app should translate those into status codes. That keeps the core clean and testable.
 
@@ -22,8 +25,7 @@ It can be raised anywhere in the call stack, not just in the handler. FastAPI tu
 
 Two properties are worth noticing. It's an **exception**. It unwinds. A function five levels deep can refuse the request without each caller checking a return value. And the response shape is steady. So Each client can lean on `detail` being there.
 
-`detail` doesn't have to be a string. A dict or list is serialised. This Is one way to return structured errors without a custom handler.
-
+`detail` doesn't have to be a string. A dict or list is serialised. This is one way to return structured errors without a custom handler.
 
 ## HTTPException is the ordinary way
 
@@ -212,6 +214,7 @@ c = TestClient(app)
 print("validation:", c.post("/modules", json={"title": "x"}).json())
 print("raised    :", c.post("/modules", json={"title": "Vectors"}).json())
 ```
+
 ## Headers on an error
 
 `HTTPException` takes `headers=`, and a few statuses are incomplete without one.
@@ -248,9 +251,9 @@ async def not_found(request, exc):
     return JSONResponse(status_code=404, content={"detail": ...})
 ```
 
-The gains compound. The service layer is testable without a client. The HTTP mapping lives in one file where it can be reviewed. Changing 404 to 410 for a case is one edit. And the same service can be exposed over a other transport without rewriting its errors.
+The gains compound. The service layer is testable without a client. The HTTP mapping lives in one file where it can be reviewed. Changing 404 to 410 for a case is one edit. And the same service can be exposed over another transport without rewriting its errors.
 
-The cost is a handler per error class. This Is a few lines each and worth it past a handful of endpoints.
+The cost is a handler per error class. This is a few lines each and worth it past a handful of endpoints.
 
 ## The catch-all
 
@@ -299,14 +302,13 @@ Service functions raise domain exceptions and know nothing about HTTP. One modul
 
 Five handlers, written once, and each endpoint after that just raises what it means.
 
-
 ## Mistakes people make
 
 **Returning errors instead of raising them.** A handler returning `{"error": ...}` with a 200 defeats each client's error handling. Can't be made from four levels down.
 
 **Importing fastapi in the service layer.** A function that raises `HTTPException` can only be used from a request - not from a job, a CLI or a test.
 
-**Swallowing exceptions.** A bare `except Exception: pass` around a DB call turns a failure into a wrong answer. This Is far worse than an error.
+**Swallowing exceptions.** A bare `except Exception: pass` around a DB call turns a failure into a wrong answer. This is far worse than an error.
 
 **Returning the traceback.** It names files, line numbers, library versions and at times values. Log it. Send an id.
 
@@ -314,7 +316,7 @@ Five handlers, written once, and each endpoint after that just raises what it me
 
 **Dropping `exc.headers` in that handler.** The `Retry-After` you carefully attached silently disappears.
 
-**500 for a thing the caller did.** If a other request would have worked, it's a 4xx.
+**500 for a thing the caller did.** If another request would have worked, it's a 4xx.
 
 ## Where the layers sit
 
@@ -331,7 +333,6 @@ It helps to see the whole setup at once.
 **One handler for `Exception`** logs and returns a plain 500 with a link id.
 
 Five handlers written once. After that each endpoint raises what it means and nothing repeats the mapping.
-
 
 ## What the client should see
 
@@ -357,7 +358,7 @@ Small, boring, and enough. If your organisation has an set format - RFC 7807 pro
 
 One case that surprises people: an exception raised *after* the response has started streaming can't become a clean error. The status line and headers have already been sent.
 
-That is why a `StreamingResponse` whose gen fails mid-way makes a truncated body rather than a 500. The client sees a link that ended early. This Is the same from a network failure.
+That is why a `StreamingResponse` whose gen fails mid-way makes a truncated body rather than a 500. The client sees a link that ended early. This is the same from a network failure.
 
 The mitigation is to do the work that can fail before you start streaming. To keep gens simple. It's also a reason not to reach for streaming unless the payload truly needs it.
 
@@ -379,7 +380,6 @@ Answering those in docs costs little. `responses=` puts the shapes in the schema
 
 The option - discovering the error contract by causing failures in production - is what most integrations really do. It's why so many clients end up matching on message strings that later change.
 
-
 ## What good error handling feels like
 
 From the outside, an API with good error handling has three properties, none of which is about code.
@@ -392,34 +392,17 @@ They're **diagnosable**: when a thing is truly broken, both sides can refer to t
 
 all in this module is in service of those. The handlers, the domain exceptions, the envelope and the logging are methods. The properties are the point. They're what a caller notices.
 
-## Summary
-
-`HTTPException` can be raised anywhere in the call stack and turns a steady JSON body. It takes headers. This A few statuses need.
-
-Business logic should raise domain exceptions and import nothing from the framework. One handler per exception class maps them to statuses at the edge. This Keeps the service usable from a job, a CLI or a test.
-
-A handler for `Exception` turns anything unanticipated into a clean 500 - logged in full, returned as a plain message plus an id. check keeps its own handler. Field-oriented failures want a other shape from single-message ones.
-
 ## Next
 
 Structure comes next: splitting a growing use into routers. That the error handlers, the models and the endpoints each live one spot a newcomer can find them - and so that `main.py` stays short enough to read in one screen.
-
-## Questions people ask
-
-<strong>How do I return an error from an endpoint?</strong> Raise HTTPException(status_code=404, detail="Item not found"). FastAPI turns it into a JSON response with a detail key.
-
-<strong>Can I add headers to an error?</strong> Yes. Pass headers={"WWW-Authenticate": "Bearer"} to HTTPException.
-
-<strong>How do I handle a custom exception globally?</strong> Register a function with @app.exception_handler(MyError) that returns a JSONResponse.
-
-<strong>How do I catch unexpected exceptions?</strong> Add a handler for Exception, or middleware, that logs the error and returns a generic 500. Never send tracebacks to clients.
-
-<strong>Is HTTPException the same as a Python exception I can catch?</strong> It is a real exception, so raising it stops the function. Do not wrap it in a bare except that swallows it.
-
-<strong>Should domain code raise HTTPException?</strong> Better not. Raise domain errors from the business logic and map them to status codes at the edge in handlers.
 
 ## A final note
 
 The setup given here - domain exceptions raised low, mapped once at the edge - is worth adopting earlier than it feels needed.
 
 Retrofitting it means finding each `HTTPException` scattered through service code and deciding what each should have been, often while also changing a thing else. Starting with it costs one extra class and one handler on the first error you need.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/handling-errors/)
+- Continue with [Error Handling](apirouter.html).

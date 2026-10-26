@@ -1,12 +1,15 @@
 title: async def or def
 intro: Where your handler runs, and the one mistake that turns a fast framework into a slow one.
-## Two placements, one interface
 
-FastAPI lets you write an endpoint as either async def or plain def. Both work, and both look the same to a client. The difference is where your code runs. An async handler runs directly on the event loop. A plain handler is sent to a pool of worker threads so it does not block that loop.
+## The core idea
+
+FastAPI lets you write an endpoint as either async def or plain def. Both work, and both look the same to a client. The difference is where your code runs.
+
+## Two placements, one interface
 
 This choice decides how well your app handles many users at once. A fast framework can still be slowed badly by one mistake, which is doing slow, blocking work inside an async function. While that work runs, the event loop cannot serve anyone else, and the entire app appears frozen.
 
-This article starts with the two placements and the single interface that hides them. It then explains why an event loop is fast in the first place, because the rule makes more sense once you know the reason. You will see the mistake in detail: calling a blocking library from inside an async handler.
+
 
 A short, clear rule follows. Use async def when everything inside is awaited, and plain def when you call code that blocks. Dependencies follow the same logic according to how they are defined, which the article covers as well.
 
@@ -29,7 +32,6 @@ A caller can't tell the gap. The response is the same, the docs is the same, che
 What differs is **where the function runs**. An `async def` endpoint is awaited right on the event loop, in the same thread that is handling every other concurrent request. A `def` endpoint is handed to a threadpool. The loop is free while it works.
 
 That single fact shows all else in this module.
-
 
 ## Both are ordinary endpoints
 
@@ -230,11 +232,13 @@ c = TestClient(app)
 for p in ["/awaits", "/blocks", "/neither"]:
     print(c.get(p).json())
 ```
+
 ## Why an event loop is fast
 
 An ASGI server handles many requests in one thread by never waiting. When a handler awaits a DB query, the loop parks it and runs a thing else. Thousands of requests can be in flight with almost none of them consuming anything but memory.
 
 That works because awaiting yields control. It stops working the moment a thing doesn't.
+
 ## The rule
 
 **Does the body await anything?**
@@ -259,7 +263,7 @@ The same rule applies to each: if the dependency opens a link with a blocking dr
 
 Sync handlers are safe for the loop and not free. Starlette's threadpool has a limited number of workers. A few dozen by default.
 
-If each request is a slow sync handler, those threads fill up and further requests queue waiting for one. The loop is healthy and the use is still stuck. This Looks similar from outside and has a other cause.
+If each request is a slow sync handler, those threads fill up and further requests queue waiting for one. The loop is healthy and the use is still stuck. This looks similar from outside and has another cause.
 
 That is the real arg for async drivers under high concurrency. Not that the syntax is better. That awaiting costs a coroutine and blocking costs a thread. There are far more coroutines on hand than threads.
 
@@ -269,7 +273,7 @@ For most uses, the threadpool is fully adequate and the simplicity of sync code 
 
 Two exact things to avoid.
 
-**Calling a sync function that blocks from inside an async handler.** That is the mistake above wearing a other hat. If you must, `await run_in_threadpool(fn)` moves it off the loop by name.
+**Calling a sync function that blocks from inside an async handler.** That is the mistake above wearing another hat. If you must, `await run_in_threadpool(fn)` moves it off the loop by name.
 
 **Calling `asyncio.run()` inside a handler.** There's already a loop running. Starting another raises. To call an async function from a sync handler, the honest answer is often to make the handler async.
 
@@ -283,7 +287,7 @@ Two exact things to avoid.
 
 **Mixing drivers without noticing.** An async endpoint using a synchronous ORM is the same bug wearing other clothes. If the driver blocks, the endpoint should be `def`.
 
-**Skipping the threadpool ceiling.** Sync handlers are safe for the loop and finite in number. Enough slow ones exhaust the pool. This Looks the same from outside and has a other cause.
+**Skipping the threadpool ceiling.** Sync handlers are safe for the loop and finite in number. Enough slow ones exhaust the pool. This looks the same from outside and has another cause.
 
 **Choosing per handler with no rule.** Then no one can tell whether a given endpoint is safe to add a blocking call to. Eventually somebody adds one to the wrong sort.
 
@@ -301,10 +305,9 @@ The fix differs. The first needs the blocking call moved off the loop - change `
 
 An use that is mostly sync and mostly fast is a just right good use. So is one that is async throughout with async drivers. Both scale further than most services ever need.
 
-What causes trouble is a code where the choice was made per handler by whoever wrote it. Then no one can look at an endpoint and tell whether adding a blocking call to it's safe. Eventually somebody adds one to the wrong sort.
+What causes trouble is code in which each handler makes the choice by whoever wrote it. Then no one can look at an endpoint and tell whether adding a blocking call is safe. Eventually somebody adds one to the wrong sort.
 
 Pick a default, write it in the project's README. Make the exception deliberate. "Sync unless it awaits" is a fine rule. So is "async all over. Each driver must be async". The rule matters more than which one.
-
 
 ## Where the ceilings are
 
@@ -328,33 +331,15 @@ What it changes is how many requests one process can have **in flight** while wa
 
 For an API that spends most of its time waiting on other systems - which is most APIs - that is the gap between a machine handling a few hundred concurrent requests and one handling many thousands. It's a concurrency win, not a delay one. Only if the waiting is done by awaiting.
 
-## Summary
-
-`def` runs in a threadpool. `async def` runs on the event loop. Callers can't tell.
-
-Write `async def` when the body awaits, `def` when it blocks. `def` by default when it does neither - because a blocking call added later can't then stall anything.
-
-Dependencies are placed by their own meaning. Mixing is normal. And note there are two ceilings. The loop. This One blocking call can stall. The threadpool. This Enough slow sync handlers can exhaust.
-
 ## Next
 
 Work that should happen after the response has been sent - what background tasks are for, what they aren't. The point at which they need to become a real queue.
-
 
 ## The rule, once more
 
 Awaits a thing, `async def`. Blocks, `def`. Neither, `def`.
 
 That covers each case, and the reason the third clause defaults to `def` is that it's the only one that stays correct when somebody later adds a blocking call to a handler that used to do nothing much.
-
-
-## A closing thought
-
-This is the one place where FastAPI will let you write a thing that looks right, passes each test, and fails only under load.
-
-Nothing warns about `async def` around a blocking call. The endpoint is correct, the tests pass because they run one request at a time. The problem appears in production as generalised slowness with no obvious cause.
-
-That skew - easy to write, hard to notice, costly to diagnose - is why it's worth knowing the rule properly rather than choosing by habit.
 
 ## One more diagnostic
 
@@ -370,30 +355,15 @@ Under load, hit it. If it's fast while other endpoints crawl, the loop is health
 
 That single finding splits a room problem from a bug. The two have fully other fixes.
 
-## In one line
-
-`async def` when the body awaits, `def` when it blocks, `def` by default when it does neither - because that is the only choice that stays correct when somebody adds a blocking call later.
-
-And if a service is slow and you can't tell which ceiling you hit, hit an endpoint that does nothing. If it's fast, the pool is full. If it's slow, the loop is blocked.
-
-## Questions people ask
-
-<strong>When should I use async def?</strong> When the body awaits async libraries, such as an async database driver or httpx.AsyncClient.
-
-<strong>What happens to a plain def endpoint?</strong> FastAPI runs it in a thread pool so it does not block the event loop.
-
-<strong>What goes wrong if I call a blocking function inside async def?</strong> The whole event loop stalls, so every other request waits until that call returns.
-
-<strong>Is async faster than sync?</strong> Only under many concurrent I/O waits. For CPU-bound work neither helps, and a sync endpoint in a thread is just as fast for a single request.
-
-<strong>How do I call blocking code from an async endpoint?</strong> Wrap it with await run_in_threadpool(func) or asyncio.to_thread.
-
-<strong>Do dependencies follow the same rule?</strong> Yes. Each dependency is sync or async on its own, and FastAPI treats it that way independent of the endpoint.
-
 ## Where the loop itself is explained
 
 This page decides one thing: `async def` or `def`. What FastAPI does with each. The thing being decided *about*. A single-threaded loop that only makes progress when the coroutine on it suspends. Is worth seeing on its own, away from routing and dependencies.
 
 <ul><li><a href="../async_python/event_loop_stepped_through.html">The event loop, one turn at a time</a>. What "ready", "waiting" and "one turn" mean concretely, stepped through by hand.</li><li><a href="../async_python/coroutines_tasks_and_await.html">Coroutines, tasks. What await really does</a>. Why awaiting two calls in a row costs the sum of their times and wrapping them as tasks costs the max. That is the same mistake as a handler which awaits its three upstream calls one after another. It's invisible in a load test with one client.</li><li><a href="../async_python/the_blocking_call_that_freezes_the_loop.html">The blocking call that freezes the loop</a>. The method behind "one slow request made each request slow", and the case the threadpool by name doesn't rescue you from.</li><li><a href="../async_python/running_work_concurrently.html">Running work concurrently, with a limit</a> &mdash; <code>gather</code>, and the semaphore you want in front of anything with a link pool.</li></ul>
 
-The layer below is worth a look too. The threadpool a `def` endpoint runs in is an plain thread pool with the plain constraints. <a href="../concurrency/the_gil_and_what_it_locks.html">The GIL. What it really locks</a> is why a `def` endpoint doing CPU work stops scaling with workers while one doing I/O keeps going. <a href="../concurrency/choosing_threads_processes_or_async.html">choosing threads, processes, or async</a> is this page's choice one level up from the route.
+The layer below is worth a look too. The threadpool a `def` endpoint runs in is a plain thread pool with the plain constraints. <a href="../concurrency/the_gil_and_what_it_locks.html">The GIL. What it really locks</a> is why a `def` endpoint doing CPU work stops scaling with workers while one doing I/O keeps going. <a href="../concurrency/choosing_threads_processes_or_async.html">choosing threads, processes, or async</a> is this page's choice one level up from the route.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/async/)
+- Continue with [async def or def](background_tasks.html).

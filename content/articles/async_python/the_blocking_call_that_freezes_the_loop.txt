@@ -1,9 +1,11 @@
 title: The Blocking Call That Freezes the Loop
 intro: One synchronous call in a coroutine stops every other coroutine dead. It is the most common async bug, and the way it hides is worse than the way it looks.
 
-## One thread means one blocker stops everything
+## The core idea
 
-Async Python runs on cooperative multitasking. The [event loop](event_loop_stepped_through.html) runs on a single thread and can only switch coroutines when the running one hits an <code>await</code>. So a coroutine that stops awaiting &mdash; because it called something synchronous that takes real time &mdash; holds the one thread for that whole time, and every other coroutine, however unrelated, waits.
+Async Python runs on cooperative multitasking. The event loop runs on a single thread and can only switch coroutines when the running one hits an await .
+
+## One thread means one blocker stops everything
 
 Nothing enforces cooperation. The loop cannot preempt a coroutine mid-call, so a blocking line does not slow the loop down, it *pauses it entirely* until the line returns.
 
@@ -268,26 +270,7 @@ contends for the interpreter. Heavy computation belongs in a process pool.
 concurrency exposes it. Test the loop under load, or run with
 <code>debug=True</code> and watch for slow-callback warnings.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>How do I tell whether a library blocks?</strong> Its API tells you. If the call is awaited it does not block; if it returns a value directly and does real I/O, it does. There is no way to tell from the shape of the line, which is the whole problem &mdash; <code>requests.get(url)</code> and <code>await client.get(url)</code> look almost identical.
-
-<strong>Is a small blocking call acceptable?</strong> It depends entirely on your latency budget and concurrency. A 2&nbsp;ms call is noise; the same call in a handler serving 500 requests a second costs a full second of loop time every second. That is the arithmetic to do, rather than reasoning about whether it "feels" slow.
-
-<strong>Why does <code>to_thread</code> help at all if Python has a global lock?</strong> Because a blocking I/O call releases the lock while it waits. The thread parks in the operating system, the interpreter is free, and the loop keeps running. For pure computation nothing is released, so the lock is held and a thread buys you nothing.
-
-<strong>Does <code>to_thread</code> work in these editors?</strong> No, and the article shows it rather than running it for that reason. The browser interpreter has no OS threads, so <code>asyncio.to_thread</code> produces the same freeze as <code>time.sleep</code> &mdash; the escape hatch is real in CPython and unavailable in this sandbox.
-
-<strong>How many threads can I hand work to?</strong> The default executor is small and shared, so a burst of <code>to_thread</code> calls queues rather than running at once. If threaded work is routine, create a <code>ThreadPoolExecutor</code> sized deliberately and use <code>loop.run_in_executor</code>.
-
-<strong>Why does it only break in production?</strong> Because one user hides it. With one request in flight, a blocking call just makes that request slow, which reads as the network. With a hundred concurrent requests, it freezes all of them for its duration &mdash; so the symptom stops being "one slow endpoint" and becomes "the service periodically stops responding", which points nowhere.
-
-## Recap in one screen
-
-- One thread and no preemption, so a synchronous call does not slow the loop down &mdash; it stops it entirely until the call returns.
-- The signature is a burst: a heartbeat goes silent for the length of the blocking call and then fires all its backed-up ticks at once.
-- Measure it rather than guessing. Loop lag &mdash; asked-for sleep against actual &mdash; catches any blocking call from the outside, and <code>debug=True</code> logs the slow callback with a location.
-- Three fixes, chosen by the kind of work: an async-native library where one exists, <code>to_thread</code> for I/O-bound calls without one, a **process** for anything CPU-bound.
-- <code>to_thread</code> works because blocking I/O releases the interpreter lock. Computation does not release it, which is why threads do not help there.
-- Inside a coroutine, every call should either await or return fast. Anything else needs a fix before it goes in.
-- It hides in development and appears under load, because concurrency is what turns one slow request into every request stalling.
+- Official reference: [Running blocking code](https://docs.python.org/3/library/asyncio-dev.html#running-blocking-code)
+- Continue with [The Blocking Call That Freezes the Loop](queues_and_backpressure.html).

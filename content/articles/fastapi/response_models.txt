@@ -1,13 +1,15 @@
 title: Response Models: Deciding What Leaves
 intro: Declaring the response docs the endpoint and, more usefully, stops things escaping.
 
-## The default is generous
+## The core idea
 
-A response model describes the shape of what your endpoint sends back. You declare it once, and FastAPI uses it in three ways. It documents the response, it checks that your return value matches, and it removes anything that should not leave the server. That last job is the one people underestimate.
+A response model describes the shape of what your endpoint sends back. You declare it once, and FastAPI uses it in three ways. It documents the response, it checks that your return value matches, and it removes anything that should not leave the server.
+
+## The default is generous
 
 Without a response model, FastAPI sends whatever you return. That is generous, and it can be dangerous. Return a database record that includes a password hash, and the hash goes out with the rest. A response model is a filter that makes this kind of leak much harder to cause by accident.
 
-This article begins with that generous default and why it deserves your attention. It then shows how to declare the shape and what changes in the generated docs. After that you will see how the framework checks your work, and what happens when your data does not fit the model you promised.
+
 
 Trimming the output comes next. You will learn how to leave out fields that are unset, fields that hold default values, or fields you name directly. The article closes with a point that guides good API design: input and output are different questions, and they usually need different models.
 
@@ -20,7 +22,6 @@ Without a response model, FastAPI serialises what your handler returns.
 That is convenient and it's how data leaks. A handler that returns a DB row returns *all* of it. Inner notes, an email address, a password hash, a flag no one outside should know exists. Nothing warns you. From the framework's point of view you asked for just that.
 
 The failure mode is quiet and it compounds. A column added to a table six months later silently starts appearing in an API response. The endpoint was never told what it was allowed to send.
-
 
 ## Without one, whatever you return is sent
 
@@ -202,6 +203,7 @@ print("stored  :", DB[1])
 print()
 print("created_by is in the store and not in the response.")
 ```
+
 ## Declaring the shape
 
 ```python
@@ -224,7 +226,7 @@ Same action, and it reads as Python rather than as framework config. Use `respon
 
 ## It checks your work
 
-The response is checked against the model. This Is worth appreciating.
+The response is checked against the model. This is worth appreciating.
 
 If a handler returns `{"id": "not-a-number"}` for a field declared `int`, that is a 500. The caller sent nothing wrong. Your code made a thing that doesn't match its own contract. The framework refuses to ship it.
 
@@ -244,7 +246,7 @@ They're convenient and they're a slope. Once you're passing two of them plus an 
 
 ## Input and output are different questions
 
-The pattern almost each endpoint settles on is split models per direction.
+The pattern almost every endpoint settles on is split models per direction.
 
 **Create** takes what a caller may supply. No id. The server assigns it. No `created_by`, because the server knows it.
 
@@ -266,7 +268,7 @@ Descriptions and examples on output fields are worth writing for the same reason
 
 ## A few practical notes
 
-**Status codes.** `response_model` shows the success response. Error shapes are documented apart with `responses={404: {...}}`. This Is worth doing for an API with consumers.
+**Status codes.** `response_model` shows the success response. Error shapes are documented apart with `responses={404: {...}}`. This is worth doing for an API with consumers.
 
 **Lists.** `-> List[ModuleOut]` filters each item. There's no extra work for sets.
 
@@ -295,9 +297,9 @@ For an API with consumers this is worth doing on each endpoint that can fail in 
 
 ## Status codes and the response model
 
-The declared model shows the route's *default* status. A handler returning a other status with a other shape. A 202 with a job id rather than a 201 with the object. Is returning a thing the schema doesn't show.
+The declared model shows the route's *default* status. A handler returning another status with another shape. A 202 with a job id rather than a 201 with the object. Is returning a thing the schema doesn't show.
 
-`responses=` can doc those options with their own models. This Keeps the doc honest. The option, an endpoint whose real action is broader than its schema, is the thing that makes made clients untrustworthy.
+`responses=` can doc those options with their own models. This keeps the doc honest. The option, an endpoint whose real action is broader than its schema, is the thing that makes made clients untrustworthy.
 
 ## Response models and inheritance
 
@@ -320,16 +322,9 @@ That is a safety property rather than a limitation. It stops a richer inner obje
 
 Filtering runs a check pass per response. For a single object it's nothing. For a list of ten thousand it's measurable. It's doing real work. Checking each field of each item against the model.
 
-Two honest options if it ever matters. Return fewer items. This Is often the right answer and is what pagination is for. Or, for a truly hot endpoint, return a `Response` with pre-serialised content and doc the shape with `responses=`. Accepting that you've opted out of the checking.
+Two honest options if it ever matters. Return fewer items. This is often the right answer and is what pagination is for. Or, for a truly hot endpoint, return a `Response` with pre-serialised content and doc the shape with `responses=`. Accepting that you've opted out of the checking.
 
 Measure before doing the second. The cost of shipping a field you didn't intend is higher than a few milliseconds.
-
-## Summary
-
-Declare a response model on each endpoint that returns data. It filters the output, validates your own work. Gives the docs a thing to show.
-
-split input and output models. What a caller may send and what they may see are other questions. Use `responses=` for the failure shapes. And note `from_attributes=True` when the handler returns an ORM row rather than a dict.
-
 
 ## Mistakes people make
 
@@ -365,41 +360,13 @@ Once clients exist, the response is a contract. The rules for changing it are sk
 
 **Adding a field is safe.** A well-written client skips what it doesn't recognise.
 
-**Dropping one is breaking.** So is renaming. This Is a removal and an addition.
+**Dropping one is breaking.** So is renaming. This is a removal and an addition.
 
 **Changing a type is breaking**, including narrowing. A field that was at times null and is now always present will be fine. The reverse won't.
 
 The hands-on sequence for dropping a field: mark it deprecated in the docs, keep returning it, measure whether anyone reads it if you can, then drop it in a new version.
 
-A response model makes all of this visible. This Is the underrated part. Without one, no one can say what the contract was. No one can say whether a change breaks it.
-
-## The question to ask each endpoint
-
-For each endpoint that returns data, one question: **could this ever hold a thing a caller shouldn't see?**
-
-If the answer is no with certainty, a response model is still worth declaring for the docs.
-
-If the answer is anything else. And for anything reading from a DB it often is. The model is the only thing standing between your storage and your consumers. Not a code review, not a rule, not the discipline of whoever writes the next handler. A class that says what may leave.
-
-## A closing thought on trust
-
-An API's consumers can't read your handlers. all they know comes from the schema and from what the endpoint really returns. When those two disagree the schema loses. They'll build against the seen action, including the fields you didn't mean to send.
-
-That is the real reason to declare the response. Not tidiness. Not the small check gain. That it makes the documented contract and the actual action the same object. Once they're the same object they can't drift, and a consumer reading your docs is reading the truth rather than an intention.
-
-## Questions people ask
-
-<strong>What does response_model do?</strong> It validates the returned data against a model and filters out any fields the model does not declare. It also drives the response schema in the docs.
-
-<strong>How do I stop a password field from leaking?</strong> Return through an output model that has no password field, set with response_model. Fields not in that model are dropped.
-
-<strong>Can I return a different type than the response model?</strong> Yes. You can return a dict or an ORM object, and FastAPI converts it to the model. With a return type annotation, FastAPI uses it the same way.
-
-<strong>How do I omit fields that were never set?</strong> Pass response_model_exclude_unset=True to the decorator. Fields left at their defaults are then left out of the JSON.
-
-<strong>What happens if my data doesn't match the model?</strong> FastAPI raises a server error, because it is your code that is wrong, not the client. This catches bugs before bad data reaches a client.
-
-<strong>Do I document error responses with it too?</strong> Yes. The responses argument maps status codes to models, which adds those shapes to the OpenAPI schema.
+A response model makes all of this visible. This is the underrated part. Without one, no one can say what the contract was. No one can say whether a change breaks it.
 
 ## The cost of not having one
 
@@ -410,3 +377,8 @@ An endpoint returns a row. Six months later a column is added. An inner flag, a 
 If it's harmless, a consumer eventually builds against it and you can no longer drop it. If it isn't harmless, you've been leaking it for but long it takes somebody to notice.
 
 Neither outcome involves anyone making a mistake. That is what makes the response model worth declaring on endpoints that appear not to need one.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/response-model/)
+- Continue with [Response Models](reading_a_422.html).

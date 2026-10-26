@@ -1,12 +1,15 @@
 title: Sub-dependencies
 intro: Dependencies that depend on dependencies, and the tree resolved before your handler runs.
-## The same syntax, one level down
 
-A sub-dependency is a dependency that itself depends on something else. For example, a function that returns the current user might need the token from the header, and a function that checks admin rights might need the current user. Each piece asks for what it needs, and the framework builds the chain.
+## The core idea
+
+A sub-dependency is a dependency that itself depends on something else. For example, a function that returns the current user might need the token from the header, and a function that checks admin rights might need the current user.
+
+## The same syntax, one level down
 
 This lets you assemble behavior from small, reusable parts. Instead of one large function that reads a token, loads a user, and checks permissions, you write three small ones that each do a single job. Each can be tested alone and reused in different combinations.
 
-This article starts with the syntax, which is the same as for any dependency, just applied one level down. Nothing new needs learning there. It then explains how the cache covers the whole tree. If two branches both need the same dependency, it runs once per request, and both receive the same value.
+
 
 The next section covers failures. When a dependency deep in the chain raises an error, the whole request stops at that point, and nothing after it runs. This is what makes authentication checks reliable, since the handler cannot be reached by accident.
 
@@ -28,7 +31,6 @@ def admin_only(user: dict = Depends(current_user)):
 ```
 
 There's no new method here. FastAPI walks the tree from the handler's signature down, calls each function in dependency order, and passes the results up.
-
 
 ## A dependency can declare its own
 
@@ -230,11 +232,12 @@ print()
 print("It works. But 'deep' declares one parameter and needs five functions,")
 print("and nothing in its signature says so.")
 ```
+
 ## The cache covers the tree
 
-This is where per-request caching stops being an tuning and turns load-bearing.
+This is where per-request caching stops being a tuning and turns load-bearing.
 
-In a realistic use, `current_user` is depended on by `permissions`. This Is depended on by `admin_only`. The handler may declare two of those right. Without caching the token would be decoded three or four times per request.
+In a realistic use, `current_user` is depended on by `permissions`. This is depended on by `admin_only`. The handler may declare two of those right. Without caching the token would be decoded three or four times per request.
 
 With it, once. The second editor above makes that visible: three split paths reach `base`. It runs a single time.
 
@@ -245,6 +248,7 @@ If any dependency raises, all below and after it's skipped, including the handle
 That is what makes layered checks safe. `admin_only` can assume `current_user` succeeded. It only runs if it did. There's no need to check for `None` or re-verify. The tree promises sorting.
 
 It's also why authentication as a dependency is truly safer than a check in the handler. A handler can forget to check. A signature can't. If the endpoint declares `admin_only`, the check ran.
+
 ## Parameters gather upward
 
 each param declared anywhere in the tree turns a param of the endpoint.
@@ -253,7 +257,7 @@ If `paging` declares `limit`, `locale` declares an `x-locale` header. `context` 
 
 That is worth appreciating: the abstraction isn't opaque. A caller reading your OpenAPI doc sees each param the endpoint really takes. Deep in the tree it was declared. Nothing is hidden by the indirection.
 
-The corollary is that a dependency adding a param changes the public contract of each endpoint using it. Adding a *needed* one is a breaking change for all of them at once. This Is worth remembering before doing it casually.
+The corollary is that a dependency adding a param changes the public contract of each endpoint using it. Adding a *needed* one is a breaking change for all of them at once. This is worth remembering before doing it casually.
 
 ## How deep to go
 
@@ -274,7 +278,6 @@ When a dependency doesn't behave as expected, the handy question is *sorting*. W
 A `print` at the top of each function shows the detail order at once. The order is fixed. There's no concurrency within one request's tree.
 
 The other common surprise is caching: a dependency that appears to run once when you expected twice is the cache doing its job, and `use_cache=False` is the switch.
-
 
 ## Mistakes people make
 
@@ -297,7 +300,6 @@ The layered-permission shape is the case that justifies the feature.
 Each level answers one question and can assume the previous one passed. A raise short-circuits all after it. `admin` never has to check whether `current_user` returned `None`, because if it had raised, `admin` wouldn't be running.
 
 That promise is what makes it safe to put security in the dependency tree rather than in handlers. A handler can forget a check. A signature can't. If the endpoint declares `admin`, the whole chain above it ran and passed.
-
 
 ## Reading a tree you did not write
 
@@ -348,7 +350,6 @@ The properties worth noticing: each level has one reason to fail and one status.
 
 That is what the tree is for. Not composition for its own sake. A set of needs that can be stated apart, reused on its own. Read from an endpoint's signature.
 
-
 ## Cost and shape
 
 each node in the tree is a function call per request, resolved before the handler runs.
@@ -365,28 +366,9 @@ Start at a handler's signature and follow the names down. Each level names one n
 
 Two things that reading reveals at once. Whether security is applied always - if half the endpoints declare `current_user` and half read the header themselves, the second half is where the bugs live. And how entangled the use is - a wide set of leaves means many things must exist for any endpoint to run.
 
-## Summary
-
-A dependency declares its own dependencies with the same syntax. FastAPI resolves the tree before the handler runs. The per-request cache covers the whole tree. A shared node is called once but many paths reach it.
-
-A raise anywhere short-circuits all after it. This Is what lets each level assume the previous one passed - and what makes declaring a check in a signature safer than remembering it in a handler.
-
-each param declared anywhere gathers upward into the endpoint's documented contract. Keep the tree about three levels deep. Name each level for the promise it gives.
-
-
 ## Summary, in one line
 
 Dependencies compose with the same syntax, the tree resolves before the handler, a shared node runs once, a raise stops all after it. Each param anywhere in the tree turns part of the endpoint's public contract.
-
-
-## A closing thought
-
-A dependency tree is a description of what an endpoint assumes, written in a form the framework enforces.
-
-That is a stronger promise than docs and a cheaper one than tests. If the endpoint declares `admin`, then a request that reaches the handler came from an authenticated, active administrator - not because somebody remembered to check. Because the handler couldn't have run else.
-
-Keeping the tree shallow and naming each level for its promise is what keeps that description readable.
-
 
 ## Two rules
 
@@ -394,22 +376,13 @@ Keeping the tree shallow and naming each level for its promise is what keeps tha
 
 **Stop at about three levels.** The tree stays handy while a signature still implies what the endpoint needs. Stops being handy the moment it doesn't.
 
-## Questions people ask
-
-<strong>What is a sub-dependency?</strong> A dependency that itself declares Depends() in its parameters. FastAPI resolves the whole tree before calling your endpoint.
-
-<strong>Is a shared dependency called twice in one tree?</strong> No. Results are cached per request, so a dependency used at two levels runs once.
-
-<strong>What happens when a deep dependency raises?</strong> The chain stops there and the client gets that error. The dependencies above it and the endpoint never run.
-
-<strong>How do I layer permissions?</strong> Build them as a chain, for example get_current_user, then get_active_user, then get_admin_user, each depending on the one before.
-
-<strong>Where do query parameters from sub-dependencies appear?</strong> They are gathered upward, so the endpoint's OpenAPI schema lists parameters from every level of the tree.
-
-<strong>How deep is too deep?</strong> When you cannot read the endpoint signature and know what runs. Two or three levels is common, beyond that consider flattening.
-
 ## Next
 
-Attaching a dependency to a router or an use rather than a param. This Is how a section gets a rule that a new route can't escape.
+Attaching a dependency to a router or an use rather than a param. This is how a section gets a rule that a new route can't escape.
 
 A tree that reads well is one where each name is a noun or an adjective showing the caller - a user, an admin, an active account - rather than a verb showing the check. The handler is receiving a promise, not commissioning an inspection.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/dependencies/sub-dependencies/)
+- Continue with [Sub-dependencies](class_dependencies.html).

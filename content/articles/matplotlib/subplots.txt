@@ -1,15 +1,17 @@
 title: Subplots
-intro: a few axes on one figure.
+intro: A few axes on one figure.
 
-## The grid
+## The core idea
 
 A single figure with multiple panels is called a subplot layout. Each panel is its own Axes object with its own data, limits, labels and legend. The panels share the figure's canvas and can share axes to make comparisons easier.
+
+## The grid
 
 Subplots are the right approach when you want to compare the same kind of chart across groups, show related variables side by side, or combine different chart types into one display. A grid of small multiples -- the same chart repeated for each category -- is one of the most effective visual patterns, and subplots are how you build it in matplotlib.
 
 `plt.subplots(rows, cols)` creates the grid and returns the figure and an array of Axes objects. From there, you index into the array to draw on each panel. The array follows NumPy conventions: `axes[row, col]` for a 2-D grid, `axes[i]` for a single row or column.
 
-This page covers the basic grid, the shape surprise when the grid is one-dimensional, shared axes, unequal panel sizes with `gridspec`, the mosaic layout for named panels, insets, removing unused panels, and the spacing controls that keep the layout clean.
+
 
 The most common issue with subplots is overlapping labels. Titles, axis labels and tick labels can collide when the panels are small. `fig.tight_layout()` adjusts the spacing automatically and fixes most cases. For finer control, `gridspec` parameters and `constrained_layout=True` give you explicit padding between panels.
 
@@ -19,7 +21,7 @@ The mosaic layout, available through `plt.subplot_mosaic`, lets you name each pa
 
 `fig, axes = plt.subplots(2, 3)` creates a figure with six axes and returns them as a NumPy array.
 
-`axes[0, 2]` is the top-right panel. `axes.flat` iterates in reading order. This Is what you want when the panels match to a flat list of groups:
+`axes[0, 2]` is the top-right panel. `axes.flat` iterates in reading order. This is what you want when the panels match to a flat list of groups:
 
 ```python
 for ax, name in zip(axes.flat, names):
@@ -27,7 +29,6 @@ for ax, name in zip(axes.flat, names):
 ```
 
 `zip` stops at the shorter of the two. A grid with more cells than data leaves the extras blank. Visible. Often worth dropping with `ax.drop()` or hiding with `ax.axis("off")`.
-
 
 ## A grid of axes
 
@@ -201,6 +202,7 @@ print()
 print("Neither is the default, and a figure that looks fine on screen")
 print("and cropped when saved is almost always missing one of them.")
 ```
+
 ## The shape surprise
 
 The returned array's shape isn't always what code expects.
@@ -217,9 +219,9 @@ That is convenient interactively and awkward in a function that takes the grid s
 
 This isn't a cosmetic setting. Without it, each panel autoscales to its own data. A bar that reaches the top of one panel may represent a smaller number than a shorter bar in the panel beside it. The grid looks like a compare and isn't one.
 
-Sharing also hides the inner tick labels. This Drops a great deal of repetition from a grid.
+Sharing also hides the inner tick labels. This drops a great deal of repetition from a grid.
 
-`sharex="col"` and `sharey="row"` share within columns or rows. This Suits a mat where each row is a other quantity.
+`sharex="col"` and `sharey="row"` share within columns or rows. This Suits a mat where each row is another quantity.
 
 The trade-off: with shared axes, a panel whose data occupies a small part of the shared range is compressed. When the panels truly have other scales, small multiples with split axes and clearly labelled ranges are more honest. But then the reader must be told not to compare heights right.
 
@@ -233,7 +235,7 @@ big = fig.add_subplot(gs[0, :])     # whole top row
 small = fig.add_subplot(gs[1, 0])   # bottom left
 ```
 
-`height_ratios` and `width_ratios` make rows and columns other sizes. This Is how you give a main chart more space than the supporting ones.
+`height_ratios` and `width_ratios` make rows and columns other sizes. This is how you give a main chart more space than the supporting ones.
 
 ## subplot_mosaic
 
@@ -299,7 +301,7 @@ Axes coords, so the letter stays in the corner even so of the data.
 
 `axes.flat` iterates row by row. This Matches how the panels will be read.
 
-`zip(axes.flat, items)` pairs them and stops at the shorter. This Is convenient and silently drops items if the grid is too small. Asserting the sizes match is one line and blocks a chart quietly missing a group:
+`zip(axes.flat, items)` pairs them and stops at the shorter. This is convenient and silently drops items if the grid is too small. Asserting the sizes match is one line and blocks a chart quietly missing a group:
 
 ```python
 assert len(items) <= axes.size
@@ -384,20 +386,6 @@ The figure size scaling with the grid is what keeps the text a constant size sca
 
 And because `zip` stops at the shorter arg, asserting `n <= axes.size` is worth the line. Else a grid that is too small silently drops groups.
 
-## In summary
-
-`subplots(r, c)` returns an array. `axes.flat` iterates in reading order. `squeeze=False` makes the shape predictable.
-
-`sharex` and `sharey` are what turn a grid into a compare. Without them each panel scales to its own data and the heights mean other things.
-
-`gridspec` and `subplot_mosaic` handle uneven layouts. The mosaic string is far easier to read than slice math.
-
-`tight_layout` or `constrained_layout` stop labels colliding. A figure that saves cropped is often missing one.
-
-Label the grid once with `supxlabel` rather than each panel, drop unused cells. Scale the figure size with the number of panels.
-
-And small multiples are the right answer far more often than one crowded chart. They're the display that makes many checks possible at once.
-
 ## Grids in practice
 
 Three layouts cover nearly all real grids.
@@ -436,26 +424,11 @@ The same applies to a colorbar: one bar serving the whole grid. This Also enforc
 
 It's a small alignment that is very visible once noticed. `align_xlabels` does the same flatly. On a grid where the panels have other value ranges, it's the gap between a column of labels that reads as one and one that looks ragged.
 
-## The short version
-
-A grid is a claim that the panels belong together. Sharing the axes is what makes the claim true. Labelling the grid once rather than each panel is what makes it read as one figure.
-
-The three things that most often go wrong are an unshared y axis making incomparable panels look close, a figure size that didn't grow with the grid so all is cramped. Empty cells left as bare boxes. All three are one line each.
-
-## Questions people ask
-
-<strong>Why does `plt.subplots` return two things?</strong> It returns the figure and the axes. Unpack as `fig, ax = plt.subplots()`.
-
-<strong>Why can I not index my axes with `ax[0]`?</strong> With one row and one column you get a single Axes. With a row or column you get a 1D array. A grid gives a 2D array. Pass `squeeze=False` to always get 2D.
-
-<strong>How do I share an axis between panels?</strong> Pass `sharex=True` or `sharey=True` to `plt.subplots`. Inner tick labels are hidden automatically.
-
-<strong>How do I make panels of different sizes?</strong> Use `subplot_mosaic` or `GridSpec` with `width_ratios` and `height_ratios`.
-
-<strong>How do I hide unused panels?</strong> Call `ax.set_visible(False)` or `ax.axis('off')` on each spare axes.
-
-<strong>What is the difference between `plt.subplot` and `plt.subplots`?</strong> `subplot` adds one axes to the current figure. `subplots` creates the figure and the whole grid at once.
-
 ## Reading the code back
 
 A grid is created in one call and finished in three. Share the axes, label the grid once. Drop what is unused. The figure size should be found from the grid rather than fixed. Adding a row makes the figure taller instead of making each panel smaller. Those four choices are what split a grid that reads as one figure from a few charts that happen to be adjacent.
+
+## Sources and next steps
+
+- Official reference: [Matplotlib documentation](https://matplotlib.org/stable/users/explain/axes/arranging_axes.html)
+- Continue with [Subplots](colours_and_colormaps.html).

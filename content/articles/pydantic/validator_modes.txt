@@ -1,9 +1,11 @@
 title: Validator Modes: before, after, plain and wrap
 intro: What runs when, scaled to coercion. Why the choice decides what a checker can do.
 
-## The pipeline
+## The core idea
 
-Every validator in Pydantic runs at a particular point in the pipeline. Some run after the built-in type check. Some run before it. Some replace it entirely. A few wrap around it and decide what to do with the result. The point where a validator runs is called its mode.
+Every validator in Pydantic runs at a particular point in the pipeline. Some run after the built-in type check. Some run before it.
+
+## The pipeline
 
 Choosing the right mode matters. A validator that runs too late sees a value that has already been converted, so it cannot fix the raw input. A validator that runs too early sees data that has not been checked, so it must defend itself against anything. Most of the confusing validator bugs come from the wrong mode.
 
@@ -22,8 +24,7 @@ checking one field is a sequence, and each mode is a slot in it:
 
 `plain` and `wrap` are other: they replace or surround the whole thing rather than sitting inside it.
 
-Almost each confusion about checkers dissolves once this sequence is clear. The question "why did my checker not run?" nearly always has the answer "it was in after mode and the value failed at step 2".
-
+Almost every confusion about checkers dissolves once this sequence is clear. The question "why did my checker not run?" nearly always has the answer "it was in after mode and the value failed at step 2".
 
 ## Seeing the pipeline
 
@@ -189,6 +190,7 @@ m = Module(tags="maths, vectors", title="  the chain rule ")
 print("tags :", m.tags)
 print("title:", repr(m.title))
 ```
+
 ## after: the default
 
 An after checker receives the value already converted. `n: int` given `"12"` reaches an after checker as the int `12`.
@@ -298,7 +300,7 @@ The same vocab applies at model level, with other scope.
 
 `model_validator(mode="after")` receives the finished model as `self` and returns it. This is where cross-field rules belong.
 
-There's a `mode="wrap"` at model level too, receiving the payload and a handler. This Can catch a whole-model failure and substitute a thing. It's rare and powerful. The same caution about swallowing errors applies.
+There's a `mode="wrap"` at model level too, receiving the payload and a handler. This can catch a whole-model failure and substitute a thing. It's rare and powerful. The same caution about swallowing errors applies.
 
 ## What each mode can and cannot do
 
@@ -338,12 +340,6 @@ For a model built a few times per request this is irrelevant. For checking a lar
 
 If profiling points at check on a hot path, the questions are. Can this rule be a constraint instead. Constraints run in Rust. And is the checker doing work that could be done once outside rather than per item. A checker that rebuilds a set of permitted values on each call is a common and easily fixed version of the second.
 
-## Summary
-
-Four slots around one pipeline: before, coerce, constrain, after. `plain` replaces the pipeline. `wrap` surrounds it.
-
-Choose by asking what the value looks like when your logic needs to see it. When a checker doesn't run, check the mode before anything else. And note that constraints sit between the two plain slots. An after checker only ever sees values that already passed them.
-
 ## The mental model
 
 One sentence holds most of it: **before sees what arrived, after sees what it became.**
@@ -354,12 +350,11 @@ all else follows. A checker repairing a shape must run before. After the shape h
 
 Keep the sentence and the rest is derivable.
 
-
 ## Mistakes people make
 
 **Shape-fixing logic in after mode.** The single most common. It presents as "my checker never runs". The value failed coercion at step two and step four was never reached.
 
-**given the type in a before checker.** It receives raw input. This Can be anything at all. Guard with `isinstance` and pass through unchanged what you don't handle. The normal path still runs.
+**given the type in a before checker.** It receives raw input. This can be anything at all. Guard with `isinstance` and pass through unchanged what you don't handle. The normal path still runs.
 
 **Losing to return.** Silent, and it sets the field to `None`. If a field mysteriously turns `None` after a checker is added, this is why.
 
@@ -369,24 +364,7 @@ Keep the sentence and the rest is derivable.
 
 **Rebuilding data inside a checker on each call.** A checker that makes a set of permitted values each time it runs does that work once per item checked. Hoist it out. On a large set it's the dominant cost.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What are the four validator modes?</strong> `after`, `before`, `plain` and `wrap`. They differ in whether your code runs after Pydantic's own checks, before them, instead of them, or around them.
-
-<strong>Which mode should I use by default?</strong> `after`. Your function receives a value that already has the right type, so you only write the extra rule.
-
-<strong>When do I need `before`?</strong> When the raw input has the wrong shape for the type, such as a comma-separated string that should become a list.
-
-<strong>What does `plain` do differently?</strong> It replaces Pydantic's built-in validation for that type, so you are responsible for everything, including the type check.
-
-<strong>What is `wrap` for?</strong> It receives the value and a handler for the normal validation, so you can run code before and after, catch errors, or skip the handler.
-
-<strong>In which order do multiple validators run?</strong> Inside `Annotated`, `after` validators run left to right, while `before` and `wrap` validators run right to left.
-
-## A closing note
-
-Nearly each question about checkers reduces to a question about spot.
-
-Not "how do I write this rule" but "where in the sequence does it need to sit". Once that is settled the code is often short and obvious. When a checker behaves strangely the spot is almost always what is wrong.
-
-Before, coerce, constrain, after. Four slots, one order. All else follows from knowing which one you're in.
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/validators/)
+- Continue with [Validator Modes](model_dump_and_model_dump_json.html).

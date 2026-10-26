@@ -1,12 +1,15 @@
 title: Lifespan Events
 intro: Work that happens once per process rather than once per request. Where a link pool belongs.
-## Two lifetimes
 
-A lifespan is the period between your application starting and stopping. Lifespan events are the places where you run code at each end of that period. On startup you might open a database pool or load a machine learning model. On shutdown you close the pool and flush anything pending.
+## The core idea
+
+A lifespan is the period between your application starting and stopping. Lifespan events are the places where you run code at each end of that period. On startup you might open a database pool or load a machine learning model.
+
+## Two lifetimes
 
 This is different from per-request work. A request lasts milliseconds, and you would not want to build a connection pool for each one. Some resources are expensive to create and meant to be shared. The lifespan is where those belong, created once and reused by every request.
 
-This article starts with the two lifetimes, per request and per process, and how to tell which one a resource needs. It then shows the shape of a lifespan function, which uses the same yield pattern you may know from dependencies. Code before the yield runs at startup, and code after it runs at shutdown.
+
 
 You will also read what the server actually does when it starts and stops, which clears up a lot of confusion about timing. A section covers the fact that lifespan runs once per worker process, so a server with four workers runs it four times. That affects anything you load into memory.
 
@@ -19,7 +22,6 @@ Almost all in this track has been per request: a body, a session, a user, a back
 Some things aren't. A DB link **pool** is created once and used by each request. So is an HTTP client, a machine-learning model, a cache client, a loaded config.
 
 Creating those per request would be absurdly wasteful. Creating them at import has its own problems. Lifespan is the third option, and the correct one.
-
 
 ## The lifespan protocol, driven by hand
 
@@ -226,6 +228,7 @@ print("after startup :", log)
 print()
 print("A test that merely imports the module paid for the first line only.")
 ```
+
 ## The shape
 
 ```python
@@ -240,13 +243,13 @@ app = FastAPI(lifespan=lifespan)
 
 An async context manager. all before the `yield` runs when the use starts. All after runs when it stops. In between, it serves requests.
 
-The shape is on purpose the same as a `yield` dependency, with a other lifetime. That one is per request, this one is per process.
+The shape is on purpose the same as a `yield` dependency, with another lifetime. That one is per request, this one is per process.
 
 ## What the server actually does
 
 Before serving anything, uvicorn sends the use a `lifespan.startup` message and waits for it to full. After the last request, it sends `lifespan.shutdown`.
 
-That is a real protocol, not a framework rule. This Is why the editors above can drive it by hand. Build the scope, send the message. Watch the same code run that uvicorn would have triggered.
+That is a real protocol, not a framework rule. This is why the editors above can drive it by hand. Build the scope, send the message. Watch the same code run that uvicorn would have triggered.
 
 ## Once per process, and per worker
 
@@ -317,7 +320,6 @@ It works and is deprecated. The lifespan context manager replaced it because it 
 
 New code should use `lifespan`. Old code is worth migrating when touched.
 
-
 ## Mistakes people make
 
 **Connecting at import.** each test collector, linter and docs gen then needs a live DB. Define at import. Create at startup.
@@ -363,16 +365,6 @@ Because the lifespan is opt-in for `TestClient`, most unit tests skip it and are
 
 Where it matters is the integration test that should prove the wiring works. That startup succeeds with real settings, that what it creates is reachable. That shutdown doesn't raise. One such test per use is often enough. It catches the class of failure where all passes and the process won't boot.
 
-## Summary
-
-A lifespan is an async context manager: before the `yield` is startup, after it's shutdown. In between the use serves requests.
-
-It runs once per process - which means once per worker. Four workers build four of all and anything that must happen just once doesn't belong there.
-
-Create costly, long-lived things there rather than at import. A test collector doesn't need a DB. Put them on `app.state` and hand them to handlers through a dependency. So The handlers stay unaware and overridable.
-
-Fail loudly before the `yield` when config is missing. Don't depend on shutdown running - a killed process never reaches it.
-
 ## Two lifetimes, restated
 
 Almost all in this track has been per request. This module is the exception. Holding the two apart is what the module is for.
@@ -385,7 +377,6 @@ Confusing them makes two distinct failures. A pool created per request is catast
 
 The lifespan owns the first group and dependencies own the second. The `yield` in each has the same shape for the same reason: acquire, use, release.
 
-
 ## Reading a startup that fails
 
 When an use won't boot, the lifespan is often where to look. The failure modes are few.
@@ -394,7 +385,7 @@ When an use won't boot, the lifespan is often where to look. The failure modes a
 
 **An unreachable dependency** - a DB that isn't up yet - raises a link error. In an orchestrated deployment this is often a race rather than a fault. The fix is a readiness probe or a retry with backoff rather than dropping the check.
 
-**A blocking call in an async lifespan** hangs rather than failing. This Is the confusing one. The process starts, never turns ready. Nothing is logged. The rule from the async module applies here too.
+**A blocking call in an async lifespan** hangs rather than failing. This is the confusing one. The process starts, never turns ready. Nothing is logged. The rule from the async module applies here too.
 
 **Work that should have run once** - a migration - appears to succeed on one worker and deadlock on the others.
 
@@ -404,35 +395,11 @@ Knowing that list turns "it won't start" into four things to check in order.
 
 Put a log line at the end of startup naming what was created and the settings that matter. It costs nothing and it turns each future boot problem into a question of which line was the last one printed.
 
-
-## A closing thought
-
-The lifespan is the only place in a FastAPI use that knows about the process rather than the request. That makes it the natural home for a exact kind of mistake. Doing a thing once that should happen once *per use*.
-
-Four workers is the default shape of a production deployment. Each one of them runs this code. A pool per worker is correct and intended. A migration per worker is a race. A scheduled job registered per worker is four schedulers.
-
-The gap isn't obvious from inside the function. Nothing about `async def lifespan(app)` suggests it will run four times. Knowing that it will is most of using it right.
-
 ## Next
 
 Testing what has been built - the client that needs no server, the replaces that drop the DB. What a suite should really assert.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What is lifespan?</strong> An async context manager passed to FastAPI(lifespan=...). Code before yield runs at startup and code after yield runs at shutdown.
-
-<strong>Why is lifespan preferred over on_event?</strong> on_event is deprecated, and lifespan keeps setup and teardown in one place so they can share variables.
-
-<strong>Where do I store what I create at startup?</strong> On app.state, or in a dict yielded from lifespan, and read it back through the request.
-
-<strong>Does lifespan run in tests?</strong> Only when you use TestClient as a context manager (with TestClient(app) as client). Otherwise startup is skipped.
-
-<strong>What happens if startup raises?</strong> The app does not start, and the error appears in the server log.
-
-<strong>What belongs in lifespan?</strong> Opening connection pools, loading a model, and starting background workers, along with closing them on exit.
-
-## In one line
-
-Startup and shutdown run once per worker, not once per use - so create costly long-lived things there, hand them over through a dependency, fail loudly if config is missing. Put anything that must happen just once one spot that runs just once.
-
-One log line at the end of startup, naming what was created, turns each future boot problem into a question of which line was the last one printed.
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/advanced/events/)
+- Continue with [Lifespan Events](testing_fastapi.html).

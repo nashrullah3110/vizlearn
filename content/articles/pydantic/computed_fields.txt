@@ -1,13 +1,15 @@
 title: Computed Fields: Derived Values in the Output
 intro: Values found from other fields that belong in the response but were never an input.
 
-## The gap it fills
+## The core idea
 
-Sometimes a value is not stored at all. It is worked out from other fields. A full name comes from first and last. A total comes from price and quantity. A model can compute these with a normal Python property, but a property does not appear when you dump the model to a dictionary or JSON.
+Sometimes a value is not stored at all. It is worked out from other fields. A full name comes from first and last.
+
+## The gap it fills
 
 A computed field fixes that. You mark a property with a decorator, and Pydantic includes it in the output and in the schema. The value is still calculated on demand. It is never accepted as input, which keeps the model honest about what the caller can set and what the model derives.
 
-This article explains the gap that computed fields fill and the shape of the decorator. It makes the point that they are output only, and why that is the right design. You will see how they show up in the JSON Schema, and why there are two schemas for a model that has them, one for input and one for output. The last section covers how to leave them out of a dump when you do not want them. They are a small feature that removes a lot of repeated code. Once you see the pattern, you will spot places in your own models where a stored field should have been computed all along.
+
 
 Some values aren't data you receive. They're results of data you receive. A full name from a first and last. A total from a quantity and a price. A reading time from a word count. An `is_expired` flag from an expiry date and the clock.
 
@@ -16,7 +18,6 @@ Storing them as fields is wrong. They can then disagree with the values they cam
 The obvious answer is a `@property`. It's half right. A property finds from the current values and can't drift. But it's invisible to output. `model_dump()` doesn't include it, `model_dump_json()` doesn't include it, and the schema doesn't know it exists. For a value that exists purely for inner use, that is fine. For one your API consumers need, it isn't.
 
 `@computed_field` closes the gap: the value is derived, and it appears in the output.
-
 
 ## A property is invisible to serialisation
 
@@ -191,6 +192,7 @@ except ZeroDivisionError as e:
     print("dump failed:", type(e).__name__, "-", e)
     print("A model that validated fine can no longer be serialised.")
 ```
+
 ## The shape
 
 ```python
@@ -214,11 +216,11 @@ A found field isn't an input. It doesn't appear in the constructor signature, it
 
 That skew is the whole point. The value is a function of the model. Allowing it to be supplied would allow it to be supplied *wrongly*. You'd have two sources of truth for one fact.
 
-It also means the value is always current. Change `minutes` and `pace` changes with it. It's recomputed on access rather than stored. There's no stale-derived-value bug on hand. This Is the class of bug this feature drops.
+It also means the value is always current. Change `minutes` and `pace` changes with it. It's recomputed on access rather than stored. There's no stale-derived-value bug on hand. This is the class of bug this feature drops.
 
 ## The schema, and the two modes
 
-A found field appears in the **output** schema and not the check one. This Is just right. It's a thing you emit, never a thing you accept.
+A found field appears in the **output** schema and not the check one. This is just right. It's a thing you emit, never a thing you accept.
 
 That gap surfaces in `model_json_schema(mode=...)`. The default, `mode="check"`, shows what the model accepts. Found fields are absent. `mode="output"` shows what it makes, and they're present.
 
@@ -289,7 +291,7 @@ A `description` in the decorator is more valuable here than on plain fields. `to
 
 ## Serialisation aliases work too
 
-Found fields accept `alias`. This Matters if the rest of your API is camelCase:
+Found fields accept `alias`. This matters if the rest of your API is camelCase:
 
 ```python
 @computed_field(alias="estimatedMinutes")
@@ -319,7 +321,7 @@ def is_expired(self) -> bool:
 
 The consumer doesn't have to know your expiry rules, parse a date, or get the timezone right. They get a boolean.
 
-Two cautions with this exact shape. It depends on the clock. Serialising the same model twice can give other output. Which breaks snapshot tests and can surprise a cache. And it makes the model's output non-fixed. This Is a property worth being deliberate about rather than discovering.
+Two cautions with this exact shape. It depends on the clock. Serialising the same model twice can give other output. Which breaks snapshot tests and can surprise a cache. And it makes the model's output non-fixed. This is a property worth being deliberate about rather than discovering.
 
 If determinism matters, pass the link time in rather than reading the clock, or find the flag in the layer that is making the response.
 
@@ -331,12 +333,6 @@ It costs a function call on each output. It demands that the function be total. 
 
 Cheap, total, and truly derived. Those three rules are the whole rule.
 
-## Summary
-
-`@computed_field` above `@property`, with a return annotation. The value is derived, output-only, recomputed each time. Appears in the output schema.
-
-Keep them cheap, because they run on each dump. Keep them total, because a found field that raises breaks output of a model that checked just right. And note that adding one changes the output of each output the model already feeds. Including the public ones.
-
 ## One more use worth knowing
 
 A found field is a good place to expose a value the model stores in a form consumers shouldn't have to understand.
@@ -345,8 +341,7 @@ Storage often wants one shape and a consumer wants another. A duration in second
 
 The found field bridges that without duplicating state. The stored field remains the single source of truth. The derived view is sure to agree with it because it's found from it.
 
-This is a better pattern than storing both. This Is where the two eventually disagree and no one can say which is right.
-
+This is a better pattern than storing both. This is where the two eventually disagree and no one can say which is right.
 
 ## Mistakes people make
 
@@ -362,20 +357,6 @@ This is a better pattern than storing both. This Is where the two eventually dis
 
 **Adding one without checking what already consumes the model.** Unlike a regular field. This You on purpose added to a schema, a found field written for one inner purpose at once appears in each existing output. Including the public ones.
 
-## Questions people ask
-
-<strong>What is a computed field?</strong> A property decorated with `@computed_field` that Pydantic includes in `model_dump()` and the JSON schema. It is derived from other fields and is never accepted as input.
-
-<strong>How is `@computed_field` different from a plain `@property`?</strong> A plain property is invisible to serialisation and the schema. A computed field appears in the dump, in `model_dump_json()` and in the generated schema.
-
-<strong>Do I need to put `@property` under `@computed_field`?</strong> Yes for a read-only value. Stack `@computed_field` on top of `@property` so Python still treats it as a property and Pydantic registers it.
-
-<strong>Can a client send a value for a computed field?</strong> No. It is output only, so a value supplied in the input is ignored by default. If you set `extra="forbid"`, the unknown key is rejected.
-
-<strong>Is the value cached?</strong> No. The property runs every time you dump the model. Add `functools.cached_property` below the decorator if the calculation is expensive and the inputs do not change.
-
-<strong>Can I leave a computed field out of one dump?</strong> Yes. Pass `exclude={"reading_time"}` to `model_dump`, or give the field `repr=False` to hide it from the printed form.
-
 ## Deciding, in one line
 
 Cheap, total, and truly derived.
@@ -383,3 +364,8 @@ Cheap, total, and truly derived.
 Cheap, because it runs on each output and there's no caching. Total, because a failure breaks the output of a model that checked just right. truly derived, because if a caller could fairly supply it, it's an input with a default rather than a found value.
 
 Fail any of those three and the answer is a thing else. A stored field, a plain property, or a value found in the layer making the response.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/fields/#the-computed_field-decorator)
+- Continue with [Computed Fields](model_config.html).

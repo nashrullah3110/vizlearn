@@ -119,7 +119,7 @@ def page(t):
         </div>
     </section>
 """
-    return (head + shell.header(PREFIX) + main + viz + mount
+    return (head + shell.header(PREFIX) + main + viz + "\n<!-- VIZLEARN:LEDE:AFTER -->\n" + mount
             + shell.close(PREFIX))
 
 

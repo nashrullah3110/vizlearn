@@ -1,9 +1,11 @@
 title: k-Means Clustering: A Practical Guide
-intro: each model so far was told the answers. This one is given features and asked to find structure - which is a truly different job. One whose results are much harder to check.
+intro: Each model so far was told the answers. This one is given features and asked to find structure - which is a truly different job. One whose results are much harder to check.
+
+## The core idea
+
+K-means is the most common clustering algorithm. It groups data points into k clusters by minimising the distance from each point to its cluster centre. You choose k in advance.
 
 ## The algorithm
-
-K-means is the most common clustering algorithm. It groups data points into `k` clusters by minimising the distance from each point to its cluster centre. You choose `k` in advance. The algorithm does the rest.
 
 Clustering is unsupervised learning. There is no target column. The model finds structure in the features alone. That makes it useful for segmentation, anomaly detection and exploratory analysis. It also makes it harder to evaluate, because there is no ground truth to compare against.
 
@@ -17,8 +19,7 @@ That is the whole thing, and it settles quickly. `inertia_` is what it cuts. The
 
 The interface is the familiar one with a piece missing. `fit(X)` takes no `y`. There's none. `labels_` holds the group number for each training row, `cluster_centers_` holds the centres. `predict` assigns new points to the nearest existing centre.
 
-The labels are any. Cluster 0 in one run may be cluster 2 in the next, with the same grouping. Checking two clusterings so needs a metric that skips the numbering. This Is what `adjusted_rand_score` is for.
-
+The labels are any. Cluster 0 in one run may be cluster 2 in the next, with the same grouping. Checking two clusterings so needs a metric that skips the numbering. This is what `adjusted_rand_score` is for.
 
 ## Fitting without a target
 
@@ -157,13 +158,14 @@ good = KMeans(5, n_init=10, random_state=0).fit(X)
 print()
 print("n_init=10 (the default) keeps the best of ten:", round(good.inertia_, 1))
 ```
+
 ## Choosing k is your problem
 
 The method can't tell you how many groups exist. It will happily split one blob into five or merge five into two.
 
 `inertia_` looks like it should help and can't. It falls monotonically. More centres always means points are closer to a centre. At `k = n` it's zero. The second editor shows the curve dropping from 4219 to 469 with no min in sight. The **elbow** is the heuristic. The point where the improvement flattens. And on this data the drops are 2213, 831, 472, 89, 78, 67. This Bends after 4.
 
-`silhouette_score` is the better tool because it has a genuine max. For each point it checks the distance to its own cluster against the distance to the nearest other cluster. Means. Values run from -1 to 1. Higher means better-separated groups. The third editor peaks at k=4. This Is the number of blobs the data was made with.
+`silhouette_score` is the better tool because it has a genuine max. For each point it checks the distance to its own cluster against the distance to the nearest other cluster. Means. Values run from -1 to 1. Higher means better-separated groups. The third editor peaks at k=4. This is the number of blobs the data was made with.
 
 Neither is authoritative. Both are heuristics on an ill-posed question. The honest answer often comes from outside. How many segments the business can act on, how many categories the taxonomy allows, what the groups turn out to mean when you look at them.
 
@@ -195,7 +197,7 @@ The centres are was reset at random, and the method settles to a local min. So d
 
 The last editor runs eight single-start fits with random init and gets inertias from 1034.9 to 1188.6. Three of the eight found the good answer and five didn't.
 
-`n_init` runs the whole thing a few times and keeps the lowest inertia. This Is why the default is 10 rather than 1. `init="k-means++"`, also the default, spreads the initial centres out rather than placing them at random. This Makes good answers much more likely and is the reason the default configuration mostly avoids this.
+`n_init` runs the whole thing a few times and keeps the lowest inertia. This is why the default is 10 rather than 1. `init="k-means++"`, also the default, spreads the initial centres out rather than placing them at random. This makes good answers much more likely and is the reason the default configuration mostly avoids this.
 
 Both defaults are sensible and both are worth knowing about. A clustering that changes between runs is often one of these two being overridden.
 
@@ -215,7 +217,7 @@ Guided models are checked against the truth. Clustering has none. The metrics sp
 
 **inner** measures use only the data and the labels the method made. `silhouette_score` checks within-cluster distance against nearest-other-cluster distance. `calinski_harabasz_score` and `davies_bouldin_score` are options with different biases. All three reward compact, well-separated groups. Which means they systematically favour just the round, equal-sized clusters that k-means makes. Would score a correct DBSCAN clustering of two crescents poorly. They measure the shape you asked for, not whether the grouping is real.
 
-**External** measures compare against known labels. `adjusted_rand_score` and `normalized_mutual_info_score` both skip the any numbering. This Is what makes them usable at all. Adjusted Rand is adjusted for chance. 0.0 is what random labelling scores and minus values are worse than random. Which is how the unscaled run above landed at -0.0032.
+**External** measures compare against known labels. `adjusted_rand_score` and `normalized_mutual_info_score` both skip the any numbering. This is what makes them usable at all. Adjusted Rand is adjusted for chance. 0.0 is what random labelling scores and minus values are worse than random. Which is how the unscaled run above landed at -0.0032.
 
 These are for the situation this track has been using throughout. Made data where the truth is known, or a subset somebody has labelled. In genuine unsupervised work there's nothing to compare against. The honest test is whether the groups turn out to be handy.
 
@@ -227,9 +229,9 @@ Three uses, of which only one is what people often mean by clustering.
 
 **Compression and feature build.** The cluster label turns a cat feature for a guided model, or the distances to each centre become numeric ones. This often helps. It's subject to the usual rule. The clustering must be fitted inside the folds, or the labels carry info from the test rows.
 
-**Finding what isn't in any group.** Points far from each centre are unusual. This Makes clustering a crude outlier finder. `DBSCAN` does this by name by labelling outliers `-1` rather than forcing them into a cluster. This Is one of its real edges over k-means.
+**Finding what isn't in any group.** Points far from each centre are unusual. This makes clustering a crude outlier finder. `DBSCAN` does this by name by labelling outliers `-1` rather than forcing them into a cluster. This is one of its real edges over k-means.
 
-The use to be careful with is treating clusters as though they were found categories. The method splits what it's given. Whether the split matches to any of it real is a separate question that the output can't answer.
+The use to be careful with is treating clusters as though they were found categories. The method splits what it is given. Whether the split matches to any of it real is a separate question that the output can't answer.
 
 <strong>Can I use k-means on cat data?</strong> Not sensibly - the mean of one-hot columns isn't a category. `KModes` outside scikit-learn, or a distance-based method with a cat metric.
 
@@ -253,15 +255,15 @@ Fitting takes one line. Understanding the result takes rather more. Skipping it'
 
 The output of that work is a name and a description per group. That is the deliverable. The labels are an mid.
 
-<strong>Is there a way to have k chosen automatically?</strong> Not by k-means. `DBSCAN` and `HDBSCAN` find the number of groups from the density instead. This Is a genuine edge when you've no prior view.
+<strong>Is there a way to have k chosen automatically?</strong> Not by k-means. `DBSCAN` and `HDBSCAN` find the number of groups from the density instead. This is a genuine edge when you've no prior view.
 
-<strong>Does predict() work on new data?</strong> Yes - it assigns each new point to the nearest existing centre without refitting. This Is what makes a clustering usable as a feature in production.
+<strong>Does predict() work on new data?</strong> Yes - it assigns each new point to the nearest existing centre without refitting. This is what makes a clustering usable as a feature in production.
 
-<strong>Why is my silhouette score low though the clusters look right?</strong> Silhouette rewards compact, well-separated, roughly spherical groups. A correct clustering of elongated or touching groups scores poorly on it. This Is a limitation of the metric rather than of the clustering.
+<strong>Why is my silhouette score low though the clusters look right?</strong> Silhouette rewards compact, well-separated, roughly spherical groups. A correct clustering of elongated or touching groups scores poorly on it. This is a limitation of the metric rather than of the clustering.
 
 <strong>Does k-means work in high dims?</strong> Less well. Distances between points become more similar as dims grow. "nearest centre" carries less info. Reducing dims first - with PCA, say - is common practice and often helps.
 
-<strong>Can two clusters end up empty?</strong> With random init, yes. Scikit-learn relocates empty clusters rather than leaving them. This Is one more thing `k-means++` makes unlikely.
+<strong>Can two clusters end up empty?</strong> With random init, yes. Scikit-learn relocates empty clusters rather than leaving them. This is one more thing `k-means++` makes unlikely.
 
 ## Things to try
 
@@ -270,20 +272,7 @@ The output of that work is a name and a description per group. That is the deliv
 3. <strong>Try the wrong shape.</strong> In the fifth editor, raise `noise` to 0.15 and see whether DBSCAN still manages.
 4. <strong>Cluster noise.</strong> Fit k=4 on `np.random.rand(300, 2)` and look at the silhouette. It won't be zero.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>How do I choose k?</strong> Try several values and compare the elbow in inertia and the silhouette score. Also ask which k gives groups you can use.
-
-<strong>Do I need to scale for KMeans?</strong> Yes. It uses Euclidean distance, so a feature with a large range will dominate the clusters.
-
-<strong>Why do results change between runs?</strong> The starting centroids are random. Set `random_state` and keep `n_init` above 1 for a steadier result.
-
-<strong>What shapes does KMeans assume?</strong> Roughly round, similarly sized blobs. For odd shapes or noise, try DBSCAN or a Gaussian mixture.
-
-<strong>Can I check the clusters without labels?</strong> Use the silhouette score and inspect cluster profiles. Stability across different seeds is also a useful sign.
-
-<strong>Can KMeans find outliers?</strong> Not directly. Outliers drag centroids, so remove or handle them first.
-
-## Where this leaves you
-
-Scale first, choose k with silhouette rather than inertia, keep `n_init` at its default. Check that the groups mean a thing before reporting them. When the clusters aren't round, the method is the wrong one rather than badly tuned.
+- Official reference: [Sklearn documentation](https://scikit-learn.org/stable/modules/clustering.html#k-means)
+- Continue with [k-Means Clustering](a_complete_workflow.html).

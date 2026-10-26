@@ -1,13 +1,15 @@
 title: Parsing JSON: One Step Instead of Two
 intro: Why model_validate_json beats json.loads plus model_validate on speed, errors and fidelity.
 
-## The habit worth changing
+## The core idea
 
 Most people parse JSON with the standard library and then pass the result to a model. That is two steps, and it works. It is also a habit worth changing, because Pydantic can do both steps in one call.
 
+## The habit worth changing
+
 The method is model_validate_json. It reads the JSON string or bytes directly and validates as it goes. That brings three gains. It is faster, because the parsing happens in Rust. The error messages are better, because they refer to the original text. And it keeps number fidelity, so large integers and precise decimals do not get mangled on the way through Python.
 
-This article explains the habit and why you might want to drop it. It covers speed, error quality and fidelity with numbers, one after another. It then looks at the other direction, turning a model back into JSON text. It also notes that bytes work as input, which matters when you read from a network socket or a file. The aim is to make the single-step version your default for JSON input, with a clear idea of why.
+
 
 Almost every service parses JSON, so even a small gain here applies to nearly all your traffic. The change is tiny. It takes one method call in place of two. Yet it affects speed, error clarity and the accuracy of your numbers all at once. The article makes the case with concrete examples rather than claims, so you can see each benefit for yourself. For example, you will see the same bad input fail in both styles, and compare the messages. One points at the exact spot in the text. The other can only tell you that something is wrong. You will also learn the one situation where the two-step habit is still the better choice. After reading, you will know when to use each approach and why, instead of copying whichever one you saw last.
 
@@ -27,7 +29,6 @@ model = Module.model_validate_json(raw)
 ```
 
 It isn't merely shorter. It's faster, makes better errors. Is more faithful with numbers. Three split reasons, and they compound.
-
 
 ## One call instead of two
 
@@ -184,6 +185,7 @@ try:
 except ValidationError as e:
     print("error :", e.errors()[0]["loc"], e.errors()[0]["type"])
 ```
+
 ## Speed
 
 The two-step version parses JSON into Python objects. Dicts, lists, strings, floats. And then validates those objects, converting again into what the model wants.
@@ -198,7 +200,7 @@ The saving grows with payload size. For a small request body it's unimportant. F
 
 This is the arg that matters most day to day.
 
-With `json.loads`, malformed JSON raises `json.JSONDecodeError`. A other exception, from a other library, that knows nothing about your model. Your handler needs two `except` clauses making two shapes of error response. The JSON one has no field data because there are no fields yet.
+With `json.loads`, malformed JSON raises `json.JSONDecodeError`. A other exception, from another library, that knows nothing about your model. Your handler needs two `except` clauses making two shapes of error response. The JSON one has no field data because there are no fields yet.
 
 `model_validate_json` folds it in. Malformed JSON turns a `ValidationError` with the type `json_invalid`, arriving through just the same channel as a missing field or a failed constraint.
 
@@ -224,7 +226,7 @@ A round trip is exact for each type Pydantic knows. A `date` turns an ISO string
 
 ## Bytes work too
 
-Both methods accept `bytes` and `str`. This Is what an HTTP body really is.
+Both methods accept `bytes` and `str`. This is what an HTTP body really is.
 
 That saves a decode step, and avoids a class of bug where the wrong encoding is assumed. If you're reading a request body or a file, pass the bytes straight in.
 
@@ -273,7 +275,7 @@ For very large docs, two things are worth knowing.
 
 Parsing is a single pass and memory-bounded by the result rather than by mid objects. `model_validate_json` uses usefully less memory than the two-step form on a big doc.
 
-There's no streaming. The whole doc is parsed before check ends. A hundred-megabyte file is a hundred megabytes in memory. If that matters, the answer is at a other level. A streaming JSON reader making records, each checked on their own or in batches with a `TypeAdapter`.
+There's no streaming. The whole doc is parsed before check ends. A hundred-megabyte file is a hundred megabytes in memory. If that matters, the answer is at another level. A streaming JSON reader making records, each checked on their own or in batches with a `TypeAdapter`.
 
 ## Reading from a file
 
@@ -303,12 +305,6 @@ It's faster, because it skips an entire mid form. It makes better errors, becaus
 
 Very few changes improve four things at once for one fewer line of code.
 
-## Summary
-
-`model_validate_json` for JSON text or bytes. `model_validate` for Python objects. One pass in Rust rather than two with garbage in between. Malformed JSON turns a `ValidationError` with a spot. One handler covers syntax and check alike. And decimals keep the precision that a trip through Python floats would have destroyed.
-
-`model_dump_json` on the way out, `TypeAdapter` for shapes that aren't models. Build adapters once rather than per call.
-
 ## Where this fits
 
 This is a small change with an unusually good ratio. It applies in more places than request handling.
@@ -316,7 +312,6 @@ This is a small change with an unusually good ratio. It applies in more places t
 Reading a config file. Consuming a queue message. checking another service's response. Loading a test fixture. Anywhere JSON text or bytes are in hand and a model is about to be built from them.
 
 In each of those the two-step habit is common. In each of them the one-step form is faster, makes better errors and keeps more precision. It's worth grepping for `json.loads` once and seeing how many of them are at once followed by a check call.
-
 
 ## Mistakes people make
 
@@ -326,7 +321,7 @@ In each of those the two-step habit is common. In each of them the one-step form
 
 **Decoding bytes needlessly.** An HTTP body is bytes and both methods accept bytes. Decoding to `str` first adds a step and a chance to assume the wrong encoding.
 
-**Expecting streaming.** There's none. The whole doc is parsed before check ends. A very large file is fully in memory. Streaming needs a other tool making records, each checked on their own or in batches.
+**Expecting streaming.** There's none. The whole doc is parsed before check ends. A very large file is fully in memory. Streaming needs another tool making records, each checked on their own or in batches.
 
 **given the fast path applies to YAML or TOML.** Only JSON has a parser inside the core. Other formats go through their own libraries and give Python objects. This Then take the plain route. Including losing decimal exactness on the way.
 
@@ -338,23 +333,9 @@ Speed, because an entire mid form is skipped. Errors, because syntax and check f
 
 All of it from handing Pydantic the text instead of parsing it first. Which is also less code than the option.
 
-## Questions people ask
-
-<strong>Should I use `json.loads` then `model_validate`, or `model_validate_json`?</strong> Prefer `model_validate_json`. It parses and validates in one pass in Rust, which is faster and gives better error locations.
-
-<strong>Does `model_validate_json` accept bytes?</strong> Yes, both `str` and `bytes` work, so you can pass a request body directly without decoding.
-
-<strong>What happens when the JSON is malformed?</strong> You get a `ValidationError` with type `json_invalid` and the position of the problem, not a `JSONDecodeError`.
-
-<strong>How do I parse a top-level JSON array?</strong> Use `TypeAdapter(list[Model]).validate_json(data)`. A model cannot represent a bare array.
-
-<strong>Do the coercion rules differ for JSON input?</strong> Slightly. Tuples and sets are read from arrays and dates from ISO strings, but a string like `"1"` for an int field is still coerced in lax mode unless you turn on strict mode.
-
-<strong>Can it handle large integers?</strong> Yes. Python ints are unbounded, and Pydantic parses large JSON integers exactly instead of rounding to a float.
-
 ## Why the habit persists
 
-The two-step form isn't the result of anyone deciding it was better. It's what you write when you learn `json` before you learn Pydantic. This Is the order nearly everybody learns them in.
+The two-step form isn't the result of anyone deciding it was better. It's what you write when you learn `json` before you learn Pydantic. This is the order nearly everybody learns them in.
 
 `json.loads` is the obvious way to turn text into data. Once the data exists, checking it's the obvious next step. Both halves are fair and the mix is worse than either author intended.
 
@@ -362,4 +343,9 @@ That is worth naming because it shows why the pattern is all over, including in 
 
 The check takes a minute: search a code for `json.loads` and look at the line after each one. Wherever it's a check call, the two lines collapse into one that is faster, more precise about numbers. Makes errors that say where in the doc the problem was.
 
-There's rarely a reason to keep the two-step version once seen. Unless a thing truly needs the raw structure in between. This Is a real case and a small one.
+There's rarely a reason to keep the two-step version once seen. Unless a thing truly needs the raw structure in between. This is a real case and a small one.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/json/)
+- Continue with [Parsing JSON](custom_serializers.html).

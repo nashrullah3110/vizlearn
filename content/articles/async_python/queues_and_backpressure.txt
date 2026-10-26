@@ -1,13 +1,11 @@
 title: Queues, Producers and Backpressure
 intro: The pattern most real async programs are built from, and the one number that stops a fast producer from burying a slow consumer.
 
-## The shape of almost every async program
+## The core idea
 
-Once a program does more than a single fan-out, it tends to settle into the same
-structure: something produces work, something else consumes it, and the two run
-at different speeds. A crawler finds URLs faster than it can fetch them. A log
-reader ingests lines faster than it can index them. A handler accepts requests
-faster than a downstream service can answer.
+Once a program does more than a single fan-out, it tends to settle into the same structure: something produces work, something else consumes it, and the two run at different speeds.
+
+## The shape of almost every async program
 
 An <code>asyncio.Queue</code> is the piece that connects the two. Producers
 <code>put</code> items in, consumers <code>get</code> them out, and because both
@@ -226,26 +224,7 @@ everything &mdash; see [the blocking call](the_blocking_call_that_freezes_the_lo
 <code>q.qsize()</code>, another coroutine may have changed it. Let <code>put</code>
 and <code>get</code> do the waiting; the count is for observing, not for control.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What should maxsize be?</strong> However far ahead of the consumer you are willing to let the producer run, expressed in items. It is a contract, not a tuning number. A queue of 100 means "up to 100 items of work may be buffered", and the right value follows from how big an item is and how stale a buffered one may be.
-
-<strong>Is an unbounded queue ever right?</strong> When the producer is naturally slower than the consumer, or the total volume is small and known. Otherwise it converts backpressure into memory growth, and the failure looks like a leak rather than a missing bound.
-
-<strong>Sentinels or <code>join</code>?</strong> <code>join</code>, once there is more than one consumer &mdash; a sentinel needs one per worker and the bookkeeping gets error-prone. Sentinels stay useful when consumers must finish in a particular order, or when the producer cannot know the work is complete.
-
-<strong>Why does my program hang at the end?</strong> Almost always a missing <code>task_done</code> on some path. So <code>join</code> is still waiting; or consumers blocked on <code>await q.get()</code> with nothing left to arrive and no cancellation. Both look like a deadlock and are really a missing shutdown signal.
-
-<strong>Can I use a <code>queue.Queue</code> from the standard library?</strong> Not inside a coroutine. Its <code>get</code> blocks the thread rather than awaiting, which freezes the loop exactly as [any blocking call does](the_blocking_call_that_freezes_the_loop.html). <code>asyncio.Queue</code> is not thread-safe either &mdash; to bridge a thread and a loop, use <code>run_coroutine_threadsafe</code> or <code>janus</code>.
-
-<strong>How many workers?</strong> Enough to saturate whatever they are waiting on, and no more than it tolerates. The same question a [semaphore](running_work_concurrently.html) answers for a fixed list of work. The queue makes it a single number you can change in one place, which is most of the appeal.
-
-## Recap in one screen
-
-- Producer, consumer and a queue between them is the shape most real async programs settle into, because the two sides run at different speeds.
-- Both <code>put</code> and <code>get</code> are awaitable, so either side can wait for the other without blocking the loop.
-- <code>maxsize</code> is the backpressure. A full queue suspends <code>put</code>, which paces the producer to the consumer's rate by itself.
-- Unbounded means the producer never waits, and a fast producer then grows the queue until memory runs out.
-- <code>task_done</code> in a <code>finally</code> plus <code>await q.join()</code> is the reliable "all drained" signal, and it replaces per-worker sentinels.
-- Cancel the workers after <code>join</code> returns, and collect the cancellations with <code>gather(..., return_exceptions=True)</code>.
-- <code>put_nowait</code> with a <code>QueueFull</code> handler is the opposite policy &mdash; shed load instead of applying backpressure &mdash; and should be a stated decision.
+- Official reference: [asyncio queues](https://docs.python.org/3/library/asyncio-queue.html)
+- Continue with [The Blocking Call That Freezes the Loop](the_blocking_call_that_freezes_the_loop.html).

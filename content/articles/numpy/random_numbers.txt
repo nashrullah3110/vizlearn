@@ -1,9 +1,11 @@
 title: Random Numbers
 intro: The modern gen API, and how to make results reproducible.
 
-## Two APIs, one of them legacy
+## The core idea
 
 Random number generation in NumPy has a clear best practice, but the legacy interface still appears in most tutorials and examples. Knowing both is necessary for reading existing code. Using the new one is better for writing new code.
+
+## Two APIs, one of them legacy
 
 The legacy interface uses module-level functions: np.random.rand, np.random.randint, np.random.normal, np.random.seed. They all share a single hidden global generator. Setting the seed in one place affects every call everywhere. That makes reproducibility fragile. Two libraries that both call np.random.seed can interfere with each other.
 
@@ -15,7 +17,6 @@ Beyond the interface question, random number generation in NumPy is fast because
 
 Distributions beyond uniform and normal are available: exponential, poisson, binomial, beta, gamma, and many others. Each takes the distribution parameters and a size argument. Sampling from a discrete set uses rng.choice, which handles replacement, weights, and multi-dimensional output.
 
-This module covers the new generator API, the most common distributions, shuffling and permutation, and the reasons to avoid the legacy interface in new code. The examples use explicit generators throughout.
 
 
 You'll see both in the wild.
@@ -29,7 +30,6 @@ The new one is preferred, and the reason isn't cosmetic. A global gen means any 
 An clear gen is passed where it's needed. Nothing else can touch it. Create it once, near the top, and thread it through.
 
 The legacy functions aren't deprecated and existing code doesn't need rewriting. New code should use `default_rng`.
-
 
 ## default_rng is the current API
 
@@ -165,6 +165,7 @@ print()
 print("Drawing two independent samples would let rows appear in both,")
 print("which quietly inflates every score you measure afterwards.")
 ```
+
 ## Seeding
 
 `default_rng(42)` gives a gen whose sequence is fully found. Two gens created with the same seed give same output.
@@ -197,7 +198,7 @@ Beyond those there are dozens. `poisson`, `steep`, `binomial`, `multivariate_nor
 
 `p=weights` gives a weighted draw. The weights must sum to 1 and have one entry per element of the pool.
 
-`choice` also accepts an int instead of an array, meaning "choose from `arange(n)`". This Is often what you want when you're really choosing indices.
+`choice` also accepts an int instead of an array, meaning "choose from `arange(n)`". This is often what you want when you're really choosing indices.
 
 ## Shuffling
 
@@ -226,7 +227,7 @@ And be clear about what a seed promises. Same results for the same NumPy version
 
 ## What is underneath a Generator
 
-`default_rng` returns a `gen` wrapping a **bit gen**. This Is the thing that really makes random bits. The default is PCG64.
+`default_rng` returns a `gen` wrapping a **bit gen**. This is the thing that really makes random bits. The default is PCG64.
 
 The split matters because the two layers have other jobs. The bit gen makes a stream of uniform bits. The gen turns those into spreads. Swapping the bit gen. `default_rng(np.random.MT19937(seed))` for the old Mersenne Twister, or `Philox` for a counter-based one. Changes the stream without changing the interface.
 
@@ -236,7 +237,7 @@ None of these are cryptographically secure. For tokens, passwords or anything an
 
 ## Independent streams
 
-Running the same modelling in parallel needs each worker to draw other numbers. Seeding each with a other any int isn't a solid way to get that. Nearby seeds can give shared streams.
+Running the same modelling in parallel needs each worker to draw other numbers. Seeding each with another any int isn't a solid way to get that. Nearby seeds can give shared streams.
 
 `SeedSequence` is the supported answer:
 
@@ -300,7 +301,7 @@ Change the order of steps and the numbers change. Add a draw in the middle and a
 
 This means a seed copies a run, not a result. Code that draws other amounts of noise based on the data won't copy across changes to that data, even with the seed fixed.
 
-The hands-on discipline: seed once at the entry point, record the seed alongside the output, pass the gen by name into anything that needs it. Use `SeedSequence` for parallel work. Those four habits cover almost each reproducibility problem people really hit.
+The hands-on discipline: seed once at the entry point, record the seed alongside the output, pass the gen by name into anything that needs it. Use `SeedSequence` for parallel work. Those four habits cover almost every reproducibility problem people really hit.
 
 ## Passing the generator around
 
@@ -355,30 +356,13 @@ Permute an index array once when splitting or shuffling aligned data.
 
 Record the seed with the results. Note that it copies the sequence of calls, not the conclusion.
 
-## A closing note
-
-Noise is one of the few areas where the convenient API and the correct API differ. Where the convenient one has been the default for long enough that most examples still use it.
-
-`np.random.seed` and its companions aren't broken. Existing code using them doesn't need rewriting. But new code has a better option, and the reasons. Alone, thread safety, reproducible parallelism. Are the kind that only matter once, catastrophically, at the point where results can't be copied.
-
-One gen, created by name, passed where it's needed. That single habit covers almost all.
-
-## Questions people ask
-
-<strong>How do I make random results reproducible?</strong> Create a generator with rng = np.random.default_rng(42) and draw from it. The same seed gives the same stream.
-
-<strong>What is wrong with np.random.seed?</strong> It sets hidden global state shared by everything in the process. The newer Generator API keeps state in an object you pass around.
-
-<strong>How do I shuffle or sample without replacement?</strong> Use rng.permutation(n) to shuffle, or rng.choice(a, size=k, replace=False) to sample. rng.shuffle works in place.
-
-<strong>How do I draw from a normal distribution?</strong> Call rng.normal(loc, scale, size). Note that scale is the standard deviation, not the variance.
-
-<strong>Is the output truly random?</strong> It is pseudorandom: deterministic given the seed but statistically well behaved. It is fine for simulation and not for cryptography.
-
-<strong>How do I get independent streams in parallel jobs?</strong> Use SeedSequence.spawn to create child seeds. Do not just add one to the seed for each worker.
-
 ## One last habit
 
 Record the seed with the output, not just in the code.
 
 A seed that lives only in a source file is lost the moment the file changes. The results it made become unreproducible without a git archaeology session. Writing it into the output. A filename, a metadata field, a log line. Costs nothing and is the gap between results that can be regenerated and results that can only be trusted.
+
+## Sources and next steps
+
+- Official reference: [Numpy documentation](https://numpy.org/doc/stable/reference/random/index.html)
+- Continue with [Random Numbers](linear_algebra.html).

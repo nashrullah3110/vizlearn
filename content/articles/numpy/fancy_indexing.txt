@@ -1,8 +1,11 @@
 title: Fancy Indexing
 intro: Selecting by a list of spots - reordering, repeating. A result whose shape follows the index.
-## Indexing with an array
 
-Fancy indexing selects elements by passing an array of indices instead of a single integer or a slice. The result contains the elements at those positions, in the order the indices specify. That order can be anything. You can repeat indices, reverse them, or pick an arbitrary subset.
+## The core idea
+
+Fancy indexing selects elements by passing an array of indices instead of a single integer or a slice. The result contains the elements at those positions, in the order the indices specify.
+
+## Indexing with an array
 
 The key difference from slicing is that fancy indexing always returns a copy, not a view. A slice shares memory with the original array. An index array does not. That distinction matters when you assign through the result. Assigning through a slice modifies the original. Assigning through a fancy index modifies a copy, and the original is unchanged.
 
@@ -14,7 +17,6 @@ argsort returns indices that sort an array. You can use those indices with fancy
 
 One pitfall is repeated indices in assignment. a[[0, 0, 0]] += 1 does not increment a[0] three times. It increments it once because the additions are not accumulated. np.add.at is the correct way to accumulate repeated assignments.
 
-This module covers fancy indexing in one and multiple dimensions, the copy-versus-view distinction, np.ix_ for cross-product selection, np.where for conditional selection, and the pitfalls of repeated indices in assignment.
 
 
 Give an int array where you'd most times give a number. You get those elements back:
@@ -26,7 +28,6 @@ a[[0, 2, 4]]
 Order is preserved as given. So This is also how you reorder. spots may repeat, so it's also how you tile or expand. Minus indices work as usual.
 
 The result takes the shape of the **index**, not the source. Indexing a 1-D array with a `(2, 2)` index array gives a `(2, 2)` result. That is at times what you want and is worth knowing before it surprises you.
-
 
 ## Indexing with a list of positions
 
@@ -174,6 +175,7 @@ try:
 except IndexError as e:
     print("   plain index :", type(e).__name__, "-", str(e)[:44])
 ```
+
 ## It copies
 
 Fancy indexing can't return a view. The selected spots are any. A view has to be describable as a start, a shape and a set of strides. Which scattered spots aren't.
@@ -238,7 +240,7 @@ Mixing the two in one formula is where fancy indexing stops being natural.
 
 But when fancy indices appear on **both sides** of a slice. `a[[0, 2], :, [1, 3]]`. NumPy has to decide where the resulting axis goes. The rule is that the fancy-indexed axis moves to the **front**. The result's shape isn't the one most people predict.
 
-The hands-on advice is to avoid the ambiguous forms. If an formula mixes fancy indices and slices in a way that makes you pause, split it into two steps. Two clear picks cost one extra mid array and save the next reader from working out the rule.
+The hands-on advice is to avoid the ambiguous forms. If a formula mixes fancy indices and slices in a way that makes you pause, split it into two steps. Two clear picks cost one extra mid array and save the next reader from working out the rule.
 
 ## np.ix_ builds the rectangle
 
@@ -258,7 +260,7 @@ The option, `a[[0, 2]][:, [1, 3]]`, gives the same answer with two picks and two
 
 ## put, take and the clip modes
 
-`np.take(a, idx)` is fancy indexing as a function call. It's often a little faster than bracket syntax on 1-D arrays. It accepts an `axis` arg. This Makes `np.take(a, idx, axis=1)` a clean way to select columns without a slice full of colons.
+`np.take(a, idx)` is fancy indexing as a function call. It's often a little faster than bracket syntax on 1-D arrays. It accepts an `axis` arg. This makes `np.take(a, idx, axis=1)` a clean way to select columns without a slice full of colons.
 
 Its handy extra is `mode`. By default an out-of-range index raises, as with normal indexing. `mode="clip"` pins the index to the valid range, and `mode="wrap"` wraps it around.
 
@@ -314,7 +316,7 @@ Element 0 is incremented **once**, not twice. The formula expands to a fetch, an
 
 `np.add.at(a, [0, 0, 1], 1)` is the unbuffered version that does what the syntax suggests. each ufunc has an `.at` method for this.
 
-This matters in any build-up where indices repeat. Building a histogram, scattering values into bins, building up grads. The buffered version makes a plausible undercount rather than an error. This Is the worst kind of wrong.
+This matters in any build-up where indices repeat. Building a histogram, scattering values into bins, building up grads. The buffered version makes a plausible undercount rather than an error. This is the worst kind of wrong.
 
 For the exact case of counting or summing by int key, `np.bincount(idx)` and `np.bincount(idx, weights=vals)` are both correct and a lot faster than `add.at`.
 
@@ -334,20 +336,6 @@ That gathering isn't free even beyond the allocation. Scattered reads defeat the
 
 The hands-on result is small. It's still far faster than a Python loop &mdash; but it means fancy indexing inside a tight loop over a large array is worth a second look. Sorting the index array first. Here Order doesn't matter, can help by making the reads more sequential.
 
-## Questions people ask
-
-<strong>What is fancy indexing?</strong> Indexing with an array or list of integers instead of a slice. a[[0, 3, 5]] picks those three positions in the order you gave.
-
-<strong>Does fancy indexing return a view?</strong> No, it always returns a copy. Slices give views and fancy indexing does not, which matters when you assign to the result.
-
-<strong>How do two index arrays combine?</strong> They pair up element by element. a[[0, 1], [2, 3]] returns a[0, 2] and a[1, 3], not a 2 by 2 block. Use np.ix_ if you want the block.
-
-<strong>What happens when an index repeats in an assignment?</strong> The last write wins for plain assignment. For counting use np.add.at, which applies every repeated index instead of just one.
-
-<strong>Can I mix a slice and an index array?</strong> Yes, and the slice axis keeps its position. a[:, [0, 2]] gives all rows and columns 0 and 2.
-
-<strong>Are negative indices allowed in the index array?</strong> Yes, they count from the end like normal indexing. Out-of-range values raise an IndexError.
-
 ## The three selections, compared
 
 | | Basic slicing | Boolean mask | Fancy indexing |
@@ -361,3 +349,8 @@ The hands-on result is small. It's still far faster than a Python loop &mdash; b
 The last row is the one that surprises people most. A boolean mask always flattens to a 1-D result. But Many dims it covered. Fancy indexing takes the shape of the index array. A `(h, w)` index array against a `(256, 3)` palette makes `(h, w, 3)`.
 
 Choosing right is mostly a matter of matching the tool to the question. A range wants a slice, a rule wants a mask, a list of spots wants fancy indexing. Where two would work, the one that states the intent is often also the faster one.
+
+## Sources and next steps
+
+- Official reference: [Numpy documentation](https://numpy.org/doc/stable/user/basics.indexing.html#advanced-indexing)
+- Continue with [Fancy Indexing](aggregations_and_axis.html).

@@ -1,12 +1,15 @@
 title: Status Codes
 intro: Which number to return when, and why 200-for-all discards data the client already understands.
-## The class matters more than the number
 
-A status code is the three-digit number at the start of every HTTP response. It tells the client, in a form machines understand, whether the request worked, and if not, whose fault it was. Clients, browsers, proxies, and monitoring tools all read it before they look at the body.
+## The core idea
+
+A status code is the three-digit number at the start of every HTTP response. It tells the client, in a form machines understand, whether the request worked, and if not, whose fault it was.
+
+## The class matters more than the number
 
 Returning 200 for everything throws that information away. A client that gets 200 with an error message inside has to parse the body to find out something the status line could have said immediately. Using the right code makes your API easier to use and easier to monitor.
 
-This article begins with the idea that the class of the number matters more than the exact value. Codes starting with 2 mean success, 4 means the client made a mistake, and 5 means the server did. You can get most decisions right just from that.
+
 
 It then picks out the success codes worth using, such as 201 for creation and 204 for a response with no content. The same treatment goes to the 4xx codes worth telling apart, including 401, 403, 404, and 409.
 
@@ -19,7 +22,6 @@ Before the exact code, a client reads the class.
 That first digit drives real action in code you didn't write: HTTP libraries retry 5xx and not 4xx, caches store 2xx, monitoring alerts on 5xx. A client's error handling branches on it before looking at anything else.
 
 Returning 200 with `{"error": "not found"}` throws all of that away. each caller now has to parse your body to discover a thing the protocol had a field for, retries do the wrong thing. Your error rate looks like zero on each dashboard. Pick the right code and the protocol carries the meaning for you.
-
 
 ## The route's default, and overriding it
 
@@ -189,6 +191,7 @@ print()
 print("documented responses:",
       sorted(app.openapi()["paths"]["/modules/{i}"]["get"]["responses"]))
 ```
+
 ## The 2xx ones worth using
 
 **200 OK** for a good read or update that returns a thing.
@@ -261,7 +264,7 @@ Worth doing for the failures a caller is expected to handle. 404 on a lookup, 40
 
 **200 with an error body.** The one that costs most. Retries, caches, monitoring and each client's error handling branch on the status class. A 200 tells all of them the call succeeded.
 
-**A body on a 204.** Malformed. Some clients error, others silently skip it. This Is worse because it works until it doesn't.
+**A body on a 204.** Malformed. Some clients error, others silently skip it. This is worse because it works until it doesn't.
 
 **Merging 401 and 403.** A client seeing 401 re-authenticates. Seeing 403 it shouldn't. Merging them makes a login loop where there should be a message.
 
@@ -287,7 +290,6 @@ a few codes are incomplete without a header. Omitting it makes a strictly-correc
 
 `HTTPException` takes `headers=` for just this. It's the sort of detail that splits an API somebody enjoys using from one they merely handle.
 
-
 ## Choosing between 404 and 403
 
 A choice with a security dim, worth making on purpose.
@@ -306,7 +308,7 @@ The 3xx codes come up less in an API than in a website, and two are worth recogn
 
 **307** preserves the method and body. **308** is its permanent equal. These are the ones FastAPI uses for the trailing-slash redirect. The reason it matters is that some clients still drop the body, turning a POST into an empty one.
 
-**301** and **302** once allowed clients to change the method to GET on redirect. This Is why they're the wrong choice for anything that isn't a plain read.
+**301** and **302** once allowed clients to change the method to GET on redirect. This is why they're the wrong choice for anything that isn't a plain read.
 
 If an API needs to move a resource permanently, 308 with a `Location` header is the honest answer. More often the better answer is to keep the old path working and doc the new one.
 
@@ -316,18 +318,9 @@ Some codes exist and are made by infrastructure rather than by your handlers.
 
 **502**, **503** and **504** come from a proxy or load balancer when your app is unreachable, overloaded or slow. Seeing them in production means the problem is in front of your code, not in it.
 
-**413** may be returned by a reverse proxy before a request reaches you. This Is why an upload limit belongs there and in the handler.
+**413** may be returned by a reverse proxy before a request reaches you. This is why an upload limit belongs there and in the handler.
 
 Knowing which layer makes which saves time when a thing breaks: a 500 is yours, a 502 isn't.
-
-## A closing thought
-
-A status code is the smallest piece of an API and the one most consumed by machines.
-
-each client library, cache, proxy, gateway and dashboard reads it. None of them read your response body. Returning the accurate one costs a keyword arg and buys correct action from all of them.
-
-Returning 200 for all costs nothing to write and moves the work onto each caller, forever.
-
 
 ## A short reference
 
@@ -337,34 +330,17 @@ Caller sent nonsense: **422** if check caught it, **400** if you did. Not signed
 
 Your code failed: **500**, logged in full, returned as a plain message with an id.
 
-## Summary
-
-The class is what a client reads first. It drives retries, caching and alerting in code you didn't write. Returning 200 with an error body discards all of it.
-
-201 for created, 204 for done-with-nothing-to-say and no body, 202 for accepted-but-not-finished. 401 for unauthenticated and 403 for not-allowed - they're other questions and clients act on the gap. 404 for missing, 409 for a valid request that conflicts with current state, 422 for a payload that didn't fit.
-
-Set the route default with `status_code=`, vary it through a `Response` param, attach the headers a status implies. Doc the failures with `responses=`.
-
 ## Next
 
 The mechanics behind most of the codes above: `HTTPException`, custom exception handlers. The setup that keeps HTTP concerns out of the code that does the actual work.
-
-## Questions people ask
-
-<strong>Which status code should a successful POST return?</strong> 201 Created when it makes a resource, ideally with a Location header. Use 200 when it only runs an action.
-
-<strong>When do I use 204?</strong> For success with nothing to return, such as a DELETE. The response must carry no body.
-
-<strong>What is the difference between 401 and 403?</strong> 401 means the caller is not authenticated, while 403 means they are authenticated but not allowed.
-
-<strong>What is the difference between 400, 409, and 422?</strong> 422 is a validation failure, 409 is a conflict with current state such as a duplicate, and 400 is a general bad request.
-
-<strong>How do I use constants instead of numbers?</strong> Import status from fastapi and write status.HTTP_201_CREATED.
-
-<strong>Should I return 404 or 403 for a resource the user can't see?</strong> Return 404 if revealing that it exists would leak information, and 403 when the user is allowed to know it exists.
 
 ## A final note
 
 Status codes are also a form of docs that no one has to read.
 
 An endpoint returning 201 with a `Location` header has told a caller that a thing was created and where to find it, without a sentence of prose. One returning 200 with a body they must inspect has told them nothing. The prose now has to exist.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/response-status-code/)
+- Continue with [Status Codes](error_handling.html).

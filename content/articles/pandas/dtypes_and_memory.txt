@@ -1,9 +1,11 @@
 title: Dtypes and Memory
-intro: object, group and the nullable types.
+intro: Object, group and the nullable types.
+
+## The core idea
+
+The dtype of each column decides three things: how much memory the column uses, what operations work on it, and how missing values behave. Getting the dtype right at load time is cheap.
 
 ## Why this matters early
-
-The dtype of each column decides three things: how much memory the column uses, what operations work on it, and how missing values behave. Getting the dtype right at load time is cheap. Fixing it after building logic on top of the wrong type is expensive and error-prone.
 
 Memory is the most visible consequence. A column of country codes stored as object takes roughly ten times the memory of the same column stored as category. Multiply that by a few such columns and a large dataset, and the frame may not fit in memory at all. The fix is often a single astype call per column.
 
@@ -13,13 +15,11 @@ Missing-value handling also depends on the dtype. Classic NumPy int columns cann
 
 Checking dtypes is part of the inspection routine for a reason. A quick look at the output of df.dtypes after loading tells you whether a column is the type you expected. If it is object when you expected int64, something in the data prevented the inference, and that something is worth finding now rather than later.
 
-This module covers the common dtype problems, how to diagnose them, and how to fix them with astype, pd.to_numeric, and the dtype argument at read time.
 
 
 A frame that doesn't fit in memory can't be analysed at all. The usual reason a frame is larger than expected isn't the number of rows. It's one or two columns stored in the widest possible type.
 
 Fixing dtypes is often the gap between a dataset that loads and one that doesn't. It takes one line per column.
-
 
 ## Every column has a dtype
 
@@ -181,11 +181,12 @@ bad = s[converted.isna() & s.notna()]
 Those are the rows that were present and unconvertible. The stray `"N/A"`, the number with a thousands separator, the value with a trailing space.
 
 `errors="raise"` is the default and is right when the data is supposed to be clean and you want to know at once if it isn't.
+
 ## object is the expensive one
 
 A column of strings has dtype `object`. That means an array of **pointers**, each leading to a split Python string one spot else in memory.
 
-Two costs follow. The obvious one is memory. A pointer plus a Python string object plus the characters, against a few bytes for a number. The less obvious one is speed. Steps on object columns fall back to per-element Python. This Is the same reason `apply` is slow.
+Two costs follow. The obvious one is memory. A pointer plus a Python string object plus the characters, against a few bytes for a number. The less obvious one is speed. Steps on object columns fall back to per-element Python. This is the same reason `apply` is slow.
 
 `df.memory_usage()` reports **8 bytes per pointer** and stops there. For a text column that is a wild underestimate. `df.memory_usage(deep=True)` follows the pointers and reports the truth. The gap between the two numbers is often a factor of ten.
 
@@ -203,18 +204,20 @@ The savings are large, and they compound: group-by and compare on a group are fa
 
 The rule is repetition. A column where each value is distinct. An email address, a UUID. Costs **more** as a group. You store the codes plus all the first values. The rule of thumb is that it pays when the number of distinct values is well under half the row count. It pays enormously when it's a tiny fraction.
 
-Two actions to know. groups carry an order if you give them one. This Is what makes sorting by a grade or a size work properly. And steps that give a value outside the group set give `NaN` rather than extending the set. This Is at times surprising and often the safer default.
+Two actions to know. groups carry an order if you give them one. This is what makes sorting by a grade or a size work properly. And steps that give a value outside the group set give `NaN` rather than extending the set. This is at times surprising and often the safer default.
+
 ## Nullable dtypes
 
 The oldest wart in pandas is that a NumPy int array can't represent a missing value. An int column with one gap turns `float64` and identifiers start printing as `1001.0`.
 
-The nullable extension types fix this. `Int64` with a **capital I** is a other dtype from `int64`. It holds ints and missing values together. The missing marker is `pd.NA` rather than `np.nan`.
+The nullable extension types fix this. `Int64` with a **capital I** is another dtype from `int64`. It holds ints and missing values together. The missing marker is `pd.NA` rather than `np.nan`.
 
 `Float64`, `boolean` and `string` are the equivalents for the other kinds. The nullable `boolean` is truly handy. Plain `bool` columns also collapse to `object` when they gain a missing value.
 
 They aren't the default, and there are corners where a library downstream expects NumPy types and doesn't handle them. But for identifiers and counts that must not become floats, they're the right answer.
 
 `pd.NA` passes through math like NaN. Checks with it return `pd.NA` rather than `False`. A gap from NaN that matters if you're filtering on such a column.
+
 ## A practical routine
 
 After loading anything:
@@ -233,7 +236,7 @@ That is often a handful of lines. On a large frame it routinely cuts memory by m
 
 That ranking tells you where to spend effort. Converting a column that holds 2% of the memory isn't worth the risk of changing a dtype.
 
-`df.info(memory_usage="deep")` gives the same data alongside dtypes and null counts. This Is often the more convenient single call.
+`df.info(memory_usage="deep")` gives the same data alongside dtypes and null counts. This is often the more convenient single call.
 
 ## Categories in more detail
 
@@ -243,13 +246,13 @@ Two results follow from the set being fixed.
 
 **Assigning a value outside the set fails** or makes `NaN`, based on the step. Adding a new city to a cat column needs `cat.add_categories` first.
 
-**Mixing two cats with other sets** gives `object` unless the sets match. This bites when concatenating frames from other files, each of which saw a other subset of the groups. `pd.api.types.union_categoricals` handles it, or convert after concatenating rather than before.
+**Mixing two cats with other sets** gives `object` unless the sets match. This bites when concatenating frames from other files, each of which saw another subset of the groups. `pd.api.types.union_categoricals` handles it, or convert after concatenating rather than before.
 
-`cat.set_categories([...], sorted=True)` gives an order. This Is what makes sorting by size or grade work right rather than alphabetically. `cat.as_ordered()` and compare ops then behave as you'd expect.
+`cat.set_categories([...], sorted=True)` gives an order. This is what makes sorting by size or grade work right rather than alphabetically. `cat.as_ordered()` and compare ops then behave as you'd expect.
 
 `cat.remove_unused_categories()` shrinks the set after filtering. This Else keeps each first group and can leave empty groups in a group-by.
 
-Group-by on a cat includes **each** group by default, even absent ones, making rows of zeros. `seen=True` restricts it to groups really present. It's worth passing on purpose since the default has changed across versions.
+For categorical columns, `observed=False` includes unused categories while `observed=True` returns only categories present in the data. pandas 3.0 changed the default to `True`; pass it explicitly when output shape must be stable across versions.
 
 ## What float32 costs
 
@@ -269,7 +272,7 @@ Three hands-on notes.
 
 Some libraries downstream expect NumPy dtypes and don't handle extension types. Converting back with `astype("float64")` at the boundary is at times needed.
 
-`convert_dtypes()` converts a whole frame to the best on hand nullable types in one call. This Is a quick way to see what it would look like.
+`convert_dtypes()` converts a whole frame to the best on hand nullable types in one call. This is a quick way to see what it would look like.
 
 ## A conversion routine
 
@@ -301,7 +304,7 @@ df.select_dtypes("object").nunique()
 df.select_dtypes("object").apply(lambda s: s.str.len().mean())
 ```
 
-The first two find which columns dominate. The third says whether they're picks for `group`. Low cardinality. Or identifiers that won't gain. The fourth shows mean string length. This Shows a column that is large despite having few rows.
+The first two find which columns dominate. The third says whether they're picks for `group`. Low cardinality. Or identifiers that won't gain. The fourth shows mean string length. This shows a column that is large despite having few rows.
 
 Almost always the answer is one or two `object` columns. Almost always one of them should be a group.
 
@@ -319,7 +322,7 @@ Memory is the visible cost. These are the ones that change results.
 
 **A float used as a key** in a merge or a group-by. Floating-point equality is unreliable. Two values that print the same way may not match.
 
-Each of these is caught by looking at `dtypes` at once after loading. This Is why that habit appears in three split modules.
+Each of these is caught by looking at `dtypes` at once after loading. This is why that habit appears in three split modules.
 
 ## When to convert
 
@@ -329,40 +332,7 @@ Each of these is caught by looking at `dtypes` at once after loading. This Is wh
 
 **Not again and again.** Each `astype` allocates a full copy of the column. Converting inside a function that runs per group or per file is a common and invisible cost.
 
-## A summary
+## Sources and next steps
 
-Text columns hold pointers. Use `deep=True` to see their real size.
-
-`group` for repeated values, and only for repeated values.
-
-Downcast numerics when the range is truly bounded.
-
-`Int64`, `boolean` and `string` hold missing values without changing type.
-
-`to_numeric(errors="coerce")` converts what it can and shows you what it couldn't.
-
-Set types as early as possible. Check `dtypes` right after loading. It's one line and it blocks a group of silent wrongness.
-
-## Questions people ask
-
-<strong>Why is my numeric column stored as object?</strong> A single non-numeric value, such as a stray string or symbol, makes pandas read the whole column as text. Use pd.to_numeric(col, errors='coerce') to find and convert it.
-
-<strong>How do I reduce a DataFrame's memory use?</strong> Convert repeated strings to category, downcast integers and floats, and drop columns you do not need. Check with df.memory_usage(deep=True).
-
-<strong>When should I use the category dtype?</strong> Use it for columns with few distinct values repeated many times, such as country or status. It stores each value once and uses small integer codes.
-
-<strong>What is the difference between int64 and Int64?</strong> int64 is the NumPy type and cannot hold missing values. Int64 is the nullable type, which stores missing values as pd.NA and keeps the column as integers.
-
-<strong>Why does memory_usage show a smaller number than the real one?</strong> Without deep=True it counts only the pointers for object columns, not the strings they point to. Pass deep=True for a realistic figure.
-
-<strong>Is float32 safe to use instead of float64?</strong> It halves memory but carries about seven significant digits, so it can lose precision in sums and money values. Use it where that loss is acceptable.
-
-## A closing note
-
-Dtypes are the quiet determinant of whether a pandas script is fast, correct. Able to load its data at all.
-
-The memory story is simple: text columns hold pointers to Python strings and dominate most real frames, `group` merges them when values repeat. Narrow numeric types halve or quarter the rest. Two loops run once after loading routinely cut a frame's footprint in half.
-
-The correctness story matters more. A numeric column stored as `object` checks as strings. `"100" < "20"` is true and each sort and max is silently wrong. An identifier read as an int loses its leading zeros permanently. An int column with one gap turns float. Ids start printing with a decimal point.
-
-None of those raise. All of them are visible in one line of `df.dtypes`, run at once after loading. Which is why that habit appears in a few modules and is worth more than any other single check in this track.
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/basics.html)
+- Continue with [Dtypes and Memory](missing_data.html).

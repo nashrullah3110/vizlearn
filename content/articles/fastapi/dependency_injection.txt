@@ -1,12 +1,15 @@
 title: Dependency Injection
 intro: Declaring what an endpoint needs and letting the framework supply it.
-## The whole idea
 
-Dependency injection means that a function declares what it needs, and something else supplies it. In FastAPI, you write a small function that produces a value, such as a database session or the current user. You then list that function as a parameter of your endpoint. The framework calls it first and passes in the result.
+## The core idea
+
+Dependency injection means that a function declares what it needs, and something else supplies it. In FastAPI, you write a small function that produces a value, such as a database session or the current user.
+
+## The whole idea
 
 This solves a common problem. Many endpoints need the same things, and writing the setup code in every handler is tedious and easy to get wrong. With dependencies, the setup lives in one place. Your handler stays short and focuses on its own job.
 
-This article begins with the whole idea in its simplest form, using the Depends function. It then shows that a dependency can see the request, so it can read headers, query values, and cookies just as a handler can. A dependency can also raise an error, which stops the request before your handler ever runs. That is how authentication usually works.
+
 
 The next section explains caching within a request. If two parts of the same request ask for the same dependency, FastAPI runs it once and shares the result. That detail affects database sessions in particular.
 
@@ -26,7 +29,6 @@ def list_modules(page: dict = Depends(pagination)):
 `Depends(fn)` means: call `fn`, and pass what it returns.
 
 There's no registry, no holder, no config and no base class. A dependency is a function. Declaring one is a default value in a signature. That simplicity is why the feature is worth learning properly. It's much smaller than "dependency injection" often implies.
-
 
 ## A dependency is just a function
 
@@ -221,6 +223,7 @@ Compare the two versions in the last editor above. Both work. Both even doc the 
 The gap is where the need lives. In the hand-written version it's four lines at the top of a handler, repeated in each handler that needs it. Diverging quietly as they're edited. In the dependency version it's one function. Each endpoint declares a param.
 
 The scaling gap is the point. Ten endpoints needing a user means ten params and one function. Not forty lines that must agree.
+
 ## Dependencies see the request
 
 The key second fact: a dependency's own params are request params. It can declare query values, headers, cookies, path params and a body, using just the syntax a handler uses.
@@ -250,9 +253,10 @@ If two params depend on the same function, it's called **once**. The result is c
 
 This matters more than it first appears. Dependencies compose. A handler might depend on `current_user`. Also on `permissions`. This Itself depends on `current_user`. Without caching, the token would be decoded twice. With it, once.
 
-The cache is per request. Nothing is shared between requests. This Is correct. A cached user leaking into the next request would be a serious bug rather than an tuning.
+The cache is per request. Nothing is shared between requests. This is correct. A cached user leaking into the next request would be a serious bug rather than a tuning.
 
 `Depends(fn, use_cache=False)` opts out, for anything that should truly differ per link. A made identifier, a fresh timestamp, a new random value.
+
 ## When something is not a dependency
 
 Two habits worth avoiding.
@@ -284,8 +288,7 @@ The dependency turns a named type, reusable across each endpoint. The signature 
 
 A `dependencies.py` beside your routers is the usual home, for the same reason a `types.py` is. A few routers need the same ones. A shared file is where they can be found.
 
-Reading that file should tell you what the use's endpoints are allowed to assume. A user, a DB session, a tenant, a set of filters. That is a handy summary to have in one place.
-
+Reading that file should tell you what the users' endpoints are allowed to assume. A user, a DB session, a tenant, a set of filters. That is a handy summary to have in one place.
 
 ## Mistakes people make
 
@@ -317,7 +320,6 @@ The dependency turns a named type. The signature is plain Python with no default
 
 It's the same idea as the constrained types from the Pydantic track. For a code with a few dependencies it's the tidier spelling.
 
-
 ## What this replaces in other frameworks
 
 It's worth seeing what the same job looks like elsewhere. It shows why the FastAPI version is so small.
@@ -346,15 +348,6 @@ Not the fifth handler, and not after a refactor - the second. Extracting it cost
 
 The failure mode of waiting isn't the duplication itself. It's that the copies drift. One checks the header case-insensitively, one strips whitespace, one returns a dict where the other returns a model. By the time somebody consolidates them there are four actions to merge and no way to know which was intended.
 
-## Summary
-
-`Depends(fn)` calls a function and passes the result. The function's own params are request params. A dependency can read anything a handler can - and all it declares appears in the endpoint's documented contract.
-
-Raising inside one stops the request before the handler runs. This Is why authentication belongs there rather than in a body somebody can forget to write. Results are cached per request. A dependency reached by a few paths is called once.
-
-Prefer returning a model over a dict, adopt the `Annotated` spelling for anything reused. Keep dependencies to "this endpoint needs an X" rather than "this endpoint does Y".
-
-
 ## Why it is the framework's best idea
 
 Of all FastAPI adds on top of Starlette and Pydantic, this is the part with no equal elsewhere that is this small.
@@ -365,36 +358,17 @@ A decorator hides the need from the signature. A holder needs registration and c
 
 The result is that "what does this endpoint need?" is answerable by reading its signature. "what happens if it isn't there?" is answerable by reading one function. Those two properties are most of what makes a large FastAPI use stay legible.
 
-
-## A closing thought
-
-The habit this module is really teaching isn't `Depends`. It's declaring what you need instead of reaching for it.
-
-A handler that calls `get_session()` in its body has acquired a thing. A handler that declares `session: Session = Depends(get_session)` has stated a need and let a thing else meet it. The first can't be tested without a DB, documented, or reused. The second is all three.
-
-That gap is older and larger than this framework. FastAPI's part is making the declaring version shorter than the acquiring one. This Is the only solid way to get people to prefer it.
-
-
 ## Two rules
 
 **Extract on the second case**, not the fifth. The cost is one function. The cost of waiting is four copies that have quietly diverged.
 
 **Dependencies supply, they don't perform.** "This endpoint needs an X" is a dependency. "this endpoint does Y" is the handler's job.
 
-## Questions people ask
-
-<strong>What is a dependency in FastAPI?</strong> Any callable you pass to Depends(). FastAPI calls it for each request and passes the result to your function.
-
-<strong>Does a dependency see the request?</strong> Yes. It can declare the same parameters an endpoint can: query, headers, cookies, and body.
-
-<strong>Is a dependency called once per request or once per use?</strong> Once per request. If several dependencies share it, the result is cached for that request unless you pass use_cache=False.
-
-<strong>Can a dependency stop the request?</strong> Yes. If it raises HTTPException, the endpoint never runs and the client gets that error.
-
-<strong>What is Annotated used for here?</strong> Annotated[User, Depends(get_user)] lets you store the dependency in a reusable type alias, so signatures stay short.
-
-<strong>How does this help testing?</strong> You can replace any dependency with a fake using dependency_overrides, so tests need no real database or login.
-
 ## Next
 
 Dependencies that need to clean up after themselves - a session that must be closed whether the handler succeeded or raised - which is what `yield` is for. Where the transaction pattern comes from.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/dependencies/)
+- Continue with [Dependency Injection](dependencies_with_yield.html).

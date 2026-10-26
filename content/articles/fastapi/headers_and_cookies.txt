@@ -1,13 +1,15 @@
 title: Headers and Cookies
 intro: The parts of a request that are neither path, query nor body. What each is properly for.
 
-## Reading a header
+## The core idea
 
-Headers and cookies carry information about a request that is neither part of the path, nor the query string, nor the body. A header might say what format the client wants, which browser it is, or who it claims to be. A cookie is a small value the browser stores and sends back on every later request to the same site.
+Headers and cookies carry information about a request that is neither part of the path, nor the query string, nor the body. A header might say what format the client wants, which browser it is, or who it claims to be.
+
+## Reading a header
 
 FastAPI reads both with the same annotation approach you use elsewhere. You declare an argument, mark it as a header or a cookie, and the framework extracts and converts the value. One detail surprises people: header names use hyphens, while Python names cannot. FastAPI converts underscores to hyphens for you.
 
-This article starts with reading a single header and what the conversion rules are. It then explains what headers are for, so you can tell which information belongs there rather than in a query string. After that it covers cookies, how a browser sends them, and how you read one.
+
 
 The article also looks at the other direction. Your response can set headers and cookies too, which is how a server hands a session or a caching hint to the client. You will see the proper way to do this without building a full response by hand.
 
@@ -24,7 +26,6 @@ If you need the literal name. A header that truly holds an underscore. `Header(c
 Header names are case-insensitive in HTTP. The framework norms them. A client sending `X-Token`, `x-token` or `X-TOKEN` all reach the same param. That is worth knowing mainly so you don't write code trying to handle the variants.
 
 all from the query-param module applies: a default makes it optional, no default makes it needed. `Header()` carries the same constraints and metadata. This Appear in the schema.
-
 
 ## Header() reads one header
 
@@ -160,6 +161,7 @@ for bad in ["k-ab", "nope-abc123"]:
 print()
 print("documented as:", app.openapi()["paths"]["/v"]["get"]["parameters"][0]["name"])
 ```
+
 ## What headers are for
 
 Headers carry metadata about the request rather than the request's subject.
@@ -215,7 +217,6 @@ Worth knowing now so you don't build the habit of doing it by hand.
 
 **Don't log headers indiscriminately.** `Authorization` and `Cookie` are just the two you least want in a log file, and they're in each request.
 
-
 ## Mistakes people make
 
 **Putting data in a header.** A filter or an identifier in a header can't be bookmarked, linked or shared. No caller will think to look for it. Headers carry metadata about the request. The URL and body carry its subject.
@@ -242,14 +243,13 @@ For an API consumed by a split front end, tokens are often simpler. For a browse
 
 Neither is universally right. What is universally wrong is choosing without noticing there was a choice.
 
-
 ## Content negotiation, briefly
 
 Two headers decide what format a request and response are in. FastAPI handles both mostly invisibly.
 
-`Content-Type` on the request says what the body is. It's how the framework knows whether to parse JSON or a form. This Is why declaring a model and a `Form()` field together is a clash - they imply other values for one header.
+`Content-Type` on the request says what the body is. It's how the framework knows whether to parse JSON or a form. This is why declaring a model and a `Form()` field together is a clash - they imply other values for one header.
 
-`Accept` on the request says what the client would like back. FastAPI doesn't negotiate on it by default. An endpoint returns JSON even so. If you need to serve more than one form, you read the header yourself and return a other response class.
+`Accept` on the request says what the client would like back. FastAPI doesn't negotiate on it by default. An endpoint returns JSON even so. If you need to serve more than one form, you read the header yourself and return another response class.
 
 That is a deliberate simplification rather than an omission. Genuine content negotiation is rarer than it looks. An API that always returns JSON is easier to consume than one whose response shape depends on a header the caller may not have set.
 
@@ -269,14 +269,13 @@ One more note, because it catches people deploying for the first time.
 
 Behind a load balancer or reverse proxy, the client address your app sees is the proxy's, not the caller's. The real one arrives in `X-Forwarded-For`, and the scheme in `X-Forwarded-Proto`.
 
-Those are headers like any other. This Means a direct caller can set them to anything. They're trustworthy only if the proxy overwrites rather than appends. Only if nothing can reach your app without going through it.
+Those are headers like any other. This means a direct caller can set them to anything. They're trustworthy only if the proxy overwrites rather than appends. Only if nothing can reach your app without going through it.
 
 Getting that wrong is how rate limiting by IP turns rate limiting by what the attacker chose to send.
 
 ## Next
 
-The two content types a browser form really sends. This Are neither JSON nor query strings: form data and file uploads.
-
+The two content types a browser form really sends. These are neither JSON nor query strings: form data and file uploads.
 
 ## A note on CORS
 
@@ -286,8 +285,7 @@ When a page on one origin calls an API on another, the browser decides whether t
 
 The key part: CORS is enforced *by the browser*, for the browser's gain. It isn't a security control on your server. A non-browser client skips it fully. A permissive CORS policy doesn't expose an API that was else protected. A strict one doesn't protect an API that has no authentication.
 
-FastAPI configures this with `CORSMiddleware`. This Is the middleware module's subject. The habit to avoid is reaching for `allow_origins=["*"]` because a thing didn't work - it often does make the error go away. It also means any page anywhere can call your API with what credentials the browser holds.
-
+FastAPI configures this with `CORSMiddleware`. This is the middleware module's subject. The habit to avoid is reaching for `allow_origins=["*"]` because a thing didn't work - it often does make the error go away. It also means any page anywhere can call your API with what credentials the browser holds.
 
 ## Where headers fit in the request
 
@@ -295,28 +293,11 @@ It helps to hold the four sources in one picture, now that all of them have appe
 
 The **path** finds a resource and is always needed. The **query string** shows a view of it and is often optional. The **body** carries the subject of a write. **Headers and cookies** carry all about the exchange that isn't about the resource at all - who is asking, in what format, on behalf of which session, with what caching state.
 
-FastAPI reads all four from one function signature, deciding by where a name appears and what marks it. That uniformity is the framework's main part. It's why a handler taking a path param, two query filters, a body and an API key still reads as an plain Python function.
+FastAPI reads all four from one function signature, deciding by where a name appears and what marks it. That uniformity is the framework's main part. It's why a handler taking a path param, two query filters, a body and an API key still reads as a plain Python function.
 
 The corollary is that putting a value in the wrong place is easy and makes a working endpoint that is awkward to use. An identifier in a header, a session token in the query string, a filter in the body of a GET - each works. Each will confuse whoever integrates with it.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>How do I read a request header?</strong> Declare a parameter with Header(), for example user_agent: str | None = Header(default=None). FastAPI converts underscores to hyphens for the lookup.
-
-<strong>Why is my header name lowercase in Python?</strong> HTTP header names are case-insensitive, and FastAPI maps user_agent to User-Agent. You can disable the conversion with convert_underscores=False.
-
-<strong>How do I read a cookie?</strong> Declare a parameter with Cookie(), for example session_id: str | None = Cookie(default=None).
-
-<strong>How do I set a cookie or header on the response?</strong> Take a Response parameter and call response.set_cookie(...) or set response.headers["X-Name"]. FastAPI merges it into the final response.
-
-<strong>Where should authentication headers be read?</strong> In a dependency, so every protected endpoint reuses one check instead of repeating the header logic.
-
-<strong>Cookies or tokens in headers?</strong> Cookies suit browser apps and bring CSRF concerns. Bearer tokens in the Authorization header suit APIs called from scripts and mobile apps.
-
-## Summary
-
-`Header()` reads one header, converting underscores to hyphens. `Cookie()` reads one cookie. Both behave like query params else. A default makes them optional, constraints and descriptions reach the schema. A failure reports `header` or `cookie` as the source.
-
-Headers carry metadata about a request - authentication, content negotiation, caching, tracing. Data belongs in the URL or the body. Here It can be seen and shared.
-
-Set outgoing headers and cookies through a `Response` param. This Keeps your response model. Use `httponly`, `secure` and `samesite` on anything that finds a session. Move authentication into a dependency before the fourth endpoint needs it.
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/header-params/)
+- Continue with [Headers and Cookies](form_data_and_files.html).

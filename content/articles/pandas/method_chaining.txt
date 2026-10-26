@@ -1,9 +1,11 @@
 title: Method Chaining
 intro: Writing a pipeline as one formula.
 
-## What it buys
+## The core idea
 
-Method chaining is a style where each step in a data pipeline is a method call on the result of the previous step. Instead of assigning intermediate variables, you write one expression that flows from input to output. The result reads top to bottom, in the order the operations happen.
+Method chaining is a style where each step in a data pipeline is a method call on the result of the previous step. Instead of assigning intermediate variables, you write one expression that flows from input to output.
+
+## What it buys
 
 The practical benefit is readability. A chained pipeline shows the sequence of transformations in one place. You can see what goes in, what happens at each step, and what comes out. Intermediate variables break that flow. They force you to invent names, and each name is one more thing to track.
 
@@ -15,10 +17,9 @@ pandas supports chaining because most methods return a new object. query, assign
 
 pipe extends chaining to functions that are not DataFrame methods. Any function that takes a DataFrame as its first argument and returns one can be called inside a chain via pipe. That includes your own functions, which means a chain can mix built-in pandas methods with custom logic.
 
-This module covers the basics of chaining, assign, pipe, and the patterns that make chains readable. It also covers the cases where chaining is the wrong choice: when the pipeline needs conditional branches or when a step is easier to read as a named variable.
 
 
-Most pandas methods return a new object. This Means they compose:
+Most pandas methods return a new object. This means they compose:
 
 ```python
 out = (df
@@ -36,7 +37,6 @@ Three things follow, and they're the actual arg for the style.
 **Each line is one step.** The chain reads top to bottom in the order the work happens. This Nested function calls don't.
 
 The wrapping parentheses are what allow the line breaks. Without them the formula has to fit on one line or carry backslashes.
-
 
 ## The same work, two ways
 
@@ -190,6 +190,7 @@ print(out)
 print()
 print("Six steps, no intermediate names, and each line is one idea.")
 ```
+
 ## assign and the lambda
 
 `assign` is what makes math chainable, and the lambda is what makes `assign` work mid-chain.
@@ -257,7 +258,7 @@ It suits less well anything with branching logic, loops, or steps whose output f
 
 ## Which methods chain
 
-Anything returning a DataFrame or Series can be chained. This Is most of the API:
+Anything returning a DataFrame or Series can be chained. This is most of the API:
 
 Pick &mdash; `query`, `loc` with a callable, `filter`, `head`, `sample`, `nlargest`.
 
@@ -299,7 +300,7 @@ Each step in a chain allocates. A ten-step chain on a large frame allocates ten 
 
 That is acceptable for most work and worth knowing when the frame is large enough that a single copy is large.
 
-Filtering early in the chain reduces each allocation after it. This Is the same advice as all over else and matters more here because there are more of them.
+Filtering early in the chain reduces each allocation after it. This is the same advice as all over else and matters more here because there are more of them.
 
 ## Common chaining mistakes
 
@@ -356,7 +357,7 @@ result = summarise(clean(load(path)))
 
 Each function is testable on its own, each chain is short enough to debug. The top-level line reads as what the script does.
 
-`load(path).pipe(clean).pipe(summarise)` expresses the same thing in chain form. This Reads in order rather than inside out.
+`load(path).pipe(clean).pipe(summarise)` expresses the same thing in chain form. This reads in order rather than inside out.
 
 ## Chaining and notebooks
 
@@ -381,32 +382,6 @@ A blank line between logical stages within a long chain.
 Names for intermediates at genuine stage boundaries.
 
 And a limit: if you can't see the whole chain on one screen, split it. The point of the style is clarity. A chain that has to be scrolled has stopped giving it.
-
-## A summary
-
-Chaining drops mid names and the stale-var bugs that come with them.
-
-Nothing is mutated, so re-running is safe.
-
-`assign` needs a lambda to see the frame mid-chain.
-
-`pipe` inserts your own functions in reading order.
-
-A `pipe` that prints and returns its input lets you debug without breaking the chain.
-
-Long chains hide which link failed &mdash; name coherent stages instead.
-
-And it's a style for linear change, not a rule for all code. Branching, loops and reuse are clearer with names.
-
-## A closing note
-
-Method chaining is one of the few stylistic choices in pandas that changes how many bugs you write rather than merely how the code looks.
-
-The method isn't elegance. It's that mid names are where stale state lives: `df_clean` that was cleaned by an earlier version of the cell above, `tmp2` that is a filtered copy of `tmp` from before the filter changed. A chain has nowhere for that to hide.
-
-The immutability matters for the same reason. Code that doesn't modify its input makes the same answer on the second run as the first. This Is the property notebooks most often lack.
-
-Against that, a chain is one formula. One formula fails as a unit. The balance is struck by keeping chains to a coherent stage and giving each stage a name. Which is plain good structure, applied to data change.
 
 ## Two more things worth knowing
 
@@ -434,26 +409,7 @@ That is a genuine unit test of a data change. It's possible only because `clean`
 
 The same structure makes the pipeline reusable across scripts and notebooks. Makes it obvious where a new step belongs. Chaining, in this reading, is less about elegance than about pushing data changes into functions that can be named, tested and reused. Which is plain software practice arriving one spot it's often skipped.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What is method chaining?</strong> It is writing a series of operations as one expression, with each method returning a new frame for the next to use. Wrapped in parentheses, it reads like a recipe from top to bottom.
-
-<strong>What does pipe do?</strong> pipe passes the frame into your own function inside a chain: df.pipe(clean, col='x'). It lets custom steps fit in the chain.
-
-<strong>How do I use a column I just created in the same chain?</strong> Use assign with a lambda: .assign(total=lambda d: d.a + d.b). The lambda receives the current frame at that step.
-
-<strong>How do I debug a long chain?</strong> Insert a pipe step that prints or checks the shape, such as .pipe(lambda d: print(d.shape) or d). You can also run the chain in parts and inspect each result.
-
-<strong>Does chaining use more memory?</strong> Each step creates a new object, but earlier ones are freed once nothing refers to them. Peak memory is usually about one extra copy.
-
-<strong>When should I not chain?</strong> When a step needs an explanation, when you need to inspect intermediate results often, or when the chain runs to dozens of lines. Split it into named steps.
-
-## In summary
-
-Chaining is a style that suits linear change. This Is most of what data cleaning is.
-
-It drops mid names and the stale-state bugs that live in them, it doesn't mutate its input so re-running is safe. It reads in the order the work happens.
-
-Its costs are real: a failure points at the whole formula, an mid needed twice forces a break. Branching or looping doesn't fit at all.
-
-The detail is named stages of a handful of steps each. This Keeps the gains and makes each stage short enough to debug and small enough to test.
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/dsintro.html)
+- Continue with [Performance](performance.html).

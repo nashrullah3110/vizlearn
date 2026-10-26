@@ -1,8 +1,11 @@
 title: Filtering Rows
 intro: Masks, isin, between and query, and the parenthesis rule that catches all.
-## A mask is a Series
+
+## The core idea
 
 Filtering in pandas does not work like filtering a Python list. There is no loop, no if-statement, no list comprehension. Instead, a comparison produces a boolean Series, and that Series is handed to the frame to select rows.
+
+## A mask is a Series
 
 That two-step process is worth understanding on its own terms. The comparison step and the selection step are separate operations. You can store the mask in a variable, inspect it, combine it with other masks, count how many rows it matches, and reuse it. A mask is data, not a control-flow instruction.
 
@@ -14,12 +17,11 @@ The module also covers isin for membership checks, between for range checks, and
 
 Filtering is the step you will do most often. Almost every analysis starts by narrowing the data to the subset that matters. Getting this right means every downstream result is computed on the right rows. If you filter wrong, every number downstream carries the mistake forward.
 
-
 `df["age"] >= 25` doesn't return rows. It returns a boolean Series, one value per row, carrying the same index as the frame.
 
 You then hand that mask to `.loc`, and pandas keeps the rows where it's `True`.
 
-Because the mask is an plain Series, all you know applies to it. `mask.sum()` counts matches. `True` is 1. `mask.mean()` gives the proportion. `~mask` inverts it. It can be stored in a var, named, and reused.
+Because the mask is a plain Series, all you know applies to it. `mask.sum()` counts matches. `True` is 1. `mask.mean()` gives the proportion. `~mask` inverts it. It can be stored in a var, named, and reused.
 
 Naming masks is worth doing when a filter has a few parts:
 
@@ -31,7 +33,6 @@ df.loc[adult & local & recent]
 ```
 
 Each name docs a rule, and each can be counted apart when the result is unexpectedly empty. Which is how you find out which clause is doing the damage.
-
 
 ## A comparison gives a boolean Series
 
@@ -108,7 +109,7 @@ print(list(df.loc[~df["city"].isin(["pune"]), "city"]))
 
 `df["city"].isin(["pune", "goa"])` is clearer and faster than `(df["city"] == "pune") | (df["city"] == "goa")`. It scales to a list of any length. Including one found at runtime.
 
-`df["age"].between(25, 31)` is inclusive of both ends by default. The `inclusive` arg takes `"both"`, `"left"`, `"right"` or `"neither"`. This Is worth passing by name when the boundary matters. The default isn't what all assumes.
+`df["age"].between(25, 31)` is inclusive of both ends by default. The `inclusive` arg takes `"both"`, `"left"`, `"right"` or `"neither"`. This is worth passing by name when the boundary matters. The default isn't what all assumes.
 
 `~` negates either of them.
 
@@ -179,6 +180,7 @@ print()
 print("Filtering never modifies the original:")
 print("   original still has", len(df), "rows")
 ```
+
 ## The parenthesis rule
 
 This is the single most common syntax error in pandas.
@@ -190,6 +192,7 @@ each rule needs its own parentheses: `(df["age"] > 20) & (df["age"] < 35)`.
 The related mistake is `and` instead of `&`. Python's `and` needs a single truth value and a Series has many. It raises "The truth value of a Series is ambiguous". That message always means the same thing: use `&`, and add parentheses.
 
 The three ops are `&` (and), `|` (or), `~` (not). There's no way to make Python's precedence rules cooperate here. Parenthesising turns a reflex.
+
 ## Missing values fail everything
 
 each compare involving `NaN` is `False`. That includes `>`, `<`, `==` and `!=`.
@@ -210,7 +213,7 @@ Inside the string, column names are bare identifiers, `and`/`or`/`not` work most
 
 `in` and `not in` work against lists.
 
-The costs: column names with spaces need backticks, there's no editor autocompletion or type checking inside a string. A typo turns a runtime error rather than a thing a linter catches. `query` also has a small parsing cost per call. This Is irrelevant once and noticeable in a loop.
+The costs: column names with spaces need backticks, there's no editor autocompletion or type checking inside a string. A typo turns a runtime error rather than a thing a linter catches. `query` also has a small parsing cost per call. This is irrelevant once and noticeable in a loop.
 
 Use it when a rule is long enough that the op form is hard to read. Use ops else.
 
@@ -221,18 +224,6 @@ Use it when a rule is long enough that the op form is hard to read. Use ops else
 Both facts matter downstream. The surviving labels mean spot-based code breaks. `reset_index(drop=True)` is the fix when you want a clean `0..n-1`.
 
 That the result is new. And namely that it may be a copy rather than a view of the first &mdash; is what makes assigning into a filtered frame unreliable. That is the subject of the next module. It's the single largest source of confusion in pandas.
-
-## A summary
-
-Build masks with checks, combine with `& | ~`, and parenthesise all.
-
-Prefer `isin` and `between` where they fit. They say what you mean.
-
-note NaN fails each test. So A rule and its negation aren't a split.
-
-Reach for `query` when the formula is long, and for ops when it's short.
-
-And know that the result is a new object whose index came along for the ride.
 
 ## Filtering on more than one column
 
@@ -279,7 +270,7 @@ Not each subset comes from a rule.
 
 `df.sample(n=100, random_state=0)` &mdash; a random subset, reproducible with the seed. `frac=0.1` takes a proportion.
 
-`df.head(1000)` &mdash; the first thousand. This Is only real if the order means a thing.
+`df.head(1000)` &mdash; the first thousand. This is only real if the order means a thing.
 
 `df.drop_duplicates(subset=["id"])` &mdash; one row per key.
 
@@ -295,7 +286,7 @@ Three things that help on large frames:
 
 **Use a group dtype** for the columns you filter on again and again. compare then runs on int codes rather than strings.
 
-`query` has a small parsing cost per call. This Is irrelevant once and measurable in a loop. It can also use `numexpr` for very large frames. This At times makes it faster than the op form rather than slower.
+`query` has a small parsing cost per call. This is irrelevant once and measurable in a loop. It can also use `numexpr` for very large frames. This At times makes it faster than the op form rather than slower.
 
 ## The mistakes, collected
 
@@ -303,7 +294,7 @@ Three things that help on large frames:
 
 **`and` instead of `&`.** The "truth value is ambiguous" error always means this.
 
-**Losing `na=False`** on a `.str` predicate. This Raises as soon as the data has a gap.
+**Losing `na=False`** on a `.str` predicate. This raises as soon as the data has a gap.
 
 **given a rule and its negation split the frame.** They don't, when values can be missing.
 
@@ -350,7 +341,7 @@ When a filter returns nothing, the cause is nearly always one of five things. Th
 
 **A stale var.** In a notebook, `df` isn't what the cell above assumed.
 
-Counting each rule apart &mdash; `is_adult.sum()`, `in_scope.sum()` &mdash; finds which clause is in charge in one step. This Is far quicker than thinking about the mix.
+Counting each rule apart &mdash; `is_adult.sum()`, `in_scope.sum()` &mdash; finds which clause is in charge in one step. This is far quicker than thinking about the mix.
 
 ## Filtering and the copy warning
 
@@ -364,38 +355,11 @@ Anything you then assign into `sub` may or may not affect `df`. This is the sing
 
 Adding `.copy()` to a filter you intend to modify costs seven characters and drops the question fully.
 
-## A closing note
-
-Filtering is the most-used step in pandas and has two persistent gotchas, both syntactic and both cheap to avoid.
-
-Parenthesise each rule, because `&` binds tighter than the compare ops and the unparenthesised version parses into a thing else fully. And use `&`, `|`, `~` rather than `and`, `or`, `not`. This Need a single truth value that a Series can't provide.
-
-The semantic gotcha is missing values. They fail each compare. A rule and its negation don't split the frame. Rows quietly appear in neither half.
-
-Beyond that, the advice is about readability: name your masks when there's more than one. Each can be counted apart when the result is unexpectedly empty. Debugging a filter that returns nothing is nearly always a matter of finding which clause is in charge. Named masks turn that into one line rather than a process of elimination.
-
 ## One more thing
 
 `df.query` accepts `engine="python"` for expressions the default parser can't handle. `inplace=True` which, as elsewhere, is best avoided.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>How do I filter rows with more than one condition?</strong> Combine boolean masks with & for and, | for or, and wrap each condition in parentheses, for example df[(df.a > 1) & (df.b == 'x')].
-
-<strong>Why do I get an error when I use 'and' instead of '&'?</strong> Python's and tries to turn a whole Series into one True or False, which is ambiguous. & works element by element.
-
-<strong>How do I keep rows whose value is in a list?</strong> Use df[df['col'].isin(['a', 'b'])]. Negate it with ~ to keep rows not in the list.
-
-<strong>Why does my filter drop rows with missing values?</strong> Any comparison with NaN is False, so those rows never pass the mask. Add | df['col'].isna() if you want to keep them.
-
-<strong>When is query() better than a boolean mask?</strong> query('a > 1 and b == 2') reads more cleanly for long conditions and chains well. Masks are better when the logic is built from variables or functions.
-
-<strong>Does filtering change the original DataFrame?</strong> No. It returns a new frame with the original index labels, so you may want reset_index(drop=True) afterwards.
-
-## In summary
-
-checks give boolean Series. Combine them with `&`, `|` and `~`, and parenthesise each one.
-
-`isin` and `between` read as the question being asked. `query` earns its place when the formula is long.
-
-Missing values fail each test. So A rule and its negation don't split the frame. And `.copy()` the result if you intend to modify it. This Decides the copy question at the point it arises rather than at the point it bites.
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/indexing.html)
+- Continue with [Filtering Rows](the_copy_warning.html).

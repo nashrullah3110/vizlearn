@@ -1,12 +1,15 @@
 title: Router and Global Dependencies
 intro: Protecting a section without each endpoint repeating itself - and the endpoint that would else be forgotten.
-## Three places to declare one
 
-Some rules apply to many endpoints at once. Every route in the admin section needs an admin user. Every route in the app might need an API key. Repeating the same dependency on each handler works, but it is tedious, and it creates a risk: the one endpoint you forget is the one left unprotected.
+## The core idea
+
+Some rules apply to many endpoints at once. Every route in the admin section needs an admin user. Every route in the app might need an API key.
+
+## Three places to declare one
 
 FastAPI lets you declare a dependency at a higher level, so it covers a whole group of routes. You can attach it to a single decorator, to an entire router, or to the whole application. The framework runs it for every matching request, before the handler.
 
-This article starts with the three places you can declare one and how each differs in reach. It then explains an important detail: a dependency declared this way runs, but its value is not injected into your handler. If you need the value, you must still ask for it in the function. That distinction confuses many readers at first.
+
 
 A section follows on the argument for the router form, which is usually the best balance. It protects a whole section by default, and a missing line in one handler cannot undo it. The article ends with practical advice on when to use each level, based on how many routes share the rule and how likely it is to change.
 
@@ -23,7 +26,6 @@ APIRouter(dependencies=[Depends(fn)])               # every route in it
 ```
 
 They stack. All three run for a request that matches, outermost first. Each adds a rule rather than replacing one.
-
 
 ## A dependency on the router
 
@@ -199,6 +201,7 @@ c = TestClient(app)
 for p in ["/g/one", "/g/two", "/e/one", "/e/two"]:
     print("%-7s no key -> %s" % (p, c.get(p).status_code))
 ```
+
 ## The value is not injected
 
 This is the gap from a param-level `Depends`, and the one thing to note.
@@ -257,8 +260,7 @@ Reaching for middleware to do authentication is a common early choice and often 
 
 ## Testing them
 
-`dependency_overrides` works on these just as on param-level ones. This Is the next module and is what makes a router-wide auth need pleasant rather than tiresome to test.
-
+`dependency_overrides` works on these just as on param-level ones. This is the next module and is what makes a router-wide auth need pleasant rather than tiresome to test.
 
 ## Mistakes people make
 
@@ -272,7 +274,7 @@ Reaching for middleware to do authentication is a common early choice and often 
 
 **Losing `responses=` on the router.** A section that can 401 should doc it once, at the router, rather than on each route or nowhere.
 
-**given order doesn't matter.** App, then router, then route. Each layer can lean on the ones outside it having passed. This Is what makes layered rules safe.
+**given order doesn't matter.** App, then router, then route. Each layer can lean on the ones outside it having passed. This is what makes layered rules safe.
 
 ## Where the boundary sits
 
@@ -283,7 +285,6 @@ The clean division, stated once:
 **Middleware** is about requests. It runs on all including unmatched paths, before routing. Knows nothing about your endpoints. CORS, packing, request identifiers, timing.
 
 Choosing by that question rather than by convenience keeps both simple.
-
 
 ## Choosing the level, concretely
 
@@ -297,7 +298,7 @@ A short choice method that avoids the common mistakes.
 
 **Does the handler need the value?** A param, not any of these - and if the section also needs the promise, declare it in both places and let the cache make it one call.
 
-The mistake worth naming again is the first. An use-level authentication dependency reads as tidy and takes out `/health` with it. This Is found by a load balancer at the worst possible moment.
+The mistake worth naming again is the first. An use-level authentication dependency reads as tidy and takes out `/health` with it. This is found by a load balancer at the worst possible moment.
 
 ## Documenting a protected section
 
@@ -323,8 +324,7 @@ Worth restating because it's the gap between a section a caller can use and one 
 
 A protected router should carry three things: the dependency that enforces the rule, a `responses` entry showing the failure. A `tags` entry grouping the routes.
 
-With those, the made docs shows a labelled group of endpoints, each documenting the header it needs and the 401 it can return. Without them the endpoints still work and a caller discovers the need by being refused. This Is a worse first experience than any amount of prose can make up for.
-
+With those, the made docs shows a labelled group of endpoints, each documenting the header it needs and the 401 it can return. Without them the endpoints still work and a caller discovers the need by being refused. This is a worse first experience than any amount of prose can make up for.
 
 ## The decision in one line
 
@@ -340,19 +340,9 @@ The return value is discarded. These run for their effect.
 
 When a handler needs the value as well, declare it again as a param and let the per-request cache collapse the two into one call. That looks redundant the first time you write it and isn't. The router declaration promises the check on each route. The param gets the value where it's used.
 
-## Summary
-
-`dependencies=[Depends(fn)]` attaches a dependency to one route, a router, or the whole use. They stack and run outermost first. Their return values are discarded - a handler needing the value declares its own. The cache keeps it to one call.
-
-The router level is where most real use belongs. The reason isn't brevity. A route added later is protected without anyone remembering to protect it.
-
-Keep it out of the use level unless it truly applies to the health check too. Use a dependency rather than middleware when the rule is about endpoints rather than about each request.
-
-
 ## Summary, in one line
 
 Put shared rules on the router. Here A route added next year takes from them. Declare the value again as a param when the handler needs it. Let the per-request cache make that one call rather than two.
-
 
 ## Two rules
 
@@ -360,27 +350,17 @@ Put shared rules on the router. Here A route added next year takes from them. De
 
 **Declare it again as a param when the handler needs the value.** The cache makes that one call. The two declarations mean two other things: the section's promise, and this handler's need.
 
-
 ## Where it sits in the tier
 
 The other modules make a dependency on hand to an endpoint that asks for it. This one makes it apply to endpoints that didn't.
 
 That gap matters most for security. Here The failure is silent. No one notices an unprotected route until somebody is looking for one.
 
-## Questions people ask
-
-<strong>Where can I declare dependencies besides each endpoint?</strong> On the decorator, on an APIRouter, in include_router, and on the FastAPI app itself.
-
-<strong>Do these dependencies pass a value to my function?</strong> No. They run for side effects like checks and raise on failure, but the return value is not injected.
-
-<strong>How do I protect a whole section of the API?</strong> Add dependencies=[Depends(require_user)] to the APIRouter. Every route on it then needs a signed-in user.
-
-<strong>What is the order they run in?</strong> App-level first, then router, then decorator, then the endpoint's own parameters.
-
-<strong>Dependencies or middleware?</strong> Use a dependency when you need route-aware logic, validation, or the docs to reflect it. Use middleware for every request regardless of route.
-
-<strong>How do I test a router with protected routes?</strong> Override the dependency in tests with dependency_overrides, so no real credentials are needed.
-
 ## Next
 
 Replacing a dependency for a test - the piece that makes all in this tier testable without a DB, a token service or a network.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/bigger-applications/)
+- Continue with [Router and Global Dependencies](dependency_overrides.html).

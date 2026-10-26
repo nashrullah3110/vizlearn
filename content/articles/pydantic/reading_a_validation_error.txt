@@ -1,9 +1,11 @@
 title: Reading a ValidationError, and Turning It Into a Message
-intro: each field checked, each failure in one report - and what each part of an entry is for.
+intro: Each field checked, each failure in one report - and what each part of an entry is for.
 
-## One raise, every problem
+## The core idea
 
 When data fails validation, Pydantic raises a ValidationError. It does not stop at the first problem. It checks every field and collects all the failures into one error, so you can see everything that is wrong in a single pass.
+
+## One raise, every problem
 
 That error is more useful than it first looks. Each problem has a location, a type, a message, and the input that caused it. The printed version is made for a person reading a terminal. The structured version is made for code, and that is the one you want when you turn an error into a response for an API client.
 
@@ -15,7 +17,7 @@ Most hand-written check gives up at the first thing it doesn't like. The caller 
 
 Pydantic checks each field and raises once, carrying the full list. For a signup form that is the gap between a form which highlights all four broken inputs at once and one which reveals them slowly, like a bad quiz.
 
-`e.error_count()` tells you how many. `str(e)` gives a readable summary. This Is what you saw printed in the first editor above. Both are for humans.
+`e.error_count()` tells you how many. `str(e)` gives a readable summary. This is what you saw printed in the first editor above. Both are for humans.
 
 ## It does not stop at the first problem
 
@@ -197,6 +199,7 @@ except ValidationError as e:
     for err in e.errors():
         print("  %-8s %-12s %s" % (err["loc"][0], err["type"], err["msg"]))
 ```
+
 ## loc, in detail
 
 Reading `loc` well is most of debugging a large payload.
@@ -288,9 +291,9 @@ That is the gap between "that is too short" and "needs at least 3 characters", w
 
 `model_validate_json` makes the same error entries with one addition. When the JSON itself is malformed, you get a `json_invalid` error whose context includes the spot in the doc.
 
-That matters for large payloads. A missing comma four hundred lines into a config file makes an error that names the line. This Is a lot more use than "invalid JSON".
+That matters for large payloads. A missing comma four hundred lines into a config file makes an error that names the line. This is a lot more use than "invalid JSON".
 
-It's also why checking JSON right is better than `json.loads` followed by `model_validate`. Go through `json.loads` and a syntax error is a `JSONDecodeError` from a other library. This You've to catch apart and which knows nothing about your model. Validate the JSON right and malformed docs and invalid data arrive through one exception type, handled in one place.
+It's also why checking JSON right is better than `json.loads` followed by `model_validate`. Go through `json.loads` and a syntax error is a `JSONDecodeError` from another library. This You've to catch apart and which knows nothing about your model. Validate the JSON right and malformed docs and invalid data arrive through one exception type, handled in one place.
 
 ## Model-level errors have no field
 
@@ -388,20 +391,11 @@ These are other audiences with other needs. Merging them serves neither. The use
 
 Doing both costs one extra line at the point where you catch the exception. It's the gap between a support conversation that starts with "can you tell me just what you typed" and one that starts with "I can see what happened". The data was in the exception the whole time. The only question is whether you kept it.
 
-## Questions people ask
-
-<strong>Does Pydantic stop at the first error?</strong> No. It collects every problem in one `ValidationError`, so you can report them all at once.
-
-<strong>What do the keys in an error entry mean?</strong> `loc` is the path to the bad value, `msg` is the human message, `type` is a stable code, and `input` is what was received.
-
-<strong>Should I check `msg` or `type` in code?</strong> Check `type`. Messages can change between versions, while error type codes are stable.
-
-<strong>How do I turn an error into JSON for an API?</strong> Call `e.errors()` for a list of dicts or `e.json()` for a string. In v2.x some entries contain exception objects under `ctx`, so use `e.json()` when you need guaranteed serialisable output.
-
-<strong>What does an integer inside `loc` mean?</strong> It is a list index. `('lessons', 2, 'title')` means the third lesson has a bad title.
-
-<strong>How do I test that validation fails?</strong> Use `pytest.raises(ValidationError)` and then inspect `exc.errors()` for the `type` and `loc` you expect.
-
 ## Next
 
 The next module goes the other way: not reading the errors Pydantic makes. Writing the rules that give them. `Field` constraints let you say more about a value than its type. A min, a length, a pattern. And each one of them comes back through just the machinery given here.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/errors/errors/)
+- Continue with [Reading a ValidationError](field_constraints.html).

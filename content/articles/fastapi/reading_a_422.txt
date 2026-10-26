@@ -1,13 +1,15 @@
 title: Reading a 422, and Making It Useful
 intro: Where the check error comes from, what each part means. How to reshape it for your callers.
 
-## Where it comes from
+## The core idea
 
-A 422 response means the server understood your request but refused it because the data was wrong. In FastAPI you will see it constantly, especially while building. A missing field, a string where a number belongs, or a value outside its limits all produce one. The response body explains exactly what went wrong, if you know how to read it.
+A 422 response means the server understood your request but refused it because the data was wrong. In FastAPI you will see it constantly, especially while building. A missing field, a string where a number belongs, or a value outside its limits all produce one.
+
+## Where it comes from
 
 The error comes from Pydantic, which does the checking, and FastAPI wraps it in a standard JSON shape. Each problem becomes an entry in a list. Each entry says where the problem is, what kind of problem it is, and a human message. Once you know the layout, you can fix most failures in seconds.
 
-This article starts with where the error comes from and why it appears before your handler runs. It then explains the first element of each entry, the location, which tells you whether the problem was in the body, the query, the path, or a header. You will see what an error looks like when many fields fail at once.
+
 
 It then compares 422 with other errors you might confuse it with, such as 400 and 404, so you can tell which layer is complaining. The later sections show how to reshape the response for your own clients, and how to write tests that confirm bad input is rejected.
 
@@ -20,7 +22,6 @@ A 422 isn't a thing FastAPI invents. It's a Pydantic `ValidationError`, caught a
 The `detail` array is `e.errors()` from the Pydantic track, with one addition: `loc` is prefixed by the part of the request the value came from. So a field error in the body has `loc: ["body", "minutes"]` rather than just `["minutes"]`.
 
 all the Pydantic track said about reading these applies right. `loc` is a path. `type` is a stable machine code. `msg` is prose. `input` is what really arrived. `ctx` carries the rule's params.
-
 
 ## It is a Pydantic error in an HTTP envelope
 
@@ -212,6 +213,7 @@ expected = {(("body", "title"), "string_too_short"),
 print()
 print("matches what we expected:", found == expected)
 ```
+
 ## The first element is the useful addition
 
 `path`, `query`, `header`, `cookie` or `body`.
@@ -248,7 +250,7 @@ A common mistake is returning 422 for a missing resource because "the id was inv
 
 ## Reshaping it
 
-The default envelope is a list of objects with `loc`, `type`, `msg` and `input`. It's precise and it isn't what most front ends want. This Is often a map of field to messages.
+The default envelope is a list of objects with `loc`, `type`, `msg` and `input`. It's precise and it isn't what most front ends want. This is often a map of field to messages.
 
 An exception handler converts it:
 
@@ -297,9 +299,9 @@ Most APIs do none of these and return the raw envelope. It's usable. The gap bet
 
 check isn't the only auto failure, and recognising the others saves time.
 
-**405 Method Not Allowed** means the path matched a route registered for a other method. often a POST to a GET-only route, or a typo in the decorator.
+**405 Method Not Allowed** means the path matched a route registered for another method. often a POST to a GET-only route, or a typo in the decorator.
 
-**307 Temporary Redirect** is the trailing-slash redirect. Harmless until a client drops the body following it. This Turns into a POST that arrives mysteriously empty.
+**307 Temporary Redirect** is the trailing-slash redirect. Harmless until a client drops the body following it. This turns into a POST that arrives mysteriously empty.
 
 **500** with a output message is the response model rejecting what your handler made.
 
@@ -311,7 +313,7 @@ check isn't the only auto failure, and recognising the others saves time.
 
 `HTTPException` has a default handler you can replace, if you want your own envelope for the 404s and 403s you raise and for check.
 
-A handler for `Exception` catches all surprise. This Is where you turn an unhandled error into a clean 500 rather than a traceback. Log the real exception there, return a thing plain to the caller. Never include the traceback in the response. It's an data leak. It's the sort that ends up in a screenshot.
+A handler for `Exception` catches all surprise. This is where you turn an unhandled error into a clean 500 rather than a traceback. Log the real exception there, return a thing plain to the caller. Never include the traceback in the response. It's an data leak. It's the sort that ends up in a screenshot.
 
 Custom exception classes with their own handlers are worth it once an app has real domain errors. Raising `ModuleNotFound` from a service and mapping it to a 404 in one handler keeps HTTP concerns out of your business logic fully.
 
@@ -327,16 +329,9 @@ The hands-on arg for leaving it alone is that clients and tooling recognise the 
 
 Log the full `exc.errors()` with a request identifier, and return your tidied version.
 
-The reason is a conversation that happens with each API. A caller reports that a valid request was rejected. The `input` field settles it in seconds. It shows just what arrived. This Is often not what they believe they sent. Without it, you're asking them to copy a thing they can't see either.
+The reason is a conversation that happens with each API. A caller reports that a valid request was rejected. The `input` field settles it in seconds. It shows just what arrived. This is often not what they believe they sent. Without it, you're asking them to copy a thing they can't see either.
 
-Don't log the whole body indiscriminately. It may hold passwords, tokens or personal data. A log is a place things persist. The error entries carry the offending values only. This Is often the right amount.
-
-## Summary
-
-A 422 is a Pydantic error with an HTTP envelope. `loc` names the source and the path. `type` is the stable code to match on. `input` is what really arrived.
-
-each problem arrives at once. check failures are 422s you never write. Facts about the world. Missing, forbidden, conflicting. Are exceptions you raise. Reshape the envelope with an exception handler if your clients expect a thing else, keep the status, and log the first.
-
+Don't log the whole body indiscriminately. It may hold passwords, tokens or personal data. A log is a place things persist. The error entries carry the offending values only. This is often the right amount.
 
 ## Mistakes people make
 
@@ -372,7 +367,7 @@ Read the errors your own API makes before anybody else has to.
 
 Send a on purpose broken request to each endpoint and look at what comes back. Is the message a thing a caller could act on? Does the `loc` point at the right thing? Is a cross-field rule making an error with nowhere to display it? Is anything sensitive echoed back in `input`?
 
-It takes minutes per endpoint and it's the only way to see your API the way somebody failing to use it does. Almost each API has at least one error that makes perfect sense to its author and none at all to anyone else.
+It takes minutes per endpoint and it's the only way to see your API the way somebody failing to use it does. Almost every API has at least one error that makes perfect sense to its author and none at all to anyone else.
 
 ## The shape of a good failure
 
@@ -382,22 +377,7 @@ Most hand-rolled check answers one. That gap is the arg for letting the framewor
 
 what envelope you settle on, keep those three. A friendlier message that drops the location has made things worse.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What does a 422 mean?</strong> The request was well formed but failed validation. Your handler did not run, and the body lists what was wrong.
-
-<strong>What is the loc field in the error?</strong> It is the path to the bad value: the first element is where it came from (body, query, path, header) and the rest is the field name.
-
-<strong>What is the difference between msg and type?</strong> msg is a human-readable sentence, while type is a stable machine code such as missing or int_parsing that clients can branch on.
-
-<strong>Does FastAPI report one error or all of them?</strong> All of them. It validates every parameter and returns the full list in one response.
-
-<strong>How do I change the shape of the error response?</strong> Register an exception handler for RequestValidationError and return your own JSON.
-
-<strong>Why 422 and not 400?</strong> 422 Unprocessable Entity says the syntax was fine but the content was semantically invalid. FastAPI uses it for every validation failure.
-
-## A closing thought
-
-Errors are the part of an API that gets the least design focus and the most use by anyone struggling with it.
-
-A caller who succeeds first time never reads one. A caller who doesn't is reading nothing else. What they find there decides whether they work it out in a minute or give up and open a ticket. It's worth twenty lines.
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/handling-errors/)
+- Continue with [Reading a 422](http_methods_and_routing.html).

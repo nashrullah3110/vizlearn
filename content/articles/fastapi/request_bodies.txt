@@ -1,13 +1,15 @@
 title: Request Bodies: A Model Is the Contract
-intro: all the Pydantic track taught, applied to an HTTP request.
+intro: All the Pydantic track taught, applied to an HTTP request.
+
+## The core idea
+
+A request body is the data a client sends along with a request, usually as JSON. You see it on POST, PUT, and PATCH calls, where the client needs to give the server something more structured than a few values in a URL.
 
 ## One annotation
 
-A request body is the data a client sends along with a request, usually as JSON. You see it on POST, PUT, and PATCH calls, where the client needs to give the server something more structured than a few values in a URL. A new user, an order, or a set of settings all arrive this way.
-
 FastAPI handles bodies with the tool you already know from Pydantic. You write a model that describes the fields and their types. You use that model as the annotation on a function argument. The framework reads the incoming JSON, validates it against the model, and gives you a real object. If the data is wrong, your handler never runs.
 
-This article starts with that single annotation and what it does behind the scenes. It then looks at how failures happen first, before any of your code, and what the client sees. You will see how structure works for nested data, and how a body, a path parameter, and a query parameter can all appear on the same endpoint without confusion.
+
 
 A common design question follows: should one model serve both input and output? The article argues for two models and explains why. It finishes with unknown keys, the extra fields a client might send that your model never mentioned, and the choices you have for handling them.
 
@@ -23,10 +25,9 @@ def create(module: ModuleIn):
 
 A param annotated with a Pydantic model is the request body. FastAPI reads the raw bytes, validates them with `model_validate_json`. Calls your handler with an object.
 
-By the time the function runs, `module.minutes` is an int. Even if the client sent `"8"`. And each constraint on the model has passed. There's nothing to check at the top of the handler. This Is the point.
+By the time the function runs, `module.minutes` is an int. Even if the client sent `"8"`. And each constraint on the model has passed. There's nothing to check at the top of the handler. This is the point.
 
 This is also the moment where the whole Pydantic track turns right applicable. Field constraints, nested models, checkers, aliases, enums, `Literal`, strict mode. All of it works here, unchanged, because this *is* Pydantic.
-
 
 ## A model parameter is the body
 
@@ -215,6 +216,7 @@ r = client.post("/strict", json=payload)
 print("strict :", r.status_code, r.json()["detail"][0]["loc"],
       r.json()["detail"][0]["type"])
 ```
+
 ## Failures happen first
 
 If the body doesn't fit the model, your handler is never called. FastAPI returns 422 with a `detail` that is `e.errors()`.
@@ -229,7 +231,7 @@ Bodies nest as deeply as your models do. A `List[Lesson]` inside a `Module` vali
 
 Two things worth carrying over from the Pydantic track.
 
-**Constrain sets.** `Field(min_length=1)` says a module must have at least one lesson. `max_length` caps how many. This Is a cheap protection against a caller sending a hundred thousand.
+**Constrain sets.** `Field(min_length=1)` says a module must have at least one lesson. `max_length` caps how many. This is a cheap protection against a caller sending a hundred thousand.
 
 **Extract models that repeat.** If `Address` appears in three request bodies, it's a model. The rules then live in one place.
 
@@ -263,7 +265,7 @@ By default Pydantic skips keys it doesn't recognise. A client sending `minuets` 
 
 Which to choose is a real choice. For an inner API, forbid. A typo should be loud. For a public one, the arg for skipping is forward match. A client sending fields from a newer version shouldn't break against an older server.
 
-What you shouldn't do is leave it unconsidered. This Is what often happens.
+What you shouldn't do is leave it unconsidered. This is what often happens.
 
 ## Which methods take a body
 
@@ -275,7 +277,7 @@ The gap between the three that do:
 
 **PUT** replaces a resource fully at a known URL. So a PUT body should hold each field. Omitting one means clearing it.
 
-**PATCH** updates part of one. This Is where `exclude_unset` from the Pydantic track earns its place. Dump only what the caller supplied. Untouched fields stay untouched.
+**PATCH** updates part of one. This is where `exclude_unset` from the Pydantic track earns its place. Dump only what the caller supplied. Untouched fields stay untouched.
 
 Getting PUT and PATCH backwards is common and makes the bug where an update wipes fields the client never mentioned.
 
@@ -299,7 +301,7 @@ Two habits, both from the Pydantic track and both worth repeating because bodies
 
 all the Pydantic track said about schema metadata applies. Bodies are where it pays off most.
 
-`description` on a field appears beside it in the interactive docs. `examples` pre-fills the request form. This Is the gap between a first-time caller pressing "Try it out" and getting a working request, or an empty box they've to guess at.
+`description` on a field appears beside it in the interactive docs. `examples` pre-fills the request form. This is the gap between a first-time caller pressing "Try it out" and getting a working request, or an empty box they've to guess at.
 
 Model-level examples are even better for a body:
 
@@ -316,7 +318,7 @@ Now the docs show a full sample payload somebody can copy.
 
 FastAPI doesn't cap request body size by default. That is worth knowing. An endpoint accepting JSON will attempt to parse what arrives.
 
-The cap most times belongs upstream. In nginx, in your ingress, in the platform &mdash; and it's one of the standard things to check before an API is public. Within the app, `max_length` on sets limits how many items a body may hold. This Handles the common case of a bulk endpoint being handed a hundred thousand records.
+The cap most times belongs upstream. In nginx, in your ingress, in the platform &mdash; and it's one of the standard things to check before an API is public. Within the app, `max_length` on sets limits how many items a body may hold. This handles the common case of a bulk endpoint being handed a hundred thousand records.
 
 ## Validation that needs the whole body
 
@@ -329,13 +331,6 @@ A rule spanning the body *and* a path param is other. No model can see both. Tha
 A POST that creates a thing isn't idempotent: a client that times out and retries may create two.
 
 The usual answer is an idempotency key. A header the client makes. This The server records alongside the result, returning the first response on a repeat. That is beyond a first tier. It's worth knowing the problem exists before an API is handling anything that matters. Retrofitting it after the copies appear is much harder.
-
-## Summary
-
-A model param is the body. all from Pydantic applies: constraints, nesting, checkers, aliases, strict mode.
-
-check runs before your handler, and a 422 carries each problem with `loc` starting at `body`. Unknown keys are skipped unless you forbid them. split models per direction, and show the fields. The docs are made from them, and a good example is the cheapest thing you can do for whoever calls you.
-
 
 ## Mistakes people make
 
@@ -355,7 +350,7 @@ check runs before your handler, and a 422 carries each problem with `loc` starti
 
 ## Next
 
-The other half of the exchange: `response_model`. This Decides what comes back and, just as importantly, what can't leak.
+The other half of the exchange: `response_model`. This decides what comes back and, just as importantly, what can't leak.
 
 ## The body is the contract
 
@@ -363,7 +358,7 @@ Of all an endpoint declares, the body model is the part consumers read most care
 
 Which makes it worth more care than the rest. Field names that read well. Descriptions on anything not self-evident. A full example. Constraints that state the real limits rather than leaving them to be found by rejection. needed fields that are truly needed. Defaults that are truly sensible.
 
-None of that changes action. All of it changes how long somebody spends getting their first good request. This Is the number that decides whether they enjoy using your API.
+None of that changes action. All of it changes how long somebody spends getting their first good request. This is the number that decides whether they enjoy using your API.
 
 ## Accepting change from clients
 
@@ -375,7 +370,7 @@ The mirror of the previous point: how a body model can evolve without breaking s
 
 **Loosening a constraint is safe.** Tightening one isn't. A `max_length` reduced from 100 to 50 rejects requests that worked yesterday.
 
-**Renaming is breaking**, unless you accept both names for a while. This Is just what `AliasChoices` from the Pydantic track is for.
+**Renaming is breaking**, unless you accept both names for a while. This is just what `AliasChoices` from the Pydantic track is for.
 
 This is why `extra="skip"` is defensible on a public API though `forbid` catches typos. A client sending fields from a newer version keeps working against an older server. It's a trade between catching mistakes and handling drift. Which side you want depends on who is calling.
 
@@ -387,22 +382,7 @@ It **parses**, turning bytes into typed values. It **validates**, rejecting anyt
 
 Written by hand those drift apart: the parser accepts a thing the checker rejects. The docs shows a shape neither of them runs. One class keeps all three in match because they're all made from it.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>How do I declare a request body?</strong> Add a parameter annotated with a Pydantic model. FastAPI reads the JSON body, validates it against the model, and passes the instance to your function.
-
-<strong>Can a GET request have a body?</strong> The spec allows it, but many clients and proxies drop it. Use query parameters for GET and keep bodies for POST, PUT, and PATCH.
-
-<strong>How do I accept more than one body parameter?</strong> Declare two model parameters. FastAPI then expects a JSON object with each parameter name as a key.
-
-<strong>What happens to extra keys the client sends?</strong> By default Pydantic ignores them. Set model_config = ConfigDict(extra="forbid") to reject them with a 422.
-
-<strong>Why use separate models for input and output?</strong> The input model describes what a client may send, while the output model controls what you return. They often differ, for example by a password or an id field.
-
-<strong>How do I read the raw body instead?</strong> Take a Request parameter and call await request.body() or await request.json(). You lose validation and documentation for that body.
-
-## A closing thought
-
-Almost each question about request bodies turns out to be a Pydantic question wearing an HTTP hat. What will it coerce, what is needed, how do I express this rule, why did that fail.
-
-Which is good news, because it means the body is the part of an API where the least framework-exact knowledge is needed. Get the models right and the endpoints are a formality.
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/body/)
+- Continue with [Request Bodies](response_models.html).

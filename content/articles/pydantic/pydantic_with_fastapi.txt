@@ -1,13 +1,15 @@
 title: Pydantic with FastAPI: Where It All Arrives
 intro: Request bodies, response models and docs, all from annotations you already wrote.
 
-## Why this is the common entry point
+## The core idea
 
 FastAPI is the most common way people first meet Pydantic. You write a model, use it as the type of a function argument, and FastAPI does the rest. It reads the request body, validates it with your model, and hands your function a typed object.
 
+## Why this is the common entry point
+
 That is a lot of work done by one annotation. The same model also feeds the interactive documentation, because FastAPI turns it into an OpenAPI schema. And when validation fails, FastAPI sends back a 422 response that carries the Pydantic errors in a structured form. You did not write any of that code.
 
-This article explains why this is the usual entry point, and how the pieces fit. It covers the request body and how the model becomes the contract. It then looks at the 422 response and what it contains, so you can read it and shape it. The last part is about response_model, which does two jobs at once: it filters what you return and it documents it. Once you see how the model sits in the middle of the framework, the rest of FastAPI makes more sense.
+
 
 You do not need to know FastAPI well to follow this. The focus stays on the model and what the framework does with it. Every behaviour described here comes from a few lines you write, plus conventions the framework applies for you. Knowing which part comes from which side makes debugging much easier. When a 422 arrives, you will know whether to fix the model or the request, instead of guessing.
 
@@ -16,7 +18,6 @@ The examples stay small and focused.
 Most people meet Pydantic through FastAPI. Often without realising they're two libraries. That is a compliment to the integration and it leaves a gap. All that looks like FastAPI magic is Pydantic doing what the previous tiers given.
 
 FastAPI has no check layer of its own. It reads your annotations, hands the request body to a Pydantic model, converts the resulting `ValidationError` into a 422. Turns the made JSON Schema into your docs. That is the whole of it. Knowing where the line falls makes both easier to reason about.
-
 
 ## A model is the request body
 
@@ -188,6 +189,7 @@ schema = spec["components"]["schemas"]["ModuleIn"]
 for name, prop in schema["properties"].items():
     print("%-8s %s" % (name, json.dumps(prop)))
 ```
+
 ## The request body
 
 ```python
@@ -198,7 +200,7 @@ def create(module: ModuleIn):
 
 A param annotated with a model is the body. FastAPI reads the request, validates it with `model_validate_json`. Calls your handler with a real object.
 
-By the time your code runs, `module.minutes` is an int. Even if the client sent `"8"`. And each constraint has passed. There's no checking to do at the top of the handler. This Is the point.
+By the time your code runs, `module.minutes` is an int. Even if the client sent `"8"`. And each constraint has passed. There's no checking to do at the top of the handler. This is the point.
 
 Scalars annotated with plain types become query or path params. The same coercion applies: `?verbose=yes` turns `True` because of the boolean vocab from the coercion module.
 
@@ -210,7 +212,7 @@ So all from the errors module applies right to what your API returns. `loc` is a
 
 That is worth showing your API's consumers. A 422 from a FastAPI service is more helpful than most people realise. Clients often discard it and report "bad request".
 
-If you want a other shape, an exception handler for `RequestValidationError` lets you reformat it globally. And the grouping code from the errors module drops straight in.
+If you want another shape, an exception handler for `RequestValidationError` lets you reformat it globally. And the grouping code from the errors module drops straight in.
 
 ## response_model does two things
 
@@ -218,7 +220,7 @@ If you want a other shape, an exception handler for `RequestValidationError` let
 @app.get("/users/{user_id}", response_model=UserOut)
 ```
 
-It **validates** the output. This Catches a handler returning the wrong shape before a client does.
+It **validates** the output. This catches a handler returning the wrong shape before a client does.
 
 And it **filters** the output to the model's fields. A handler returning a dict with `password_hash` in it makes a response without one. `UserOut` doesn't declare it.
 
@@ -277,7 +279,7 @@ This is the concrete payback for being exact in your annotations. It's visible t
 
 ## A note on this page
 
-There's no server here &mdash; a browser tab can't listen on a port. `client` calls the app through ASGI. This Is the same interface uvicorn uses. Routing, check, status codes and schema making all behave just as they would in production.
+There's no server here &mdash; a browser tab can't listen on a port. `client` calls the app through ASGI. This is the same interface uvicorn uses. Routing, check, status codes and schema making all behave just as they would in production.
 
 The full reason, and the one action that truly differs, is on the [FastAPI compiler](../fastapi-lab/) page.
 
@@ -307,18 +309,9 @@ def health(settings: Settings = Depends(get_settings)):
     return {"env": settings.env}
 ```
 
-Cached, so the setting is read and checked once rather than per request. And overridable in tests through FastAPI's dependency replaces. This Is much cleaner than mutating the setting around a test.
+Cached, so the setting is read and checked once rather than per request. And overridable in tests through FastAPI's dependency replaces. This is much cleaner than mutating the setting around a test.
 
 The same pattern covers anything made once and used all over. A DB session factory, a client for another service, a pagination object built from checked query params.
-
-## Summary
-
-A model param is the request body, checked before your handler runs. Failures become a 422 whose `detail` is `e.errors()`, with `loc` naming which part of the request was wrong.
-
-`response_model` validates and filters the output. Undeclared fields can't leak. A property worth leaning on on purpose rather than trusting each handler to return just the right keys.
-
-split `Create`, `Update` and `Out` models per resource. Keep facts about the world in the service layer and shape in the model. And prefer constraints to checkers. Only one of them reaches the docs your callers read.
-
 
 ## Mistakes people make
 
@@ -334,7 +327,7 @@ split `Create`, `Update` and `Out` models per resource. Keep facts about the wor
 
 **given a 422 body is opaque.** It's `e.errors()`, with `loc` naming body, path or query and then the field. A lot of clients discard it and report "bad request" when the exact problem was right there.
 
-**Instantiating settings per request.** Reading and checking the setting on each call is wasted work. Cache it with `lru_cache` and inject it with `Depends`. This Is also what makes it overridable in tests.
+**Instantiating settings per request.** Reading and checking the setting on each call is wasted work. Cache it with `lru_cache` and inject it with `Depends`. This is also what makes it overridable in tests.
 
 ## A last habit
 
@@ -356,26 +349,7 @@ FastAPI adds routing and an HTTP layer on top. Almost nothing else. Which means 
 
 That is a good spot to be in. Models are cheap to improve. Narrowing a `str` to a `Literal`, moving a rule from a checker to a constraint, splitting one all-optional model into three honest ones, adding a description to a field whose name isn't self-explanatory. Each is a small edit. Each is visible to everybody who calls you.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>How does FastAPI use Pydantic?</strong> A model type in the endpoint signature becomes the request body, validated before your function runs. FastAPI also uses it to build the OpenAPI docs.
-
-<strong>What is a 422 response?</strong> It is FastAPI's reply when validation fails. The body is a list of errors with `loc`, `msg` and `type`, taken from Pydantic's own error entries.
-
-<strong>What does `response_model` do?</strong> It validates and filters what your function returns. Fields not in the response model, such as a password hash, are dropped from the output.
-
-<strong>Why use separate models for create, update and read?</strong> Each has different required fields. A create model needs everything, an update model makes fields optional, and a read model adds the id and hides secrets.
-
-<strong>Do I need to call `model_dump` myself?</strong> Usually not. FastAPI serialises the returned model, and calling it yourself is mostly for background tasks or storage.
-
-<strong>Where does validation stop?</strong> At the edge of the request. FastAPI will not check that a foreign key exists in your database, so that check still belongs in your code.
-
-## One last thing to check
-
-Before shipping an endpoint, three questions that take a minute each.
-
-**Does it have a `response_model`?** Without one the docs says nothing about the response. Nothing filters what a handler returns.
-
-**Is the update path using `exclude_unset=True`?** Without it, a PATCH overwrites fields the caller never mentioned.
-
-**Would a 422 from this endpoint tell a caller what to fix?** If a field is a bare `str` where a `Literal` belongs, or a rule lives in a checker that the schema can't show, the answer is no. And the caller finds out by being rejected rather than by reading.
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/integrations/devtools/)
+- Continue with [Pydantic with FastAPI](performance_and_pydantic_core.html).

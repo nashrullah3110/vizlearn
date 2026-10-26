@@ -1,12 +1,15 @@
 title: HTTP Methods and Routing
 intro: What each verb promises, and how the router decides which handler runs.
-## A resource is one name and several operations
 
-HTTP methods are the verbs of a web request. GET asks for data. POST creates something. PUT replaces it, PATCH changes part of it, and DELETE removes it. Routing is the step where the server looks at the method and the path together and decides which function should answer.
+## The core idea
+
+HTTP methods are the verbs of a web request. GET asks for data. POST creates something.
+
+## A resource is one name and several operations
 
 FastAPI gives you one decorator for each method, and the router matches requests against them in order. The combination of method and path picks the handler. Two handlers can share a path as long as their methods differ, which is how a single resource supports several operations.
 
-This article begins with that idea: a resource is one name with several operations attached. A path like /orders can list orders with GET and create one with POST. It then covers the promises each verb makes. Some are safe, meaning they change nothing. Some are idempotent, meaning repeating them has the same effect as doing them once. Clients, caches, and proxies rely on those promises, so breaking them causes real trouble.
+
 
 The next section explains the difference between a 404 and a 405. One says the path does not exist. The other says the path exists but not for that method. Mixing them up wastes debugging time.
 
@@ -17,7 +20,6 @@ These ideas are older than FastAPI, and they apply to any web framework. Learnin
 The same path with other methods is the central idea of an HTTP API. `/modules/7` names a thing. `GET`, `PUT` and `DELETE` are what you can do to it.
 
 FastAPI gives you a decorator per verb. Registering a few against one path is normal rather than a special case.
-
 
 ## One path, several methods
 
@@ -209,6 +211,7 @@ print("missing:", c.get("/modules/99").status_code)
 print("delete :", c.delete("/modules/1").status_code)
 print("list   :", c.get("/modules").json())
 ```
+
 ## The promises each verb makes
 
 These aren't rules you may skip. Browsers, proxies, CDNs, load balancers and HTTP client libraries all act on them. Breaking one makes action you didn't write.
@@ -219,7 +222,7 @@ These aren't rules you may skip. Browsers, proxies, CDNs, load balancers and HTT
 
 **PUT is idempotent.** It replaces a resource at a known URL. Repeating it leaves the same state. A client can retry it safely.
 
-**DELETE is idempotent.** Deleting twice leaves the thing deleted. The second call returning 404 is acceptable. Many APIs return 204 both times. This Is friendlier to a retrying client.
+**DELETE is idempotent.** Deleting twice leaves the thing deleted. The second call returning 404 is acceptable. Many APIs return 204 both times. This is friendlier to a retrying client.
 
 **PATCH isn't always idempotent.** "Set the title to X" is. "increment the counter" isn't.
 
@@ -227,17 +230,17 @@ That retry property is the hands-on payoff. It's what lets a client library on i
 
 ## 404 versus 405
 
-A path nothing matched is a 404. A path that matched a route registered for a other verb is a **405 Method Not Allowed**.
+A path nothing matched is a 404. A path that matched a route registered for another verb is a **405 Method Not Allowed**.
 
-The gap is truly handy when debugging: a 405 means the URL is right and the method is wrong. This Is often a typo in the decorator or a client sending POST where PUT was meant. A 404 means the path never matched at all. This Is a other search.
+The gap is truly handy when debugging: a 405 means the URL is right and the method is wrong. This is often a typo in the decorator or a client sending POST where PUT was meant. A 404 means the path never matched at all. This is another search.
 
 ## Order, and inspecting it
 
 Routes match in registration order and the first match wins. The rule from the first tier. The reason a fixed path must be declared before a var one that would also match.
 
-`app.routes` is worth knowing about. It settles args. Printing the table shows just what the router will try and in what order. This Is faster than thinking about it.
+`app.routes` is worth knowing about. It settles args. Printing the table shows just what the router will try and in what order. This is faster than thinking about it.
 
-Routes registered through an `APIRouter` appear in the order the routers were included. This Turns relevant once an app is split up. A catch-all in an early router can shadow a exact route in a later one.
+Routes registered through an `APIRouter` appear in the order the routers were included. This turns relevant once an app is split up. A catch-all in an early router can shadow an exact route in a later one.
 
 ## One function, several verbs
 
@@ -257,14 +260,13 @@ Most sets end up with five endpoints. There's little value in being creative abo
 
 The temptation is to add verbs to paths for anything that doesn't fit. `/modules/{id}/publish`, `/modules/search`. at times that is right. An action that isn't a create, read, update or delete truly needs a name. `POST /modules/{id}/publish` is clearer than inventing a field whose mutation has a side effect.
 
-What to avoid is the halfway house: `POST /getModules`, or `GET /modules/delete/{id}`. The first copies what the method already says. The second puts a destructive action behind a safe verb. This Is the one mistake in this module with real results.
+What to avoid is the halfway house: `POST /getModules`, or `GET /modules/delete/{id}`. The first copies what the method already says. The second puts a destructive action behind a safe verb. This is the one mistake in this module with real results.
 
 ## Trailing slashes, once more
 
 `/modules` and `/modules/` are other paths, and FastAPI redirects between them with a 307.
 
 That is mostly invisible. Where it bites is a POST. A 307 preserves the method and body . Some clients drop the body making a request that arrives empty for no reason the caller can see. Pick one rule across your API and hold it.
-
 
 ## Mistakes people make
 
@@ -284,12 +286,11 @@ That is mostly invisible. Where it bites is a POST. A 307 preserves the method a
 
 The property is worth one more paragraph because it's the one people skip.
 
-A network is unreliable in a exact way. A request can succeed while the response is lost. The client sees a timeout and has no idea whether the write happened.
+A network is unreliable in an exact way. A request can succeed while the response is lost. The client sees a timeout and has no idea whether the write happened.
 
 For a PUT or DELETE that doesn't matter - retry. The end state is the same. For a POST it matters a great deal. The standard answer is an idempotency key. The client makes one, sends it as a header, and the server records it alongside the result so a repeat returns the first response instead of creating a second record.
 
 Payment APIs all do this, for obvious reasons. Most other APIs should and don't. It's much easier to add before the copies appear than after.
-
 
 ## Designing a URL space
 
@@ -313,16 +314,7 @@ Two things worth knowing are absent.
 
 **No wildcard fallback by default.** An unmatched path is a 404 from the router with a plain body. If you want a catch-all - to serve a single-page app, say - you register one. It must come last or it shadows all after it.
 
-That last point is the sorting rule at its most severe. A catch-all in an early router makes each route in each later router unreachable. This Is a confusing morning.
-
-## A closing thought
-
-The verbs are the oldest and best-given part of an HTTP API. The part most often treated as any.
-
-Choosing them right isn't pedantry. It's what lets a client library retry safely, a proxy cache right, a monitoring system set apart a failure from a rejection. A newcomer guess what an endpoint does before reading its docs.
-
-None of that needs anything from you except using the verb that matches what the endpoint really does - which is data you already have.
-
+That last point is the sorting rule at its most severe. A catch-all in an early router makes each route in each later router unreachable. This is a confusing morning.
 
 ## The set worth memorising
 
@@ -332,33 +324,9 @@ Five endpoints per set, and there's little value in deviating.
 
 Anything that doesn't fit turns a sub-resource with a name: `POST /things/{id}/publish`. Keep those few. An API that is mostly named actions is an RPC interface. Would be clearer written as one than disguised as REST.
 
-## Summary
-
-One path, a handler per verb. GET is safe and must change nothing. PUT and DELETE are idempotent. A client can retry them after a timeout. POST isn't. This Is why idempotency keys exist.
-
-A known path with an unregistered method is 405, not 404. The gap tells you the URL was right.
-
-Routes match in registration order and, across routers, in inclusion order. `app.routes` prints the table when a thing isn't behaving.
-
-And design the URL space once: plural nouns, shallow nesting, filters in the query string, and no verbs in paths.
-
 ## Next
 
 Headers and cookies come next - the parts of a request that show the exchange rather than the resource - followed by the two body formats a browser form really sends, the status codes that report what happened, the error handling that makes them. The structure that keeps all of it navigable once there's more than one resource.
-
-## Questions people ask
-
-<strong>Which method should I use to create a resource?</strong> POST, typically returning 201 with the new resource. Use PUT when the client chooses the id and replaces the whole thing.
-
-<strong>What is the difference between PUT and PATCH?</strong> PUT replaces the entire resource, while PATCH changes only the fields supplied in the request.
-
-<strong>What does idempotent mean?</strong> Repeating the request has the same effect as sending it once. GET, PUT, and DELETE are idempotent; POST is not.
-
-<strong>Why do I get a 405 instead of a 404?</strong> The path exists but not for that method. A 404 means no route matched the path at all.
-
-<strong>Can one function handle several methods?</strong> Yes, with app.api_route("/x", methods=["GET", "POST"]). Separate functions per method are usually clearer.
-
-<strong>How do I see every registered route?</strong> Loop over app.routes and print each route's path and methods, or open /docs.
 
 ## One more on safety
 
@@ -367,3 +335,8 @@ The safe-method rule deserves restating because it's the only item here whose vi
 "Safe" doesn't mean "harmless to call once". It means the caller hasn't requested a change. Anything may call it, any number of times, without asking. Link previews in chat uses fetch URLs. Antivirus scanners fetch URLs. Browsers prefetch on hover. Corporate proxies fetch to inspect.
 
 each one of those will eventually hit a destructive GET. The resulting incident is hard to explain because no one clicked anything. Putting the action behind POST or DELETE drops the entire class.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/first-steps/)
+- Continue with [HTTP Methods and Routing](headers_and_cookies.html).

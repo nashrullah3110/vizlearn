@@ -1,12 +1,15 @@
 title: Dependencies with yield
 intro: Setup before the handler, teardown after it, and the transaction pattern that falls out.
-## The shape
 
-A dependency with yield is one that does work before your handler runs and again after it finishes. The code before the yield is setup. The value after the yield is what the handler receives. The code after the yield is cleanup. It is how you open a database session, hand it to the handler, and close it afterward.
+## The core idea
+
+A dependency with yield is one that does work before your handler runs and again after it finishes. The code before the yield is setup. The value after the yield is what the handler receives.
+
+## The shape
 
 You need this whenever a resource must be released. A connection left open, a transaction left half done, or a file never closed will cause trouble that appears later and far from its cause. Putting the cleanup next to the setup keeps the pair together, so neither is forgotten.
 
-This article starts with the basic shape and what each part does. It then explains a key promise: teardown always runs, even when the handler raises an error. That guarantee is what makes the pattern safe. You will also see how that interacts with exceptions and what the cleanup code can and cannot do about them.
+
 
 A practical example follows, the transaction pattern. The session commits if the handler succeeds and rolls back if it fails, all in one small function. This is the form you will use most.
 
@@ -26,7 +29,6 @@ def get_session():
 all before the `yield` runs before the handler. The yielded value is what the handler receives. all after runs once the response has been made.
 
 It's a gen, and it behaves like a context manager. Which is just the point. "acquire, use, release" is what a DB session, a file handle, a lock or a temporary folder all need.
-
 
 ## yield splits it in two
 
@@ -222,6 +224,7 @@ print("log   :", log)
 print()
 print("The response was already decided. Log the failure; do not raise it.")
 ```
+
 ## Teardown always runs
 
 The reason this exists rather than a plain dependency returning a session: cleanup must happen even when the handler fails.
@@ -251,7 +254,7 @@ def get_db():
 
 Three lines, and each endpoint using this dependency now has correct transaction handling without writing any. That is a large amount of correctness for very little code, and it's the single most common use of the feature.
 
-Note the `raise` in the `except`. Swallowing there would turn a failed request into a good-looking one with a rolled-back transaction. This Is worse than either outcome alone.
+Note the `raise` in the `except`. Swallowing there would turn a failed request into a good-looking one with a rolled-back transaction. This is worse than either outcome alone.
 
 ## Nesting and order
 
@@ -283,7 +286,6 @@ What doesn't: work that could be done once at startup. A link *pool* is created 
 
 That gap is the lifespan module's subject.
 
-
 ## Mistakes people make
 
 **No `try/finally`.** The single most consequential omission. A handler that raises then skips the cleanup. A link leaks on just the requests you most want to live.
@@ -302,12 +304,11 @@ That gap is the lifespan module's subject.
 
 Both forms work, and the choice follows the resource.
 
-`def get_session()` runs in the threadpool. This Is right for a blocking driver - psycopg2, a synchronous HTTP client, a file.
+`def get_session()` runs in the threadpool. This is right for a blocking driver - psycopg2, a synchronous HTTP client, a file.
 
-`async def get_session()` runs on the event loop. This Is right for an async driver - asyncpg, httpx's async client.
+`async def get_session()` runs on the event loop. This is right for an async driver - asyncpg, httpx's async client.
 
-Mixing is allowed: an async handler may depend on a sync yield dependency and the other way round. What matters is that a blocking call isn't made right on the loop. This Is the runtime tier's subject.
-
+Mixing is allowed: an async handler may depend on a sync yield dependency and the other way round. What matters is that a blocking call isn't made right on the loop. This is the runtime tier's subject.
 
 ## How it works underneath
 
@@ -317,7 +318,7 @@ A `yield` dependency is a gen. FastAPI wraps it in a context manager and enters 
 
 That is why teardown sorting is reverse, why teardown runs on failure. Why raising in teardown is awkward. The stack is unwinding while the response is already on its way out.
 
-It also shows the lifetime just. The dependency is alive for the whole request, including while the response is being serialised - so a session yielded here is still usable by a response model reading lazy fields. This Is a common source of confusion when it's *not* the case in other frameworks.
+It also shows the lifetime just. The dependency is alive for the whole request, including while the response is being serialised - so a session yielded here is still usable by a response model reading lazy fields. This is a common source of confusion when it's *not* the case in other frameworks.
 
 ## A checklist
 
@@ -335,36 +336,17 @@ Is this per-request, or per-process? A session is per request. The pool it comes
 
 A subtle one, worth knowing before it bites.
 
-The dependency stays open while the **response is serialised**, not just while the handler runs. A session yielded here is still alive when a response model reads an field that triggers a lazy load.
+The dependency stays open while the **response is serialised**, not just while the handler runs. A session yielded here is still alive when a response model reads a field that triggers a lazy load.
 
 That is convenient, and it's also how a single output quietly turns fifty queries. The model touches a link, the session is still open, and the ORM obliges. The fix is on the query side - load what the response needs up front - but the reason it's possible at all is this lifetime.
 
 It's also why closing the session inside the handler is a mistake that appears to work. The handler returns fine. The serialiser then finds a closed session, and the error names neither.
-
-## Summary
-
-Code before the `yield` is setup, the yielded value is what the handler receives. Code after it runs once the response has been made - on success and on failure alike.
-
-Wrap the `yield` in `try/finally` when anything is acquired. Put `commit()` at once after it and `rollback()` in an `except` that re-raises. The transaction pattern falls out in three lines.
-
-Teardowns run in reverse order, the per-request cache still applies. Nothing in the teardown should raise or be slow.
-
 
 ## Summary, in one line
 
 Setup before the `yield`, teardown after it, `try/finally` around it when anything is acquired - and `commit()` at once after the `yield` so that only a good handler reaches it.
 
 all else in this module is a result of those four facts.
-
-
-## A closing thought
-
-Almost each resource bug in a web use is a lifetime bug. A thing opened and not closed, closed too early, or shared between requests that shouldn't share it.
-
-`yield` dependencies exist to make the common lifetime - one request - the easy one to express. Setup, use, teardown, in one function, applied by declaring a param.
-
-The failure modes it drops are the ones that don't show up in development. A link leaked on the error path, a transaction left open, a pool exhausted an hour after deploy under real traffic.
-
 
 ## Two rules
 
@@ -374,27 +356,17 @@ all here reduces to two.
 
 **Put success-only work between the `yield` and the `except`.** That is where `commit()` goes. It's why the transaction pattern needs no flag, no inspection of the response. No cooperation from the handler.
 
-
 ## Where it sits in the tier
 
 Of the five modules here, this is the one whose lack causes production incidents rather than inconvenience.
 
-A missing `Depends` is a repeated four lines. A missing `try/finally` is a link pool that empties under load on the error path. This Is the path that gets busy just when all else is going wrong.
-
-## Questions people ask
-
-<strong>What does yield do in a dependency?</strong> Code before yield runs before the endpoint, the yielded value is injected, and code after yield runs once the response is handled.
-
-<strong>Does the cleanup run if the endpoint raises?</strong> Yes, if you put it in a finally block. Without finally, an exception skips code after yield.
-
-<strong>What is the common use?</strong> Database sessions and other resources: open a session, yield it, and close it afterward.
-
-<strong>In what order do nested yield dependencies close?</strong> In reverse order of creation, so the dependency opened last closes first.
-
-<strong>Should I raise HTTPException in the teardown?</strong> Not after yield. The response may have already been sent, so errors there cannot change the status.
-
-<strong>Does a sync generator dependency block the loop?</strong> No. FastAPI runs sync generators in a thread pool, while async generators run on the event loop.
+A missing `Depends` is a repeated four lines. A missing `try/finally` is a link pool that empties under load on the error path. This is the path that gets busy just when all else is going wrong.
 
 ## Next
 
 Dependencies that depend on dependencies, the tree FastAPI resolves before your handler runs. Why a shared node in that tree is still only called once.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/dependencies/dependencies-with-yield/)
+- Continue with [Dependencies with yield](sub_dependencies.html).

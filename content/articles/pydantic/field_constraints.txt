@@ -1,13 +1,15 @@
 title: Field Constraints: Saying What You Actually Mean
 intro: A type allows far more values than your domain does. Field is where you close the gap.
 
-## The gap between a type and a meaning
+## The core idea
 
-A type tells Pydantic what kind of value to expect. It says nothing about what the value should mean. An integer can be negative. A string can be empty. A list can hold a thousand items. For most real data, the type is only the first half of the rule.
+A type tells Pydantic what kind of value to expect. It says nothing about what the value should mean. An integer can be negative.
+
+## The gap between a type and a meaning
 
 Field constraints are the second half. You attach limits to a field with Field, and Pydantic enforces them during validation. A price must be above zero. A username must be between three and twenty characters. A tag list must hold at least one item. The rules sit next to the field, so anyone reading the model can see them.
 
-This article covers the constraints by kind. The number constraints handle ranges and multiples. The string constraints handle length and patterns. Collections have their own limits on size. The last section looks at how constraints combine with default values, and where a default can quietly break a rule you thought you had set. Each constraint also ends up in the JSON Schema, so your documentation stays in step with your checks.
+
 
 Read it with a real model in mind, such as a form you already have. You will find that most of the rules you currently check by hand can move into the field itself, where they are shorter and easier to see. The constraints also appear in the generated JSON Schema, so your API documentation stays accurate without extra work.
 
@@ -22,7 +24,6 @@ minutes: int = Field(gt=0, le=180)
 Now the model refuses what the domain refuses. Two things follow from that. The second matters more than people expect.
 
 The first is that bad data stops at the door. The second is that the rule is now written down in the one place a reader will look. A check buried in a service function is invisible to all who doesn't open that function. A constraint on the field is part of the model's meaning. It appears in the made schema, the API docs and your editor's tooltips.
-
 
 ## A type is a weak promise
 
@@ -176,11 +177,12 @@ for name, spec in schema["properties"].items():
 
 print("required:", schema.get("required", []))
 ```
+
 ## The number constraints
 
 Four checks, named for the ops: `gt`, `ge`, `lt`, `le`. There's no `eq`. That is what a `Literal` is for.
 
-`multiple_of` constrains the step. This Is more handy than it first appears. Prices in whole pence, durations in five-minute blocks, page sizes in powers of ten.
+`multiple_of` constrains the step. This is more handy than it first appears. Prices in whole pence, durations in five-minute blocks, page sizes in powers of ten.
 
 Choosing between `gt=0` and `ge=1` on an int field is worth a moment. They accept just the same values. They say other things. `gt=0` says *plus*. `ge=1` says *at least one*. Pick the one that matches the sentence you'd say out loud. The error message the caller sees is made from it.
 
@@ -292,7 +294,7 @@ user_id: int = Field(strict=True)
 
 Now `user_id="123"` raises while the rest of the model still accepts strings for its numbers. Identifiers are the classic case. An id that arrives as text is often a sign that a thing upstream is confused. Quietly converting it hides that.
 
-The `Annotated` form works too: `Annotated[int, Field(strict=True)]`. This Can then be named and reused like any other constrained type.
+The `Annotated` form works too: `Annotated[int, Field(strict=True)]`. This can then be named and reused like any other constrained type.
 
 ## More than one constraint, and how failures report
 
@@ -331,13 +333,13 @@ The second version makes a clearer error, appears in the schema as an enumeratio
 
 all on hand, in one place. So You can stop looking it up.
 
-**Numbers:** `gt`, `ge`, `lt`, `le`, `multiple_of`. Also `allow_inf_nan=False` for floats. This Is worth setting on anything that will be serialised to JSON. `Infinity` and `NaN` aren't valid JSON. A value that checked happily will fail on the way out.
+**Numbers:** `gt`, `ge`, `lt`, `le`, `multiple_of`. Also `allow_inf_nan=False` for floats. This is worth setting on anything that will be serialised to JSON. `Infinity` and `NaN` aren't valid JSON. A value that checked happily will fail on the way out.
 
 **Strings:** `min_length`, `max_length`, `pattern`. Plus the config-level `str_strip_whitespace`, `str_to_lower` and `str_to_upper`. This Apply to each string field on a model. Stripping whitespace on input is almost always the right default for form data.
 
 **sets:** `min_length`, `max_length`.
 
-**Decimals:** `max_digits` and `decimal_places`. This Are what you want for money and which no amount of `float` will give you.
+**Decimals:** `max_digits` and `decimal_places`. These are what you want for money and which no amount of `float` will give you.
 
 **all:** `strict`, `frozen` on a single field, `description`, `title`, `examples`, `deprecated`, `repr=False`, `exclude=True`.
 
@@ -347,24 +349,15 @@ Look at the constraints you've written and ask what a reader learns from them. A
 
 An unconstrained model is a list of types. The actual rules are scattered through the code that consumes it. A check here, an assertion there, an assumption one spot else that no one wrote down. Those rules still exist. They're just not anywhere you can read them. They disagree with each other more often than anyone expects.
 
-Moving a rule into the model isn't primarily about catching bad data, though it does that. It's about having one place where the shape of your domain is stated. This Is the same reason the annotations were worth enforcing in the first place.
-
-## Questions people ask
-
-<strong>How do I require a number to be positive?</strong> Use `Field(gt=0)` for strictly positive or `Field(ge=0)` for zero and up. The same keywords, `lt` and `le`, set upper bounds.
-
-<strong>What are the string constraints?</strong> `min_length`, `max_length` and `pattern` cover most cases. For example `Field(min_length=3, pattern=r"^[a-z-]+$")`.
-
-<strong>Why does `Field(max_length=5)` also work on lists?</strong> The constraint applies to anything with a length, so strings, lists, sets and dicts all honour it. The error type changes with the container, for example `string_too_long` or `too_long`.
-
-<strong>Do constraints check the default value?</strong> No, defaults are not validated unless you set `validate_default=True`. A default that breaks its own rule will not raise until that option is on.
-
-<strong>What is the difference between `Field(gt=0)` and `PositiveInt`?</strong> They enforce the same rule. `PositiveInt` is a reusable named type, while `Field(gt=0)` is attached to one field and can sit next to a description or default.
-
-<strong>Where do constraints appear in the JSON schema?</strong> They become `minimum`, `exclusiveMinimum`, `minLength`, `maxLength` and `pattern` keywords, so clients and API docs see them for free.
+Moving a rule into the model isn't primarily about catching bad data, though it does that. It's about having one place where the shape of your domain is stated. This is the same reason the annotations were worth enforcing in the first place.
 
 ## Next
 
 That ends the foundations. You can define a model, know just what it will and won't convert, control what is needed, narrow values to your domain. Read the errors when a thing doesn't fit.
 
 The last module in this tier steps back to a question worth answering before you reach for a model at all. When a plain dataclass is the better tool.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/fields/)
+- Continue with [Field Constraints](pydantic_vs_dataclasses.html).

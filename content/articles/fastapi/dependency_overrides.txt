@@ -1,12 +1,15 @@
 title: Dependency Overrides
 intro: Swapping a dependency for a test, and why that makes the whole tier hands-on.
-## The mechanism
 
-A dependency override replaces one dependency with another, for the whole app, while it is running. Its main use is testing. Your real database dependency connects to a real database. During a test, you want it to return a fake or an in-memory one. An override swaps it without touching your endpoint code.
+## The core idea
+
+A dependency override replaces one dependency with another, for the whole app, while it is running. Its main use is testing. Your real database dependency connects to a real database.
+
+## The mechanism
 
 This is one of the best reasons to use dependency injection at all. Because endpoints ask for what they need instead of creating it, you can change what they receive from outside. There is no patching of modules and no tricks with imports. You set a single entry in a dictionary.
 
-This article starts with the mechanism itself: the dictionary on the app, and what you put into it. It then explains why it matters for the way you design and test code. You will learn that the key is the function object, not its name, so you must reference the original function exactly as the endpoint did.
+
 
 Next comes reach. An override applies to the whole dependency tree, so a replaced function is swapped everywhere it appears, even in sub-dependencies. It also works at the router and app levels. Overrides stay in place until you clear them, so the article closes with how to reset them after each test.
 
@@ -21,7 +24,6 @@ app.dependency_overrides[get_db] = fake_db
 A dict on the app, mapping the real callable to a swap. When FastAPI resolves a dependency it checks that dict first. Uses the stand-in if one is registered.
 
 That is the whole feature. It needs no test framework, no patching. No change to the endpoints.
-
 
 ## Replacing one for a test
 
@@ -200,13 +202,14 @@ app.dependency_overrides[get_db] = fake_db
 print(TestClient(app).get("/rows").json())
 print("lifecycle:", log)
 ```
+
 ## Why it matters
 
 all in this tier pushes needs into dependencies. The DB session, the current user, the permission check, the filters. That is good design and it would be a problem if those were hard to replace. Each test would then need a real DB and a real token.
 
 replaces are the release valve. The endpoint keeps declaring `Depends(get_db)`. The test decides what `get_db` means.
 
-Two results worth noticing. Tests get faster. Nothing real is made. And tests get *narrower*. A test for a handler's logic isn't also a test of authentication. This Means a broken token service doesn't fail two hundred unrelated tests.
+Two results worth noticing. Tests get faster. Nothing real is made. And tests get *narrower*. A test for a handler's logic isn't also a test of authentication. This means a broken token service doesn't fail two hundred unrelated tests.
 
 ## The key is the function object
 
@@ -215,6 +218,7 @@ This is the one thing that goes wrong. The symptom is confusing: the replace app
 The dict is keyed by identity. The object you use as the key must be the same object the endpoints depend on. If your test imports `get_db` from `app.db` and the router imported it from `.db`. Those resolve to two other module objects, you've two other functions and the replace targets the wrong one.
 
 The fix is to be steady about import paths. When an replace silently does nothing, compare the two objects before looking anywhere else.
+
 ## Router and app level too
 
 An replace replaces the function wherever it's declared. This Includes `dependencies=[...]` on a router or the app.
@@ -245,7 +249,6 @@ Dependencies let an endpoint declare what it needs. Sub-dependencies let those n
 
 Together that is most of what splits a FastAPI use that stays testable from one that doesn't. And none of it needs anything beyond functions and a default arg.
 
-
 ## Mistakes people make
 
 **Two import paths for one function.** The dict is keyed by identity. `from app.db import get_db` and `from .db import get_db` can be other objects. The replace then targets a function no one depends on, and does nothing, silently.
@@ -256,7 +259,7 @@ Together that is most of what splits a FastAPI use that stays testable from one 
 
 **Using them in production without saying so.** An replace is action that appears in no endpoint signature. If it isn't a test, gate it behind an clear setting and log it at startup.
 
-**Losing they work on router-level dependencies.** They do. This Is what makes a section-wide auth need testable.
+**Losing they work on router-level dependencies.** They do. This is what makes a section-wide auth need testable.
 
 **replacing instead of designing.** If a test needs six replaces, the endpoint probably depends on six things it shouldn't.
 
@@ -274,7 +277,6 @@ def client():
 
 each test using that fixture gets the fake. No test can leak it into the next one. It's four lines. It's the gap between a suite that is trustworthy and one that fails differently based on sorting.
 
-
 ## What good test structure looks like
 
 replaces work best with a small amount of structure around them.
@@ -291,7 +293,7 @@ replaces work best with a small amount of structure around them.
 
 replaces replace a dependency, and that is all they do.
 
-They can't change what an endpoint declares. An endpoint based on a thing not needed still depends on it in tests. They don't apply to code called *inside* a handler - a handler that imports and calls `get_session()` right is untouched by any replace. This Is the strongest hands-on arg for declaring dependencies rather than reaching for them.
+They can't change what an endpoint declares. An endpoint based on a thing not needed still depends on it in tests. They don't apply to code called *inside* a handler - a handler that imports and calls `get_session()` right is untouched by any replace. This is the strongest hands-on arg for declaring dependencies rather than reaching for them.
 
 And they're per app object. Tests that make their own `FastAPI()` per module get alone for free. Tests that share one imported app need the discipline of clearing.
 
@@ -313,7 +315,6 @@ replaces make dependencies replaceable. They don't make an over-connected endpoi
 
 Used that way the feature is also a design signal. The number of things you've to fake to test an endpoint is a fair measure of how entangled it's.
 
-
 ## Why this closes the tier
 
 The five modules in this tier fit together. Replaces are what make the setup hands-on rather than merely elegant.
@@ -326,19 +327,9 @@ replaces invert it. Because the edges are declared rather than reached for, they
 
 That is the trade this tier is really about: declaring needs instead of acquiring them. all else follows from it.
 
-## Summary
-
-`app.dependency_overrides[real] = fake` replaces a dependency all over it appears, including in a tree and on a router.
-
-The key is the function object. Inconsistent import paths are the usual reason an replace silently does nothing. replaces live on the app. So Clear them between tests or one quietly changes the next.
-
-Fake at the edges - the DB, the clock, the token - and let the real logic above run. Keep one test with nothing overridden. The fakes can't drift from what they stand in for without a thing failing.
-
-
 ## Summary, in one line
 
 `app.dependency_overrides[real] = fake` swaps a dependency all over it appears - keyed by the function object, cleared between tests. Applied as low in the tree as possible so the logic above it still runs.
-
 
 ## Two rules
 
@@ -346,29 +337,19 @@ Fake at the edges - the DB, the clock, the token - and let the real logic above 
 
 **Clear between tests.** A leaked replace fails a later, unrelated test with no visible cause.
 
-
 ## Where it sits in the tier
 
 Last of the five, and the one that justifies the other four.
 
 Pushing needs into dependencies moves real things - DBs, tokens, clocks - to the edge of the use. That would make testing harder if the edge couldn't be replaced. replaces are what make it replaceable. So what makes the whole approach pay.
 
-## Questions people ask
-
-<strong>How do I replace a dependency in a test?</strong> Set app.dependency_overrides[original_function] = fake_function. FastAPI then calls the fake.
-
-<strong>What is the key of the overrides dict?</strong> The original function object itself, not its name. It must be the same object used in Depends().
-
-<strong>Does it work for sub-dependencies?</strong> Yes. The override applies anywhere in the tree where that dependency is used.
-
-<strong>How do I undo it?</strong> Call app.dependency_overrides.clear() or use a pytest fixture that yields then clears.
-
-<strong>Does the fake need the same parameters?</strong> No. The override gets its own signature, and FastAPI resolves that signature instead.
-
-<strong>Is it only for tests?</strong> It is mostly for tests, but it also helps with local development against a stub service.
-
 ## Next
 
 The runtime: what really happens when a request arrives, why an `async def` endpoint that makes a blocking call stalls every other request in the process. The parts of the framework that need a real event loop.
 
-And the failure to watch for is silence. An replace that targets a other object than the endpoints use does nothing at all, reports nothing. Leaves the test passing against the real dependency.
+And the failure to watch for is silence. An replace that targets another object than the endpoints use does nothing at all, reports nothing. Leaves the test passing against the real dependency.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/advanced/testing-dependencies/)
+- Continue with [Dependency Overrides](async_vs_sync_endpoints.html).

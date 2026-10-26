@@ -1,9 +1,11 @@
 title: Probabilities and Thresholds: A Practical Guide
-intro: each classifier in this track has been making a choice on your behalf at 0.5. Taking that choice back costs nothing and often raises the model more than tuning does.
+intro: Each classifier in this track has been making a choice on your behalf at 0.5. Taking that choice back costs nothing and often raises the model more tha tuning does.
+
+## The core idea
+
+Most classifiers in scikit-learn can output probabilities, not just class labels. predictproba returns the estimated chance of each class for every row. predict takes those probabilities and applies a threshold to turn them into labels.
 
 ## The hidden default
-
-Most classifiers in scikit-learn can output probabilities, not just class labels. `predict_proba` returns the estimated chance of each class for every row. `predict` takes those probabilities and applies a threshold to turn them into labels.
 
 The default threshold is 0.5. If the predicted probability of the positive class is above 0.5, the model says positive. Otherwise it says negative. That threshold is baked into `predict` and there is no parameter to change it.
 
@@ -16,7 +18,6 @@ Moving the threshold does not retrain the model. The fitted probabilities stay t
 There's nothing principled about 0.5. It's the point where the two classes are equally likely. This Would be the right cut only if the classes were equally frequent *and* the two kinds of mistake cost the same. Neither is often true.
 
 The consequence on imbalanced data can be severe. The second editor fits a model on data with 15% positives and reports what happens at each threshold. At 0.5 the model flags 5 cases out of 900 and catches **2.2%** of the positives. It isn't a broken model. At a threshold of 0.1 the same fitted model catches 91.6%. It's a model being asked the wrong question.
-
 
 ## predict is proba plus a hidden decision
 
@@ -177,6 +178,7 @@ print("cheapest threshold: %.2f  (cost %d = %d misses x10 + %d false alarms)"
 tn, fp, fn, tp = confusion_matrix(y_te, (proba >= 0.5).astype(int)).ravel()
 print("the default 0.5 would cost:", 10 * fn + fp)
 ```
+
 ## Moving it costs nothing
 
 The threshold is applied *after* fitting. Changing it needs no refitting, no search. No extra data. Get the chances once and each operating point is available.
@@ -191,7 +193,7 @@ Three ways, in growing order of rigour.
 
 **To meet a need.** "We must catch 90% of cases" is a recall target. `precision_recall_curve` says what threshold reaches it and what precision you pay. The third editor answers it right: 90% recall needs a threshold of 0.105 and gives precision 0.207. Roughly five false alarms per real case. This The business either accepts or doesn't.
 
-**To balance the metric you chose.** Sweep the threshold, find F1 or weighed fit at each, take the best. Simple. It optimises a proxy rather than the thing you care about.
+**To balance the metric you chose.** Sweep the threshold, find F1 or weighted F1 score at each, take the best. Simple. It optimises a proxy rather than the thing you care about.
 
 **To cut cost.** The honest version. Attach a price to a false minus and a false plus, find the total at each threshold, take the min. The last editor does just this with a miss costing ten times a false alarm. The cheapest threshold is 0.15 with a cost of 50, against 90 at the default. Nearly half the cost, from changing one number.
 
@@ -199,7 +201,7 @@ Whichever you use, choose it on a **validation** set. The threshold is a param f
 
 ## The curve, and its summary
 
-`precision_recall_curve` returns arrays of precision, recall and the thresholds that give them. The trailing element of precision and recall has no matching threshold. This Is why indexing them together needs the `[:-1]` the editor uses.
+`precision_recall_curve` returns arrays of precision, recall and the thresholds that give them. The trailing element of precision and recall has no matching threshold. This is why indexing them together needs the `[:-1]` the editor uses.
 
 `average_precision_score` summarises the whole curve as one number. `roc_curve` and `roc_auc_score` are the option pair, plotting the true positive rate against the false positive rate.
 
@@ -225,7 +227,7 @@ A subtle point that causes real problems in deployment. Once you choose a thresh
 
 A pipeline pickled without its threshold will be loaded a place else and used through `predict()`. This Silently reverts to 0.5. And on the imbalanced problem above that is the difference between catching 91% of cases and catching 2%. Nothing raises. The service simply flags almost nothing and everyone assumes the model is weak.
 
-Three ways to keep them together. Record the threshold alongside the model file and apply it by name in the serving code. This Is the most common and leans on discipline. Wrap the model in a small class whose `predict` applies your threshold. The object carries it. Or, from recent scikit-learn versions, use `FixedThresholdClassifier` and `TunedThresholdClassifierCV`. This Are estimators that hold a threshold and expose the plain interface. The second finds it by cross-validation against a metric or a cost function you supply.
+Three ways to keep them together. Record the threshold alongside the model file and apply it by name in the serving code. This is the most common and leans on discipline. Wrap the model in a small class whose `predict` applies your threshold. The object carries it. Or, from recent scikit-learn versions, use `FixedThresholdClassifier` and `TunedThresholdClassifierCV`. These are estimators that hold a threshold and expose the plain interface. The second finds it by cross-validation against a metric or a cost function you supply.
 
 The last of those is the tidiest answer. The threshold is then chosen inside the folds like any other param and stored on the fitted object like any other learned value.
 
@@ -233,13 +235,13 @@ The last of those is the tidiest answer. The threshold is then chosen inside the
 
 All on this page assumes two classes. With more, `predict()` takes the highest chance rather than checking against a threshold. There's no single number to move.
 
-The equal adjustments are different. `class_weight` shifts the model's own preferences during fitting. Post-processing the chance mat. Timesing each column by a factor and taking the argmax. Is the closest analogue and has to be tuned per class. And a truly cost-sensitive multi-class choice means writing the expected cost of each guess by name and choosing the min. This Is a few lines and rarely done.
+The equal adjustments are different. `class_weight` shifts the model's own preferences during fitting. Post-processing the chance mat. Timesing each column by a factor and taking the argmax. Is the closest analogue and has to be tuned per class. And a truly cost-sensitive multi-class choice means writing the expected cost of each guess by name and choosing the min. This is a few lines and rarely done.
 
 Where a binary threshold *does* reappear is one-versus-rest setups. Here Each class has its own binary choice and each can carry its own threshold. Which is how multi-label problems are often handled.
 
 <strong>Which column of predict_proba is the positive class?</strong> The one matching `classes_`. With labels 0 and 1 that is column 1. With string labels it's whichever sorts second - read `classes_` rather than given.
 
-<strong>What if my model has no predict_proba?</strong> Many have `decision_function` instead. This Returns an unbounded score rather than a chance. Thresholding it works the same way. The numbers are just not chances.
+<strong>What if my model has no predict_proba?</strong> Many have `decision_function` instead. This returns an unbounded score rather than a chance. Thresholding it works the same way. The numbers are just not chances.
 
 <strong>Should I tune the threshold or use class_weight?</strong> Both. They do different things. `class_weight` changes what the model optimises while fitting. The threshold changes the choice afterwards. Tuning the threshold is cheaper and reversible.
 
@@ -267,7 +269,7 @@ The whole thing is about fifteen lines and it's the difference between a model w
 
 <strong>Can the threshold be above 0.5?</strong> Yes. It should be when false alarms are the costly mistake - a spam filter that deletes mail, say. Nothing restricts it to the lower half.
 
-<strong>Why does my precision-recall curve have one more point than thresholds?</strong> The curve includes the endpoint where all is predicted minus. This Has no threshold. Index with `[:-1]` when pairing them.
+<strong>Why does my precision-recall curve have one more point than thresholds?</strong> The curve includes the endpoint where all is predicted minus. This has no threshold. Index with `[:-1]` when pairing them.
 
 ## Things to try
 
@@ -276,20 +278,7 @@ The whole thing is about fifteen lines and it's the difference between a model w
 3. <strong>Change the cost ratio.</strong> In the last editor, make a miss cost 100 and see where the threshold moves.
 4. <strong>Calibrate the forest.</strong> Wrap it in `CalibratedClassifierCV` and re-measure the gap.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What threshold does predict use?</strong> For most binary classifiers it effectively uses 0.5 on the positive probability. You can choose a different cut-off yourself.
-
-<strong>How do I choose a threshold?</strong> Use a precision-recall curve on validation data and pick the point that matches your costs or minimum recall.
-
-<strong>Does changing the threshold retrain the model?</strong> No. It only changes how probabilities become labels, so it is cheap to try.
-
-<strong>Are predict_proba values true probabilities?</strong> Not always. Check a calibration curve, and use `CalibratedClassifierCV` if they are off.
-
-<strong>What does ROC AUC tell me?</strong> It is the chance that a random positive scores higher than a random negative, independent of any threshold.
-
-<strong>Should the threshold be saved with the model?</strong> Yes. It is part of the decision rule, and a loaded model will otherwise fall back to the default.
-
-## Where this leaves you
-
-`predict()` hides a choice. `predict_proba()` gives it back. Choose the threshold from the cost of each mistake, on a validation set, using the precision-recall curve to see the options. And check that the chances are calibrated before treating any of them as a number.
+- Official reference: [Sklearn documentation](https://scikit-learn.org/stable/modules/classification_threshold.html)
+- Continue with [Probabilities and Thresholds](class_imbalance.html).

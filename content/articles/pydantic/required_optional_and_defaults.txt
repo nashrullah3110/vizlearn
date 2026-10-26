@@ -1,9 +1,11 @@
 title: Required, Optional and Defaults: The Three-Way Distinction
 intro: Why Optional doesn't mean optional. How to tell "not sent" from "sent as null".
 
-## The rule, first
+## The core idea
 
-Every field on a model is in one of three states. It is required, so the caller must provide it. It has a default, so the model fills it in when the caller does not. Or it can be None, which is a separate idea that people often mix up with the other two.
+Every field on a model is in one of three states. It is required, so the caller must provide it. It has a default, so the model fills it in when the caller does not.
+
+## The rule, first
 
 The confusion comes from the word Optional. In Python's typing module it means "this value may be None". It does not mean "you may leave this out". A field typed as Optional with no default is still required. That one fact causes more wrong assumptions than almost anything else in the library.
 
@@ -22,7 +24,6 @@ class Module(BaseModel):
 Leave out `title` and the model refuses to be built, with an error whose `type` is `missing`. Leave out `minutes` and you get `10`.
 
 all confusing about this topic comes from one word being borrowed for two jobs.
-
 
 ## A field with no default is required
 
@@ -187,6 +188,7 @@ print()
 print("what the caller actually set:", full.model_fields_set)
 print("only their input           :", minimal.model_dump(exclude_unset=True))
 ```
+
 ## Optional does not mean optional
 
 `Optional[str]` comes from the `typing` module. Here It means just one thing: `str or None`. It's a statement about which *values* are allowed. It says nothing whatsoever about whether the field has to be supplied.
@@ -293,7 +295,7 @@ Prefer the second. The first makes readers who haven't met the rule stop and loo
 
 ## Defaults that depend on the environment
 
-A default doesn't have to be a literal. `default_factory` takes any callable. This Means a default can come from config, the clock, or a gen:
+A default doesn't have to be a literal. `default_factory` takes any callable. This means a default can come from config, the clock, or a gen:
 
 ```python
 created: datetime = Field(default_factory=datetime.now)
@@ -301,7 +303,7 @@ request_id: str = Field(default_factory=lambda: uuid4().hex)
 retries: int = Field(default_factory=lambda: int(os.getenv("RETRIES", "3")))
 ```
 
-The third one is worth a caution. Reading config inside a default factory works. It happens at model-build time rather than at import. This Makes it harder to reason about and hard to replace in tests. For anything that is really config, a settings model is the better home. That is a module in the last tier.
+The third one is worth a caution. Reading config inside a default factory works. It happens at model-build time rather than at import. This makes it harder to reason about and hard to replace in tests. For anything that is really config, a settings model is the better home. That is a module in the last tier.
 
 There's also a form of `default_factory` that receives the already-checked data, letting a default depend on other fields. It's powerful and easy to overuse. A value found from other fields is often better expressed as a `computed_field`. This Doesn't pretend to be an input.
 
@@ -381,22 +383,13 @@ needed fields are a promise to the rest of your program. Each one you make lets 
 
 There's a fourth state people at times need, beyond needed, defaulted and nullable. A field that may be absent but has no sensible default. Here You truly want to know whether it was supplied.
 
-That is what `model_fields_set` and `exclude_unset` exist for. It's worth naming by name because the instinct is to invent a sentinel. A magic string, a `-1`, a custom `UNSET` object. And thread it through the code. Pydantic already tracks the answer. Reach for the sentinel only when the value has to live output. This Is rare. Think hard before you do. Each consumer of that data now has to know about your magic value.
-
-## Questions people ask
-
-<strong>Does `Optional[str]` make a field optional?</strong> No. It only means the value may be `None`. Without a default, the key must still be present.
-
-<strong>How do I make a field both optional and nullable?</strong> Write `name: str | None = None`. The default makes it omittable and the union allows an explicit null.
-
-<strong>Is a default value validated?</strong> No, defaults are not validated unless `validate_default=True`. A bad default will slip through until it is used.
-
-<strong>Is it safe to use a list as a default?</strong> Yes, in Pydantic. Each instance gets its own copy, unlike a plain Python function default. You can also use `Field(default_factory=list)`.
-
-<strong>How can I tell a missing field from one set to None?</strong> Check `model_fields_set`. It lists fields the caller actually supplied, including explicit `None`.
-
-<strong>How do I write an update model where every field is optional?</strong> Give each field a default of `None`, and use `model_dump(exclude_unset=True)` to apply only the fields the caller sent.
+That is what `model_fields_set` and `exclude_unset` exist for. It's worth naming by name because the instinct is to invent a sentinel. A magic string, a `-1`, a custom `UNSET` object. And thread it through the code. Pydantic already tracks the answer. Reach for the sentinel only when the value has to live output. This is rare. Think hard before you do. Each consumer of that data now has to know about your magic value.
 
 ## Next
 
 The next module is about the moment a model says no. How to read a `ValidationError` in full, what each part of an entry means. How to turn one into a message a user can act on.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/fields/)
+- Continue with [Required, Optional and Defaults](reading_a_validation_error.html).

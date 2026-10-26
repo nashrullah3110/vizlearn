@@ -1,9 +1,11 @@
 title: Hyperparameter Search: A Practical Guide
 intro: Settings have to be chosen by reading rather than by taste. The tools that do it are simple. The number they report is the part that needs care.
 
-## What is being searched
+## The core idea
 
-Every estimator has parameters that you set before calling `fit`. These are hyperparameters. The number of neighbours in KNN, the regularisation strength in logistic regression, the maximum depth of a tree. The model does not learn them from the data. You choose them.
+Every estimator has parameters that you set before calling fit. These are hyperparameters. The number of neighbours in KNN, the regularisation strength in logistic regression, the maximum depth of a tree.
+
+## What is being searched
 
 Choosing well matters. The right hyperparameters can double a model's score. The wrong ones can make a good algorithm look useless. Manual tuning works for one or two parameters, but it is slow, hard to reproduce, and easy to fool yourself with.
 
@@ -20,7 +22,6 @@ Choosing by hand means changing one, re-running. Keeping what scored better. Whi
 `GridSearchCV` takes a dict of params to lists of values and tries each combination. The number of fits is the product of the list lengths times the number of folds. It grows alarmingly. Three params with five values each and five folds is 375 fits.
 
 Both search objects are themselves estimators. They've `fit`, `predict` and `score`. A search can go inside a pipeline, inside `cross_val_score`, or anywhere else an estimator goes. Which is what makes nested cross-validation a one-liner.
-
 
 ## The search, and what it leaves you with
 
@@ -184,13 +185,14 @@ print()
 print("two of the three keep the default and the third does not.")
 print("scoring= is a decision about the problem, not a formality.")
 ```
+
 ## Grid or random
 
 `RandomizedSearchCV` samples `n_iter` combinations rather than trying all of them, drawing from lists or from spreads such as `scipy.stats.randint` and `loguniform`.
 
 It's often the better choice, for a reason that isn't obvious. In a common search most params barely matter and one or two dominate. A grid spends its budget evenly. With two params and sixteen combinations it tries only four distinct values of the one that matters. Random search with sixteen samples tries sixteen distinct values of it. Each sample varies all.
 
-The editor above shows six random samples getting within 0.003 of a sixteen-combination grid in 40% of the time. This Is the usual shape of the result.
+The editor above shows six random samples getting within 0.003 of a sixteen-combination grid in 40% of the time. This is the usual shape of the result.
 
 Grid search remains right when the space is truly small and you want each combination on record. Two or three params with a handful of sensible values each.
 
@@ -230,11 +232,11 @@ The key property is that all of this happens **inside** the folds. A search over
 
 `scoring` defaults to fit for classifiers and R&sup2; for regressors. Leaving it there means optimising fit whether or not fit is what you care about.
 
-The last editor searches `class_weight` on imbalanced data under three metrics. Fit and F1 keep the default. Weighed fit chooses `"weighed"`. Same data, same grid, different winner. Because the metrics disagree about what a good model is. This Is just what the metrics modules said they would do.
+The last editor searches `class_weight` on imbalanced data under three metrics. Fit and F1 keep the default. Weighed fit chooses `"weighed"`. Same data, same grid, different winner. Because the metrics disagree about what a good model is. This is just what the metrics modules said they would do.
 
 So `scoring=` is where the choice about which mistakes matter enters the tuning process. Choosing it on purpose isn't optional if the classes are imbalanced or the costs are skewed.
 
-`refit` can name one metric to refit on when a few are being found. This Is how you report a panel of metrics while selecting on one.
+`refit` can name one metric to refit on when a few are being found. This is how you report a panel of metrics while selecting on one.
 
 ## Keeping it affordable
 
@@ -268,7 +270,7 @@ Worth stating, because tuning is where effort goes when a model disappoints. It'
 
 A search moves a model within its family. It can't make a linear model represent a curve, can't make a tree extrapolate. Can't make up for for features that don't carry the signal. If the learning curve has settled and the model is underfitting, no combination of settings closes the gap. The answer is different features or a different family.
 
-Nor can it fix a metric that measures the wrong thing, a split that leaks, or labels that are wrong. A search will optimise what it's pointed at, including a leak. Report a confident number for it.
+Nor can it fix a metric that measures the wrong thing, a split that leaks, or labels that are wrong. A search will optimise what it is pointed at, including a leak. Report a confident number for it.
 
 The order that wastes least effort: get the split and the metric right, get the features right, pick a model family that can represent the structure. Tune last. Tuning first is the most common way to spend a week moving a score by half a point.
 
@@ -276,7 +278,7 @@ The order that wastes least effort: get the split and the metric right, get the 
 
 <strong>Can I search two models at once?</strong> Yes - put the estimator itself in the grid: `{"clf": [LogisticRegression(), RandomForestClassifier()]}`, with each model's own params guarded by the step name.
 
-<strong>Does refit cost much?</strong> One extra fit on the full data. This Is negligible next to the search itself. `refit=False` skips it if you only want the table.
+<strong>Does refit cost much?</strong> One extra fit on the full data. This is negligible next to the search itself. `refit=False` skips it if you only want the table.
 
 <strong>What is `error_score` for?</strong> Some combinations are invalid and raise. The default passes the error. `error_score=np.nan` records the failure and lets the search continue.
 
@@ -299,20 +301,7 @@ The corollary is that a first pass should be on purpose wide and coarse. Powers 
 3. <strong>Tune a step away.</strong> In the fourth editor, note that `passthrough` won. The PCA step wasn't helping.
 4. <strong>Change the metric.</strong> In the last editor, add `"recall"` and see which setting it prefers.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>GridSearchCV or RandomizedSearchCV?</strong> Grid search tries every combination and suits small spaces. Randomized search samples a fixed number and covers large spaces cheaper.
-
-<strong>Why is best_score_ too optimistic?</strong> It is the maximum over many noisy trials, so it is biased upwards. Confirm on a test set or with nested cross-validation.
-
-<strong>Should I search over a whole pipeline?</strong> Yes. Passing the pipeline keeps preprocessing inside each fold, and you can tune its steps with the double-underscore names.
-
-<strong>How do I choose the scoring metric?</strong> Pick the metric that matches the real goal and pass it as `scoring`. The default may favour something you do not care about.
-
-<strong>How do I keep a search affordable?</strong> Use fewer folds, a smaller range, `n_jobs=-1` and `HalvingRandomSearchCV`, which drops weak candidates early.
-
-<strong>Where can I read all the results?</strong> In `cv_results_`, which converts to a DataFrame and shows scores and spread for every candidate.
-
-## Where this leaves you
-
-Random search over a sensible range, with a pipeline so the prep is tuned honestly, a `scoring` chosen for the problem, `cv_results_` read rather than skimmed. The winner's score treated as optimistic until a held-out set says or else.
+- Official reference: [Sklearn documentation](https://scikit-learn.org/stable/modules/grid_search.html)
+- Continue with [Hyperparameter Search](kmeans_clustering.html).

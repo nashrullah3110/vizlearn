@@ -1,13 +1,15 @@
 title: Performance and pydantic-core: What Validation Actually Costs
 intro: Why v2 is fast. Here The time goes. The three habits that account for most of the gap.
 
-## Two libraries in a trench coat
+## The core idea
 
-People ask whether Pydantic is fast enough. In version 2 the answer is usually yes, because the validation engine is written in Rust. That engine is a separate library called pydantic-core, and the Python library you import sits on top of it. So there are two libraries working together.
+People ask whether Pydantic is fast enough. In version 2 the answer is usually yes, because the validation engine is written in Rust. That engine is a separate library called pydantic-core, and the Python library you import sits on top of it.
+
+## Two libraries in a trench coat
 
 Knowing that split helps you reason about speed. The Rust part is quick at the checks it knows how to do. The Python part, including any validator you write, runs at Python speed. So the time goes where your own code runs, not where the library does.
 
-This article starts with how the two libraries fit together. It shows where the time actually goes when you validate data, which is often not where people expect. It gives three habits that keep things quick, such as parsing JSON directly and building adapters once. It then looks at validators, which are the expensive part, and how to keep them cheap. You do not need to optimise early, but you should know which choices cost something. That lets you make sensible decisions without measuring everything first. The goal is not to make you profile every model, but to help you avoid the few mistakes that actually slow things down.
+
 
 Installing `pydantic` installs two things.
 
@@ -15,10 +17,9 @@ A **Python layer** that reads your class, reads the annotations, resolves types.
 
 **`pydantic-core`**, a compiled Rust engine that runs that schema against data. This runs each time you validate.
 
-Almost all about v2's speed follows from that split. check is compiled code walking a prepared schema, not Python reading annotations per call. Version 1 did the latter. This Is why v2 was a rewrite rather than an tuning.
+Almost all about v2's speed follows from that split. check is compiled code walking a prepared schema, not Python reading annotations per call. Version 1 did the latter. This is why v2 was a rewrite rather than a tuning.
 
 It also shows details you'll have noticed. Error `type` codes look like machine identifiers because they come from the core. `model_validate_json` beats parsing apart because the core parses and validates in one pass. And there's a compiled wheel per platform. There's compiled code in there.
-
 
 ## Already-correct types are nearly free
 
@@ -194,11 +195,12 @@ print("json.loads + validate : %.3f s" % two_step)
 print("model_validate_json   : %.3f s" % one_step)
 print("ratio                 : %.2fx" % (two_step / one_step))
 ```
+
 ## Where the time actually goes
 
 Three parts, worth separating.
 
-**Schema building** happens once per class or adapter. It's the most costly single step and it should be invisible. Unless you build schemas again and again. This Is the mistake below.
+**Schema building** happens once per class or adapter. It's the most costly single step and it should be invisible. Unless you build schemas again and again. This is the mistake below.
 
 **check** happens per value. Cost scales with how much work there's. A value already of the right type is checked and passed through. One needing conversion costs more. One needing a custom checker costs the most. That means leaving Rust for Python.
 
@@ -243,7 +245,7 @@ A `field_validator` is Python. each time it runs, the core suspends, calls into 
 
 For a model built a few times per request that is irrelevant. For a hundred thousand rows it's the dominant cost, and it's worth two questions.
 
-**Could this be a constraint?** `Field(gt=0)` and a checker checking `v > 0` reject the same values. The constraint runs in Rust. It also reaches the schema. This Is the more key reason.
+**Could this be a constraint?** `Field(gt=0)` and a checker checking `v > 0` reject the same values. The constraint runs in Rust. It also reaches the schema. This is the more key reason.
 
 **Is it doing work that could be done once?** A checker that rebuilds a set of permitted values on each call is doing that per item. Hoisting it to module level is often a bigger win than anything else in the model.
 
@@ -278,14 +280,6 @@ The **ratios** transfer &mdash; checking a list in one call really is faster tha
 
 That caveat applies to any benchmark run anywhere, including ones you write yourself on your laptop. scaled checks under same rules are helpful. Abs numbers are a property of the machine.
 
-## Summary
-
-Pydantic v2 is a Python layer that builds schemas and a Rust core that runs them. This Is why check is cheap enough to do on each request.
-
-Three habits account for most of the avoidable cost. Validate once at the boundary, validate sets in a single call. Parse JSON right. Prefer constraints over checkers where either would do. Build schemas once rather than in a loop.
-
-Then stop, because check is rarely the slow part. The left questions belong to a profiler rather than to a rule of thumb.
-
 ## What not to optimise
 
 A short list of things that look like speed choices and aren't.
@@ -296,7 +290,7 @@ A short list of things that look like speed choices and aren't.
 
 **Avoiding nested models to reduce check count.** A flat model with the same fields does the same total work. Nesting is an organisational choice, not a speed one.
 
-**Reaching for `model_construct`.** It skips check fully. This Makes it fast and unsafe. It exists for cases where the data provably came from a trusted source. Rebuilding from your own cache, say. Using it to speed up a normal path drops the property you installed the library for.
+**Reaching for `model_construct`.** It skips check fully. This makes it fast and unsafe. It exists for cases where the data provably came from a trusted source. Rebuilding from your own cache, say. Using it to speed up a normal path drops the property you installed the library for.
 
 ## Measuring properly
 
@@ -306,7 +300,7 @@ If you do need to measure, three things make the result real.
 
 **Time the right thing.** Wrap the check, not the loop that also builds the input data. Making ten thousand dicts isn't free either.
 
-**Compare under same rules.** Same machine, same process, same interpreter. abs numbers don't live a move between any of those. This Is why the timings on this page are presented as ratios.
+**Compare under same rules.** Same machine, same process, same interpreter. abs numbers don't live a move between any of those. This is why the timings on this page are presented as ratios.
 
 `time.perf_counter` is enough for A-versus-B. For finding where time goes in a real use, a profiler will point at the DB long before it points at check.
 
@@ -324,7 +318,7 @@ If you do need to measure, three things make the result real.
 
 **Optimising check before profiling.** In a handler that makes three DB queries, check is a rounding error. A profiler will point at the DB long before it points here.
 
-**Quoting benchmark seconds.** abs numbers are a property of the machine. Doubly so on this page. This Runs on WebAssembly. Ratios under same rules transfer. Seconds don't.
+**Quoting benchmark seconds.** abs numbers are a property of the machine. Doubly so on this page. This runs on WebAssembly. Ratios under same rules transfer. Seconds don't.
 
 ## Why it was worth rewriting
 
@@ -336,36 +330,7 @@ Moving run into Rust changed the answer from "at times" to "almost never". A mod
 
 So the hands-on guidance became much simpler: adopt the three habits because they're also clearer code. Else stop thinking about it. That is a better place to be than a set of tuning tricks. It's the reason most of this module is about what not to optimise.
 
-## The honest summary
+## Sources and next steps
 
-Most uses shouldn't think about this module at all.
-
-Adopt the three habits &mdash; validate once, validate sets in one call, parse JSON right &mdash; because each is also clearer code than the option. Then stop. They aren't speed tricks. They're the obvious way to write it. This Happens also to be the fast way.
-
-If a thing is truly slow, profile it. The answer will often be I/O. On the occasions it really is check the answer will often be one of the three habits not being followed, or a checker doing per-item work that belongs outside the loop.
-
-What changed in v2 is that this stopped being a live concern for plain code. check used to be a thing you budgeted for. Now it's a thing you can put at each boundary without thinking about the cost. That is a better outcome than any tuning advice.
-
-## In one line
-
-Validate once at the boundary, validate sets in a single call. Hand JSON straight to Pydantic. Then stop thinking about it. In v2 check is almost never the slow part.
-
-## Questions people ask
-
-<strong>Why is Pydantic v2 faster than v1?</strong> Validation and serialisation moved from Python to `pydantic-core`, a Rust library. The model's rules are compiled into a schema once and executed in native code.
-
-<strong>Do I need to install Rust?</strong> No. Wheels for common platforms ship on PyPI with the compiled core already built.
-
-<strong>What is the cheapest speedup?</strong> Use `model_validate_json` for JSON input, reuse `TypeAdapter` objects, and prefer built-in constraints over Python validators.
-
-<strong>Why is building a `TypeAdapter` in a loop slow?</strong> Each construction builds a new core schema. Create it once at module level and call `validate_python` on it.
-
-<strong>Are Python validators slow?</strong> Each call crosses from Rust into Python, which is much slower than a built-in constraint. Use `Field(ge=0)` where it can express the rule.
-
-<strong>When should I stop optimising?</strong> When the profile shows validation is a small share of request time. For most services, database and network calls dominate.
-
-## A closing thought
-
-The most handy speed property of Pydantic v2 isn't that it's fast. It's that it's fast enough to stop being a consideration.
-
-That changes how you write code. check at each boundary stops being a trade-off and turns the default. This Means more of your program can assume its inputs are correct. And that is worth a lot more than the microseconds.
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/performance/)
+- Continue with [Performance and pydantic-core](migrating_v1_to_v2.html).

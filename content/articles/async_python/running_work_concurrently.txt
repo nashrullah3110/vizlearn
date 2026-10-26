@@ -1,12 +1,11 @@
 title: Running Work Concurrently: gather and TaskGroup
 intro: Fan out many awaits at once, collect the results, and decide what should happen when one of them fails.
 
-## The shape of the win
+## The core idea
 
-The reason to reach for async is almost always the same: you have many
-independent waits &mdash; requests, queries, file reads &mdash; and doing them
-one after another wastes the time each one spends idle. Running them together
-collapses the total time from the sum of the waits to the longest single wait.
+The reason to reach for async is almost always the same: you have many independent waits — requests, queries, file reads — and doing them one after another wastes the time each one spends idle.
+
+## The shape of the win
 
 <code>asyncio.gather</code> is the direct tool. Hand it several coroutines and it
 schedules them all as [tasks](coroutines_tasks_and_await.html), waits for every
@@ -329,25 +328,7 @@ on. TaskGroup is what cancels siblings.
 **Passing plain values to gather.** Everything you gather must be awaitable. A
 non-coroutine in the list is an error, not a constant that passes through.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>gather or TaskGroup?</strong> TaskGroup for new code on 3.11 or later: it cancels the siblings when one task fails. So a failure never leaves work running unsupervised. Reach for <code>gather</code> when you in detail want the siblings to survive a failure, or when you need the results lined up with the arguments.
-
-<strong>Does <code>gather</code> cancel the others when one raises?</strong> No, and this is the single most common wrong assumption about it. The first exception propagates and the other coroutines carry on running with nobody watching them. That gap is exactly what TaskGroup was added to close.
-
-<strong>When is <code>return_exceptions=True</code> right?</strong> When a failure is data you intend to inspect. Nine of ten shards answered, report the tenth. It is wrong when a failure should abort the batch, because it converts errors into list entries that code can silently treat as results.
-
-<strong>How many is too many to gather?</strong> Whatever the other end can take. This is a property of the remote service and not of asyncio. Once the list is long enough that you are asking the question, bound it with a semaphore rather than guessing.
-
-<strong>Can I mix <code>await</code> and tasks in one function?</strong> Yes, and it is normal: start the slow independent work as tasks, do other things, then await the handles when you finally need the results. What you cannot do is expect a row of plain awaits to overlap.
-
-<strong>What is <code>except*</code> for?</strong> Unpacking an <code>ExceptionGroup</code>, which is what a TaskGroup raises because several tasks can fail at once. It selects the matching exceptions from the group and leaves the rest to propagate. A plain <code>except ValueError</code> will not match a group that contains one.
-
-## Recap in one screen
-
-- The win is collapsing many independent waits from their sum to their maximum: 0.3, 0.2 and 0.1&nbsp;s together take 0.30, not 0.60.
-- <code>gather</code> returns results in **call** order however they finished, and by default raises the first exception while leaving the siblings running.
-- <code>TaskGroup</code> scopes the work to an <code>async with</code> block and cancels every sibling if one fails. Structured concurrency, and the sensible default on 3.11+.
-- Several tasks can fail at once, so a TaskGroup raises an <code>ExceptionGroup</code>. This <code>except*</code> exists to unpack.
-- <code>as_completed</code> trades the input ordering for the first result arriving as soon as it is ready.
-- Async removed the accidental concurrency ceiling threads used to impose. So bound it on purpose. A <code>Semaphore</code> inside the coroutine, around the part being limited.
+- Official reference: [Task groups and concurrent tasks](https://docs.python.org/3/library/asyncio-task.html#task-groups)
+- Continue with [Running Work Concurrently: gather and TaskGroup](the_blocking_call_that_freezes_the_loop.html).

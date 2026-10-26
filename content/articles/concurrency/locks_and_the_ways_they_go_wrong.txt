@@ -1,12 +1,11 @@
 title: Locks, and the Four Ways They Go Wrong
 intro: A lock is two methods and a rule. Almost every problem with one is a question of which lock, what it guards, how long it is held, and in what order.
 
-## The whole protocol
+## The core idea
 
-A <code>threading.Lock</code> has two operations. <code>acquire()</code> takes
-it, waiting if another thread holds it; <code>release()</code> hands it back.
-Everything else is a consequence, and all of it can be watched from one
-thread:
+A threading.Lock has two operations. acquire() takes it, waiting if another thread holds it; release() hands it back. Everything else is a consequence, and all of it can be watched from one thread:
+
+## The whole protocol
 
 ```python-run
 import threading
@@ -337,25 +336,7 @@ it can turn a slow remote server into a stalled process.
 **Taking two locks in whatever order reads best.** That is how the deadlock
 above gets written. Pick an order once, write it down, follow it everywhere.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>Should I just use <code>RLock</code> everywhere?</strong> It is a little slower and it hides a design smell, because needing reentrancy usually means a locked method is calling another locked method. Reach for <code>Lock</code> first; if you need <code>RLock</code>, ask whether a private unlocked helper would be clearer.
-
-<strong>How do I know if a lock is being contended?</strong> Take it with <code>acquire(timeout=...)</code> or <code>blocking=False</code> and count the failures. A lock that is never contended is cheap and a lock that is always contended is your bottleneck &mdash; and neither is visible without measuring, because both look identical in the source.
-
-<strong>Is <code>Condition</code> just a lock?</strong> It is a lock plus a way to wait for a change to what the lock protects. Use it when a thread needs to block until a predicate becomes true &mdash; the pattern is <code>while not ready: cond.wait()</code> inside <code>with cond:</code>, and the loop matters because a wakeup does not guarantee the predicate.
-
-<strong>What is a <code>Semaphore</code> for?</strong> Counting rather than excluding: it allows N holders instead of one, which is how you cap concurrent access to a pool of connections. A <code>Semaphore(1)</code> behaves like a lock but does not error on a stray release, which is why <code>BoundedSemaphore</code> exists.
-
-<strong>Do I need a lock if I only ever append to a list?</strong> No &mdash; <code>append</code> is one C call and cannot be interleaved. You need one the moment you read the list and then act on what you read, which is [check-then-act](race_conditions_in_python.html) again.
-
-<strong>Can I detect a deadlock at runtime?</strong> Not from inside the deadlocked threads, which is the problem. <code>faulthandler.dump_traceback_later()</code> will print every thread's stack after a timeout, and two stacks sitting in <code>acquire</code> on different locks is the signature. Prevention through ordering is the real answer.
-
-## Recap in one screen
-
-- A lock is <code>acquire</code> and <code>release</code>; everything else &mdash; <code>locked()</code>, <code>blocking=False</code>, <code>timeout=</code> &mdash; is a way to ask about it without hanging.
-- Always take it with <code>with</code>. The manual form leaks the lock on any exception, and the symptom is a hang with no traceback.
-- <code>Lock</code> is not reentrant, so a locked method calling another locked method deadlocks against itself. <code>RLock</code> counts, and signals that the lock is doing two jobs.
-- Granularity is a real trade: 200,000 acquires tripled a loop's cost, while one acquire around the loop was free. Hold it over the smallest region containing the whole invariant, and never across I/O.
-- Two locks taken in two orders is a deadlock. A global acquisition order makes cycles impossible; timeouts downgrade a hang to an error, and bring livelock with them.
-- A lock only protects what every thread agrees it protects, on every access, including the read-only ones.
+- Official reference: [Python synchronization primitives](https://docs.python.org/3/library/threading.html#lock-objects)
+- Continue with [Locks, and the Four Ways They Go Wrong](threads_or_processes.html).

@@ -1,9 +1,11 @@
 title: Your First Endpoint, and What the Decorator Really Does
 intro: How a function turns a route, what happens to the return value. The sorting rule that catches all once.
 
-## The decorator does not wrap anything
+## The core idea
 
-An endpoint is a Python function that answers one kind of request at one address. You write the function, add a decorator that names the method and the path, and FastAPI does the rest. The first one is the smallest useful program you can write with the framework, and it teaches more than its size suggests.
+An endpoint is a Python function that answers one kind of request at one address. You write the function, add a decorator that names the method and the path, and FastAPI does the rest.
+
+## The decorator does not wrap anything
 
 The decorator looks like it wraps your function, but it does not. It registers the function in a table of routes and hands the function back untouched. That is why you can still call it directly in a test. Once you see this, a lot of behavior stops feeling like magic.
 
@@ -21,10 +23,9 @@ def read_modules():
 
 The instinct is that `@app.get` wraps the function in a thing. It doesn't. It **registers** it. The app records the path, the HTTP method and the function's signature in a routing table, and returns the function unchanged.
 
-You can verify that, and the first editor above does. `read_modules()` called right still returns the list. This is worth knowing because it means an endpoint is an plain function, testable on its own, with no framework machinery attached to it.
+You can verify that, and the first editor above does. `read_modules()` called right still returns the list. This is worth knowing because it means an endpoint is a plain function, testable on its own, with no framework machinery attached to it.
 
-What the app records from the signature is more than the name. It notes which params match to placeholders in the path. This Have defaults. What each is annotated as. That analysis happens once, at import. This Is why routing is cheap at request time.
-
+What the app records from the signature is more than the name. It notes which params match to placeholders in the path. This Have defaults. What each is annotated as. That analysis happens once, at import. This is why routing is cheap at request time.
 
 ## The decorator registers a route
 
@@ -194,6 +195,7 @@ r = client.post("/modules", json={"title": "Eigenvalues", "minutes": 14})
 print("created:", r.status_code, r.json())
 print("after  :", client.get("/modules").json())
 ```
+
 ## The return value
 
 what you return is converted to JSON: dicts, lists, Pydantic models. Primitives like strings and numbers. The default status is 200 and the content type is `use/json`.
@@ -212,7 +214,7 @@ The decorator takes `status_code`:
 
 That sets the *default* for the route. A handler can still replace it per response when it needs to.
 
-The `status` module is worth using over bare ints. `status.HTTP_201_CREATED` says what it means. Your editor will autocomplete it. This Matters more than it sounds for the codes people reach for less often.
+The `status` module is worth using over bare ints. `status.HTTP_201_CREATED` says what it means. Your editor will autocomplete it. This matters more than it sounds for the codes people reach for less often.
 
 One rule that bites: **a 204 must have no body.** Returning a dict with `status_code=204` makes a malformed response. Declare `status_code=204` and return `None`.
 
@@ -239,7 +241,7 @@ The `int` annotation does soften this: a truly numeric path still routes right. 
 
 Three things shape the docs, and all are free.
 
-`summary` is the short label in the docs list. Without one, FastAPI makes a title from the function name. This Is often worse than a sentence you write.
+`summary` is the short label in the docs list. Without one, FastAPI makes a title from the function name. This is often worse than a sentence you write.
 
 `tags` group endpoints into sections. On an API of any size this is the gap between a navigable doc and a flat list of forty routes.
 
@@ -273,7 +275,7 @@ They aren't the same, and choosing right gives you action from the wider web for
 
 **POST** creates, or performs an action that isn't idempotent. Sending it twice does it twice.
 
-**PUT** replaces a resource at a known URL. Sending it twice leaves the same result. This Makes it safe for a client to retry after a timeout.
+**PUT** replaces a resource at a known URL. Sending it twice leaves the same result. This makes it safe for a client to retry after a timeout.
 
 **PATCH** updates part of one.
 
@@ -310,7 +312,6 @@ def create(module: ModuleCreate) -> ModuleOut:
 ```
 
 all HTTP-exact is in the decorator and the signature. all else is a function you could call from anywhere.
-
 
 ## Mistakes people make
 
@@ -365,33 +366,13 @@ The hands-on advice for a new project: create the router file on day one, even w
 
 ## Reloading while you work
 
-`uvicorn main:app --reload` restarts the process when a file changes. This Is what you want in development and never in production. The reloader spawns an extra process and watches the filesystem.
+`uvicorn main:app --reload` restarts the process when a file changes. This is what you want in development and never in production. The reloader spawns an extra process and watches the filesystem.
 
 Two things people trip on. Module-level state resets on each reload. Anything held in a global disappears when you save. And an import error leaves the previous version running. So A change that "does nothing" is at times a syntax error scrolled off the top of the terminal.
 
 ## The one-line summary
 
 The decorator registers a function as a route without changing it. The return value turns JSON. `status_code` sets the route's default and a 204 must carry nothing. Fixed paths go before var ones. And the docstring you were going to write anyway turns the description in your API docs.
-
-## A closing thought
-
-The endpoints in this module are four lines each. That is representative rather than simplified. A well-factored FastAPI handler often is short. All it would else hold has moved one spot better. The check into a model, the shape of the response into another model. The work into a function that knows nothing about HTTP.
-
-If a handler is growing, that is often the signal. Not that the endpoint is complicated. That a thing in it belongs elsewhere.
-
-## Questions people ask
-
-<strong>What does the decorator actually do?</strong> It registers the function in the app's routing table under a path and HTTP method. The function itself is returned unchanged.
-
-<strong>Why does my endpoint return JSON when I return a dict?</strong> FastAPI serializes the return value with its JSON encoder and sets the content type to application/json.
-
-<strong>Why can't I reach a route I declared later in the file?</strong> Routes match in registration order and the first match wins. Put fixed paths before paths with parameters that would shadow them.
-
-<strong>How do I change the default status code?</strong> Pass status_code to the decorator, for example @app.post("/items", status_code=201).
-
-<strong>How do I run the app?</strong> Run uvicorn main:app --reload, where main is the file name and app is the FastAPI instance. The --reload flag is for development only.
-
-<strong>Where does the description in /docs come from?</strong> From the function's docstring, unless you pass description to the decorator. Markdown in the docstring is rendered.
 
 ## What to check before shipping one
 
@@ -400,3 +381,8 @@ A short list, all of which this module has covered.
 Does it declare a response model? Is the status code right for what it does? Does the method match its effect. Nothing mutating behind a GET? Is a fixed path registered before any var one that would shadow it? Does it have a summary and a tag. The docs is navigable? And is the handler thin enough that the logic could be tested without a request?
 
 Six questions, most answerable in seconds. Between them they catch nearly all this module given.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/first-steps/)
+- Continue with [Your First Endpoint](path_parameters.html).

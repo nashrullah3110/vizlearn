@@ -1,13 +1,15 @@
 title: What Pydantic Is For, and the Problem It Solves
 intro: Python's type annotations do nothing on their own. This is the library that makes them real.
 
-## The gap between what you wrote and what runs
+## The core idea
 
-Pydantic takes a Python class with type annotations and turns it into a data validator. You define a model, pass in a dictionary or JSON, and get back a typed object if the data fits. If it does not, you get an error that names every field that failed and why.
+Pydantic takes a Python class with type annotations and turns it into a data validator. You define a model, pass in a dictionary or JSON, and get back a typed object if the data fits.
+
+## The gap between what you wrote and what runs
 
 That description sounds simple, but the range of what it covers is wide. Pydantic handles type coercion, so a string "42" arriving from JSON becomes the integer 42 without any code from you. It produces JSON Schema from your models, which feeds OpenAPI docs when used with a framework like FastAPI. It validates nested structures, enforces constraints on individual fields, and gives you hooks for custom logic that runs during validation.
 
-This article explains what problem Pydantic solves, how it differs from plain dataclasses, and what coercion means in practice. It then covers the error format, the extra things a model gives you beyond validation, and the common expectations people bring that do not match how the library actually works. The final section maps out where the rest of the track goes.
+
 
 Write a function like this and you've made a promise:
 
@@ -21,7 +23,6 @@ The promise is that `count` is a whole number. Python doesn't keep it. Annotatio
 That is a small problem when the wrong value is only printed. It turns a real one the moment a thing math happens. A string that has been travelling through three function calls disguised as an int fails at the point it's finally cut. The traceback points at the division, not at the front door where the bad value walked in.
 
 This is the gap Pydantic fills. It reads the annotations you already write and enforces them, at a moment you choose.
-
 
 ## A type hint is only a note to the reader
 
@@ -171,6 +172,7 @@ for name, spec in schema["properties"].items():
     print("  %-10s %s" % (name, spec.get("type")))
 print("  required:", schema["required"])
 ```
+
 ## Validation is a boundary problem
 
 Almost no bad data originates inside your program. It arrives. From a JSON request body, a form post, a config file, a CSV, a DB column that has been nullable since 2019, an setting var, another team's API. all that crosses into your code from outside is, until proven else, a guess.
@@ -228,7 +230,7 @@ Pydantic isn't an ORM, though it's often paired with one. It doesn't talk to you
 
 It isn't a static type checker either. Mypy analyses code without running it. Pydantic checks values while the program runs. They complement each other rather than compete, and using both is normal.
 
-And it isn't free. check costs a thing. This Is just why the boundary discipline matters. Validate on the way in, once. Then trust the result rather than re-checking the same object at each layer.
+And it isn't free. check costs a thing. This is just why the boundary discipline matters. Validate on the way in, once. Then trust the result rather than re-checking the same object at each layer.
 
 ## What the hand-written version looks like
 
@@ -264,7 +266,7 @@ Building a model does real work: reading a compiled schema, checking each field,
 
 Two things make it matter less than people fear. The first is that Pydantic v2 does the work in Rust rather than Python. This Moved it from "noticeable" to "often irrelevant". The second is scale. A model that validates in single-digit microseconds sits next to a DB query taking milliseconds and a network call taking hundreds of milliseconds. In a common request handler, check is a rounding error on the request.
 
-Where it truly matters is bulk. checking a hundred thousand rows from a file, or each element of a large array in a numeric pipeline, is a case where you should measure. The answer there's often not to abandon models but to validate the holder once rather than each item through a Python loop. This Is a topic the `TypeAdapter` module returns to.
+Where it truly matters is bulk. checking a hundred thousand rows from a file, or each element of a large array in a numeric pipeline, is a case where you should measure. The answer there's often not to abandon models but to validate the holder once rather than each item through a Python loop. This is a topic the `TypeAdapter` module returns to.
 
 The rule that follows is the one this article opened with. Validate at the boundary, once. Re-checking an object that has already passed is pure cost with no data gained.
 
@@ -294,22 +296,13 @@ When you find yourself writing `if not isinstance(...)`, or reaching into a dict
 
 The comment in given is the strongest signal. A sentence showing the shape of data is a schema that can't be ran, checked or kept honest. Turning it into a model costs about the same number of lines and can't go stale.
 
-## Questions people ask
-
-<strong>What is Pydantic used for?</strong> Validating data against Python type hints and converting it to the right types. It is common for API input, configuration files and parsing external data.
-
-<strong>Is Pydantic a web framework?</strong> No. It is a data validation library. FastAPI uses it, but it works in any Python code.
-
-<strong>Does it check types when I assign to a model?</strong> Not by default. It checks when the model is created. Set `validate_assignment=True` to check later assignments too.
-
-<strong>Do I get errors for all fields or just the first?</strong> All of them, collected in one `ValidationError`.
-
-<strong>Is it slow?</strong> Version 2 runs its core in Rust and is fast enough for most services. Cost grows with the amount of data, not the number of models.
-
-<strong>Which version should I learn?</strong> Version 2. It is the current major release and the one FastAPI and most libraries target.
-
 ## Where this track goes
 
 The next module builds a first model properly. Fields, needed versus optional. What you get back. After that comes the part all trips over. just which values Pydantic will convert and which it will refuse. How to read the error when it refuses.
 
 The fastest way through all of it's to keep changing the values in the editors above and pressing Run. A rule you've watched break is a rule you note.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/models/)
+- Continue with [What Pydantic Is For](your_first_basemodel.html).

@@ -1,9 +1,11 @@
 title: Random Forests: A Practical Guide
 intro: The previous module ended with a model that changes its mind when you resample the data. This one fixes that by building hundreds of them and taking a vote.
 
-## The idea
+## The core idea
 
 A random forest is an ensemble of decision trees. It fits many trees on slightly different versions of the data and averages their predictions. The average is almost always more accurate than any single tree.
+
+## The idea
 
 Random forests are the default first model for many practitioners. They work on classification and regression, handle numeric and categorical features, require little tuning, and resist overfitting better than single trees. On tabular data, they are competitive with gradient-boosted trees and far simpler to configure.
 
@@ -19,8 +21,7 @@ A random forest adds disagreement twice.
 
 **Random feature subsets.** At each split, the tree considers only a random subset of the features rather than all of them. This is the more key of the two. It's what sets apart a random forest from plain bagging.
 
-The second matters because bootstrapping alone leaves the trees too similar. If one feature is strongly predictive, each tree splits on it first and the trees end up nearly the same. Restricting the choice forces different trees down different paths. This Is just the freedom the blending needs.
-
+The second matters because bootstrapping alone leaves the trees too similar. If one feature is strongly predictive, each tree splits on it first and the trees end up nearly the same. Restricting the choice forces different trees down different paths. This is just the freedom the blending needs.
 
 ## More accurate, and far more stable
 
@@ -184,6 +185,7 @@ print()
 print("averaging many trees does not fix extrapolation - every tree")
 print("is flat past the edge, so the average is too.")
 ```
+
 ## What it buys
 
 The fit improvement is real and often modest. 0.79 to 0.83 in the first editor.
@@ -196,9 +198,9 @@ The first editor measures that right: refitting on five bootstrap resamples, one
 
 `n_estimators` is unusual: **it can't overfit**. More trees means a better guess of the mean. This Settles rather than degrading. The only cost is time and memory. a thing like 100 to 500 is normal. The editor above shows the curve flattening after about 25. Past which the differences are fold noise rather than improvement.
 
-That makes it the one cost-shaped param with no trade-off. This Is worth stating because it runs against the pattern of all else in the track.
+That makes it the one cost-shaped param with no trade-off. This is worth stating because it runs against the pattern of all else in the track.
 
-`max_features` controls the decorrelation. `"sqrt"` is the default for classification and is often right. Setting it to `None` gives each tree each feature. The third editor shows the cost: 0.8500 against 0.8650. The trees became too alike. Lower values mean more diverse and on their own weaker trees. This Is often a good trade.
+`max_features` controls the decorrelation. `"sqrt"` is the default for classification and is often right. Setting it to `None` gives each tree each feature. The third editor shows the cost: 0.8500 against 0.8650. The trees became too alike. Lower values mean more diverse and on their own weaker trees. This is often a good trade.
 
 `max_depth` and `min_samples_leaf` are inherited from the tree. A forest needs them far less. Single trees are allowed to overfit. Their overfitting is unlinked and means out. Leaving them unconstrained is a reasonable default. Constraining them slightly can help on small or very noisy data.
 
@@ -208,7 +210,7 @@ That makes it the one cost-shaped param with no trade-off. This Is worth stating
 
 Because each tree misses about 37% of the rows, those rows can score it. And blending that across trees gives a validation guess without a separate fit.
 
-`oob_score=True` finds it, and `oob_score_` holds the result. The editor above gives 0.8683 against a cross-validated 0.8383. This Is the usual tie: OOB tends to run slightly optimistic scaled to k-fold. Each OOB guess comes from the subset of trees that missed that row rather than from a full forest.
+`oob_score=True` finds it, and `oob_score_` holds the result. The editor above gives 0.8683 against a cross-validated 0.8383. This is the usual tie: OOB tends to run slightly optimistic scaled to k-fold. Each OOB guess comes from the subset of trees that missed that row rather than from a full forest.
 
 It's truly handy when fitting is costly. It costs nothing beyond the fit you were doing anyway. It isn't a swap for cross-validation when you're checking models or tuning, both because of the optimism and because it only exists for bagged ensembles.
 
@@ -256,7 +258,7 @@ The pattern: bagging reduces variance and does nothing for bias. It helps unstab
 
 A forest is cheap to fit and costly to keep.
 
-**Memory.** each tree is stored in full. A forest of 500 unconstrained trees on a hundred thousand rows can run to hundreds of megabytes. The pickle is the same size. Constraining `max_depth` or `min_samples_leaf` shrinks it a lot at a small fit cost. This Is often the right trade for a thing that has to be shipped.
+**Memory.** each tree is stored in full. A forest of 500 unconstrained trees on a hundred thousand rows can run to hundreds of megabytes. The pickle is the same size. Constraining `max_depth` or `min_samples_leaf` shrinks it a lot at a small fit cost. This is often the right trade for a thing that has to be shipped.
 
 **guess latency.** each guess traverses each tree. That is fast per tree and adds up: 500 trees is 500 traversals. For batch scoring it's irrelevant. For a request-response service with a latency budget it can decide the design.
 
@@ -270,7 +272,7 @@ The lever for all three is the same. Fewer, shallower trees. Measuring how much 
 
 <strong>Are the chances from predict_proba trustworthy?</strong> They're the proportion of trees voting for each class. This Ranks well and is systematically pushed towards the middle. Calibrate if you need them as numbers.
 
-<strong>Can it handle missing values?</strong> Not in scikit-learn - impute first, or use `HistGradientBoosting`. This Handles them natively.
+<strong>Can it handle missing values?</strong> Not in scikit-learn - impute first, or use `HistGradientBoosting`. This handles them natively.
 
 ## Why averaging works at all
 
@@ -291,20 +293,7 @@ Boosting attacks the other half of the problem, fitting each new model to what t
 3. <strong>Compare the importances.</strong> The third editor's two columns disagree about a column that is pure noise.
 4. <strong>Break the decorrelation.</strong> In the fifth editor, try `max_features=1` and see whether so much range starts to hurt.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>Why is a forest better than one tree?</strong> Averaging many de-correlated trees cancels out much of their individual variance, so the ensemble is steadier.
-
-<strong>How many trees do I need?</strong> A few hundred is usually plenty. More trees rarely hurt accuracy but add time and memory.
-
-<strong>What is out-of-bag scoring?</strong> Each tree skips about a third of the rows, so those rows act as a free validation set. Enable it with `oob_score=True`.
-
-<strong>Does a random forest need scaling?</strong> No, because trees split on thresholds and are unaffected by feature scale.
-
-<strong>Can a forest still overfit?</strong> Yes, though less than one tree. Limiting depth and leaf size and using `max_features` helps.
-
-<strong>Are forest importances reliable?</strong> Impurity-based ones favour high-cardinality features. Permutation importance on a held-out set is more honest.
-
-## Where this leaves you
-
-Many on purpose different trees, averaged. More trees never hurt, `max_features` is the dial that matters, out-of-bag scoring is free, the built-in importances are biased towards many-valued columns. The whole thing still can't see past the edge of its training data.
+- Official reference: [Sklearn documentation](https://scikit-learn.org/stable/modules/ensemble.html#forest)
+- Continue with [Random Forests](hyperparameter_search.html).

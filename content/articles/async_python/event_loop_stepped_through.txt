@@ -1,12 +1,11 @@
 title: The Event Loop, Stepped Through
 intro: One thread, one queue of ready work, and coroutines that step aside at every await. Everything else about async Python is a consequence of this.
 
-## The whole machine, in one sentence
+## The core idea
 
-Asynchronous Python runs on a single thread. There is no parallelism here and no
-second core doing work behind your back. What there is instead is an **event
-loop**: a plain loop that keeps a queue of coroutines that are ready to run,
-takes one, runs it until it voluntarily steps aside, and moves to the next.
+Asynchronous Python runs on a single thread. There is no parallelism here and no second core doing work behind your back.
+
+## The whole machine, in one sentence
 
 That "steps aside" is the entire trick, and it happens at exactly one kind of
 place: an <code>await</code>. Between two awaits a coroutine has the thread to
@@ -223,25 +222,7 @@ changed after it.
 it, and neither does the loop until you hand it over &mdash; which is what
 [coroutines, tasks and await](coroutines_tasks_and_await.html) is about.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>Is async faster than threads?</strong> Not at running code &mdash; it runs strictly less at once, because there is one thread. It is far cheaper at *waiting*: a coroutine suspended at an await costs a small object, where a blocked thread costs a stack and a context switch. Thousands of simultaneous waits are routine for a loop and expensive for threads.
-
-<strong>Does async help CPU-bound work?</strong> No. One thread, no preemption, so a computation holds it until it finishes and every other coroutine stops. Processes are the answer there &mdash; <code>multiprocessing</code> or a <code>ProcessPoolExecutor</code>.
-
-<strong>What does <code>await asyncio.sleep(0)</code> actually do?</strong> It returns to the loop and puts the coroutine straight back on the ready queue. So whatever was already queued runs before your next line. It is the idiomatic way to yield the thread partway through a long loop. And that is the only reason to call it.
-
-<strong>Can I run two loops at once?</strong> Not in one thread &mdash; <code>asyncio.run</code> inside a running loop raises the RuntimeError above. Separate threads may each own a loop, and work moves between them with <code>run_coroutine_threadsafe</code>.
-
-<strong>Why does my coroutine never run?</strong> Because you called it rather than awaiting or scheduling it. <code>main()</code> builds a coroutine object and runs nothing; something has to drive it. Python's "coroutine was never awaited" warning says precisely this, and is worth promoting to an error.
-
-<strong>Can another coroutine run between two of my lines?</strong> Only if one of them is an await. That is the guarantee cooperative scheduling buys: your code between two awaits is atomic with respect to other coroutines. So none of them can observe a half-finished update. Across an await, assume anything may have run.
-
-## Recap in one screen
-
-- One thread, one loop, and a coroutine that runs until it voluntarily awaits. No preemption, no parallelism.
-- The loop is a ready queue, a timer heap and an I/O selector. An iteration drains the queue, then polls for whichever event comes due first.
-- <code>await</code> is the only place a switch can happen, which is what makes the code between two awaits atomic against other coroutines.
-- Three states, and following them predicts any async program: exactly one coroutine *running*, the rest *ready* in the queue or *waiting* on an unresolved await.
-- The win is overlapped **waiting**, not parallel computing. A thousand coroutines can be waiting at once on one thread; a thousand threads is a different proposition.
-- Cooperation is mandatory. A coroutine that runs a long time without awaiting freezes every other one for exactly that long.
+- Official reference: [Python event loop](https://docs.python.org/3/library/asyncio-eventloop.html)
+- Continue with [The Event Loop, Stepped Through](coroutines_tasks_and_await.html).

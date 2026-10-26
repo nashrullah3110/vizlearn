@@ -1,9 +1,11 @@
 title: Broadcasting
 intro: Two rules that decide whether shapes combine, and why a wrong guess costs gigabytes.
 
-## Everyone already uses it
+## The core idea
 
-If you have ever added a scalar to an array, you have already used broadcasting. NumPy stretched the scalar to match the shape of the array without creating a copy. That stretch is broadcasting. The general rules extend the same idea to arrays of different shapes.
+If you have ever added a scalar to an array, you have already used broadcasting. NumPy stretched the scalar to match the shape of the array without creating a copy.
+
+## Everyone already uses it
 
 Broadcasting matters because it eliminates temporary arrays. Without it, adding a bias to every row of a matrix would require you to tile the bias vector into a full matrix first. That tile allocates memory, fills it with copies, and then gets thrown away after the addition. Broadcasting skips all of that. The bias vector is reused in place.
 
@@ -15,13 +17,11 @@ Shape errors from broadcasting are among the clearest error messages in NumPy. T
 
 The common mistake is adding a dimension in the wrong place. A (3,) array broadcast with a (4, 3) array works along columns. The same array reshaped to (3, 1) would broadcast along rows. The position of the one decides the axis of the stretch. Getting that right is the whole skill.
 
-This module covers the broadcasting rules, the common patterns, how to predict the output shape, and how to add dimensions with np.newaxis or reshape to make two arrays compatible.
 
 
 `a + 10` on a `(2, 3)` array adds ten to each element. Conceptually the scalar is stretched to `(2, 3)`. nothing is copied and NumPy simply reuses the value as it walks.
 
 That is broadcasting. The general rules extend the same idea to arrays.
-
 
 ## The simplest case: a scalar
 
@@ -154,6 +154,7 @@ print("broadcast_arrays gives the stretched views:")
 print("   a ->", va.shape, " b ->", vb.shape)
 print("   memory actually used stays small:", va.base is not None or True)
 ```
+
 ## The rules
 
 Line the shapes up **from the right** and compare them pair by pair. Each pair must meet one of:
@@ -193,15 +194,15 @@ So broadcasting itself is cheap. What can be costly is the **result**.
 
 A column `(n, 1)` and a row `(1, m)` broadcast to `(n, m)`. That is just what you want for an outer product or a distance mat. It's the classic way to exhaust memory by accident.
 
-Two arrays of ten thousand elements each. 80 KB apiece. Combine into a hundred million elements. This Is 800 MB in `float64`. Nothing warns you. The formula looks small.
+Two arrays of ten thousand elements each. 80 KB apiece. Combine into a hundred million elements. This is 800 MB in `float64`. Nothing warns you. The formula looks small.
 
-When an step is unexpectedly slow or the process dies, this is the first thing to check. `np.broadcast_shapes` gives you the answer without allocating anything. It's a good habit when an formula mixes arrays whose shapes you haven't thought about carefully.
+When a step is unexpectedly slow or the process dies, this is the first thing to check. `np.broadcast_shapes` gives you the answer without allocating anything. It's a good habit when a formula mixes arrays whose shapes you haven't thought about carefully.
 
 ## Inspecting
 
 `np.broadcast_shapes(s1, s2)` returns the result shape, or raises with the same error the real step would.
 
-`np.broadcast_arrays(a, b)` returns views stretched to the common shape. This Is handy for seeing what the operands look like after alignment. They're views. The memory stays small. And they're read-only for that reason.
+`np.broadcast_arrays(a, b)` returns views stretched to the common shape. This is handy for seeing what the operands look like after alignment. They're views. The memory stays small. And they're read-only for that reason.
 
 `np.newaxis` (which is just `None`) inserts an axis wherever you need one. Is the tool for making shapes line up on purpose rather than hopefully.
 
@@ -209,7 +210,7 @@ When an step is unexpectedly slow or the process dies, this is the first thing t
 
 When two arrays combine, ask what shape you expect the result to be, and check.
 
-If the answer is bigger than either input, you're creating a grid. Make sure that is what you meant. If an step raises, right-align the two shapes on paper and find the pair that disagrees. And when adding a per-row quantity to a mat, write `[:, None]` on purpose rather than discovering whether it was needed.
+If the answer is bigger than either input, you're creating a grid. Make sure that is what you meant. If a step raises, right-align the two shapes on paper and find the pair that disagrees. And when adding a per-row quantity to a mat, write `[:, None]` on purpose rather than discovering whether it was needed.
 
 ## Nothing is allocated
 
@@ -237,7 +238,7 @@ Four shapes of problem cover most real broadcasting.
 
 ## When to use einsum instead
 
-Once an formula needs three or four `None` insertions, it has stopped being readable, and `np.einsum` is often clearer.
+Once a formula needs three or four `None` insertions, it has stopped being readable, and `np.einsum` is often clearer.
 
 `np.einsum("ij,jk->ik", a, b)` is mat product. `np.einsum("ij,ij->i", a, b)` is a row-wise dot product. This Written with broadcasting needs a times and a sum with the right axis.
 
@@ -257,9 +258,9 @@ Three defences, in growing order of formality.
 
 **Print the shape.** For interactive work, checking `result.shape` after any broadcasting formula catches this at once.
 
-**Assert it.** In code that matters, `assert result.shape == (n,)` docs the intent and fails at the right place.
+**Assert it.** In code that matters, `assert result.shape == (n,)` documents the intent and fails at the right place.
 
-**Predict it first.** `np.broadcast_shapes((1000, 1), (1000,))` returns the result shape without finding anything. This Is how you check a broadcast against a large array without allocating the answer.
+**Predict it first.** `np.broadcast_shapes((1000, 1), (1000,))` returns the result shape without finding anything. This is how you check a broadcast against a large array without allocating the answer.
 
 ## The habit that prevents most of it
 
@@ -321,21 +322,7 @@ Missing leading axes are treated as 1. Then, per column: 1 against 7 gives 7. 6 
 
 That is 1,680 elements from inputs of 48 and 35. The expansion is the point of the method and also the hazard. On real sizes it's how a plausible formula allocates a hundred gigabytes.
 
-`np.broadcast_shapes` finds this without allocating anything. This Is the safe way to check an formula before running it on real data.
-
-## Questions people ask
-
-<strong>What are the broadcasting rules?</strong> Compare shapes from the rightmost axis backwards. Two axes are compatible when they are equal or one of them is 1, and a missing leading axis counts as 1.
-
-<strong>Does broadcasting copy the data?</strong> No. NumPy reads the length-1 axis repeatedly using a stride of zero, so the small array is never physically expanded.
-
-<strong>How do I subtract a column mean from each column?</strong> Compute a.mean(axis=0), which has shape (columns,), and subtract it. The shape lines up with the last axis so it broadcasts across the rows.
-
-<strong>How do I subtract a row mean from each row?</strong> Use a.mean(axis=1, keepdims=True), giving shape (rows, 1). Without keepdims the shape is (rows,) and will not line up with the columns.
-
-<strong>What does 'operands could not be broadcast together' mean?</strong> Somewhere a pair of axes differ and neither is 1. Print both shapes, align them from the right, and find the first mismatch.
-
-<strong>How do I build a pairwise table of two vectors?</strong> Add a new axis with None or np.newaxis so one becomes a column. A[:, None] - B[None, :] gives every difference in one shape (len A, len B) array.
+`np.broadcast_shapes` finds this without allocating anything. This is the safe way to check a formula before running it on real data.
 
 ## A summary of the tools
 
@@ -352,3 +339,8 @@ That is 1,680 elements from inputs of 48 and 35. The expansion is the point of t
 `np.einsum` &mdash; when the index bookkeeping has become the hard part.
 
 Between them, those cover each broadcasting situation, and the first two cover most of them.
+
+## Sources and next steps
+
+- Official reference: [Numpy documentation](https://numpy.org/doc/stable/user/basics.broadcasting.html)
+- Continue with [Broadcasting](boolean_masking.html).

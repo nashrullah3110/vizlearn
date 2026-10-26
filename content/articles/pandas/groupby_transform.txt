@@ -1,9 +1,11 @@
 title: transform and filter
 intro: Group statistics broadcast back to each row.
 
-## The shape decides the method
+## The core idea
 
-The previous module covered group-by with agg, which returns one row per group. That is the right tool when you want a summary table. But many real tasks need the group statistic broadcast back to every row. Normalising sales by each store's total, flagging rows above the group average, ranking within each category -- all of these need a value per original row, not per group.
+The previous module covered group-by with agg, which returns one row per group. That is the right tool when you want a summary table. But many real tasks need the group statistic broadcast back to every row.
+
+## The shape decides the method
 
 That is what transform does. It computes a statistic per group and returns a Series with the same index as the input. The result aligns to the original frame and can be assigned as a new column directly. No merge is needed, and the alignment is handled by the index.
 
@@ -13,7 +15,6 @@ filter is the third method. It returns the original rows, but only for groups th
 
 Knowing which method to use is almost always obvious once you ask what shape you want. One row per group means agg. One row per original row means transform. A subset of the original rows means filter. That decision tree covers the vast majority of group-by tasks.
 
-This module covers transform with built-in functions and with lambdas, filter with group-level tests, and the cases where agg and a merge are still the better option. The examples show the same problem solved with each approach, so the differences are concrete.
 
 
 Three group-by steps differ only in the shape of what they return. Choosing between them is nearly always obvious once you ask what shape you want.
@@ -25,7 +26,6 @@ Three group-by steps differ only in the shape of what they return. Choosing betw
 `filter` returns **a subset of the first rows**. Fewer rows, same columns.
 
 Most confusion here is someone reaching for `agg` when they wanted `transform`, then writing a merge to get back to the first shape.
-
 
 ## agg reduces, transform broadcasts
 
@@ -166,6 +166,7 @@ print("  a summary   -> agg")
 print("  a column    -> transform")
 print("  fewer rows  -> filter")
 ```
+
 ## transform
 
 `df.groupby("city")["sales"].transform("sum")` gives each row its city's total.
@@ -177,9 +178,9 @@ df["city_total"] = df.groupby("city")["sales"].transform("sum")
 df["share"] = df["sales"] / df["city_total"]
 ```
 
-Two lines for "what fraction of its city's sales is this row". This Is a question that else needs an aggregation, a rename, a merge and a check that the merge didn't change anything.
+Two lines for "what fraction of its city's sales is this row". This is a question that else needs an aggregation, a rename, a merge and a check that the merge didn't change anything.
 
-That last point is the real arg. The aggregate-then-merge route is three steps, each of which can go wrong. The aggregate can drop `NaN` keys, the merge can times rows if the key isn't unique. The result can come back in a other order. `transform` can't do any of those. It never leaves the first index.
+That last point is the real arg. The aggregate-then-merge route is three steps, each of which can go wrong. The aggregate can drop `NaN` keys, the merge can times rows if the key isn't unique. The result can come back in another order. `transform` can't do any of those. It never leaves the first index.
 
 ## What transform accepts
 
@@ -187,9 +188,9 @@ A string naming a built-in (`"sum"`, `"mean"`, `"max"`, `"count"`) is fastest. I
 
 A function that maps a Series to a Series of the same length also works. `transform(lambda s: s - s.mean())` centres within group.
 
-A function returning a **scalar** is broadcast to the whole group. This Is why `transform("sum")` works at all.
+A function returning a **scalar** is broadcast to the whole group. This is why `transform("sum")` works at all.
 
-What it can't do is change the shape. A function returning a other length raises. This Is the gap between `transform` and `apply` and the reason `transform` is predictable.
+What it can't do is change the shape. A function returning another length raises. This is the gap between `transform` and `apply` and the reason `transform` is predictable.
 
 Some methods exist right on the groupby object and don't need `transform`: `rank`, `cumsum`, `cumcount`, `shift`, `diff` and `pct_change` all return per-row results already. `g.rank()` is both clearer and faster than `g.transform("rank")`.
 
@@ -201,7 +202,7 @@ Some methods exist right on the groupby object and don't need `transform`: `rank
 
 **Rank within group** &mdash; `g.rank(ascending=False)`. "Where does this row come in its own team."
 
-**Group-wise fill** &mdash; `df["temp"].fillna(g.transform("mean"))`. Filling a missing temp with the mean for that *city* rather than the mean of all over. This Uses data a global fill throws away.
+**Group-wise fill** &mdash; `df["temp"].fillna(g.transform("mean"))`. Filling a missing temp with the mean for that *city* rather than the mean of all over. This uses data a global fill throws away.
 
 **Flagging outliers scaled to the group**. Checking each value against its group's standard deviation.
 
@@ -227,7 +228,7 @@ That form is worth knowing because it composes with other rules, whereas `filter
 
 `groupby(...).apply(func)` is the general escape hatch, and it can return any shape.
 
-That flexibility costs speed &mdash; it's a Python call per group &mdash; and predictability. The shape of the result depends on what the function returned. In pandas 2.2 it also warns about whether the grouping columns are passed to the function. This Is a sign of how awkward its semantics have become.
+That flexibility costs speed &mdash; it's a Python call per group &mdash; and predictability. The shape of the result depends on what the function returned. In pandas 2.2 it also warns about whether the grouping columns are passed to the function. This is a sign of how awkward its semantics have become.
 
 Reach for `agg`, `transform` or `filter` first. They cover the large majority of cases, run in compiled code. Return a shape you can predict from the method name alone.
 
@@ -241,11 +242,11 @@ a few methods on a groupby already return one row per input row. They need no `t
 
 `shift`, `diff`, `pct_change` &mdash; compare with the previous row **of the same group**.
 
-That last set matters more than it looks. `df["v"].diff()` on a frame holding a few entities finds a gap across the boundary between one entity and the next. This Is meaningless. `df.groupby("id")["v"].diff()` doesn't.
+That last set matters more than it looks. `df["v"].diff()` on a frame holding a few entities finds a gap across the boundary between one entity and the next. This is meaningless. `df.groupby("id")["v"].diff()` doesn't.
 
 Any time you use `shift`, `diff` or `rolling` on panel data. A few entities stacked in one frame. The group-by version is almost certainly the one you want. Using the plain version is a quiet, plausible-looking error.
 
-`cumcount()` numbers the rows within each group from zero. This Is how you take "the first three per group" or label repeat visits.
+`cumcount()` numbers the rows within each group from zero. This is how you take "the first three per group" or label repeat visits.
 
 ## Percentages and shares
 
@@ -276,7 +277,7 @@ Two cautions. A group with one row has a standard deviation of `NaN`. The result
 
 ## Filtering by a group property
 
-`filter` takes a callback per group. This Is flexible and slow.
+`filter` takes a callback per group. This is flexible and slow.
 
 For the common cases, a `transform` and a boolean mask is faster and composes better:
 
@@ -291,11 +292,11 @@ Reach for `filter` when the predicate truly needs the whole sub-frame. A rule in
 
 ## Why apply is the last resort
 
-`groupby(...).apply(func)` can return anything. This Is its appeal and its problem.
+`groupby(...).apply(func)` can return anything. This is its appeal and its problem.
 
 It's a Python call per group, so it's slow.
 
-The shape of the result depends on what the function returned. This Makes it unpredictable to read.
+The shape of the result depends on what the function returned. This makes it unpredictable to read.
 
 And in pandas 2.2 it warns about whether the grouping columns are passed to the function. The historical action was ambiguous enough to need changing.
 
@@ -345,35 +346,7 @@ They do the same job with other trade-offs.
 
 `df[df.groupby(k)[c].transform("size") >= n]` &mdash; compiled, faster, and composes with other rules using `&`.
 
-Use the mask for simple rules on a single statistic. This Is most of them. Use `filter` when the predicate truly needs a few columns or a math with no vectorised form.
-
-## A summary
-
-`agg` reduces, `transform` broadcasts, `filter` selects rows.
-
-`transform` assigns straight back, because it keeps the first index.
-
-It replaces aggregate-then-merge, without the risk of changing row count or order.
-
-Group-wise `rank`, `cumsum`, `cumcount`, `shift` and `diff` are methods in their own right &mdash; no `transform` needed.
-
-On panel data, always use the group-wise `shift`/`diff`, or the compare crosses between entities.
-
-Group fills use data a global fill throws away.
-
-And prefer a `transform`-built mask to `filter` for simple size or total rules.
-
-## A closing note
-
-`transform` is the step that drops the most not needed joins from real pandas code.
-
-The pattern it replaces &mdash; aggregate to a summary, rename the column, merge it back &mdash; is three steps, each of which can change the row count or the order. All of which exist only to get a group statistic aligned with the rows it came from. `transform` does that by build. It never leaves the first index.
-
-Once you've it, a family of questions turns one line each. This row's share of its group, its rank within its group, its distance from its group's mean, its group's size as a filter.
-
-`filter` is the less-used sibling and is often better expressed as a mask built from `transform`. This Composes with other rules and runs in compiled code.
-
-Between `agg`, `transform` and a mask, the all-round `apply` is rarely needed. Which is the point. It's the slow and unpredictable one.
+Use the mask for simple rules on a single statistic. This is most of them. Use `filter` when the predicate truly needs a few columns or a math with no vectorised form.
 
 ## One more thing
 
@@ -381,24 +354,7 @@ Between `agg`, `transform` and a mask, the all-round `apply` is rarely needed. W
 
 More handy is that `transform` works on a whole frame, not just one column: `df.groupby("k").transform("mean")` returns a frame of group means for each numeric column at once, aligned with the first rows. Subtracting it centres the entire frame within groups in a single formula.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What is the difference between agg and transform?</strong> agg returns one row per group, while transform returns a result with the same length as the input. That makes transform suited to adding a group statistic as a new column.
-
-<strong>How do I add each group's mean as a new column?</strong> Use df['g_mean'] = df.groupby('g')['x'].transform('mean').
-
-<strong>How do I calculate each row's share of its group total?</strong> Divide the column by its group sum: df['x'] / df.groupby('g')['x'].transform('sum').
-
-<strong>What does groupby().filter() do?</strong> It keeps or drops whole groups based on a condition on the group, such as filter(lambda g: len(g) > 5). The rows in the surviving groups come back unchanged.
-
-<strong>Why is apply slower than transform?</strong> transform with a built-in name uses optimised code for all groups. apply runs a Python function on each group, which is slower.
-
-<strong>How do I rank rows within each group?</strong> Use df.groupby('g')['x'].rank(ascending=False), which numbers the values separately inside every group.
-
-## In summary
-
-Three steps, distinguished only by the shape they return: `agg` gives one row per group, `transform` one row per input row, `filter` a subset of rows.
-
-`transform` is the one that drops work. It replaces the aggregate-rename-merge pattern with a single formula that can't change the row count or the order.
-
-Prefer the group-by methods that already return per-row results. `rank`, `cumsum`, `cumcount`, `shift`, `diff`. Over `transform` where they apply. Use the group-wise forms on panel data so checks don't cross between entities.
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/groupby.html)
+- Continue with [transform and filter](counting_and_binning.html).

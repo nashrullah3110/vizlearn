@@ -1,9 +1,11 @@
 title: Dtypes
 intro: One type for the whole array: what it costs, when it overflows. How promotion decides the result.
 
-## Kind and width
+## The core idea
 
-Every element in a NumPy array has the same type. That type is the dtype. It records two things: what kind of number the element is, and how many bytes it occupies. Understanding dtypes is necessary because they control precision, memory usage, and the behaviour of arithmetic operations.
+Every element in a NumPy array has the same type. That type is the dtype. It records two things: what kind of number the element is, and how many bytes it occupies.
+
+## Kind and width
 
 The kind tells you the family: signed integer, unsigned integer, floating point, complex, boolean, or string. The width tells you the size: int8 is one byte, int64 is eight bytes. A wider type holds a larger range of values but uses more memory.
 
@@ -15,7 +17,6 @@ Floating-point precision is the other common issue. float32 has about seven deci
 
 NumPy infers the dtype from the input. A list of Python ints becomes int64. A list of Python floats becomes float64. A list with one float and the rest ints becomes float64, because the dtype must hold every element. That promotion is silent and worth checking.
 
-This module covers the common dtypes, their ranges and memory costs, how to specify them, and how to convert between them safely. It also covers the structured dtypes that let a single array hold multiple fields per element, like a lightweight record type.
 
 
 A dtype records what kind of number and how many bytes. `int32` is a signed int in four bytes. `float64` is a double-precision float in eight.
@@ -23,7 +24,6 @@ A dtype records what kind of number and how many bytes. `int32` is a signed int 
 Both halves matter. The kind decides what steps mean. The width decides the range and the memory.
 
 `np.iinfo` and `np.finfo` report the limits. It's worth looking at them once rather than remembering guesses. The first editor prints them.
-
 
 ## What a dtype records
 
@@ -162,6 +162,7 @@ print("   float32 accumulator: %.6f" % f32)
 print("   float64 accumulator: %.6f" % f64)
 print("   difference         : %.6f" % abs(f32 - f64))
 ```
+
 ## Integers wrap
 
 This is the sharpest gap from plain Python and the one most likely to cause a quiet bug.
@@ -209,7 +210,7 @@ Two considerations, and they pull in opposite directions.
 
 **Precision and range.** `float32` carries about seven large decimal digits, `float64` about sixteen. For image pixels, neural network weights and most measured data, `float32` is ample. For building up a sum over millions of elements it isn't. The running total grows until adding one more small value changes nothing.
 
-The last editor shows that: summing a million ones in `float32` doesn't give a million. `sum(dtype=np.float64)` builds up in double precision while keeping the array itself small. This Is often the right compromise.
+The last editor shows that: summing a million ones in `float32` doesn't give a million. `sum(dtype=np.float64)` builds up in double precision while keeping the array itself small. This is often the right compromise.
 
 ## A working rule
 
@@ -227,7 +228,7 @@ Those numbers are the whole story for choosing. The handy question isn't "how mu
 
 A temp sensor accurate to a tenth of a degree has three large digits. Storing its readings in `float64` records twelve digits of noise very just. `float32` would be ample, and would halve the memory.
 
-The counter-arg is build-up. Summing a million `float32` values loses precision faster than summing a million `float64` values. The rounding error at each step is larger scaled to the running total. NumPy mitigates this by using pairwise summation inside. This Keeps the error growth much slower than a naive loop. It doesn't drop it.
+The counter-arg is build-up. Summing a million `float32` values loses precision faster than summing a million `float64` values. The rounding error at each step is larger scaled to the running total. NumPy mitigates this by using pairwise summation inside. This keeps the error growth much slower than a naive loop. It doesn't drop it.
 
 A hands-on compromise, and what many libraries do. Store in `float32`, build up in `float64`. `a.sum(dtype=np.float64)` does just that. Reads a narrow array, builds up in a wide type.
 
@@ -243,7 +244,7 @@ The result: **never test floats for equality**.
 
 Both take `rtol` and `atol`. The scaled handling handles large values. Here A fixed abs gap is meaningless. The abs handling handles values near zero. Here A scaled compare breaks down. The defaults are sensible for common data and worth replacing when your values are unusually large or unusually small.
 
-`equal_nan=True` makes NaN compare equal to NaN. This Is often what you want when checking that two arrays came out the same.
+`equal_nan=True` makes NaN compare equal to NaN. This is often what you want when checking that two arrays came out the same.
 
 ## Booleans
 
@@ -259,7 +260,7 @@ NumPy string dtypes are **fixed width**. An array created from `["ana", "barthol
 
 Assign a longer string into it later and it's **silently truncated** to eleven characters. Nothing raises. This is the single most surprising action in NumPy's type system. It's a direct result of the fixed-size-elements design that makes all else work.
 
-If you need real var-length strings, the options are an object array. Which stores pointers to Python strings and gives up each speed gain. Or pandas. This Handles this properly.
+If you need real var-length strings, the options are an object array. Which stores pointers to Python strings and gives up each speed gain. Or pandas. This handles this properly.
 
 NumPy 2.0 added a var-width string dtype that handles this. It's recent enough that most code and most settings you'll meet don't have it.
 
@@ -267,7 +268,7 @@ NumPy 2.0 added a var-width string dtype that handles this. It's recent enough t
 
 `dtype=object` makes an array of pointers to any Python objects. It looks like an array and supports the indexing syntax.
 
-It isn't fast. each step falls back to calling Python methods per element. This Is a list with extra steps. It also can't be saved without pickling, with the security results covered later.
+It isn't fast. each step falls back to calling Python methods per element. This is a list with extra steps. It also can't be saved without pickling, with the security results covered later.
 
 at times it's the right answer. A ragged set that you truly need to index like an array. often its appearance is a sign that the data doesn't want to be a NumPy array at all. It's worth checking whether a list, a dict or a DataFrame fits better before building on it.
 
@@ -299,25 +300,11 @@ Unsigned ints behave oddly in subtraction.
 
 `np.uint8(3) - np.uint8(5)` isn't `-2`. There are no minus values in an unsigned type. It wraps to 254.
 
-This bites most often with image data. This Is often `uint8`. Subtracting two images to find a gap gives large plus values wherever the result should have been minus. The resulting image looks wrong in a way that is easy to misread as a bug elsewhere.
+This bites most often with image data. This is often `uint8`. Subtracting two images to find a gap gives large plus values wherever the result should have been minus. The resulting image looks wrong in a way that is easy to misread as a bug elsewhere.
 
 The fix is to convert before subtracting: `a.astype(np.int16) - b.astype(np.int16)`, then clip and convert back if needed.
 
 Mixed signed and unsigned math also promotes in ways that surprise. Mixing `int64` and `uint64` gives `float64`. No int type can hold the full range of both. And that silent jump to float is a real source of precision loss on large ints.
-
-## Questions people ask
-
-<strong>What is a dtype?</strong> It is the description of how each element's bytes are read: the kind, such as integer or float, and the width in bits. Every element in an array shares one dtype.
-
-<strong>What happens when an integer array overflows?</strong> It wraps around silently. An int8 holding 127 plus 1 becomes -128, with no warning, so pick a width that holds your largest value.
-
-<strong>What is the difference between astype and view?</strong> astype converts the values and returns a new array. view reinterprets the same bytes under another dtype, with no conversion at all.
-
-<strong>Why is 0.1 + 0.2 not equal to 0.3?</strong> Binary floating point cannot store 0.1 or 0.2 exactly. Compare with np.isclose or np.allclose instead of ==.
-
-<strong>Should I use float32 or float64?</strong> float64 is the default and the safe choice. float32 halves memory and is common in deep learning, but it carries only about seven decimal digits.
-
-<strong>Why does mixing int and float give float?</strong> NumPy promotes to the smallest type that can hold both without losing the range. An int and a float therefore produce a float.
 
 ## Choosing, summarised
 
@@ -332,3 +319,8 @@ Mixed signed and unsigned math also promotes in ways that surprise. Mixing `int6
 **Objects.** Almost always a sign the data doesn't want to be an array.
 
 And in all cases: set it at creation. `astype` allocates a second full array. Getting it right the first time avoids both that copy and the class of bugs where an int array quietly refuses the float you assigned into it.
+
+## Sources and next steps
+
+- Official reference: [Numpy documentation](https://numpy.org/doc/stable/user/basics.types.html)
+- Continue with [Dtypes](shape_and_reshape.html).

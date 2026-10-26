@@ -1,9 +1,11 @@
 title: Reshaping: pivot and melt
 intro: Long to wide and back, and when each shape is right.
 
-## Two shapes
+## The core idea
 
-Most data problems that feel complicated are actually shape problems. The data holds the right information but in the wrong layout. A column that should be a row. A value that should be a column header. A pair of columns that should be a single column of key-value pairs. Reshaping is the tool for converting between these layouts.
+Most data problems that feel complicated are actually shape problems. The data holds the right information but in the wrong layout. A column that should be a row.
+
+## Two shapes
 
 The two fundamental shapes are long and wide. Long form has one observation per row with columns naming the variable and holding the value. Wide form has one subject per row with a column per variable. Neither is more correct. They serve different purposes.
 
@@ -15,7 +17,6 @@ pivot_table converts from long to wide. melt converts from wide to long. They ar
 
 The tricky part of pivot is what happens when multiple rows map to the same cell. If two rows both say city=Delhi, year=2024, there is no unique value to put in the cell. pivot raises. pivot_table applies an aggregation function, with mean as the default. That silent averaging is worth knowing about.
 
-This module covers pivot_table, melt, and the stack and unstack methods that do the same work on the index rather than on columns. The examples use small frames where the transformation is visible.
 
 
 The same data can be laid out two ways.
@@ -29,7 +30,6 @@ Neither is more correct. They suit other purposes. Most real work involves conve
 Long form is better for **storage and math**. Adding a year adds rows, not columns. Nothing downstream changes. Group-by works on its own. Missing mixes simply don't appear. DBs and most plotting libraries expect it.
 
 Wide form is better for **reading**. A table with years across the top is what people want to look at. It's what a spreadsheet or a report needs.
-
 
 ## Long and wide, the same data
 
@@ -176,6 +176,7 @@ print("changes every expression that named the old ones.")
 print()
 print("Keep data long; pivot at the end, for display.")
 ```
+
 ## pivot
 
 `df.pivot(index="city", columns="year", values="sales")` goes long to wide.
@@ -192,7 +193,7 @@ Three args: what turns the row index, what turns the columns, and what fills the
 df.pivot_table(index="city", columns="plan", values="sales", aggfunc="sum")
 ```
 
-`aggfunc` defaults to `"mean"`. This Is worth knowing before it surprises you. A pivot table of sales that means when you expected a total looks fully plausible.
+`aggfunc` defaults to `"mean"`. This is worth knowing before it surprises you. A pivot table of sales that means when you expected a total looks fully plausible.
 
 `fill_value` replaces the `NaN` in empty cells, often with 0.
 
@@ -282,7 +283,7 @@ Beyond the basics, three args do real work.
 
 `index` and `columns` accept **lists**, giving nested axes. Region and city down the side, year and quarter across the top.
 
-`dropna=False` keeps columns that are fully empty. This Matters when the table must have a fixed shape for compare.
+`dropna=False` keeps columns that are fully empty. This matters when the table must have a fixed shape for compare.
 
 `margins_name` renames the `All` row and column.
 
@@ -296,7 +297,7 @@ A long frame with 100,000 rows covering 5,000 users and 3,000 products pivots in
 
 That is the main hands-on arg for staying long: the wide form materialises each mix, whether or not it occurred.
 
-When a wide layout is truly needed for a sparse dataset, `pivot_table` with `fill_value=0` at least avoids the float promotion that `NaN` forces. A sparse dtype or a other tool is worth considering past a certain size.
+When a wide layout is truly needed for a sparse dataset, `pivot_table` with `fill_value=0` at least avoids the float promotion that `NaN` forces. A sparse dtype or another tool is worth considering past a certain size.
 
 ## Which operation, by shape
 
@@ -338,62 +339,17 @@ That round trip is a quick way to test an assumption about the data's grain. If 
 
 They may not be valid identifiers. A year is an int, a product name may hold spaces. So `df.column_name` won't work and `df["2024"]` may need to be `df[2024]`.
 
-They change when the data changes. Code that names them breaks when a new group appears. This Is the maintenance arg for staying long.
+They change when the data changes. Code that names them breaks when a new group appears. This is the maintenance arg for staying long.
 
 `rename_axis(columns=None)` drops the axis name that pivoting leaves behind. This Else shows up as a stray label above the columns when printing.
-
-## A summary
-
-Long is one row per finding. Wide is one row per subject.
-
-`pivot` for long to wide with unique pairs. `pivot_table` when aggregation is needed.
-
-`melt` for wide to long, naming both output columns.
-
-`stack`/`unstack` do the same through index levels.
-
-`explode` for lists in cells.
-
-Wide materialises each mix, so it can be far larger than the long form.
-
-Work long, pivot at the end, for display.
-
-And when a reshape is confusing, write down the shape you've and the shape you want. The step follows from that. Trial and error rarely settles.
-
-## A closing note
-
-Reshaping is the step people most often approach by trial and error. The one where that approach works worst.
-
-The solid method is to write down the shape you've and the shape you want. What is a row, what is a column. And pick the step that moves between them. Long to wide is `pivot`, or `pivot_table` if any cell would hold more than one value. Wide to long is `melt`. Through the index instead of named columns, it's `stack` and `unstack`.
-
-The default that catches people is `pivot_table`'s `aggfunc="mean"`. A table of sales that quietly means where you expected a total looks fully plausible, and nothing shows else.
-
-And the structural advice is to stay long until the end. Wide data materialises each mix whether it occurred or not. Each new group changes the columns. And so each formula that names them.
 
 ## One more thing
 
 `melt` accepts `ignore_index=False`, which keeps the first index rather than renumbering. That matters when the identifiers you want to keep are in the index rather than in columns, since `id_vars` only names columns.
 
-And `wide_to_long` handles the exact case of columns named with a stem and a suffix. `sales_2023`, `sales_2024`. Unpivoting them into a stem column and a suffix column in one call. This Is else a `melt` followed by a `str.extract`.
+And `wide_to_long` handles the exact case of columns named with a stem and a suffix. `sales_2023`, `sales_2024`. Unpivoting them into a stem column and a suffix column in one call. This is else a `melt` followed by a `str.extract`.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>What is the difference between pivot and pivot_table?</strong> pivot only reshapes and fails if a row and column pair repeats. pivot_table aggregates the duplicates with a function such as mean or sum.
-
-<strong>What does melt do?</strong> It turns wide data into long data: several columns become two, one holding the old column names and one holding their values.
-
-<strong>When do I need long format versus wide?</strong> Long format suits groupby, plotting libraries such as seaborn, and storage. Wide format is easier for humans to read and for matrix-style calculations.
-
-<strong>Why does pivot raise 'Index contains duplicate entries'?</strong> Two rows share the same index and column combination, so pandas does not know which value to keep. Use pivot_table with an aggregation or remove the duplicates.
-
-<strong>What is the difference between stack and unstack?</strong> stack moves column labels into the row index, and unstack moves an index level into the columns.
-
-<strong>How do I fill empty cells in a pivot table?</strong> Pass fill_value=0 to pivot_table, or call fillna on the result.
-
-## In summary
-
-Long form is one row per finding and composes with all. Wide form is one row per subject and reads better.
-
-Convert with `pivot` and `melt`, or through the index with `stack` and `unstack`. Use `pivot_table` when a cell could hold more than one value. Remembering that its `aggfunc` defaults to `mean`.
-
-Work long and pivot at the end. In wide form a new group is a new column. Each formula that named the old columns has to change.
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/reshaping.html)
+- Continue with [Reshaping: pivot and melt](multiindex.html).

@@ -1,9 +1,11 @@
 title: Unique Values and Set Operations
 intro: Counting distinct values, checking arrays, and rebuilding the first.
 
-## unique
+## The core idea
 
-Finding distinct values is one of the first things you do with categorical or integer data. How many different ids are there? What are the distinct labels? Are there values in one array that are missing from another? NumPy's set operations answer these questions on arrays directly, without converting to Python sets.
+Finding distinct values is one of the first things you do with categorical or integer data. How many different ids are there? What are the distinct labels?
+
+## unique
 
 np.unique returns the distinct values from an array, sorted. The sorting is not optional. That matters because it means the output order does not match the input order. If you need the values in the order they first appeared, you can use the return_index parameter and sort by those indices, but the default behaviour is sorted output.
 
@@ -15,7 +17,6 @@ The set operations -- intersect1d, union1d, setdiff1d, and setxor1d -- work on s
 
 in1d and its modern replacement isin test membership. Given two arrays, isin returns a boolean array showing which elements of the first are present in the second. That boolean array can be used directly as a mask for filtering.
 
-This module covers unique with its return parameters, the set operations, and isin. The examples show common use cases: deduplication, frequency counting, filtering by membership, and comparing two datasets for overlap.
 
 
 `np.unique(a)` returns the distinct values, **sorted**, as a 1-D array.
@@ -25,7 +26,6 @@ Two things about that are worth stating by name, because both catch people.
 It's always sorted. If you wanted first-appearance order, `unique` alone doesn't give it. You need `return_index` and then a sort of those indices.
 
 It always flattens, unless you pass `axis`. A 2-D input gives back a flat list of each distinct value in the whole array.
-
 
 ## unique returns sorted distinct values
 
@@ -152,6 +152,7 @@ print("   ", np.intersect1d(ids, wanted))
 print()
 print("isin is the one to use when you need to filter rows by a key.")
 ```
+
 ## The optional returns
 
 Three flags turn `unique` from a de-duplicator into a thing a lot more handy.
@@ -217,11 +218,11 @@ For counting, `np.bincount` is faster than `unique(return_counts=True)` when the
 
 When the values are small non-minus ints, `np.bincount` counts them far faster than `unique(return_counts=True)`. It indexes an output array right instead of sorting.
 
-`np.bincount(a)` returns an array of length `a.max() + 1`. Here Spot `i` holds the count of value `i`. Values that never appear get zero. This Is either convenient or a nuisance based on whether the value space is dense.
+`np.bincount(a)` returns an array of length `a.max() + 1`. Here Spot `i` holds the count of value `i`. Values that never appear get zero. This is either convenient or a nuisance based on whether the value space is dense.
 
-`minlength` forces a min output size. This Matters when you're counting class labels and a class might be absent from a given batch. Without it, the output length varies with the data and downstream code breaks.
+`minlength` forces a min output size. This matters when you're counting class labels and a class might be absent from a given batch. Without it, the output length varies with the data and downstream code breaks.
 
-The `weights` arg turns it into a group-sum. `np.bincount(group_ids, weights=values)` sums the values belonging to each group in a single pass. This Is the fastest group-by NumPy offers and a truly handy thing to know.
+The `weights` arg turns it into a group-sum. `np.bincount(group_ids, weights=values)` sums the values belonging to each group in a single pass. This is the fastest group-by NumPy offers and a truly handy thing to know.
 
 The constraint is that the values must be non-minus ints. Memory is scaled to the largest one. Counting values around a million allocates a million-element array even so of how few distinct values there are.
 
@@ -265,7 +266,7 @@ The bins are half-open &mdash; `[a, b)` &mdash; except the last. This Includes i
 
 `intersect1d`, `setdiff1d` and `isin` accept `assume_unique=True`.
 
-Setting it skips the inner de-duplication. This Is a real saving on large arrays. Setting it wrongly gives **wrong answers**, not an error. Copies are handled as though they weren't there. Results can come out with surprise repeats.
+Setting it skips the inner de-duplication. This is a real saving on large arrays. Setting it wrongly gives **wrong answers**, not an error. Copies are handled as though they weren't there. Results can come out with surprise repeats.
 
 Use it only when uniqueness is sure structurally. The array came from `unique`, or it's a main key, or you've just checked. "It should be unique" isn't the same thing.
 
@@ -310,13 +311,13 @@ Applying `unique` to floating-point data often disappoints. Values that are conc
 
 There's no handling arg, and adding one would be ill-defined. "close enough" isn't transitive. A tolerant unique has no unambiguous answer.
 
-The hands-on approaches are to round first, `np.unique(np.round(a, 6))`. This Is exact and cheap but sensitive to values sitting near a rounding boundary. Or to sort and group with an clear handling if the semantics matter.
+The hands-on approaches are to round first, `np.unique(np.round(a, 6))`. This is exact and cheap but sensitive to values sitting near a rounding boundary. Or to sort and group with an clear handling if the semantics matter.
 
 For anything more careful, this is a clustering problem rather than a uniqueness problem. Treating it as one avoids pretending the answer is exact.
 
 ## Set operations on rows
 
-The `1d` family flattens, so checking two tables row-wise needs a other approach.
+The `1d` family flattens, so checking two tables row-wise needs another approach.
 
 `np.unique(rows, axis=0)` handles de-duplication. For intersection and gap between two sets of rows, the usual trick is to view each row as a single opaque item. Either through a structured dtype, or by converting rows to tuples and using Python sets when the arrays are small enough.
 
@@ -342,32 +343,17 @@ For repeated membership tests against a fixed small set, a Python `set` can beat
 
 `intersect1d` / `union1d` / `setdiff1d` / `setxor1d`. Set checks, all sorting, de-duplicating and flattening.
 
-`np.isin` &mdash; membership as a mask of the first shape. This Is the one to use for filtering.
+`np.isin` &mdash; membership as a mask of the first shape. This is the one to use for filtering.
 
 The recurring choice is between the functions that **reduce** and the one that **preserves shape**. If the answer is going to index a thing, you want the mask.
-
-## A closing note
-
-The functions in this module are simple on their own and powerful in mix. `unique` with `return_inverse` feeding `bincount` with `weights` is four lines that replace a loop, a dict and a fair amount of care about missing keys.
-
-The one gap worth carrying away is between reducing and preserving shape. Almost each mistake in this area is reaching for a set function. Which discards spots. When the question was really about filtering. This Needs them. When the answer is going to index a thing, `isin` is the function you want.
-
-## Questions people ask
-
-<strong>What does np.unique return?</strong> The sorted distinct values. Add return_counts=True for counts and return_inverse=True for the mapping back to the original.
-
-<strong>How do I count occurrences of each value?</strong> Use np.unique(a, return_counts=True). For small non-negative integers np.bincount is faster.
-
-<strong>How do I find common elements of two arrays?</strong> Use np.intersect1d. There are also union1d, setdiff1d and setxor1d for the other set operations.
-
-<strong>What is the quick way to test membership?</strong> np.isin(a, values) returns a boolean array the shape of a. It is the vectorised version of the in operator.
-
-<strong>Does np.unique keep the original order?</strong> No, it sorts. To keep the first-seen order, use return_index=True and sort those indices.
-
-<strong>Can I find unique rows?</strong> Yes, np.unique(a, axis=0) treats each row as one item.
 
 ## Where this fits
 
 Counting distinct values is often the first thing anyone does with a new dataset. The last thing anyone remembers to do before trusting a result.
 
 `np.unique(col, return_counts=True)` on each cat column at load time takes seconds and routinely surfaces the problems that would else appear much later. A group with a trailing space, an identifier that isn't unique, a class that appears twice in the training set and never in the test set.
+
+## Sources and next steps
+
+- Official reference: [Numpy documentation](https://numpy.org/doc/stable/reference/routines.set.html)
+- Continue with [Unique Values and Set Operations](random_numbers.html).

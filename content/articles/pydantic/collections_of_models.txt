@@ -1,13 +1,15 @@
 title: Collections of Models, and Errors That Know Their Index
 intro: Lists, dicts, sets and tuples - what gets checked, what gets converted, and where failures point.
 
-## Item by item
+## The core idea
 
-Once you can nest one model inside another, the next step is a field that holds many of them. A course has a list of modules. A report has a dictionary of scores. A shape has a pair of coordinates. These are collections of models, and Pydantic validates them item by item.
+Once you can nest one model inside another, the next step is a field that holds many of them. A course has a list of modules. A report has a dictionary of scores.
+
+## Item by item
 
 Each item gets the full treatment. If one module in a list of fifty is wrong, Pydantic tells you which one. The error includes the position of the bad item, so you do not have to hunt through the input to find it. That small detail makes a large difference once the data comes from a user or another system.
 
-This article covers the collection types one at a time. Lists validate each item and put the index in the error path. Dictionaries check both the keys and the values. Sets remove duplicates, which can be a feature or a surprise. Tuples check the length and the type at each position. Along the way you will see what the error paths look like, so you can read them without guessing. It is a short step from nested models, and it covers most of the shapes real payloads take.
+
 
 The aim is to make a long payload feel as easy to check as a short one. You will not write any loops. You declare the shape, and the library walks it for you, reporting the position of every failure it finds along the way. The error paths alone save hours of debugging on large imports.
 
@@ -22,7 +24,6 @@ lessons: List[Lesson]
 Given a list, Pydantic walks it and validates each element as a `Lesson`. A dict turns a `Lesson` object. An element that is already a `Lesson` passes through. An element that is neither makes an error. For that element only.
 
 That last part matters more than it sounds. check doesn't abandon the set at the first bad item. It checks all of them and reports all the failures. This For a bulk import is the gap between fixing one row per attempt and seeing the whole problem at once.
-
 
 ## A list of models
 
@@ -192,19 +193,20 @@ except ValidationError as e:
     print()
     print("errors work the same:", e.errors()[0]["loc"])
 ```
+
 ## The index is part of the path
 
 An int in `loc` is a spot. So `("lessons", 1, "minutes")` reads as. The `lessons` field, the item at index 1, its `minutes` field.
 
 For a payload with a hundred items this is the entire diagnosis. Without it, "one of your lessons has an invalid duration" sends the caller looking through a hundred objects by hand.
 
-Note that the index is the spot in the *input*. This Is what you want. It lets the caller map the error back to the data they sent. If you're surfacing these to a user editing a form with repeated rows, the index is just the row number to highlight.
+Note that the index is the spot in the *input*. This is what you want. It lets the caller map the error back to the data they sent. If you're surfacing these to a user editing a form with repeated rows, the index is just the row number to highlight.
 
 ## Dicts, and what the key does
 
 `Dict[str, Stats]` validates keys against `str` and values against `Stats`, on its own.
 
-The key type is a real constraint. A handy one. `Dict[int, Stats]` will coerce the string keys that JSON forces on you back into ints. This Is a small annoyance handled once instead of at each read site. JSON object keys are always strings. This comes up more often than you'd expect.
+The key type is a real constraint. A handy one. `Dict[int, Stats]` will coerce the string keys that JSON forces on you back into ints. This is a small annoyance handled once instead of at each read site. JSON object keys are always strings. This comes up more often than you'd expect.
 
 In the error path, the key appears where an index would: `("tracks", "maths", "minutes")`. Same method, same readability.
 
@@ -216,7 +218,7 @@ A caution about key coercion with untrusted data: `Dict[int, X]` given `{"1": ..
 
 That is often the intent. Where it bites is when the copies were real and no one thought about it. A list of tags is fine to deduplicate. A list of readings from a sensor isn't. A `Set[float]` will silently discard each repeated reading.
 
-Sets are also unordered, so the order you sent isn't the order you get back. `model_dump_json` has to give an array from a thing with no defined order. If order matters, use a list. And if uniqueness matters too, check it in a checker. This Gives you an error instead of silent removal.
+Sets are also unordered, so the order you sent isn't the order you get back. `model_dump_json` has to give an array from a thing with no defined order. If order matters, use a list. And if uniqueness matters too, check it in a checker. This gives you an error instead of silent removal.
 
 ## Tuples check length and position
 
@@ -258,13 +260,13 @@ parsed = lessons.validate_json(payload)
 
 You get the same check, the same error paths. `dump_json` in the other direction. It also works for anything else you can annotate. `Dict[str, float]`, `Optional[int]`, a bare `Lesson`, a union.
 
-Build the adapter once and reuse it. Making a `TypeAdapter` compiles a schema. This Isn't free. Doing it inside a loop is a genuine and easily-missed speed mistake. Module level is the right home.
+Build the adapter once and reuse it. Making a `TypeAdapter` compiles a schema. This isn’t free. Doing it inside a loop is a genuine and easily-missed speed mistake. Module level is the right home.
 
 ## Performance with large collections
 
 This is the place in Pydantic where check cost turns visible. It's worth being concrete.
 
-checking ten thousand items means ten thousand validations. The work happens in Rust. This Makes it far faster than a Python loop doing the same checks. It isn't free.
+checking ten thousand items means ten thousand validations. The work happens in Rust. This makes it far faster than a Python loop doing the same checks. It isn't free.
 
 The key thing is to let the core do the looping. `TypeAdapter(List[Lesson]).validate_python(rows)` validates the whole list in one call into the compiled core. Writing `[Lesson.model_validate(r) for r in rows]` does the same work with ten thousand round trips between Python and Rust. It's measurably slower for no gain.
 
@@ -284,7 +286,7 @@ And apply the rule from the first tier. Validate once, at the boundary. Re-check
 
 ## Mutable defaults, one more time
 
-The rule from the defaults module has a exact shape here that is worth repeating. Sets are where it bites.
+The rule from the defaults module has an exact shape here that is worth repeating. Sets are where it bites.
 
 ```python
 lessons: List[Lesson] = []
@@ -298,7 +300,7 @@ That habit isn't wrong, and `Field(default_factory=list)` is arguably clearer ab
 
 If you want a list. Order preserved, JSON array on the way out &mdash; but copies rejected rather than silently dropped, a set is the wrong tool. Deduplication and rejection are other actions.
 
-The check belongs in a checker. This Is the next tier's subject. The shape is worth seeing now:
+The check belongs in a checker. This is the next tier's subject. The shape is worth seeing now:
 
 ```python
 @field_validator("tags")
@@ -321,7 +323,7 @@ schedule: Dict[str, List[Lesson]]
 
 A failure inside makes `("schedule", "monday", 2, "minutes")`. The key, the index, the field. Four elements. It names just one value in a structure that would else take a while to search by hand.
 
-The hands-on limit is comprehension rather than capability. `Dict[str, List[Dict[str, List[int]]]]` is valid and no one can read it. Once an annotation needs more than about three levels, extracting a model for the inner shape makes the outer one legible again. And gives the inner shape a name. This Is often the thing that was missing.
+The hands-on limit is comprehension rather than capability. `Dict[str, List[Dict[str, List[int]]]]` is valid and no one can read it. Once an annotation needs more than about three levels, extracting a model for the inner shape makes the outer one legible again. And gives the inner shape a name. This is often the thing that was missing.
 
 ## Ordering and duplicates in the output
 
@@ -349,7 +351,7 @@ A last thought that applies to each set you annotate.
 
 The holder type is docs. `List[Lesson]` says these are sorted and repeats are real. `Set[str]` says order is irrelevant and copies aren't a thing. `Dict[str, Stats]` says you look these up by name. `Tuple[int, int]` says just two. The spots mean a thing fixed.
 
-Someone reading the model learns all of that without opening a single function. Choosing the holder carelessly. Defaulting to `List` because it's the one that always works. Throws that away and leaves the reader to infer the rules from the code that consumes it. This Is just the situation models exist to prevent.
+Someone reading the model learns all of that without opening a single function. Choosing the holder carelessly. Defaulting to `List` because it's the one that always works. Throws that away and leaves the reader to infer the rules from the code that consumes it. This is just the situation models exist to prevent.
 
 ## Two failure modes to watch for
 
@@ -363,22 +365,7 @@ Both are the same oversight: a holder's *size* is part of its contract. Leaving 
 
 sets handle many things of the same type. The next module is about the opposite problem. A field that could be one of a few *other* types. How to make that choice clear rather than letting Pydantic guess.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>How do I validate a list of models?</strong> Annotate the field as `list[Lesson]`. Each item is validated as a `Lesson`, and an error names the exact index that failed, such as `lessons.2.title`.
-
-<strong>How do I validate a bare JSON array that has no wrapping model?</strong> Use `TypeAdapter(list[Lesson])` and call `validate_python` or `validate_json` on it. You do not need to invent a wrapper class.
-
-<strong>Can I require at least one item or cap the length?</strong> Yes. Use `Field(min_length=1, max_length=50)` on the list field. The same keywords work on sets, tuples and dicts.
-
-<strong>What happens to duplicates in a `set` of models?</strong> Pydantic builds a set, which needs hashable items. A regular model is not hashable unless it is frozen, so use `frozen=True` or choose a list and check duplicates yourself.
-
-<strong>How does a `dict[str, Module]` field validate?</strong> Both the keys and the values are validated. The key is coerced to `str`, and each value must be a valid `Module`.
-
-<strong>Is a tuple different from a list?</strong> A tuple such as `tuple[int, str]` checks both length and the type at each position. A `tuple[int, ...]` accepts any length of ints.
-
-## Summary
-
-holders validate their contents item by item. Each failure carries a path that names the exact spot. Index for a sequence, key for a mapping. Nothing is skipped because a thing earlier failed. One report covers the whole set.
-
-Choose the holder for what the consumer does with it, not for what is convenient to build. Constrain the size. An unbounded set is an unstated contract. And when the payload is a bare array with no object around it, use `TypeAdapter` rather than inventing a wrapper model to hold it.
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/models/)
+- Continue with [Collections of Models](unions_and_discriminated_unions.html).

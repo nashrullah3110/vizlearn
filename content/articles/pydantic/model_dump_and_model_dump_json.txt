@@ -1,13 +1,15 @@
 title: model_dump and model_dump_json: Getting Data Back Out
 intro: Two methods, a few filters, and the one mistake that raises TypeError.
 
-## Two methods, and the difference that matters
+## The core idea
 
 Validation brings data in. Sooner or later you have to send it back out, as a dictionary for Python code or as JSON for a client. Pydantic has two methods for this, and they look similar enough that people use the wrong one.
 
+## Two methods, and the difference that matters
+
 The first, model_dump, gives you a dictionary of Python values. The second, model_dump_json, gives you a JSON string. The difference matters because some Python values, such as dates and decimals, are not JSON. Pass a dumped dictionary straight to the standard json module and you can hit a TypeError.
 
-This article explains the difference between the two methods and when each one is right. It covers that TypeError and how to avoid it. It then shows how to shape the output, choosing which fields to include and which to leave out. There are three exclusion options that look alike, such as leaving out unset fields, default fields and None values, and the article separates them clearly. By the end you will know how to produce exactly the output a caller expects, and how to do it with the least code. You will also see why the mode="json" variant exists and when it is the better choice over the other two.
+
 
 You will use these two methods in almost every project, so small details add up quickly.
 
@@ -22,7 +24,6 @@ The rule of thumb: **dump for inside, dump_json for outside**. If the data is go
 There's a third form worth knowing: `model_dump(mode="json")` gives you a dict whose values are already JSON-matching. That is what you want when a thing else will do the encoding. A framework, a JSON logger, an SDK that takes a dict.
 
 In Pydantic v1 these were `.dict()` and `.json()`. They still exist in v2 and warn. They're all over the internet.
-
 
 ## Two methods, two purposes
 
@@ -184,6 +185,7 @@ That is truly handy for copying, for caching, and for tests.
 It stops being true the moment you filter. `model_dump(exclude={"minutes"})` makes a dict missing a needed field. Checking it raises. Worth remembering when a filtered dump is being stored and later read back. The filter that made the output tidy also made it un-reloadable.
 
 Round tripping through JSON works too, and is exact for the types Pydantic knows.
+
 ## The TypeError
 
 Everybody meets this once:
@@ -229,11 +231,12 @@ Two methods, for two other exposures.
 
 `Field(exclude=True)` keeps a field out of each output. It's still on the object and still accessible. It simply never appears in a dump. This is right for a password hash, an inner id, or anything the model needs and consumers must not see.
 
-`SecretStr` handles a other risk: the value appearing in a `repr`, a log line or a traceback. It displays as `**********` and needs `.get_secret_value()` to read. This Makes each access deliberate and easy to grep for.
+`SecretStr` handles another risk: the value appearing in a `repr`, a log line or a traceback. It displays as `**********` and needs `.get_secret_value()` to read. This makes each access deliberate and easy to grep for.
 
 They're complementary. A token that must neither be logged nor serialised wants both.
 
 The safest structure of all is a split output model that simply doesn't have the field. You can't leak what isn't there. No future refactor can accidentally drop a flag.
+
 ## Nested behaviour
 
 all recurses. `model_dump()` on a model holding models returns nested plain dicts, and `model_dump_json()` makes nested JSON.
@@ -252,7 +255,7 @@ Those warnings are worth listening to rather than silencing. They mean the objec
 
 Pydantic emits a warning when output meets a value that doesn't match its field's annotation. That happens when `validate_assignment` is off and a thing assigned freely, leaving the object's contents at odds with what the model claims.
 
-Those warnings are worth reading rather than filtering. They mean the serialised output may not match the schema you publish. This Is a defect a consumer will find before you do.
+Those warnings are worth reading rather than filtering. They mean the serialised output may not match the schema you publish. This is a defect a consumer will find before you do.
 
 If you see them regularly, the fix is upstream: turn on `validate_assignment`, or freeze the model so the divergence can't happen.
 
@@ -296,24 +299,13 @@ Serialising the same object again and again. Inside a loop that renders one obje
 
 Neither matters at small scale. Both are visible when a response holds thousands of models.
 
-## Summary
-
-`model_dump()` for Python objects, `model_dump_json()` for text, `model_dump(mode="json")` for a JSON-safe dict.
-
-`json.dumps(model_dump())` is the classic mistake. The dict is full of real objects.
-
-`exclude_unset` for PATCH, and not `exclude_none`. This Discards the gap between "not mentioned" and "please clear this".
-
-`Field(exclude=True)` and `SecretStr` for secrets, and a split output model when you want the promise rather than the setting.
-
 ## A last habit
 
 Look at what your model really emits, once, before it goes anywhere public.
 
-One `print(m.model_dump_json(indent=2))` shows you the keys, the casing, the formats. Anything present that shouldn't be. It's the same five-minute review as printing the schema. It catches a other set of problems. A secret that was never excluded, a nested field no one meant to expose, snake_case where the rest of the API is camelCase.
+One `print(m.model_dump_json(indent=2))` shows you the keys, the casing, the formats. Anything present that shouldn't be. It's the same five-minute review as printing the schema. It catches another set of problems. A secret that was never excluded, a nested field no one meant to expose, snake_case where the rest of the API is camelCase.
 
 The output of a model is a contract with all who consumes it. It's worth having read it.
-
 
 ## Mistakes people make
 
@@ -337,20 +329,6 @@ If only two things live from this module, make them these.
 
 `exclude_none` isn't `exclude_unset`. The first throws away a caller's clear instruction to clear a field. The second preserves it. On a PATCH endpoint that gap is a bug users report and no one can copy.
 
-## Questions people ask
-
-<strong>What is the difference between `model_dump` and `model_dump_json`?</strong> `model_dump` returns a Python dict, while `model_dump_json` returns a JSON string. The dict may hold objects like `datetime` that `json.dumps` cannot handle.
-
-<strong>Why does `json.dumps(m.model_dump())` raise a TypeError?</strong> The dict contains values like datetimes, UUIDs or Decimals. Use `model_dump(mode="json")` or `model_dump_json()` to get JSON-safe output.
-
-<strong>How do I leave out fields?</strong> Use `exclude={...}`, `include={...}`, `exclude_none=True`, `exclude_unset=True` or `exclude_defaults=True`, depending on what you want removed.
-
-<strong>What is the difference between `exclude_unset` and `exclude_defaults`?</strong> `exclude_unset` drops fields the caller never supplied. `exclude_defaults` drops fields whose value equals the default, even if the caller set it explicitly.
-
-<strong>How do I include aliases in the output?</strong> Pass `by_alias=True`. The default output uses Python field names.
-
-<strong>Can I round-trip a dump back into a model?</strong> Usually, with `Model.model_validate(m.model_dump())`. It breaks if you excluded required fields or used a custom serialiser that changes the shape.
-
 ## Output as a contract
 
 The output of a model is a contract, whether or not anybody wrote it down.
@@ -360,3 +338,8 @@ Somebody is parsing those keys. A thing depends on that date format. A client on
 That is why the choices in this module deserve more care than they often get. Adding a found field changes each response the model feeds. Renaming a field breaks parsers. Changing an exclusion set alters what leaves your system, silently and without any test failing.
 
 The hands-on habit is to treat a model that reaches the outside world as a published interface. Know what it emits, be deliberate about changing it. Prefer a split output model when the shape you send differs from the shape you hold. A dedicated class makes the contract clear, checkable and hard to alter by accident. Which is just what a contract should be.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/serialization/)
+- Continue with [model_dump and model_dump_json](aliases.html).

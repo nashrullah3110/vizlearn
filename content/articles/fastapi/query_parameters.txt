@@ -1,13 +1,15 @@
 title: Query Parameters: Everything After the Question Mark
 intro: Optional by default, converted by annotation, and where most of an API's flexibility lives.
 
-## How FastAPI decides
+## The core idea
 
-A query parameter is a named value placed after the question mark in a URL, like page=2 or sort=name. Clients use them to filter, sort, search, and page through results. They are optional by nature, because a URL works fine without them. That makes them the main place where an API gets its flexibility.
+A query parameter is a named value placed after the question mark in a URL, like page=2 or sort=name. Clients use them to filter, sort, search, and page through results.
+
+## How FastAPI decides
 
 In FastAPI you declare a query parameter by adding a function argument that does not appear in the path. The framework notices that and reads it from the query string. Give it a default and it becomes optional. Leave the default off and it becomes required. The type annotation controls conversion, exactly as it does for path parameters.
 
-This article begins with how FastAPI decides where each argument comes from, since the rule is short and worth memorizing. It then covers required versus optional parameters and what a default really means. From there it moves to constraints with the Query function, which lets you set limits on length, value ranges, and patterns.
+
 
 You will also see how lists work, because a query string can repeat a name. Booleans get their own section, since clients write them in many ways and FastAPI accepts several. Closed sets with enums come next.
 
@@ -26,7 +28,6 @@ If it's a dependency, a `Header`, a `Cookie`, or one of the other clear markers,
 else it's a **query param**.
 
 That last rule is the default. It's why a handler with a plain `limit. Int = 10` works with no annotation ceremony at all.
-
 
 ## Anything not in the path is a query parameter
 
@@ -184,6 +185,7 @@ print(client.get("/modules?q=loop").json())
 print()
 print("bad sort:", client.get("/modules?sort=colour").status_code)
 ```
+
 ## Required versus optional
 
 The rule is the same one from the Pydantic track. It's worth restating because it's the most common confusion here too.
@@ -228,7 +230,7 @@ This catches people, and the action is right.
 
 A query string is text. So A flag arrives as a word. `?on=true`, `?on=yes`, `?on=1` and `?on=on` all give `True`. `false`, `no`, `0` and `off` give `False`. Anything else is a 422.
 
-Compare with plain Python. Here `bool("false")` is `True` because the string is non-empty. Pydantic reads the meaning of the word rather than the emptiness of the holder. This Is just what a checkbox or a `?verbose=false` needs.
+Compare with plain Python. Here `bool("false")` is `True` because the string is non-empty. Pydantic reads the meaning of the word rather than the emptiness of the holder. This is just what a checkbox or a `?verbose=false` needs.
 
 ## Closed sets
 
@@ -262,7 +264,7 @@ The gap that resolves most args: a path param **finds** a resource. A query para
 
 `/modules/7` is a thing. `/modules?track=maths` is a filtered set. `/modules/7?verbose=true` is a thing, presented differently.
 
-If dropping the value would leave you handling a other resource, it belongs in the path. If it would leave you handling the same resource with other presentation or filtering, it belongs in the query string.
+If dropping the value would leave you handling another resource, it belongs in the path. If it would leave you handling the same resource with other presentation or filtering, it belongs in the query string.
 
 One hands-on result: query params are the right place for anything optional. A URL with an optional path segment is really two routes.
 
@@ -312,15 +314,6 @@ For most APIs offset is fine and honest. For a large or busy dataset, cursors ar
 
 Either way: cap the limit, return the count, and doc both.
 
-## Summary
-
-Query params are the default sorting, optional when they've a default, needed when they don't. `Query()` adds constraints, metadata and aliases, all of which reach the schema.
-
-Lists come from repeated keys. Booleans read words, not emptiness. `Literal` beats `str` for anything with a fixed set of values. The option is a silent fallback no one notices.
-
-And always cap the limit.
-
-
 ## Mistakes people make
 
 **An uncapped `limit`.** `?limit=1000000` is a valid request your DB will try to meet. `le=100` is the cheapest protection on hand.
@@ -365,26 +358,6 @@ The defaults on a listing endpoint are the action most callers will ever see. Mo
 
 Choosing those defaults on purpose costs nothing and is worth more than any single param you might add later.
 
-## A closing thought
-
-Query params are where an API is most flexible and so where it most easily turns incoherent.
-
-Each one is easy to add, hard to drop. Interacts with every other. The discipline that keeps a listing endpoint healthy isn't technical. Constraints and `Literal` handle the mechanics. But editorial. Deciding what this endpoint is *for*. Declining the params that belong to a other question.
-
-## Questions people ask
-
-<strong>How does FastAPI know a parameter is a query parameter?</strong> Any function parameter that is not in the path and is not a Pydantic model is treated as a query parameter.
-
-<strong>How do I make a query parameter required?</strong> Give it no default value. A parameter with a default, or with None as the default, is optional.
-
-<strong>How do I accept a list of values like ?tag=a&amp;tag=b?</strong> Annotate with Query, for example tags: list[str] = Query(default=[]). Without Query, a list is read as a body.
-
-<strong>Which values count as true for a bool parameter?</strong> FastAPI accepts true, 1, on, yes and their false counterparts, ignoring case. Anything else returns a 422.
-
-<strong>How do I use a query name that isn't a valid Python identifier?</strong> Set an alias, for example item_query: str = Query(alias="item-query").
-
-<strong>Should I use a path or a query parameter?</strong> Use the path for identifying one resource and query parameters for filtering, sorting, and paging a collection.
-
 ## One more on naming
 
 param names are part of the public interface and are read far more often than they're written.
@@ -392,3 +365,8 @@ param names are part of the public interface and are read far more often than th
 Prefer full words to abbreviations. `limit` over `lim`, `offset` over `off`. Prefer the noun a caller would use over the one your DB uses. And keep the same name for the same concept across each endpoint. An API where one route takes `limit` and another takes `page_size` makes each caller check.
 
 `alias` exists for when the wire name and the Python name must differ. It isn't a licence to have three names for the same idea.
+
+## Sources and next steps
+
+- Official reference: [Fastapi documentation](https://fastapi.tiangolo.com/tutorial/query-params/)
+- Continue with [Query Parameters](request_bodies.html).

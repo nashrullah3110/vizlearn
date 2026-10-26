@@ -1,13 +1,15 @@
 title: Enums and Literals: Closed Sets Done Properly
 intro: Two ways to say a field may only hold one of a fixed list, and when each is right.
 
-## The rule a type cannot express
+## The core idea
 
-Many fields should accept only a small, fixed set of values. A status can be draft, published or archived. A level can be beginner, intermediate or advanced. A plain string type cannot express that, because any string would pass. You need a type that names the allowed values.
+Many fields should accept only a small, fixed set of values. A status can be draft, published or archived. A level can be beginner, intermediate or advanced.
+
+## The rule a type cannot express
 
 Python gives you two ways to do it. A Literal lists the exact values inline, right in the annotation. An Enum defines a named class with members, which suits values you use in many places. Pydantic validates both, rejects anything outside the set, and puts the allowed values into the error message and the JSON Schema.
 
-This article explains the rule a plain type cannot express and why a regular expression is the wrong tool for it. It covers Literal first, since it is the lighter option. Then it moves to Enum, including how Pydantic converts between a raw value and a member. You will see why the str mixin matters for JSON, and why leaving it out causes trouble. The final section helps you choose between the two, and covers what happens when new values appear in the data later.
+
 
 Most applications are full of closed sets. Roles, states, categories and plan names all qualify. Getting them wrong does not usually crash anything. It lets a typo travel deep into your system, where it turns up as a strange bug days later. A closed type stops that at the door. The article shows both options side by side, so you can see what each one costs and what each one gives back. It also covers how the choice affects the JSON your API sends, which is where many people first notice a problem. Take a few minutes to learn which one fits which job, and you will make the choice quickly every time after. The payoff is immediate: your error messages will name the allowed values for the caller.
 
@@ -16,7 +18,6 @@ Both choices are quick to learn and easy to apply.
 `track: str` allows each string ever written. Your use allows four. That gap is where invalid data lives. Closing it's one of the highest-value constraints on hand. A misspelt group is a bug that lives for months because nothing rejects it.
 
 There are two good ways to close it, and one common bad one.
-
 
 ## Literal is the smallest way to say it
 
@@ -76,7 +77,7 @@ print("  literal:", WithLiteral.model_json_schema()["properties"]["track"])
 
 **Static checking.** Mypy knows the four values of a `Literal` and will tell you when a compare can never be true. It has no idea what a regular formula permits.
 
-**Maintenance.** Adding a fifth track means editing a regular formula. This Is a place people make mistakes, versus adding a word to a list.
+**Maintenance.** Adding a fifth track means editing a regular formula. This is a place people make mistakes, versus adding a word to a list.
 
 The only case for a pattern is a set that is truly open. A format rather than a list. Slugs, postcodes, identifiers. If you can enumerate the values, enumerate them.
 
@@ -198,6 +199,7 @@ for bad in [3, "2"]:                        # note: "2" is NOT coerced
 # A Literal matches the value as given. Unlike an int field, it does not
 # parse "2" into 2 first - the literal members are compared directly.
 ```
+
 ## Literal
 
 ```python
@@ -207,6 +209,7 @@ track: Literal["maths", "python", "dsa", "ml"]
 The permitted values are written where the type goes. Anything else raises, with an error that lists the options.
 
 It's the smallest thing that works, it needs no imports beyond `typing`. Mypy understands it. So your own code gets checked against the same set. A compare against `"mathematics"` is flagged by your editor before it ever runs.
+
 ## Enum
 
 An `Enum` gives the set an identity:
@@ -228,13 +231,13 @@ Three things follow that a `Literal` doesn't give you.
 
 ## The str mixin is not optional
 
-Write `class Track(str, Enum)`, not `class Track(Enum)`, unless you've a exact reason.
+Write `class Track(str, Enum)`, not `class Track(Enum)`, unless you've an exact reason.
 
 Without the mixin, members aren't strings. `Track.MATHS == "maths"` is `False`. This Breaks each compare in code that doesn't know about the enum. `json.dumps` refuses them. String formatting makes `Track.MATHS` rather than `maths`.
 
 With the mixin, members *are* strings with extra structure. each compare works, output is plain text. Code that was written before the enum existed keeps working.
 
-Python 3.11 added `StrEnum`. This Is the same idea with a cleaner spelling. Either is fine. The plain `Enum` is the one to avoid.
+Python 3.11 added `StrEnum`. This is the same idea with a cleaner spelling. Either is fine. The plain `Enum` is the one to avoid.
 
 ## What comes out when you dump
 
@@ -312,7 +315,7 @@ With a `Literal`, the default is the value: `track: Track = "maths"`.
 
 With an `Enum`, the default is most times the member: `track: Track = Track.MATHS`. The string also works. Check coerces it. The member reads better and is checked by your editor.
 
-One caution with enum defaults: `= Track.MATHS` is checked once at class-meaning time. This Is fine because enum members are singletons and immutable. This is one of the few mutable-looking defaults that is truly safe.
+One caution with enum defaults: `= Track.MATHS` is checked once at class-meaning time. This is fine because enum members are singletons and immutable. This is one of the few mutable-looking defaults that is truly safe.
 
 ## Extending a set safely
 
@@ -334,10 +337,6 @@ Two cases where reaching for an enum causes more trouble than it blocks.
 
 The rule of thumb: enumerate when the set is small, stable and part of your domain's vocab. else validate membership another way.
 
-## Summary
-
-`Literal` for small, local sets and for critic tags. A named `Literal` alias when the same small set is used in a few places. `Enum` when the set is domain vocab, needs action, or appears across a public API where consumers gain from a named type. `str, Enum` always, never a bare `Enum`. And never a bare `str` with a comment.
-
 ## The underlying point
 
 A closed set is one of the few pieces of domain knowledge that a type system can hold fully.
@@ -350,24 +349,15 @@ That is why it's worth the small effort of not writing `str`. You get an exact e
 
 When you add an enum to an existing field, run your data through it before you deploy.
 
-A `str` field that has been accepting anything for a year almost certainly holds values no one expected. A trailing space, a other case, an old name from before a rename, a placeholder somebody typed once. each one of those will start raising the moment the annotation tightens.
+A `str` field that has been accepting anything for a year almost certainly holds values no one expected. A trailing space, another case, an old name from before a rename, a placeholder somebody typed once. each one of those will start raising the moment the annotation tightens.
 
-Finding them beforehand is a short script and an afternoon. Finding them later is an incident. The failures arrive on reads of existing data rather than on new input. This Is the direction no one tests.
-
-## Questions people ask
-
-<strong>When should I use `Literal` and when an `Enum`?</strong> Use `Literal` for a short, fixed set of values that appear only in this one place. Use an `Enum` when the set has a name, is shared across models, or needs methods.
-
-<strong>Why does my enum dump as `<Level.easy: 'easy'>`?</strong> A plain `Enum` dumps as the member in Python mode. Inherit from `str` (`class Level(str, Enum)`) or call `model_dump(mode="json")` to get the plain value.
-
-<strong>How do I accept enum values case-insensitively?</strong> Add a `mode="before"` field validator that lowercases the input, or define `_missing_` on the enum. Pydantic itself matches the value exactly.
-
-<strong>What error do I get for a value outside the set?</strong> A `literal_error` for `Literal` and an `enum` error for enums, each listing the permitted values in the message.
-
-<strong>Can I use `Literal` with non-string values?</strong> Yes. Integers, booleans, `None` and members of an enum all work, for example `Literal[1, 2, 3]`.
-
-<strong>How do I add a new value without breaking old data?</strong> Adding a member only widens what is accepted, so old data still validates. Removing one is the breaking change, because stored values may no longer parse.
+Finding them beforehand is a short script and an afternoon. Finding them later is an incident. The failures arrive on reads of existing data rather than on new input. This is the direction no one tests.
 
 ## Next
 
 The next module covers the types Pydantic already knows how to parse for you. Dates, times, UUIDs and decimals. And the traps in each, above all the two that cost money: floats and timezones.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/types/)
+- Continue with [Enums and Literals](dates_uuids_and_decimals.html).

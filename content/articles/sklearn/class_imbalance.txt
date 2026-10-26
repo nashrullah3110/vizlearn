@@ -1,9 +1,11 @@
 title: Class Imbalance: A Practical Guide
 intro: The notable class is often the rare one. Four remedies exist, they aren't equally good. The first thing to check is whether you need one at all.
 
-## What goes wrong
+## The core idea
 
-Class imbalance is present in most real classification problems. Fraud is rare. Equipment failure is rare. Disease is rare. Click-through is rare. The class you care about is almost always the minority.
+Class imbalance is present in most real classification problems. Fraud is rare. Equipment failure is rare.
+
+## What goes wrong
 
 A standard classifier trained on imbalanced data will mostly predict the majority class. It gets a high accuracy by ignoring the minority entirely. The accuracy number looks good, the model is useless, and nothing in the default output warns you.
 
@@ -11,14 +13,13 @@ The issue is not that the algorithm is broken. The algorithm is doing exactly wh
 
 Fixing imbalance requires changing the objective, changing the data, or changing the threshold. scikit-learn supports all three. `class_weight="balanced"` adjusts the loss function. `RandomOverSampler` and `RandomUnderSampler` adjust the data. Moving the decision threshold adjusts the trade-off between false positives and false negatives.
 
-This page covers the symptoms, the diagnostics and the remedies. It also covers why you should check whether imbalance is actually hurting before applying a fix.
+
 
 When one class is rare, the model has almost no incentive to find it. Predicting the majority for all is right 98% of the time. The loss function. Which counts each row equally. Says that is great.
 
 The first editor shows the result: 96% fit. 3 of 49 positives found. The confusion mat makes it concrete, with 46 misses and zero false alarms. That isn't a broken fit. It's a correct optimisation of the wrong goal.
 
 The problems compound. Fit is uninformative, as the classification-metrics module showed. A random split can leave almost no positives in the test set. The metrics found from them are noise. And the default 0.5 threshold, chosen for weighed classes, is far from where it should be.
-
 
 ## What the default model does
 
@@ -193,6 +194,7 @@ print()
 print("imbalance is not the problem by itself. the problem is imbalance")
 print("plus classes the features cannot separate.")
 ```
+
 ## Check whether you have a problem
 
 Before reaching for a remedy, find out whether imbalance is really hurting.
@@ -213,11 +215,11 @@ This should almost always be tried first. It often makes the others unneeded. It
 
 The second editor shows what it does: recall rises from 0.06 to 0.55, precision falls from 1.00 to 0.06. Fit from 0.96 to 0.65. That is a genuine trade rather than an improvement. Whether it's worth it depends fully on the costs. Note that on F1 it didn't beat the default at all.
 
-`class_weight` can also take a dict. This Is how you express a exact cost ratio rather than accepting the inverse-rate default.
+`class_weight` can also take a dict. This is how you express an exact cost ratio rather than accepting the inverse-rate default.
 
 **Resample.** Oversample the minority by duplicating rows, or undersample the majority by discarding them, until the classes are weighed.
 
-Both are blunter than the options. Oversampling shows the model the same rows again and again. This Pushes storing them. Undersampling throws away real data. This Is wasteful when the majority isn't huge. SMOTE and its relatives, from the `imbalanced-learn` package, make synthetic minority points between existing ones instead of duplicating. Better in principle. It invents data, which on a truly rare class can invent structure that isn't there.
+Both are blunter than the options. Oversampling shows the model the same rows again and again. This Pushes storing them. Undersampling throws away real data. This is wasteful when the majority isn't huge. SMOTE and its relatives, from the `imbalanced-learn` package, make synthetic minority points between existing ones instead of duplicating. Better in principle. It invents data, which on a truly rare class can invent structure that isn't there.
 
 **Collect more of the minority.** Rarely available and by far the best when it's.
 
@@ -237,7 +239,7 @@ And what you do to the training data, **never resample the test data**. The test
 
 Fit is out. Beyond that, the choice follows the costs, as the metrics modules argued.
 
-**Recall** when missing a case is costly: disease, fraud, safety. **Precision** when a false alarm is costly. **F1** or **weighed fit** for a single summary. **Mean precision** rather than ROC AUC for the curve summary. ROC AUC stays flatteringly high when negatives dominate. 0.825 against an mean precision of 0.134 in the thresholds module.
+**Recall** when missing a case is costly: disease, fraud, safety. **Precision** when a false alarm is costly. **F1** or **weighted F1 score** for a single summary. **Mean precision** rather than ROC AUC for the curve summary. ROC AUC stays flatteringly high when negatives dominate. 0.825 against a mean precision of 0.134 in the thresholds module.
 
 Whichever you pick, pass it as `scoring=` to any cross-validation or search. Leaving it at the default tunes for fit. This On this data means tuning towards skipping the minority.
 
@@ -267,7 +269,7 @@ For ranking and for thresholding that doesn't matter. Both are rule to a monoton
 
 `class_weight` has a milder version of the same effect. Threshold tuning has none at all. It leaves the fitted model untouched. One more reason it's the remedy to try first.
 
-If you do resample and need honest chances, recalibrate afterwards on data with the real class balance. This Is what `CalibratedClassifierCV` on an unresampled validation set does.
+If you do resample and need honest chances, recalibrate afterwards on data with the real class balance. This is what `CalibratedClassifierCV` on an unresampled validation set does.
 
 <strong>How imbalanced is too imbalanced?</strong> There's no threshold. A 1% problem with a strong signal is easy and a 30% problem with a weak one is hard. Measure recall on the minority rather than counting the ratio.
 
@@ -281,9 +283,9 @@ If you do resample and need honest chances, recalibrate afterwards on data with 
 
 Imbalance doesn't affect each estimator equally, and knowing the pattern saves some experimentation.
 
-**any of it cutting an mean loss** feels it most right. Logistic regression, SVMs, neural networks, grad boosting. each row adds equally to the goal. The rare class adds almost nothing and the fit skips it. All of them accept `class_weight` or `sample_weight`. This Is the direct fix.
+**any of it cutting a mean loss** feels it most right. Logistic regression, SVMs, neural networks, grad boosting. each row adds equally to the goal. The rare class adds almost nothing and the fit skips it. All of them accept `class_weight` or `sample_weight`. This is the direct fix.
 
-**Trees and forests** are affected through the split criterion. A split that isolates a handful of minority rows barely reduces impurity. It's rarely chosen. `min_samples_leaf` can prevent it fully. A leaf size of 20 on a class with 40 members is a severe constraint no one intended. Forests also suffer at the bootstrap stage. Here A rare class can be almost absent from some samples. `class_weight="balanced_subsample"` reweights per bootstrap rather than globally. This Is the version to use there.
+**Trees and forests** are affected through the split criterion. A split that isolates a handful of minority rows barely reduces impurity. It's rarely chosen. `min_samples_leaf` can prevent it fully. A leaf size of 20 on a class with 40 members is a severe constraint no one intended. Forests also suffer at the bootstrap stage. Here A rare class can be almost absent from some samples. `class_weight="balanced_subsample"` reweights per bootstrap rather than globally. This is the version to use there.
 
 **k-NN** is affected geometrically: with 98% negatives, the nearest neighbours of almost any point are minus. A minority point has to be in a very pure pocket to be found. Lowering `n_neighbors` helps, and `weights="distance"` helps more.
 
@@ -293,9 +295,9 @@ The general rule: the more a model means across all rows at once, the more the r
 
 <strong>Can I combine the remedies?</strong> Yes. It's easy to overshoot. `class_weight="weighed"` plus oversampling plus a lowered threshold corrects three times for the same thing and floods you with false positives. Apply one, measure, then decide.
 
-<strong>What about multi-class imbalance?</strong> The same ideas: stratify, use macro blending so small classes count. Pass `class_weight="weighed"`. This Handles any number of classes.
+<strong>What about multi-class imbalance?</strong> The same ideas: stratify, use macro blending so small classes count. Pass `class_weight="weighed"`. This handles any number of classes.
 
-<strong>My minority class has 30 examples in total. What now?</strong> Very little, honestly. Thirty examples can't support a model of any cost. Each metric found from a handful of test cases moves in large steps. The productive answers are collecting more, widening the meaning, or treating it as outlier spotting rather than classification - `IsolationForest` and `OneClassSVM` model the majority and flag departures from it. This Needs no minority examples at all.
+<strong>My minority class has 30 examples in total. What now?</strong> Very little, honestly. Thirty examples can't support a model of any cost. Each metric found from a handful of test cases moves in large steps. The productive answers are collecting more, widening the meaning, or treating it as outlier spotting rather than classification - `IsolationForest` and `OneClassSVM` model the majority and flag departures from it. This needs no minority examples at all.
 
 <strong>Why did class_weight make my fit worse?</strong> Because it's supposed to. Reweighting buys recall on the minority with precision and fit on the majority. If fit is what you're judged on, don't reweight - and reconsider whether fit is the right judgement.
 
@@ -306,20 +308,7 @@ The general rule: the more a model means across all rows at once, the more the r
 3. <strong>Watch the leak.</strong> In the fourth editor, the labels are random. The first number isn't a result.
 4. <strong>Make it separable.</strong> In the last editor, lower `class_sep` to 0.5 and watch the need for a remedy return.
 
-## Questions people ask
+## Sources and next steps
 
-<strong>Why does accuracy fail with imbalanced classes?</strong> A model that always predicts the majority class gets a high score yet finds no positives. Use recall, precision or average precision.
-
-<strong>What is the cheapest fix?</strong> Set `class_weight='balanced'`, which reweights the loss without changing the data.
-
-<strong>When should I use SMOTE or oversampling?</strong> When weights are not enough. Apply resampling inside the training folds only, using an imbalanced-learn pipeline.
-
-<strong>Does resampling change predicted probabilities?</strong> Yes. They no longer match real-world rates, so recalibrate or move the threshold.
-
-<strong>Should I resample the test set?</strong> No. The test set must keep the real class ratio so the numbers reflect production.
-
-<strong>Which models suffer most from imbalance?</strong> Those trained to minimise overall error, like logistic regression and plain trees. Boosting with class weights usually copes better.
-
-## Where this leaves you
-
-Stratify the split, drop fit, and check whether the model is really struggling before doing any of it. If it's, move the threshold first, reach for `class_weight` second, and resample only inside the folds. Never before the split, and never on the test set.
+- Official reference: [Sklearn documentation](https://scikit-learn.org/stable/modules/classes.html#module-sklearn.utils.class_weight)
+- Continue with [Class Imbalance](cross_validation.html).

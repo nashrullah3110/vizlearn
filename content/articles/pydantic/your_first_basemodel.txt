@@ -1,9 +1,11 @@
 title: Your First BaseModel, End to End
 intro: Defining a model, creating one, reading it back, and getting the data out again.
 
-## The whole idea in three lines
+## The core idea
 
-A BaseModel is the class you inherit from to get everything Pydantic offers. You list the fields you expect, give each one a type, and the class does the rest. It checks the data when you create an object, converts what it can, and refuses what it cannot.
+A BaseModel is the class you inherit from to get everything Pydantic offers. You list the fields you expect, give each one a type, and the class does the rest.
+
+## The whole idea in three lines
 
 This is the first model you will write, so the article stays small on purpose. You will see how little code it takes to define one, what happens when you create an instance from clean data, and what the object lets you do afterwards. Fields become attributes. The object knows how to describe itself, compare itself to another, and copy itself.
 
@@ -25,7 +27,6 @@ class Module(BaseModel):
 That is the entire meaning. There's no `__init__`, no set of `self.title = title`, no check code. Pydantic reads the annotations when the class is created and builds the machinery from them. A constructor, a checker, a serialiser, an equality method and a readable `repr`.
 
 The economy matters more than it first appears. Adding a field is one line. In the hand-written equal it's four. The param, the set, the check. The line in `to_dict`. Those four drift apart over time. The drift is where bugs live.
-
 
 ## Subclass, annotate, done
 
@@ -187,6 +188,7 @@ print("detail  :", full.model_dump())
 print()
 print("summary :", summary.model_dump())
 ```
+
 ## Creating one
 
 Models take keyword args:
@@ -217,7 +219,7 @@ m.minutes + 1    # 12  - a real int, not a string
 
 That last line is the payoff. Downstream code doesn't need to check or convert anything. The conversion already happened at the door.
 
-Models aren't dicts. `m["title"]` raises, and asking for a field that doesn't exist raises `AttributeError` like any other object. This is a feature. A typo in a dict key returns `None` or a `KeyError` deep inside a function, whereas a typo in an field name is caught at once and is visible to your editor's autocomplete.
+Models aren't dicts. `m["title"]` raises, and asking for a field that doesn't exist raises `AttributeError` like any other object. This is a feature. A typo in a dict key returns `None` or a `KeyError` deep inside a function, whereas a typo in a field name is caught at once and is visible to your editor's autocomplete.
 
 ## Methods and behaviour
 
@@ -234,7 +236,7 @@ class Module(BaseModel):
 
 This is worth doing. Logic that depends only on a model's own fields belongs on the model. Here It's discoverable and testable, rather than in a loose function three modules away.
 
-Later in this track you'll meet `@computed_field`. This Is the version of this that also appears in the serialised output.
+Later in this track you'll meet `@computed_field`. This is the version of this that also appears in the serialised output.
 
 ## Getting the data out
 
@@ -242,7 +244,7 @@ Two methods, and the gap between them is worth getting right early.
 
 `model_dump()` returns a dict of Python objects. A `datetime` field comes back as a `datetime`, a `Decimal` as a `Decimal`. Use it when the data is staying inside your program. Passing to another function, feeding a template, checking in a test.
 
-`model_dump_json()` returns a JSON string, converting all into a thing JSON can represent. Use it when the data is leaving. An HTTP response, a message queue, a file on disk. It handles the types that plain `json.dumps` refuses outright. This Is a small mercy you'll appreciate the first time a `datetime` appears in a payload.
+`model_dump_json()` returns a JSON string, converting all into a thing JSON can represent. Use it when the data is leaving. An HTTP response, a message queue, a file on disk. It handles the types that plain `json.dumps` refuses outright. This is a small mercy you'll appreciate the first time a `datetime` appears in a payload.
 
 Both take args that shape the output. `include`, `exclude`, `exclude_none`, `by_alias`. And those get a module of their own in the output tier.
 
@@ -274,7 +276,7 @@ split models say what they mean. `ModuleSummary` has two needed fields and is ho
 
 Fields have an order &mdash; the order you wrote them &mdash; and although you can't pass them positionally, the order isn't cosmetic.
 
-It finds the order of keys in `model_dump()` and in the made JSON. This Matters when a human reads the output or when a thing downstream diffs two payloads. It finds the order fields appear in the made schema. So in API docs. And it finds check order. This Turns large once you write checkers that look at before-checked fields.
+It finds the order of keys in `model_dump()` and in the made JSON. This matters when a human reads the output or when a thing downstream diffs two payloads. It finds the order fields appear in the made schema. So in API docs. And it finds check order. This turns large once you write checkers that look at before-checked fields.
 
 The hands-on advice is to order fields the way you'd explain them. Identity first, then the key fields, then the optional extras. It costs nothing and each reader of the output gains.
 
@@ -342,7 +344,7 @@ Be careful with one thing: a subclass can't make an from parent needed field opt
 
 ## What `repr` gives you
 
-Printing a model prints its fields. This Is more handy than the default `<Module object at 0x...>` and is one of the small things that makes models pleasant in a REPL or a log line.
+Printing a model prints its fields. This is more handy than the default `<Module object at 0x...>` and is one of the small things that makes models pleasant in a REPL or a log line.
 
 You can keep a field out of that output with `Field(repr=False)`. The obvious use being anything secret. A password hash or an API token in a model that gets logged is a genuine incident waiting to happen. `repr=False` is the one-word fix.
 
@@ -375,22 +377,13 @@ Frozen, because it arrives from outside and is then only read. Two needed fields
 
 Nothing exotic, and it already gives you check, coercion, equality, a readable `repr`, JSON in both directions and a schema. That ratio. How much you get for how little you wrote. Is the reason the library is worth learning properly rather than copying from examples.
 
-## Questions people ask
-
-<strong>How do I define a model?</strong> Subclass `BaseModel` and add annotated fields, for example `title: str` and `minutes: int`.
-
-<strong>How do I create an instance?</strong> Call the class with keyword arguments, or use `Model.model_validate(data)` with a dict. Positional arguments are not accepted.
-
-<strong>How do I turn a model back into a dict or JSON?</strong> Use `model_dump()` for a dict and `model_dump_json()` for a JSON string.
-
-<strong>Are model instances mutable?</strong> Yes by default. Set `frozen=True` in `model_config` to make them immutable.
-
-<strong>How do I copy a model with one change?</strong> Use `m.model_copy(update={"minutes": 12})`. The update values are not validated.
-
-<strong>Can a required field come after one with a default?</strong> Yes. Unlike dataclasses, Pydantic allows it, and fields keep the order you wrote them for printing and dumping.
-
 ## What to try next
 
 Change a thing in the editors above and watch what happens. Add a field to a model and leave it out of the constructor call. Pass `minutes` as `"11"` and print its type. Drop a field from the JSON before checking it back.
 
 The next module is just about those conversions. Which values Pydantic will quietly accept and turn into the type you asked for, and which it will refuse.
+
+## Sources and next steps
+
+- Official reference: [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/models/)
+- Continue with [Your First BaseModel](types_and_coercion.html).

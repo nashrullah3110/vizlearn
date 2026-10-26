@@ -1,9 +1,11 @@
 title: Performance
 intro: Where the time really goes, in the order worth fixing it.
 
-## The order to work in
+## The core idea
 
 Performance tuning in pandas follows a predictable order. The biggest gains come from the simplest changes, and the biggest mistake is starting with the hardest optimisation while ignoring the obvious one.
+
+## The order to work in
 
 The most common performance problem is per-row Python. An apply call with axis=1, an iterrows loop, or a list comprehension that processes one row at a time. Each of these drops out of compiled code and into the Python interpreter, which is roughly a hundred times slower. Replacing the loop with a vectorised column operation gives you that factor back.
 
@@ -26,7 +28,6 @@ Pandas speed work is unusually predictable. In descending order of payoff:
 5. **Reach past pandas.** When the data or the method truly doesn't suit it.
 
 Working down that list in order means the large wins come first. Working up it means spending an afternoon on step 4 while a `apply(axis=1)` sits untouched.
-
 
 ## Per-row Python is the whole story
 
@@ -207,6 +208,7 @@ print("Slowest here: %s" % max([("groupby", a), ("sort", b),
                                key=lambda p: p[1])[0])
 print("Optimising the arithmetic would have gained nothing.")
 ```
+
 ## Per-row Python
 
 `df.apply(func, axis=1)`, `iterrows`, and a `for` loop over rows all do the same thing. Call back into the interpreter once per row.
@@ -255,11 +257,11 @@ The last editor times four steps on the same frame. The ranking isn't what most 
 
 Two rules that save the most wasted effort:
 
-**Profile the real workload.** A small sample has other traits. Other memory pressure, other cache action, at times a other code path.
+**Profile the real workload.** A small sample has other traits. Other memory pressure, other cache action, at times another code path.
 
 **Fix the top item and measure again.** The bottleneck moves. The second item on the first list is often no longer second.
 
-And keep the ceiling in view: an step taking 5% of the runtime can't give back more than 5%. Cleverly it's rewritten.
+And keep the ceiling in view: a step taking 5% of the runtime can't give back more than 5%. Cleverly it's rewritten.
 
 ## When to leave pandas
 
@@ -283,7 +285,7 @@ For a whole script, `cProfile` finds the hot function and `line_profiler` finds 
 
 `df.info(memory_usage="deep")` and `memory_profiler` cover the memory side.
 
-Two rules save the most wasted effort. Profile the **real** workload. A small sample has other cache action and at times takes a other code path. And re-profile after each fix, because the bottleneck moves.
+Two rules save the most wasted effort. Profile the **real** workload. A small sample has other cache action and at times takes another code path. And re-profile after each fix, because the bottleneck moves.
 
 ## Reducing before combining
 
@@ -407,48 +409,9 @@ Some things are already fast and are often rewritten for no gain:
 
 **Anything running once on a small frame.**
 
-Rewriting these makes less readable code and no measurable gain. This Is a bad trade. The reading step exists to prevent just that.
+Rewriting these makes less readable code and no measurable gain. This is a bad trade. The reading step exists to prevent just that.
 
-## A summary
+## Sources and next steps
 
-Drop per-row Python first. It's often the whole problem.
-
-Never grow a frame in a loop.
-
-Right-size dtypes &mdash; groups and narrow numerics.
-
-Filter early, so all downstream does less.
-
-`itertuples` if you must iterate. Never `iterrows`.
-
-`inplace=True` isn't an tuning.
-
-Measure the real workload, fix the top item, measure again.
-
-And know when the answer is a other tool. When the data doesn't fit, no pandas technique fixes it.
-
-## Questions people ask
-
-<strong>Why is my pandas code slow?</strong> The usual cause is a Python loop over rows: iterrows, apply with axis=1, or growing a frame in a loop. Replace it with whole-column operations.
-
-<strong>Is iterrows ever acceptable?</strong> For small frames or one-off scripts, yes. On more than a few thousand rows, vectorise instead, because it is typically far faster.
-
-<strong>How do I reduce memory use quickly?</strong> Read only the columns you need, use category for repeated strings, and downcast numbers. Check the result with memory_usage(deep=True).
-
-<strong>How do I find out which line is slow?</strong> Time suspects with %timeit in a notebook or time.perf_counter, and use a profiler such as cProfile for a whole script. Measure first, because the slow step is often not where you expect.
-
-<strong>Should I filter before or after merging?</strong> Before. Reducing the rows and columns first makes the merge smaller and faster.
-
-<strong>When should I switch away from pandas?</strong> When data no longer fits in memory or operations remain slow after vectorising. Polars, DuckDB or Dask handle larger data and parallel work.
-
-## A closing note
-
-Pandas speed is unusually predictable. This Makes it unusually easy to get right.
-
-Almost each slow script has the same cause: Python running once per row, spelled as `apply(axis=1)`, `iterrows`, or a loop. Dropping it's worth one or two orders of magnitude. Nothing else on the list comes close.
-
-After that the wins are structural rather than clever. Don't grow frames in loops, filter before finding rather than after. Give columns types that fit the data. None of these need knowing anything about pandas internals.
-
-What does need discipline is measuring. The bottleneck is regularly not where it feels like it's. The steps people most often rewrite. Column math, boolean masks, group-by with a string aggregation. Are already compiled and already fast.
-
-And there's a ceiling. When the data no longer fits in memory, no pandas technique fixes it. The answer is Polars, DuckDB, Dask or a DB.
+- Official reference: [Pandas documentation](https://pandas.pydata.org/docs/user_guide/enhancingperf.html)
+- Continue with [Performance](method_chaining.html).
