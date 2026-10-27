@@ -140,6 +140,7 @@ def visual(q):
                         <div class="vz-iv-legend" aria-label="Visualization state key"></div>
                         <div class="vz-iv-reads"></div>
                         <p class="vz-iv-caption" aria-live="polite"></p>
+                        <div class="vz-iv-timeline" role="group" aria-label="Choose a step"></div>
                         <input class="vz-iv-scrub" type="range" min="0" value="0"
                                aria-label="Step position">
                         <div class="vz-iv-controls">

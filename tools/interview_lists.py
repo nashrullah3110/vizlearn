@@ -1556,7 +1556,7 @@ print("multiplication. For a sum-based version they would be 0 instead.")
 def _intervals_frames():
     data = [(1, 3), (2, 6), (8, 10), (9, 12), (15, 18)]
     out = [frame(pairs([("%d-%d" % iv, "unmerged") for iv in data],
-                       {}, label="sorted by start"),
+                       {}, label="sorted by start", view="intervals"),
                  "Sort by start first. That is what makes one pass enough - an "
                  "interval can only ever overlap the one before it.",
                  {"merged": 0})]
@@ -1569,7 +1569,7 @@ def _intervals_frames():
             merged.append([lo, hi])
         out.append(frame(pairs([("%d-%d" % tuple(m), "kept") for m in merged],
                                {"%d-%d" % tuple(merged[-1]): "hit" if touches else "lo"},
-                               label="merged so far"),
+                               label="merged so far", view="intervals"),
                          "%d-%d %s" % (lo, hi,
                                        "overlaps the last one, so extend it to %d."
                                        % merged[-1][1] if touches

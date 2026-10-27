@@ -3382,9 +3382,23 @@ def _edit_frames():
         table[i][0] = i
     for j in range(cols):
         table[0][j] = j
-    out = [frame(pairs([("row 0", " ".join(str(x) for x in table[0])),
-                        ("col 0", " ".join(str(table[i][0]) for i in range(rows)))],
-                       {"row 0": "lo"}, label="base cases"),
+    row_labels = ["ε"] + list(a)
+    column_labels = ["ε"] + list(b)
+    filled = {(0, j) for j in range(cols)} | {(i, 0) for i in range(rows)}
+
+    def matrix(active=None):
+        items = []
+        for r in range(rows):
+            for c in range(cols):
+                state = "hit" if (r, c) == active else (
+                    "done" if (r, c) in filled else "dim")
+                value = str(table[r][c]) if (r, c) in filled else "·"
+                items.append(cell(value, state))
+        return row(items, label="dp[i][j] · %r → %r" % (a, b),
+                   view="matrix", index=False, columns=cols,
+                   row_labels=row_labels, column_labels=column_labels)
+
+    out = [frame(matrix(),
                  "The edges are free: turning a prefix into the empty string "
                  "costs one deletion per character.",
                  {"filled": rows + cols - 1})]
@@ -3394,8 +3408,8 @@ def _edit_frames():
             table[i][j] = (table[i - 1][j - 1] if same
                            else 1 + min(table[i - 1][j - 1], table[i - 1][j],
                                         table[i][j - 1]))
-            out.append(frame([marked([str(x) for x in table[i]],
-                                     {j: "hit"}, label="row %d (%r)" % (i, a[i - 1])),
+            filled.add((i, j))
+            out.append(frame([matrix((i, j)),
                               pairs([("comparing", "%r vs %r" % (a[i - 1], b[j - 1])),
                                      ("cost here", table[i][j])],
                                     {"cost here": "hit"}, label="cell")],
@@ -3404,8 +3418,7 @@ def _edit_frames():
                                 "whatever the diagonal held" if same
                                 else "1 + the cheapest of the three neighbours"),
                              {"i": i, "j": j, "cost": table[i][j]}))
-    out.append(frame(marked([str(x) for x in table[-1]], {cols - 1: "hit"},
-                            label="last row"),
+    out.append(frame(matrix(),
                      "Bottom-right is the answer: %d edit(s) to turn %r into %r."
                      % (table[-1][-1], a, b),
                      {"i": rows - 1, "j": cols - 1, "cost": table[-1][-1]}))

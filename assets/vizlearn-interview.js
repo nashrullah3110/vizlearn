@@ -117,6 +117,31 @@
     return wrap;
   }
 
+  function drawPairs(row, previous) {
+    var wrap = el('div', 'vz-iv-row vz-iv-row-pairs');
+    if (row.label) wrap.appendChild(el('span', 'vz-iv-rowlabel', row.label));
+    var table = el('div', 'vz-iv-pair-table');
+    table.setAttribute('role', 'table');
+    table.setAttribute('aria-label', row.label || 'Current key and value state');
+    (row.items || []).forEach(function (item, index) {
+      var value = item.v == null ? '' : String(item.v);
+      var split = value.indexOf(' : ');
+      var key = split >= 0 ? value.slice(0, split) : '';
+      var result = split >= 0 ? value.slice(split + 3) : value;
+      var old = previous && previous.items ? previous.items[index] : null;
+      var state = item.k ? ' is-' + item.k : '';
+      var line = el('div', 'vz-iv-pair' + state + (changed(item, old) ? ' is-changed' : ''));
+      line.setAttribute('role', 'row');
+      line.setAttribute('aria-label', (key ? key + ': ' : '') + result + (item.k ? ', ' + stateText(item.k) : ''));
+      line.appendChild(el('span', 'vz-iv-pair-key', key || 'value'));
+      line.appendChild(el('span', 'vz-iv-pair-value', result));
+      if (item.tag) line.appendChild(el('span', 'vz-iv-tag', item.tag));
+      table.appendChild(line);
+    });
+    wrap.appendChild(table);
+    return wrap;
+  }
+
   function drawStack(row, previous) {
     var wrap = el('div', 'vz-iv-row vz-iv-row-stack');
     if (row.label) wrap.appendChild(el('span', 'vz-iv-rowlabel', row.label));
@@ -242,11 +267,101 @@
     return wrap;
   }
 
+  function drawIntervals(row) {
+    var parsed = (row.items || []).map(function (item) {
+      var value = String(item.v == null ? '' : item.v);
+      var split = value.indexOf(' : ');
+      var range = split < 0 ? value : value.slice(0, split);
+      var state = split < 0 ? '' : value.slice(split + 3);
+      var match = range.match(/^(-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)$/);
+      return match ? { item: item, start: Number(match[1]), end: Number(match[2]), state: state } : null;
+    }).filter(Boolean);
+    var wrap = el('div', 'vz-iv-row vz-iv-row-intervals');
+    if (row.label) wrap.appendChild(el('span', 'vz-iv-rowlabel', row.label));
+    if (!parsed.length) return drawCells(row, 'pairs', null);
+
+    var min = Math.min.apply(null, parsed.map(function (x) { return x.start; }));
+    var max = Math.max.apply(null, parsed.map(function (x) { return x.end; }));
+    var span = Math.max(1, max - min);
+    var left = 48, right = 18, width = 800;
+    var lane = 44, top = 10, axis = 28;
+    var height = top + parsed.length * lane + axis;
+    var svg = svgEl('svg', {
+      viewBox: '0 0 ' + width + ' ' + height,
+      role: 'img',
+      'aria-label': 'Intervals on a shared number line: ' + parsed.map(function (x) {
+        return x.start + ' to ' + x.end + (x.state ? ', ' + x.state : '');
+      }).join('; ')
+    });
+    svg.classList.add('vz-iv-intervals-svg');
+    var plot = width - left - right;
+    var ticks = span <= 8 ? Math.ceil(span) : 4;
+    for (var t = 0; t <= ticks; t++) {
+      var value = min + span * t / ticks;
+      var x = left + plot * t / ticks;
+      svg.appendChild(svgEl('line', { x1: x, y1: top, x2: x, y2: height - axis + 1, class: 'vz-iv-interval-guide' }));
+      svg.appendChild(svgEl('text', { x: x, y: height - 7, 'text-anchor': 'middle', class: 'vz-iv-interval-tick' },
+        Number.isInteger(value) ? String(value) : value.toFixed(1)));
+    }
+    parsed.forEach(function (entry, index) {
+      var y = top + index * lane + 8;
+      var x1 = left + (entry.start - min) / span * plot;
+      var x2 = left + (entry.end - min) / span * plot;
+      var group = svgEl('g', { class: 'vz-iv-interval' + (entry.item.k ? ' is-' + entry.item.k : '') });
+      group.appendChild(svgEl('text', { x: 2, y: y + 15, class: 'vz-iv-interval-index' }, String(index + 1)));
+      group.appendChild(svgEl('rect', { x: x1, y: y, width: Math.max(8, x2 - x1), height: 22, rx: 6 }));
+      group.appendChild(svgEl('text', { x: Math.min(x1 + 7, width - 90), y: y + 15, class: 'vz-iv-interval-label' },
+        entry.start + '–' + entry.end));
+      svg.appendChild(group);
+    });
+    wrap.appendChild(svg);
+    return wrap;
+  }
+
+  function drawMatrix(row, previousFrame) {
+    var columns = Math.max(1, Number(row.columns) || 1);
+    var items = row.items || [];
+    var rowLabels = row.row_labels || [];
+    var columnLabels = row.column_labels || [];
+    var wrap = el('div', 'vz-iv-row vz-iv-row-matrix');
+    if (row.label) wrap.appendChild(el('span', 'vz-iv-rowlabel', row.label));
+    var grid = el('div', 'vz-iv-matrix');
+    grid.setAttribute('role', 'grid');
+    grid.setAttribute('aria-label', row.label || 'Table of algorithm states');
+    grid.style.gridTemplateColumns = 'minmax(2rem, .65fr) repeat(' + columns + ', minmax(2.6rem, 1fr))';
+    grid.appendChild(el('span', 'vz-iv-matrix-corner', ''));
+    columnLabels.forEach(function (label) {
+      var head = el('span', 'vz-iv-matrix-head', label);
+      head.setAttribute('role', 'columnheader');
+      grid.appendChild(head);
+    });
+    for (var r = 0; r < rowLabels.length; r++) {
+      var rowHead = el('span', 'vz-iv-matrix-head vz-iv-matrix-rowhead', rowLabels[r]);
+      rowHead.setAttribute('role', 'rowheader');
+      grid.appendChild(rowHead);
+      for (var c = 0; c < columns; c++) {
+        var index = r * columns + c;
+        var item = items[index] || { v: '' };
+        var previous = findPreviousRow(previousFrame, row);
+        var old = previous && previous.items ? previous.items[index] : null;
+        var cell = drawCell(item, c, { index: false }, 'matrix', old);
+        cell.setAttribute('role', 'gridcell');
+        cell.setAttribute('aria-label', 'row ' + rowLabels[r] + ', column ' + columnLabels[c] + ': ' + item.v + (item.k ? ', ' + stateText(item.k) : ''));
+        grid.appendChild(cell);
+      }
+    }
+    wrap.appendChild(grid);
+    return wrap;
+  }
+
   function drawRow(row, topic, previousFrame) {
     var layout = layoutFor(row, topic);
     var previous = findPreviousRow(previousFrame, row);
+    if (layout === 'pairs') return drawPairs(row, previous);
     if (layout === 'heap') return drawHeap(row, previous);
     if (layout === 'bars') return drawBars(row, previous);
+    if (layout === 'intervals') return drawIntervals(row);
+    if (layout === 'matrix') return drawMatrix(row, previousFrame);
     if (layout === 'stack') return drawStack(row, previous);
     if (layout === 'queue') return drawQueue(row, previous);
     return drawCells(row, layout, previous);
@@ -306,6 +421,7 @@
 
     var count = block.querySelector('.vz-iv-count');
     if (count) count.textContent = 'Step ' + (index + 1) + ' of ' + data.frames.length;
+    updateTimeline(block, index);
     var scrub = block.querySelector('.vz-iv-scrub');
     if (scrub) {
       if (Number(scrub.value) !== index) scrub.value = String(index);
@@ -316,6 +432,32 @@
     var step = block.querySelector('.vz-iv-step');
     if (back) back.disabled = index === 0;
     if (step) step.disabled = index >= data.frames.length - 1;
+  }
+
+  function buildTimeline(block, data, select) {
+    var rail = block.querySelector('.vz-iv-timeline');
+    if (!rail) return;
+    rail.textContent = '';
+    (data.frames || []).forEach(function (frame, index) {
+      var note = String(frame.note || '').replace(/\s+/g, ' ').trim();
+      var button = el('button', 'vz-iv-step-mark', String(index + 1));
+      button.type = 'button';
+      button.title = note;
+      button.setAttribute('aria-label', 'Step ' + (index + 1) + ': ' + note);
+      button.addEventListener('click', function () { select(index); });
+      rail.appendChild(button);
+    });
+  }
+
+  function updateTimeline(block, index) {
+    var rail = block.querySelector('.vz-iv-timeline');
+    if (!rail) return;
+    Array.prototype.forEach.call(rail.children, function (button, step) {
+      button.classList.toggle('is-complete', step < index);
+      button.classList.toggle('is-current', step === index);
+      if (step === index) button.setAttribute('aria-current', 'step');
+      else button.removeAttribute('aria-current');
+    });
   }
 
   function wire(block) {
@@ -357,6 +499,8 @@
       }, STEP_MS);
     }
 
+    buildTimeline(block, data, function (index) { stop(); show(index); });
+
     if (scrub) {
       scrub.max = String(data.frames.length - 1);
       scrub.addEventListener('input', function () { stop(); show(Number(scrub.value)); });
@@ -367,6 +511,7 @@
     if (reset) reset.addEventListener('click', function () { stop(); show(0); });
 
     block.addEventListener('keydown', function (event) {
+      if (event.target !== block) return;
       if (event.key === 'ArrowRight') { stop(); show(at + 1); event.preventDefault(); }
       else if (event.key === 'ArrowLeft') { stop(); show(at - 1); event.preventDefault(); }
     });

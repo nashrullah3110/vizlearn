@@ -34,7 +34,7 @@ def cell(v, k=None, tag=None):
     return out
 
 
-def row(items, label=None, kind="cells", index=True, view=None):
+def row(items, label=None, kind="cells", index=True, view=None, **details):
     out = {"items": items}
     if label:
         out["label"] = label
@@ -45,6 +45,7 @@ def row(items, label=None, kind="cells", index=True, view=None):
     view = view or _view_for(label, kind)
     if view:
         out["view"] = view
+    out.update(details)
     return out
 
 
@@ -102,11 +103,11 @@ def marked(values, marks=None, tags=None, kind="cells", label=None, index=True, 
     return row(items, label=label, kind=kind, index=index, view=view)
 
 
-def pairs(items, marks=None, label=None):
+def pairs(items, marks=None, label=None, view=None):
     """A key/value column - dictionaries, counters, tables."""
     marks = marks or {}
     cells = [cell("%s : %s" % (k, v), marks.get(k)) for k, v in items]
-    return row(cells, label=label, kind="pairs", index=False)
+    return row(cells, label=label, kind="pairs", index=False, view=view)
 
 
 # --------------------------------------------------------------------------
