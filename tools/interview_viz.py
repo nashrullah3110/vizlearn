@@ -110,6 +110,14 @@ def pairs(items, marks=None, label=None, view=None):
     return row(cells, label=label, kind="pairs", index=False, view=view)
 
 
+def references(label, nodes, edges, columns=None):
+    """Describe real name/object bindings for the reference-graph view."""
+    details = {"nodes": nodes, "edges": edges}
+    if columns:
+        details["columns"] = columns
+    return row([], label=label, view="references", **details)
+
+
 # --------------------------------------------------------------------------
 # Shared patterns
 # --------------------------------------------------------------------------

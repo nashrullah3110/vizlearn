@@ -15,7 +15,8 @@ do.
 import copy as _copy
 import inspect as _inspect
 
-from interview_viz import cost_table, frame, marked, pairs, row, cell, viz
+from interview_viz import (cost_table, frame, marked, pairs, references, row,
+                           cell, viz)
 
 SEMANTICS = []
 
@@ -271,23 +272,26 @@ def _default_frames():
         return into
 
     out = [frame(
-        pairs([("collect.__defaults__[0]", "[]"), ("built", "once, at def time"),
-               ("calls so far", "0")], {"built": "lo"},
-              label="the default object"),
+        references("The default slot already points to one list", [
+            {"id": "default", "column": "Name", "label": "collect.__defaults__[0]"},
+            {"id": "list", "column": "Object", "label": "list object 1", "value": "[]", "state": "lo"}],
+            [{"from": "default", "to": "list"}], ["Name", "Object"]),
         "The default is evaluated when the `def` runs, not when the function "
         "is called. One list object now exists and belongs to the function.",
         {"calls": 0, "length": 0})]
 
     for i, item in enumerate("abc"):
         got = collect(item)
+        nodes = [{"id": "default", "column": "Name", "label": "default slot"}]
+        edges = [{"from": "default", "to": "shared"}]
+        for j, previous in enumerate("abc"[:i + 1], 1):
+            node_id = "return%d" % j
+            nodes.append({"id": node_id, "column": "Name", "label": "return from call %d" % j})
+            edges.append({"from": node_id, "to": "shared"})
+        nodes.append({"id": "shared", "column": "Object", "label": "same list object", "value": repr(got), "state": "hit"})
         out.append(frame(
-            [pairs([("collect.__defaults__[0]", repr(got)),
-                    ("built", "once, at def time"),
-                    ("calls so far", str(i + 1))],
-                   {"collect.__defaults__[0]": "hit"},
-                   label="the default object"),
-             marked(list(got), {j: "done" for j in range(len(got))},
-                    label="what the caller got back")],
+            references("Every call returns the same mutable list", nodes, edges,
+                       ["Name", "Object"]),
             "collect(%r) appended to the SAME list the last call appended to. "
             "The caller asked for a fresh one and got the accumulated one."
             % item,
@@ -301,10 +305,18 @@ def _default_frames():
 
     results = [collect_ok(ch) for ch in "abc"]
     out.append(frame(
-        pairs([("into=None", "the sentinel"),
-               ("call 1", repr(results[0])), ("call 2", repr(results[1])),
-               ("call 3", repr(results[2]))],
-              {"into=None": "done", "call 3": "hit"}, label="the fix"),
+        references("None creates a fresh list inside each call", [
+            {"id": "default", "column": "Name", "label": "default value"},
+            {"id": "none", "column": "Object", "label": "sentinel", "value": "None", "state": "done"},
+            {"id": "call1", "column": "Name", "label": "call 1 result"},
+            {"id": "call2", "column": "Name", "label": "call 2 result"},
+            {"id": "call3", "column": "Name", "label": "call 3 result"},
+            {"id": "list1", "column": "Object", "label": "new list 1", "value": repr(results[0])},
+            {"id": "list2", "column": "Object", "label": "new list 2", "value": repr(results[1])},
+            {"id": "list3", "column": "Object", "label": "new list 3", "value": repr(results[2]), "state": "hit"}],
+            [{"from": "default", "to": "none"}, {"from": "call1", "to": "list1"},
+             {"from": "call2", "to": "list2"}, {"from": "call3", "to": "list3"}],
+            ["Name", "Object"]),
         "With None as the default, the list is built inside the body, so each "
         "call gets its own. Three calls, three lists, no shared state.",
         {"calls": 3, "length": 1}))
@@ -504,32 +516,54 @@ def _identity_frames():
     e = 257
     f = 257
     out = [frame(
-        pairs([("a = int('256')", "256"), ("b = int('256')", "256"),
-               ("a == b", str(a == b)), ("a is b", str(a is b))],
-              {"a is b": "hit"}, label="small integers"),
+        [references("Two names, one cached integer object", [
+            {"id": "a", "column": "Names", "label": "a", "value": "int('256')"},
+            {"id": "b", "column": "Names", "label": "b", "value": "int('256')"},
+            {"id": "i256", "column": "Objects", "label": "integer object", "value": "256", "state": "hit"}],
+            [{"from": "a", "to": "i256"}, {"from": "b", "to": "i256"}],
+            ["Names", "Objects"]),
+         pairs([("a == b", str(a == b)), ("a is b", str(a is b))],
+               {"a is b": "hit"}, label="comparison")],
         "Both names point at the same object, because CPython pre-creates the "
         "integers from -5 to 256 and hands out the cached one. `is` is True "
         "here as an implementation detail, not a language rule.",
         {"objects": 1}),
         frame(
-        pairs([("c = int('257')", "257"), ("d = int('257')", "257"),
-               ("c == d", str(c == d)), ("c is d", str(c is d))],
-              {"c is d": "bad"}, label="past the cache"),
+        [references("Equal values, separate objects", [
+            {"id": "c", "column": "Names", "label": "c", "value": "int('257')"},
+            {"id": "d", "column": "Names", "label": "d", "value": "int('257')"},
+            {"id": "i257a", "column": "Objects", "label": "integer object A", "value": "257"},
+            {"id": "i257b", "column": "Objects", "label": "integer object B", "value": "257"}],
+            [{"from": "c", "to": "i257a"}, {"from": "d", "to": "i257b"}],
+            ["Names", "Objects"]),
+         pairs([("c == d", str(c == d)), ("c is d", str(c is d))],
+               {"c is d": "bad"}, label="comparison")],
         "257 is one past the cache, so each int() built its own object. Equal "
         "values, different identities - which is the whole distinction.",
         {"objects": 2}),
         frame(
-        pairs([("e = 257", "257"), ("f = 257", "257"),
-               ("e == f", str(e == f)), ("e is f", str(e is f))],
-              {"e is f": "lo"}, label="the trap in the demo"),
+        [references("Two literals folded to one constant", [
+            {"id": "e", "column": "Names", "label": "e", "value": "literal 257"},
+            {"id": "f", "column": "Names", "label": "f", "value": "literal 257"},
+            {"id": "constant", "column": "Objects", "label": "code constant", "value": "257", "state": "lo"}],
+            [{"from": "e", "to": "constant"}, {"from": "f", "to": "constant"}],
+            ["Names", "Objects"]),
+         pairs([("e == f", str(e == f)), ("e is f", str(e is f))],
+               {"e is f": "lo"}, label="comparison")],
         "Written as literals in one code block, the compiler folds them into "
         "ONE constant, so `is` is True again - for a third reason unrelated to "
         "the cache. This is why the classic demo is unreliable.",
         {"objects": 1}),
         frame(
-        pairs([("x = [1, 2]", "[1, 2]"), ("y = [1, 2]", "[1, 2]"),
-               ("x == y", "True"), ("x is y", "False")],
-              {"x == y": "done", "x is y": "bad"}, label="the rule that holds"),
+        [references("Equal lists are still different objects", [
+            {"id": "x", "column": "Names", "label": "x", "value": "[1, 2]"},
+            {"id": "y", "column": "Names", "label": "y", "value": "[1, 2]"},
+            {"id": "listx", "column": "Objects", "label": "list object X", "value": "[1, 2]", "state": "done"},
+            {"id": "listy", "column": "Objects", "label": "list object Y", "value": "[1, 2]", "state": "bad"}],
+            [{"from": "x", "to": "listx"}, {"from": "y", "to": "listy"}],
+            ["Names", "Objects"]),
+         pairs([("x == y", "True"), ("x is y", "False")],
+               {"x == y": "done", "x is y": "bad"}, label="comparison")],
         "Two equal lists, two objects. `==` asks about value and `is` asks "
         "about identity; they agree only by coincidence, and the coincidences "
         "are interpreter details.",
@@ -721,27 +755,56 @@ def _copy_frames():
     shallow = _copy.copy(original)
     deep = _copy.deepcopy(original)
     out = [frame(
-        pairs([("original", repr(original)),
-               ("shallow is original", str(shallow is original)),
-               ("deep is original", str(deep is original))],
-              {"original": "lo"}, label="three names"),
+        references("Each variable points to its own outer list", [
+            {"id": "original", "column": "Names", "label": "original"},
+            {"id": "shallow", "column": "Names", "label": "shallow copy"},
+            {"id": "deep", "column": "Names", "label": "deep copy"},
+            {"id": "outer1", "column": "Outer lists", "label": "outer list 1", "value": "2 items", "state": "lo"},
+            {"id": "outer2", "column": "Outer lists", "label": "outer list 2", "value": "2 items"},
+            {"id": "outer3", "column": "Outer lists", "label": "outer list 3", "value": "2 items"}],
+            [{"from": "original", "to": "outer1"}, {"from": "shallow", "to": "outer2"},
+             {"from": "deep", "to": "outer3"}], ["Names", "Outer lists"]),
         "Both copies are new outer lists - neither is the original. So far "
         "copy.copy and copy.deepcopy look identical.",
         {"outer objects": 3}),
         frame(
-        pairs([("original[0] is shallow[0]", str(original[0] is shallow[0])),
-               ("original[0] is deep[0]", str(original[0] is deep[0]))],
-              {"original[0] is shallow[0]": "bad",
-               "original[0] is deep[0]": "done"},
-              label="the inner lists"),
+        references("Shallow shares inner lists; deep copy rebuilds them", [
+            {"id": "original", "column": "Names", "label": "original"},
+            {"id": "shallow", "column": "Names", "label": "shallow copy"},
+            {"id": "deep", "column": "Names", "label": "deep copy"},
+            {"id": "outer1", "column": "Outer lists", "label": "outer 1"},
+            {"id": "outer2", "column": "Outer lists", "label": "outer 2"},
+            {"id": "outer3", "column": "Outer lists", "label": "outer 3"},
+            {"id": "innerA", "column": "Inner lists", "label": "inner A", "value": "[1, 2]", "state": "bad"},
+            {"id": "innerB", "column": "Inner lists", "label": "inner B", "value": "[3, 4]"},
+            {"id": "innerC", "column": "Inner lists", "label": "deep inner A", "value": "[1, 2]", "state": "done"},
+            {"id": "innerD", "column": "Inner lists", "label": "deep inner B", "value": "[3, 4]"}],
+            [{"from": "original", "to": "outer1"}, {"from": "shallow", "to": "outer2"},
+             {"from": "deep", "to": "outer3"}, {"from": "outer1", "to": "innerA"},
+             {"from": "outer1", "to": "innerB"}, {"from": "outer2", "to": "innerA"},
+             {"from": "outer2", "to": "innerB"}, {"from": "outer3", "to": "innerC"},
+             {"from": "outer3", "to": "innerD"}], ["Names", "Outer lists", "Inner lists"]),
         "Here they diverge. The shallow copy copied the outer list and reused "
         "the SAME inner lists; deepcopy rebuilt them.",
         {"outer objects": 3})]
     original[0].append(99)
     out.append(frame(
-        [marked(original, {0: "hit"}, label="original after append(99)"),
-         marked(shallow, {0: "bad"}, label="shallow"),
-         marked(deep, {0: "done"}, label="deep")],
+        references("A nested mutation follows shared references", [
+            {"id": "original", "column": "Names", "label": "original"},
+            {"id": "shallow", "column": "Names", "label": "shallow copy"},
+            {"id": "deep", "column": "Names", "label": "deep copy"},
+            {"id": "outer1", "column": "Outer lists", "label": "outer 1"},
+            {"id": "outer2", "column": "Outer lists", "label": "outer 2"},
+            {"id": "outer3", "column": "Outer lists", "label": "outer 3"},
+            {"id": "innerA", "column": "Inner lists", "label": "shared inner A", "value": "[1, 2, 99]", "state": "hit"},
+            {"id": "innerB", "column": "Inner lists", "label": "shared inner B", "value": "[3, 4]"},
+            {"id": "innerC", "column": "Inner lists", "label": "deep inner A", "value": "[1, 2]", "state": "done"},
+            {"id": "innerD", "column": "Inner lists", "label": "deep inner B", "value": "[3, 4]"}],
+            [{"from": "original", "to": "outer1"}, {"from": "shallow", "to": "outer2"},
+             {"from": "deep", "to": "outer3"}, {"from": "outer1", "to": "innerA"},
+             {"from": "outer1", "to": "innerB"}, {"from": "outer2", "to": "innerA"},
+             {"from": "outer2", "to": "innerB"}, {"from": "outer3", "to": "innerC"},
+             {"from": "outer3", "to": "innerD"}], ["Names", "Outer lists", "Inner lists"]),
         "Appending to original[0] changed what the shallow copy sees, because "
         "it is the same object. The deep copy is untouched.",
         {"outer objects": 3}))
@@ -953,39 +1016,53 @@ def _closure_frames():
     factory = [make(i) for i in range(3)]
 
     out = [frame(
-        pairs([("functions built", "3"),
-               ("each closes over", "the name i"),
-               ("i after the loop", "2")],
-              {"i after the loop": "bad"}, label="the loop finished"),
+        references("Three closures share one cell", [
+            {"id": "f0", "column": "Functions", "label": "late[0]"},
+            {"id": "f1", "column": "Functions", "label": "late[1]"},
+            {"id": "f2", "column": "Functions", "label": "late[2]"},
+            {"id": "cell", "column": "Closure cell", "label": "cell for i", "value": "2", "state": "bad"}],
+            [{"from": "f0", "to": "cell"}, {"from": "f1", "to": "cell"},
+             {"from": "f2", "to": "cell"}], ["Functions", "Closure cell"]),
         "Three functions were built and none has run. Each one closed over "
         "the NAME i, not the value i had at the time.",
         {"cells": 1}),
         frame(
-        pairs([("late[0]()", str(late[0]())), ("late[1]()", str(late[1]())),
-               ("late[2]()", str(late[2]())),
-               ("shared cell holds", str(late[0].__closure__[0].cell_contents))],
-              {"late[0]()": "bad", "late[1]()": "bad", "late[2]()": "bad"},
-              label="calling them now"),
+        [references("Each function reads the same final value", [
+            {"id": "f0", "column": "Functions", "label": "late[0]() → 2", "state": "bad"},
+            {"id": "f1", "column": "Functions", "label": "late[1]() → 2", "state": "bad"},
+            {"id": "f2", "column": "Functions", "label": "late[2]() → 2", "state": "bad"},
+            {"id": "cell", "column": "Closure cell", "label": "shared cell", "value": "i = 2"}],
+            [{"from": "f0", "to": "cell"}, {"from": "f1", "to": "cell"},
+             {"from": "f2", "to": "cell"}], ["Functions", "Closure cell"]),
+         pairs([("shared cell holds", str(late[0].__closure__[0].cell_contents))],
+               {}, label="value at call time")],
         "All three answer 2. They look up i when CALLED, and by then the loop "
         "has left it at 2 - one cell, shared by all three closures.",
         {"cells": 1}),
         frame(
-        pairs([("early[0]()", str(early[0]())), ("early[1]()", str(early[1]())),
-               ("early[2]()", str(early[2]())),
-               ("mechanism", "default argument")],
-              {"early[0]()": "done", "early[1]()": "done",
-               "early[2]()": "done"}, label="fix 1: bind at definition"),
+        references("Default arguments capture separate values", [
+            {"id": "e0", "column": "Functions", "label": "early[0]() → 0", "state": "done"},
+            {"id": "e1", "column": "Functions", "label": "early[1]() → 1", "state": "done"},
+            {"id": "e2", "column": "Functions", "label": "early[2]() → 2", "state": "done"},
+            {"id": "v0", "column": "Captured values", "label": "default", "value": "0"},
+            {"id": "v1", "column": "Captured values", "label": "default", "value": "1"},
+            {"id": "v2", "column": "Captured values", "label": "default", "value": "2"}],
+            [{"from": "e0", "to": "v0"}, {"from": "e1", "to": "v1"},
+             {"from": "e2", "to": "v2"}], ["Functions", "Captured values"]),
         "lambda i=i: i evaluates the default when the lambda is created, so "
         "each function captures a value instead of a name. The same early "
         "binding that makes mutable defaults a bug is the fix here.",
         {"cells": 0}),
         frame(
-        pairs([("factory[0]()", str(factory[0]())),
-               ("factory[1]()", str(factory[1]())),
-               ("factory[2]()", str(factory[2]())),
-               ("separate cells",
-                str([f.__closure__[0].cell_contents for f in factory]))],
-              {"separate cells": "hit"}, label="fix 2: a new scope each time"),
+        references("Each factory call owns a separate closure cell", [
+            {"id": "m0", "column": "Functions", "label": "factory[0]() → 0"},
+            {"id": "m1", "column": "Functions", "label": "factory[1]() → 1"},
+            {"id": "m2", "column": "Functions", "label": "factory[2]() → 2"},
+            {"id": "c0", "column": "Closure cells", "label": "cell 1", "value": "i = 0"},
+            {"id": "c1", "column": "Closure cells", "label": "cell 2", "value": "i = 1"},
+            {"id": "c2", "column": "Closure cells", "label": "cell 3", "value": "i = 2", "state": "hit"}],
+            [{"from": "m0", "to": "c0"}, {"from": "m1", "to": "c1"},
+             {"from": "m2", "to": "c2"}], ["Functions", "Closure cells"]),
         "Each make(i) call has its own frame, so each lambda closes over a "
         "different cell. Three cells with three values, which is what the "
         "loop looked like it was doing.",
@@ -1199,34 +1276,52 @@ def _decorator_frames():
     wrapped = shout_wraps(greet)
 
     out = [frame(
-        pairs([("greet.__name__", plain_name), ("greet.__doc__", plain_doc),
-               ("greet('ada')", greet("ada"))],
-              {"greet.__name__": "done"}, label="before decoration"),
+        [references("The name points directly to the original function", [
+            {"id": "greet", "column": "Name", "label": "greet"},
+            {"id": "fn", "column": "Function object", "label": "function object", "value": "name=greet", "state": "done"}],
+            [{"from": "greet", "to": "fn"}], ["Name", "Function object"]),
+         pairs([("__name__", plain_name), ("__doc__", plain_doc),
+                ("greet('ada')", greet("ada"))],
+               {"__name__": "done"}, label="function metadata")],
         "An ordinary function with its own name and docstring.",
         {"objects": 1}),
         frame(
-        pairs([("@shout means", "greet = shout(greet)"),
-               ("the name greet now points at", "wrapper"),
-               ("result", bare("ada"))],
-              {"the name greet now points at": "hit"},
-              label="what the @ line does"),
+        [references("Decoration rebinds greet to a wrapper", [
+            {"id": "greet", "column": "Name", "label": "greet", "state": "hit"},
+            {"id": "wrapper", "column": "Function objects", "label": "wrapper", "value": "upper-case result"},
+            {"id": "original", "column": "Function objects", "label": "original greet", "value": "hello ada"}],
+            [{"from": "greet", "to": "wrapper"}, {"from": "wrapper", "to": "original", "label": "calls"}],
+            ["Name", "Function objects"]),
+         pairs([("@shout", "greet = shout(greet)"), ("result", bare("ada"))],
+               {"@shout": "hit"}, label="assignment")],
         "Decoration is one assignment. The original function still exists, "
         "captured inside wrapper - but the NAME greet now refers to wrapper.",
         {"objects": 2}),
         frame(
-        pairs([("__name__", bare.__name__), ("__doc__", str(bare.__doc__)),
-               ("cost", "introspection is broken")],
-              {"__name__": "bad", "__doc__": "bad"},
-              label="without functools.wraps"),
+        [references("The wrapper replaces the name and metadata", [
+            {"id": "greet", "column": "Name", "label": "greet"},
+            {"id": "wrapper", "column": "Function object", "label": bare.__name__, "value": "__doc__ = None", "state": "bad"},
+            {"id": "original", "column": "Function object", "label": "original", "value": plain_doc}],
+            [{"from": "greet", "to": "wrapper"}, {"from": "wrapper", "to": "original", "label": "closed over"}],
+            ["Name", "Function object"]),
+         pairs([("__name__", bare.__name__), ("__doc__", str(bare.__doc__)),
+                ("cost", "introspection is broken")],
+               {"__name__": "bad", "__doc__": "bad"}, label="metadata")],
         "Because greet is now wrapper, every tool that reads metadata - help(), "
         "tracebacks, Sphinx, pytest - sees 'wrapper' and no docstring.",
         {"objects": 2}),
         frame(
-        pairs([("__name__", wrapped.__name__),
-               ("__doc__", str(wrapped.__doc__)),
-               ("__wrapped__", wrapped.__wrapped__.__name__)],
-              {"__name__": "done", "__doc__": "done", "__wrapped__": "hit"},
-              label="with functools.wraps"),
+        [references("wraps copies metadata and keeps an explicit original link", [
+            {"id": "greet", "column": "Name", "label": "greet"},
+            {"id": "wrapper", "column": "Function object", "label": wrapped.__name__, "value": "metadata copied", "state": "done"},
+            {"id": "original", "column": "Function object", "label": wrapped.__wrapped__.__name__, "value": "original function"}],
+            [{"from": "greet", "to": "wrapper"}, {"from": "wrapper", "to": "original", "label": "__wrapped__"}],
+            ["Name", "Function object"]),
+         pairs([("__name__", wrapped.__name__),
+                ("__doc__", str(wrapped.__doc__)),
+                ("__wrapped__", wrapped.__wrapped__.__name__)],
+               {"__name__": "done", "__doc__": "done", "__wrapped__": "hit"},
+               label="metadata")],
         "wraps copies __name__, __doc__, __module__ and __qualname__ across, "
         "and leaves __wrapped__ pointing at the original so tools can still "
         "find it.",

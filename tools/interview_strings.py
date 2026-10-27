@@ -10,7 +10,7 @@ tools/interview_viz.py for why that matters.
 """
 
 from interview_viz import (cost_table, frame, growing_window, marked, pairs,
-                           row, cell, viz)
+                           references, row, cell, viz)
 
 STRINGS = []
 
@@ -759,16 +759,23 @@ print("sha256(bytes) ->", hashlib.sha256(b).hexdigest()[:16], "...")
 
 
 def _interning_frames():
-    out = [frame(pairs([("a = 'hello'", "0x1a40"), ("b = 'hello'", "0x1a40"),
-                        ("a is b", "True")], {"a is b": "done"}, label="literals"),
+    out = [frame([references("Identical literals share one interned object", [
+                        {"id": "a", "column": "Names", "label": "a", "value": "'hello'"},
+                        {"id": "b", "column": "Names", "label": "b", "value": "'hello'"},
+                        {"id": "s", "column": "String object", "label": "interned string", "value": "hello", "state": "done"}],
+                        [{"from": "a", "to": "s"}, {"from": "b", "to": "s"}], ["Names", "String object"]),
+                 pairs([("a is b", "True"), ("a == b", "True")], {"a is b": "done"}, label="comparison")],
                  "Two identical literals that look like identifiers: CPython "
                  "interns them, so both names point at one object.",
                  {"objects": 1})]
-    out.append(frame(pairs([("a = 'hello world'", "0x1a40"),
-                            ("b = 'hello' + ' world'", "0x3f10"),
-                            ("a is b", "False"),
-                            ("a == b", "True")],
-                           {"a is b": "bad", "a == b": "hit"}, label="built at runtime"),
+    out.append(frame([references("Equal strings can occupy separate objects", [
+                            {"id": "a", "column": "Names", "label": "a", "value": "literal"},
+                            {"id": "b", "column": "Names", "label": "b", "value": "built at runtime"},
+                            {"id": "s1", "column": "String objects", "label": "string A", "value": "hello world", "state": "bad"},
+                            {"id": "s2", "column": "String objects", "label": "string B", "value": "hello world", "state": "hit"}],
+                            [{"from": "a", "to": "s1"}, {"from": "b", "to": "s2"}], ["Names", "String objects"]),
+                     pairs([("a is b", "False"), ("a == b", "True")],
+                           {"a is b": "bad", "a == b": "hit"}, label="comparison")],
                      "Built at runtime instead of being a literal, so no "
                      "interning. `is` is now False while `==` is still True - "
                      "which is the whole trap.",

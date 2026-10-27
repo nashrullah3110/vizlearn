@@ -9,7 +9,7 @@ Same shape as tools/interview_strings.py; see tools/interview.py for the
 fields each entry carries.
 """
 
-from interview_viz import counter_fill, frame, marked, pairs, viz
+from interview_viz import counter_fill, frame, marked, pairs, row, cell, viz
 
 DICTS = []
 
@@ -841,8 +841,7 @@ print("Roughly 2x, not 4x. Same answers, one line different in each.")
 def _lru_frames():
     out = [frame([pairs([("cache", "empty"), ("capacity", "2")], {},
                         label="state"),
-                  marked(["(front = newest)", "(back = oldest)"], {},
-                         label="recency order", index=False)],
+                  row([], label="Doubly linked recency order", view="linked-list")],
                  "A dict for O(1) lookup, and an order for O(1) eviction. "
                  "Neither alone is enough.",
                  {"size": 0, "evictions": 0})]
@@ -872,9 +871,10 @@ def _lru_frames():
                 note = "get(%s) -> miss. It was evicted earlier." % key
         out.append(frame([pairs([(k, cache[k]) for k in order] or [("cache", "empty")],
                                 {order[-1]: "hit"} if order else {}, label="cache"),
-                          marked(list(reversed(order)) or ["-"],
-                                 {0: "lo"} if order else {},
-                                 label="newest -> oldest", index=False)],
+                          row([cell(k, "hit" if i == 0 and op == "get" and key in cache else
+                                    "lo" if i == 0 else "done")
+                               for i, k in enumerate(reversed(order))],
+                              label="Doubly linked recency order", view="linked-list")],
                          note, {"size": len(cache), "evictions": evictions}))
     return viz(out)
 

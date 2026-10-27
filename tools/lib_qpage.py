@@ -51,9 +51,10 @@ CSS = """
         }
         .vz-iq-tag-hard { color: var(--accent-primary); border-color: var(--accent-primary); }
 
-        .vz-iq-grid { display: grid; gap: 1.25rem; grid-template-columns: 1fr; }
-        @media (min-width: 1024px) {
-            .vz-iq-grid { grid-template-columns: minmax(0, 1fr) 20rem; align-items: start; }
+        .vz-iq-grid { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); }
+        .vz-iq-support { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+        @media (min-width: 760px) {
+            .vz-iq-support { grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
         }
         .vz-iq-note {
             border: 1px solid var(--border-subtle);
@@ -71,7 +72,7 @@ CSS = """
             font-size: 0.84rem; line-height: 1.65; color: var(--text-muted);
         }
         .vz-iq-note ul { list-style: disc; padding-left: 1.15rem; display: grid; gap: 0.45rem; }
-        .vz-iq-note + .vz-iq-note { margin-top: 1rem; }
+        .vz-iq-note + .vz-iq-note { margin-top: 0; }
         .vz-iq-note code {
             font-family: 'JetBrains Mono', ui-monospace, monospace;
             font-size: 0.82em; color: var(--text-main);
@@ -149,11 +150,18 @@ def visual(q):
                             <button type="button" class="vz-iv-btn vz-iv-play"
                                     aria-pressed="false">Auto-run</button>
                             <button type="button" class="vz-iv-btn vz-iv-reset">Reset</button>
+                            <label class="vz-iv-speed-label">Speed
+                                <select class="vz-iv-speed" aria-label="Playback speed">
+                                    <option value="0.6">Slow</option>
+                                    <option value="1" selected>Normal</option>
+                                    <option value="1.6">Fast</option>
+                                </select>
+                            </label>
                             <span class="vz-iv-count"></span>
                         </div>
                     </div>
                 </div>
-                <div>%(notice)s%(answer)s</div>
+                <div class="vz-iq-support">%(notice)s%(answer)s</div>
             </div>
         </section>
 """ % {"eye": EYE, "data": data, "notice": notice_block,

@@ -566,12 +566,15 @@ def _predicate_frames():
         ok = d <= D
         span = hi - lo + 1
         out.append(frame(
-            pairs([("range of capacities", "[%d, %d]" % (lo, hi)),
+            [pairs([("range of capacities", "[%d, %d]" % (lo, hi)),
                    ("trying capacity", str(mid)),
                    ("days needed", str(d)),
                    ("within %d days?" % D, "yes" if ok else "no")],
                   {"within %d days?" % D: "hit" if ok else "bad"},
                   label="probe %d" % (len(out) + 1)),
+             row([], label="Feasible capacity boundary", view="range", low=lo,
+                 high=hi, domain_min=max(weights), domain_max=sum(weights),
+                 probe=mid, verdict="works" if ok else "too small")],
             "Capacity %d needs %d days, which is %s. So %s - the range halves "
             "without trying any of the other capacities."
             % (mid, d, "enough" if ok else "too slow",
@@ -583,11 +586,13 @@ def _predicate_frames():
         else:
             lo = mid + 1
     out.append(frame(
-        pairs([("answer", str(lo)),
+        [pairs([("answer", str(lo)),
                ("days at %d" % lo, str(days_needed(lo))),
                ("days at %d" % (lo - 1), str(days_needed(lo - 1))),
                ("probes used", str(len(out)))],
               {"answer": "hit"}, label="the boundary"),
+         row([], label="Minimum feasible capacity", view="range", low=lo,
+             high=lo, domain_min=max(weights), domain_max=sum(weights))],
         "Capacity %d works and %d does not, so %d is the smallest that does. "
         "%d probes instead of %d candidates."
         % (lo, lo - 1, lo, len(out), sum(weights) - max(weights) + 1),

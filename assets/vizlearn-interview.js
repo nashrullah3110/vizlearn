@@ -240,17 +240,20 @@
     var scroll = el('div', 'vz-iv-diagram-scroll');
     var width = 800, height = 240, left = 30, right = 20, top = 22, base = 186;
     var plotWidth = width - left - right;
-    var max = Math.max.apply(null, items.map(function (item) { return Number(item.v) || 0; }).concat([1]));
+    var logScale = row.scale === 'log';
+    var transform = function (value) { return logScale ? Math.log10(Math.max(0, Number(value) || 0) + 1) : Math.max(0, Number(value) || 0); };
+    var max = Math.max.apply(null, items.map(function (item) { return transform(item.v); }).concat([1]));
     var gap = items.length > 22 ? 3 : 8;
     var barWidth = Math.max(4, (plotWidth - gap * Math.max(0, items.length - 1)) / Math.max(items.length, 1));
     var svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + height, role: 'img',
-      'aria-label': 'Bar chart of ' + row.label + ': ' + items.map(function (item) { return item.v; }).join(', ') });
+      'aria-label': (logScale ? 'Logarithmic ' : '') + 'bar chart of ' + row.label + ': ' + items.map(function (item) { return item.v; }).join(', ') });
     svg.classList.add('vz-iv-bars-svg');
     svg.style.minWidth = items.length > 14 ? '38rem' : '100%';
     svg.appendChild(svgEl('line', { x1: left, y1: base, x2: width - right, y2: base, class: 'vz-iv-chart-axis' }));
     items.forEach(function (item, i) {
       var value = Math.max(0, Number(item.v) || 0);
-      var h = value ? Math.max(3, (value / max) * (base - top)) : 2;
+      var scaled = transform(value);
+      var h = scaled ? Math.max(3, (scaled / max) * (base - top)) : 2;
       var x = left + i * (barWidth + gap);
       var y = base - h;
       var old = previous && previous.items ? previous.items[i] : null;
@@ -318,6 +321,178 @@
     return wrap;
   }
 
+  function drawReferences(row, previous) {
+    var nodes = row.nodes || [];
+    var edges = row.edges || [];
+    var columns = row.columns || [];
+    nodes.forEach(function (node) {
+      var name = node.column || node.kind || 'Objects';
+      if (columns.indexOf(name) < 0) columns.push(name);
+    });
+    if (!nodes.length) return drawCells(row, 'cells', previous);
+    var width = 800, nodeWidth = Math.min(188, Math.floor((width - 64) / Math.max(columns.length, 1)) - 24);
+    var margin = 28, gap = columns.length > 1 ? (width - 2 * margin - nodeWidth * columns.length) / (columns.length - 1) : 0;
+    var byColumn = {};
+    columns.forEach(function (column) { byColumn[column] = []; });
+    nodes.forEach(function (node) { byColumn[node.column || node.kind || columns[0]].push(node); });
+    var positions = {}, maxNodes = 1;
+    columns.forEach(function (column, col) {
+      maxNodes = Math.max(maxNodes, byColumn[column].length);
+      byColumn[column].forEach(function (node, index) {
+        var yIndex = Number.isFinite(Number(node.pos)) ? Number(node.pos) : index;
+        positions[node.id] = { x: margin + col * (nodeWidth + gap), y: 26 + yIndex * 68 };
+      });
+    });
+    var height = Math.max(142, 36 + maxNodes * 68);
+    var svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + height, role: 'img',
+      'aria-label': 'Reference diagram: ' + nodes.map(function (n) { return n.label + (n.value ? ' ' + n.value : ''); }).join('; ') });
+    svg.classList.add('vz-iv-references-svg');
+    var defs = svgEl('defs', {});
+    var marker = svgEl('marker', { id: 'vz-iv-arrow', viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '6', markerHeight: '6', orient: 'auto-start-reverse' });
+    marker.appendChild(svgEl('path', { d: 'M 0 0 L 10 5 L 0 10 z' }));
+    defs.appendChild(marker); svg.appendChild(defs);
+    edges.forEach(function (edge) {
+      var from = positions[edge.from], to = positions[edge.to];
+      if (!from || !to) return;
+      var sx = from.x + nodeWidth, sy = from.y + 22;
+      var tx = to.x, ty = to.y + 22;
+      var bend = Math.max(24, (tx - sx) * 0.48);
+      var path = svgEl('path', { d: 'M ' + sx + ' ' + sy + ' C ' + (sx + bend) + ' ' + sy + ', ' + (tx - bend) + ' ' + ty + ', ' + tx + ' ' + ty,
+        class: 'vz-iv-reference-edge', 'marker-end': 'url(#vz-iv-arrow)' });
+      svg.appendChild(path);
+      if (edge.label) svg.appendChild(svgEl('text', { x: (sx + tx) / 2, y: (sy + ty) / 2 - 5, 'text-anchor': 'middle', class: 'vz-iv-reference-edge-label' }, edge.label));
+    });
+    var oldNodes = {};
+    if (previous && previous.nodes) previous.nodes.forEach(function (node) { oldNodes[node.id] = node; });
+    nodes.forEach(function (node) {
+      var point = positions[node.id];
+      var old = oldNodes[node.id];
+      var didChange = old && (old.label !== node.label || old.value !== node.value || old.state !== node.state);
+      var group = svgEl('g', { class: 'vz-iv-reference-node' + (node.state ? ' is-' + node.state : '') + (didChange ? ' is-changed' : '') });
+      group.appendChild(svgEl('rect', { x: point.x, y: point.y, width: nodeWidth, height: 46, rx: 9 }));
+      var label = String(node.label || node.id || 'object');
+      var value = String(node.value == null ? '' : node.value);
+      group.appendChild(svgEl('text', { x: point.x + 10, y: point.y + (value ? 18 : 27), class: 'vz-iv-reference-label' }, label.length > 26 ? label.slice(0, 24) + '…' : label));
+      if (value) group.appendChild(svgEl('text', { x: point.x + 10, y: point.y + 35, class: 'vz-iv-reference-value' }, value.length > 28 ? value.slice(0, 26) + '…' : value));
+      var title = svgEl('title', {}, label + (value ? ': ' + value : ''));
+      group.appendChild(title); svg.appendChild(group);
+    });
+    var wrap = el('div', 'vz-iv-row vz-iv-row-references');
+    if (row.label) wrap.appendChild(el('span', 'vz-iv-rowlabel', row.label));
+    var scroll = el('div', 'vz-iv-diagram-scroll'); scroll.appendChild(svg); wrap.appendChild(scroll);
+    return wrap;
+  }
+
+  function drawPointerGraph(row) {
+    var items = row.items || [];
+    var n = items.length;
+    if (!n) return drawCells(row, 'cells', null);
+    var width = 800, height = 390, cx = 400, cy = 194;
+    var rx = Math.min(285, 94 + n * 30), ry = Math.min(125, 48 + n * 14), radius = Math.min(30, 210 / n);
+    var points = items.map(function (_, index) {
+      var angle = -Math.PI / 2 + index * Math.PI * 2 / n;
+      return { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
+    });
+    var svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + height, role: 'img',
+      'aria-label': 'Pointer graph: ' + items.map(function (item, index) { return 'index ' + index + ' points to ' + item.v; }).join('; ') });
+    svg.classList.add('vz-iv-pointer-svg');
+    var defs = svgEl('defs', {});
+    var marker = svgEl('marker', { id: 'vz-iv-pointer-arrow', viewBox: '0 0 10 10', refX: '8', refY: '5', markerWidth: '6', markerHeight: '6', orient: 'auto' });
+    marker.appendChild(svgEl('path', { d: 'M 0 0 L 10 5 L 0 10 z' })); defs.appendChild(marker); svg.appendChild(defs);
+    items.forEach(function (item, index) {
+      var targetIndex = Number(item.v);
+      if (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= n) return;
+      var a = points[index], b = points[targetIndex];
+      if (index === targetIndex) {
+        svg.appendChild(svgEl('path', { d: 'M ' + (a.x + radius * 0.5) + ' ' + (a.y - radius * 0.8) + ' C ' + (a.x + 78) + ' ' + (a.y - 78) + ', ' + (a.x + 78) + ' ' + (a.y + 78) + ', ' + (a.x + radius * 0.45) + ' ' + (a.y + radius * 0.85), class: 'vz-iv-pointer-edge', 'marker-end': 'url(#vz-iv-pointer-arrow)' }));
+      } else {
+        var dx = b.x - a.x, dy = b.y - a.y, len = Math.sqrt(dx * dx + dy * dy) || 1;
+        var sx = a.x + dx / len * (radius + 4), sy = a.y + dy / len * (radius + 4);
+        var tx = b.x - dx / len * (radius + 7), ty = b.y - dy / len * (radius + 7);
+        svg.appendChild(svgEl('line', { x1: sx, y1: sy, x2: tx, y2: ty, class: 'vz-iv-pointer-edge', 'marker-end': 'url(#vz-iv-pointer-arrow)' }));
+      }
+    });
+    items.forEach(function (item, index) {
+      var point = points[index];
+      var group = svgEl('g', { class: 'vz-iv-pointer-node' + (item.k ? ' is-' + item.k : '') });
+      group.appendChild(svgEl('circle', { cx: point.x, cy: point.y, r: radius }));
+      group.appendChild(svgEl('text', { x: point.x, y: point.y + 5, 'text-anchor': 'middle', class: 'vz-iv-pointer-value' }, String(item.v)));
+      group.appendChild(svgEl('text', { x: point.x, y: point.y + radius + 17, 'text-anchor': 'middle', class: 'vz-iv-pointer-index' }, 'index ' + index));
+      if (item.tag) group.appendChild(svgEl('text', { x: point.x, y: point.y - radius - 8, 'text-anchor': 'middle', class: 'vz-iv-pointer-tag' }, item.tag));
+      svg.appendChild(group);
+    });
+    var wrap = el('div', 'vz-iv-row vz-iv-row-pointer-graph');
+    if (row.label) wrap.appendChild(el('span', 'vz-iv-rowlabel', row.label));
+    var scroll = el('div', 'vz-iv-diagram-scroll'); scroll.appendChild(svg); wrap.appendChild(scroll);
+    return wrap;
+  }
+
+  function drawRange(row) {
+    var min = Number(row.domain_min), max = Number(row.domain_max);
+    var low = Number(row.low), high = Number(row.high);
+    if (![min, max, low, high].every(Number.isFinite) || max <= min) return drawCells(row, 'cells', null);
+    var width = 800, height = 170, left = 42, right = 30, y = 82;
+    var plot = width - left - right;
+    var xFor = function (v) { return left + (v - min) / (max - min) * plot; };
+    var svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + height, role: 'img',
+      'aria-label': 'Candidate range from ' + low + ' through ' + high + (row.probe != null ? '; testing ' + row.probe + ', ' + row.verdict : '') });
+    svg.classList.add('vz-iv-range-svg');
+    svg.appendChild(svgEl('line', { x1: left, y1: y, x2: width - right, y2: y, class: 'vz-iv-range-base' }));
+    svg.appendChild(svgEl('rect', { x: xFor(low), y: y - 13, width: Math.max(2, xFor(high) - xFor(low)), height: 26, rx: 13, class: 'vz-iv-range-active' }));
+    var ticks = 5;
+    for (var i = 0; i <= ticks; i++) {
+      var val = min + (max - min) * i / ticks, x = xFor(val);
+      svg.appendChild(svgEl('line', { x1: x, y1: y + 18, x2: x, y2: y + 25, class: 'vz-iv-range-tick' }));
+      svg.appendChild(svgEl('text', { x: x, y: y + 45, 'text-anchor': 'middle', class: 'vz-iv-range-label' }, String(Math.round(val))));
+    }
+    svg.appendChild(svgEl('text', { x: xFor(low), y: 42, 'text-anchor': 'middle', class: 'vz-iv-range-endpoint' }, 'low ' + low));
+    svg.appendChild(svgEl('text', { x: xFor(high), y: 42, 'text-anchor': 'middle', class: 'vz-iv-range-endpoint' }, 'high ' + high));
+    if (row.probe != null) {
+      var px = xFor(Number(row.probe));
+      svg.appendChild(svgEl('line', { x1: px, y1: 48, x2: px, y2: y + 14, class: 'vz-iv-range-probe' }));
+      svg.appendChild(svgEl('circle', { cx: px, cy: y, r: 8, class: 'vz-iv-range-dot' }));
+      svg.appendChild(svgEl('text', { x: px, y: 30, 'text-anchor': 'middle', class: 'vz-iv-range-probe-label' }, 'try ' + row.probe));
+    }
+    var wrap = el('div', 'vz-iv-row vz-iv-row-range');
+    if (row.label) wrap.appendChild(el('span', 'vz-iv-rowlabel', row.label));
+    wrap.appendChild(svg); return wrap;
+  }
+
+  function drawLinkedList(row, previous) {
+    var items = row.items || [];
+    var wrap = el('div', 'vz-iv-row vz-iv-row-linked-list');
+    if (row.label) wrap.appendChild(el('span', 'vz-iv-rowlabel', row.label));
+    if (!items.length || items.every(function (x) { return String(x.v) === '-' || String(x.v) === '(empty)'; })) {
+      wrap.appendChild(el('div', 'vz-iv-empty', 'empty cache'));
+      return wrap;
+    }
+    var width = Math.max(800, items.length * 150 + 150), height = 150;
+    var svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + height, role: 'img',
+      'aria-label': 'Doubly linked recency order, newest to oldest: ' + items.map(function (x) { return x.v; }).join(', ') });
+    svg.classList.add('vz-iv-linked-svg');
+    var defs = svgEl('defs', {});
+    ['next','prev'].forEach(function (id) {
+      var m = svgEl('marker', { id: 'vz-iv-' + id, viewBox: '0 0 10 10', refX: id === 'next' ? '8' : '2', refY: '5', markerWidth: '5', markerHeight: '5', orient: id === 'next' ? 'auto' : 'auto-start-reverse' });
+      m.appendChild(svgEl('path', { d: 'M 0 0 L 10 5 L 0 10 z' })); defs.appendChild(m);
+    });
+    svg.appendChild(defs);
+    var boxW = 86, boxH = 42, gap = 54, start = 76, y = 58;
+    svg.appendChild(svgEl('text', { x: 6, y: y + 5, class: 'vz-iv-linked-end' }, 'NEWEST'));
+    svg.appendChild(svgEl('text', { x: width - 72, y: y + 5, class: 'vz-iv-linked-end' }, 'OLDEST'));
+    items.forEach(function (item, i) {
+      var x = start + i * (boxW + gap);
+      if (i > 0) {
+        svg.appendChild(svgEl('line', { x1: x - gap + 3, y1: y + 15, x2: x - 8, y2: y + 15, class: 'vz-iv-linked-arrow', 'marker-end': 'url(#vz-iv-next)' }));
+        svg.appendChild(svgEl('line', { x1: x - 8, y1: y + 32, x2: x - gap + 3, y2: y + 32, class: 'vz-iv-linked-arrow is-back', 'marker-end': 'url(#vz-iv-prev)' }));
+      }
+      var group = svgEl('g', { class: 'vz-iv-linked-node' + (item.k ? ' is-' + item.k : '') });
+      group.appendChild(svgEl('rect', { x: x, y: y, width: boxW, height: boxH, rx: 8 }));
+      group.appendChild(svgEl('text', { x: x + boxW / 2, y: y + 27, 'text-anchor': 'middle' }, String(item.v)));
+      svg.appendChild(group);
+    });
+    wrap.appendChild(svg); return wrap;
+  }
+
   function drawMatrix(row, previousFrame) {
     var columns = Math.max(1, Number(row.columns) || 1);
     var items = row.items || [];
@@ -358,6 +533,10 @@
     var layout = layoutFor(row, topic);
     var previous = findPreviousRow(previousFrame, row);
     if (layout === 'pairs') return drawPairs(row, previous);
+    if (layout === 'references') return drawReferences(row, previous);
+    if (layout === 'pointer-graph') return drawPointerGraph(row);
+    if (layout === 'range') return drawRange(row);
+    if (layout === 'linked-list') return drawLinkedList(row, previous);
     if (layout === 'heap') return drawHeap(row, previous);
     if (layout === 'bars') return drawBars(row, previous);
     if (layout === 'intervals') return drawIntervals(row);
@@ -423,6 +602,7 @@
     if (count) count.textContent = 'Step ' + (index + 1) + ' of ' + data.frames.length;
     updateTimeline(block, index);
     var scrub = block.querySelector('.vz-iv-scrub');
+    var speed = block.querySelector('.vz-iv-speed');
     if (scrub) {
       if (Number(scrub.value) !== index) scrub.value = String(index);
       scrub.setAttribute('aria-valuetext', 'Step ' + (index + 1) + ' of ' + data.frames.length);
@@ -496,7 +676,7 @@
       timer = window.setInterval(function () {
         if (at >= data.frames.length - 1) { stop(); return; }
         show(at + 1);
-      }, STEP_MS);
+      }, STEP_MS / (speed ? Number(speed.value) || 1 : 1));
     }
 
     buildTimeline(block, data, function (index) { stop(); show(index); });
@@ -508,6 +688,9 @@
     if (step) step.addEventListener('click', function () { stop(); show(at + 1); });
     if (back) back.addEventListener('click', function () { stop(); show(at - 1); });
     if (play) play.addEventListener('click', start);
+    if (speed) speed.addEventListener('change', function () {
+      if (timer) { stop(); start(); }
+    });
     if (reset) reset.addEventListener('click', function () { stop(); show(0); });
 
     block.addEventListener('keydown', function (event) {

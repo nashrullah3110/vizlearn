@@ -40,9 +40,13 @@ def _stairs_frames():
         calls["n"] = 0
         v = naive(n)
         out.append(frame(
-            pairs([("n", str(n)), ("ways", str(v)),
+            [pairs([("n", str(n)), ("ways", str(v)),
                    ("calls made", "{:,}".format(calls["n"]))],
                   {"calls made": "bad"}, label="plain recursion"),
+             row([cell(count, "bad", "n=%d" % steps)
+                  for count, steps in zip(
+                      [1, 15, calls["n"]], [1, 5, n])],
+                 label="Recursive call growth (log scale)", view="bars", scale="log")],
             "ways(%d) = %d, and it took %s calls to work out. The count roughly "
             "doubles with each extra step, because the same subproblems are solved "
             "again and again." % (n, v, "{:,}".format(calls["n"])),

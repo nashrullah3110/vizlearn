@@ -6,8 +6,8 @@ the coding problems underneath it. Same shape as tools/interview_strings.py;
 see tools/interview.py for the fields each entry carries.
 """
 
-from interview_viz import (frame, linear_scan, marked, pairs, two_pointer_sum,
-                           viz)
+from interview_viz import (frame, linear_scan, marked, pairs, references, row, cell,
+                           two_pointer_sum, viz)
 
 LISTS = []
 
@@ -216,29 +216,41 @@ print("Indexing is address arithmetic. The length never enters into it.")
 
 
 def _aliasing_frames():
-    out = [frame(pairs([("row", "[0, 0, 0]  @0x1f40")], {"row": "lo"},
-                       label="one list object"),
+    out = [frame(references("One name points to one mutable row", [
+                           {"id": "row", "column": "Names", "label": "row"},
+                           {"id": "list", "column": "List object", "label": "list object", "value": "[0, 0, 0]", "state": "lo"}],
+                           [{"from": "row", "to": "list"}], ["Names", "List object"]),
                  "One row object exists.",
                  {"objects": 1})]
-    out.append(frame(pairs([("grid[0]", "@0x1f40"), ("grid[1]", "@0x1f40"),
-                            ("grid[2]", "@0x1f40")],
-                           {"grid[1]": "bad", "grid[2]": "bad"},
-                           label="[[0]*3] * 3"),
+    out.append(frame(references("List multiplication repeats the same reference", [
+                           {"id": "r0", "column": "Grid rows", "label": "grid[0]"},
+                           {"id": "r1", "column": "Grid rows", "label": "grid[1]", "state": "bad"},
+                           {"id": "r2", "column": "Grid rows", "label": "grid[2]", "state": "bad"},
+                           {"id": "list", "column": "List object", "label": "one shared row", "value": "[0, 0, 0]"}],
+                           [{"from": "r0", "to": "list"}, {"from": "r1", "to": "list"},
+                            {"from": "r2", "to": "list"}], ["Grid rows", "List object"]),
                      "Multiplying the OUTER list repeats the reference. All "
                      "three rows are the same object.",
                      {"objects": 1}))
-    out.append(frame([pairs([("grid[0]", "[9, 0, 0]"), ("grid[1]", "[9, 0, 0]"),
-                             ("grid[2]", "[9, 0, 0]")],
-                            {k: "bad" for k in ("grid[0]", "grid[1]", "grid[2]")},
-                            label="after grid[0][0] = 9")],
+    out.append(frame(references("One write changes the shared object", [
+                           {"id": "r0", "column": "Grid rows", "label": "grid[0]", "state": "bad"},
+                           {"id": "r1", "column": "Grid rows", "label": "grid[1]", "state": "bad"},
+                           {"id": "r2", "column": "Grid rows", "label": "grid[2]", "state": "bad"},
+                           {"id": "list", "column": "List object", "label": "one shared row", "value": "[9, 0, 0]", "state": "hit"}],
+                           [{"from": "r0", "to": "list"}, {"from": "r1", "to": "list"},
+                            {"from": "r2", "to": "list"}], ["Grid rows", "List object"]),
                      "Writing to one row wrote to all three, because there is "
                      "only one row.",
                      {"objects": 1}))
-    out.append(frame(pairs([("grid[0]", "[9, 0, 0]  @0x1f40"),
-                            ("grid[1]", "[0, 0, 0]  @0x2b90"),
-                            ("grid[2]", "[0, 0, 0]  @0x3c11")],
-                           {"grid[0]": "hit"},
-                           label="[[0]*3 for _ in range(3)]"),
+    out.append(frame(references("The comprehension allocates three rows", [
+                           {"id": "r0", "column": "Grid rows", "label": "grid[0]"},
+                           {"id": "r1", "column": "Grid rows", "label": "grid[1]"},
+                           {"id": "r2", "column": "Grid rows", "label": "grid[2]"},
+                           {"id": "list0", "column": "List objects", "label": "row object 1", "value": "[9, 0, 0]", "state": "hit"},
+                           {"id": "list1", "column": "List objects", "label": "row object 2", "value": "[0, 0, 0]"},
+                           {"id": "list2", "column": "List objects", "label": "row object 3", "value": "[0, 0, 0]"}],
+                           [{"from": "r0", "to": "list0"}, {"from": "r1", "to": "list1"},
+                            {"from": "r2", "to": "list2"}], ["Grid rows", "List objects"]),
                      "The comprehension runs [0]*3 three times, so there are "
                      "three objects and the write lands on one of them.",
                      {"objects": 3}))
@@ -1758,8 +1770,14 @@ def _duplicate_frames():
         marks = {i: "dim" for i in range(len(values))}
         marks[slow] = "lo"
         marks[fast] = "hi" if fast != slow else "hit"
-        out.append(frame(marked(values, marks, {slow: "slow", fast: "fast"},
+        out.append(frame([marked(values, marks, {slow: "slow", fast: "fast"},
                                 label="treat each value as a next pointer"),
+                          row([cell(v, "hit" if i == slow == fast else
+                                    "lo" if i == slow else "hi" if i == fast else "dim",
+                                    ("slow + fast" if i == slow == fast else
+                                     "slow" if i == slow else "fast" if i == fast else None))
+                               for i, v in enumerate(values)],
+                              label="next-pointer cycle", view="pointer-graph")],
                          "slow -> index %d, fast -> index %d.%s"
                          % (slow, fast, "  They have met." if slow == fast else ""),
                          {"slow": slow, "fast": fast}))
@@ -1769,9 +1787,13 @@ def _duplicate_frames():
     while finder != slow:
         finder = values[finder]
         slow = values[slow]
-    out.append(frame(marked(values, {i: ("hit" if values[i] == finder or i == finder
+    out.append(frame([marked(values, {i: ("hit" if values[i] == finder or i == finder
                                          else "dim") for i in range(len(values))},
                             label="values"),
+                      row([cell(v, "hit" if i == finder else "done" if v == finder else "dim",
+                                "entrance" if i == finder else None)
+                           for i, v in enumerate(values)], label="cycle entrance",
+                          view="pointer-graph")],
                      "Phase two walks one pointer from the start; they meet at "
                      "the duplicate, %d. O(1) memory, array untouched." % finder,
                      {"slow": slow, "fast": finder}))
