@@ -602,7 +602,6 @@
     if (count) count.textContent = 'Step ' + (index + 1) + ' of ' + data.frames.length;
     updateTimeline(block, index);
     var scrub = block.querySelector('.vz-iv-scrub');
-    var speed = block.querySelector('.vz-iv-speed');
     if (scrub) {
       if (Number(scrub.value) !== index) scrub.value = String(index);
       scrub.setAttribute('aria-valuetext', 'Step ' + (index + 1) + ' of ' + data.frames.length);
@@ -651,6 +650,8 @@
     var back = block.querySelector('.vz-iv-back');
     var reset = block.querySelector('.vz-iv-reset');
     var scrub = block.querySelector('.vz-iv-scrub');
+    var speed = block.querySelector('.vz-iv-speed');
+    var speed = block.querySelector('.vz-iv-speed');
 
     function show(index) {
       at = Math.max(0, Math.min(data.frames.length - 1, index));
@@ -699,8 +700,17 @@
       else if (event.key === 'ArrowLeft') { stop(); show(at - 1); event.preventDefault(); }
     });
     document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); });
-    renderLegend(block, data);
-    show(0);
+    try {
+      renderLegend(block, data);
+      show(0);
+    } catch (err) {
+      if (window.console) console.error('vz-iv: could not render the first frame', err);
+      var stage = block.querySelector('.vz-iv-stage');
+      if (stage) {
+        stage.textContent = '';
+        stage.appendChild(el('p', 'vz-iv-error', 'This visualization could not load. Reload the page or use the code example below.'));
+      }
+    }
   }
 
   function init() {
