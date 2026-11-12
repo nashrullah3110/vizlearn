@@ -13,6 +13,7 @@ against the ones the pages really carry.
 
 from lib_pages import CONTACT_EMAIL, GITHUB, KAGGLE, LINKEDIN
 
+
 GA_ID = "G-ZT6JM33V5J"
 ADSENSE_PUB = "ca-pub-7551664560637561"
 
@@ -81,8 +82,10 @@ PAGES = {
          "the site better.</p>" % (GITHUB, LINKEDIN, KAGGLE)),
 
         ("How it is funded",
-         "<p>VizLearn is free to use and does not require an account. To keep every module "
-         "free, with no paywall and no login, the site may show advertising outside the "
+         "<p>VizLearn is free for personal learning and does not require an account. Colleges "
+         "and teams that want to teach with it at scale can take an institutional licence "
+         "(see <a href=\"colleges.html\">For Colleges</a>). To keep every module "
+         "free for individuals, with no paywall and no login, the site may show advertising outside the "
          "learning area; that is what pays for the domain and the time that goes into new "
          "modules. Ads never sit inside a visualisation and never gate a page.</p>"
          "<p>Advertising means third-party cookies, so the "
@@ -216,6 +219,139 @@ PAGES = {
 },
 
 # ---------------------------------------------------------------------------
+"colleges.html": {
+    "h1": "VizLearn for Colleges and Teams",
+    "lead": "Free for individuals. For institutions, a licence that covers "
+            "everyone you teach.",
+    "description": "VizLearn is free for personal learning. Colleges, universities and "
+                   "training teams can ask for an institutional licence: written "
+                   "permission to teach with it at scale, and an ad-free copy.",
+    "sections": [
+        ("Who pays and who does not",
+         "<p><strong>Free, always:</strong> students and self-learners using the site "
+         "for themselves, and individual teachers linking to a module or using one live "
+         "in a lecture.</p>"
+         "<p><strong>Needs a licence:</strong> an institution or company that deploys "
+         "VizLearn as part of a course or programme for a cohort &mdash; a department "
+         "making it required material, a college running it in a lab, a company using "
+         "it to train staff, a bootcamp or paid course building on it. The "
+         "<a href=\"terms.html\">Terms of Use</a> spell the line out.</p>"),
+
+        ("What a licence gives you",
+         "<ul class=\"vz-list\">"
+         "<li><strong>Written permission</strong> to teach with VizLearn across a "
+         "department or the whole institution, for a stated period.</li>"
+         "<li><strong>An ad-free copy</strong> you can host yourself on a campus "
+         "network or lab machines, so students see no advertising and nothing "
+         "leaves your network. The site is static, so this works offline.</li>"
+         "<li><strong>Your name and logo</strong> on the copy you host, if you "
+         "want it.</li>"
+         "<li><strong>Embedding</strong> modules in your LMS or course pages.</li>"
+         "<li><strong>A direct line</strong> to the author for corrections and "
+         "module requests that matter to your syllabus.</li>"
+         "</ul>"),
+
+        ("What is not built yet",
+         "<p>Being straight about it: there are no student accounts, class rosters or "
+         "progress dashboards today. Progress is stored in each learner's own browser "
+         "and nothing is sent to a server. Teacher tools such as assignments and "
+         "completion reports are planned, and what is built first will depend on what "
+         "institutions say they need &mdash; which is what the form below is for.</p>"),
+
+        ("Tell me what you need",
+         "<p>Fill this in and your email app opens with the message ready to send. "
+         "Nothing is stored by this page or sent anywhere until you press send in your "
+         "own email app.</p>"
+         '<form id="vz-college-form" class="vz-college-form" style="display:grid;gap:.9rem;max-width:36rem">'
+         '<label>Your name<br><input name="name" required autocomplete="name" '
+         'style="width:100%%;padding:.55rem;border:1px solid var(--border-color, #888);'
+         'border-radius:.4rem;background:transparent;color:inherit"></label>'
+         '<label>Your email<br><input name="email" type="email" required autocomplete="email" '
+         'style="width:100%%;padding:.55rem;border:1px solid var(--border-color, #888);'
+         'border-radius:.4rem;background:transparent;color:inherit"></label>'
+         '<label>College, university or company<br><input name="org" required '
+         'style="width:100%%;padding:.55rem;border:1px solid var(--border-color, #888);'
+         'border-radius:.4rem;background:transparent;color:inherit"></label>'
+         '<label>Your role<br><input name="role" placeholder="Professor, HOD, training lead..." '
+         'style="width:100%%;padding:.55rem;border:1px solid var(--border-color, #888);'
+         'border-radius:.4rem;background:transparent;color:inherit"></label>'
+         '<label>Roughly how many learners<br>'
+         '<select name="size" style="width:100%%;padding:.55rem;border:1px solid var(--border-color, #888);'
+         'border-radius:.4rem;background:transparent;color:inherit">'
+         '<option>Under 50</option><option>50 to 200</option><option>200 to 1000</option>'
+         '<option>More than 1000</option></select></label>'
+         '<fieldset style="border:1px solid var(--border-color, #888);border-radius:.4rem;padding:.6rem">'
+         '<legend>Tracks you would teach</legend>'
+         '<label><input type="checkbox" name="track" value="Maths"> Maths</label> '
+         '<label><input type="checkbox" name="track" value="Machine Learning"> Machine Learning</label> '
+         '<label><input type="checkbox" name="track" value="Deep Learning"> Deep Learning</label> '
+         '<label><input type="checkbox" name="track" value="Algorithms and Data Structures"> DSA</label> '
+         '<label><input type="checkbox" name="track" value="NLP"> NLP</label> '
+         '<label><input type="checkbox" name="track" value="Computer Vision"> Computer Vision</label> '
+         '<label><input type="checkbox" name="track" value="Databases and SQL"> Databases</label> '
+         '<label><input type="checkbox" name="track" value="Gen AI"> Gen AI</label> '
+         '<label><input type="checkbox" name="track" value="Python and libraries"> Python</label> '
+         '<label><input type="checkbox" name="track" value="Interview prep"> Interview prep</label>'
+         '</fieldset>'
+         '<fieldset style="border:1px solid var(--border-color, #888);border-radius:.4rem;padding:.6rem">'
+         '<legend>What would help most</legend>'
+         '<label><input type="checkbox" name="need" value="Permission to use in courses"> Permission to use in courses</label> '
+         '<label><input type="checkbox" name="need" value="Ad-free self-hosted copy"> Ad-free self-hosted copy</label> '
+         '<label><input type="checkbox" name="need" value="LMS embedding"> LMS embedding</label> '
+         '<label><input type="checkbox" name="need" value="Class rosters and progress reports"> Rosters and progress reports</label> '
+         '<label><input type="checkbox" name="need" value="Assignments"> Assignments</label> '
+         '<label><input type="checkbox" name="need" value="Custom modules"> Custom modules</label>'
+         '</fieldset>'
+         '<label>Anything else<br><textarea name="note" rows="4" '
+         'style="width:100%%;padding:.55rem;border:1px solid var(--border-color, #888);'
+         'border-radius:.4rem;background:transparent;color:inherit"></textarea></label>'
+         '<button type="submit" style="justify-self:start;padding:.65rem 1.2rem;border-radius:.4rem;'
+         'border:0;background:var(--accent, #4f46e5);color:#fff;font-weight:600;cursor:pointer">'
+         'Open email to send</button>'
+         '</form>'
+         '<p id="vz-college-fallback" style="margin-top:1rem">Prefer to write it yourself? '
+         'Email <a href="mailto:' + CONTACT_EMAIL + '">' + CONTACT_EMAIL + '</a> with the subject '
+         '&ldquo;Institutional licence&rdquo;.</p>'
+         '<script>'
+         '(function(){'
+         'var f=document.getElementById("vz-college-form");'
+         'if(!f)return;'
+         'f.addEventListener("submit",function(e){'
+         'e.preventDefault();'
+         'function v(n){return (f.elements[n]&&f.elements[n].value||"").trim();}'
+         'function all(n){return Array.prototype.map.call(f.querySelectorAll("input[name="+n+"]:checked"),'
+         'function(x){return x.value;}).join(", ")||"not stated";}'
+         'var body=["Name: "+v("name"),"Email: "+v("email"),"Institution: "+v("org"),'
+         '"Role: "+v("role"),"Learners: "+v("size"),"Tracks: "+all("track"),'
+         '"Needs: "+all("need"),"","Notes:",v("note")].join("\\n");'
+         'var url="mailto:' + CONTACT_EMAIL + '?subject="+encodeURIComponent("Institutional licence: "+v("org"))'
+         '+"&body="+encodeURIComponent(body);'
+         'window.location.href=url;'
+         '});'
+         '})();'
+         '</script>'),
+
+        ("Pricing",
+         "<p>There is no fixed price list yet. I would rather learn what you actually need "
+         "before naming a number, and a small department and a whole university should not "
+         "pay the same. Early institutions get a say in what is built next, and a rate "
+         "that reflects that.</p>"),
+
+        ("Questions you may have",
+         "<p><strong>We already use VizLearn in class. Are we in breach?</strong> No. "
+         "Linking to modules and using them live has always been allowed and still is. A "
+         "licence is for deploying it as a programme for a cohort, or for the extras above."
+         "</p>"
+         "<p><strong>Can individual students still use it free?</strong> Yes. Nothing "
+         "about the free site changes.</p>"
+         "<p><strong>Is student data collected?</strong> Not by VizLearn. There are no "
+         "accounts. The public site uses Google Analytics and AdSense as described in the "
+         "<a href=\"privacy.html\">Privacy Policy</a>; the ad-free hosted copy removes "
+         "both.</p>"),
+    ],
+},
+
+# ---------------------------------------------------------------------------
 "contact.html": {
     "h1": "Contact",
     "lead": "Corrections, questions, requests for a module that does not exist yet.",
@@ -285,8 +421,10 @@ PAGES = {
 
         ("Using VizLearn in teaching",
          "<p>You are welcome to link to any module from a course page, a reading list or a "
-         "lecture, and to use it live in a classroom. No permission needed. If you want to "
-         "reproduce a visualisation or the written text somewhere else, check the "
+         "lecture, and to use it live in a classroom. No permission needed. If your "
+         "college or company wants to deploy it for a whole cohort, see "
+         "<a href=\"colleges.html\">VizLearn for Colleges and Teams</a>. To reproduce a "
+         "visualisation or the written text somewhere else, check the "
          "<a href=\"terms.html\">Terms of Use</a> first, then email me.</p>"),
 
         ("Advertising, licensing and press",
@@ -458,30 +596,56 @@ PAGES = {
                    "and written explanations, accuracy, and limitation of liability.",
     "sections": [
         ("Using the site",
-         "<p>VizLearn is free to use for learning and for teaching. You do not need an "
-         "account and you do not need to ask permission to read, link to, bookmark or use "
-         "any module in a classroom.</p>"
-         "<p>By using the site you accept these terms. If you do not, please stop using "
-         "it.</p>"),
+         "<p>VizLearn is free for personal use: learning, self-study, and teaching in "
+         "the ordinary way described below. You do not need an account to read, link to, "
+         "bookmark or use any module.</p>"
+         "<p>Organisations that deploy VizLearn for a cohort need a licence; the section "
+         "on institutional use says what that means. By using the site you accept these "
+         "terms. If you do not, please stop using it.</p>"),
 
         ("What you may do without asking",
          "<ul class=\"vz-list\">"
+         "<li>Read and use any module for your own learning, free of charge.</li>"
          "<li>Link to any page, from anywhere.</li>"
-         "<li>Use modules live in a lecture, workshop, tutorial or study group.</li>"
+         "<li>As an individual teacher, use modules live in a lecture, workshop, "
+         "tutorial or study group.</li>"
          "<li>Put a module on a reading list or in course materials, as a link.</li>"
          "<li>Take screenshots for a talk, a blog post or a paper, with attribution to "
          "vizlearn.in.</li>"
          "<li>Copy a cheat sheet for your own notes &mdash; there is a button for it.</li>"
          "</ul>"),
 
-        ("What needs permission",
+        ("Institutional use needs a licence",
+         "<p>A licence is required when an organisation &mdash; a college, university, "
+         "school, company, bootcamp or training provider &mdash; does any of the "
+         "following with VizLearn:</p>"
+         "<ul class=\"vz-list\">"
+         "<li>makes it required or core material for a programme, and directs a cohort "
+         "of learners to it;</li>"
+         "<li>hosts, mirrors or copies it on its own servers, intranet or lab "
+         "machines;</li>"
+         "<li>embeds it in a learning management system, a paid course or a product;</li>"
+         "<li>uses it to train employees, or in any activity for which it charges "
+         "fees.</li>"
+         "</ul>"
+         "<p>An individual teacher linking to a module, or using one live in a lecture, "
+         "does not need a licence. To arrange one, see "
+         "<a href=\"colleges.html\">VizLearn for Colleges and Teams</a> or email "
+         "<a href=\"mailto:%s\">%s</a>. Organisations already using VizLearn in the way "
+         "this page used to allow may carry on while we talk, and I will not treat that "
+         "as a breach.</p>" % (CONTACT_EMAIL, CONTACT_EMAIL)),
+
+        ("What else needs permission",
          "<p>The written explanations and the visualisations on this site are original work "
          "and remain copyright of their author. Please ask before you republish a module's "
          "text elsewhere, mirror pages on another domain, embed a visualisation in a "
          "commercial product or paid course, or use the material to train or fine-tune a "
          "model for redistribution.</p>"
-         "<p>The site's source code is published separately under the MIT licence; that "
-         "licence covers the code, not the written explanations.</p>"),
+         "<p>The source code and content in the repository are published under the "
+         "licence in its LICENSE file: free for personal and "
+         "non-commercial use, with institutional and commercial use by licence. Copies "
+         "obtained earlier under the MIT licence keep the rights that licence gave for "
+         "the versions they received.</p>"),
 
         ("Accuracy",
          "<p>Every module is written to be correct and the visualisations run the real "
