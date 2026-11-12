@@ -421,7 +421,8 @@ PAGES = {
 
         ("Using VizLearn in teaching",
          "<p>You are welcome to link to any module from a course page, a reading list or a "
-         "lecture, and to use it live in a classroom. No permission needed. If your "
+         "lecture, and, as an individual teacher, to use it live in a classroom. No "
+         "permission needed. If your "
          "college or company wants to deploy it for a whole cohort, see "
          "<a href=\"colleges.html\">VizLearn for Colleges and Teams</a>. To reproduce a "
          "visualisation or the written text somewhere else, check the "
