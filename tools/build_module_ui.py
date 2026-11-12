@@ -304,8 +304,11 @@ def author_card(root_prefix):
         '<span class="vz-byline-sep" aria-hidden="true">&middot;</span>'
         '<a href="%scontact.html">Contact</a>'
         "</p>"
+        '<p class="vz-author-body">Teaching a course with this? Individual teachers can use '
+        'it freely; for a whole department or programme, see '
+        '<a href="%scolleges.html">institutional licences</a>.</p>'
         "</section>"
-        % (html.escape(AUTHOR), root_prefix, root_prefix, root_prefix)
+        % (html.escape(AUTHOR), root_prefix, root_prefix, root_prefix, root_prefix)
     )
 
 

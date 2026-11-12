@@ -207,7 +207,9 @@ def how_it_works():
 def faq():
     qs = [
         ("Is it actually free?",
-         "Yes, and there is nothing to sign up for. No account, no trial, no email wall."),
+         "Yes for personal learning, and there is nothing to sign up for. No account, no "
+         "trial, no email wall. Colleges and companies that teach a whole cohort with it "
+         "need an institutional licence."),
         ("Does the Python really run?",
          "It runs CPython compiled to WebAssembly, in a worker thread in your browser. "
          "Nothing is uploaded and nothing is executed on a server."),
@@ -224,6 +226,19 @@ def faq():
             '<p class="vzx-kicker">Questions</p>'
             '<h2 class="vzx-h" id="vzx-faq-h">The ones worth answering up front</h2>'
             '<div class="vzx-faq">%s</div></div></section>' % items)
+
+
+def colleges_strip():
+    return ('<section class="vzx-sec" aria-labelledby="vzx-col-h"><div class="vzx-wrap">'
+            '<div class="vzx-panel" style="padding:1.5rem;text-align:center">'
+            '<p class="vzx-kicker">For colleges and teams</p>'
+            '<h2 class="vzx-h" id="vzx-col-h" style="margin-top:0">Teaching a course with VizLearn?</h2>'
+            '<p class="vzx-sub" style="margin:0 auto 1rem">Free for individual learners, always. '
+            'Colleges, universities and training teams can get an institutional licence: '
+            'permission to teach with it across a department and an ad-free copy to host '
+            'on your own network.</p>'
+            '<a class="vzx-btn vzx-btn-solid" href="colleges.html">See how institutional '
+            'licences work</a></div></div></section>')
 
 
 def cta(n):
@@ -543,9 +558,9 @@ def main():
     src = TRACK_STAT.sub(r"\g<1>%d\g<2>" % n["tracks"], src, count=1)
 
     top = "%s\n%s\n%s\n    " % (BEGIN_TOP, featured(), END_TOP)
-    bottom = "%s\n%s%s%s%s\n%s\n%s\n    " % (
+    bottom = "%s\n%s%s%s%s%s\n%s\n%s\n    " % (
         BEGIN_BOT,
-        how_it_works(), study_tools(), faq(), cta(n), HUB_JS, END_BOT)
+        how_it_works(), study_tools(), faq(), colleges_strip(), cta(n), HUB_JS, END_BOT)
 
     at = src.find(ANCHOR_TOP)
     if at == -1:
