@@ -577,12 +577,13 @@ def is_practice_page(rel):
     return rel == PRACTICE["rel"]
 
 
-STATIC_PAGES = ["about.html", "author.html", "contact.html", "privacy.html",
-                "terms.html"]
+STATIC_PAGES = ["about.html", "author.html", "colleges.html", "contact.html",
+                "privacy.html", "terms.html"]
 
 STATIC_TITLES = {
     "about.html": "About VizLearn",
     "author.html": "Ashish Jangra",
+    "colleges.html": "For Colleges and Teams",
     "contact.html": "Contact",
     "privacy.html": "Privacy Policy",
     "terms.html": "Terms of Use",
@@ -595,6 +596,7 @@ STATIC_LD_TYPE = {
     # and it is what makes the byline on 580 module pages resolve to
     # something a reader - or a reviewer - can actually check.
     "author.html": "ProfilePage",
+    "colleges.html": "WebPage",
     "contact.html": "ContactPage",
     "privacy.html": "PrivacyPolicyPage",
     "terms.html": "WebPage",

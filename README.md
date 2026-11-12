@@ -3,8 +3,10 @@
 **[vizlearn.in](https://vizlearn.in)** — 166 interactive visual explainers for AI,
 Machine Learning, Algorithms and the maths underneath them.
 
-Free, no login, nothing to install. Supported by display advertising —
-see the [privacy policy](https://vizlearn.in/privacy.html) for what that sets.
+Free for personal learning, no login, nothing to install. Supported by display
+advertising — see the [privacy policy](https://vizlearn.in/privacy.html) for
+what that sets. Colleges and teams that want to teach with it at scale can get
+an institutional licence — see [For Colleges](https://vizlearn.in/colleges.html).
 
 ---
 
@@ -103,6 +105,7 @@ rail, then runs an audit that fails on anything inconsistent. See [tools/README.
 
 Beyond the modules and the hub: a landing page per track at `/<track>/`, plus
 [about](https://vizlearn.in/about.html),
+[for colleges](https://vizlearn.in/colleges.html),
 [contact](https://vizlearn.in/contact.html),
 [privacy](https://vizlearn.in/privacy.html) and
 [terms](https://vizlearn.in/terms.html). All generated — see
@@ -110,7 +113,10 @@ Beyond the modules and the hub: a landing page per track at `/<track>/`, plus
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+Free for personal and non-commercial use; institutional and commercial use
+needs a licence — see [LICENSE](LICENSE) and
+[vizlearn.in/colleges.html](https://vizlearn.in/colleges.html). Versions
+obtained earlier under the MIT licence keep the rights that licence gave.
 
 ## Contact
 
