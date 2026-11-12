@@ -1,0 +1,179 @@
+title: Production RAG System Design
+intro: Seven connected subsystems turn a RAG demo into a service you can run: ingestion, hybrid retrieval, generation, evaluation, monitoring, scaling and failure recovery.
+
+## From prototype to production
+
+A demo [RAG](rag.html) system fetches chunks and writes an answer. A production system does that and six more things. It takes in documents reliably. It combines vector and keyword search. It checks answer quality offline. It watches itself in real time. It scales under load. And it keeps working when one of its parts fails.
+
+This page walks through all seven for an example learning platform with 200,000 articles and a large user base. The targets are examples to design against: a p95 latency under two seconds, answer quality that you measure and hold above a bar you set, daily content updates with no downtime, no raw errors shown to users when one component fails, and a cost you track.
+
+Each subsystem fails in its own way and scales in its own way. So build them as separate services that talk through queues and APIs. A slow ingestion job should never slow down a search.
+
+Here is how the flow runs. Ingestion fills the vector store. The retrieval service queries it and passes chunks to the generation service. Monitoring watches all of it. The evaluation suite checks quality offline, and its results feed back into tuning. The scaling layer sizes the machines from the monitoring data. And the recovery layer wraps every dependency in a circuit breaker and a fallback.
+
+## Ingestion
+
+Ingestion turns raw articles into indexed chunks with [embeddings](embeddings_and_vector_search.html). With 200,000 articles and daily changes, this is a bulk load plus a steady trickle. Treat each article as one task: fetch, chunk, embed, write.
+
+Make it idempotent. Derive each chunk ID from a hash of the article ID, chunk index and content, so writing the same article twice produces the same chunks and no duplicates. Remove stale chunks from an old version only after the new ones are written, never before. The details are in [distributed ingestion](distributed_ingestion_pipeline.html).
+
+For a teaching site, [chunking](chunking_strategies_for_rag.html) should respect section boundaries and keep code blocks whole. Half a code example, in either of two chunks, helps nobody. Keep an equation with the sentences around it.
+
+## Hybrid retrieval
+
+Vector search alone can miss exact terms. A student who searches "eigenvalue decomposition" wants that article. Vector search may return a related but different idea. [BM25](bm25_and_sparse_retrieval.html) keyword search catches rare terms, formulas and acronyms that embeddings blur.
+
+The retrieval service runs both searches at once. It merges the lists with [reciprocal rank fusion](hybrid_search_reciprocal_rank_fusion.html). Fusion uses rank, not score size, so it copes with scores on different scales. A [reranker](reranking_bi_encoders_vs_cross_encoders.html) then re-scores the merged list.
+
+```python-run
+def rrf(*ranked_lists, k=60):
+    """Each document scores 1 / (k + rank) in every list that contains it."""
+    scores = {}
+    for ranked in ranked_lists:
+        for rank, doc in enumerate(ranked, 1):
+            scores[doc] = scores.get(doc, 0) + 1.0 / (k + rank)
+    return sorted(scores.items(), key=lambda kv: -kv[1])
+
+vector = ["doc_A", "doc_B", "doc_C", "doc_D", "doc_E"]
+keyword = ["doc_C", "doc_F", "doc_A", "doc_G", "doc_B"]
+for doc, score in rrf(vector, keyword)[:6]:
+    print(f"{doc}  {score:.4f}  in vector: {doc in vector!s:5}  in keyword: {doc in keyword}")
+```
+
+The documents that appear in both lists, A, C and B, rise to the top because they collect a score from each. That is the point of hybrid search: a document that matches by meaning and by words is a strong candidate.
+
+## Generation
+
+The generation service turns retrieved context into an answer. Three decisions matter for a teaching product.
+
+<strong>Route by difficulty.</strong> Simple factual questions go to a fast, cheap model. Hard explanations go to a stronger one. That cuts the typical latency and the bill, though it does not by itself shrink the slowest requests. See [RAG latency optimization](rag_latency_optimization.html).
+
+<strong>Stream the reply.</strong> Students notice the wait for the first word far more than the total time.
+
+<strong>Teach, do not just answer.</strong> Tune the prompt to explain, give an example and cite the source articles so students can read on. If the sources fall short, the system should say what it can answer and what needs more reading.
+
+## Evaluation
+
+A demo has no evaluation. A production system has two kinds. Offline checks run on a schedule and cover a lot. Online checks sample live traffic.
+
+<strong>Retrieval recall at k</strong> asks whether the right chunks appear in the top k. For RAG, recall matters more than precision. A missing chunk gives an incomplete answer. An irrelevant extra chunk wastes space, and the model can usually ignore it.
+
+<strong>Model-graded answers</strong> score each reply against a reference on correctness, completeness, clarity and citations. A separate, stronger model acts as judge. That is cheaper than human review and gives steady scores. Still, spot-check the judge against people.
+
+<strong>Faithfulness checks</strong> test that each claim in an answer is backed by the sources. They catch [hallucination](hallucination_and_grounding.html), the worst failure on a site where students trust what they read.
+
+```python-run
+tests = [
+    ("What is backpropagation?", {"art_12", "art_45"}, {"art_12", "art_45", "art_99"}),
+    ("Explain gradient descent", {"art_7"}, {"art_7", "art_8"}),
+    ("How does dropout work?", {"art_33", "art_34", "art_35"}, {"art_33", "art_50", "art_51"}),
+]
+recalls = []
+for query, relevant, retrieved in tests:
+    found = relevant & retrieved
+    recalls.append(len(found) / len(relevant))
+    print(f"{query:28s} recall {recalls[-1]:.2f}  ({len(found)} of {len(relevant)})")
+print("mean recall@k:", round(sum(recalls) / len(recalls), 2))
+```
+
+## Monitoring
+
+Track three kinds of signal.
+
+<strong>Operational</strong>: latency at p50, p95 and p99, throughput, error rate and queue depth. Alert when p95 or the error rate crosses a limit you set from your own baseline.
+
+<strong>Quality</strong>: thumbs up and down, follow-up rates (a follow-up often means the first answer was incomplete) and retrieval relevance scores. Alert when the average rating falls.
+
+<strong>Cost</strong>: model tokens, embedding calls and infrastructure. Routing and caching are the main levers.
+
+## Scaling
+
+Parts scale in different ways. Stateless services such as the gateway and generation scale out by adding copies. Stateful ones, the vector store and the cache, scale by sharding. The bottleneck moves as load grows: with few users it is often the model API, and with many it shifts toward the store and the cache.
+
+Write autoscaling rules from your own traces. Scale out when p95 stays high for several minutes, or when the ingestion queue backs up. Scale in only after a longer calm spell. Add a cooldown between actions so the system does not thrash.
+
+## Failure recovery
+
+When a part fails, degrade in steps instead of showing an error. The full pipeline runs hybrid retrieval, a reranker and a strong model. With the reranker down, use vector search and a fast model. With retrieval down, serve from the semantic cache. With everything down, show curated FAQ answers. Only the last step is an error page.
+
+A circuit breaker protects each dependency. After a run of failures it opens, and requests are refused at once instead of queueing behind a dead service. After a wait it lets one probe through. If the probe works, it closes again.
+
+```python-run
+class Breaker:
+    def __init__(self, threshold=3, wait=30):
+        self.threshold, self.wait = threshold, wait
+        self.failures, self.state, self.opened_at = 0, "closed", 0
+
+    def call(self, now, ok):
+        if self.state == "open":
+            if now - self.opened_at < self.wait:
+                return "refused (open)"
+            self.state = "half-open"            # allow one probe
+        if ok:
+            self.failures, self.state = 0, "closed"
+            return "ok"
+        self.failures += 1
+        if self.state == "half-open" or self.failures >= self.threshold:
+            self.state, self.opened_at = "open", now
+        return "failed"
+
+b = Breaker()
+for t, ok in [(0, False), (1, False), (2, False), (5, True), (20, True), (40, True), (45, True)]:
+    print(f"t={t:2d}s dependency {'up  ' if ok else 'down'} -> {b.call(t, ok):15s} state: {b.state}")
+```
+
+Three failures open the breaker. The calls at 5 s and 20 s are refused without touching the dead service. The probe at 40 s succeeds and traffic resumes.
+
+## Control cost
+
+At high traffic, the model bill is the largest line. Routing sends easy questions to a cheap model, and caching skips the model for repeats. Work the savings out from your own prices and traffic. The numbers below are placeholders.
+
+```python-run
+queries_per_day = 1_000_000
+tokens_per_query = 2_000
+price_capable, price_fast = 10.0, 1.0     # dollars per million tokens: placeholders
+simple_share, cache_hit = 0.70, 0.30
+
+def monthly(price_mix, hit):
+    return queries_per_day * 30 * (1 - hit) * tokens_per_query / 1e6 * price_mix
+
+all_capable = monthly(price_capable, 0)
+routed = monthly(simple_share * price_fast + (1 - simple_share) * price_capable, 0)
+routed_cached = monthly(simple_share * price_fast + (1 - simple_share) * price_capable, cache_hit)
+print(f"all capable model  : ${all_capable:,.0f} a month")
+print(f"with routing       : ${routed:,.0f} a month")
+print(f"routing and caching: ${routed_cached:,.0f} a month")
+```
+
+With these placeholder prices, routing alone cuts the bill by 63%, and adding a 30% cache hit rate brings the cut to 74%. Your numbers will differ, but the shape holds: the biggest saving comes from not sending easy questions to the big model.
+
+## Things to try
+
+1. Set <strong>What fails</strong> to the vector store with <strong>Safeguards</strong> off. Search is down and no answers are served.
+2. Turn <strong>Safeguards</strong> on. Keyword search and the cache keep answers flowing at lower quality.
+3. Fail the reranker with safeguards on. Quality dips and the service stays up.
+4. Fail the ingestion pipeline. Search still works, but the index slowly goes stale unless a queue buffers the updates.
+
+## What to remember
+
+A production RAG system has seven parts: ingestion, hybrid retrieval, generation, evaluation, monitoring, scaling and recovery. Make ingestion idempotent. Fuse vector and keyword search. Measure recall and faithfulness. Watch speed, quality and cost. Wrap every dependency in a circuit breaker with a fallback.
+
+## Questions people ask
+
+<strong>Single node or sharded vector store?</strong> Start with one node. Shard when search slows under load or the index no longer fits in RAM.
+
+<strong>How often should I run offline evaluation?</strong> Weekly as a start, and after every pipeline change such as a new embedding model, prompt or chunking setting.
+
+<strong>How big should the test set be?</strong> Start with a few hundred question and answer pairs and add the edge cases you find in production.
+
+<strong>How do I invalidate the cache?</strong> Set a time limit on entries and invalidate when the source article is updated. Have the ingestion step trigger it.
+
+<strong>What should a circuit breaker threshold be?</strong> A few consecutive failures within a short window, then a probe after a wait. Tune both from your dependency's real behaviour.
+
+## Recap in one screen
+
+- Seven subsystems: ingest, retrieve, generate, evaluate, monitor, scale, recover.
+- Idempotent ingestion keeps the index clean.
+- Hybrid search with rank fusion beats either search alone.
+- Measure recall and faithfulness offline, and watch quality and cost online.
+- Circuit breakers and stepwise fallbacks beat error pages.

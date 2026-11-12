@@ -1,0 +1,198 @@
+title: Similarity Threshold Gating
+intro: Filter retrieved chunks before they reach the model, using a fixed floor, a score-drop cut and a threshold learned from labelled data.
+
+## Why raw top-k retrieval cannot be trusted
+
+A retriever always returns k results. It does this even when nothing in the corpus is relevant. Ask a programming knowledge base about pizza in Naples and you still get k chunks. They match a word or two, and they are about something else.
+
+If those chunks go straight to the model, it tries to answer from them. The answer sounds sure and is wrong. That is the worst failure in a [RAG](rag.html) system.
+
+A similarity gate sits between the retriever and the model. For each chunk it asks one question: good enough to pass, or too noisy to keep? The hard part is setting it. Too strict and you lose borderline chunks the model could use. Too loose and the noise gets through.
+
+A single fixed number rarely works. [Cosine similarity](../machine_learning/cosine_similarity.html) from `all-MiniLM-L6-v2` puts irrelevant pairs at about 0.15 to 0.45 and relevant pairs at about 0.55 to 0.85. The zone from 0.40 to 0.55 is where one cut-off cannot tell signal from noise.
+
+So production systems stack three gates. A floor removes the clearly irrelevant. A score-drop cut finds the natural edge of each result set. A threshold learned from labelled data adds what you know about your own domain. This page builds each one and then combines them.
+
+For how retrieval quality is measured, see [evaluation metrics](retrieval_evaluation_metrics.html). For how [BM25](bm25_and_sparse_retrieval.html) and [hybrid search](hybrid_search_reciprocal_rank_fusion.html) change score ranges, see those pages.
+
+## Score ranges differ between models
+
+Know the shape of your scores before you pick a number.
+
+Cosine scores run from -1 to 1, but real ones bunch up. For `all-MiniLM-L6-v2` they sit between 0.15 and 0.85. For OpenAI `text-embedding-3-small` the band is closer to 0.20 to 0.75. A cut-off tuned for one model breaks on the other.
+
+Dot-product scores have no fixed range, because they grow with vector length. Normalise the vectors and the dot product equals cosine, which is why normalising is standard.
+
+BM25 scores are positive numbers with no upper limit, and they depend on your corpus. A score of 8 can be strong in one corpus and weak in another. Gate BM25 separately from dense scores.
+
+```python-run
+import random
+
+def simulate(n_rel, n_irr, rel_mean, irr_mean, std, seed=42):
+    random.seed(seed)
+    clip = lambda x: min(1.0, max(0.0, x))
+    rel = [clip(random.gauss(rel_mean, std)) for _ in range(n_rel)]
+    irr = [clip(random.gauss(irr_mean, std)) for _ in range(n_irr)]
+    return rel, irr
+
+for name, rm, im, sd in [("MiniLM", 0.68, 0.32, 0.10),
+                         ("OpenAI-small", 0.55, 0.28, 0.08)]:
+    rel, irr = simulate(30, 70, rm, im, sd)
+    lowest = min(rel)
+    overlap = sum(1 for s in irr if s > lowest)
+    print(name)
+    print("  relevant mean  :", round(sum(rel) / len(rel), 3))
+    print("  irrelevant mean:", round(sum(irr) / len(irr), 3))
+    print("  noise above the weakest relevant chunk:", overlap)
+```
+
+## Gate 1: a fixed floor
+
+The simplest gate rejects any chunk below a set score. It works well as a floor that removes obvious junk. Common starting points are 0.35 to 0.45 for MiniLM and 0.30 to 0.40 for OpenAI embeddings. For messy user queries, lower the number by 0.05 to 0.10.
+
+Its weakness is rigidity. A cut-off of 0.40 passes a weak chunk at 0.41 and rejects a useful one at 0.39. It cannot adapt to the query. Use it as the first layer, never the only one.
+
+```python-run
+def absolute_gate(scores, threshold=0.40):
+    passed = [(i, s) for i, s in enumerate(scores) if s >= threshold]
+    rejected = [(i, s) for i, s in enumerate(scores) if s < threshold]
+    return passed, rejected
+
+scores = [0.82, 0.79, 0.55, 0.42, 0.38, 0.31, 0.28, 0.22]
+passed, rejected = absolute_gate(scores, 0.40)
+
+print("threshold 0.40")
+print("passed  :", [(i, s) for i, s in passed])
+print("rejected:", [(i, s) for i, s in rejected])
+```
+
+## Gate 2: cut at the score drop
+
+Instead of a fixed number, look for the gap where scores fall off a cliff. Relevant chunks tend to bunch near the top with similar scores. Then comes a gap, then the irrelevant tail.
+
+Take `[0.82, 0.79, 0.77, 0.74, 0.52, 0.48, 0.45]`. The biggest gap is 0.22, between 0.74 and 0.52. Cut there. This needs no knowledge of the score scale, so it works across models.
+
+Two settings keep it safe. `min_drop` stops it cutting on tiny gaps. `min_keep` makes sure at least one chunk survives. When no gap is big enough, it keeps everything, and that is the right call for a smooth list.
+
+```python-run
+def score_drop_gate(scores, min_drop=0.10, min_keep=1):
+    if len(scores) <= min_keep:
+        return len(scores), 0.0
+    best_gap, cut = 0.0, len(scores)
+    for i in range(min_keep, len(scores)):
+        gap = scores[i - 1] - scores[i]
+        if gap >= min_drop and gap > best_gap:
+            best_gap, cut = gap, i
+    return cut, best_gap
+
+sharp = [0.82, 0.79, 0.77, 0.74, 0.52, 0.48, 0.45, 0.41]
+cut, gap = score_drop_gate(sharp)
+print("keep", sharp[:cut], "- gap", round(gap, 2))
+
+smooth = [0.72, 0.70, 0.68, 0.66, 0.64, 0.62]
+cut, gap = score_drop_gate(smooth)
+print("smooth list, no gap of 0.10: keep all", cut)
+```
+
+## Gate 3: learn the threshold from labelled data
+
+Run your retriever on queries where you know which chunks are relevant. Collect the scores of the relevant chunks. Then pick the cut-off that keeps the share of them you want.
+
+Aim for recall, not precision. A missing chunk is worse than a noisy one. The model can ignore noise, but it cannot invent a fact that was filtered out. A target of 0.95 means you accept losing 5% of the relevant chunks.
+
+```python-run
+import random
+
+def calibrate(rel, irr, target_recall=0.95):
+    ordered = sorted(rel)
+    cutoff = ordered[max(0, int((1 - target_recall) * len(ordered)))]
+    tp = sum(1 for s in rel if s >= cutoff)
+    fp = sum(1 for s in irr if s >= cutoff)
+    return cutoff, tp / (tp + fp), tp / len(rel)
+
+random.seed(42)
+clip = lambda x: min(1.0, max(0.0, x))
+rel = [clip(random.gauss(0.65, 0.10)) for _ in range(100)]
+irr = [clip(random.gauss(0.35, 0.10)) for _ in range(300)]
+
+for target in [0.99, 0.95, 0.90, 0.80]:
+    cutoff, precision, recall = calibrate(rel, irr, target)
+    print("target", target, "cut-off", round(cutoff, 3),
+          "precision", round(precision, 3), "recall", round(recall, 3))
+```
+
+## Gate 4: stack all three
+
+Each gate catches a different failure. The floor stops a pizza question returning Python code. The drop adapts to this one query. The learned cut-off adds knowledge of your data. A chunk must clear every layer to reach the model.
+
+```python-run
+def score_drop(scores, min_drop=0.10, min_keep=1):
+    best, cut = 0.0, len(scores)
+    for i in range(min_keep, len(scores)):
+        gap = scores[i - 1] - scores[i]
+        if gap >= min_drop and gap > best:
+            best, cut = gap, i
+    return cut
+
+def layered_gate(scores, floor=0.25, calibrated=0.45):
+    above = [(i, s) for i, s in enumerate(scores) if s >= floor]
+    if not above:
+        return [], "all below the floor"
+    cut = score_drop([s for _, s in above])
+    kept = [(i, s) for i, s in above[:cut] if s >= calibrated]
+    return kept, "passed" if kept else "nothing cleared the learned cut-off"
+
+cases = [("clear cluster", [0.81, 0.78, 0.76, 0.52, 0.31, 0.28]),
+         ("all weak", [0.22, 0.20, 0.18, 0.15]),
+         ("gradual decay", [0.72, 0.68, 0.64, 0.60, 0.56, 0.52])]
+for name, scores in cases:
+    kept, why = layered_gate(scores)
+    print(name, "->", [s for _, s in kept], "(" + why + ")")
+```
+
+## When nothing passes
+
+Many systems get this wrong. When every chunk is gated out you have two options. You can say "I do not have enough information". Or you can let the model answer from memory and lose the grounding that RAG exists to give you.
+
+The first is almost always right. A confident wrong answer costs more trust than an honest "I don't know". Passing weak chunks through anyway defeats the gate.
+
+An empty gate is also one of the strongest tools against [hallucination](hallucination_and_grounding.html), because it stops the model before it can answer without evidence. The next page, [abstention in RAG](abstention_in_rag.html), builds on it.
+
+## Recalibrate as things change
+
+A threshold is not a one-time setting. A new embedding model shifts every score. New document types change the corpus. Query habits drift over a year.
+
+Watch the gating ratio, which is the share of chunks that pass. A sudden rise means the gate is too loose. A sudden drop often means the model or the content changed. Recalibrate when you change the embedding model, add a new document type, or see the ratio move and stay moved.
+
+## Things to try
+
+1. Set the <strong>Strategy</strong> to absolute, then move the <strong>Absolute cut-off</strong> to 60. Good chunks vanish. Move it to 20 and noise comes through.
+2. Switch the <strong>Strategy</strong> to score drop. It cuts at the biggest gap without any number from you.
+3. Choose calibrated and push <strong>Target recall</strong> to 99. The cut-off falls, so recall rises and precision drops.
+4. Choose layered. A chunk must clear the floor, the drop and the learned cut-off together.
+
+## What to remember
+
+A retriever returns k chunks even when none are relevant, so put a gate in front of the model. A fixed floor catches junk, a score drop adapts to each query, and a threshold learned from labelled data fits your domain. Stack them, aim for high recall, and say "I do not know" when nothing passes.
+
+## Questions people ask
+
+<strong>What cosine threshold should I use?</strong> There is no universal number. Learn it from labelled data. As a start, try 0.35 to 0.45 for MiniLM and 0.30 to 0.40 for OpenAI embeddings.
+
+<strong>Is precision or recall more important?</strong> Recall. A missing chunk leaves the model with no answer. A noisy chunk is usually ignored. Aim for about 0.95 recall.
+
+<strong>What if the gate rejects everything?</strong> Say you do not have enough information. Do not pass weak chunks through.
+
+<strong>Does score-drop work with BM25?</strong> Yes. It looks at gaps, not absolute values, so it works with cosine, dot product and BM25.
+
+<strong>How often should I recalibrate?</strong> When you change the embedding model, add a new document type, or see the gating ratio drift.
+
+<strong>Should I always keep one chunk?</strong> Usually yes. In medical or legal work, returning nothing can be safer than a weak chunk.
+
+## Recap in one screen
+
+- Top-k always returns k results, relevant or not.
+- Use a floor, a score-drop cut and a learned threshold together.
+- Aim for high recall: the model can ignore noise but cannot invent missing facts.
+- If nothing passes, say so.
+- Recalibrate when the model, the content or the traffic changes.

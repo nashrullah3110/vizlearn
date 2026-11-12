@@ -3750,3 +3750,10 @@ for _entry in TOPICS:
   "<p>CRAG is the cheapest of the four and needs no training, which is why it "
   "is usually the first one to add. The others are what you reach for once you "
   "have measured that grading alone is not enough.</p>"))
+
+
+# The operations pages (gating, abstention, ingestion, capacity, ...) are kept
+# in their own module because they share one interactive file, and because
+# this one is already thousands of lines. Imported last so _t, WIDGETS and ART
+# are all defined.
+import rag_ops_topics  # noqa: E402,F401

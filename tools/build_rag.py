@@ -179,6 +179,10 @@ def widget(entry):
     # draw an index never downloads the code that draws one.
     scene = '<div class="p-5 pb-0 vz-rv-scene" hidden></div>' if spec.get("scene") else ""
     ann = " data-vz-ann" if spec.get("scene") else ""
+    # The operations models (gating, capacity, latency, ...) live in their own
+    # file for the same reason: a page that does not use them never loads them.
+    if spec.get("ops"):
+        ann += " data-vz-ops"
 
     return """
         <div class="vz-rv grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in"

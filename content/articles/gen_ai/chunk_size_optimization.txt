@@ -1,0 +1,214 @@
+title: Chunk Size Optimization
+intro: Find the best chunk size and overlap by running a small experiment on your own data, then picking the cheapest setting that still retrieves the answer.
+
+## Why chunk size is the setting to tune first
+
+Chunk size changes what the retriever can find, what it costs, and what the model reads. Cut too small, and the answer is split across two chunks, so neither one matches the question. Cut too big, and each chunk covers many topics, so its embedding is a blurry average. It also sends more tokens to the model on every query.
+
+Overlap is the second lever. With none, a fact that sits on a boundary is cut in two. With a little, both neighbouring chunks keep the whole sentence. The price is more chunks to store and search.
+
+No number is right for everyone, and the cheapest setting is usually not the biggest. A post that says "512 is best" is describing one dataset. The right size depends on your documents, your questions and your embedding model. So the reliable method is to measure: build a small test set, sweep a grid of sizes and overlaps, and compare what each one costs.
+
+This page does that with a small real experiment you can run and change. It covers the test set, the grid, the loop, how to read the results, and how to choose. For how chunking works mechanically, see [chunking strategies](chunking_strategies_for_rag.html). For how the vectors are made, see [embeddings and vector search](embeddings_and_vector_search.html).
+
+## Build a test set first
+
+The test set matters more than the grid. If your test questions do not look like real user questions, the size that wins on them will not win in production.
+
+Each test case needs the question, the passage that holds the answer, and ideally a written answer. Start by asking a model to draft questions from your documents, then have a person check them. Model-drafted questions tend to be easy to retrieve, because they copy the wording of the passage. That inflates recall, so review them.
+
+Mix easy, medium and hard cases. An easy question matches one obvious passage. A hard one needs a passage that uses different words from the question.
+
+The experiment below builds a toy test set so you can see the whole loop. It makes 24 short documents. Each holds one fact, such as "The billing limit is 24 per hour", buried among filler sentences. Each question asks for one fact.
+
+```python-run
+import random
+random.seed(7)
+TOPICS = ("billing backup export login audit webhook quota alerts search import "
+          "sharing archive invoice refund session upload report sync token cache "
+          "queue email label theme").split()
+FILLER = ["We review this area every quarter and update the guide.",
+          "Most customers keep the default setting for this feature.",
+          "Contact support if the behaviour differs from this page.",
+          "The dashboard shows the current state of each item."]
+
+def make_corpus():
+    docs, queries = [], []
+    for t in TOPICS:
+        unit = random.choice(["day", "hour", "user"])
+        fact = f"The {t} limit is {random.randint(5, 95)} per {unit}."
+        s = [random.choice(FILLER) for _ in range(11)]
+        s.insert(random.randint(1, 10), fact)
+        docs.append(" ".join(s))
+        queries.append((f"what is the {t} limit", fact))
+    return docs, queries
+
+docs, queries = make_corpus()
+print(len(docs), "documents,", len(docs[0].split()), "words in the first")
+print("question:", queries[0][0])
+print("answer  :", queries[0][1])
+```
+
+## Chunk with a size and an overlap
+
+A chunker slides a window across the words. The size is the window length. The overlap is how many words the next window shares with the last. With size 16 and overlap 4, each window starts 12 words after the one before.
+
+```python-run
+text = ("Billing runs nightly. The billing limit is 62 per day. "
+        "Contact support if the number looks wrong. Older plans differ.")
+
+def chunk(text, size, overlap):
+    words = text.split()
+    step = max(1, size - overlap)
+    return [" ".join(words[i:i + size])
+            for i in range(0, max(1, len(words) - overlap), step)]
+
+for overlap in (0, 4):
+    print("overlap", overlap)
+    for c in chunk(text, 8, overlap):
+        print("  |", c)
+```
+
+Look at the zero-overlap output. The fact "The billing limit is 62 per day" is cut across two chunks. A question about the billing limit matches the half that has the words but not the number, and the half with the number but not the words. With overlap, one chunk holds the whole sentence.
+
+## Run the sweep
+
+For each size and overlap, chunk every document, rank the chunks for every question, and check whether the top three contain the fact. Recall at 3 is the share of questions that pass. Alongside it, record two costs: how many chunks you must store, and how many tokens you send to the model per question. That second cost is `k` times the chunk size, because you paste the top `k` chunks into the prompt.
+
+The ranking here counts shared words. That is a stand-in for a real retriever, so treat the numbers as a demonstration of the method, not a benchmark.
+
+```python-run
+import random, re
+random.seed(7)
+TOPICS = ("billing backup export login audit webhook quota alerts search import "
+          "sharing archive invoice refund session upload report sync token cache "
+          "queue email label theme").split()
+FILLER = ["We review this area every quarter and update the guide.",
+          "Most customers keep the default setting for this feature.",
+          "Contact support if the behaviour differs from this page.",
+          "The dashboard shows the current state of each item."]
+docs, queries = [], []
+for t in TOPICS:
+    fact = f"The {t} limit is {random.randint(5, 95)} per {random.choice(['day', 'hour', 'user'])}."
+    s = [random.choice(FILLER) for _ in range(11)]
+    s.insert(random.randint(1, 10), fact)
+    docs.append(" ".join(s)); queries.append((f"what is the {t} limit", fact))
+
+def chunk(text, size, overlap):
+    w = text.split(); step = max(1, size - overlap)
+    return [" ".join(w[i:i + size]) for i in range(0, max(1, len(w) - overlap), step)]
+
+def recall_at(size, overlap, k=3):
+    chunks = [c for d in docs for c in chunk(d, size, overlap)]
+    hits = 0
+    for q, fact in queries:
+        terms = set(q.split())
+        ranked = sorted(chunks, key=lambda c: -len(terms & set(re.findall(r"[a-z]+", c.lower()))))
+        hits += any(fact in c for c in ranked[:k])
+    return hits / len(queries), len(chunks)
+
+for size in [8, 16, 32, 64, 128]:
+    for pct in (0, 25):
+        r, n = recall_at(size, size * pct // 100)
+        print(f"size {size:3d} overlap {pct:2d}%  recall@3 {r:.2f}  chunks {n:3d}  tokens/query {3 * size}")
+```
+
+## Read the results
+
+Three things show up, and they hold well beyond this toy.
+
+Very small chunks lose. At 8 words most facts are cut in half, so recall is low whatever the overlap. Recall climbs as the chunk grows large enough to hold a whole fact.
+
+Overlap helps most when chunks are small. At 16 words it recovers facts the boundary cut. At 128 words the chunk already holds the fact, so overlap adds storage and nothing else.
+
+Bigger chunks stop paying once recall levels off, and they keep costing. Tokens per query grow in a straight line with chunk size. A setting that matches another on recall while sending four times the text is simply worse.
+
+One thing this toy cannot show is dilution. It counts words, so a long chunk is not penalised. A dense embedding is different. As a chunk grows, its vector averages more topics, and a specific question matches it less well. Many models also truncate their input: `all-MiniLM-L6-v2` reads only the first 256 tokens. Measure dilution on your own data and model.
+
+## Choose with a Pareto front
+
+The best setting is rarely the one with the highest recall. A setting with 0.90 recall and 200 ms latency can be worse for users than one with 0.85 recall and 20 ms.
+
+A setting is on the Pareto front when no other setting is at least as good on every goal and better on one. Goals here: high recall, few tokens per query, few chunks. Everything off the front is beaten and can be dropped. Then you choose among the survivors based on what you care about.
+
+```python-run
+results = [  # (name, recall@3, tokens per query, chunks) from the sweep above
+    ("size 8", 0.38, 24, 336), ("size 8, 25% overlap", 0.46, 24, 437),
+    ("size 16", 0.75, 48, 168), ("size 16, 25% overlap", 0.96, 48, 216),
+    ("size 32", 0.75, 96, 96), ("size 32, 25% overlap", 1.00, 96, 120),
+    ("size 64", 0.92, 192, 48), ("size 64, 25% overlap", 1.00, 192, 48),
+    ("size 128", 1.00, 384, 24),
+]
+
+def beaten(a, b):
+    """True if b is at least as good as a on everything and better on one."""
+    ge = b[1] >= a[1] and b[2] <= a[2] and b[3] <= a[3]
+    gt = b[1] > a[1] or b[2] < a[2] or b[3] < a[3]
+    return ge and gt
+
+front = [a for a in results if not any(beaten(a, b) for b in results if b is not a)]
+for name, recall, tokens, chunks in front:
+    print(f"{name:22s} recall {recall:.2f}  tokens/query {tokens}  chunks {chunks}")
+
+good = [r for r in front if r[1] >= 0.95]
+print("cheapest with recall >= 0.95:", min(good, key=lambda r: r[2])[0])
+```
+
+Eight of the nine settings survive, because with three goals it is hard to beat anything outright. So finish with a rule. Take the cheapest setting whose recall clears your bar. For a bar of 0.95, that is size 16 with 25% overlap: 0.96 recall at 48 tokens per query, against 384 tokens for size 128. Set the bar from what your users need, not from what the sweep happens to show.
+
+## Use tokens, not characters
+
+Measure chunk size in tokens, not characters. 500 characters of plain English may be 100 tokens. 500 characters of code with short names may be 250. Counting tokens makes behaviour match across content types. Use `tiktoken` for OpenAI models, or the embedding model's own tokenizer.
+
+Characters also hide truncation. Two 2,000-character chunks might be 300 and 800 tokens. If the model reads at most 512, it silently drops half of the second one. The toy above counts words to keep the code short.
+
+## Do not over-read small differences
+
+With few test questions, small gaps are noise. The 95% margin of error on a recall figure is about `1.96 * sqrt(p * (1 - p) / n)`. At 50 questions and a recall of 0.85 that is about plus or minus 0.10. At 100 questions it is about 0.07. Two settings that differ by less than that are not clearly different.
+
+Use at least 100 questions when you can. To compare two settings directly, resample the questions with replacement 1,000 times and count how often A beats B.
+
+## Sweep coarse, then fine
+
+The first sweep is coarse. Once one region looks best, say 200 to 400 tokens, sweep that region in smaller steps. This finds the peak without wasting the first sweep on settings that were never close.
+
+Run the sweep again when you change the embedding model, add a new document type, or see query patterns shift. Contracts, support chats and API docs can each want a different size.
+
+## What it costs at scale
+
+Quarter the chunk size and you get about four times the chunks. That means four times the vectors to store and a bigger index to search. At 1,536 dimensions in float32, a vector is 6,144 bytes. Ten million chunks need about 61 GB. Forty million need about 245 GB, and a graph index such as [HNSW](hnsw_index.html) gets slower as it grows.
+
+Put a cost measure beside recall when you compare settings. A setting that wins on recall may not be affordable at your scale. For more on measuring retrieval, see [evaluation metrics](retrieval_evaluation_metrics.html).
+
+## Things to try
+
+1. Set the <strong>Chunk size</strong> to 8 words. Recall collapses, because most facts are cut in half.
+2. Raise the <strong>Chunk size</strong> to 64 with <strong>Overlap</strong> at 0. Recall is higher, and tokens per query are eight times higher than at 8.
+3. Set <strong>Chunk size</strong> to 16 and move <strong>Overlap</strong> from 0 to 25. Overlap recovers facts that a boundary cut.
+4. Set <strong>Chunk size</strong> to 128. Compare it with 32 at 25% overlap: the same recall for four times the tokens.
+
+## What to remember
+
+Chunk size is the first setting to tune, and the right value depends on your data. Build a test set from real questions, sweep sizes and overlaps, and compare recall against cost. Pick from the Pareto front, count in tokens, and repeat the sweep whenever the model or the documents change.
+
+## Questions people ask
+
+<strong>What chunk size should I start with?</strong> Try 256 tokens with about 10% overlap, then measure. It is a common starting point, not a proven best.
+
+<strong>Does overlap matter?</strong> Most when chunks are small. Beyond about 20% overlap, storage grows faster than recall.
+
+<strong>How many test questions do I need?</strong> At least 50 for a rough signal and 100 or more to tell close settings apart.
+
+<strong>Sentence splitting or recursive splitting?</strong> Put both in the grid. Sentence splitting never cuts a sentence but gives uneven sizes. Recursive splitting on paragraphs, then lines, then sentences is a common default.
+
+<strong>How often should I re-run the sweep?</strong> When you change the embedding model, add a new document type, or see answer quality drop.
+
+<strong>Why not use the largest chunk the model allows?</strong> Large chunks blur the embedding and send more text to the model on every query.
+
+## Recap in one screen
+
+- Too-small chunks cut facts. Too-large chunks blur meaning and cost more per query.
+- Build a test set from real questions before you sweep anything.
+- Compare recall against tokens per query and index size.
+- Choose from the Pareto front, and count in tokens.
+- Re-run the sweep when the model or the data changes.

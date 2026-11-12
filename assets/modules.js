@@ -1740,6 +1740,14 @@ window.VIZLEARN_MODULES = [
   "desc": "Build an HNSW graph and an IVF index from the same vectors, run a nearest-neighbour query on each, and compare the recall-speed tradeoff."
  },
  {
+  "title": "Abstention in RAG",
+  "path": "gen_ai/abstention_in_rag.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Build the three gates that let a RAG system say it does not know: retrieval confidence, a prompt that allows refusal and a faithfulness check on the answer."
+ },
+ {
   "title": "Annoy",
   "path": "gen_ai/annoy_index.html",
   "category": "Gen AI",
@@ -1756,6 +1764,14 @@ window.VIZLEARN_MODULES = [
   "desc": "The keyword-matching half of search, computed live. Drag length normalization to zero and watch a verbose repetitive document dominate purely on term count."
  },
  {
+  "title": "Batch Embedding Generation",
+  "path": "gen_ai/batch_embedding_generation.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Embed 100,000 texts in batches: pick a model, sort by length to cut padding, clean the input, save the matrix, and keep the row-to-text mapping."
+ },
+ {
   "title": "Byte Pair Encoding Tokenizer",
   "path": "gen_ai/byte_pair_encoding_tokenizer.html",
   "category": "Gen AI",
@@ -1770,6 +1786,22 @@ window.VIZLEARN_MODULES = [
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "See how predicting the next token, over and over, is all it takes for a model like GPT to produce fluent text."
+ },
+ {
+  "title": "Chunk Deduplication",
+  "path": "gen_ai/chunk_deduplication.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Remove exact copies with hashing, near-copies with MinHash and repeats at query time with MMR, without merging chunks that state different facts."
+ },
+ {
+  "title": "Chunk Size Optimization",
+  "path": "gen_ai/chunk_size_optimization.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Run a real chunk-size and overlap sweep on a toy corpus, compare recall against tokens per query and index size, and choose from the Pareto front."
  },
  {
   "title": "Chunking Strategies for RAG",
@@ -1820,12 +1852,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Evaluate a model answer for factual correctness against a reference, compare automated and human scoring, and see why this dimension costs most."
  },
  {
+  "title": "Debugging RAG",
+  "path": "gen_ai/debugging_rag.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Trace a wrong RAG answer through retrieval, context, synthesis and post-processing, run contrastive experiments, and turn each fix into a regression test."
+ },
+ {
   "title": "DiskANN",
   "path": "gen_ai/diskann_index.html",
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Build a DiskANN graph on a billion vectors, serve queries from SSD with a small memory footprint, and see how the alpha parameter controls recall."
+ },
+ {
+  "title": "Distributed Ingestion Pipeline",
+  "path": "gen_ai/distributed_ingestion_pipeline.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Design idempotent ingestion workers with content-based chunk IDs, upserts, stale-chunk cleanup and a dead-letter queue, and see what a crash does to the index."
  },
  {
   "title": "Distributed retrieval and sharding",
@@ -1836,12 +1884,36 @@ window.VIZLEARN_MODULES = [
   "desc": "Scale vector search across machines. Compare sharding strategies, see how routing works, and spot the latency-throughput trade-off at every split."
  },
  {
+  "title": "Document Ingestion Pipeline",
+  "path": "gen_ai/document_ingestion_pipeline.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Walk a five-stage ingestion pipeline from PDF extraction and OCR to cleaning, chunking, embedding and idempotent upserts, and model what each stage loses."
+ },
+ {
   "title": "Dot Product vs Cosine Similarity for Retrieval",
   "path": "gen_ai/dot_product_vs_cosine_similarity.html",
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Stretch a document vector and watch dot-product ranking promote it for being longer, while cosine ranking stays put."
+ },
+ {
+  "title": "Embedding Model Migration",
+  "path": "gen_ai/embedding_model_migration.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Move a vector database to a new embedding model with a blue-green index, shadow validation and a staged cutover, without ever mixing embedding spaces."
+ },
+ {
+  "title": "Embedding Resilience and Checkpointing",
+  "path": "gen_ai/embedding_resilience_and_checkpointing.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Make a large embedding job survive rate limits and crashes with a sliding-window limiter, retries with jitter, and a checkpoint that stops you paying twice."
  },
  {
   "title": "Embeddings and Vector Search",
@@ -1996,12 +2068,28 @@ window.VIZLEARN_MODULES = [
   "desc": "Split a high-dimensional vector into subvectors, quantize each one separately, and watch product quantization shrink a billion vectors into RAM."
  },
  {
+  "title": "Production RAG System Design",
+  "path": "gen_ai/production_rag_system_design.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "See the seven subsystems of a production RAG service and what each failure does to users, with circuit breakers, fallbacks, rank fusion and cost controls."
+ },
+ {
   "title": "Quantization in LLMs",
   "path": "gen_ai/quantization_in_llms.html",
   "category": "Gen AI",
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Snap 32-bit weights to 8-bit or 4-bit levels and fit a 70B-parameter model on a single consumer GPU, with the accuracy cost shown."
+ },
+ {
+  "title": "Query Decomposition",
+  "path": "gen_ai/query_decomposition.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Split a complex question into sub-questions with a dependency graph, reject cycles, run independent parts in parallel and count the latency it adds."
  },
  {
   "title": "Query Rewriting and HyDE",
@@ -2018,6 +2106,22 @@ window.VIZLEARN_MODULES = [
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Add query, embedding and prompt caches to a RAG pipeline, measure the latency and cost each one removes, and see where staleness matters."
+ },
+ {
+  "title": "RAG Capacity Planning",
+  "path": "gen_ai/rag_capacity_planning.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Estimate chunks, vector storage, index overhead and RAM for a RAG corpus from first principles, and see how dimensions, precision and overlap move the total."
+ },
+ {
+  "title": "RAG Latency Optimization",
+  "path": "gen_ai/rag_latency_optimization.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Time each stage of a RAG request, read the latency distribution, and compare streaming, routing, caching, parallel stages and timeouts, and what each does to p95."
  },
  {
   "title": "Re-ranking: Bi-Encoders vs Cross-Encoders",
@@ -2082,6 +2186,14 @@ window.VIZLEARN_MODULES = [
   "topic": "gen-ai",
   "icon": "robot",
   "desc": "Split text where the meaning shifts instead of where a character count runs out. Compare semantic chunking to fixed-size splits on real paragraphs."
+ },
+ {
+  "title": "Similarity Threshold Gating",
+  "path": "gen_ai/similarity_threshold_gating.html",
+  "category": "Gen AI",
+  "topic": "gen-ai",
+  "icon": "robot",
+  "desc": "Gate retrieved chunks with a floor, a score-drop cut and a learned threshold. Compare what each keeps and loses, and see why recall matters more than precision."
  },
  {
   "title": "Structure-aware chunking",

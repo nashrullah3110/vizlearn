@@ -1,0 +1,212 @@
+title: RAG Latency Optimization
+intro: Measure each stage of a RAG request, find the one that costs you time, and fix that one first.
+
+## Find the slow stage before you fix anything
+
+A RAG app with a four-second p95 is rarely slow everywhere. Usually one or two stages hold most of the delay. The method is to time every stage on every request, read the distribution, and then fix the biggest contributor. Guessing wastes weeks. You can tune retrieval for a month and save 30 ms while the model takes two seconds.
+
+A typical request runs these stages in order: query cleanup, embedding the query, vector search, [reranking](reranking_bi_encoders_vs_cross_encoders.html), building the prompt, generating the answer, and post-processing. Generation is often the longest, reranking and retrieval come next, and the rest are small. Your own mix is what matters, so measure it.
+
+Two terms come up all the time. The p50 is the median: half of requests are faster. The p95 is the time that 95% of requests beat, so it describes the slow tail. A system with a p50 of 800 ms and a p95 of 4,000 ms has a tail problem, not a general speed problem, and tails have different causes, such as cold starts, retries and pauses.
+
+This page covers measuring, reading the distribution, speeding up generation and retrieval, running stages in parallel, protecting against hangs, and weighing latency against cost. The sample numbers throughout are assumptions chosen to show the method. Replace them with your own traces. Related pages: [caching in RAG](caching_in_rag_pipelines.html) and [hybrid search](hybrid_search_reciprocal_rank_fusion.html).
+
+## Time every stage
+
+You cannot improve what you do not measure. Give each request a trace that records how long each stage took. In real code, use a monotonic clock around each stage:
+
+```python
+import time
+from contextlib import contextmanager
+
+class Trace:
+    def __init__(self):
+        self.ms = {}
+
+    @contextmanager
+    def stage(self, name):
+        start = time.perf_counter()
+        try:
+            yield
+        finally:
+            self.ms[name] = (time.perf_counter() - start) * 1000
+
+trace = Trace()
+with trace.stage("embedding"):
+    vector = embed(query)
+with trace.stage("retrieval"):
+    chunks = search(vector)
+```
+
+Ship these traces to your monitoring system and look at the aggregate. The block below takes one recorded trace and shows where the time went.
+
+```python-run
+recorded = {"preprocess": 30, "embedding": 80, "retrieval": 150, "reranking": 350,
+            "context": 10, "generation": 1800, "postprocess": 20}
+total = sum(recorded.values())
+print(f"{'stage':12s} {'ms':>6s} {'share':>7s}")
+for name, ms in sorted(recorded.items(), key=lambda kv: -kv[1]):
+    print(f"{name:12s} {ms:6d} {ms / total:7.1%}")
+print(f"{'total':12s} {total:6d}")
+```
+
+## Read the distribution, not one request
+
+One trace can mislead. Gather a few thousand and look at each stage's spread. The simulation below draws stage times from assumed normal distributions and then compares them.
+
+```python-run
+import random
+random.seed(42)
+spec = {"embed": (100, 30, 20), "retrieve": (150, 60, 30),
+        "rerank": (400, 120, 50), "generate": (2000, 500, 200)}   # mean, sd, floor
+rows = {k: [] for k in spec}
+totals = []
+for _ in range(2000):
+    t = 0
+    for k, (mu, sd, floor) in spec.items():
+        v = max(floor, random.gauss(mu, sd))
+        rows[k].append(v)
+        t += v
+    totals.append(t)
+
+pct = lambda xs, q: sorted(xs)[int(len(xs) * q)]
+print("total p50", round(pct(totals, .5)), "ms, p95", round(pct(totals, .95)), "ms")
+mean_total = sum(totals) / len(totals)
+stage_p95_sum = 0
+for k, xs in rows.items():
+    stage_p95_sum += pct(xs, .95)
+    print(f"{k:9s} p50 {pct(xs, .5):5.0f}  p95 {pct(xs, .95):5.0f}  "
+          f"share of mean time {sum(xs) / len(xs) / mean_total:4.0%}")
+print("sum of stage p95s:", round(stage_p95_sum), "ms - not the same as the total p95")
+```
+
+The stage p95s add up to more than the total p95, because it is rare for every stage to be slow at once. So do not add percentiles. Compare each stage's share of the mean time instead. Here generation takes about three quarters of it, so it is the target.
+
+## Speed up generation
+
+Generation is usually the largest part. Three techniques attack it from different sides.
+
+<strong>Stream the answer.</strong> Send tokens as they are produced. The user sees the first word almost at once instead of waiting for the full text. Total time is unchanged, but the time to first token, which is what users feel, drops sharply.
+
+<strong>Cap the output length.</strong> If answers average 150 tokens, a `max_tokens` of 300 stops rare runaway replies from stretching the tail.
+
+<strong>Route by difficulty.</strong> Send simple lookups to a small, fast model and keep the larger one for hard questions. Test this carefully, because the tail may not improve the way you expect.
+
+```python-run
+import random
+random.seed(42)
+pct = lambda xs, q: sorted(xs)[int(len(xs) * q)]
+
+n, simple_share = 1000, 0.70
+one_model = [random.gauss(2000, 500) for _ in range(n)]
+routed = [random.gauss(400, 80) if random.random() < simple_share
+          else random.gauss(2500, 500) for _ in range(n)]
+
+for name, xs in [("one model", one_model), ("routed", routed)]:
+    print(f"{name:10s} p50 {pct(xs, .5):5.0f}  mean {sum(xs) / n:5.0f}  p95 {pct(xs, .95):5.0f}")
+```
+
+Look at the three columns. Routing cut the median and the mean sharply, and it also cuts cost. But the p95 got worse here, because the 30% of hard questions now go to a slower model, and they make up the whole tail. Routing wins on typical latency and cost. To improve the tail you must speed up the slow path itself.
+
+## Cache whole answers
+
+For repeated or similar questions, a cache can skip the pipeline. Check for an exact match first with a hash lookup, then for a semantic match: an embedding close enough to a stored question. Exact matching catches repeated questions. Semantic matching catches paraphrases such as "how to reset password" and "password reset steps".
+
+Cache at the response level, not the chunk level. A chunk cache saves retrieval but not generation, which is the expensive part. Expire entries and drop them when content changes, because a stale cache is worse than none. See [caching in RAG](caching_in_rag_pipelines.html) for invalidation.
+
+```python-run
+hit_rate = 0.30          # assumed share of requests answered from cache
+cache_ms, pipeline_ms = 8, 2650
+
+average = hit_rate * cache_ms + (1 - hit_rate) * pipeline_ms
+print("average latency with cache:", round(average), "ms")
+print("saved:", f"{1 - average / pipeline_ms:.0%}")
+print("a cache miss still costs  :", pipeline_ms, "ms")
+```
+
+The cache lowers the average, but a miss is as slow as ever. It does not fix the p95 of the requests that miss.
+
+## Speed up retrieval
+
+Three changes help, and each trades a little accuracy or effort.
+
+<strong>Filter before searching.</strong> Apply access-control and metadata filters inside the vector search, not after. A post-filter must fetch many extra candidates and throw most away.
+
+<strong>Tune the search width.</strong> With an [HNSW](hnsw_index.html) index, the `ef_search` setting trades speed for recall. Lower values are faster and miss more. Measure recall at several settings on your own data.
+
+<strong>Search in two passes.</strong> Use compact binary vectors for a fast first pass over many candidates, then rescore the best with full-precision vectors.
+
+## Run independent stages together
+
+Some stages do not depend on each other. The query embedding and a cache lookup both need only the query. With [hybrid search](hybrid_search_reciprocal_rank_fusion.html), the keyword search needs only the query too, so it can run while the embedding and vector search happen. Total time then follows the longest path, not the sum.
+
+```python-run
+embedding, cache_check = 80, 50
+vector_search, keyword_search = 120, 100
+
+sequential = embedding + cache_check + vector_search + keyword_search
+parallel = max(embedding, cache_check) + max(vector_search, keyword_search)
+print("sequential:", sequential, "ms")
+print("parallel  :", parallel, "ms")
+print("saved     :", sequential - parallel, "ms", f"({1 - parallel / sequential:.0%})")
+```
+
+## Put a timeout on every stage
+
+Tail latency often comes from one stage that hangs or runs slowly. Give each stage a budget and a fallback. If reranking runs out of time, skip it and use the retrieval order. Quality dips a little and the user still gets an answer. This is graceful degradation.
+
+The right budget is a trade-off. A tight one protects the tail and degrades more requests. The simulation shows both sides.
+
+```python-run
+import math, random
+random.seed(1)
+pct = lambda xs, q: sorted(xs)[int(len(xs) * q)]
+rerank = [random.lognormvariate(math.log(350), 0.6) for _ in range(5000)]
+
+print(f"no timeout: p50 {pct(rerank, .5):4.0f}  p95 {pct(rerank, .95):4.0f}")
+for budget in (500, 800, 1200):
+    capped = [min(x, budget) for x in rerank]
+    skipped = sum(x > budget for x in rerank) / len(rerank)
+    print(f"budget {budget:4d}: p95 {pct(capped, .95):4.0f}  falls back for {skipped:5.1%} of requests")
+```
+
+## Match the cause to the fix
+
+A p95 far above the p50 has specific causes. Cold starts, the first request after a pod scales up, need pre-warming. Garbage-collection pauses in some stores need tuned memory settings. Retries on transient errors need capped backoff. Lock contention during index updates may need read replicas. Find the cause from the traces before you pick a remedy.
+
+## Weigh latency against cost
+
+A model that is ten times faster and ten times more expensive per token may not be an improvement. State every latency fix with its cost. Routing is often attractive because it lowers the typical latency and the bill together, as the run above showed. Just remember what it does to the tail.
+
+## Things to try
+
+1. Set <strong>Model size</strong> to small. The generation bar shrinks and the total follows it.
+2. Turn off <strong>Reranker</strong>. Quality may drop, and the total falls by the reranker's share.
+3. Turn on <strong>Run searches in parallel</strong>. The keyword search overlaps the vector search.
+4. Raise <strong>Cache hit rate</strong> to 40. The average falls, and the uncached p95 does not move.
+
+## What to remember
+
+Time every stage, read the distribution and fix the stage with the biggest share of the mean. Stream the answer, cap its length, cache whole answers, run independent stages in parallel and give every stage a timeout. Do not add percentiles together, and check what each fix does to the tail.
+
+## Questions people ask
+
+<strong>What is the biggest source of latency?</strong> Usually generation. Check your own traces.
+
+<strong>Does streaming reduce total latency?</strong> No. It lowers time to first token, which is what users feel.
+
+<strong>How much does a semantic cache help?</strong> It depends on how often questions repeat. Measure your hit rate before you build one.
+
+<strong>When is model routing not helpful?</strong> When most questions are hard, or when you care about the tail more than the average.
+
+<strong>How do I measure time to first token?</strong> Record when the first token arrives and subtract the request start time.
+
+<strong>What p95 should I target?</strong> It depends on the product. Interactive apps need to feel fast, and batch jobs can tolerate more. Set a goal from user research, not a rule of thumb.
+
+## Recap in one screen
+
+- Measure every stage; the biggest share of the mean is your target.
+- Percentiles do not add up, so compare shares of mean time.
+- Stream, cap output, cache answers and run independent stages in parallel.
+- Routing helps typical latency and cost, not necessarily the tail.
+- Give every stage a timeout and a fallback.

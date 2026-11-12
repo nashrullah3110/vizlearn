@@ -1,0 +1,183 @@
+title: Query Decomposition
+intro: Break a complex question into sub-questions that single-pass retrieval can answer, run the independent ones side by side, and merge the answers.
+
+## When one retrieval pass is not enough
+
+Standard [RAG](rag.html) finds chunks similar to the question and hands them to a model. That works when the answer sits in one passage, such as "What is the default timeout for HTTP connections?"
+
+Many real questions need several sources. Ask "How does error handling in service A differ from service B?" and the retriever returns chunks about error handling, probably all from one service. The other service's chunks sit below the top-k cut-off because the question names only one of them strongly.
+
+Query decomposition fixes that. It breaks the question into simpler sub-questions, each answerable by one retrieval pass, and then combines the answers. It helps with four kinds of question.
+
+<strong>Comparative</strong> questions weigh two or more things: "How does our Python SDK differ from the Java SDK?" <strong>Multi-hop</strong> questions chain facts: "Which team owns the service that caused Tuesday's outage?" You must find the service before you can look up its owner. <strong>Aggregation</strong> questions collect items from many documents: "What are all the breaking changes in the last three releases?" <strong>Conditional</strong> questions need if-then reasoning: "If we upgrade to PostgreSQL 16, which stored procedures break?"
+
+The cost is time and model calls. Every sub-question adds a retrieval and an answer, and there are extra calls to plan and to merge. This page covers when it is worth the cost, how to classify questions, how to run a plan that has dependencies, and how to merge the results.
+
+## Decide which questions need it
+
+Most questions are simple, and decomposing them wastes calls and can add errors. A classifier at the front decides. Rules are quick and cheap and catch the common patterns. A model can handle the rest, and the rules make a safe fallback when the model gets it wrong.
+
+```python-run
+def classify(query):
+    q = query.lower()
+    if any(w in q for w in ["differ", "compare", "versus", " vs ", "difference between"]):
+        return "comparative"
+    if any(w in q for w in ["list all", "all the", "every ", "across all", "how many"]):
+        return "aggregation"
+    if any(w in q for w in ["which team", "who owns", "what caused", "why did"]):
+        return "multi-hop"
+    if any(w in q for w in ["if we", "what if", "what would happen", "assuming"]):
+        return "conditional"
+    return "simple"
+
+for q in ["What is the default timeout?",
+          "How does the Python SDK differ from the Java SDK?",
+          "List all breaking changes across v2, v3 and v4",
+          "Which team owns the service that caused the outage?",
+          "If we migrate to PostgreSQL 16, what breaks?"]:
+    print(f"{classify(q):12s} {q}")
+```
+
+Treat the cost of a wrong guess as lopsided. Decomposing a simple question wastes time and risks inventing errors. Skipping decomposition on a hard question just gives you ordinary single-pass quality. So tune the classifier for precision: when unsure, do not decompose.
+
+## Write the plan as a graph
+
+The decomposer outputs sub-questions and what each depends on. For "Which team owns the service that caused Tuesday's outage?", the second sub-question needs the answer to the first.
+
+```python-run
+plan = [
+    {"id": "sq1", "question": "What service caused Tuesday's outage?", "needs": []},
+    {"id": "sq2", "question": "Which team owns the service from sq1?", "needs": ["sq1"]},
+]
+for sq in plan:
+    needs = ", ".join(sq["needs"]) or "nothing, so it can start now"
+    print(f"{sq['id']}: {sq['question']}")
+    print(f"     waits for: {needs}")
+```
+
+The graph sets the order. Sub-questions with no dependencies can run at once. The others wait for what they need.
+
+## Reject plans with cycles
+
+A model can occasionally write a plan that loops: sq1 needs sq3, sq3 needs sq2, sq2 needs sq1. Nothing could ever start. Check every plan before you run it, with a depth-first search that notices when it returns to a node it is still exploring.
+
+```python-run
+def validate(plan):
+    needs = {sq["id"]: sq["needs"] for sq in plan}
+    done, active = set(), set()
+
+    def visit(node):
+        if node in active:
+            return False
+        if node in done:
+            return True
+        active.add(node)
+        ok = all(visit(dep) for dep in needs.get(node, []))
+        active.discard(node)
+        done.add(node)
+        return ok
+
+    return all(visit(sq["id"]) for sq in plan)
+
+good = [{"id": "sq1", "needs": []}, {"id": "sq2", "needs": ["sq1"]},
+        {"id": "sq3", "needs": ["sq1"]}]
+loop = [{"id": "sq1", "needs": ["sq3"]}, {"id": "sq2", "needs": ["sq1"]},
+        {"id": "sq3", "needs": ["sq2"]}]
+print("valid plan   :", validate(good))
+print("circular plan:", validate(loop))
+```
+
+When you find a cycle, drop all the dependencies and run every sub-question independently. The merge step can still combine the answers without the chain.
+
+## Run independent sub-questions together
+
+Schedule the plan in rounds. In each round, start every sub-question whose prerequisites are done, up to the number of workers you allow. A comparative question usually has two independent parts, so it finishes in about the time of one. A chain cannot be sped up, because each step waits for the one before.
+
+The times below are assumptions for the demonstration. Measure yours.
+
+```python-run
+def schedule(plan, workers=2, ms=700):
+    done, finish = {}, {}
+    time_now = 0
+    remaining = {sq["id"]: sq for sq in plan}
+    while remaining:
+        ready = [sq for sq in remaining.values() if all(n in done for n in sq["needs"])]
+        batch = ready[:workers]
+        time_now += ms
+        for sq in batch:
+            done[sq["id"]] = True
+            finish[sq["id"]] = time_now
+            del remaining[sq["id"]]
+        print(f"  round ends at {time_now} ms: ran {[sq['id'] for sq in batch]}")
+    return time_now
+
+compare = [{"id": "A", "needs": []}, {"id": "B", "needs": []}]
+chain = [{"id": "sq1", "needs": []}, {"id": "sq2", "needs": ["sq1"]}]
+print("comparative, 2 workers:"); t1 = schedule(compare, 2)
+print("comparative, 1 worker :"); t2 = schedule(compare, 1)
+print("multi-hop chain       :"); t3 = schedule(chain, 2)
+```
+
+Two workers halve the comparative case. The chain stays at two rounds whatever you add. That is the dependency graph setting the limit.
+
+## Merge the answers
+
+The last step merges sub-answers. The method depends on the question type. A comparison lists what is shared, then what differs. A chain tells the story step by step. An aggregation builds one list, grouped by theme. Others weave the parts together without visible seams.
+
+The merge prompt should also handle sub-questions that found nothing. If one comes back as NOT_FOUND, the final answer should say what is missing, not silently leave it out.
+
+## Count the latency
+
+Decomposition adds stages: classify, plan, retrieve and answer each part, then merge. Add them up with your own numbers and compare with a single pass.
+
+```python-run
+classify_ms, plan_ms, merge_ms = 200, 800, 1000
+sub_ms = 650                      # one retrieval plus one answer
+single_pass_ms = 1200
+
+parallel_then_chain = classify_ms + plan_ms + sub_ms + sub_ms + merge_ms
+all_parallel = classify_ms + plan_ms + sub_ms + merge_ms
+print("single pass                     :", single_pass_ms, "ms")
+print("3 sub-questions, 2 + 1 chained  :", parallel_then_chain, "ms")
+print("3 independent sub-questions     :", all_parallel, "ms")
+print("slowdown vs single pass         :", round(parallel_then_chain / single_pass_ms, 1), "x")
+```
+
+You can claw some of this back by caching plans for common question shapes, and by streaming the merge. See [caching in RAG pipelines](caching_in_rag_pipelines.html).
+
+## When not to decompose
+
+For "What is the capital of France?" decomposition only adds delay and a chance of error. Most traffic in many systems is simple, so the classifier should send it straight through. Check your own query log to see the split.
+
+Also limit depth. A sub-question that itself needs decomposing means the first plan was too coarse. Allow one extra level at most, or the number of model calls can grow very fast. If a plan has more than about five sub-questions, the original question is probably too broad to answer well.
+
+## Things to try
+
+1. Set the <strong>Mode</strong> to single pass. It is fast and makes one retrieval for the whole question.
+2. Set the <strong>Mode</strong> to decomposed with <strong>Workers</strong> at 1. Every sub-question waits in line.
+3. Raise <strong>Workers</strong> to 3. The three independent parts run together, but the owner lookup still waits for the outage lookup.
+4. Raise <strong>Workers</strong> to 4. Nothing improves, because the dependency chain is now the limit.
+
+## What to remember
+
+Decompose only questions that need it: comparisons, multi-hop chains, aggregations and conditions. Write the plan as a dependency graph, reject cycles, run independent parts together and merge with the question type in mind. Expect higher latency, and keep simple questions on the fast path.
+
+## Questions people ask
+
+<strong>How many sub-questions are too many?</strong> More than about five usually means the question is too broad. Each one adds a retrieval, an answer and a chance of NOT_FOUND.
+
+<strong>Can rules replace the model for decomposing?</strong> Rules handle known patterns such as "compare X and Y" or "list all Z". A model handles the rest. Use both.
+
+<strong>What if a sub-answer is NOT_FOUND?</strong> Go on with partial information and say what is missing. For a borderline case, reword the sub-question and retry once.
+
+<strong>Does it work with hybrid search?</strong> Yes. Each sub-question runs its own [hybrid search](hybrid_search_reciprocal_rank_fusion.html) pass.
+
+<strong>How do I test it?</strong> Build a set of complex questions with known correct plans. Check that each sub-question retrieves the expected chunks and that the merged answer matches a reference.
+
+## Recap in one screen
+
+- Single-pass retrieval misses questions that need several sources.
+- Classify first, and keep simple questions on the fast path.
+- Write the plan as a graph, and reject circular ones.
+- Run independent sub-questions together; chains cannot be sped up.
+- Count the latency, and cap the depth of the plan.

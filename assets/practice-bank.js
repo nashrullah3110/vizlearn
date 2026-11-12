@@ -1649,16 +1649,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Async Python",
   "q": [
    {
-    "t": "What does this module say about “A coroutine is a plan, not an action”?",
+    "t": "What does this module say about “The core idea”?",
     "ans": "Define a function with async def and calling it does not run it. It hands you back a coroutine object — a description of work that has not started."
+   },
+   {
+    "t": "What does this module say about “A coroutine is a plan, not an action”?",
+    "ans": "These editors run inside a browser event loop that is already going. So the examples finish with await main() . In a standalone .py script — run with python file.py — you write asyncio.run(main()) instead. This starts a loop, runs the coroutine, and closes it. The two are the same program with different entry points."
    },
    {
     "t": "What does this module say about “await runs it, and waits for it”?",
     "ans": "await does two things at once. It starts the coroutine, and it suspends the current one until that coroutine finishes, handing control back to the loop in the meantime. The value of the expression is whatever the coroutine returned."
-   },
-   {
-    "t": "What does this module say about “Tasks are what run concurrently”?",
-    "ans": "To make two coroutines make progress also, you wrap each in a task . asyncio.create_task schedules a coroutine on the loop at once and returns a handle; the coroutine starts running at the next await, whether or not you have awaited the handle yet."
    }
   ]
  },
@@ -1668,16 +1668,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Async Python",
   "q": [
    {
+    "t": "What does this module say about “The core idea”?",
+    "ans": "Most async programs use the same structure after their first fan-out. One part produces work, another consumes it, and they often run at different speeds."
+   },
+   {
     "t": "What does this module say about “The shape of almost every async program”?",
-    "ans": "Once a program does more than a single fan-out, it tends to settle into the same structure: something produces work, something else consumes it, and the two run at different speeds. A crawler finds URLs faster than it can fetch them. A log reader ingests lines faster than it can index them. A handler accepts requests faster than a downstream service can answer."
+    "ans": "An asyncio.Queue is the piece that connects the two. Producers put items in, consumers get them out, and because both operations are awaitable. The queue lets one side wait for the other without blocking the loop ."
    },
    {
     "t": "What does this module say about “Producer and consumer, running together”?",
     "ans": "These editors run inside a browser event loop that is already going, so the examples finish with await main() . In a standalone .py script — run with python file.py — you write asyncio.run(main()) instead. This starts a loop, runs the coroutine, and closes it. The two are the same program with different entry points."
-   },
-   {
-    "t": "What does this module say about “Backpressure is the maxsize”?",
-    "ans": "maxsize=2 made the queue bounded , and a bounded queue is what creates backpressure . When it is full, put waits, so a fast producer is by itself slowed to the rate the consumer can keep up with. The producer never runs more than two items ahead."
    }
   ]
  },
@@ -1687,16 +1687,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Async Python",
   "q": [
    {
+    "t": "What does this module say about “The core idea”?",
+    "ans": "Reach for async when you have many independent waits, such as requests, queries, or file reads. Running them one after another wastes the time each spends idle."
+   },
+   {
     "t": "What does this module say about “The shape of the win”?",
-    "ans": "The reason to reach for async is almost always the same: you have many independent waits — requests, queries, file reads — and doing them one after another wastes the time each one spends idle. Running them together collapses the total time from the sum of the waits to the longest single wait."
+    "ans": "asyncio.gather is the direct tool. Hand it several coroutines and it schedules them all as tasks , waits for every one, and returns their results in the order you passed them. That can differ from the order in which they finished."
    },
    {
     "t": "What does this module say about “What happens when one fails”?",
     "ans": "By default, the first exception in any of the gathered coroutines stops the wait and propagates out of gather . The other coroutines are not cancelled, but their results are lost — you get the exception, not a partial list."
-   },
-   {
-    "t": "What does this module say about “TaskGroup: the modern default”?",
-    "ans": "gather has an awkward gap: when one coroutine fails, the others keep running unsupervised, and cleaning them up is your problem. Python 3.11 added asyncio.TaskGroup to close it, and it is now the recommended way to run concurrent work."
    }
   ]
  },
@@ -1706,16 +1706,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Async Python",
   "q": [
    {
+    "t": "What does this module say about “The core idea”?",
+    "ans": "Async Python runs on cooperative multitasking. The event loop runs on a single thread and can only switch coroutines when the running one hits an await ."
+   },
+   {
     "t": "What does this module say about “One thread means one blocker stops everything”?",
-    "ans": "Async Python runs on cooperative multitasking. The event loop runs on a single thread and can only switch coroutines when the running one hits an await . So a coroutine that stops awaiting — because it called something synchronous that takes real time — holds the one thread for that whole time, and every other coroutine, however unrelated, waits."
+    "ans": "Nothing enforces cooperation. The loop cannot preempt a coroutine mid-call, so a blocking line does not slow the loop down, it *pauses it entirely* until the line returns."
    },
    {
     "t": "What does this module say about “Watch a heartbeat stall”?",
     "ans": "Here a heartbeat prints a tick every 0.1 seconds — the kind of steady progress a healthy loop makes — while a second coroutine does a blocking time.sleep(0.3) instead of an async one."
-   },
-   {
-    "t": "What does this module say about “The fix: stop blocking the thread”?",
-    "ans": "The blocking call has to stop holding the thread. The direct fix — and the one this editor can show — is to use the async-native version of whatever you were doing. Here that means await asyncio.sleep in place of time.sleep ; in real code it means an async HTTP client ( httpx , aiohttp ) instead of requests , or an async database driver instead of a blocking one."
    }
   ]
  },
@@ -1725,16 +1725,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Async Python",
   "q": [
    {
+    "t": "What does this module say about “The core idea”?",
+    "ans": "Asynchronous Python runs on a single thread. There is no parallelism here and no second core doing work behind your back."
+   },
+   {
     "t": "What does this module say about “The whole machine, in one sentence”?",
-    "ans": "Asynchronous Python runs on a single thread. There is no parallelism here and no second core doing work behind your back. What there is instead is an event loop : a plain loop that keeps a queue of coroutines that are ready to run, takes one, runs it until it voluntarily steps aside, and moves to the next."
+    "ans": "That \"steps aside\" is the entire trick. It happens at one kind of place: an await . Between awaits, a coroutine has the thread to itself. Nothing can interrupt it. At an await, it hands control back to the loop. The loop can run something else while the first coroutine waits for a result."
    },
    {
     "t": "What does this module say about “Watch two coroutines take turns”?",
     "ans": "The clearest way to see the loop switching is to make two coroutines that yield control on purpose, with await asyncio.sleep(0) — a sleep of zero seconds whose only effect is to return to the loop."
-   },
-   {
-    "t": "What does this module say about “Where the concurrency actually comes from”?",
-    "ans": "Nothing above ran in parallel. A and B took turns on one thread, and the total work was the same as doing them one after another. So what is the loop for?"
    }
   ]
  },
@@ -2454,12 +2454,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "is the process of stringing rows of pixels together into a line."
    },
    {
-    "t": "What does this module say about “The idea in brief”?",
-    "ans": "When you look at an pic, you see a 2D grid of colors. However, standard Artificial Neural Networks (namely Dense or Fully-Connected Layers ) are structured to accept just a one-dimensional (1D) array or vector of counts as input. Before a network can \"look\" at an pic, the pic must undergo Flattening ."
-   },
-   {
     "t": "What does this module say about “Preprocessing Parameters”?",
     "ans": "Neural networks usually compress images to small grids (like 28x28) to manage node count."
+   },
+   {
+    "t": "What does this module say about “The idea in brief”?",
+    "ans": "When you look at an pic, you see a 2D grid of colors. However, standard Artificial Neural Networks (namely Dense or Fully-Connected Layers ) are structured to accept just a one-dimensional (1D) array or vector of counts as input. Before a network can \"look\" at an pic, the pic must undergo Flattening ."
    }
   ]
  },
@@ -2539,12 +2539,12 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Computer Vision",
   "q": [
    {
-    "t": "What does this module say about “The problem it solves”?",
-    "ans": "A detector's region proposal stage doesn't stop at one box per object — it scores hundreds of candidate boxes and keeps each one above a confidence floor. It for a single real object often means a cluster of overlapping, near-duplicate boxes. Intersection over Union (IoU) is the standard way to measure how much two boxes overlap: the area they share, divided by the total area either one covers."
-   },
-   {
     "t": "What does this module say about “NMS Threshold”?",
     "ans": "boxes A-D are four raw proposals from one detector pass, four confidence scores, two actual objects"
+   },
+   {
+    "t": "What does this module say about “The problem it solves”?",
+    "ans": "A detector's region proposal stage doesn't stop at one box per object — it scores hundreds of candidate boxes and keeps each one above a confidence floor. It for a single real object often means a cluster of overlapping, near-duplicate boxes. Intersection over Union (IoU) is the standard way to measure how much two boxes overlap: the area they share, divided by the total area either one covers."
    },
    {
     "t": "What does this module say about “Non-Max Suppression”?",
@@ -3333,16 +3333,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Concurrency",
   "q": [
    {
+    "t": "What does this module say about “The core idea”?",
+    "ans": "Everything on this track collapses into one distinction. While your program is slow, is it holding the interpreter or waiting for something else?"
+   },
+   {
     "t": "What does this module say about “The question that decides it”?",
-    "ans": "Everything on this track collapses into one distinction. While your program is slow, is it holding the interpreter or waiting for something else ?"
+    "ans": "Holding the interpreter is CPU-bound work: a loop, a parse, a transform, a model. The GIL means one thread at a time may do it, so threads cannot overlap it and neither can async. Only separate interpreters — processes — get past that."
    },
    {
     "t": "What does this module say about “Measuring the unit of work”?",
     "ans": "Before choosing, measure one unit. Everything downstream is arithmetic on this number:"
-   },
-   {
-    "t": "What does this module say about “Where the ceiling comes from”?",
-    "ans": "The explorer above draws the three curves, and the shape they share is worth naming. Amdahl's law says that if a fraction *s* of the work is irreducibly serial, the best possible speed-up on any number of workers is 1/*s*."
    }
   ]
  },
@@ -3352,16 +3352,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Concurrency",
   "q": [
    {
+    "t": "What does this module say about “The core idea”?",
+    "ans": "The previous pages built up a set of primitives and a set of ways to misuse them. There is a lock you must take on every access, a Condition whose wait must sit in a while loop, a race waiting in any check-then-act."
+   },
+   {
     "t": "What does this module say about “Why a queue rather than a lock”?",
-    "ans": "The previous pages built up a set of primitives and a set of ways to misuse them. There is a lock you must take on every access, a Condition whose wait must sit in a while loop, a race waiting in any check-then-act. A queue.Queue is those three things already put together by someone who got the details right."
+    "ans": "It is internally locked, so put and get are safe from any number of threads with no locking of your own. It blocks when it has nothing to give and — if you bound it — when it has nowhere to put something. And it turns shared mutable state into message passing , which is the design that removes races rather than guarding them."
    },
    {
     "t": "What does this module say about “A worker pool that stops cleanly”?",
     "ans": "Here is the whole pattern on CPython. Three workers, a bounded queue, and a shutdown that does not guess:"
-   },
-   {
-    "t": "What does this module say about “Bounded, and why it matters”?",
-    "ans": "maxsize is the difference between a queue that paces your program and a queue that hides a leak."
    }
   ]
  },
@@ -3371,7 +3371,7 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Concurrency",
   "q": [
    {
-    "t": "What does this module say about “The whole protocol”?",
+    "t": "What does this module say about “The core idea”?",
     "ans": "A threading.Lock has two operations. acquire() takes it, waiting if another thread holds it; release() hands it back. Everything else is a consequence, and all of it can be watched from one thread:"
    },
    {
@@ -3390,16 +3390,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Concurrency",
   "q": [
    {
+    "t": "What does this module say about “The core idea”?",
+    "ans": "The previous page ended on a fact worth repeating. Everything here follows from it: a thread can switch only between bytecodes. A single bytecode is atomic with respect to other threads."
+   },
+   {
     "t": "What does this module say about “One statement, several bytecodes”?",
-    "ans": "The previous page ended on a fact worth repeating, because everything here follows from it: a thread switch can only happen *between* bytecodes, so a single bytecode is atomic with respect to other threads. That sounds reassuring until you ask how many bytecodes an ordinary line of Python is."
+    "ans": "Read the middle three. LOAD_GLOBAL reads the current value. BINARY_OP adds one, and STORE_GLOBAL writes the result back. These are a read , a modify , and a write . They are separate steps, with two gaps where a thread switch may occur."
    },
    {
     "t": "What does this module say about “The lost update, step by step”?",
     "ans": "Take two threads, each running counter += 1 exactly once, starting from zero. The expected answer is 2. Here are the same six steps in two different orders:"
-   },
-   {
-    "t": "What does this module say about “At scale, and why testing misses it”?",
-    "ans": "With two increments the damage is at most one. With two threads each doing a hundred thousand increments, the damage is however many times the switch happened to land in a gap:"
    }
   ]
  },
@@ -3409,8 +3409,8 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Concurrency",
   "q": [
    {
-    "t": "What does this module say about “One lock, and what holds it”?",
-    "ans": "A CPython process has a global interpreter lock , and the rule around it is short: a thread must hold the GIL to execute Python bytecode. Threads are real operating-system threads — the kernel schedules them, they have their own stacks, they can sit on different cores — and exactly one of them at a time is permitted to run your Python code."
+    "t": "What does this module say about “The core idea”?",
+    "ans": "A CPython process has a global interpreter lock, and the rule around it is short: a thread must hold the GIL to execute Python bytecode."
    },
    {
     "t": "What does this module say about “Where the switch happens”?",
@@ -3428,16 +3428,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Concurrency",
   "q": [
    {
+    "t": "What does this module say about “The core idea”?",
+    "ans": "Threads in one process share an address space. They can access the same globals and objects. That makes thread startup cheap, but shared writes need coordination such as locks."
+   },
+   {
     "t": "What does this module say about “Two models, one difference”?",
-    "ans": "Threads in a process share one address space. Every global, every module, every open object is the same object seen from all of them, which is why they are cheap to start and why they need locks . They are also subject to the GIL , so they never run Python at once."
+    "ans": "Processes have separate address spaces. Each has its own interpreter and objects. A process cannot directly read another process's objects. Multiple processes can run Python code at the same time on separate cores."
    },
    {
     "t": "What does this module say about “The boundary is pickle”?",
     "ans": "Sending an argument to a worker process means serialising it, writing the bytes to a pipe, and reconstructing it on the other side. So the question \"can I use a process pool for this?\" is really \"can this be pickled, and how big is it?\""
-   },
-   {
-    "t": "What does this module say about “The three start methods”?",
-    "ans": "The start method decides what a child begins life with, and it is the setting behind most \"it works on my machine\" reports:"
    }
   ]
  },
@@ -3447,16 +3447,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Concurrency",
   "q": [
    {
+    "t": "What does this module say about “The core idea”?",
+    "ans": "concurrent.futures makes the choice from the previous page a one-word change. Both executors use the same methods. Switching between them means changing the class name:"
+   },
+   {
     "t": "What does this module say about “One interface, two backends”?",
-    "ans": "concurrent.futures exists so that the decision from the previous page is a one-word change. Both executors have the same methods, so switching between them is switching a class name:"
+    "ans": "That symmetry is the library's main selling point. But it does not change the pickle boundary. A thread pool accepts any callable and argument. A process pool accepts only values that can be pickled and sent to another process. The one-word change therefore works in one direction more often than the other."
    },
    {
     "t": "What does this module say about “A Future is a small state machine”?",
     "ans": "A Future is a box that does not have a result yet. It has four states, and you can put one through all of them by hand:"
-   },
-   {
-    "t": "What does this module say about “Where the exception goes”?",
-    "ans": "Submitting work that raises does not raise at submit time, and does not print anything. The exception is stored on the future and re-raised when you ask for the result:"
    }
   ]
  },
@@ -3506,16 +3506,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What does this module say about “What CASE and views give you”?",
-    "ans": "SQL has no if statement, but it has CASE — a conditional expression that lives inside a SELECT list and produces a different value for each row depending on a condition. You use it whenever a query needs to classify, bucket, or label rows on the fly."
+    "t": "What does this module say about “Two different tools”?",
+    "ans": "A CASE expression selects a result for each row based on conditions. A view stores a query definition under a name so other queries can reuse it. Neither changes the underlying rows by itself. They solve different problems: conditional logic in a result, and reuse of a query shape."
    },
    {
-    "t": "What does this module say about “Views: a name for a query, not a copy of it”?",
-    "ans": "A plain view stores no data. Every time you query it, the underlying SELECT runs again against the current table — which is the whole point of the raise experiment below. This is different from a materialized view , which does store a snapshot and has to be refreshed explicitly to catch up with changes underneath it."
+    "t": "What does this module say about “Use CASE for conditional values”?",
+    "ans": "A searched CASE checks conditions in order and returns the result for the first true condition. If none match, ELSE supplies the fallback; without it, the result is NULL ."
    },
    {
-    "t": "What does this module say about “CASE: if/else inside a query”?",
-    "ans": "CASE is SQL's conditional expression. It returns a value, so it can appear anywhere a value can — in SELECT , in ORDER BY , inside an aggregate, even in WHERE ."
+    "t": "What does this module say about “A view is a saved query”?",
+    "ans": "Create a view when a query expresses a stable, reusable concept such as active customers:"
    }
   ]
  },
@@ -3525,16 +3525,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A Common Table Expression is a named temporary result set set with WITH , on hand just to the statement that follows it. Think of it as a var for a query: compute something once, give it a name, then use that name."
+    "t": "What does this module say about “A query with named steps”?",
+    "ans": "A common table expression (CTE) is introduced with WITH . It can make a multi-step query easier to read because each step gets a name and can refer to earlier steps. A CTE exists for that statement; it does not create a permanent table."
    },
    {
-    "t": "What does this module say about “Why Not Just Nest Subqueries”?",
-    "ans": "You can — the nested case in this lab returns just the same rows. But check how they read. A nested query is tested inside out . So you must find the innermost parenthesis and work outward, holding each layer in your head. A chain of CTEs reads top to bottom , like a recipe."
+    "t": "What does this module say about “CTEs do not guarantee faster execution”?",
+    "ans": "A CTE is a way to structure SQL, not automatically a temporary table or an optimization fence. Engines may inline, materialize, or otherwise transform it. PostgreSQL's behavior depends on features such as whether the CTE is referenced more than once and whether it is marked MATERIALIZED ; SQLite also has materialization hints. Check the plan for the database and version you deploy."
    },
    {
-    "t": "What does this module say about “Recursive CTEs: The Real Superpower”?",
-    "ans": "This is the thing subqueries genuinely cannot do. A recursive CTE has two halves joined by UNION ALL :"
+    "t": "What does this module say about “Recursive CTEs”?",
+    "ans": "A recursive CTE repeatedly applies a query to rows produced by an earlier iteration. It has an anchor query for the starting rows and a recursive term for the next rows. This is useful for hierarchies, graph traversal, and generated sequences. It must have a termination condition or a guard such as a depth limit; cycles can otherwise keep producing rows. For a full walk-through, see recursive CTEs ."
    }
   ]
  },
@@ -3624,20 +3624,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What is meant by “Adding a column with a default” here?",
-    "ans": "historically rewrote each row. PostgreSQL 11+ and MySQL 8+ handle constant defaults without a rewrite. Older versions do not."
+    "t": "What does this module say about “The schema-changing statements”?",
+    "ans": "DDL (Data Definition Language) creates and changes the structures that hold data. Common commands include CREATE to define an object, ALTER to change it, and DROP to remove it. The exact syntax and supported operations depend on the database engine."
    },
    {
-    "t": "What is meant by “Changing a column type” here?",
-    "ans": "generally rewrites the table and holds a strong lock."
+    "t": "What does this module say about “DROP is not DELETE”?",
+    "ans": "DELETE FROM products removes rows while retaining the table definition; it can use a WHERE clause and is usually DML. DROP TABLE products removes the table definition and its data. TRUNCATE is a separate command in engines that support it and has different transactional and identity behavior. SQLite does not support TRUNCATE TABLE ."
    },
    {
-    "t": "What is meant by “Adding an index” here?",
-    "ans": "locks writes unless you use CREATE INDEX CONCURRENTLY (PostgreSQL) or an online index build."
-   },
-   {
-    "t": "What is meant by “Adding a NOT NULL constraint” here?",
-    "ans": "needs scanning the table to verify. Adding it as NOT VALID and validating later avoids the long lock in PostgreSQL."
+    "t": "What does this module say about “Treat schema changes as migrations”?",
+    "ans": "In a production system, record each schema change as a migration that can be applied in a known order. Consider existing data, locks, validation cost, application compatibility, and rollback strategy. Adding a non-null column to a populated table may require a default or a staged rollout. DDL transaction behavior varies by engine and statement; do not assume every operation can be rolled back."
    }
   ]
  },
@@ -3647,16 +3643,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "DML is where data actually changes, and the WHERE clause is what stands between a targeted fix and a table-wide accident. Preview with SELECT, wrap risky work in a transaction, and let the constraints you declared in DDL catch what you miss."
+    "t": "What does this module say about “The commands that change rows”?",
+    "ans": "DML (Data Manipulation Language) includes statements that insert, update, and delete rows. INSERT adds data, UPDATE changes selected rows, and DELETE removes selected rows. SELECT is often taught alongside DML, though SQL classifications vary."
    },
    {
-    "t": "What does this module say about “The idea in brief”?",
-    "ans": "Data Manipulation Language (DML) is what you use after the table exists. DDL creates the container; DML fills it, changes it, and empties it. Four statements do almost all the work: INSERT adds rows, UPDATE changes values in existing rows, DELETE removes rows, and SELECT reads them without changing anything. These four are the verbs of every day-to-day database task."
+    "t": "What does this module say about “Make multi-step changes atomic”?",
+    "ans": "When several statements must succeed together, use a transaction: begin, perform the changes, then commit only when the required conditions hold. Roll back when any step fails. The exact syntax and error recovery behavior are engine-specific; see transactions and ACID ."
    },
    {
-    "t": "What does this module say about “The Four Statements”?",
-    "ans": "Both are valid SQL, both run without complaint, and both are the reason database people flinch at typing UPDATE into a production console."
+    "t": "What does this module say about “Bulk changes and safety”?",
+    "ans": "Large changes can hold locks, generate substantial logs, and affect replication. Batch them only when the batches preserve the intended transaction semantics. Record how many rows changed and verify important invariants afterward. Use bound parameters for values supplied by users; see SQL injection prevention ."
    }
   ]
  },
@@ -3666,16 +3662,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Pick the narrowest type that will hold each legitimate value, use DECIMAL for anything monetary, use real date types for dates. And add NOT NULL wherever a missing value would be meaningless. These choices are hard to change later and quietly govern correctness forever."
+    "t": "What does this module say about “Types are engine-specific contracts”?",
+    "ans": "SQL types describe the kinds of values a column accepts, but details differ across database engines. Integer types represent whole numbers; decimal or numeric types represent fixed decimal precision where supported; floating-point types approximate many real numbers; text types store strings; and date/time types model temporal values. Choose by required range and operations, not by the shortest type name."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A datatype declares what a column may hold. The database uses it to reject invalid data, to decide how many bytes each value occupies. And to choose how comparisons and arithmetic behave. Get it wrong and you pay in storage, in speed. Or — worst — in silently incorrect counts."
+    "t": "What does this module say about “Money, time, and text”?",
+    "ans": "Binary floating point cannot represent many decimal fractions exactly. For money, use an exact decimal type where the engine supports it, or store an integer number of the smallest currency unit when the scale and range are well-defined. The right choice depends on currency precision, rounding rules, and database behavior."
    },
    {
-    "t": "What does this module say about “Integers: pick the smallest that fits”?",
-    "ans": "SMALLINT holds ±32,767 in 2 bytes. INT holds about ±2.1 billion in 4. BIGINT holds roughly ±9.2 quintillion in 8."
+    "t": "What does this module say about “Make a type decision”?",
+    "ans": "For each field, ask: what values are valid, what comparisons are needed, can it be absent, and what precision or time zone is meaningful? Enforce important limits with constraints as well as types. Avoid storing numbers as text when numeric sorting and arithmetic are required. See constraints and NULL handling ."
    }
   ]
  },
@@ -3805,16 +3801,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "WHERE filters rows before grouping and HAVING filters groups after, which is why WHERE cannot mention an aggregate and why HAVING is the only place a condition on SUM or COUNT can live. The consequence people miss is that WHERE does not merely remove rows from the output — it changes what every aggregate downstream is computed from, so moving one condition between the two clauses changes the numbers, not just the row..."
+    "t": "What does this module say about “Two filters, two stages”?",
+    "ans": "Use WHERE for conditions on input rows. Use HAVING for conditions on groups, often involving an aggregate. For example, to find customers with at least three paid orders, remove unpaid orders first, then keep groups whose count reaches three."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "HAVING is like WHERE , but for groups instead of rows. A grouped query runs in stages. Rows are read, WHERE discards the ones that fail a per-row test, what is left is collected into groups, each group is boiled down to its aggregates, and only then does HAVING get a look — at the groups, not the rows. This ordering is the entire module. WHERE cannot see SUM() because no sum exists yet when WHERE runs."
+    "t": "What does this module say about “A common misplacement”?",
+    "ans": "A condition such as status = 'paid' belongs in WHERE when only paid rows should contribute to the count. Putting it in HAVING may require changing the grouping and can produce confusing results. Conversely, filtering on COUNT(*) in WHERE is invalid because that aggregate does not exist at the row-filter stage."
    },
    {
-    "t": "What does this module say about “Two things people are surprised by”?",
-    "ans": "HAVING works without GROUP BY. With no GROUP BY the whole table is one implicit group, so SELECT SUM (amount) FROM sales HAVING SUM (amount) > 5000 returns either one row or none. An aggregate in HAVING need not appear in SELECT. You can filter on COUNT (*) while selecting only the region. The aggregate is computed either way; SELECT just decides what is shown."
+    "t": "What does this module say about “Check the intended grain”?",
+    "ans": "Before adding HAVING , state what one result row should represent: a customer, month, product, or another key. Then verify the grouping columns and test a small dataset where one group is just below the threshold and another just above it. That catches off-by-one filters and accidental grouping by extra columns."
    }
   ]
  },
@@ -3824,20 +3820,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What is meant by “Storage” here?",
-    "ans": "Typically 10–20% of the table size per index, sometimes far more for wide composite indexes."
+    "t": "What does this module say about “What an index changes”?",
+    "ans": "A B-tree index keeps indexed values ordered with references to table rows. When a query filters on an indexed column, the database can often navigate to matching entries instead of checking every row. An index can also support ordering or a join, depending on its columns and the query."
    },
    {
-    "t": "What is meant by “Insert, update and delete speed” here?",
-    "ans": "Every index must be updated whenever the indexed data changes. A table with eight indexes does nine writes for every logical write."
+    "t": "What does this module say about “Match indexes to query patterns”?",
+    "ans": "Index columns used in selective filters, join keys, and ordering. A composite index's column order matters; see composite and covering indexes . Expressions or leading wildcards can prevent use of a simple index, although some engines offer specialized indexes for those cases."
    },
    {
-    "t": "What is meant by “Planning time and instability” here?",
-    "ans": "More indexes means more options for the planner to consider, and more chances for it to choose a bad one on a mis-estimated query."
-   },
-   {
-    "t": "What is meant by “Maintenance” here?",
-    "ans": "Indexes fragment as data changes and occasionally need rebuilding."
+    "t": "What does this module say about “Indexes have a cost”?",
+    "ans": "Every extra index uses storage and must be maintained when rows are inserted, updated, or deleted. Too many indexes can slow writes and make cache use worse. Start with the slow query and its plan, add the smallest index likely to help, then measure reads and writes."
    }
   ]
  },
@@ -3927,16 +3919,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What is meant by “Do not show an exact total” here?",
-    "ans": "\"Showing 21–40\" with a next button is usually enough, and it is what most large sites do."
+    "t": "What does this module say about “A page is an ordered slice”?",
+    "ans": "A query without ORDER BY has no guaranteed result order. If rows can tie on the sort key, add a unique tie-breaker so that repeated requests produce a stable sequence."
    },
    {
-    "t": "What is meant by “Use an approximate count” here?",
-    "ans": "PostgreSQL's reltuples in pg_class , or EXPLAIN 's row estimate, is instant and close enough for \"about 1,200 results\"."
+    "t": "What does this module say about “Deep offsets have a cost”?",
+    "ans": "With a large offset, the engine may still need to find and skip all preceding rows before returning the page. The work can grow as a user moves deeper into a large result set. Concurrent inserts and deletes can also shift offsets, causing repeated or skipped rows across page requests."
    },
    {
-    "t": "What is meant by “Cache it” here?",
-    "ans": "Store the count and refresh it periodically, or maintain it with a trigger if it must be exact."
+    "t": "What does this module say about “Define what “page” means”?",
+    "ans": "Decide whether users need a total count, a stable snapshot, random page access, or just “load more.” Exact counts can be expensive and may change while paging. An index matching the filter and order can help; inspect a plan and benchmark. See indexes and ORDER BY ."
    }
   ]
  },
@@ -3986,16 +3978,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "NULL means unknown, so comparisons involving it are UNKNOWN rather than TRUE or FALSE, and aggregates skip it by default. COALESCE substitutes a default, NULLIF creates a NULL on purpose, and IS NULL is the only comparison that actually works — everything else is a trap that looks like it should work and quietly does not."
+    "t": "What does this module say about “NULL is not zero or an empty string”?",
+    "ans": "A column value of NULL means the value is missing, unknown, or intentionally not applicable according to the data model. It is not equal to zero, an empty string, or even another NULL . If the reason for absence matters, store that reason separately."
    },
    {
-    "t": "What does this module say about “Context first”?",
-    "ans": "NULL is not zero, not an empty string, and not false. It means the value is unknown or missing or not applicable. Every comparison that touches NULL inherits that uncertainty: NULL = NULL is not TRUE, it is UNKNOWN. NULL > 5 is UNKNOWN. NULL + 10 is UNKNOWN. This is three-valued logic — true, false, or unknown — not the two-valued logic of most programming languages."
+    "t": "What does this module say about “Aggregates and membership”?",
+    "ans": "COUNT(*) counts every row; COUNT(column) ignores NULL values. SUM and AVG also ignore NULL inputs, and an aggregate over no values may return NULL. See aggregate functions ."
    },
    {
-    "t": "What does this module say about “The three tools”?",
-    "ans": "The single idea that unlocks this topic: NULL does not mean zero, and it does not mean an empty string. It means no value was recorded ."
+    "t": "What does this module say about “Count what the metric means”?",
+    "ans": "If a survey has 100 responses and 18 respondents skipped a question, COUNT(*) is 100 while COUNT(answer) is 82. Neither count is wrong: one measures response rows, the other measures supplied answers. AVG(answer) uses the known answers only. If missing answers should be treated as a category, count them explicitly or group by the nullable column."
    }
   ]
  },
@@ -4005,16 +3997,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What does this module say about “Start here”?",
-    "ans": "A denormalized table stores the same fact in more than one place. It means updating it can leave two copies disagreeing. Normalization is a sequence of rules, each one removing a set kind of redundancy by moving data into its own table."
+    "t": "What does this module say about “Why split a table”?",
+    "ans": "Suppose a table repeats a department's address on every employee row. If the address changes, every row must be updated; missing one creates inconsistent data. The design also makes it awkward to record a department before it has employees. These are update, deletion, and insertion anomalies."
    },
    {
-    "t": "What does this module say about “The three rules”?",
-    "ans": "Put all in one wide table and three set problems appear. They have names, and recognising them is most of the skill."
+    "t": "What does this module say about “The practical meaning of common normal forms”?",
+    "ans": "First normal form (1NF) is commonly taught as keeping each column value atomic for the operations the database must perform, rather than storing repeating lists in one field."
    },
    {
-    "t": "What does this module say about “The problem normalisation solves”?",
-    "ans": "Put all in one wide table and three set problems appear. They have names, and recognising them is most of the skill."
+    "t": "What does this module say about “A small split”?",
+    "ans": "Model employees(employee_id, department_id, name) and departments(department_id, name, address). The department's address now has one authoritative row, and department_id links employees to it. A foreign-key constraint can enforce that reference; see primary and foreign keys ."
    }
   ]
  },
@@ -4064,16 +4056,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A result set has no order unless ORDER BY gives it one, and the order is only deterministic once your keys separate every pair of rows — which is why a unique tie-breaker belongs on anything paginated. Keys apply left to right, each one consulted only for the ties the previous keys left behind. NULL placement is engine-specific, so write NULLS FIRST or NULLS LAST rather than trusting a default."
+    "t": "What does this module say about “Ask for the order you need”?",
+    "ans": "Tables represent rows, not a sorted list. An index or insertion history may make results appear ordered, but SQL does not guarantee that order without ORDER BY. Add it whenever sequence matters, including reports, exports, and pagination."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A table is a set of rows, and a set has no order. Without an ORDER BY the database is free to return rows in whatever order came out of its plan — insertion order, index order, or whatever the parallel workers finished in. It often looks stable for months and then changes the day the table grows an index or the optimiser picks a different plan."
+    "t": "What does this module say about “NULLs and collations”?",
+    "ans": "The placement of NULL values and text comparison rules can vary by engine and collation. PostgreSQL supports NULLS FIRST and NULLS LAST; SQLite also supports explicit NULL ordering in current versions. Text order can depend on locale and collation. Test the target database when results must be portable."
    },
    {
-    "t": "What does this module say about “Ties, and why a second key is not optional”?",
-    "ans": "Sorting by a column with duplicate values leaves the tied rows in an undefined order relative to each other. Combined with LIMIT , this produces one of the most confusing bugs in SQL:"
+    "t": "What does this module say about “Sorting has a cost”?",
+    "ans": "The engine may satisfy an order using an index or sort rows at runtime. An index matching the filter and order can help, but adds storage and write cost. Check the plan rather than assuming either that an index is used or that every sort is expensive."
    }
   ]
  },
@@ -4163,20 +4155,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What is meant by “DISTINCT” here?",
-    "ans": "runs after SELECT and before ORDER BY . That is why SELECT DISTINCT x FROM t ORDER BY y fails in strict engines — y was removed before the sort could use it."
+    "t": "What does this module say about “The logical stages”?",
+    "ans": "A useful simplified order for a query is: FROM and joins, WHERE, GROUP BY, HAVING, the SELECT list, DISTINCT, ORDER BY, then LIMIT or its equivalent. This is a reasoning model for the query's meaning, not a requirement that the physical engine execute each stage literally in this order."
    },
    {
-    "t": "What is meant by “Window functions” here?",
-    "ans": "are computed after HAVING and before DISTINCT . They can see the grouped rows, and WHERE / HAVING cannot see them. Filtering on a window function always needs an outer query."
+    "t": "What does this module say about “Logical order is not the physical plan”?",
+    "ans": "Window functions are evaluated after grouping and HAVING in the logical model, but before the final ORDER BY. That is why a window result usually needs an outer query or CTE before it can be filtered. The database planner can reorder joins, push filters, and choose indexes as long as the result semantics stay correct. Do not infer actual runtime from the logical model."
    },
    {
-    "t": "What is meant by “CTEs ( WITH )” here?",
-    "ans": "are conceptually evaluated first, as named inputs to the main query, though modern planners inline them and optimise across the boundary."
-   },
-   {
-    "t": "What is meant by “OFFSET” here?",
-    "ans": "runs with LIMIT , at the very end, after everything has been produced and sorted — which is exactly why deep offsets are slow."
+    "t": "What does this module say about “Why aliases can surprise you”?",
+    "ans": "In many SQL dialects, an alias introduced in the SELECT list is available to ORDER BY but not WHERE. The WHERE stage logically happens before that output alias exists. If a derived value needs to be filtered, repeat the expression or place it in a CTE/subquery and filter from the outer query. Dialects sometimes extend alias visibility, so portable code should not depend on a nonstandard shortcut."
    }
   ]
  },
@@ -4226,20 +4214,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What is meant by “Anchor them” here?",
-    "ans": "Without ^ and $ , a pattern matches anywhere in the string. It is often not what a validation rule means."
+    "t": "What does this module say about “SQL does not define one regex dialect”?",
+    "ans": "Regular-expression matching is often provided by a database-specific operator or function. Pattern syntax, flags, capture behavior, and available functions are not portable. In SQLite, the REGEXP operator calls an application-defined regexp() function; SQLite does not provide that function by default. An editor or driver may register one, so confirm what the actual application supports."
    },
    {
-    "t": "What is meant by “Escape well” here?",
-    "ans": "A literal dot is \\. . Unescaped it matches any character. So '^[0-9]+.[0-9]+$' accepts \"12x34\"."
+    "t": "What does this module say about “Write the narrowest useful pattern”?",
+    "ans": "A pattern should express the actual rule, not a vague approximation. For example, a regex that accepts a numeric identifier should specify whether signs, spaces, and decimals are allowed. Test valid and invalid boundary cases. For user-provided patterns, consider runtime limits: pathological expressions can consume significant CPU in some engines or libraries."
    },
    {
-    "t": "What is meant by “Watch case sensitivity” here?",
-    "ans": "PostgreSQL's ~ is case-sensitive, ~* is not. MySQL's REGEXP follows the column collation."
-   },
-   {
-    "t": "What is meant by “Prefer explicit classes” here?",
-    "ans": "[0-9] is unambiguous across engines. \\d is not always on hand and may include non-ASCII digits under Unicode rules."
+    "t": "What does this module say about “Prefer constraints for data integrity”?",
+    "ans": "If a pattern defines a required format, validate it at input boundaries and, where the database supports it, add an appropriate constraint. Do not assume a regex check proves that a value is a valid email address, URL, or other complex semantic object. See SQL data types and query plans ."
    }
   ]
  },
@@ -4289,16 +4273,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "The clauses run in a fixed order, and knowing it removes almost all confusion about which filter goes where:"
+    "t": "What does this module say about “What a group represents”?",
+    "ans": "GROUP BY divides filtered rows into groups with the same value for each grouping expression. An aggregate such as COUNT or SUM then summarizes each group. If you group orders by customer_id , the result has one row per customer who has at least one qualifying order."
    },
    {
-    "t": "What does this module say about “The idea in brief”?",
-    "ans": "GROUP BY collapses many rows into one per group. You choose which column's values to group by (for example, 'region' or 'customer_id'), and the database collapses all rows with the same value in that column into one. You then apply an aggregation function to each group: SUM adds the values, COUNT counts them, AVG averages them, MAX and MIN find the largest and smallest values."
+    "t": "What does this module say about “Select only values that describe the group”?",
+    "ans": "In standard SQL, every selected expression that is not aggregated must be part of the grouping key (or otherwise be functionally determined where the engine supports that rule). Selecting an arbitrary name next to a grouped customer_id can be invalid or ambiguous. SQLite permits some bare columns and may choose a value from an input row; do not rely on that behavior for portable results."
    },
    {
-    "t": "What does this module say about “The Core Idea: Collapse and Calculate”?",
-    "ans": "Imagine you have a table of sales data. You don't want to see every single sale; you want to know the total sales for each department. GROUP BY is how you do this. It performs two main steps:"
+    "t": "What does this module say about “NULL and empty groups”?",
+    "ans": "Rows with NULL in a grouping key are collected into one NULL group in common SQL engines. A group appears only when at least one input row belongs to it. A query with GROUP BY over no qualifying rows therefore returns no groups, while an aggregate without GROUP BY still returns one summary row."
    }
   ]
  },
@@ -4388,16 +4372,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Window functions are a powerful feature in SQL that do a math across a set of table rows that are somehow tied to the current row. Unlike aggregate functions ( SUM , COUNT ). It collapse rows into a single output row, window functions give a value for each single row ."
+    "t": "What does this module say about “Aggregate without collapsing rows”?",
+    "ans": "GROUP BY combines rows into one row per group. A window function instead calculates across a window of related rows and returns a value for each original row. This makes it useful for ranks, running totals, moving averages, and comparing a row with its neighbors."
    },
    {
-    "t": "What does this module say about “The Core Idea: A \"Window\" into Your Data”?",
-    "ans": "The magic of window functions is the OVER() clause. This clause sets the \"window\" or set of rows the function should consider for its math. It has two key parts:"
+    "t": "What does this module say about “Ranking and neighboring rows”?",
+    "ans": "ROW_NUMBER assigns a unique sequence within a partition. RANK leaves gaps after ties; DENSE_RANK does not. LAG and LEAD read a value from a previous or next row in the ordered partition. Include a deterministic tie-breaker when the order must be stable."
    },
    {
-    "t": "What does this module say about “Aggregate without collapsing”?",
-    "ans": "GROUP BY answers \"what is the total per region?\" and destroys the individual rows in the process. A window function answers \"what is the total for this row's region, shown next to this row?\" and keeps all."
+    "t": "What does this module say about “Frames can change the answer”?",
+    "ans": "A window frame defines which ordered rows contribute to the current calculation. Defaults depend on the function and ordering and can include peers with equal order values. For a running total, specify a frame deliberately when peer behavior matters. For LAST_VALUE over the entire partition, a frame ending at the current row often surprises; request UNBOUNDED FOLLOWING when you mean the partition's final value."
    }
   ]
  },
@@ -4527,20 +4511,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What is meant by “A scalar subquery returning more than one row” here?",
-    "ans": "The engine raises an error at runtime, and only when the data grows enough to produce a second row — so this bug ships. Guard with LIMIT 1 and an explicit ORDER BY , or use MIN / MAX ."
+    "t": "What does this module say about “Three common shapes”?",
+    "ans": "A scalar subquery returns one value, such as a maximum date. A subquery in FROM acts as a derived table. A subquery in WHERE can test membership or existence. These shapes let one query express a calculation or filter that would otherwise need a separate statement."
    },
    {
-    "t": "What is meant by “NOT IN with NULLs” here?",
-    "ans": "Covered above, and worth repeating because it fails silently rather than loudly."
+    "t": "What does this module say about “Correlated and uncorrelated”?",
+    "ans": "An uncorrelated subquery can be evaluated independently of the current outer row. A correlated subquery refers to a column from that row, as in a test for whether a customer's orders exist. Correlation describes the logic, not necessarily the physical execution: an optimizer may transform or decorrelate it."
    },
    {
-    "t": "What is meant by “Forgetting the alias on a derived table” here?",
-    "ans": "Most engines require one; the error message is clear but the cause is not obvious the first time."
-   },
-   {
-    "t": "What is meant by “Correlated subqueries in SELECT” here?",
-    "ans": "SELECT name, (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) FROM customers c runs one count per customer. A LEFT JOIN with GROUP BY , or a window function, does it in one pass."
+    "t": "What does this module say about “Check cardinality and NULLs”?",
+    "ans": "A scalar subquery should return at most one row; behavior when it returns more than one is engine-specific. PostgreSQL reports an error, while SQLite uses the first result row, so do not rely on accidental multi-row results. NOT IN can produce UNKNOWN if its candidate set contains NULL. Test empty input, duplicate matches, and NULLs when those cases are possible."
    }
   ]
  },
@@ -4630,16 +4610,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What is meant by “Always touch rows in a steady order” here?",
-    "ans": "Sort account IDs before updating them. And the cycle above cannot form."
+    "t": "What does this module say about “What ACID promises”?",
+    "ans": "Atomicity means a transaction's changes are committed together or rolled back together. Consistency means committed changes preserve the database rules and application invariants that are actually enforced. Isolation defines how concurrent transactions interact. Durability means committed changes survive failures according to the database's configuration and storage guarantees."
    },
    {
-    "t": "What is meant by “Keep deals short” here?",
-    "ans": "Never hold a deal open across a network call, a user's think time. Or an external API. The most common cause of lock contention is a deal that started before it needed to."
+    "t": "What does this module say about “Commit, rollback, and durability”?",
+    "ans": "Use the transaction API for the target database and ensure every error path commits or rolls back deliberately. Durability can depend on configuration, replication mode, and storage guarantees; “COMMIT returned” should be interpreted using the engine's documented settings."
    },
    {
-    "t": "What is meant by “Retry on deadlock” here?",
-    "ans": "Deadlock errors are expected under load, not exceptional. Use code that touches contended rows should catch the error and retry with a short random delay."
+    "t": "What does this module say about “Check invariants inside the transaction”?",
+    "ans": "A transfer should validate that the debit actually updated one row and that the balance cannot go below the allowed limit. Make those conditions part of the UPDATE predicate or a database constraint, then inspect the affected-row count before committing. If the credit fails, roll back the debit. Isolation matters when two withdrawals race for the same balance."
    }
   ]
  },
@@ -4649,20 +4629,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What is meant by “Mixing partitioned or archived tables” here?",
-    "ans": "into one result. It is the classic UNION ALL case."
+    "t": "What does this module say about “Three ways to combine result sets”?",
+    "ans": "UNION returns rows that appear in either query and removes duplicates. UNION ALL keeps every row, including duplicates. INTERSECT keeps rows common to both results. EXCEPT keeps rows from the first result that do not appear in the second."
    },
    {
-    "t": "What is meant by “Checking two datasets in a migration” here?",
-    "ans": "Run A EXCEPT B and B EXCEPT A . If both give nothing, the datasets are identical. This is the fastest reconciliation check there is."
+    "t": "What does this module say about “The result columns must line up”?",
+    "ans": "Each query must return the same number of columns in the same order, with compatible types. Column names generally come from the first SELECT. Set operators combine values by position; they do not match columns by name."
    },
    {
-    "t": "What is meant by “Adding a total row” here?",
-    "ans": "to a report by unioning the detail with an aggregate."
-   },
-   {
-    "t": "What is meant by “Merging results from other sources” here?",
-    "ans": "that happen to share a shape — internal customers and external ones, current staff and alumni."
+    "t": "What does this module say about “Choose between a set operation and a join”?",
+    "ans": "Use a set operator when each query produces a compatible list of values to stack or compare. Use a join when columns from related rows should appear side by side. See joins . If the input query includes NULL, duplicate handling follows the set operation's rules, which may differ from ordinary equality predicates."
    }
   ]
  },
@@ -4672,16 +4648,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "There is no \"better\" net, just other bargains. Relational gives you enforced consistency and flexible ad-hoc queries. Non-relational gives you speed, scale and schema freedom in exchange for moving integrity into your application. Most real systems today use both."
+    "t": "What does this module say about “Several families, not one model”?",
+    "ans": "Document databases store records as documents, often with nested fields. Key-value stores retrieve values by a key. Wide-column systems organize data into column families for distributed workloads. Graph databases represent entities and relationships for traversal."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A non-relational database stores data in a shape other than fixed tables of rows and columns. The name \"NoSQL\" is a historical accident. It is best read as \"not just SQL\" , since many of these systems now support SQL-like query languages."
+    "t": "What does this module say about “Schema flexibility still needs a contract”?",
+    "ans": "A flexible storage format can make new fields easier to add, but the application still needs to agree on required fields, types, and meanings. Without validation, records written by different versions of a service may disagree in ways that break readers."
    },
    {
-    "t": "What does this module say about “The Four Families”?",
-    "ans": "The headline gain of a document store is that you can add a field to one document without altering anything else. For rapidly changing data. Or genuinely heterogeneous records, that removes real friction: no migration, no downtime, no coordination."
+    "t": "What does this module say about “Choose from access and consistency needs”?",
+    "ans": "Write down the queries, update patterns, consistency expectations, growth, and operational skills required. Compare those needs against a relational design before choosing a specialized store. A multi-database architecture also needs clear ownership of each fact and a way to handle partial failure across stores."
    }
   ]
  },
@@ -4691,16 +4667,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What does this module say about “The problem it solves”?",
-    "ans": "A relational database stores data in tables of rows and columns. There each table describes one kind of thing. Customers, orders, products — and tables are connected by shared key vals rather than by nesting data inside each other."
+    "t": "What does this module say about “What “relational” means”?",
+    "ans": "In everyday SQL, a relation is commonly presented as a table: rows represent records and columns represent attributes. A key identifies rows, while foreign keys express references between tables. The relational model is more than “tables linked together”; it also gives a formal way to define valid data and query results."
    },
    {
-    "t": "What does this module say about “Keys are the whole trick”?",
-    "ans": "The foreign key is what turns a pile of tables into a database. Declared well, it makes an order pointing at a non-existent customer impossible. Not unlikely, not caught by a validation function somewhere. But rejected by the engine for each client that ever connects."
+    "t": "What does this module say about “Why separate related facts”?",
+    "ans": "If every order stores a customer's address, changing that address requires updating many rows and risks contradictions. A normalized design stores customer facts once and references the customer from each order. Joins combine the related rows when a query needs them. Constraints can enforce uniqueness and referential integrity; see primary and foreign keys and normalization ."
    },
    {
-    "t": "What does this module say about “Why Split the Data at All”?",
-    "ans": "Switch this lab to one flat table and look at the red cells. The customer's name and city now repeat on each order they ever placed. That redundancy causes three classic problems:"
+    "t": "What does this module say about “Transactions and limits”?",
+    "ans": "Many relational systems support transactions and constraints, which help keep related changes valid. These features have engine-specific behavior and configuration. Relational databases can also scale and replicate, but those properties depend on the particular system and design; they are not guaranteed merely by the relational model."
    }
   ]
  },
@@ -4710,20 +4686,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Database",
   "q": [
    {
-    "t": "What is meant by “BETWEEN a AND b” here?",
-    "ans": "is inclusive at both ends. For dates this is a common source of off-by-one bugs, because BETWEEN '2026-01-01' AND '2026-01-31' excludes anything timestamped later on the 31st. Prefer >= start AND < next_start ."
+    "t": "What does this module say about “Filter before grouping”?",
+    "ans": "WHERE applies a condition to input rows. For each row, SQL evaluates the condition and retains the row only when the result is TRUE. FALSE and UNKNOWN are both excluded. This filtering happens before GROUP BY and aggregate calculations."
    },
    {
-    "t": "What is meant by “IN (...)” here?",
-    "ans": "is shorthand for a chain of ORs, and works with a subquery as well as a literal list."
+    "t": "What does this module say about “NULL and three-valued logic”?",
+    "ans": "A comparison such as email = NULL is UNKNOWN, so it does not select missing emails. Use IS NULL or IS NOT NULL. Be careful with NOT IN when the candidate set may contain NULL; see NULL handling and EXISTS vs IN ."
    },
    {
-    "t": "What is meant by “LIKE” here?",
-    "ans": "uses % for any run of characters and _ for exactly one. Escape literal percent signs with an ESCAPE clause."
-   },
-   {
-    "t": "What is meant by “IS DISTINCT FROM” here?",
-    "ans": "compares two values treating NULLs as comparable — NULL IS DISTINCT FROM 5 is TRUE. It is the operator you want when comparing nullable columns, and it is supported by PostgreSQL and several others."
+    "t": "What does this module say about “Write filters the planner can use”?",
+    "ans": "A simple predicate on an indexed column can make an index useful, but the planner decides whether that is cheaper than scanning. Wrapping a column in a function may prevent a regular index from helping unless an expression index exists. Do not rewrite a correct condition based on guesswork; inspect query plans and measure."
    }
   ]
  },
@@ -5250,12 +5222,12 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Deep Learning",
   "q": [
    {
-    "t": "What does this module say about “Context first”?",
-    "ans": "Training a deep network means passing a loss signal backward through every layer. Each layer multiplies the incoming gradient by its own local derivative. Chain enough of these together and the product either shrinks toward zero or grows toward infinity."
-   },
-   {
     "t": "What does this module say about “Gradient Magnitudes”?",
     "ans": "With weight scale 1.0, gradients pass through unchanged. Move the slider to break the balance."
+   },
+   {
+    "t": "What does this module say about “Context first”?",
+    "ans": "Training a deep network means passing a loss signal backward through every layer. Each layer multiplies the incoming gradient by its own local derivative. Chain enough of these together and the product either shrinks toward zero or grows toward infinity."
    },
    {
     "t": "What does this module say about “The chain rule is a product”?",
@@ -5423,12 +5395,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Gradient clipping rescales an oversized gradient down to a max norm before the optimiser applies it, preserving way while bounding step size. It is cheap insurance against the rare exploding gradient that would otherwise throw training off course. And it is standard practice in RNNs and very deep networks. There long chains of multiplication make the occasional huge gradient close to inevitable."
    },
    {
-    "t": "What does this module say about “Context first”?",
-    "ans": "Most gradients in training are reasonably sized. At times — a badly scaled batch, a long recurrent chain, a numerically unstable loss — one gradient is enormous. Applied right, w − lr · g can throw a weight far outside the region the optimiser was making sane progress in. And the next few steps are spent recovering rather than learning."
-   },
-   {
     "t": "What does this module say about “Run Training”?",
     "ans": "Steps 1-2 are ordinary. Step 3 injects a spike 50x the real gradient — an exploding gradient, the kind deep or recurrent nets produce on their own."
+   },
+   {
+    "t": "What does this module say about “Context first”?",
+    "ans": "Most gradients in training are reasonably sized. At times — a badly scaled batch, a long recurrent chain, a numerically unstable loss — one gradient is enormous. Applied right, w − lr · g can throw a weight far outside the region the optimiser was making sane progress in. And the next few steps are spent recovering rather than learning."
    }
   ]
  },
@@ -5986,12 +5958,12 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Deep Learning",
   "q": [
    {
-    "t": "What does this module say about “What this is”?",
-    "ans": "Stack enough layers and, by the chain rule, the gradient reaching an early layer is the product of each local derivative between it and the loss. If each of those derivatives is reliably less than 1 — true of sigmoid and tanh almost all over — the product shrinks geometrically. Ten layers at a local derivative of 0.55 now leaves the input gradient at about 0.0025 of what it started as."
-   },
-   {
     "t": "What does this module say about “The Stack”?",
     "ans": "every layer squashes its input by the same factor (local derivative 0.55) — realistic for a deep sigmoid/tanh stack"
+   },
+   {
+    "t": "What does this module say about “What this is”?",
+    "ans": "Stack enough layers and, by the chain rule, the gradient reaching an early layer is the product of each local derivative between it and the loss. If each of those derivatives is reliably less than 1 — true of sigmoid and tanh almost all over — the product shrinks geometrically. Ten layers at a local derivative of 0.55 now leaves the input gradient at about 0.0025 of what it started as."
    },
    {
     "t": "What does this module say about “The two reasons it works”?",
@@ -7501,6 +7473,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/abstention_in_rag.html",
+  "title": "Abstention in RAG",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Models answer even when they should not, so one gate is never enough. Check retrieval confidence first, let the prompt allow a refusal, and verify the finished answer against its sources. Tune the thresholds on answerable and unanswerable questions, and make every refusal point the user somewhere useful."
+   },
+   {
+    "t": "What does this module say about “Why saying \"I do not know\" is hard”?",
+    "ans": "Language models are trained to be helpful. Give one a question and some context, and it will write a fluent answer, even when the context holds nothing useful. That is not a bug. It is the model doing what it was trained to do. Your system has to override it, and no single check is enough."
+   },
+   {
+    "t": "What does this module say about “Gate 1: is the retrieval confident”?",
+    "ans": "The first gate runs before the model is called. If no chunk is relevant enough, stop there. You spend nothing on generation."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/annoy_index.html",
   "title": "Annoy",
   "cat": "Gen AI",
@@ -7539,6 +7530,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/batch_embedding_generation.html",
+  "title": "Batch Embedding Generation",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Encode in batches, sort texts by length so batches carry little padding, and clean the input. Keep the row-to-text mapping, normalise the vectors, and save them as a memory-mappable array. Float16 halves the size, and you should check that it keeps your results."
+   },
+   {
+    "t": "What does this module say about “What batch embedding is and why it matters”?",
+    "ans": "Batch embedding means turning a large pile of text into vectors that a search system can compare. For 100,000 article titles or chunks, you load an embedding model, feed it texts in groups, and save the resulting matrix to disk."
+   },
+   {
+    "t": "What does this module say about “Choose a model by dimension, depth and length limit”?",
+    "ans": "The model sets the vector size, the speed and the quality. Three facts matter before any benchmark: the dimension, the number of layers, and the longest input it reads. Text past that limit is silently cut."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/byte_pair_encoding_tokenizer.html",
   "title": "Byte Pair Encoding Tokenizer",
   "cat": "Gen AI",
@@ -7573,6 +7583,44 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Greedy Decoding”?",
     "ans": "The simplest method is to always choose the token with the highest chance. This is called \"greedy decoding.\" It's predictable but can lead to repetitive and boring text. The Role of Temperature"
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/chunk_deduplication.html",
+  "title": "Chunk Deduplication",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Hash cleaned text to catch exact copies, use MinHash to catch near-copies, and run both at ingestion. At retrieval time, use MMR to keep the results varied. Keep the threshold high enough that a chunk with a different fact is not treated as a copy."
+   },
+   {
+    "t": "What does this module say about “Why duplicate chunks hurt”?",
+    "ans": "Company documents repeat themselves. The same policy sits in a wiki, a shared drive and a PDF. API docs are built from one spec in three formats. Changelogs overlap from one release to the next."
+   },
+   {
+    "t": "What does this module say about “Exact copies: hash the cleaned text”?",
+    "ans": "The cheapest check is to clean the text and hash it. Cleaning means lowercase, one space between words, and no trailing punctuation, so that formatting-only differences collapse. Two chunks with the same hash are the same chunk."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/chunk_size_optimization.html",
+  "title": "Chunk Size Optimization",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Chunk size is the first setting to tune, and the right value depends on your data. Build a test set from real questions, sweep sizes and overlaps, and compare recall against cost. Pick from the Pareto front, count in tokens, and repeat the sweep whenever the model or the documents change."
+   },
+   {
+    "t": "What does this module say about “Why chunk size is the setting to tune first”?",
+    "ans": "Chunk size changes what the retriever can find, what it costs, and what the model reads. Cut too small, and the answer is split across two chunks, so neither one matches the question. Cut too big, and each chunk covers many topics, so its embedding is a blurry average. It also sends more tokens to the model on every query."
+   },
+   {
+    "t": "What does this module say about “Build a test set first”?",
+    "ans": "The test set matters more than the grid. If your test questions do not look like real user questions, the size that wins on them will not win in production."
    }
   ]
  },
@@ -7691,6 +7739,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/debugging_rag.html",
+  "title": "Debugging RAG",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A wrong answer was lost at retrieval, at synthesis or after the model. Record a trace, check the stages in order, and change one thing at a time. Fix the first stage that fails, then add a regression test. Do not debug against live traffic; use saved traces."
+   },
+   {
+    "t": "What does this module say about “Three places an answer goes wrong”?",
+    "ans": "Every wrong answer from a RAG system was lost at one of three stages. Your first job is to find which one. Do not start by rewriting the prompt."
+   },
+   {
+    "t": "What does this module say about “Start with a trace”?",
+    "ans": "You cannot debug what you did not record. A trace captures every stage for one question: the raw query, the rewritten query, the retrieved chunks with scores, the reranked list, the exact prompt, the raw model reply, and the final output."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/diskann_index.html",
   "title": "DiskANN",
   "cat": "Gen AI",
@@ -7706,6 +7773,25 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Vamana: one graph, pruned with slack”?",
     "ans": "The graph algorithm is called Vamana. It starts from a random R-regular graph and improves it in two passes. For each node, in random order:"
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/distributed_ingestion_pipeline.html",
+  "title": "Distributed Ingestion Pipeline",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Distribute for safety, not speed. Use at-least-once delivery with idempotent workers. Give chunks deterministic IDs, check versions and upsert. Write new chunks before you delete old ones. Send poison messages to a dead-letter queue, skip unchanged articles, and watch the failure rate."
+   },
+   {
+    "t": "What does this module say about “Why the design is about safety, not speed”?",
+    "ans": "A production RAG system takes in new and updated documents every day. The ingestion pipeline splits each article into chunks, makes embeddings and writes them to the vector store. At 10,000 articles a day, raw throughput is modest. One worker can embed the whole batch in about a minute."
+   },
+   {
+    "t": "What does this module say about “Size the workload first”?",
+    "ans": "Quantify the job before you design anything. The answer tells you whether you need a distributed design, and how many workers. The latency per batch below is an assumption, so measure your own."
    }
   ]
  },
@@ -7729,21 +7815,78 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/document_ingestion_pipeline.html",
+  "title": "Document Ingestion Pipeline",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Ingestion is five stages: extract, clean, chunk, embed, store. Use OCR for scans, count tokens, make IDs deterministic and writes idempotent, and checkpoint so a crash costs one batch. Count documents at every stage, because silent loss at the first one is invisible later."
+   },
+   {
+    "t": "What does this module say about “What the pipeline does”?",
+    "ans": "An ingestion pipeline is the foundation of any RAG system. Before a model can answer questions about your documents, those documents must be broken apart, turned into vectors and stored in an index. The pipeline does that work from end to end."
+   },
+   {
+    "t": "What does this module say about “Stage 1: extract the text”?",
+    "ans": "PDF is a presentation format, not a data format. Text may be stored as characters, as glyph references, or as a picture of a page in a scan. That makes extraction the messiest stage."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/dot_product_vs_cosine_similarity.html",
   "title": "Dot Product vs Cosine Similarity for Retrieval",
   "cat": "Gen AI",
   "q": [
    {
-    "t": "What does this module say about “What this is”?",
-    "ans": "Cosine likeness asks \"what angle apart are these two vectors\" and ignores length fully. Dot product asks \"how much do these two vectors agree, weighted by how long they both are\" — length is part of the answer, not discarded. Most embedding search defaults to cosine, but a growing number of models (some recommendation embeddings, some matryoshka and MIPS-optimised models) are trained."
-   },
-   {
     "t": "What does this module say about “Stretch Doc B”?",
     "ans": "same direction as before, just longer — like a verbose, repetitive document embedding"
    },
    {
+    "t": "What does this module say about “What this is”?",
+    "ans": "Cosine likeness asks \"what angle apart are these two vectors\" and ignores length fully. Dot product asks \"how much do these two vectors agree, weighted by how long they both are\" — length is part of the answer, not discarded. Most embedding search defaults to cosine, but a growing number of models (some recommendation embeddings, some matryoshka and MIPS-optimised models) are trained."
+   },
+   {
     "t": "What does this module say about “When size is noise, and when it is signal”?",
     "ans": "Use cosine when length carries no meaning. Text embeddings are the standard case. A 4,000-word article and a 200-word summary of it should be close. And their vector lengths differ mainly because of length and count, not content."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/embedding_model_migration.html",
+  "title": "Embedding Model Migration",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Never mix embedding spaces. Build a green index in the background, validate in shadow mode with overlap and labelled queries, cut over in stages through a router, and keep blue for rollback. Write new documents to both indexes during the window, and keep the model and dimension in config."
+   },
+   {
+    "t": "What does this module say about “Why swapping the model is harder than it looks”?",
+    "ans": "On paper, migration is simple. Re-embed everything with the new model and swap the index. In practice three things make it a real engineering job."
+   },
+   {
+    "t": "What does this module say about “The rule: never mix embedding spaces”?",
+    "ans": "A query embedded by model B and chunks embedded by model A cannot be compared. The scores are not a measure of meaning. This holds even when the dimensions match. Two 384-dimension models trained on different data have spaces that are rotated and stretched relative to each other."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/embedding_resilience_and_checkpointing.html",
+  "title": "Embedding Resilience and Checkpointing",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Rate limit with a sliding window on both requests and tokens. Retry only temporary errors, with exponential backoff and jitter. Record each finished batch in a crash-safe store so a restart never pays twice. Estimate time and cost before you start, and log progress while you run."
+   },
+   {
+    "t": "What does this module say about “What goes wrong at scale”?",
+    "ans": "Embedding half a million chunks of about 256 tokens means sending 128 million tokens to an embedding API. At 100 chunks per request, that is 5,000 calls. Any of them can fail, and the whole run takes long enough for something to go wrong."
+   },
+   {
+    "t": "What does this module say about “Scope the job before you write code”?",
+    "ans": "Start with arithmetic. The numbers below are assumptions, so replace them with your provider's current limits and price."
    }
   ]
  },
@@ -7926,12 +8069,12 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Gen AI",
   "q": [
    {
-    "t": "What does this module say about “The idea in brief”?",
-    "ans": "Dense retrieval and BM25 fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously."
-   },
-   {
     "t": "What does this module say about “Fusion”?",
     "ans": "small k lets rank-1 dominate; large k (60 is the common default) smooths everything out"
+   },
+   {
+    "t": "What does this module say about “The idea in brief”?",
+    "ans": "Dense retrieval and BM25 fail in different, mostly non-overlapping ways. A document phrased differently from the query but on the same topic can score well under a dense method and poorly under exact keyword match; a document with an unusual acronym or exact code can score well under BM25 and be embedded ambiguously."
    },
    {
     "t": "What does this module say about “Why fuse ranks, not raw scores”?",
@@ -8040,12 +8183,12 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Gen AI",
   "q": [
    {
-    "t": "What does this module say about “Context first”?",
-    "ans": "Plain top-k retrieval picks the k highest-scoring documents on its own. If a document collection has a few near-the same passages about the same popular sub-topic, all of them can legitimately score near the top — and a naive top-k fills the context with repetition instead of coverage. This wastes the retrieval budget on saying the same thing three times."
-   },
-   {
     "t": "What does this module say about “Selection”?",
     "ans": "1.0 = pure relevance (same as MMR off). 0.0 = pure diversity, ignores relevance entirely."
+   },
+   {
+    "t": "What does this module say about “Context first”?",
+    "ans": "Plain top-k retrieval picks the k highest-scoring documents on its own. If a document collection has a few near-the same passages about the same popular sub-topic, all of them can legitimately score near the top — and a naive top-k fills the context with repetition instead of coverage. This wastes the retrieval budget on saying the same thing three times."
    },
    {
     "t": "What does this module say about “The formula”?",
@@ -8172,6 +8315,25 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/production_rag_system_design.html",
+  "title": "Production RAG System Design",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A production RAG system has seven parts: ingestion, hybrid retrieval, generation, evaluation, monitoring, scaling and recovery. Make ingestion idempotent. Fuse vector and keyword search. Measure recall and faithfulness. Watch speed, quality and cost. Wrap every dependency in a circuit breaker with a fallback."
+   },
+   {
+    "t": "What does this module say about “From prototype to production”?",
+    "ans": "A demo RAG system fetches chunks and writes an answer. A production system does that and six more things. It takes in documents reliably. It combines vector and keyword search. It checks answer quality offline. It watches itself in real time. It scales under load. And it keeps working when one of its parts fails."
+   },
+   {
+    "t": "What does this module say about “Ingestion”?",
+    "ans": "Ingestion turns raw articles into indexed chunks with embeddings . With 200,000 articles and daily changes, this is a bulk load plus a steady trickle. Treat each article as one task: fetch, chunk, embed, write."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/quantization_in_llms.html",
   "title": "Quantization in LLMs",
   "cat": "Gen AI",
@@ -8191,17 +8353,36 @@ window.VIZLEARN_PRACTICE = [
   ]
  },
  {
+  "path": "gen_ai/query_decomposition.html",
+  "title": "Query Decomposition",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Decompose only questions that need it: comparisons, multi-hop chains, aggregations and conditions. Write the plan as a dependency graph, reject cycles, run independent parts together and merge with the question type in mind. Expect higher latency, and keep simple questions on the fast path."
+   },
+   {
+    "t": "What does this module say about “When one retrieval pass is not enough”?",
+    "ans": "Standard RAG finds chunks similar to the question and hands them to a model. That works when the answer sits in one passage, such as \"What is the default timeout for HTTP connections?\""
+   },
+   {
+    "t": "What does this module say about “Decide which questions need it”?",
+    "ans": "Most questions are simple, and decomposing them wastes calls and can add errors. A classifier at the front decides. Rules are quick and cheap and catch the common patterns. A model can handle the rest, and the rules make a safe fallback when the model gets it wrong."
+   }
+  ]
+ },
+ {
   "path": "gen_ai/query_rewriting_and_hyde.html",
   "title": "Query Rewriting and HyDE",
   "cat": "Gen AI",
   "q": [
    {
-    "t": "What does this module say about “Before the details”?",
-    "ans": "A user's question and the passage that answers it are much written in else registers. Short and colloquial versus long-form and technical. Each likeness metric in this batch — cosine , BM25 — depends on shared vocabulary between what is embedded and what is stored. If the question and the answer do not share words, no likeness metric can bridge that gap on its own."
-   },
-   {
     "t": "What does this module say about “What Gets Embedded”?",
     "ans": "the HyDE passage below is written by hand as a labelled example of what an LLM would draft — no model runs in this page"
+   },
+   {
+    "t": "What does this module say about “Before the details”?",
+    "ans": "A user's question and the passage that answers it are much written in else registers. Short and colloquial versus long-form and technical. Each likeness metric in this batch — cosine , BM25 — depends on shared vocabulary between what is embedded and what is stored. If the question and the answer do not share words, no likeness metric can bridge that gap on its own."
    },
    {
     "t": "What does this module say about “Two ways to close the gap”?",
@@ -8225,6 +8406,44 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “Query cache: the highest saving, and the highest risk”?",
     "ans": "Keyed on the question, storing the final answer. A hit skips retrieval, reranking and generation — often seconds and most of the cost. Real traffic is heavily repetitive, so hit rates can be high."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/rag_capacity_planning.html",
+  "title": "RAG Capacity Planning",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Count chunks from a sample of real article lengths, multiply by bytes per vector, then add text, metadata, the index and overhead. Size RAM for the vectors and the index with headroom, and keep text on disk. Quantize to cut size, measure the recall cost, and plan for growth."
+   },
+   {
+    "t": "What does this module say about “Why capacity planning matters for RAG”?",
+    "ans": "A retrieval-augmented system stores your documents as chunks, and each chunk as a vector. Before you provision servers, you need three numbers. How many chunks does your corpus make? How much disk do the vectors, text and index take? And how much RAM does the index need to stay fast?"
+   },
+   {
+    "t": "What does this module say about “Count the chunks”?",
+    "ans": "A document is cut into overlapping windows. The stride is the chunk size minus the overlap. With 500-token chunks and 50 tokens of overlap, each window starts 450 tokens after the last. The overlap makes sure a sentence at a boundary appears whole in at least one chunk."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/rag_latency_optimization.html",
+  "title": "RAG Latency Optimization",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "Time every stage, read the distribution and fix the stage with the biggest share of the mean. Stream the answer, cap its length, cache whole answers, run independent stages in parallel and give every stage a timeout. Do not add percentiles together, and check what each fix does to the tail."
+   },
+   {
+    "t": "What does this module say about “Find the slow stage before you fix anything”?",
+    "ans": "A RAG app with a four-second p95 is rarely slow everywhere. Usually one or two stages hold most of the delay. The method is to time every stage on every request, read the distribution, and then fix the biggest contributor. Guessing wastes weeks. You can tune retrieval for a month and save 30 ms while the model takes two seconds."
+   },
+   {
+    "t": "What does this module say about “Time every stage”?",
+    "ans": "You cannot improve what you do not measure. Give each request a trace that records how long each stage took. In real code, use a monotonic clock around each stage:"
    }
   ]
  },
@@ -8299,12 +8518,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "Retrieval returns a ranking, so metrics are computed at a cutoff k and differ mainly in whether they care about position. Precision@k and recall@k ignore order within the cutoff; MRR looks only at the first apt result; NDCG discounts by position and handles graded relevance. For RAG, recall@k at your actual context size is the number to optimise,."
    },
    {
-    "t": "What does this module say about “Why classification metrics are not enough”?",
-    "ans": "A retriever does not return a yes or no; it returns an ordered list of candidates. Two systems can retrieve exactly the same documents and be very different in quality if one puts the apt ones first and the other buries them at position 10."
-   },
-   {
     "t": "What does this module say about “Ranking”?",
     "ans": "all three rankings retrieve exactly the same 5 relevant / 5 irrelevant documents"
+   },
+   {
+    "t": "What does this module say about “Why classification metrics are not enough”?",
+    "ans": "A retriever does not return a yes or no; it returns an ordered list of candidates. Two systems can retrieve exactly the same documents and be very different in quality if one puts the apt ones first and the other buries them at position 10."
    }
   ]
  },
@@ -8402,6 +8621,25 @@ window.VIZLEARN_PRACTICE = [
    {
     "t": "What does this module say about “When to reach for it”?",
     "ans": "Worth it for long unstructured prose. Transcripts, interviews, reports without headings. Where no formatting sign exists and a fixed-size split reliably cuts mid-input."
+   }
+  ]
+ },
+ {
+  "path": "gen_ai/similarity_threshold_gating.html",
+  "title": "Similarity Threshold Gating",
+  "cat": "Gen AI",
+  "q": [
+   {
+    "t": "Without scrolling back — what is the one-line takeaway from this module?",
+    "ans": "A retriever returns k chunks even when none are relevant, so put a gate in front of the model. A fixed floor catches junk, a score drop adapts to each query, and a threshold learned from labelled data fits your domain. Stack them, aim for high recall, and say \"I do not know\" when nothing passes."
+   },
+   {
+    "t": "What does this module say about “Why raw top-k retrieval cannot be trusted”?",
+    "ans": "A retriever always returns k results. It does this even when nothing in the corpus is relevant. Ask a programming knowledge base about pizza in Naples and you still get k chunks. They match a word or two, and they are about something else."
+   },
+   {
+    "t": "What does this module say about “Gate 1: a fixed floor”?",
+    "ans": "The simplest gate rejects any chunk below a set score. It works well as a floor that removes obvious junk. Common starting points are 0.35 to 0.45 for MiniLM and 0.30 to 0.40 for OpenAI embeddings. For messy user queries, lower the number by 0.05 to 0.10."
    }
   ]
  },
@@ -11645,20 +11883,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What is meant by “The Goal is Generalization” here?",
-    "ans": "A low training error is meaningless if the validation error is high. The goal is always to build a net that does well on data it has never seen before."
+    "t": "What does this module say about “The two sources of model error”?",
+    "ans": "Imagine training the same kind of model on many different samples from one population. Bias is how far its average prediction is from the target pattern. Variance is how much those fitted predictions differ from one another. A rigid straight line trying to fit a curved relationship may have high bias. A very flexible curve that changes sharply whenever the sample changes may have high variance."
    },
    {
-    "t": "What is meant by “Underfitting (High Bias)” here?",
-    "ans": "Your net is too simple. Symptoms: High training error and high validation error."
+    "t": "What does this module say about “Read the training and validation errors”?",
+    "ans": "These patterns are clues, not proof. Data leakage, a distribution shift, a small validation set, or a mismatched metric can also create misleading curves. See learning curves for how error changes as training data grows."
    },
    {
-    "t": "What is meant by “Overfitting (High Variance)” here?",
-    "ans": "Your net is too complex. Symptoms: Very low training error but high validation error. The gap between them is large."
-   },
-   {
-    "t": "What is meant by “The Tradeoff is Real” here?",
-    "ans": "As you decrease bias by making your net more complex (e.g., adding more features or layers), you almost always increase its variance. The art of machine learning is finding the right level of complexity for the given data."
+    "t": "What does this module say about “Explore resampling”?",
+    "ans": "The visualiser is a teaching model, not a diagnostic estimator. In a real workflow, compare training and validation performance using the same split strategy and a metric suited to the task."
    }
   ]
  },
@@ -11748,16 +11982,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “Measuring similarity by angle, not distance”?",
-    "ans": "How do we measure how \"close\" two things are, especially when they are shown as lists of counts (vectors)? While we could measure the distance between their endpoints (Euclidean distance), Cosine Similarity offers a other perspective: it measures the angle between two vectors. This simple but powerful idea is basic to modern AI, from search engines to recommendation systems."
+    "t": "What does this module say about “Definition”?",
+    "ans": "Cosine similarity compares the direction of two nonzero vectors using their normalized dot product. It is useful when orientation matters more than magnitude, such as comparing document embeddings; it can discard useful information when vector length itself matters."
    },
    {
-    "t": "What does this module say about “The Core Idea: It's All About Way”?",
-    "ans": "Imagine two arrows starting from the same point (the origin). Cosine similarity doesn't care about the length of these arrows (their \"magnitude\"). It just cares about the way they are pointing."
+    "t": "What does this module say about “Worked example”?",
+    "ans": "Let (a=[3,2,0]) and (b=[30,20,0]). Since (b=10a), they point in exactly the same direction and their cosine similarity is 1. For (c=[0,1,5]), the dot product with (a) is 2; dividing by the vector lengths gives about 0.11. The latter shares little direction with (a)."
    },
    {
-    "t": "What does this module say about “Why angle rather than distance”?",
-    "ans": "Here is the case cosine similarity was invented for. Take two documents about football. One is a 200-word match report. The other is a 4,000-word essay on the same match. Count the words in each and you get two vectors: the essay's counts are all roughly twenty times bigger."
+    "t": "What does this module say about “Explore the vectors”?",
+    "ans": "Choose Parallel , 90° , or Opposite in the visualizer and watch the angle and similarity change. Then scale one vector without changing its direction: the cosine remains constant. The demonstration makes the geometry visible; it does not imply that a high embedding similarity proves two texts mean the same thing."
    }
   ]
  },
@@ -11847,16 +12081,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “How a tree learns to ask the right questions”?",
-    "ans": "A Decision Tree is one of the most intuitive and interpretable nets in machine learning. It makes predictions by learning a series of simple \"if-then-else\" rules from the data, forming a tree-like structure. This lab visualizes the ID3 (Iterative Dichotomiser 3) algorithm."
+    "t": "What does this module say about “How a split is chosen”?",
+    "ans": "The tree looks for a feature question that makes the resulting groups less mixed. For binary classes with positive fraction p, entropy is:"
    },
    {
-    "t": "What does this module say about “The Core Idea: Boosting Information Gain”?",
-    "ans": "The goal of the ID3 algorithm is to build a tree that separates the data into pure groups (i.e., groups holding just a single class) as well as possible. It does this by choosing the best feature to split on at each node. The \"best\" feature is the one that results in the most major reduction in uncertainty, a concept measured by Information Gain ."
+    "t": "What does this module say about “Follow the split in the visualiser”?",
+    "ans": "The example shows the rule-building process, not an automatic claim that the chosen tree will generalise. A tree can keep splitting until it memorises its training examples."
    },
    {
-    "t": "What does this module say about “Entropy: A Measure of Impurity”?",
-    "ans": "First, we measure the \"impurity\" or \"randomness\" of a set of data with a metric called Entropy . A dataset with a perfect mix of all classes (e.g., 50% 'Yes', 50% 'No') has the highest entropy (max uncertainty). A dataset with just one class (e.g., 100% 'Yes') has zero entropy (perfect certainty). Information Gain: The Reduction in Entropy"
+    "t": "What does this module say about “When trees are useful”?",
+    "ans": "Tree paths are readable as a sequence of decisions, and the model can represent nonlinear boundaries and feature interactions without scaling numeric inputs. A small, pruned tree can be a useful explanation or baseline."
    }
   ]
  },
@@ -11866,16 +12100,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “What each metric tells you”?",
-    "ans": "In regression, our goal is to predict a continuous value, like a price or a temperature. But how do we know if our model's predictions are any good? Evaluation metrics are the tools we use to measure a model's performance and quantify its error. This lab visualizes four of the most common regression metrics, allowing you to see how they respond to changes in data and model fit in real-time."
+    "t": "What does this module say about “Start with residuals”?",
+    "ans": "Regression metrics summarize how far numeric predictions are from observed values, but they weight errors differently. For residual eᵢ = yᵢ − ŷᵢ , MAE averages absolute errors while MSE squares them, so large misses count more."
    },
    {
-    "t": "What does this module say about “The Four Key Metrics”?",
-    "ans": "Each metric tells a slightly different story about your model's errors. The interactive plot above shows the true data points (green dots), the model's prediction line (orange), and the errors, or residuals (dashed red lines), which are the distances between each true point and the line."
+    "t": "What does this module say about “Worked example: one large miss”?",
+    "ans": "Suppose three predictions have absolute errors 1, 1, and 4 units. MAE is (1 + 1 + 4)/3 = 2 . MSE is (1² + 1² + 4²)/3 = 6 , so RMSE is about 2.45. The 4-unit miss contributes 16 to the squared-error total, which explains why MSE and RMSE react more to large errors than MAE."
    },
    {
-    "t": "What does this module say about “Mean Squared Error (MSE)”?",
-    "ans": "Definitions blur together until you put numbers through them. Here are five predicted and actual house prices, in thousands of pounds:"
+    "t": "What does this module say about “A nearby metric: percentage error”?",
+    "ans": "Mean absolute percentage error (MAPE) divides absolute error by the actual value. It can be useful when relative error is meaningful, but it is undefined at zero and unstable near zero. It can also weight over- and under-prediction asymmetrically. Do not use it blindly for demand or other targets that can be zero."
    }
   ]
  },
@@ -12005,16 +12239,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What is meant by “XGBoost” here?",
-    "ans": "— the one that made boosting famous by winning competitions. Adds explicit L1 and L2 regularisation on leaf weights and a well-engineered handling of missing values, where each split learns a default direction for absent values."
+    "t": "What does this module say about “Quick Context”?",
+    "ans": "Gradient boosting builds an ensemble sequentially: each new, usually shallow tree is fitted to reduce the current model’s loss. This can produce strong predictions, but learning rate, tree count, and depth must be tuned together to manage overfitting and training cost."
    },
    {
-    "t": "What is meant by “LightGBM” here?",
-    "ans": "— the fastest on large data. It grows trees leaf-wise (always splitting the leaf that reduces loss most) rather than level by level, and bins continuous features into histograms. Usually the best choice above a few hundred thousand rows, but leaf-wise growth overfits small datasets unless you cap num_leaves ."
+    "t": "What does this module say about “The sequential fit”?",
+    "ans": "This residual description is exact for squared-error regression, which the visualizer demonstrates. More generally, gradient boosting fits each new learner to the negative gradient of the chosen loss, so the target depends on the loss function."
    },
    {
-    "t": "What is meant by “CatBoost” here?",
-    "ans": "— the one to reach for with many categorical columns. It encodes them with target statistics computed in a way that avoids leaking the target, and its defaults are unusually good, so it often wins with no tuning at all."
+    "t": "What does this module say about “Boosting versus bagging”?",
+    "ans": "Both can perform well on tabular data. A random forest is a useful baseline; boosting may improve the fit but generally needs careful validation and tuning."
    }
   ]
  },
@@ -12104,16 +12338,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “How label format shapes what a net learns”?",
-    "ans": "When you train a sorting net, the label vector is the target the loss pushes the net toward. A hard label is a one-hot vector — [0, 0, 1] for the third class — which tells the net to be 100% sure of one answer and 0% of all else. A soft label is a chance spread like [0.1, 0.2, 0.7]. It notes ambiguity and gives the net a richer signal."
+    "t": "What does this module say about “What each label represents”?",
+    "ans": "For three classes, a hard label for class two is ([0,1,0]). A soft label such as ([0.1,0.7,0.2]) assigns a target share to each class; its values sum to 1. Hard labels are appropriate when examples have a clear agreed answer. Soft labels are useful when ambiguity or disagreement is part of the task."
    },
    {
-    "t": "What does this module say about “Setting the Labels”?",
-    "ans": "Imagine you're training a net to sort the tone of a tweet as 'Negative', 'Neutral', or 'Positive'. How you tell the net the \"right\" answer for each tweet is where labelling plan comes in."
+    "t": "What does this module say about “A worked example”?",
+    "ans": "Suppose five of seven clinicians mark a scan positive and two mark it negative. A hard majority vote records only “positive.” A soft target of ([2/7,5/7]) retains the disagreement. It does not prove the scan has a (5/7) chance of disease; it records how this group labeled it. The interpretation depends on how the targets were made."
    },
    {
-    "t": "What does this module say about “Hard Labelling (One-Hot Encoding)”?",
-    "ans": "This is the most common way. You are 100% sure about the class. The right class gets a val of 1. And all other classes get a 0. It's a \"winner takes all\" way. Case Vector: For a 'Positive' tweet, the hard label is [0, 0, 1] . This tells the net, \"This tweet is positive. And nothing else.\" Soft Labelling (Chance-Based)"
+    "t": "What does this module say about “What changes during training”?",
+    "ans": "With cross-entropy, a hard target penalizes probability assigned away from the labelled class. A soft target distributes that penalty across classes. This can discourage extreme confidence and preserve relationships among classes. It cannot correct an inaccurate target distribution, and soft labels do not automatically produce calibrated probabilities."
    }
   ]
  },
@@ -12243,16 +12477,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “Two steps, repeated”?",
-    "ans": "K-means is the simplest and most widely used clustering algorithm. It groups data points into k clusters by repeatedly assigning each point to the nearest centre and then moving each centre to the middle of its assigned points. The algorithm is fast, easy to implement, and works well when clusters are roughly round and evenly sized."
+    "t": "What does this module say about “The two steps”?",
+    "ans": "Choose (k) initial centroids. Assignment: assign each point to its nearest centroid. Update: replace each centroid with the mean of its assigned points. Repeat until assignments stop changing or another stopping rule is reached."
    },
    {
-    "t": "What does this module say about “What clustering is for, in plain words”?",
-    "ans": "Most machine learning you meet first is supervised : someone hands you examples that are already labelled — this email is spam, that house sold for £320,000 — and the model learns to copy those labels on new data."
+    "t": "What does this module say about “Follow a clustering”?",
+    "ans": "Set Clusters (K) and choose an Initial Layout . Press the step control to watch points change assignments and centroids move. Increase Points Count to see how the display changes as the dataset grows. Compare Gaussian Blobs with Nested Moons or Concentric Circles : k-means can split curved groups because each cluster is represented by a centroid and nearest-centroid regions."
    },
    {
-    "t": "What does this module say about “The tidying-up analogy”?",
-    "ans": "Imagine a room with hundreds of books on the floor and you want them in five piles."
+    "t": "What does this module say about “Choosing k”?",
+    "ans": "The elbow method plots inertia for several values of (k). Inertia always decreases as (k) increases, reaching zero if every point gets its own cluster. A bend where additional centroids yield smaller improvements can suggest a useful value, but the bend may be unclear and is not a statistical proof."
    }
   ]
  },
@@ -12302,16 +12536,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “Turning categories into integers. And when that goes wrong”?",
-    "ans": "Machine learning nets are math-based functions. They understand counts, not text. Before we can train a net on categorical data (like city names, product types, or sentiments), we must turn that text into a numerical format. Label Coding is one of the simplest tricks to reach this. It works by giving a unique integer to each unique category or \"label\" in your dataset."
+    "t": "What does this module say about “From words to IDs”?",
+    "ans": "Label encoding maps categories or tokens to integer IDs. These numbers identify values; their size does not express meaning, order, or distance. Language models use token IDs as indices into learned embeddings, while ordinary numeric models may misread arbitrary category IDs as measurements."
    },
    {
-    "t": "What does this module say about “How It Works: Building the Vocabulary”?",
-    "ans": "The process is straightforward and consists of two main steps. It you can see in action by clicking the \"Encode Corpus\" button above."
+    "t": "What does this module say about “Choose an encoding for the model”?",
+    "ans": "For a nominal feature, codes such as London=0, Manchester=1, and Leeds=2 invent a ranking. A linear model treats a one-step code change as a fixed numeric effect; a distance-based model treats some categories as farther apart than others. One-hot encoding avoids that false ordering, but can create many columns for high-cardinality features."
    },
    {
-    "t": "What does this module say about “Create a Vocabulary”?",
-    "ans": "First, the encoder scans the whole input text (the \"corpus\") to find all unique words (or \"tokens\"). It then sorts these unique words alphabetically to create a steady vocabulary. This vocabulary acts as a dictionary or a look-up table. 2. Give Integer IDs"
+    "t": "What does this module say about “Handle categories not seen in training”?",
+    "ans": "An encoder fitted on London, Manchester, and Leeds must have a policy for a new category such as Bristol. Fit one mapping on training data and apply it unchanged to validation, test, and production rows. Do not fit separate encoders on different splits."
    }
   ]
  },
@@ -12321,16 +12555,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “Why 99% score can mean a useless net”?",
-    "ans": "In many real-world scenarios, the data we care about is rare. Think of credit card fraud, rare disease detection. Or critical system failures. In these datasets, the \"normal\" class vastly outnumbers the \"anomaly\" class. This is called Label Imbalance . And it creates a dangerous trap for machine learning nets: The Score Paradox ."
+    "t": "What does this module say about “Why accuracy can hide failure”?",
+    "ans": "Imagine 100,000 transactions, 500 of which are fraudulent. A model that predicts “legitimate” every time gets 99.5% accuracy and catches no fraud. The score is correct as a fraction of all predictions, but it says little about the rare class the system is meant to find."
    },
    {
-    "t": "What does this module say about “What is the Score Paradox”?",
-    "ans": "The Score Paradox occurs when a net reaches a very high score score but is fully useless in practice. This happens since the net learns to simply predict the majority class each single time. In a dataset with 99% normal transactions and 1% fraudulent ones, a net that always guesses \"normal\" will be 99% exact. It sounds great. But it has failed at its one key job: detecting fraud."
+    "t": "What does this module say about “Read beyond the overall score”?",
+    "ans": "No metric is universally best. A fraud team with limited review capacity may prioritize precision; a safety screen may accept more false alarms to improve recall. Report the confusion matrix, class prevalence, selected threshold, and the metric tied to the decision."
    },
    {
-    "t": "What does this module say about “The \"Naive\" Net”?",
-    "ans": "This is a deliberately dumb net. Its just rule is: always predict Class 0 (the majority class) . It never predicts an anomaly. As you'll see, its score is deceptively high. 2. The Standard Trained Net"
+    "t": "What does this module say about “Explore prevalence and overlap”?",
+    "ans": "Adjust Class 0 (Normal) % and Data Overlap in the visualizer. As normal examples become more common, a model can achieve high overall accuracy without finding many anomalies. Increasing overlap makes the classes harder to separate even if their proportions stay fixed. These controls vary two different properties: prevalence and separability."
    }
   ]
  },
@@ -12420,16 +12654,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Logistic regression computes a linear score and squashes it through a sigmoid to get a probability. It makes the decision edge a straight line and the output something you can really reason about. It is trained with log loss since that surface is convex and punishes confident mistakes well."
+    "t": "What does this module say about “Explore the model”?",
+    "ans": "Scikit-learn’s LogisticRegression uses L2 regularisation by default, with C=1.0 . C is the inverse of regularisation strength: smaller values penalise large coefficients more strongly. Regularisation helps keep estimates finite and reduces overfitting; see the official LogisticRegression documentation for solver and penalty options."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Linear regression predicts a count. If you need a yes or no, you cannot use it right: it happily predicts −4 or 17. And neither is a probability. Logistic regression fixes this with one extra step. It computes the same weighted sum, then passes the result through a function that squashes any real count into the range 0 to 1."
+    "t": "What does this module say about “Regularisation and feature scale”?",
+    "ans": "Scikit-learn’s LogisticRegression uses L2 regularisation by default, with C=1.0 . C is the inverse of regularisation strength: smaller values penalise large coefficients more strongly. Regularisation helps keep estimates finite and reduces overfitting; see the official LogisticRegression documentation for solver and penalty options."
    },
    {
-    "t": "What does this module say about “Work one through by hand”?",
-    "ans": "Take weights w = [1.0, 1.0] and bias b = −10 , the vals this page starts on. Feed it the point (4, 4) :"
+    "t": "What does this module say about “Assumptions and common mistakes”?",
+    "ans": "For a closer look at how probabilities compare with decisions, continue to probability calibration and the confusion matrix ."
    }
   ]
  },
@@ -12439,16 +12673,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “What drift looks like and why it matters”?",
-    "ans": "A machine learning net is a snapshot of the world at the moment it was trained. The world does not stay still. Customer preferences shift, economic conditions change. And new patterns appear that the training data never held. Net drift is the degradation of a net's predictive power over time since the environment it was deployed into has moved away from the environment it was trained on."
+    "t": "What does this module say about “Three kinds of change”?",
+    "ans": "Drift is a change in the data a deployed model receives, the outcomes it predicts, or the relationship between them. Monitoring can reveal changes that deserve investigation, but a shift alone does not prove model performance has fallen."
    },
    {
-    "t": "What does this module say about “Types of Drift”?",
-    "ans": "This occurs when the basic relationship between the input vars and the target var changes. The \"rules of the game\" have changed. In the visualization, the green dashed line (the true underlying pattern) will slowly change its shape over time, while the data points continue to follow it. The deployed net ( red line ). It learned the first pattern, turns increasingly wrong. 2. Data Drift (Covariate Shift)"
+    "t": "What does this module say about “See the relationship move”?",
+    "ans": "Select Concept Drift in the visualizer and use Simulate Time . The underlying relationship changes over time while the deployed model stays fixed, so its error grows. Use Retrain model to compare how fitting to newer data changes the result. The demonstration is deliberately simple: in a real system, retraining helps only if recent labels are available, representative, and reliable."
    },
    {
-    "t": "What does this module say about “Concept Drift”?",
-    "ans": "This occurs when the basic relationship between the input vars and the target var changes. The \"rules of the game\" have changed. In the visualization, the green dashed line (the true underlying pattern) will slowly change its shape over time, while the data points continue to follow it. The deployed net ( red line ). It learned the first pattern, turns increasingly wrong. 2. Data Drift (Covariate Shift)"
+    "t": "What does this module say about “Sources and next steps”?",
+    "ans": "Fast-forward through production and watch a well-trained model decay as incoming data drifts away from what it learned."
    }
   ]
  },
@@ -12458,16 +12692,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “How Bayes' theorem classifies with one bold assumption”?",
-    "ans": "The Naive Bayes Classifier is a simple yet powerful algorithm for predictive modeling. It is based on Bayes' Theorem and is very useful for text classification, like spam filtering. Its core idea is to calculate the probability of a certain outcome (e.g., \"Should I play tennis?\") based on the evidence provided by a set of features (e.g., the weather outlook, temperature, and wind)."
+    "t": "What does this module say about “Bayes’ rule and conditional independence”?",
+    "ans": "Naive Bayes predicts a class by combining its prior probability with the likelihood of the observed features under that class. The “naive” assumption makes the calculation practical: given the class, the model treats each feature as independent of the others."
    },
    {
-    "t": "What does this module say about “The \"Naive\" Assumption: A Key Simplification”?",
-    "ans": "The \"naive\" part of the name comes from a key assumption the algorithm makes: it assumes that all features are independent of each other . In our case, it assumes that the 'Outlook' has no effect on the 'Temperature' or 'Wind'. While this is often not true in the real world (a sunny outlook often implies hotter temperatures), this simplification makes the math much easier and faster."
+    "t": "What does this module say about “What the assumption buys, and what it costs”?",
+    "ans": "The product turns a large joint-probability problem into separate per-feature counts. This makes training and prediction fast, even with many features and relatively few examples. It can work well for text classification, where word features are dependent but their counts still carry useful class information."
    },
    {
-    "t": "What does this module say about “Bayes' theorem without the fear”?",
-    "ans": "All here rests on one line. And the line is less intimidating written as a sentence."
+    "t": "What does this module say about “Sources and next steps”?",
+    "ans": "See scikit-learn’s Naive Bayes guide for the variants and their assumptions. The weather counts above illustrate how priors and likelihoods combine; your own application should validate both classification performance and probability quality."
    }
   ]
  },
@@ -12797,16 +13031,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A classifier does not really output a class. It outputs a score — a probability, often — and something else turns that into a label by checking it against a threshold. The confusion matrix describes one such threshold. Change the threshold and you get a other matrix from the very same net."
+    "t": "What does this module say about “Two rates across thresholds”?",
+    "ans": "A receiver operating characteristic (ROC) curve shows how the true-positive and false-positive rates trade off as a classifier threshold changes. Its area summarizes ranking across thresholds, but it does not select an operating threshold or show alert volume on its own."
    },
    {
-    "t": "What does this module say about “What AUC really measures”?",
-    "ans": "The area under that curve compresses the whole picture into one count between 0 and 1."
+    "t": "What does this module say about “Follow one operating point”?",
+    "ans": "Set Threshold to 0.9, then lower it toward 0.1. The operating point moves along the curve: a lower threshold usually catches more positives but also flags more negatives. The AUC readout stays the same because changing the threshold does not change the score ranking."
    },
    {
-    "t": "What does this module say about “One net, each threshold”?",
-    "ans": "A classifier that outputs probabilities is not one classifier — it is a family of them, one for each threshold you might pick. Threshold at 0.9 and you get a cautious net. Threshold at 0.1 and you get an eager one. Accuracy, precision and recall all describe a single member of that family."
+    "t": "What does this module say about “Why prevalence still matters”?",
+    "ans": "TPR and FPR use separate class totals, so their values do not directly show how many alerts a system will generate. Suppose 1% of one million cases are positive. At TPR 90% and FPR 10%, the model catches 9,000 positives but also flags 99,000 negatives. Precision is 9,000 / (9,000 + 99,000), or about 8.3%; more than nine in ten alerts are false."
    }
   ]
  },
@@ -12816,16 +13050,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A random forest trains many deep, deliberately other trees and lets them vote. It cancels the variance that makes any single deep tree unreliable. The diversity comes from two places — a bootstrap sample of the rows and a random subset of the features at each split — and without that diversity extra trees buy nothing. Adding trees never overfits. So depth and leaf size are the params that really need care."
+    "t": "What does this module say about “How a forest combines trees”?",
+    "ans": "Random forests combine many decision trees so that individual quirks have less influence on the final prediction. The method works best when the trees are reasonably accurate but make different errors."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A decision tree grown to full depth will classify each training point correctly. It does this by carving the space into ever less rectangles until each one is pure — with rectangles that exist just to accommodate a single mislabelled point. The result has near-perfect training accuracy and a edge that looks like a staircase drawn in an earthquake."
+    "t": "What does this module say about “From one tree to a forest”?",
+    "ans": "A deep decision tree can fit its training data closely, including accidental patterns. Bagging (bootstrap aggregating) trains each tree on a bootstrap sample: a same-size sample drawn with replacement. A bootstrap sample contains about 63% of the distinct training rows on average; the remaining rows are out of bag for that tree."
    },
    {
-    "t": "What does this module say about “What makes a forest more than bagging”?",
-    "ans": "Bagged trees have a weakness: if one feature is strongly predictive, nearly each tree splits on it first. And the trees end up highly correlated. Averaging correlated nets buys much less than averaging independent ones."
+    "t": "What does this module say about “Out-of-bag evaluation”?",
+    "ans": "Each training row is left out of roughly 36.8% of bootstrap samples. For that row, the trees that did not train on it can produce an out-of-bag prediction. Aggregating these predictions gives an out-of-bag score without reserving a separate validation split."
    }
   ]
  },
@@ -12835,16 +13069,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Give a degree-12 polynomial eighteen noisy points and it will pass through nearly all of them. The fit looks superb on the data it has seen. And it is worthless: between the points the curve swings violently, since the just way to hit each point is to use enormous coefficients that cancel each other out."
+    "t": "What does this module say about “How regularisation affects coefficients”?",
+    "ans": "Regularisation discourages a regression model from using unnecessarily large coefficients. Ridge uses a squared penalty; Lasso uses an absolute-value penalty. That difference affects whether fitted coefficients can become exactly zero."
    },
    {
-    "t": "What does this module say about “One extra term”?",
-    "ans": "Ordinary least squares minimises the squared error alone. Ridge and Lasso add a cost on the size of the weights:"
+    "t": "What does this module say about “What the penalties change”?",
+    "ans": "Ordinary least squares minimises the sum of squared residuals. Ridge and Lasso add a penalty controlled by λ:"
    },
    {
-    "t": "What does this module say about “Why Lasso zeroes and Ridge does not”?",
-    "ans": "Look at how each cost behaves as a coefficient ways zero. The derivative of w 2 is 2w . It it goes to zero — so the closer a Ridge coefficient gets to zero, the weaker the force pushing it more. It ways zero and never arrives."
+    "t": "What does this module say about “See the effect on a flexible fit”?",
+    "ans": "The visualiser uses a small synthetic dataset. In a real problem, select λ using validation data or cross-validation—not the final test set."
    }
   ]
  },
@@ -12854,16 +13088,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A sliding window turns a time series into supervised (input, target) pairs, with the window size encoding how much history you claim is relevant and the stride controlling how much consecutive cases overlap. The modelling choice is straightforward. The discipline is in the split — chronological, with a gap of at least one window between segments. And each scaler fitted on the training period alone."
+    "t": "What does this module say about “Make examples from a sequence”?",
+    "ans": "For a one-step forecast, a window of width (W=3) over values 10, 11, 12, 13 creates the input [10, 11, 12] and target 13 . Sliding one step gives the next input [11, 12, 13] and its following target. The window is the model’s lookback; the target’s distance from its end is the forecast horizon."
    },
    {
-    "t": "What does this module say about “Turning a sequence into a supervised problem”?",
-    "ans": "A net needs cases with features and a label. A time series is a single ordered run of vals. So you build cases by sliding a fixed-length window along it: the vals inside the window are the input. And the value at once after it is the target."
+    "t": "What does this module say about “Choose lookback, stride, and horizon”?",
+    "ans": "A lookback should cover patterns that matter. For daily data with a weekly cycle, a window shorter than seven days cannot include a full week, though longer history is not automatically better. Longer windows increase input size and may include irrelevant older values. Use domain knowledge and validation to compare choices."
    },
    {
-    "t": "What does this module say about “Window size and stride”?",
-    "ans": "Window size (W) is how much history the net sees per prediction. And it is a real modelling assumption: it asserts that nothing older than W steps matters. Too small and the net cannot see the pattern — a weekly cycle needs at least seven daily steps. Too large and each case carries mostly irrelevant history, the input dimension grows. And the count of cases shrinks."
+    "t": "What does this module say about “Split by forecast time”?",
+    "ans": "Do not randomly split overlapping windows for a future-forecast task. Nearby windows share many observations, and random splitting can put later targets in training while earlier times are in test. Instead, split by forecast origin: training targets must occur before the validation or test period, matching the information available when each prediction would have been made."
    }
   ]
  },
@@ -12913,16 +13147,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “The Core Idea of SVM”?",
-    "ans": "A Support Vector Machine (SVM) is a powerful supervised learning algorithm used for classification and regression. For classification, its primary goal is to find the best hyperplane that best separates data points of other classes in a high-dimensional space. The \"best\" hyperplane is the one that has the largest possible margin —the distance between the hyperplane and the nearest data point from either class."
+    "t": "What does this module say about “What the margin means”?",
+    "ans": "A support vector machine (SVM) chooses a decision boundary that separates classes while keeping the nearest training points as far from that boundary as possible. The margin is that distance; a wide margin can make a classifier less sensitive to small changes near the boundary."
    },
    {
-    "t": "What does this module say about “Boosting the Margin”?",
-    "ans": "Why is a large margin so key? A more margin implies a more confident and reliable classification net. It means the decision edge is as far as possible from the data points of both classes, making it less sensitive to small variations in the data and more likely to generalize well to new, unseen data."
+    "t": "What does this module say about “How the boundary is chosen”?",
+    "ans": "For a linear binary classifier, the score is w·x + b , and the boundary is where that score is zero. Here x is a feature vector, w sets the direction of the boundary, and b shifts it. With a conventional scaling of w , the margin edges are w·x + b = 1 and w·x + b = −1 ; their separation is 2 / ||w|| ."
    },
    {
-    "t": "What does this module say about “What are Support Vectors”?",
-    "ans": "The data points that lie just on the margin edges are called Support Vectors . These are the most critical data points in the dataset since they alone \"support\" or set the position and orientation of the best hyperplane."
+    "t": "What does this module say about “Which points set the boundary”?",
+    "ans": "Support vectors are the training examples with nonzero influence on the fitted boundary. In a hard-margin solution they sit on the margin; in a soft-margin solution they can sit on or inside it, including on the wrong side. Moving a support vector can change the fit. A non-support vector does not directly constrain the current solution, though changing the training set or preprocessing can affect a refit."
    }
   ]
  },
@@ -13012,16 +13246,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Machine Learning",
   "q": [
    {
-    "t": "What does this module say about “Why imbalance breaks training”?",
-    "ans": "Standard training cuts average loss over the dataset. When one class holds 99% of the rows, that average is dominated by it: predicting the bulk all over now reaches very low loss. So there is little gradient pressure to learn the small class at all."
+    "t": "What does this module say about “What imbalance changes”?",
+    "ans": "When positives are rare, a classifier can achieve high accuracy by mostly predicting the majority class while missing the cases that matter. With 1% positives, always predicting negative gives 99% accuracy and zero recall, so evaluate class-specific errors as well as the overall score."
    },
    {
-    "t": "What does this module say about “The three families of fix”?",
-    "ans": "Resample the data. Up-sampling duplicates small rows — simple. And risks overfitting to the few cases you have. SMOTE improves on it by synthesising new small points along the lines between existing neighbours rather than copying. Down-sampling discards bulk rows. It balances the classes and throws away real information. It is fair when the bulk class is genuinely enormous. Reweight the loss."
+    "t": "What does this module say about “Three different interventions”?",
+    "ans": "Try threshold adjustment and sensible evaluation first. If the model still fails the task, compare weights or resampling using the same validation procedure."
    },
    {
-    "t": "What does this module say about “Start by changing nothing about the data”?",
-    "ans": "The instinct on seeing an imbalanced dataset is to resample it at once. That is often the third-best move. Two cheaper things come first. And often one of them is enough."
+    "t": "What does this module say about “Read the visualizer”?",
+    "ans": "Set Class 0 Ratio to 50, then press Retrain Both Nets . Increase it to 95 and retrain again. The two classes become less evenly represented, and the learned decision region can shift. The demonstration isolates class balance in a small synthetic problem; real performance also depends on feature overlap, sample size, model choice, and random variation."
    }
   ]
  },
@@ -13071,16 +13305,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Most people first meet a matrix as a grid of counts with rules for multiplying it. The rules work, but they explain nothing. And matrix multiplication in particular looks arbitrary — why rows against columns. And why in that order?"
+    "t": "In a matrix acting on column vectors, what does the first column represent?",
+    "o": [
+     "Where (1, 0) maps",
+     "Where the origin maps",
+     "The determinant",
+     "The inverse of the map"
+    ],
+    "a": 0,
+    "w": "Multiplying by (1, 0) selects the first column, so it is the image of the first basis vector."
    },
    {
-    "t": "What does this module say about “The columns are the whole story”?",
-    "ans": "Start with the two basis vectors: î = (1, 0) pointing along x. And ĵ = (0, 1) pointing along y. Each vector is built from them — (3, 2) means \"3 of î plus 2 of ĵ\"."
-   },
-   {
-    "t": "What does this module say about “Why matrix-vector multiplication looks like that”?",
-    "ans": "Now the formula stops being arbitrary. To transform (x, y), take x copies of where î went and y copies of where ĵ went, and add:"
+    "t": "What does a zero determinant mean for a square linear map?",
+    "o": [
+     "It preserves area",
+     "It collapses at least one direction and is not invertible",
+     "It is a rotation",
+     "It doubles every vector"
+    ],
+    "a": 1,
+    "w": "A zero determinant means volume collapses to lower dimension, so the transformation cannot be undone."
    }
   ]
  },
@@ -13130,16 +13374,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “What this is”?",
-    "ans": "Bayes' theorem takes a prior belief and revises it in light of new evidence. It is the mathematics of changing your mind correctly."
+    "t": "What does the prior probability represent in Bayes’ theorem?",
+    "o": [
+     "Belief before observing the evidence",
+     "The false-positive rate",
+     "The test result",
+     "The posterior after updating"
+    ],
+    "a": 0,
+    "w": "The prior is the probability assigned before using the new evidence."
    },
    {
-    "t": "What does this module say about “Count People, Not Percentages”?",
-    "ans": "The grid shows 10,000 people, one square each. With a 1% base rate and a 99% exact test:"
-   },
-   {
-    "t": "What does this module say about “The Base Rate Dominates”?",
-    "ans": "Drag the base rate slider from 0.1% upward and watch the answer climb. The test never changed — just how common the condition is. This is why:"
+    "t": "Why can a positive test have a low chance of indicating disease?",
+    "o": [
+     "The condition may be rare, so false positives can outnumber true positives",
+     "Sensitivity is always zero",
+     "Bayes’ theorem ignores prevalence",
+     "Positive tests prove disease"
+    ],
+    "a": 0,
+    "w": "The posterior depends on prevalence as well as sensitivity and false-positive rate."
    }
   ]
  },
@@ -13269,16 +13523,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Conditioning on B does not change the outcomes, it discards the ones where B did not happen. So P(A | B) is simply the count of outcomes in both events divided by the count in B. Independence is the special case where that shrinking leaves A's share unchanged. It is just when P(A and B) = P(A)P(B) is valid and not before."
+    "t": "In P(A|B), what sample space is used?",
+    "o": [
+     "All outcomes",
+     "Only outcomes in B",
+     "Only outcomes in A",
+     "The complement of B"
+    ],
+    "a": 1,
+    "w": "Conditioning on B restricts the reference set to cases where B occurred."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Chance counts favourable outcomes against all possible outcomes. Conditional chance changes one thing: it shrinks what counts as possible. P(A | B) is read \"the chance of A given B\". The bar does not mean division and it does not mean \"and\". It means: assume B happened, throw away each outcome where it did not. And ask about A within what stays."
-   },
-   {
-    "t": "What does this module say about “Chaining conditions”?",
-    "ans": "The definition rearranges into the multiplication rule. It extends to any count of events:"
+    "t": "Are P(A|B) and P(B|A) generally equal?",
+    "o": [
+     "Yes",
+     "No",
+     "Only if A and B are disjoint",
+     "Only if the probabilities are small"
+    ],
+    "a": 1,
+    "w": "Conditional probability is directional; Bayes’ theorem relates the two using their base rates."
    }
   ]
  },
@@ -13368,16 +13632,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Variance describes how one var spreads out. Covariance is the same idea for two: when x is above its mean, is y often above its mean too? Link is covariance with the units removed. That single change is what makes it comparable across datasets. And, as we will see, still leaves it blind to anything that is not a straight line."
+    "t": "What does correlation near zero rule out?",
+    "o": [
+     "Every relationship",
+     "A strong linear relationship",
+     "Nonlinear patterns",
+     "Outliers"
+    ],
+    "a": 1,
+    "w": "Near-zero Pearson correlation indicates weak linear association, but a nonlinear relationship may remain."
    },
    {
-    "t": "What does this module say about “Why link exists”?",
-    "ans": "Covariance has a fatal flaw for reporting: it carries the units of both vars multiplied together. Measure height in metres and weight in kilograms and you get one count. Switch height to centimetres and the same data gives a count a hundred times more. Nothing about the link changed."
-   },
-   {
-    "t": "What does this module say about “Change the units, watch one move”?",
-    "ans": "The same two vars, with height measured in metres and then in centimetres. One count survives the change and one does not."
+    "t": "Does zero covariance generally prove independence?",
+    "o": [
+     "Yes, always",
+     "No; it only means no linear co-variation",
+     "Only for positive data",
+     "Only for large samples"
+    ],
+    "a": 1,
+    "w": "Independent variables have zero covariance when moments exist, but the converse is not generally true."
    }
   ]
  },
@@ -13387,16 +13661,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Entropy is the average surprise of a spread. The shortest average code length you could reach if you knew the true chances. Cross-entropy asks a harsher question: what does it cost if you build your code for q and the data really comes from p? The answer is always at least H(p). And the excess is the KL divergence. Each sorter trained with \"cross-entropy loss\" is being pushed to make that excess less."
+    "t": "How are cross-entropy, entropy, and KL divergence related?",
+    "o": [
+     "H(P,Q) = H(P) + DKL(P‖Q)",
+     "H(P,Q) = H(P) − DKL(P‖Q)",
+     "They are always equal",
+     "KL is the square root of entropy"
+    ],
+    "a": 0,
+    "w": "Cross-entropy equals target entropy plus the KL divergence from the target to the prediction."
    },
    {
-    "t": "What does this module say about “Entropy, cross-entropy and KL, in one relationship”?",
-    "ans": "Three quantities that are constantly confused. And one equation that separates them:"
-   },
-   {
-    "t": "What does this module say about “The loss your sorter really pays”?",
-    "ans": "Cross-entropy is entropy plus the cost for with the wrong spread. This separates the two. And shows why KL is not symmetric."
+    "t": "Why is KL divergence not a distance metric?",
+    "o": [
+     "It is generally asymmetric",
+     "It can only be negative",
+     "It ignores probabilities",
+     "It is always infinite"
+    ],
+    "a": 0,
+    "w": "In general DKL(P‖Q) differs from DKL(Q‖P), so it is not symmetric like a metric."
    }
   ]
  },
@@ -13446,16 +13730,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "The determinant is the signed area factor of a change: ad − bc is the area of the parallelogram the unit square turns, its magnitude says how much each region is scaled. And its sign says whether the plane was flipped over. Zero is the case that matters. The square has been flattened onto a line."
+    "t": "What does the absolute determinant measure geometrically?",
+    "o": [
+     "Area or volume scale",
+     "Largest entry",
+     "Number of rows",
+     "Average eigenvalue"
+    ],
+    "a": 0,
+    "w": "The absolute determinant is the factor by which a square map scales area or volume."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A grid is a change of space. And the determinant measures one thing about it: how much it scales area. A determinant of 3 means each region comes out three times as large. 0.5 means all shrinks by half. 1 means area is untouched, however much the shape has been rotated or sheared."
-   },
-   {
-    "t": "What does this module say about “What zero means”?",
-    "ans": "If the determinant is zero, the parallelogram has no area: the two columns lie on the same line. And the whole plane has been squashed onto that line. All that goes wrong with a singular grid follows from this one picture."
+    "t": "What follows when a square matrix has determinant zero?",
+    "o": [
+     "It has an inverse",
+     "It is singular and loses a dimension",
+     "It preserves all lengths",
+     "It must be symmetric"
+    ],
+    "a": 1,
+    "w": "A zero determinant means the map collapses dimension and has no inverse."
    }
   ]
  },
@@ -13465,16 +13759,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "Euclidean, Manhattan and Chebyshev are the L2, L1 and L∞ norms of the gap between two points, always ordered Chebyshev ≤ Euclidean ≤ Manhattan and agreeing just when a single coordinate differs. Their equal-distance rings are a circle, a diamond and a square. It is what makes them disagree. Cosine is a other kind of measure fully. It checks way from the origin and ignores magnitude."
+    "t": "For points (0, 0) and (3, 4), what is their L1 distance?",
+    "o": [
+     "5",
+     "7",
+     "4",
+     "12"
+    ],
+    "a": 1,
+    "w": "L1 distance sums coordinate gaps: |3−0| + |4−0| = 7."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A surprising count of algorithms do nothing but check distances. KNN finds the nearest points, k-means assigns each point to the nearest centre, hierarchical clustering merges the closest pair. And a vec database retrieves the closest embeddings."
-   },
-   {
-    "t": "What does this module say about “A few ways to measure \"far apart\"”?",
-    "ans": "Distance is the foundation of clustering, nearest-neighbour ways, anomaly detection and most retrieval systems. And there is more than one sensible definition."
+    "t": "Why can feature scaling change nearest-neighbour results?",
+    "o": [
+     "Distance may be dominated by a large-unit feature",
+     "Scaling always makes all distances zero",
+     "L2 ignores units",
+     "Scaling changes the number of dimensions"
+    ],
+    "a": 0,
+    "w": "A coordinate measured in thousands can dominate another measured in fractions unless the scale is considered."
    }
   ]
  },
@@ -13484,20 +13788,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What is meant by “Scale before decomposing” here?",
-    "ans": "Eigenvalues of a covariance grid depend on units. So an unscaled column with a large range dominates the first part."
+    "t": "What is special about an eigenvector v of A?",
+    "o": [
+     "Av = λv",
+     "Av = 0 for every A",
+     "It must have length 1",
+     "It is always a column of A"
+    ],
+    "a": 0,
+    "w": "An eigenvector keeps its direction under A and is scaled by its eigenvalue λ."
    },
    {
-    "t": "What is meant by “Signs are arbitrary” here?",
-    "ans": "An eigenvector and its negation describe the same way. Do not read meaning into which one a library returns."
-   },
-   {
-    "t": "What is meant by “Order is not guaranteed” here?",
-    "ans": "by np.linalg.eig . Sort clearly, or use eigh for symmetric matrices."
-   },
-   {
-    "t": "What is meant by “Repeated eigenvalues” here?",
-    "ans": "mean the corresponding eigenvectors are not unique. Any rotation within that subspace works. So single part ways turn meaningless."
+    "t": "Why is SVD useful when a matrix is rectangular?",
+    "o": [
+     "It applies to rectangular matrices",
+     "It requires a determinant",
+     "It always gives integer values",
+     "It avoids all numerical error"
+    ],
+    "a": 0,
+    "w": "SVD factors rectangular matrices, unlike standard eigenvector analysis of square matrices."
    }
   ]
  },
@@ -13507,16 +13817,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Suppose I am about to tell you the outcome of an event. And you want to know how much you are about to learn. If the event is a coin flip, you will learn something. If it is \"will the sun rise tomorrow\", you will learn in effect nothing, since you now knew."
+    "t": "Which event carries more self-information?",
+    "o": [
+     "A less likely event",
+     "A more likely event",
+     "Both always carry the same",
+     "The event with the larger label"
+    ],
+    "a": 0,
+    "w": "Self-information is −log(p), so lower-probability events carry more information."
    },
    {
-    "t": "What does this module say about “Surprise first”?",
-    "ans": "Start with a single outcome. How surprising is it? Two things should be true: a certain outcome (p = 1) should carry zero surprise. And rarer outcomes should be more surprising. One function does this cleanly:"
-   },
-   {
-    "t": "What does this module say about “Entropy is average surprise”?",
-    "ans": "Now take the whole spread and average the surprise, weighting each outcome by how often it really occurs:"
+    "t": "What is the entropy of a certain outcome?",
+    "o": [
+     "Zero",
+     "One bit",
+     "Infinite",
+     "Undefined"
+    ],
+    "a": 0,
+    "w": "There is no uncertainty when one outcome is certain, so entropy is zero."
    }
   ]
  },
@@ -13557,6 +13877,17 @@ window.VIZLEARN_PRACTICE = [
     ],
     "a": 1,
     "w": "w·x + b is y = mx + c with more inputs. Weights play the role of slopes and the bias plays the role of the intercept, which is why a perceptron can only ever draw a straight boundary."
+   },
+   {
+    "t": "For y = 3x + 2, what changes if the intercept becomes 4 and the slope stays 3?",
+    "o": [
+     "The line shifts up by 2 units",
+     "The line becomes steeper",
+     "The line becomes vertical",
+     "The slope changes to 4"
+    ],
+    "a": 0,
+    "w": "The intercept sets y when x = 0. Increasing c from 2 to 4 shifts every point up by 2 without changing the slope."
    }
   ]
  },
@@ -13606,16 +13937,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “Before the details”?",
-    "ans": "In y = b^x the var sits in the exponent . Each step of 1 in x multiplies y by b, rather than adding to it. That single gap is what separates exponential from linear behaviour."
+    "t": "For b > 1, what happens to bˣ as x increases by 1?",
+    "o": [
+     "It increases by b times",
+     "It increases by 1",
+     "It is squared",
+     "It is unchanged"
+    ],
+    "a": 0,
+    "w": "bˣ⁺¹ = b·bˣ, so each unit step multiplies the value by the same base."
    },
    {
-    "t": "What does this module say about “Exponential Always Wins Eventually”?",
-    "ans": "Keep the polynomial comparison on and look at the left of the plot: x³ is far ahead. Now slide x rightward. There is a crossover point. And after it 2^x leaves x³ hopelessly behind."
-   },
-   {
-    "t": "What does this module say about “Doubling Time and Half-Life”?",
-    "ans": "A setting feature of exponentials: the time to double is constant . It takes just as long to go from 1 to 2 as from a million to two million. The panel computes this live — at base 2 it is just 1 step, at base 1.1 about 7.3 steps."
+    "t": "Which equation models continuous growth at a constant rate k?",
+    "o": [
+     "y = y₀eᵏᵗ",
+     "y = y₀ + kt",
+     "y = y₀tᵏ",
+     "y = y₀eᵗ + k"
+    ],
+    "a": 0,
+    "w": "The solution to dy/dt = ky is y₀eᵏᵗ; the sign of k determines growth or decay."
    }
   ]
  },
@@ -13665,16 +14006,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "The identity is the matrix that changes nothing. And the inverse is the one that undoes A — set by A A⁻¹ = I and computed by dividing through by the determinant. It is precisely why a zero determinant means no inverse exists: the transformation destroyed information and no matrix can recover it. A small determinant is the same problem in slow motion."
+    "t": "What does multiplying a vector by the identity matrix do?",
+    "o": [
+     "Leaves it unchanged",
+     "Reflects it",
+     "Sets it to zero",
+     "Doubles it"
+    ],
+    "a": 0,
+    "w": "The identity is the matrix equivalent of multiplying a number by 1."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "A matrix is a transformation . Once you can do something to space, three questions follow at once: what does nothing, what puts it back. And what happens if you read the matrix sideways."
-   },
-   {
-    "t": "What does this module say about “Three steps that keep appearing”?",
-    "ans": "The identity matrix I has ones on the diagonal and zeros elsewhere. Multiplying by it changes nothing:"
+    "t": "When does an orthogonal matrix satisfy Q⁻¹ = Qᵀ?",
+    "o": [
+     "Always",
+     "Only when it is diagonal",
+     "Only when its determinant is zero",
+     "Never"
+    ],
+    "a": 0,
+    "w": "Orthogonal columns give QᵀQ = I, so the transpose is the inverse."
    }
   ]
  },
@@ -13684,16 +14035,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Entropy measures how mixed a set of labels is: 1 bit for an still fifty-fifty split of two classes, 0 bits when each label is the same. Information gain is simply how much that count falls when you split the set in two. A decision tree does nothing cleverer than this. At each node it tries each feature and each threshold, computes the gain for each. And keeps the winner."
+    "t": "How is information gain computed for a split?",
+    "o": [
+     "Parent entropy minus weighted child entropy",
+     "Sum of child entropies without weights",
+     "Number of rows minus columns",
+     "The target mean"
+    ],
+    "a": 0,
+    "w": "The weighted child uncertainty is subtracted from the original entropy."
    },
    {
-    "t": "What does this module say about “How much did that question help”?",
-    "ans": "Information gain measures how much a split reduces uncertainty. It is the gap between the entropy before a question is asked and the average entropy afterwards."
-   },
-   {
-    "t": "What does this module say about “How a tree uses it”?",
-    "ans": "At each node the algorithm loops over each feature and, for numeric features, each candidate threshold. For each candidate it computes the information gain. And it keeps the best. Then it repeats on each child."
+    "t": "Why can information gain favour an identifier feature?",
+    "o": [
+     "It can create many tiny, nearly pure groups",
+     "It always removes all noise",
+     "It ignores child groups",
+     "It is measured in rows"
+    ],
+    "a": 0,
+    "w": "High-cardinality features can isolate records and appear informative without generalising well."
    }
   ]
  },
@@ -13783,16 +14144,48 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A log is an exponent in disguise. It turns products into sums, compresses vast ranges into readable ones. And is undefined at zero — three facts that between them explain log-likelihood, cross-entropy loss, entropy in bits. And most NaN bugs in training code."
+    "t": "What does log₂(8) = 3 mean?",
+    "o": [
+     "2 × 8 = 3",
+     "2 raised to the third power is 8",
+     "8 raised to the second power is 3",
+     "The graph has slope 3"
+    ],
+    "a": 1,
+    "w": "A logarithm gives the exponent: 2³ = 8, so log₂(8) = 3."
    },
    {
-    "t": "What does this module say about “The Property That Matters Most”?",
-    "ans": "A logarithm turns multiplication into addition . Change the two counts in the product demo and watch both sides stay equal. This is not a curiosity — it is why logs are all over in machine learning."
+    "t": "Which expression equals log_b(pq), for positive p and q?",
+    "o": [
+     "log_b(p) × log_b(q)",
+     "log_b(p) + log_b(q)",
+     "log_b(p + q)",
+     "log_p(b) + log_q(b)"
+    ],
+    "a": 1,
+    "w": "The product rule turns multiplication inside one logarithm into addition of two logarithms with the same base."
    },
    {
-    "t": "What does this module say about “The Three Bases You Will Meet”?",
-    "ans": "The base just rescales the curve — each log is a constant multiple of each other. Watch the three readouts stay in fixed proportion as you slide x."
+    "t": "Which x-values are allowed in a real-valued log_b(x)?",
+    "o": [
+     "All real x",
+     "Only x ≥ 0",
+     "Only x > 0",
+     "Only integers"
+    ],
+    "a": 2,
+    "w": "A real logarithm requires a positive input. At x = 0 and for negative x it is undefined."
+   },
+   {
+    "t": "What does changing the logarithm's base do to its value?",
+    "o": [
+     "It rescales the output by a constant factor",
+     "It changes the input domain to include zero",
+     "It turns sums into products",
+     "It changes the curve into a straight line"
+    ],
+    "a": 0,
+    "w": "The change-of-base formula is log_b(x) = ln(x) / ln(b), so changing the base rescales the output."
    }
   ]
  },
@@ -13882,16 +14275,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “The problem it solves”?",
-    "ans": "Multiplying two matrices gives a new matrix in which each single entry is a dot product — one row of the left matrix against one column of the right. Nothing more complicated is happening."
+    "t": "What shape results from multiplying an m × n matrix by an n × p matrix?",
+    "o": [
+     "m × p",
+     "n × n",
+     "p × m",
+     "m × n"
+    ],
+    "a": 0,
+    "w": "The inner dimensions n must match; the two outer dimensions give the output shape."
    },
    {
-    "t": "What does this module say about “The Rule for a Single Cell”?",
-    "ans": "Click any cell in C and the app highlights the blue row and amber column that feed it, then writes out the arithmetic term by term. Each cell is independent of each other — which is precisely why this step parallelises so well on a GPU."
-   },
-   {
-    "t": "What does this module say about “Order Matters”?",
-    "ans": "Matrix multiplication is not commutative : AB ≠ BA in general. Often BA is not still a legal step — a (2×3) times a (3×4) works. But (3×4) times (2×3) does not. When people say the order of layers matters, this is the literal reason."
+    "t": "In ABx, which matrix acts first on a column vector x?",
+    "o": [
+     "A",
+     "B",
+     "Both at once",
+     "Neither"
+    ],
+    "a": 1,
+    "w": "ABx = A(Bx), so the rightmost matrix B is applied first."
    }
   ]
  },
@@ -13901,16 +14304,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What is meant by “Consistent” here?",
-    "ans": "With enough data, the guess locks on to the true param val."
+    "t": "What does maximum likelihood choose?",
+    "o": [
+     "Parameters that maximise the observed data likelihood",
+     "The parameter with the largest prior only",
+     "The most common observation",
+     "A guaranteed unbiased estimate"
+    ],
+    "a": 0,
+    "w": "MLE selects model parameters that make the observed data most probable under the model."
    },
    {
-    "t": "What is meant by “Fast in large samples” here?",
-    "ans": "No other consistent rule has less spread in the large-sample limit."
-   },
-   {
-    "t": "What is meant by “Invariant” here?",
-    "ans": "If θ-hat is the MLE of θ, then g(θ-hat) is the MLE of g(θ) — so you can work on any scale."
+    "t": "Why can maximising log-likelihood be easier than likelihood?",
+    "o": [
+     "Products become sums and the optimum is preserved",
+     "It changes the model",
+     "It guarantees a unique answer",
+     "It makes probabilities exceed one"
+    ],
+    "a": 0,
+    "w": "Log is increasing, so it preserves the maximiser while turning products into sums."
    }
   ]
  },
@@ -13920,16 +14333,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "The mean is the balance point and uses every value — which makes it precise but fragile. The median is the middle and shrugs off outliers. The mode is the most common and is the only option for categories. Skewed data pulls them apart, and \"average\" without qualification is an ambiguous word."
+    "t": "Which measure is usually least affected by one extreme outlier?",
+    "o": [
+     "Mean",
+     "Median",
+     "Variance",
+     "Range"
+    ],
+    "a": 1,
+    "w": "The median depends on ordered position, so one extreme value usually moves it less than the mean."
    },
    {
-    "t": "What does this module say about “What this is”?",
-    "ans": "All three are measures of central tendency — attempts to summarise a whole dataset with one number. They answer subtly different questions, and on skewed data they can be wildly far apart."
-   },
-   {
-    "t": "What does this module say about “The Three Definitions”?",
-    "ans": "On a perfectly symmetric distribution all three land in the same place. Load Symmetric and see the three markers stack up."
+    "t": "Which measure can summarise a categorical variable?",
+    "o": [
+     "Mode",
+     "Variance",
+     "Standard deviation",
+     "Midrange only"
+    ],
+    "a": 0,
+    "w": "The mode is the most frequent category or value; the mean requires numerical values."
    }
   ]
  },
@@ -13979,16 +14402,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “Start here”?",
-    "ans": "Standing on a hillside, \"how steep is it?\" has no single answer — it depends which way you face. A partial derivative answers it for one fixed way. The gradient bundles those answers into a vector pointing straight up the slope."
+    "t": "When computing a partial derivative with respect to x, what happens to other inputs?",
+    "o": [
+     "They are held fixed",
+     "They are set to zero",
+     "They are differentiated first",
+     "They are removed from the function"
+    ],
+    "a": 0,
+    "w": "A partial derivative varies one coordinate while holding the others constant."
    },
    {
-    "t": "What does this module say about “Partials: Freeze All Else”?",
-    "ans": "To compute ∂f/∂x you treat y as a constant and differentiate often. That is the whole idea — you are asking how f changes if you step east while refusing to move north."
-   },
-   {
-    "t": "What does this module say about “Gradient Descent: Just Walk Backwards”?",
-    "ans": "Training a net means finding the lowest point of a loss surface. The gradient points uphill, so you step the other way:"
+    "t": "Under Euclidean geometry, which direction is steepest local increase?",
+    "o": [
+     "The gradient",
+     "The negative gradient",
+     "Any tangent direction",
+     "The Hessian determinant"
+    ],
+    "a": 0,
+    "w": "The gradient points toward steepest local increase; its negative is the descent direction."
    }
   ]
  },
@@ -14038,16 +14471,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "Projection answers one question: of all the points on the line through a. It is closest to b? The answer is b's shadow. And the line from b down to that shadow is perpendicular. Those two facts — closest point, perpendicular error — are the same fact. And almost each fitting way in machine learning is built on it."
+    "t": "After projecting v onto a line, what is true of the residual?",
+    "o": [
+     "It is parallel to the line",
+     "It is perpendicular to the line",
+     "It is always zero",
+     "It has the same length as v"
+    ],
+    "a": 1,
+    "w": "The closest point on a line leaves a residual orthogonal to that line."
    },
    {
-    "t": "What does this module say about “Casting a shadow onto a way”?",
-    "ans": "A projection answers: how much of vector a lies along the way of vector b ? Picture the sun right cost of b and a casting a shadow onto it."
-   },
-   {
-    "t": "What does this module say about “Least squares is a projection”?",
-    "ans": "Linear regression fits a line by minimising squared residuals. Geometrically it is projecting."
+    "t": "What is required to project onto the direction a using (a·v)/(a·a)?",
+    "o": [
+     "a must be nonzero",
+     "v must be a unit vector",
+     "a and v must be perpendicular",
+     "Both vectors must be positive"
+    ],
+    "a": 0,
+    "w": "If a is zero, the denominator a·a is zero and there is no direction to project onto."
    }
   ]
  },
@@ -14137,20 +14580,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What is meant by “Pic compression” here?",
-    "ans": "A 1000×1000 pic kept at rank 50 stores 5% of the counts and often looks nearly identical, since natural pics are dominated by a few strong ways."
+    "t": "If one column is a multiple of another, what does that imply?",
+    "o": [
+     "The columns are dependent",
+     "The matrix is orthogonal",
+     "The rank is full",
+     "The determinant is one"
+    ],
+    "a": 0,
+    "w": "A multiple adds no new direction, so the columns are linearly dependent."
    },
    {
-    "t": "What is meant by “Recommender systems” here?",
-    "ans": "A user-item ratings matrix is assumed to be about low rank — a few latent taste factors explain most preferences — and the missing entries are filled by reconstructing from those factors."
-   },
-   {
-    "t": "What is meant by “Noise reduction” here?",
-    "ans": "Signal often lives in the strong ways and noise is spread across the weak ones. So truncating the small singular vals cleans the data."
-   },
-   {
-    "t": "What is meant by “LoRA fine-tuning” here?",
-    "ans": "Large language nets are adapted by learning a low-rank update to the weight matrices, training a tiny fraction of the params. The whole way is named after this property."
+    "t": "What does matrix rank count?",
+    "o": [
+     "Independent directions",
+     "All matrix entries",
+     "Only the rows",
+     "The determinant sign"
+    ],
+    "a": 0,
+    "w": "Rank is the dimension of the column space (equivalently, the row space)."
    }
   ]
  },
@@ -14320,16 +14769,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “Before the details”?",
-    "ans": "When a function feeds into another — y = f(g(x)) — a change in x must travel through both to reach y . The chain rule says the sensitivities simply multiply."
+    "t": "For y = f(g(x)), what does the chain rule multiply?",
+    "o": [
+     "The outer rate by the inner rate",
+     "The function values",
+     "The two inputs",
+     "The second derivatives only"
+    ],
+    "a": 0,
+    "w": "The derivative is f′(g(x))g′(x): the local rates through the two stages multiply."
    },
    {
-    "t": "What does this module say about “The Gear Analogy”?",
-    "ans": "Picture two gears. Turning the first makes the second turn 3× as fast. That second gear drives a third at 2×. Turn the first gear once and the last one spins 6 times — the ratios multiplied."
-   },
-   {
-    "t": "What does this module say about “Reading the Diagram”?",
-    "ans": "The chain strip shows x → u → y with each link's local derivative underneath. The app also computes a numeric check — the slope measured by really nudging x by a tiny amount — and it always matches the product. The rule is not an approximation."
+    "t": "Why does backpropagation use the chain rule?",
+    "o": [
+     "A network is a composition of functions",
+     "It makes every gradient equal to one",
+     "It removes the need for derivatives",
+     "It guarantees the global minimum"
+    ],
+    "a": 0,
+    "w": "A network composes layers, and the chain rule propagates the loss derivative through them."
    }
   ]
  },
@@ -14379,16 +14838,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "The normal (or Gaussian) spread is the familiar bell curve: symmetric, single-peaked, thin-tailed. It is fully named by just two counts. The mean μ sets where it sits. And the standard deviation σ sets how wide it is."
+    "t": "What does a z-score measure?",
+    "o": [
+     "Distance from the mean in standard deviations",
+     "Probability of an event",
+     "Sample size",
+     "Skewness"
+    ],
+    "a": 0,
+    "w": "z = (x−μ)/σ expresses how many standard deviations x lies from the mean."
    },
    {
-    "t": "What does this module say about “Two Knobs, Nothing Else”?",
-    "ans": "That fixed unit area is what makes it a chance density: area under a stretch of the curve is the chance of landing in that range."
-   },
-   {
-    "t": "What does this module say about “The 68–95–99.7 Rule”?",
-    "ans": "These percentages hold for each normal spread, whatever μ and σ are. Cycle the region selector and watch the shaded area match. The app integrates the curve numerically rather than quoting the constants."
+    "t": "Does a large sample automatically mean raw data are normally distributed?",
+    "o": [
+     "Yes",
+     "No; the CLT concerns suitable sums or averages",
+     "Only when the mean is zero",
+     "Only with equal variance zero"
+    ],
+    "a": 1,
+    "w": "The central limit theorem concerns standardised sums or averages under conditions, not every raw dataset."
    }
   ]
  },
@@ -14438,16 +14907,26 @@ window.VIZLEARN_PRACTICE = [
   "cat": "Maths",
   "q": [
    {
-    "t": "Without scrolling back — what is the one-line takeaway from this module?",
-    "ans": "A norm answers \"how big is this vector\". And L1, L2 and L∞ give three other answers — the sum of absolute vals, the straight-line length. And the largest part — always ordered L∞ ≤ L2 ≤ L1, agreeing just on the axes. What separates them in practice is the shape of their unit ball: L2's circle is smooth and touches a solution set at a generic point, while L1's diamond is mostly corner and its corners sit on the axes."
+    "t": "What is the L1 norm of (3, −4)?",
+    "o": [
+     "5",
+     "7",
+     "4",
+     "12"
+    ],
+    "a": 1,
+    "w": "The L1 norm sums absolute components: |3| + |−4| = 7."
    },
    {
-    "t": "What does this module say about “Quick Context”?",
-    "ans": "\"How big is this vector?\" sounds like it has one answer. It has a few. And machine learning uses at least three of them routinely — often in the same net."
-   },
-   {
-    "t": "What does this module say about “The shapes are the point”?",
-    "ans": "Draw each vector whose norm equals just 1 and you get that norm's unit ball . This is where the three stop being interchangeable:"
+    "t": "Why is squared L2 length not a norm?",
+    "o": [
+     "It can be negative",
+     "It fails the triangle inequality",
+     "It depends on units",
+     "It is not zero at the origin"
+    ],
+    "a": 1,
+    "w": "Squared L2 length does not satisfy the triangle inequality, even though L2 length does."
    }
   ]
  },
@@ -14987,12 +15466,12 @@ window.VIZLEARN_PRACTICE = [
     "ans": "An RNN is one cell unrolled across time, sharing weights at each step. So its parameter count is fixed at dh + h² + h no matter sequence length. Training backpropagates through the whole unrolled graph, which makes the effective depth equal to the sequence length. Hence vanishing gradients, mandatory gradient clipping, and truncated BPTT."
    },
    {
-    "t": "What does this module say about “Unrolling”?",
+    "t": "What does this module say about “Internal Flow”?",
     "ans": "An RNN is often drawn as a cell with an arrow looping back to itself. That is compact and slightly misleading. To understand training, unroll it: draw one copy of the cell per timestep, with the hidden state flowing left to right between copies."
    },
    {
-    "t": "What does this module say about “Internal Flow”?",
-    "ans": "Unrolling a recurrent cell across time gives a network as deep as the sequence is long - sharing one set of weights the whole way. That is what makes RNNs efficient, and what makes them hard to train."
+    "t": "What does this module say about “Unrolling”?",
+    "ans": "An RNN is often drawn as a cell with an arrow looping back to itself. That is compact and slightly misleading. To understand training, unroll it: draw one copy of the cell per timestep, with the hidden state flowing left to right between copies."
    }
   ]
  },
@@ -15291,16 +15770,16 @@ window.VIZLEARN_PRACTICE = [
   "cat": "NLP",
   "q": [
    {
+    "t": "What does this module say about “Architecture Flow”?",
+    "ans": "A forward RNN at spot t has seen tokens 1 to t and nothing after. That is a real handicap, because disambiguation often depends on what comes next."
+   },
+   {
     "t": "What does this module say about “Why one direction is not enough”?",
     "ans": "A forward RNN at spot t has seen tokens 1 to t and nothing after. That is a real handicap, because disambiguation often depends on what comes next."
    },
    {
     "t": "What does this module say about “How the two passes combine”?",
     "ans": "A bidirectional layer runs two fully separate recurrent cells with their own weights. The forward cell reads left to right; the backward cell reads the same sequence right to left. At each spot their hidden states are concatenated:"
-   },
-   {
-    "t": "What does this module say about “Reading the sequence twice”?",
-    "ans": "A forward LSTM at word 5 knows words 1 to 5. A bidirectional layer runs a second, free LSTM backwards. From the end to the beginning. And concatenates the two hidden states at each spot."
    }
   ]
  },

@@ -213,6 +213,9 @@ SHARED_SCRIPTS = (
     # harness above. Listed after it, because deferred scripts run in
     # document order and this one reads window.VizRagViz at parse time.
     ("vizlearn-annviz.js", "data-vz-ann"),
+    # The operations models on the generated gen_ai/ pages (gating, capacity,
+    # latency, ingestion). Same ordering rule: after the harness.
+    ("vizlearn-ragops.js", "data-vz-ops"),
     # The image-processing harness on the generated computer_vision/ modules.
     ("vizlearn-cv.js", "data-vz-cv"),
     # The architecture explorers: the named-model modules across computer

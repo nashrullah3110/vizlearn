@@ -1,0 +1,234 @@
+title: Embedding Resilience and Checkpointing
+intro: Build a batch embedding pipeline that survives rate limits, flaky calls and crashes, and never pays twice to embed the same chunk.
+
+## What goes wrong at scale
+
+Embedding half a million chunks of about 256 tokens means sending 128 million tokens to an embedding API. At 100 chunks per request, that is 5,000 calls. Any of them can fail, and the whole run takes long enough for something to go wrong.
+
+A naive loop has no rate limit, no retries and no memory of what it has done. It hits a "429 too many requests" error within seconds and starts failing. If it crashes at batch 3,000 of 5,000, every finished batch is lost. The restart embeds everything again, and you pay twice in time and money.
+
+A production pipeline has to handle three things: rate limits, temporary failures, and the ability to resume. Three layers do it. A rate limiter keeps you inside the request and token budgets. A retry wrapper with exponential backoff and jitter absorbs temporary errors. A checkpoint store records each finished batch, so a restart picks up where the last run stopped.
+
+This page builds each layer in small pieces you can run. For where the vectors go next, see [embeddings and vector search](embeddings_and_vector_search.html) and the [RAG](rag.html) overview. For local models instead of an API, see [batch embedding generation](batch_embedding_generation.html).
+
+## Scope the job before you write code
+
+Start with arithmetic. The numbers below are assumptions, so replace them with your provider's current limits and price.
+
+```python-run
+chunks = 500_000
+tokens_per_chunk = 256
+tpm_limit = 5_000_000        # tokens per minute: check your own tier
+price_per_million = 0.02     # dollars per million tokens: check current pricing
+batch_size = 100
+
+total_tokens = chunks * tokens_per_chunk
+print("total tokens :", f"{total_tokens:,}")
+print("API calls    :", f"{chunks // batch_size:,}")
+print("minutes at the limit:", round(total_tokens / tpm_limit, 1))
+print("cost in dollars     :", round(total_tokens / 1e6 * price_per_million, 2))
+```
+
+That is the best case, at full throughput with no failures. Retries and waits push the real time above it, and a good limiter keeps you close.
+
+## Layer 1: the rate limiter
+
+Providers limit two things at once: requests per minute and tokens per minute. Your limiter must watch both. Use a sliding window, not a fixed one.
+
+A fixed window resets on the minute. You can spend the whole budget in the last second of one window and the whole budget again in the first second of the next. That is a burst of double the limit, and the server may reject it. A sliding window counts everything in the last 60 seconds, so the burst cannot happen.
+
+```python-run
+limit = 10  # requests per 60 seconds
+
+def fixed_window_allowed(times):
+    counts = {}
+    ok = 0
+    for t in times:
+        window = int(t // 60)
+        if counts.get(window, 0) < limit:
+            counts[window] = counts.get(window, 0) + 1
+            ok += 1
+    return ok
+
+def sliding_window_allowed(times):
+    sent = []
+    for t in times:
+        sent = [s for s in sent if s > t - 60]
+        if len(sent) < limit:
+            sent.append(t)
+    return len(sent)
+
+# 20 requests: 10 in the last second of minute one, 10 in the first of minute two.
+times = [59 + i * 0.01 for i in range(10)] + [60 + i * 0.01 for i in range(10)]
+print("requests that arrive within 1 second:", len(times))
+print("fixed window lets through  :", fixed_window_allowed(times))
+print("sliding window lets through:", sliding_window_allowed(times))
+```
+
+A real limiter also keeps a safety margin. Use about 90% of the published limit, because your token count is an estimate and the server's may differ.
+
+## Layer 2: retries with backoff and jitter
+
+Treat errors by type. A 429 means slow down: honour the `Retry-After` header if it is present, otherwise back off. A 500, 502 or 503 is usually temporary and clears within a few tries. A 400 is permanent because the input is invalid, so do not retry it. Log it and skip the batch.
+
+Backoff doubles the wait after each failure: 1 second, 2, 4, 8. That gives a struggling server room to recover. Jitter is the detail that matters in production. If many workers fail together and all wait exactly 2 seconds, they all retry together and hit the limit again. Jitter randomises each wait between 50% and 150% of the plan, which spreads them out.
+
+```python-run
+import random
+random.seed(42)
+
+def delay(attempt, base=1.0, cap=60.0, jitter=True):
+    wait = min(base * 2 ** attempt, cap)
+    return wait * (0.5 + random.random()) if jitter else wait
+
+print("attempt  plain   jittered")
+for attempt in range(5):
+    print(f"{attempt:7d} {delay(attempt, jitter=False):6.1f}s {delay(attempt):8.2f}s")
+
+workers = 6
+print("\nsix workers fail together and retry once:")
+print("no jitter  :", sorted({round(delay(1, jitter=False), 1) for _ in range(workers)}))
+print("with jitter:", sorted(round(delay(1), 1) for _ in range(workers)))
+```
+
+Without jitter every worker lands on the same retry time. With it they spread across nearly two seconds.
+
+## Layer 3: the checkpoint store
+
+The checkpoint is the layer that saves you money. It records every batch that finished, so a restart skips them. It must survive a crash, allow a skip check, and give you a progress count.
+
+An append-only log of one JSON line per finished batch is the simplest form. Its weakness is the crash itself: a process can die halfway through writing a line, leaving a broken last line. Your loader must ignore it, and that batch simply runs again.
+
+```python-run
+import io, json
+
+log = io.StringIO()
+for i in range(5):                       # five batches finish...
+    log.write(json.dumps({"batch": i}) + "\n")
+log.write('{"batch": 5')                 # ...and the process dies mid-write
+
+def load_done(text):
+    done = set()
+    for line in text.splitlines():
+        try:
+            done.add(json.loads(line)["batch"])
+        except (json.JSONDecodeError, KeyError):
+            pass                         # the torn last line
+    return done
+
+done = load_done(log.getvalue())
+print("finished batches found:", sorted(done))
+print("batch 5 will run again :", 5 not in done)
+```
+
+For pipelines with more than a few thousand batches, SQLite is the better store. It is transactional and crash safe. With write-ahead logging, a batch either commits fully or not at all, so there are no torn lines to repair. It also answers progress queries with one `SELECT`. Store each embedding as a binary blob, not JSON text. A 1,536-dimension float32 vector is 6,144 bytes as a blob and several times that as text.
+
+```python
+import sqlite3
+
+db = sqlite3.connect("embeddings.db")
+db.execute("PRAGMA journal_mode=WAL")        # crash-safe writes
+db.execute("""CREATE TABLE IF NOT EXISTS batches (
+    batch_id TEXT PRIMARY KEY, vectors BLOB, status TEXT)""")
+
+def save(batch_id, blob):
+    with db:                                 # one atomic transaction
+        db.execute("INSERT OR REPLACE INTO batches VALUES (?, ?, 'done')",
+                   (batch_id, blob))
+
+def is_done(batch_id):
+    row = db.execute("SELECT status FROM batches WHERE batch_id=?",
+                     (batch_id,)).fetchone()
+    return bool(row) and row[0] == "done"
+```
+
+## Put the layers together
+
+The orchestrator groups chunks into batches, then loops. For each batch it checks the checkpoint, waits for the limiter, calls the API through the retry wrapper, and saves the result. On a permanent failure it records the error and moves on.
+
+The demo below uses a fake API that fails a third of the time. It crashes the run partway through, then resumes. Count the calls: the second run only pays for what the first one did not finish.
+
+```python-run
+import random
+random.seed(3)
+
+calls = 0
+def fake_api(batch_id):
+    global calls
+    calls += 1
+    if random.random() < 0.33:
+        raise RuntimeError("temporary error")
+    return f"vectors for {batch_id}"
+
+def embed_with_retry(batch_id, retries=4):
+    for _ in range(retries + 1):
+        try:
+            return fake_api(batch_id)
+        except RuntimeError:
+            pass
+    return None
+
+def run(batches, done, crash_at=None):
+    for n, b in enumerate(batches):
+        if crash_at is not None and n == crash_at:
+            raise KeyboardInterrupt("process killed")
+        if b in done:
+            continue
+        if embed_with_retry(b) is not None:
+            done.add(b)
+
+batches = [f"b{i}" for i in range(40)]
+done = set()
+try:
+    run(batches, done, crash_at=30)
+except KeyboardInterrupt:
+    pass
+print("after the crash:", len(done), "batches saved,", calls, "API calls")
+run(batches, done)
+print("after the resume:", len(done), "batches saved,", calls, "API calls in total")
+```
+
+The resume skips every saved batch. Without the checkpoint, the second run would embed all 40 again.
+
+## Recovering from failures
+
+After a crash or a run with failures, call the same function on the same data. Finished batches are skipped. Only pending batches and earlier failures run.
+
+For batches that failed for good, fix the cause first. The usual cause is a text longer than the per-text token limit. Trim it, reset those batches to pending in the checkpoint, and run again. Because storing results is an upsert, a batch that finished just before a crash and was not recorded is simply embedded again. You pay for it once more and get a correct result.
+
+## Choose a batch size
+
+APIs often allow up to 2,048 texts per request. Bigger requests take longer, so a retry re-embeds more, and the checkpoint is coarser, so a crash wastes more. Stay between 50 and 200 texts per batch, and cap the tokens per batch too.
+
+Log progress every 50 batches. A twenty-five-minute run with no output is a black box. Report batches finished, skipped and failed, plus the total time spent waiting on the limiter.
+
+## Things to try
+
+1. Raise the <strong>Failure rate</strong> to 60 with <strong>Retries</strong> at 2. A visible share of batches is abandoned for good.
+2. Raise <strong>Retries</strong> to 8. About 1 batch in 100 is lost, and the average attempts per batch rise.
+3. Turn off <strong>Checkpointing</strong>. A crash at 70% means redoing 3,500 batches instead of none.
+4. Turn off <strong>Jitter</strong>. The retries line up, which is how a brief limit becomes a long outage.
+
+## What to remember
+
+Rate limit with a sliding window on both requests and tokens. Retry only temporary errors, with exponential backoff and jitter. Record each finished batch in a crash-safe store so a restart never pays twice. Estimate time and cost before you start, and log progress while you run.
+
+## Questions people ask
+
+<strong>Why SQLite for checkpoints?</strong> Crash safety. With write-ahead logging a batch commits fully or not at all. A plain file can end with a torn line.
+
+<strong>Why add jitter?</strong> Without it, workers that failed together retry together and hit the limit again.
+
+<strong>Should I retry a 400 error?</strong> No. The input is invalid. Log it, skip the batch and fix the text.
+
+<strong>What if tokens, not requests, are the limit?</strong> Then track both. A batch of 100 texts at 500 tokens each is 50,000 tokens, which can use a minute's budget faster than the request count suggests.
+
+<strong>What if a crash happens between embedding and saving?</strong> The batch runs again on restart. That is safe because saving is an upsert. You pay for it twice and the result is right.
+
+## Recap in one screen
+
+- Scope the job first: tokens, calls, minutes and cost.
+- Use a sliding window on requests and tokens, with a safety margin.
+- Retry temporary errors with backoff and jitter. Never retry a 400.
+- Save every finished batch so a restart skips it.
+- Log progress, and keep batches to 50 to 200 texts.

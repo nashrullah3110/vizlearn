@@ -1448,3 +1448,36 @@ DESCRIPTIONS = {
 from arch_topics import DESCRIPTIONS as _ARCH_DESCRIPTIONS  # noqa: E402
 
 DESCRIPTIONS.update(_ARCH_DESCRIPTIONS)
+
+
+# The RAG operations pages (tools/rag_ops_topics.py).
+DESCRIPTIONS.update({
+    "gen_ai/similarity_threshold_gating.html":
+        "Gate retrieved chunks with a floor, a score-drop cut and a learned threshold. Compare what each keeps and loses, and see why recall matters more than precision.",
+    "gen_ai/abstention_in_rag.html":
+        "Build the three gates that let a RAG system say it does not know: retrieval confidence, a prompt that allows refusal and a faithfulness check on the answer.",
+    "gen_ai/chunk_deduplication.html":
+        "Remove exact copies with hashing, near-copies with MinHash and repeats at query time with MMR, without merging chunks that state different facts.",
+    "gen_ai/chunk_size_optimization.html":
+        "Run a real chunk-size and overlap sweep on a toy corpus, compare recall against tokens per query and index size, and choose from the Pareto front.",
+    "gen_ai/debugging_rag.html":
+        "Trace a wrong RAG answer through retrieval, context, synthesis and post-processing, run contrastive experiments, and turn each fix into a regression test.",
+    "gen_ai/batch_embedding_generation.html":
+        "Embed 100,000 texts in batches: pick a model, sort by length to cut padding, clean the input, save the matrix, and keep the row-to-text mapping.",
+    "gen_ai/embedding_resilience_and_checkpointing.html":
+        "Make a large embedding job survive rate limits and crashes with a sliding-window limiter, retries with jitter, and a checkpoint that stops you paying twice.",
+    "gen_ai/document_ingestion_pipeline.html":
+        "Walk a five-stage ingestion pipeline from PDF extraction and OCR to cleaning, chunking, embedding and idempotent upserts, and model what each stage loses.",
+    "gen_ai/distributed_ingestion_pipeline.html":
+        "Design idempotent ingestion workers with content-based chunk IDs, upserts, stale-chunk cleanup and a dead-letter queue, and see what a crash does to the index.",
+    "gen_ai/embedding_model_migration.html":
+        "Move a vector database to a new embedding model with a blue-green index, shadow validation and a staged cutover, without ever mixing embedding spaces.",
+    "gen_ai/production_rag_system_design.html":
+        "See the seven subsystems of a production RAG service and what each failure does to users, with circuit breakers, fallbacks, rank fusion and cost controls.",
+    "gen_ai/query_decomposition.html":
+        "Split a complex question into sub-questions with a dependency graph, reject cycles, run independent parts in parallel and count the latency it adds.",
+    "gen_ai/rag_capacity_planning.html":
+        "Estimate chunks, vector storage, index overhead and RAM for a RAG corpus from first principles, and see how dimensions, precision and overlap move the total.",
+    "gen_ai/rag_latency_optimization.html":
+        "Time each stage of a RAG request, read the latency distribution, and compare streaming, routing, caching, parallel stages and timeouts, and what each does to p95.",
+})

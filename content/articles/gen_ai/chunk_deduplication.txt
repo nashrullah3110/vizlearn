@@ -1,0 +1,236 @@
+title: Chunk Deduplication
+intro: Remove redundant chunks at ingestion and again at retrieval, so the model's context holds different passages instead of the same one three times.
+
+## Why duplicate chunks hurt
+
+Company documents repeat themselves. The same policy sits in a wiki, a shared drive and a PDF. API docs are built from one spec in three formats. Changelogs overlap from one release to the next.
+
+Each copy costs you three times. It takes space in the index. It costs money to embed. And it competes for the model's limited context window. If three of the top five chunks say the same thing, the model sees 60% repeated text, and it may lean too hard on that one point.
+
+Two kinds of duplicate need two tools. An exact copy, even with different spacing or capital letters, is caught by hashing. A near-copy, such as the same paragraph with one sentence changed, needs a similarity test on word groups. That test is called MinHash.
+
+There are also two moments to remove them. At ingestion you stop duplicates from entering the index. At retrieval you drop results that repeat a higher-ranked one, using [maximal marginal relevance](maximal_marginal_relevance.html). Doing both keeps the index lean and the context varied.
+
+This page covers hashing, MinHash, an ingestion pipeline that uses both, retrieval-time filtering, and the cases that break each approach.
+
+## Exact copies: hash the cleaned text
+
+The cheapest check is to clean the text and hash it. Cleaning means lowercase, one space between words, and no trailing punctuation, so that formatting-only differences collapse. Two chunks with the same hash are the same chunk.
+
+```python-run
+import hashlib
+
+def normalize(text):
+    text = " ".join(text.lower().split())
+    return text.rstrip(".,;:!?")
+
+def content_hash(text):
+    return hashlib.sha256(normalize(text).encode()).hexdigest()[:16]
+
+a = "The quick brown fox   jumps over the lazy dog."
+b = "the quick brown fox jumps over the lazy dog"
+c = "The quick brown cat jumps over the lazy dog."
+
+print("A:", content_hash(a))
+print("B:", content_hash(b))
+print("C:", content_hash(c))
+print("A equals B (spacing and case differ):", content_hash(a) == content_hash(b))
+print("A equals C (one word differs):       ", content_hash(a) == content_hash(c))
+```
+
+A 16-character hash takes about 32 bytes with overhead. For ten million chunks that is roughly 320 MB, small enough for Redis or process memory. Each lookup is a single dictionary check.
+
+Hashing has one blind spot: it only finds copies. Change one word and the hash changes completely, as chunk C shows.
+
+## Near copies: compare sets of word groups
+
+Two chunks can share 90% of their words and differ in one sentence. To find them, turn each chunk into a set of three-word groups, called shingles. Then measure how much the two sets overlap. That measure is Jaccard similarity: shared shingles divided by all shingles.
+
+```python-run
+import re
+
+def shingles(text, size=3):
+    words = re.findall(r"\w+", text.lower())
+    if len(words) < size:
+        return {" ".join(words)}
+    return {" ".join(words[i:i + size]) for i in range(len(words) - size + 1)}
+
+def jaccard(a, b):
+    return len(a & b) / len(a | b) if a | b else 1.0
+
+original = ("The vector database stores embeddings for fast similarity search. "
+            "Each embedding is a 768-dimensional float32 vector. "
+            "Queries return the closest vectors by cosine score. "
+            "Results are sorted from best to worst match.")
+near = original.replace("float32", "float16")
+other = ("Binary search trees keep data sorted for fast lookup. "
+         "They need a balanced shape to stay quick.")
+
+print("original vs near-copy:", round(jaccard(shingles(original), shingles(near)), 2))
+print("original vs other    :", round(jaccard(shingles(original), shingles(other)), 2))
+```
+
+A threshold of 0.8 means four in five shingles are shared. The near-copy scores 0.82, so it is caught. The unrelated text scores 0.0. Notice the catch, though: float32 and float16 are different facts, and a 0.8 threshold treats them as the same chunk. The edge cases below come back to this.
+
+## Doing it at scale with MinHash
+
+Comparing every chunk to every other costs n squared. MinHash avoids it. It shrinks each shingle set to a short signature of k numbers. The share of matching positions in two signatures estimates the Jaccard score.
+
+Add locality-sensitive hashing, which puts similar signatures in the same bucket, and you only compare chunks that share a bucket. The work then grows roughly in step with n.
+
+```python-run
+import hashlib, re
+
+def shingles(text, size=3):
+    w = re.findall(r"\w+", text.lower())
+    return {" ".join(w[i:i + size]) for i in range(len(w) - size + 1)}
+
+def signature(sh, k=128):
+    sig = []
+    for seed in range(k):
+        sig.append(min(int(hashlib.md5(f"{seed}:{s}".encode()).hexdigest()[:8], 16)
+                       for s in sh))
+    return sig
+
+def estimate(a, b):
+    return sum(x == y for x, y in zip(a, b)) / len(a)
+
+t1 = ("The vector database stores embeddings for fast similarity search. "
+      "Each embedding is a 768-dimensional float32 vector. "
+      "Queries return the closest vectors by cosine score. "
+      "Results are sorted from best to worst match.")
+t2 = t1.replace("float32", "float16")
+s1, s2 = shingles(t1), shingles(t2)
+exact = len(s1 & s2) / len(s1 | s2)
+print("exact Jaccard :", round(exact, 3))
+print("MinHash k=128 :", round(estimate(signature(s1), signature(s2)), 3))
+```
+
+With 128 hash functions the estimate lands within about five points of the exact value (0.77 against 0.82). The error shrinks as you add hash functions. Real systems use a library such as `datasketch`. It stores the signatures in an LSH index so each new chunk is checked in milliseconds.
+
+## An ingestion pipeline with both checks
+
+Run the cheap check first. Exact hashing is one lookup per chunk, so it removes the easy copies before the slower similarity test runs. Only chunks that survive the hash check are compared by shingles.
+
+```python-run
+import hashlib, re
+
+seen_hashes = set()
+kept = {}
+
+def words(text):
+    return re.findall(r"\w+", text.lower())
+
+def shingles(text, size=3):
+    w = words(text)
+    return {" ".join(w[i:i + size]) for i in range(len(w) - size + 1)}
+
+def process(chunk_id, text, threshold=0.8):
+    h = hashlib.sha256(" ".join(words(text)).encode()).hexdigest()
+    if h in seen_hashes:
+        return "skip: exact copy"
+    sh = shingles(text)
+    for other in kept.values():
+        if len(sh & other) / len(sh | other) >= threshold:
+            return "skip: near copy"
+    seen_hashes.add(h)
+    kept[chunk_id] = sh
+    return "indexed"
+
+base = ("Vector databases store high-dimensional embeddings for similarity search "
+        "across large document collections, and they return the closest matches "
+        "to a query vector ranked by cosine score for every request.")
+chunks = [
+    ("c1", base),
+    ("c2", base.upper()),
+    ("c3", base.replace("closest", "nearest")),
+    ("c4", "Binary trees keep sorted data for efficient lookups."),
+    ("c5", "Binary trees keep sorted data for efficient lookups."),
+]
+for cid, text in chunks:
+    print(cid, process(cid, text))
+```
+
+## Retrieval time: filter with MMR
+
+Some near-copies still slip through. The threshold is never perfect, and older documents may have been indexed before you turned dedup on. So filter again at query time.
+
+[Maximal marginal relevance](maximal_marginal_relevance.html) picks results one at a time. Each pick maximises `lambda * relevance - (1 - lambda) * similarity to what you already picked`. A high lambda favours relevance. A low one favours variety.
+
+```python-run
+import math
+
+def cos(a, b):
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    return dot / (na * nb) if na and nb else 0.0
+
+def mmr(query, docs, lam=0.4, k=3):
+    chosen, left = [], list(range(len(docs)))
+    while left and len(chosen) < k:
+        def score(i):
+            redundancy = max((cos(docs[i][1], docs[j][1]) for j in chosen), default=0)
+            return lam * cos(query, docs[i][1]) - (1 - lam) * redundancy
+        best = max(left, key=score)
+        chosen.append(best)
+        left.remove(best)
+    return [docs[i][0] for i in chosen]
+
+query = [0.9, 0.1, 0.0]
+docs = [("A overview", [0.85, 0.15, 0.0]), ("B near-copy of A", [0.84, 0.16, 0.01]),
+        ("C indexing", [0.80, 0.10, 0.20]), ("D near-copy of A", [0.83, 0.14, 0.02]),
+        ("E query tuning", [0.70, 0.05, 0.50])]
+print("MMR      :", mmr(query, docs))
+ranked = sorted(docs, key=lambda d: -cos(query, d[1]))[:3]
+print("relevance:", [d[0] for d in ranked])
+```
+
+With lambda 0.4, MMR keeps one of the three near-copies and then picks the indexing and query-tuning documents. Plain relevance ranking returns the same material three times.
+
+Lambda matters more than it looks. An exact copy scores about `2 * lambda - 1`, because its relevance and its overlap with a pick are both close to 1. At lambda 0.7 that is still positive, so a copy can beat a different but less relevant document. Below 0.5, copies are pushed down.
+
+## Edge cases that break naive dedup
+
+<strong>Formatting variants.</strong> The same endpoint documented in Markdown, HTML and reStructuredText gives three chunks with different markup. Strip the markup before you hash or shingle.
+
+<strong>Boilerplate.</strong> A shared header such as "This document is confidential" pushes the overlap up between unrelated files. Find shingles that appear in more than 20% of documents and remove them before comparing.
+
+<strong>Versions.</strong> When a near-copy comes from a newer version of a document, keep the newer one, since it likely holds fixes. Log the swap.
+
+<strong>Similar text, different facts.</strong> Two chunks that differ by a number, a date or a negation are not duplicates. The float32 and float16 pair above is one. Compare the document source and metadata too, and keep the threshold high enough to spare real differences.
+
+## What it saves
+
+The saving depends on your corpus, so measure it. Hash a sample, count how many chunks are exact copies, then count the near-copies at 0.8. Every removed chunk is one less embedding to pay for, one less vector to store, and one less repeat in the prompt. If each query currently sends 1,200 tokens and three of five chunks repeat, cutting the repeats can bring that down sharply. Check recall before and after using [retrieval metrics](retrieval_evaluation_metrics.html) to make sure only copies went.
+
+## Things to try
+
+1. Set the <strong>Strategy</strong> to exact copies. Only the byte-identical chunks go. The one-word change survives.
+2. Switch to near-duplicates with the <strong>Near-duplicate threshold</strong> at 80. The one-word change goes. So does the float16 chunk, which is a red row: a different fact lost.
+3. Lower the <strong>Near-duplicate threshold</strong> to 70. The new refund policy is removed as a "copy" of the old one.
+4. Raise the <strong>Near-duplicate threshold</strong> to 95. Only exact copies go, and nothing distinct is lost.
+
+## What to remember
+
+Hash cleaned text to catch exact copies, use MinHash to catch near-copies, and run both at ingestion. At retrieval time, use MMR to keep the results varied. Keep the threshold high enough that a chunk with a different fact is not treated as a copy.
+
+## Questions people ask
+
+<strong>Should I dedupe at ingestion or at retrieval?</strong> Both. Ingestion saves storage and embedding cost. Retrieval filtering improves the answer. If you can only do one, retrieval filtering helps users more.
+
+<strong>What Jaccard threshold should I use?</strong> Start at 0.8. Lower values catch more copies and risk merging different chunks. Higher values are safer and let more copies through. Read sample pairs at each level.
+
+<strong>How does MMR relate to cosine similarity?</strong> MMR uses [cosine similarity](../machine_learning/cosine_similarity.html) twice. It scores each candidate against the query for relevance and against the picks so far for redundancy. Lambda sets the balance.
+
+<strong>Does dedup hurt recall?</strong> Not if you remove only copies. Measure recall before and after to be sure.
+
+<strong>What about identical text in different documents?</strong> Check the source first. The same paragraph in a security guide and in an API reference can serve different readers. Use document metadata in the decision.
+
+## Recap in one screen
+
+- Duplicates waste storage, embedding cost and context space.
+- Hash cleaned text for exact copies, and MinHash for near-copies.
+- Run the cheap check first.
+- Use MMR at query time to keep results varied.
+- Guard against merging chunks that look alike but state different facts.

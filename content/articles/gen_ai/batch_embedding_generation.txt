@@ -1,0 +1,199 @@
+title: Batch Embedding Generation
+intro: Turn 100,000 texts into vectors with Sentence Transformers by batching well, cleaning the input, saving the matrix in the right format and keeping the row mapping.
+
+## What batch embedding is and why it matters
+
+Batch embedding means turning a large pile of text into vectors that a search system can compare. For 100,000 article titles or chunks, you load an embedding model, feed it texts in groups, and save the resulting matrix to disk.
+
+Sentence Transformers is a Python library built on Hugging Face Transformers. A raw BERT model gives one vector per token. A Sentence Transformer adds a pooling step to produce one vector per text. The steps are: split the text into tokens, run them through a transformer of six or twelve layers, average the token vectors (mean pooling), and optionally scale the result to unit length. A title like "Machine learning fundamentals" becomes one 384-dimensional vector that captures its meaning.
+
+You can run a model locally or call an API. A local model costs nothing per text and keeps data on your machines. It needs hardware, and it is fastest with a GPU. An API needs no hardware and charges per token, and your text leaves your network. For a one-off job either works. For a pipeline that runs every day, the cost and delay add up, so check current prices and measure your own speed before you decide.
+
+This page covers choosing a model, batching, cleaning input, picking a storage format, searching the result, and what changes at larger scale. For how embeddings fit into a full [RAG](rag.html) system, see [embeddings and vector search](embeddings_and_vector_search.html). For failures and restarts on bigger jobs, see [embedding resilience and checkpointing](embedding_resilience_and_checkpointing.html).
+
+## Choose a model by dimension, depth and length limit
+
+The model sets the vector size, the speed and the quality. Three facts matter before any benchmark: the dimension, the number of layers, and the longest input it reads. Text past that limit is silently cut.
+
+`all-MiniLM-L6-v2` gives 384-dimensional vectors from six layers and reads up to 256 tokens. `all-MiniLM-L12-v2` has twelve layers, so it is slower and often a little better, but it reads only 128 tokens by default. `all-mpnet-base-v2` gives 768 dimensions from twelve larger layers and reads 384 tokens. It is usually the strongest of the three and the slowest.
+
+For question answering, `multi-qa-MiniLM-L6-cos-v1` is tuned on question and answer pairs. For many languages, `paraphrase-multilingual-MiniLM-L12-v2` covers 50 or more. Titles are short, 5 to 20 tokens, so any of these finishes quickly. Pick on quality, and check the limit against your longest text.
+
+Dimension decides storage. The code below prices 100,000 vectors for each choice.
+
+```python-run
+models = [  # name, dimensions, layers, max tokens read
+    ("all-MiniLM-L6-v2", 384, 6, 256),
+    ("all-MiniLM-L12-v2", 384, 12, 128),
+    ("all-mpnet-base-v2", 768, 12, 384),
+]
+count = 100_000
+print(f"{'model':20s} {'dims':>5} {'layers':>6} {'max tokens':>10} {'MB for 100k':>12}")
+for name, dims, layers, limit in models:
+    mb = count * dims * 4 / 1e6
+    print(f"{name:20s} {dims:5d} {layers:6d} {limit:10d} {mb:12.1f}")
+```
+
+## Batch the texts, and sort them by length
+
+Encoding one text at a time is the biggest mistake. Calling `model.encode(title)` in a loop wastes the GPU, which is built to do thousands of operations at once. Pass a list instead: `model.encode(titles, batch_size=256)`.
+
+Batch size is limited by memory. Memory use grows with the batch size and with the longest text in the batch, because attention compares every token with every other token. If you see out-of-memory errors, halve the batch size.
+
+There is a second, quieter cost. A batch is a rectangle: every text is padded with blank tokens up to the longest one. One long title in a batch of short ones makes the whole batch do work on blanks. Sort the texts by length before batching and most of the padding disappears.
+
+```python-run
+import random
+random.seed(1)
+lengths = [min(120, 4 + int(random.expovariate(1 / 10))) for _ in range(2000)]
+
+def padded_tokens(lengths, batch_size):
+    total = 0
+    for i in range(0, len(lengths), batch_size):
+        batch = lengths[i:i + batch_size]
+        total += max(batch) * len(batch)
+    return total
+
+real = sum(lengths)
+print("real tokens:", real)
+for bs in (16, 64, 256):
+    plain = padded_tokens(lengths, bs)
+    ordered = padded_tokens(sorted(lengths), bs)
+    print(f"batch {bs:3d}: padded {plain:6d} ({1 - real / plain:4.0%} blank) "
+          f"-> sorted {ordered:6d} ({1 - real / ordered:4.0%} blank)")
+```
+
+In this sample, unsorted batches are 63% to 76% blank, and sorting cuts that to 2% at batch 16 and 27% at batch 256. The bigger the batch, the more chance one long text drags the rest, and sorting limits the damage. Sentence Transformers already sorts by length inside a single `encode` call, so pass the whole list at once instead of splitting it yourself. On CPU, batches of 64 to 128 are typical, because there is no GPU parallelism to feed. Batching there mostly cuts the overhead of Python calls.
+
+## Clean the input and keep a mapping
+
+Real data is messy. Handle empty strings, null bytes and odd spacing before you encode. Normalise Unicode to the NFC form, because the same visible accent can be stored as one character or as two. Without it, two identical-looking titles can get different vectors.
+
+Keep a mapping from each cleaned row to its original position. When you skip an empty title, row numbers no longer line up with your title list. The mapping is what lets you turn a search hit back into a title. Without it, the matrix is useless.
+
+```python-run
+import unicodedata
+
+def preprocess(titles):
+    cleaned, mapping, skipped = [], {}, 0
+    for i, title in enumerate(titles):
+        if not title or not title.strip():
+            skipped += 1
+            continue
+        text = unicodedata.normalize("NFC", title).replace("\x00", "")
+        text = " ".join(text.replace("\t", " ").split())
+        mapping[len(cleaned)] = i
+        cleaned.append(text)
+    return cleaned, mapping, skipped
+
+titles = ["Machine Learning 101", "", "  Deep   Learning\t\tBasics  ",
+          None, "Café culture"]
+cleaned, mapping, skipped = preprocess(titles)
+print("input", len(titles), "valid", len(cleaned), "skipped", skipped)
+for row, text in enumerate(cleaned):
+    print(f"  row {row} -> original {mapping[row]}: {text!r}")
+print("accent before:", len(titles[4]), "chars, after:", len(cleaned[2]), "chars")
+```
+
+## Save the matrix so it loads fast
+
+100,000 vectors at 384 dimensions in float32 take about 154 MB. How you save them decides load time and memory.
+
+A NumPy `.npy` file is the simplest choice. Loaded with `np.load(path, mmap_mode="r")`, the operating system reads only the rows you touch, so a large file opens instantly. HDF5 adds chunked reads, compression and metadata, and suits files you slice often. Do not use pickle. It cannot be memory-mapped, it is slow for big arrays, and loading a pickle can run arbitrary code.
+
+Float16 halves the size. For cosine search it rarely changes which results come back, but it can. Measure it on your data instead of trusting a general claim.
+
+```python-run
+import io
+import numpy as np
+
+rng = np.random.default_rng(0)
+vecs = rng.normal(size=(5000, 384)).astype(np.float32)
+vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
+
+def saved_bytes(arr):
+    buf = io.BytesIO()
+    np.save(buf, arr)
+    return len(buf.getvalue())
+
+half = vecs.astype(np.float16)
+print("float32 file:", saved_bytes(vecs), "bytes")
+print("float16 file:", saved_bytes(half), "bytes")
+
+queries = vecs[:200]
+same = 0
+for q in queries:
+    top32 = set(np.argsort(vecs @ q)[-10:])
+    top16 = set(np.argsort(half.astype(np.float32) @ q)[-10:])
+    same += top32 == top16
+print("queries whose top-10 is identical:", same, "of", len(queries))
+```
+
+## Search the result
+
+At 100,000 vectors, exact brute-force search is fast enough that you do not need an approximate index. A typical rule is to look at indexes such as [HNSW](hnsw_index.html) once you pass about a million vectors, but measure on your hardware.
+
+Encode the query with the same model. Take the dot product with every stored vector, which equals cosine similarity when the vectors are unit length. Then find the top k with `np.argpartition`, which selects the best k in linear time. A full sort does more work than you need.
+
+```python-run
+import numpy as np
+
+rng = np.random.default_rng(1)
+store = rng.normal(size=(20000, 64)).astype(np.float32)
+store /= np.linalg.norm(store, axis=1, keepdims=True)
+query = store[123] + 0.05 * rng.normal(size=64).astype(np.float32)
+query /= np.linalg.norm(query)
+
+scores = store @ query
+k = 5
+part = np.argpartition(scores, -k)[-k:]
+top = part[np.argsort(-scores[part])]
+full = np.argsort(-scores)[:k]
+
+print("argpartition top-5:", top.tolist())
+print("full sort top-5   :", full.tolist())
+print("same results:", top.tolist() == full.tolist())
+```
+
+## Past 100,000: stream and spread out
+
+At ten million titles, holding everything in memory stops working. Stream the titles from disk and write each finished batch to a growing HDF5 dataset. Peak memory is then one batch plus the model. Flush to disk every few thousand rows so a crash loses little.
+
+For several GPUs, Sentence Transformers can start one worker per device and split the texts between them. The workers do not talk to each other, so speed rises close to linearly with the number of devices. Measure it, because disk and tokenising can become the limit.
+
+## Normalise, and always save the mapping
+
+Two rules are not optional. Normalise vectors to unit length if you will use cosine similarity, and you almost certainly will. Doing it once at encode time is cheaper than at every query. And save the row-to-title mapping next to the matrix. The matrix has no labels of its own.
+
+## Things to try
+
+1. Set the <strong>Model</strong> to mpnet and the <strong>Batch size</strong> to 1024. Memory passes the 16 GB card and the bar turns red.
+2. With MiniLM and a <strong>Batch size</strong> of 256, turn on <strong>Sort texts by length</strong>. The blank share drops from 79% to 33%.
+3. Drop the <strong>Batch size</strong> to 8. Memory falls to almost nothing, and the model calls climb to 12,500.
+4. Keep <strong>Sort texts by length</strong> on and compare memory. Sorting saves work, not peak memory.
+
+## What to remember
+
+Encode in batches, sort texts by length so batches carry little padding, and clean the input. Keep the row-to-text mapping, normalise the vectors, and save them as a memory-mappable array. Float16 halves the size, and you should check that it keeps your results.
+
+## Questions people ask
+
+<strong>Why is batching faster than one text at a time?</strong> A GPU runs thousands of operations at once. One short text fills a sliver of it. A batch fills it.
+
+<strong>How big should the batch be?</strong> On GPU, start at 256 and raise it until memory gets tight. On CPU, 64 to 128 is typical.
+
+<strong>When is float16 fine?</strong> When storage matters and cosine search is all you do. Test that your top results do not change.
+
+<strong>API or local model?</strong> An API suits small jobs without a GPU where data privacy is not a worry. A local model suits big or repeated jobs and private data.
+
+<strong>When do I need an approximate index?</strong> Around a million vectors, give or take. Below that, exact search is simpler and fast.
+
+<strong>Why sort by length?</strong> Batches are padded to their longest text. Sorting puts similar lengths together, so less work goes on blanks.
+
+## Recap in one screen
+
+- Encode lists, not single texts, and sort them by length.
+- Check each model's token limit, because longer text is cut off.
+- Clean and normalise Unicode, and keep a row-to-original mapping.
+- Save as `.npy` or HDF5, not pickle.
+- Normalise the vectors, and test float16 before you rely on it.
