@@ -22,7 +22,7 @@ import subprocess
 from lib_catalog import ROOT, SITE, DIR_META
 
 AUTHOR = "Ashish Jangra"
-CONTACT_EMAIL = "ashishjangra2910@gmail.com"
+CONTACT_EMAIL = "hello.vizlearn@gmail.com"
 
 GITHUB = "https://github.com/AshishJangra27"
 LINKEDIN = "https://www.linkedin.com/in/ashish-jangra/"
