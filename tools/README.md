@@ -78,6 +78,35 @@ inside those markers.
   generators have written their markup produces a stylesheet missing every class
   they are about to emit — and only the second build looks right.
 
+## Build gotchas
+
+- **Adding generated pages (gen_ai/ operations modules, interview questions,
+  and so on): create the pages before the full build.** The `sequence` step
+  runs near the start and refuses to reorder when a path in `sequence.py` is
+  not on disk yet, and the pages are only written later by `rag` or
+  `interview`. For a brand-new module run its generator once on its own
+  (`python3 tools/build_rag.py`), then `npm run build`.
+- **Page dates come from git, and a failing `git` silently stamps today.**
+  `lib_pages.py` runs `git` in a subprocess and treats a failure as "changed
+  today", so a build in an environment where `git` does not start gives every
+  page a fresh "Last updated" and `datePublished`. On macOS under a sandbox
+  the `/usr/bin/git` shim can fail with `unable to load libxcrun`; put the
+  real binary first and the problem goes away:
+
+      PATH=/Library/Developer/CommandLineTools/usr/bin:$PATH npm run build
+
+  Check one old page's `datePublished` after a build before committing.
+- **Commit rebuilds separately from content changes.** The committed pages
+  can lag the build tools, so a full rebuild touches most pages. To see what
+  your change really does, build an unmodified checkout in a second
+  `git worktree` and compare the two trees; only files that differ between
+  them belong to your change.
+- **Browser Python cannot import everything.** Runnable code fences execute in
+  Pyodide. `sqlite3` is not preloaded, threads cannot start, and CPU timing is
+  unreliable, so show those as static `python` fences or use plain data
+  structures. `.claude/skills/rewrite/reference/pyodide-limits.md` lists what
+  works.
+
 ## Page kinds
 
 Four now, where there used to be two:

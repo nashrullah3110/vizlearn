@@ -259,8 +259,14 @@ def scripts_for(src):
 
 
 # The one-time migration wrote these directly; drop the loose copies.
+#
+# `defer` is optional because build_articles.ensure_sql_runner_scripts appends
+# `<script defer src=...>` tags for the SQL editor when a page has none yet.
+# Those were never stripped, so a page rebuilt from scratch (dbtopics, then
+# articles, then this step) ended up loading vizlearn-sql.js and
+# vizlearn-code.js twice. The block below re-adds whatever the page needs.
 LOOSE_SCRIPT = re.compile(
-    r'[ \t]*<script src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-notebook|vizlearn-rails|vizlearn-js|vizlearn-html|vizlearn-code|vizlearn-interview|vizlearn-ragviz)\.js"></script>\n?')
+    r'[ \t]*<script (?:defer )?src="(?:\.\./)*assets/(?:modules|search|vizlearn|vizlearn-lab|vizlearn-state|vizlearn-pwa|vizlearn-keys|glossary|vizlearn-glossary|vizlearn-python|vizlearn-notebook|vizlearn-rails|vizlearn-js|vizlearn-html|vizlearn-code|vizlearn-sql|vizlearn-interview|vizlearn-ragviz)\.js"></script>\n?')
 
 META_DESC = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"\s*/?>', re.I)
 TITLE = re.compile(r"<title>(.*?)</title>", re.S)
