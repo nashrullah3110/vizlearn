@@ -1,0 +1,234 @@
+title: Distributed Ingestion Pipeline
+intro: Process thousands of articles a day with idempotent workers, so a crash, a retry or a redelivered message never leaves a duplicate or a hole in your index.
+
+## Why the design is about safety, not speed
+
+A production [RAG](rag.html) system takes in new and updated documents every day. The ingestion pipeline splits each article into chunks, makes [embeddings](embeddings_and_vector_search.html) and writes them to the vector store. At 10,000 articles a day, raw throughput is modest. One worker can embed the whole batch in about a minute.
+
+So why distribute it? For safety. If one article has malformed text, it must not block the other 9,999. If the embedding API rate-limits you halfway, finished articles must not be redone. If a worker dies between embedding and writing, the system must recover without leaving duplicates.
+
+Three choices give you those properties. A message queue feeds idempotent workers. Chunk IDs are derived from the content, so they are the same every time. And a dead-letter queue catches messages that can never succeed.
+
+This page covers sizing, the worker design, the three layers of idempotency, failure recovery, change detection and monitoring. The patterns suit any corpus that feeds a vector store, whether you use Celery with Redis or Kafka with your own consumers.
+
+One idea runs through all of it. Assume every step can run twice, or stop halfway. Then make sure the index ends up right either way. That single habit removes most of the failures that haunt ingestion jobs in production.
+
+## Size the workload first
+
+Quantify the job before you design anything. The answer tells you whether you need a distributed design, and how many workers. The latency per batch below is an assumption, so measure your own.
+
+```python-run
+import math
+
+articles_per_day = 10_000
+avg_tokens, chunk_size, overlap = 1200, 500, 50
+embedding_ms_per_batch, batch_size = 50, 32
+
+stride = chunk_size - overlap
+chunks_per_article = math.ceil((avg_tokens - overlap) / stride)
+total_chunks = articles_per_day * chunks_per_article
+batches = math.ceil(total_chunks / batch_size)
+seconds = batches * embedding_ms_per_batch / 1000
+
+print("chunks per article  :", chunks_per_article)
+print("chunks per day      :", f"{total_chunks:,}")
+print("embedding batches   :", batches)
+print("one worker, seconds :", round(seconds, 1))
+```
+
+One worker finishes in well under a minute. The real reasons to distribute are bursts (10,000 articles arriving in one hour, not spread over 24), failure isolation, and room to grow.
+
+## Deterministic chunk IDs
+
+Idempotency starts with the chunk ID. If the ID comes from the content, reprocessing the same article produces the same IDs. Writing those chunks again overwrites the old records instead of adding copies.
+
+```python-run
+import hashlib
+
+def chunk_id(article_id, index, content):
+    key = f"{article_id}:{index}:{content}"
+    return hashlib.sha256(key.encode()).hexdigest()[:16]
+
+a = chunk_id("art_42", 0, "The quick brown fox")
+b = chunk_id("art_42", 0, "The quick brown fox")
+c = chunk_id("art_42", 0, "The quick brown cat")
+print("same content, same ID  :", a == b)
+print("changed content, new ID:", a != c)
+print(a, b, c)
+```
+
+A counter or a random ID breaks this. Each reprocessing run would mint new IDs and create duplicates. Notice what a changed chunk does: it gets a new ID, so the old chunk is left behind. The cleanup section below deals with that.
+
+## Three layers of idempotency
+
+Processing the same article twice must give the same result. Three layers make that true.
+
+<strong>Layer 1: message deduplication.</strong> A FIFO queue or Kafka offsets stop the same message being delivered twice inside a window.
+
+<strong>Layer 2: version checking.</strong> Before work starts, the worker checks whether this version is already done. This catches redeliveries that got past layer 1.
+
+<strong>Layer 3: content-addressed writes.</strong> Chunk IDs come from content, and writes are upserts, so the final state is the same however many times a chunk is written.
+
+```python-run
+store = {"art_1": ("v3", "completed"), "art_2": ("v1", "processing"),
+         "art_3": ("v2", "failed")}
+
+def should_process(article_id, version):
+    record = store.get(article_id)
+    if record is None:
+        return True, "never seen"
+    done_version, status = record
+    if done_version == version and status == "completed":
+        return False, "already processed"
+    if done_version == version and status == "processing":
+        return False, "in progress"
+    return True, "new version or an earlier failure"
+
+for aid, ver in [("art_1", "v3"), ("art_1", "v4"), ("art_2", "v1"),
+                 ("art_3", "v2"), ("art_99", "v1")]:
+    go, why = should_process(aid, ver)
+    print(f"{aid:7s} {ver}: process={go!s:5}  ({why})")
+```
+
+## See what a crash does
+
+Delivery is at least once. If a worker dies before it acknowledges a message, the queue sends it again. That is the safe choice, and it means some chunks get written twice. The simulation below crashes a worker after the write and before the acknowledgement, 10% of the time, and compares two ways of writing.
+
+```python-run
+import random, hashlib
+random.seed(5)
+
+def run(deterministic, n=1000, crash_rate=0.10):
+    index = {}                                  # stands in for the vector store
+    for i in range(n):
+        for attempt in range(2):                # a redelivery gets a second try
+            key = (hashlib.sha256(f"chunk{i}".encode()).hexdigest()
+                   if deterministic else f"random{random.random()}")
+            index[key] = i                      # write
+            if random.random() >= crash_rate:   # acknowledged: stop retrying
+                break
+    return len(index)
+
+print("chunks that should exist :", 1000)
+print("random IDs, plain insert :", run(False))
+print("content IDs, upsert      :", run(True))
+```
+
+With random IDs, every redelivery leaves a copy: the store ends with 1,099 entries for 1,000 chunks. With content IDs, the repeat write lands on the same key and the count stays at 1,000. At-least-once delivery plus an idempotent write is the standard pattern. Exactly-once delivery is either impossible or very costly in a distributed system. The same idea underlies [distributed retrieval](distributed_retrieval_and_sharding.html).
+
+## Recovering from failures
+
+Three kinds of failure get three responses.
+
+<strong>Transient failures</strong> such as timeouts and rate limits trigger a retry with exponential backoff, for example waits of 60, 120 and 240 seconds.
+
+<strong>Poison messages</strong>, such as malformed content or encoding errors, go to a dead-letter queue after the retries run out. It is a place to investigate, not a graveyard. Each entry needs enough context to diagnose the cause and replay it after a fix.
+
+<strong>Partial failures</strong>, for example three of five embedding batches succeeding, trigger a retry of the whole article. Because IDs are deterministic and writes are upserts, the finished chunks are overwritten with identical data. No duplicates and nothing stale.
+
+## Clean up stale chunks
+
+When an article changes, the new version may produce different chunks. The old chunks that no longer exist must go. The order matters: write the new chunks first, then delete the old ones. If you delete first, there is a window where the article has no chunks and queries on it come back empty.
+
+```python-run
+old = {"chunk_a", "chunk_b", "chunk_c"}
+new = {"chunk_a", "chunk_d"}
+
+store = set(old)
+store |= new                       # step 1: upsert the new chunks
+print("during the update:", sorted(store), "- nothing missing")
+store -= (old - new)               # step 2: delete what the new version dropped
+print("after cleanup    :", sorted(store))
+print("stale removed    :", sorted(old - new))
+```
+
+## Detect changes before you queue work
+
+Most articles do not change on a given day. In a corpus of 200,000 articles where 10,000 change daily, change detection spares you from reprocessing 190,000 unchanged ones. Hash each article and compare it with the stored hash. Only articles with a new hash enter the queue.
+
+```python-run
+import hashlib
+
+def content_hash(text):
+    return hashlib.sha256(text.strip().lower().encode()).hexdigest()[:16]
+
+stored = {"art_1": content_hash("Same content as before"),
+          "art_2": content_hash("The original text of article two")}
+
+incoming = [("art_1", "Same content as before"),
+            ("art_2", "Updated content here"),
+            ("art_4", "A brand new article")]
+
+queue = []
+for aid, text in incoming:
+    if stored.get(aid) == content_hash(text):
+        print(f"{aid}: unchanged, skip")
+    else:
+        queue.append(aid)
+        print(f"{aid}: new or changed, enqueue")
+print(f"\nto process: {len(queue)} of {len(incoming)}")
+```
+
+## Why Celery rather than asyncio
+
+For this workload Celery with Redis or RabbitMQ is the practical choice.
+
+<strong>Worker isolation.</strong> Each worker is a separate process. If one dies from running out of memory, or from a crash in a native embedding library, the others keep going. Asyncio tasks share one process, so one crash takes everything down.
+
+<strong>Built-in retries.</strong> Celery ships retry, backoff, rate limiting and dead-letter routing. With asyncio you write that yourself.
+
+<strong>Horizontal scaling.</strong> Adding a worker is one command, with no code change.
+
+Asyncio wins at very high rates, such as 100,000 tasks a second, or where a queue hop adds too much delay. Kafka fits better when you need ordering or replay from an offset.
+
+## Monitor it
+
+A pipeline you cannot see is a pipeline that fails silently. Track the failure rate, queue depth, dead-letter depth and processing time, and alert when they drift.
+
+```python-run
+m = {"processed": 9850, "failed": 150, "queue_depth": 200, "dlq_depth": 12,
+     "p95_ms": 2400}
+failure_rate = m["failed"] / (m["processed"] + m["failed"])
+
+alerts = []
+if failure_rate > 0.01:
+    alerts.append(f"failure rate {failure_rate:.1%} is above 1%")
+if m["dlq_depth"] > 100:
+    alerts.append(f"dead-letter queue holds {m['dlq_depth']} messages")
+if m["queue_depth"] > 50_000:
+    alerts.append(f"queue backlog of {m['queue_depth']:,}")
+
+print(f"failure rate {failure_rate:.2%}")
+print("alerts:", alerts if alerts else "none")
+```
+
+## Things to try
+
+1. Set the <strong>Delivery</strong> to at most once with a <strong>Worker crash rate</strong> of 10. No duplicates appear, and chunks are silently lost.
+2. Set the <strong>Delivery</strong> to at least once and <strong>Safety layers</strong> to none. Redeliveries leave duplicate chunks.
+3. Move <strong>Safety layers</strong> to content IDs and upsert. The duplicates vanish, but stale chunks from edited articles remain.
+4. Move <strong>Safety layers</strong> to IDs, upsert and cleanup. The index is clean.
+
+## What to remember
+
+Distribute for safety, not speed. Use at-least-once delivery with idempotent workers. Give chunks deterministic IDs, check versions and upsert. Write new chunks before you delete old ones. Send poison messages to a dead-letter queue, skip unchanged articles, and watch the failure rate.
+
+## Questions people ask
+
+<strong>Why not process everything in one batch?</strong> One bad article aborts the run. Per-article tasks isolate failures.
+
+<strong>Why content hashes instead of counters?</strong> A counter mints new IDs on every reprocessing and creates duplicates. A hash gives the same ID for the same content.
+
+<strong>How do I handle articles deleted at the source?</strong> Keep a list of active article IDs, compare it with the vector store on a schedule, and delete chunks for articles that are gone.
+
+<strong>When should I use Kafka?</strong> When ordering matters, when you need to replay from an offset, or at very high rates. Otherwise Celery is simpler.
+
+<strong>How do I test idempotency?</strong> Process the same article twice and check the store holds the same chunks with the same IDs, with the count unchanged.
+
+## Recap in one screen
+
+- Distribute for failure isolation and bursts, not raw speed.
+- Content-derived chunk IDs plus upserts make repeats harmless.
+- Use at-least-once delivery, never at-most-once, for an index.
+- Write new chunks first, then delete the stale ones.
+- Hash articles to skip unchanged ones, and alert on failure rate.

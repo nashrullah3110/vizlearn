@@ -1,0 +1,187 @@
+title: Embedding Model Migration
+intro: Move a vector database from one embedding model to another with no downtime, using a blue-green index, shadow validation and a staged cutover you can roll back.
+
+## Why swapping the model is harder than it looks
+
+On paper, migration is simple. Re-embed everything with the new model and swap the index. In practice three things make it a real engineering job.
+
+First, you cannot take a production [RAG](rag.html) system offline. Users expect it to work while you re-embed millions of chunks. Second, dimensions are fixed. [HNSW](hnsw_index.html), IVF and PQ indexes are built for one vector size, so a model with a different size needs a new index from scratch.
+
+Third, and most important, embedding spaces do not line up. Even if two models produce the same number of dimensions, their spaces differ. A [cosine similarity](../machine_learning/cosine_similarity.html) of 0.85 in one model's space says nothing about 0.85 in another's. You cannot mix vectors from two models in one index and get meaningful results.
+
+The safe approach comes from blue-green deployment in web services. You build a new index with the new model next to the live one. You check retrieval quality on held-out queries. You switch traffic through a router that can flip back at once. And only then do you retire the old index.
+
+This page walks through each step: the router, the re-embedding job, shadow validation, the staged cutover and handling documents that arrive mid-migration. For the re-embedding job, see [embedding resilience and checkpointing](embedding_resilience_and_checkpointing.html). For background, see [embeddings and vector search](embeddings_and_vector_search.html).
+
+## The rule: never mix embedding spaces
+
+A query embedded by model B and chunks embedded by model A cannot be compared. The scores are not a measure of meaning. This holds even when the dimensions match. Two 384-dimension models trained on different data have spaces that are rotated and stretched relative to each other.
+
+The demonstration below is as kind to the new model as it can be. Model A hashes words into 16 dimensions. Model B is exactly A with its axes rotated, so it holds the same information and ranks documents identically on its own. Mixing them still breaks retrieval.
+
+```python-run
+import numpy as np
+
+def embed_a(text, dims=16):
+    v = np.zeros(dims)
+    for word in text.lower().split():
+        v[hash_word(word) % dims] += 1
+    return v / np.linalg.norm(v)
+
+def hash_word(word):
+    return sum(ord(c) * (31 ** i) for i, c in enumerate(word))
+
+rng = np.random.default_rng(0)
+Q, _ = np.linalg.qr(rng.normal(size=(16, 16)))     # a rotation: model B's axes
+embed_b = lambda text: Q @ embed_a(text)
+
+docs = ["refund policy for returns", "billing cycle and invoices",
+        "api rate limits per key", "getting started guide",
+        "cancel your subscription", "reset a lost password"]
+queries = ["how do returns and refunds work", "when are invoices billed",
+           "what is the api rate limit", "start here guide",
+           "cancel subscription", "password reset"]
+
+def top1_correct(embed_q, embed_d):
+    D = np.array([embed_d(d) for d in docs])
+    return sum(int(np.argmax(D @ embed_q(q)) == i) for i, q in enumerate(queries))
+
+print("A queries on A docs:", top1_correct(embed_a, embed_a), "of", len(docs))
+print("B queries on B docs:", top1_correct(embed_b, embed_b), "of", len(docs))
+print("B queries on A docs:", top1_correct(embed_b, embed_a), "of", len(docs), "(mixed)")
+```
+
+Each model gets 4 of 6 queries right on its own, which is expected for a toy. The mixed run gets 0 of 6, and it fails quietly: you still get a ranked list, just a wrong one. That is why a half-migrated index is worse than an old one.
+
+## Blue-green architecture
+
+Keep two complete, independent indexes. The blue index holds the old model's vectors and serves production. The green index holds the new model's vectors and is built in the background. A router in front sends each request to the right one.
+
+The router has three modes. Blue sends everything to the old index. Green sends everything to the new one. Shadow sends every query to both, returns the blue results so users see no change, and logs the green results for comparison.
+
+```python-run
+class Router:
+    def __init__(self):
+        self.mode = "blue"
+        self.calls = {"blue": 0, "green": 0}
+
+    def search(self, query):
+        targets = {"blue": ["blue"], "green": ["green"],
+                   "shadow": ["blue", "green"]}[self.mode]
+        for t in targets:
+            self.calls[t] += 1
+        shown = "green" if self.mode == "green" else "blue"
+        logged = "green" if self.mode == "shadow" else None
+        return shown, logged
+
+router = Router()
+for mode in ("blue", "shadow", "green"):
+    router.mode = mode
+    shown, logged = router.search("What is the refund policy?")
+    print(f"{mode:7s} user sees {shown:5s} logged for comparison: {logged}")
+print("index calls:", router.calls)
+```
+
+## Re-embed in the background
+
+The re-embedding job runs while blue serves traffic. It reuses the checkpoint and retry design from [embedding resilience and checkpointing](embedding_resilience_and_checkpointing.html), and it never touches the production index. It writes to a staging area. When it finishes, you bulk-load the vectors into the green index, built with the new model's dimension and distance metric.
+
+Estimate the job the same way as any batch: chunks times tokens per chunk, divided by your rate limit, then priced at your provider's rate.
+
+## Validate in shadow mode
+
+Before the cutover, run the router in shadow mode and collect side-by-side results. One useful measure is the overlap of the top-k document IDs from blue and green: the shared IDs divided by all IDs. It shows how alike the two models rank the same corpus.
+
+Treat the thresholds as a starting rule you tune on your own data. A mean overlap above about 0.7 suggests the models mostly agree. Between 0.5 and 0.7 deserves a manual look, since the new model may be better where they differ. Below 0.5, investigate.
+
+Overlap measures similarity, not quality. A low overlap can mean the new model is better, and a high one can hide a shared mistake. So also score both indexes on a labelled query set with [retrieval metrics](retrieval_evaluation_metrics.html). Run shadow mode long enough to cover a normal range of traffic, for example a thousand queries or a full day.
+
+```python-run
+def overlap(a, b):
+    return len(a & b) / len(a | b) if a | b else 1.0
+
+queries = [
+    ("refund policy",       {"d1", "d2", "d3"},  {"d1", "d2", "d4"}),
+    ("billing cycle",       {"d5", "d6"},        {"d5", "d6"}),
+    ("API rate limits",     {"d7", "d8", "d9"},  {"d8", "d10", "d11"}),
+    ("getting started",     {"d12", "d13"},      {"d12", "d13"}),
+    ("cancel subscription", {"d14", "d15"},      {"d14", "d15", "d16"}),
+]
+scores = []
+for name, blue, green in queries:
+    scores.append(overlap(blue, green))
+    print(f"{name:20s} overlap {scores[-1]:.2f}")
+
+mean = sum(scores) / len(scores)
+verdict = "proceed" if mean > 0.7 else "review" if mean > 0.5 else "investigate"
+print(f"mean overlap {mean:.3f} -> {verdict}")
+```
+
+## Cut over in stages
+
+Move traffic gradually. Stage one is a canary: send 10% of traffic to green for a set time and watch errors and latency. Stage two is 50%. Stage three is 100%. Keep the blue index for several days after, and only then retire it. Storage is cheap next to the risk of finding a regression with no way back.
+
+Rollback works at every stage because blue is untouched: flip the router. To split traffic fairly, route by a hash of a stable ID, so a given user always lands on the same index.
+
+```python-run
+import hashlib
+
+def goes_to_green(user_id, percent):
+    bucket = int(hashlib.sha256(user_id.encode()).hexdigest(), 16) % 100
+    return bucket < percent
+
+users = [f"user{i}" for i in range(1000)]
+for percent in (10, 50, 100):
+    share = sum(goes_to_green(u, percent) for u in users)
+    print(f"{percent:3d}% canary -> {share} of 1000 users on green")
+print("same user, same answer:", goes_to_green("user7", 50) == goes_to_green("user7", 50))
+```
+
+## Documents that arrive mid-migration
+
+Documents ingested during the migration window need vectors in both indexes. Without dual writes, a document added on Tuesday sits in blue but not in green, and after Wednesday's cutover it cannot be found.
+
+So the ingestion path embeds each new document with both models and writes to both indexes for the length of the migration. That doubles the embedding cost for new documents, but the window lasts days. If ingestion is heavy, embed for green asynchronously. After the cutover, switch ingestion to the new model only.
+
+## A cheaper option: shorter vectors
+
+Some newer models, such as OpenAI's `text-embedding-3` family, support a `dimensions` parameter. They are trained so that the first dimensions carry the most information (Matryoshka representation learning), and the vector can be shortened with a small quality loss. That cuts storage and speeds up search without changing models. Check the loss on your own labelled queries before you adopt it.
+
+## Configure, do not hard-code
+
+If `EMBEDDING_DIM = 1536` appears all over your code, every migration touches dozens of files. Keep the model name and the dimension in configuration, and use it to create indexes, size arrays and validate input. The next migration then becomes a config change.
+
+Also copy the metadata. Filters, namespaces and chunk text must move to the new index, or you cannot filter it.
+
+## Things to try
+
+1. Choose the <strong>Strategy</strong> in place, set <strong>Documents in the new space</strong> to 50 and leave <strong>Queries use the new model</strong> off. Recall drops, because half the documents are now in a space the old model cannot read.
+2. Turn on <strong>Queries use the new model</strong> at the same 50. Recall stays low, because now the other half is unreadable.
+3. Switch the <strong>Strategy</strong> to blue-green with the cutover off. Recall stays at the old level while the green index fills.
+4. Turn the cutover on at 50. Recall falls, because the green index is half empty. At 100 it rises above the old level.
+
+## What to remember
+
+Never mix embedding spaces. Build a green index in the background, validate in shadow mode with overlap and labelled queries, cut over in stages through a router, and keep blue for rollback. Write new documents to both indexes during the window, and keep the model and dimension in config.
+
+## Questions people ask
+
+<strong>Can I mix two models in one index?</strong> No. Their spaces are incomparable, so the scores mean nothing.
+
+<strong>What if the new model has the same dimension?</strong> You still need a separate index. The same size does not mean the same space.
+
+<strong>How long does re-embedding take?</strong> Work it out as chunks times tokens divided by your rate limit, then add time for retries. See the resilience page.
+
+<strong>When should I shorten the vectors instead?</strong> When the goal is storage or speed and the model is fine. Test the quality loss first.
+
+<strong>How long do I keep the old index?</strong> At least several days after full cutover. It is your rollback path.
+
+<strong>What about new documents?</strong> Embed them with both models and write to both indexes until the cutover.
+
+## Recap in one screen
+
+- Vectors from two models cannot be compared, even at equal size.
+- Build the new index beside the old one and route between them.
+- Validate in shadow mode with overlap and labelled queries.
+- Cut over in stages by hashing a stable ID, and keep blue for rollback.
+- Dual-write new documents, and keep model settings in config.

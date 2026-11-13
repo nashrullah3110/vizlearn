@@ -1,0 +1,207 @@
+title: Debugging RAG
+intro: When the knowledge base holds the answer and the system still gets it wrong, follow the trace stage by stage until you find where the answer was lost.
+
+## Three places an answer goes wrong
+
+Every wrong answer from a [RAG](rag.html) system was lost at one of three stages. Your first job is to find which one. Do not start by rewriting the prompt.
+
+A retrieval failure means the right chunk is in the store, but the retriever did not return it in the top k. A synthesis failure means the right chunk reached the model, and the model ignored it, misread it or wrote over it. A post-processing failure means the model answered correctly, and something after it broke the answer. That could be an output parser, a guardrail, a citation step or a stale [cache](caching_in_rag_pipelines.html).
+
+People blame the model first, because the wrong text came from the model. But the model can only use what it was given. Check retrieval before you suspect generation. Many teams find retrieval is the most common cause, but count your own failures instead of trusting a rule of thumb.
+
+The method has four steps. Record a trace of every stage. Read the trace for the failing question. Run small experiments that change one thing at a time. Then fix the cause and add a regression test, so the bug cannot return unseen. The rest of this page walks through each step.
+
+## Start with a trace
+
+You cannot debug what you did not record. A trace captures every stage for one question: the raw query, the rewritten query, the retrieved chunks with scores, the reranked list, the exact prompt, the raw model reply, and the final output.
+
+Record the exact prompt that went to the model, not one you rebuild later. Templates, system prompts and few-shot examples all shape the answer, and a rebuilt prompt hides them.
+
+```python-run
+import hashlib, time
+
+class DebugTrace:
+    def __init__(self, query):
+        key = f"{query}:{time.time()}".encode()
+        self.query_id = hashlib.sha256(key).hexdigest()[:12]
+        self.raw_query = query
+        self.stages = {}
+
+    def record(self, stage, data):
+        self.stages[stage] = data
+
+    def summary(self):
+        print("trace", self.query_id, "|", self.raw_query)
+        for stage, data in self.stages.items():
+            print(f"  {stage:16s} {str(data)[:60]}")
+
+trace = DebugTrace("What is our PTO policy?")
+trace.record("rewritten_query", "PTO vacation leave policy")
+trace.record("top_chunk_score", 0.42)
+trace.record("retrieved", ["leave_policy_3", "holiday_calendar_1", "travel_2"])
+trace.record("raw_reply", "Based on the context, employees get 15 days.")
+trace.record("final_output", "Employees get 15 days of PTO per year.")
+trace.summary()
+```
+
+## Retrieval: where did the right chunk rank?
+
+When the correct chunk is missing, fetch a wider window than production. Ask for the top 20 instead of the top 5. Then find the rank of the chunk you wanted.
+
+Rank 7 means it was close, and a small fix may bring it in. Rank 200 means the question and the chunk are far apart in embedding space, which is a deeper problem. If the chunk is not in the list at all, it never made it into the store.
+
+```python-run
+def diagnose(ranked_ids, scores, gold_id, production_k=5):
+    if gold_id not in ranked_ids:
+        return "chunk is not in the store or was filtered out"
+    rank = ranked_ids.index(gold_id) + 1
+    cutoff = scores[production_k - 1]
+    gap = round(cutoff - scores[rank - 1], 2)
+    if rank <= production_k:
+        return f"rank {rank}: it was retrieved, so look at the model"
+    if rank <= 2 * production_k:
+        return f"rank {rank}, {gap} below the cutoff: try query expansion or hybrid search"
+    return f"rank {rank}: far from the query, so suspect the embedding or the chunking"
+
+ids = ["a", "b", "c", "d", "e", "f", "gold", "h"]
+scores = [0.85, 0.78, 0.72, 0.68, 0.65, 0.61, 0.58, 0.55]
+print(diagnose(ids, scores, "gold"))
+print(diagnose(ids, scores, "b"))
+print(diagnose(ids, scores, "missing"))
+```
+
+Four causes explain most retrieval failures:
+
+<strong>Vocabulary mismatch.</strong> The user writes "PTO policy" and the document says "vacation and leave entitlements". Add query expansion, or use [hybrid search](hybrid_search_reciprocal_rank_fusion.html) so [BM25](bm25_and_sparse_retrieval.html) catches the words the [embeddings](embeddings_and_vector_search.html) miss.
+
+<strong>Chunk boundaries.</strong> The answer spans two chunks and neither one is enough. Use overlap or parent-child retrieval. See [chunking strategies](chunking_strategies_for_rag.html).
+
+<strong>Stale embeddings.</strong> The document changed and the vectors did not. Hash the content and re-embed when the hash changes.
+
+<strong>Filters.</strong> A [permission filter](permission_filtering_in_rag.html) quietly removed the chunk. Log the filters you applied and run the query with and without them.
+
+## Synthesis: change one thing at a time
+
+If the right chunk was in the prompt and the answer is still wrong, the model failed to use it. Find out why with contrastive experiments. Each changes one thing and compares the result.
+
+1. <strong>Solo chunk.</strong> Give the model only the right chunk. If it still fails, the chunk text is unclear.
+2. <strong>Full context.</strong> Give it everything that was retrieved. If this is worse than the solo run, distractors are drowning the signal.
+3. <strong>Reversed order.</strong> Flip the chunk order. Research on long contexts finds models attend most to the start and end and least to the middle, so position can change the answer.
+4. <strong>No system prompt.</strong> Remove the persona and safety text. Sometimes it makes the model refuse or reword what the context says.
+
+The loop below takes any function that answers from a list of chunks. Here a stand-in model with a built-in flaw plays that role: it only reads the first chunk. That makes the pattern of results easy to read.
+
+```python-run
+GOLD = "Employees get 15 days of PTO."
+
+def toy_model(chunks, system_prompt=""):
+    """A stand-in that only reads the first chunk."""
+    return chunks[0]
+
+retrieved = ["Parking is free for staff.", "Holidays follow the national calendar.",
+             GOLD, "Travel must be booked early."]
+
+experiments = {
+    "solo chunk":     toy_model([GOLD]),
+    "full context":   toy_model(retrieved),
+    "reversed order": toy_model(list(reversed(retrieved))),
+    "gold moved to front": toy_model([GOLD] + [c for c in retrieved if c != GOLD]),
+}
+for name, answer in experiments.items():
+    print(f"{name:20s} {'PASS' if GOLD in answer else 'FAIL'}")
+```
+
+Read the pattern, not each line. Pass on the solo run and fail on the full run means the model can read the chunk but loses it among the others. The fix is to rerank, send fewer chunks, or put the best chunk first.
+
+## Post-processing: compare raw and final
+
+Put the raw model reply beside the final output. Check whether a parser cut the answer, a guardrail rewrote it, or a cache served an old one.
+
+One sign of a stale cache: retrieval time under a millisecond. Real retrieval over a vector store takes longer. If a cached answer predates a document update, the user sees old facts.
+
+Another sign is length. If the final output is far shorter than the raw reply, a parser is probably truncating it.
+
+## Put it together as a decision tree
+
+The checks above form a fixed order. Run them in that order for every failing question, and stop at the first stage that fails.
+
+```python-run
+def first_failure(rank, k, solo_ok, full_ok, raw_answer, final_answer):
+    if rank is None or rank > 10:
+        return "retrieval: the right chunk was not fetched"
+    if rank > k:
+        return f"context cut-off: rank {rank} but only k={k} chunks sent"
+    if not solo_ok:
+        return "synthesis: the chunk itself is unclear to the model"
+    if not full_ok:
+        return "synthesis: distractor chunks drown the signal"
+    if len(final_answer) < 0.5 * len(raw_answer):
+        return "post-processing: the final answer is much shorter than the raw reply"
+    return "no failure found in the trace"
+
+print(first_failure(7, 5, True, True, "x" * 100, "x" * 100))
+print(first_failure(3, 5, True, False, "x" * 100, "x" * 100))
+print(first_failure(2, 5, True, True, "x" * 100, "x" * 30))
+```
+
+## Turn every fix into a test
+
+Each bug you fix should become a regression test. A golden set of (question, expected chunks, words the answer must contain) catches regressions after any change: a new embedding model, a different chunk size, a prompt edit or a new [reranker](reranking_bi_encoders_vs_cross_encoders.html).
+
+```python-run
+suite = [
+    {"query": "What is our PTO policy?", "expected_chunk": "leave_policy_3",
+     "must_contain": ["15 days"], "tag": "vocabulary mismatch"},
+    {"query": "How do I reset my password?", "expected_chunk": "help_7",
+     "must_contain": ["settings"], "tag": "lost in the middle"},
+]
+
+def pipeline(query):
+    """Stand-in for your real pipeline: returns (retrieved ids, answer)."""
+    if "PTO" in query:
+        return ["leave_policy_3", "travel_2"], "Employees get 15 days a year."
+    return ["help_7", "help_9"], "Open your profile."
+
+for test in suite:
+    chunks, answer = pipeline(test["query"])
+    found = test["expected_chunk"] in chunks
+    said = all(w in answer for w in test["must_contain"])
+    print(f"{test['tag']:20s} retrieval {'ok' if found else 'FAIL'}, answer {'ok' if said else 'FAIL'}")
+```
+
+The first test passes. The second one finds the right chunk and still gets the answer wrong, which points at synthesis, not retrieval. A test that separates the two like this saves hours.
+
+Start with one test per bug. A mature system grows to hundreds. Run them on every pipeline change.
+
+## Things to try
+
+1. Set the <strong>Rank of the correct chunk</strong> to 8 with <strong>Chunks in the prompt</strong> at 5. It was retrieved, then cut. The trace blames the context cut-off, not the model.
+2. Set the <strong>Rank of the correct chunk</strong> to 11. The chunk was never fetched, so retrieval fails first.
+3. Put the rank at 2 and lower <strong>Model uses the context</strong> to 40. Now the model is at fault.
+4. Turn on <strong>Output parser truncates the answer</strong> with everything else healthy. The fault moves to post-processing.
+
+## What to remember
+
+A wrong answer was lost at retrieval, at synthesis or after the model. Record a trace, check the stages in order, and change one thing at a time. Fix the first stage that fails, then add a regression test. Do not debug against live traffic; use saved traces.
+
+## Questions people ask
+
+<strong>Which stage fails most often?</strong> Count yours from traces. Many teams find retrieval is the most common cause, so check it first.
+
+<strong>What is the lost-in-the-middle effect?</strong> Models tend to use information at the start and end of a long context better than information in the middle. Place the best chunk first.
+
+<strong>How do I catch post-processing bugs?</strong> Log the raw reply next to the final output and compare length and content.
+
+<strong>How many regression tests do I need?</strong> One per bug you fix, at minimum. Mature systems keep hundreds.
+
+<strong>Should I debug in production?</strong> No. Replay saved traces offline. Debugging live traffic pollutes your metrics and confuses users.
+
+<strong>How costly are the experiments?</strong> About four model calls per failing question. That is cheap next to guessing at one prompt.
+
+## Recap in one screen
+
+- Wrong answers are lost in retrieval, synthesis or post-processing.
+- Record a full trace, including the exact prompt.
+- Find the rank of the right chunk before blaming the model.
+- Change one thing at a time to find synthesis faults.
+- Turn each fix into a regression test.

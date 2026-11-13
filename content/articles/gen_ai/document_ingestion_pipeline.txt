@@ -1,0 +1,233 @@
+title: Document Ingestion Pipeline
+intro: Turn ten thousand PDFs into searchable vectors with a five-stage pipeline that handles OCR, cleaning, chunking, embedding and storage, and loses as little as possible on the way.
+
+## What the pipeline does
+
+An ingestion pipeline is the foundation of any [RAG](rag.html) system. Before a model can answer questions about your documents, those documents must be broken apart, turned into vectors and stored in an index. The pipeline does that work from end to end.
+
+It has five stages. Extraction turns PDF pages into raw text, with an OCR fallback for scanned pages. Cleaning removes Unicode quirks, repeated headers and footers, and extra whitespace. Chunking cuts the clean text into pieces of a set size, with overlap so that no fact falls through a boundary. Embedding turns each chunk into a vector. Storage writes the vectors to a database, with metadata that traces each one back to its source.
+
+For ten thousand PDFs the design favours throughput and fault tolerance over speed on a single file. Each stage reads from a queue or folder and writes to the next.
+
+The hard part is not any one stage. It is the orchestration. At ten thousand files, failures are certain. A scanned PDF can crash the OCR engine. An API call can time out mid-batch. The pipeline has to survive them without losing work. Checkpoints let it resume. Batching keeps it fast. Idempotent writes mean that running it twice updates records instead of duplicating them.
+
+Every choice here affects retrieval later, in [chunking strategies](chunking_strategies_for_rag.html), [embedding models](embeddings_and_vector_search.html) and [HNSW indexing](hnsw_index.html).
+
+## Stage 1: extract the text
+
+PDF is a presentation format, not a data format. Text may be stored as characters, as glyph references, or as a picture of a page in a scan. That makes extraction the messiest stage.
+
+`pymupdf`, imported as `fitz`, is a common default. It is written in C, copes with malformed and encrypted files, and extracts fast. Compare it with alternatives on your own files before you commit. `pdfplumber` is the better pick when you need tables.
+
+For scanned pages, fall back to OCR. A simple rule works: if a page yields under about 50 characters of text but holds images, render it to an image and run an OCR engine such as Tesseract. Its documentation suggests about 300 DPI. Lower resolutions lose accuracy, and higher ones multiply the pixels for little gain.
+
+```python-run
+def extract(pdf_name, pages):
+    """pages: list of (text, has_images). Returns text per page and the method used."""
+    out, used_ocr = [], False
+    for text, has_images in pages:
+        if len(text.strip()) < 50 and has_images:
+            text = f"[OCR needed: page had only {len(text.strip())} characters of text]"
+            used_ocr = True
+        out.append(text)
+    return pdf_name, out, "ocr" if used_ocr else "text"
+
+report = [("Revenue grew 12% year over year, driven by cloud services across all regions.", False),
+          ("Operating margins improved to 28.4% from 25.1% as costs fell in the second half.", False)]
+invoice = [("Inv", True)]
+blank = [("", False)]  # a blank page with no images is left alone
+
+for name, pages in [("annual_report", report), ("scanned_invoice", invoice), ("blank_page", blank)]:
+    doc, texts, method = extract(name, pages)
+    print(f"{doc:16s} pages={len(texts)} method={method}")
+```
+
+## Stage 2: clean the text
+
+Raw extracted text is noisy. Page numbers, headers, footers and ligatures all get in the way of later steps. Cleaning has a fixed order, because each step relies on the one before.
+
+1. Normalise Unicode so an accent is one character, not two.
+2. Replace ligatures such as `ﬁ` and `ﬂ` with plain letters. Normalising to NFKC does this too, but it changes other characters as well.
+3. Remove lines that repeat on three or more pages. They are almost always headers or footers.
+4. Collapse extra blank lines and runs of spaces.
+
+```python-run
+import re, unicodedata
+from collections import Counter
+
+LIGATURES = {"ﬁ": "fi", "ﬂ": "fl", "ﬃ": "ffi", "ﬄ": "ffl"}
+
+def clean_pages(pages):
+    pages = [unicodedata.normalize("NFC", p) for p in pages]
+    for lig, plain in LIGATURES.items():
+        pages = [p.replace(lig, plain) for p in pages]
+    seen = Counter(line.strip() for p in pages for line in set(p.split("\n")) if line.strip())
+    repeated = {line for line, n in seen.items() if n >= 3}
+    cleaned = []
+    for p in pages:
+        lines = [l.strip() for l in p.split("\n") if l.strip() not in repeated]
+        text = re.sub(r"[^\S\n]+", " ", "\n".join(lines))
+        cleaned.append(re.sub(r"\n{3,}", "\n\n", text).strip())
+    return cleaned, repeated
+
+pages = ["ACME CONFIDENTIAL\nRevenue grew ﬁrmly.\n\n\n\nProﬁt   margins improved.",
+         "ACME CONFIDENTIAL\nCosts fell in the second half.",
+         "ACME CONFIDENTIAL\nOutlook: continued momentum."]
+cleaned, repeated = clean_pages(pages)
+print("removed as headers:", repeated)
+print(cleaned[0])
+```
+
+## Stage 3: chunk by tokens
+
+Chunking is the bridge between documents and the embedding model. The goal is a piece small enough to carry one focused idea and large enough to stand on its own. Measure size in tokens, not characters, because the embedding model and the language model both have token limits.
+
+Character counts hide variation. A 2,000-character chunk may be 300 tokens in plain English and 800 in code. Use the model's own tokenizer, such as `tiktoken` for OpenAI models.
+
+Overlap protects facts that straddle a boundary. A common setting is 50 tokens of overlap on 400-token chunks. That stores about 12% more text and recovers facts that would be cut. For how to choose both numbers, see [chunk size optimization](chunk_size_optimization.html).
+
+```python-run
+def chunk_text(text, size=15, overlap=3):
+    tokens = text.split()           # words stand in for tokens here
+    chunks, start = [], 0
+    while start < len(tokens):
+        end = min(start + size, len(tokens))
+        chunks.append({"index": len(chunks), "start": start,
+                       "tokens": end - start, "text": " ".join(tokens[start:end])})
+        if end == len(tokens):
+            break
+        start += size - overlap
+    return chunks
+
+text = ("Revenue grew 12 percent year over year. Cloud services led the growth "
+        "with a 34 percent increase. Operating margins improved to 28 percent. "
+        "The company expects continued momentum in the fourth quarter.")
+for c in chunk_text(text):
+    print(f"chunk {c['index']}: words {c['start']}-{c['start'] + c['tokens'] - 1}, {c['text'][:52]}...")
+```
+
+## Stage 4: embed in batches
+
+Embedding turns each chunk into a vector. Batching matters a great deal: one chunk per call leaves a GPU almost idle, so pass many chunks at once. See [batch embedding generation](batch_embedding_generation.html) for batch sizes and memory.
+
+Normalise the vectors to unit length. Then [cosine similarity](../machine_learning/cosine_similarity.html) equals the dot product, and you can use the cheaper dot-product metric in the database and get the same ranking.
+
+```python-run
+import math
+
+def normalise(v):
+    n = math.sqrt(sum(x * x for x in v))
+    return [x / n for x in v] if n else v
+
+def dot(a, b):
+    return sum(x * y for x, y in zip(a, b))
+
+def cosine(a, b):
+    return dot(a, b) / (math.sqrt(dot(a, a)) * math.sqrt(dot(b, b)))
+
+a, b = [0.5, 0.3, 0.8, 0.1], [0.4, 0.35, 0.75, 0.15]
+print("cosine of the raw vectors     :", round(cosine(a, b), 4))
+print("dot of the normalised vectors :", round(dot(normalise(a), normalise(b)), 4))
+```
+
+## Stage 5: store with idempotent upserts
+
+The last stage writes the vectors to a database such as Qdrant, Pinecone, Weaviate or pgvector. Use an upsert, not an insert. An upsert writes a record if the ID is new and replaces it if the ID exists, so running the pipeline twice cannot create duplicates. That only works if the ID is deterministic: derive it from the document and chunk position, not from a random number.
+
+Write in batches of a few hundred points per call, and test what your database prefers. Create indexes on fields you filter by, such as `doc_id`. Store metadata with each point: chunk ID, document ID, chunk text, chunk index, token count and source path. Without it, a retrieved vector cannot be traced back to anything.
+
+```python-run
+import hashlib
+
+def point_id(chunk_id):
+    return int(hashlib.sha256(chunk_id.encode()).hexdigest()[:16], 16)
+
+store = {}                                   # stands in for the database
+
+def upsert(chunks):
+    for c in chunks:
+        store[point_id(c["chunk_id"])] = c   # same ID -> replace, never duplicate
+
+chunks = [{"chunk_id": "report_0001", "doc_id": "report", "tokens": 42},
+          {"chunk_id": "report_0002", "doc_id": "report", "tokens": 38}]
+upsert(chunks)
+print("after the first run :", len(store), "points")
+upsert(chunks)                               # the pipeline runs again
+print("after the second run:", len(store), "points")
+print("sample id:", point_id("report_0001"))
+```
+
+## The orchestrator
+
+The orchestrator ties the stages together, and it needs two properties. Use parallelism where it helps, and checkpoint so a crash does not lose progress.
+
+PDF parsing is CPU-bound, so spread it over several processes with `ProcessPoolExecutor`. Threads would not help because of the GIL. Embedding is already batched on the GPU. Storage waits on the network and benefits from larger batches.
+
+For a batch job, a checkpoint file listing finished documents is the simplest design. On restart, load it, drop finished documents and continue. Update it after each stored batch, so a crash costs at most one batch. For a pipeline that runs all the time, use a job queue such as Celery instead. The page on [embedding resilience and checkpointing](embedding_resilience_and_checkpointing.html) builds that in detail.
+
+## Estimate losses and time
+
+Before the first big run, model the funnel. Every stage loses some documents and costs some time. The rates below are placeholders. Replace them with numbers measured on a sample of your own files.
+
+```python-run
+pdfs, scanned, workers = 10_000, 0.20, 4
+ocr_on = True
+stages = [  # name, share kept, seconds per document
+    ("extract", 1 - scanned * (0.05 if ocr_on else 0.90) - 0.01,
+     scanned * (4.0 if ocr_on else 0.2) + (1 - scanned) * 0.4),
+    ("clean", 0.995, 0.05), ("chunk", 0.999, 0.08),
+    ("embed", 1 - 0.02 ** 3, 0.60), ("store", 0.999, 0.10),
+]
+alive = pdfs
+for name, keep, secs in stages:
+    out = round(alive * keep)
+    print(f"{name:8s} in {alive:6d} out {out:6d} lost {alive - out:4d}  "
+          f"{pdfs * secs / workers / 3600:5.2f} h on {workers} workers")
+    alive = out
+print("documents searchable:", alive, "of", pdfs)
+```
+
+Change `ocr_on` to `False` and run it again. The extract stage then loses most scanned files, and nothing downstream reports it. That silent loss is the main reason to count documents at every stage.
+
+## Design choices, briefly
+
+<strong>Why tokens, not characters?</strong> Models have token limits, and a token count is a predictable unit of cost.
+
+<strong>Why `ProcessPoolExecutor`?</strong> Parsing is CPU-bound and the GIL stops threads from running it in parallel. For network work, use threads or `asyncio`.
+
+<strong>Why normalise vectors?</strong> Unit vectors let you use the faster dot product with identical ranking.
+
+<strong>Why a file checkpoint?</strong> It adds no dependency and is enough for a batch job.
+
+## Things to try
+
+1. Turn off <strong>OCR</strong> with 20% of files scanned. Most scanned documents drop out at stage one.
+2. Raise <strong>Scanned share</strong> to 60 with OCR on. Extraction becomes the slowest stage.
+3. Lower <strong>Embedding retries</strong> to 0. A few documents are lost at the embed stage.
+4. Raise <strong>Workers</strong> to 16. The wall-clock time falls in proportion.
+
+## What to remember
+
+Ingestion is five stages: extract, clean, chunk, embed, store. Use OCR for scans, count tokens, make IDs deterministic and writes idempotent, and checkpoint so a crash costs one batch. Count documents at every stage, because silent loss at the first one is invisible later.
+
+## Questions people ask
+
+<strong>How long does it take to ingest 10,000 PDFs?</strong> It depends on how many pages need OCR and on your hardware. Run a sample of 100 files, time each stage and scale up.
+
+<strong>What happens after a crash?</strong> The checkpoint lists finished documents, so a restart skips them and continues with the rest.
+
+<strong>Which PDF library should I use?</strong> `pymupdf` is a common default. Use `pdfplumber` for tables, and test on your own files.
+
+<strong>How much overlap?</strong> About 10 to 20% of the chunk size. For 400 tokens, that is 40 to 80.
+
+<strong>Can I skip cleaning?</strong> Not safely. Without it, headers pollute the embeddings and encoding differences create near-duplicates.
+
+<strong>How do I choose a chunk size?</strong> Start at 256 to 512 tokens and measure recall on a test set.
+
+## Recap in one screen
+
+- Five stages: extract, clean, chunk, embed, store.
+- OCR scanned pages, or they vanish at stage one.
+- Chunk by tokens, with 10 to 20% overlap.
+- Use deterministic IDs and upserts so a re-run cannot duplicate.
+- Checkpoint progress, and count documents at every stage.

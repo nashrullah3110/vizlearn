@@ -1,0 +1,179 @@
+title: RAG Capacity Planning
+intro: Estimate how many chunks you will have, how many gigabytes they take, and how much RAM the index needs, before you buy any infrastructure.
+
+## Why capacity planning matters for RAG
+
+A retrieval-augmented system stores your documents as chunks, and each chunk as a vector. Before you provision servers, you need three numbers. How many chunks does your corpus make? How much disk do the vectors, text and index take? And how much RAM does the index need to stay fast?
+
+Get them wrong and you pay either way. Over-provision and you waste money. Under-provision and the index spills out of memory onto disk, and search slows from milliseconds to seconds. The arithmetic is not hard, but it has steps that are easy to skip, and the raw vectors turn out to be only part of the bill.
+
+Take a worked example. A knowledge base holds 200,000 articles averaging 1,200 tokens each. You plan to use 500-token chunks with 50 tokens of overlap, and 768-dimensional float32 [embeddings](embeddings_and_vector_search.html). This page works through that calculation from first principles, so you can swap in your own numbers and have an answer in minutes.
+
+The same method sizes a single Qdrant node or a sharded [distributed retrieval](distributed_retrieval_and_sharding.html) cluster. Only the constants change. Count the chunks, multiply by bytes per vector, add the overhead, and compare the result with the RAM you have. Sizes below are in decimal gigabytes, so 1 GB is one billion bytes.
+
+## Count the chunks
+
+A document is cut into overlapping windows. The stride is the chunk size minus the overlap. With 500-token chunks and 50 tokens of overlap, each window starts 450 tokens after the last. The overlap makes sure a sentence at a boundary appears whole in at least one chunk.
+
+For an article of L tokens, the count is `ceil((L - overlap) / stride)`, with a minimum of one. The last chunk may be short, but you still keep it, because dropping a tail loses content.
+
+```python-run
+import math
+
+def chunks_per_article(tokens, chunk_size, overlap):
+    if tokens <= chunk_size:
+        return 1
+    return math.ceil((tokens - overlap) / (chunk_size - overlap))
+
+n = chunks_per_article(1200, 500, 50)
+print("stride:", 500 - 50, "tokens")
+print("ceil((1200 - 50) / 450) = ceil(2.556) =", n)
+print("200,000 articles x", n, "=", f"{200_000 * n:,}", "chunks")
+```
+
+That gives 600,000 chunks. It is a quick estimate, and it assumes every article is exactly average.
+
+## Account for articles of different lengths
+
+Real lengths are skewed. Many articles are short and a few are very long. The average of a rounded-up count is not the rounded-up count of the average, so measure from a sample. The code below draws article lengths from a lognormal distribution with a mean of 1,200 and a standard deviation of 400. That is an assumption standing in for your own length histogram.
+
+```python-run
+import math, random
+
+def estimate(num_articles, mean, std, chunk_size, overlap, seed=42, sample=50_000):
+    random.seed(seed)
+    stride = chunk_size - overlap
+    variance = math.log(1 + (std / mean) ** 2)
+    mu = math.log(mean) - variance / 2
+    n = min(num_articles, sample)
+    total = 0
+    for _ in range(n):
+        length = random.lognormvariate(mu, math.sqrt(variance))
+        total += 1 if length <= chunk_size else math.ceil((length - overlap) / stride)
+    average = total / n
+    return average, int(average * num_articles)
+
+average, total = estimate(200_000, 1200, 400, 500, 50)
+print("average chunks per article:", round(average, 2))
+print("estimated total chunks    :", f"{total:,}")
+print("quick estimate            : 600,000")
+```
+
+Here the two estimates are within 2% of each other, so the quick one is fine. With a wider spread of lengths they can drift apart, which is why you should sample your own corpus. The distribution-based figure of 611,052 chunks is the one used below.
+
+## Price the vectors
+
+One float32 takes 4 bytes. A 768-dimension vector takes 768 times 4, which is 3,072 bytes. Multiply by the number of chunks.
+
+```python-run
+chunks, dims, bytes_per_value = 611_052, 768, 4
+per_vector = dims * bytes_per_value
+total = chunks * per_vector
+print("bytes per vector:", f"{per_vector:,}")
+print("total bytes     :", f"{total:,}")
+print("gigabytes       :", round(total / 1e9, 2))
+```
+
+The raw vectors come to about 1.88 GB. That is the number people quote, and it is only a part of what you store.
+
+## Add everything else
+
+A vector database also stores the chunk text, so it can show results, and metadata such as the article ID, title, URL and dates. It stores the index structure. And it adds its own bookkeeping, such as write-ahead logs.
+
+Be careful with the index. An [HNSW](hnsw_index.html) graph stores about `2 * M` neighbour links per vector at its bottom layer, where `M` is a build setting, commonly 16. At 4 bytes per link that is 128 bytes per vector, plus a few percent for the upper layers. That is small beside a 3,072-byte vector. An index that is an exact copy of the vectors would be a different design.
+
+```python-run
+chunks, dims = 611_052, 768
+M = 16
+
+embeddings = chunks * dims * 4
+text = chunks * 2000                     # about 500 tokens of UTF-8
+metadata = chunks * 500                  # IDs, title, URL, timestamps
+hnsw = int(chunks * 2 * M * 4 * 1.07)    # bottom-layer links plus upper layers
+subtotal = embeddings + text + metadata + hnsw
+overhead = int(subtotal * 0.10)          # logs and bookkeeping
+total = subtotal + overhead
+
+for name, b in [("embeddings", embeddings), ("chunk text", text), ("metadata", metadata),
+                ("HNSW graph", hnsw), ("db overhead", overhead), ("total", total)]:
+    print(f"{name:12s} {b / 1e9:6.2f} GB")
+```
+
+The total is about 3.8 GB, roughly twice the raw vectors. In this setup the chunk text is the second-largest item, not the index.
+
+## Shrink the vectors with quantization
+
+You rarely keep full float32 in production. Quantization stores fewer bits per number, which cuts storage and speeds up search at some cost to recall. The size saving is exact arithmetic. The recall cost depends on your data and model, so measure it on your own evaluation set before you commit.
+
+```python-run
+chunks, dims = 611_052, 768
+options = [("float32", 4), ("float16", 2), ("int8 scalar", 1), ("binary", 1 / 8)]
+base = chunks * dims * 4
+for name, bytes_per_dim in options:
+    size = chunks * dims * bytes_per_dim
+    print(f"{name:12s} {size / 1e9:5.2f} GB   {size / base:5.1%} of float32")
+```
+
+float16 halves the size and usually costs little recall. int8 quarters it. Binary quantization shrinks 32 times and is mostly used for a fast first pass, followed by rescoring the best candidates with the full vectors.
+
+## Decide what lives in RAM
+
+Vector search is memory-bound. The vectors and the index should fit in RAM for fast queries. Chunk text and metadata can sit on SSD, because they are read only for the top k results, not during the search itself.
+
+Leave headroom for the operating system, connections and garbage collection. A 30% margin is a common starting point.
+
+```python-run
+embeddings_gb, index_gb, total_gb = 1.88, 0.08, 3.84
+headroom = 1.3
+
+ram = (embeddings_gb + index_gb) * headroom
+disk = total_gb - embeddings_gb - index_gb
+print("RAM for vectors + index + headroom:", round(ram, 1), "GB")
+print("disk for text and metadata        :", round(disk, 1), "GB")
+print("RAM with float16 vectors          :", round((embeddings_gb / 2 + index_gb) * headroom, 1), "GB")
+```
+
+With float16 the hot data fits in about 1.3 GB of RAM, a small instance. The same calculation tells you when you will outgrow one machine. As a rough guide, that point arrives somewhere between 10 and 50 million vectors, depending on dimension and hardware. Check against your own limits.
+
+## Trade chunk size against overlap
+
+The 500/50 setup is a middle path. Ten percent overlap covers most boundary cases without inflating the chunk count much. Smaller chunks retrieve more precisely and produce more chunks to store. Larger chunks keep more context and blur relevance when one sentence matters. You settle it by measuring recall, not by arithmetic. See [chunk size optimization](chunk_size_optimization.html) and [chunking strategies](chunking_strategies_for_rag.html).
+
+Overlap costs storage directly. Raising it from 10% to 30% shrinks the stride from 450 tokens to 350, so the chunk count goes up and more repeated text sits in the index.
+
+## Plan for growth
+
+A plan for today's corpus fails if the corpus doubles in six months. Include a growth multiplier. At 5% growth a month, the corpus doubles in about 14 months, because the doubling time is `ln 2 / ln 1.05`. Provision for at least 2x, or design to scale out from the start. See [distributed retrieval and sharding](distributed_retrieval_and_sharding.html) for partitioning once one node is not enough.
+
+## Things to try
+
+1. Set <strong>Precision</strong> to float16. The embedding bar halves, and the RAM figure falls with it.
+2. Set the <strong>Chunk size</strong> to 250, then raise the <strong>Overlap</strong> from 10% to 30%. Each article needs more chunks, and every storage figure rises.
+3. Set <strong>Dimensions</strong> to 3072. The vectors dominate the total.
+4. Raise <strong>Articles</strong> to 2000. The total passes the 16 GB RAM budget and the note warns you.
+
+## What to remember
+
+Count chunks from a sample of real article lengths, multiply by bytes per vector, then add text, metadata, the index and overhead. Size RAM for the vectors and the index with headroom, and keep text on disk. Quantize to cut size, measure the recall cost, and plan for growth.
+
+## Questions people ask
+
+<strong>How do I estimate chunks when lengths vary?</strong> Sample your corpus and compute the count per article with the ceiling formula. Average those counts.
+
+<strong>Does quantization hurt retrieval?</strong> It can. float16 usually costs very little. int8 costs more, and binary needs rescoring. Measure on your own data.
+
+<strong>How much does an HNSW index add?</strong> About `2 * M * 4` bytes per vector plus a few percent, so roughly 130 to 140 bytes at `M = 16`. Check your database's settings, since it may store more.
+
+<strong>When should I shard?</strong> When the vectors and index no longer fit in the RAM of a cost-effective instance. Before that, a bigger machine is simpler.
+
+<strong>Why is total storage much more than the raw vectors?</strong> Text, metadata, the index and overhead each add bytes. Here the total is about twice the vectors.
+
+<strong>What if I run out of RAM?</strong> The index spills to disk, and each query triggers random reads, so latency jumps sharply.
+
+## Recap in one screen
+
+- Chunks per article is `ceil((L - overlap) / stride)`, so sample real lengths.
+- Vectors take `chunks x dims x bytes per value`.
+- Add text, metadata, the index and overhead for the true total.
+- Keep vectors and index in RAM with about 30% headroom.
+- Quantize to shrink, measure recall, and plan for growth.
